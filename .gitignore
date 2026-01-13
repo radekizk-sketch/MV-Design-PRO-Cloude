@@ -24,6 +24,14 @@ TestResults.xml
 ### Python ###
 __pycache__/
 *.py[cod]
+*.pyo
+.pytest_cache/
+*.egg-info/
+dist/
+build/
+.eggs/
+venv/
+.venv/
 *$py.class
 *.so
 .Python
