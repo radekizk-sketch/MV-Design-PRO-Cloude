@@ -1,27 +1,26 @@
 """
-Node module for power network modeling.
+Moduł definiujący węzły sieci elektroenergetycznej.
 
-Contains classes for modeling network nodes (buses) with different types:
-- SLACK: Reference bus with fixed voltage magnitude and angle
-- PQ: Load bus with specified active and reactive power
-- PV: Generator bus with specified active power and voltage magnitude
-
-Units:
-- Voltage magnitude: p.u. (per-unit) or kV
-- Voltage angle: degrees
-- Active power: MW
-- Reactive power: Mvar
-- Voltage level: kV
+Ten moduł zawiera definicje typów węzłów oraz klasę reprezentującą
+węzeł w modelu sieci elektroenergetycznej używanym w obliczeniach
+rozpływu mocy.
 """
 
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Dict, Optional
+import uuid
 
 
 class NodeType(Enum):
-    """Enumeration of node types in the network model."""
+    """
+    Typ węzła w sieci elektroenergetycznej.
 
+    Węzły w analizie rozpływu mocy dzielą się na trzy kategorie:
+    - SLACK (bilansujący): węzeł referencyjny z zadanym napięciem i kątem
+    - PQ (obciążeniowy): węzeł z zadaną mocą czynną i bierną
+    - PV (generatorowy): węzeł z zadaną mocą czynną i amplitudą napięcia
+    """
     SLACK = "SLACK"
     PQ = "PQ"
     PV = "PV"
@@ -30,180 +29,232 @@ class NodeType(Enum):
 @dataclass
 class Node:
     """
-    Network node (bus) representation.
+    Reprezentacja węzła sieci elektroenergetycznej.
+
+    Klasa przechowuje parametry elektryczne węzła niezbędne do
+    przeprowadzenia obliczeń rozpływu mocy metodą Newtona-Raphsona
+    lub innymi metodami iteracyjnymi.
 
     Attributes:
-        id: Unique identifier for the node.
-        name: Name/description of the node.
-        node_type: Type of the node (SLACK, PQ, PV).
-        voltage_level: Nominal voltage level [kV].
-        voltage_magnitude: Voltage magnitude [p.u.] (required for SLACK, PV).
-        voltage_angle: Voltage angle [degrees] (required for SLACK).
-        active_power: Active power [MW] (required for PQ, PV).
-        reactive_power: Reactive power [Mvar] (required for PQ).
-        in_service: Whether the node is in service (default True).
-    """
+        id: Unikalny identyfikator węzła (UUID).
+        name: Nazwa węzła (np. "GPZ Centrum").
+        node_type: Typ węzła (SLACK, PQ lub PV).
+        voltage_level: Poziom napięcia znamionowego [kV].
+        voltage_magnitude: Zadana amplituda napięcia |U| [pu].
+        voltage_angle: Kąt fazowy napięcia θ [rad].
+        active_power: Moc czynna P [MW] (dodatnia = generacja).
+        reactive_power: Moc bierna Q [MVAr] (dodatnia = generacja).
 
-    id: str
-    name: str
-    node_type: NodeType
-    voltage_level: float = 20.0
-    voltage_magnitude: Optional[float] = None
-    voltage_angle: Optional[float] = None
-    active_power: Optional[float] = None
-    reactive_power: Optional[float] = None
-    in_service: bool = True
+    Raises:
+        ValueError: Gdy parametry węzła są niezgodne z jego typem.
+    """
+    id: str = field(default_factory=lambda: str(uuid.uuid4()))
+    name: str = field(default="")
+    node_type: NodeType = field(default=NodeType.PQ)
+    voltage_level: float = field(default=0.0)
+    voltage_magnitude: Optional[float] = field(default=None)
+    voltage_angle: Optional[float] = field(default=None)
+    active_power: Optional[float] = field(default=None)
+    reactive_power: Optional[float] = field(default=None)
 
     def __post_init__(self) -> None:
         """
-        Validate node parameters after initialization.
+        Walidacja parametrów węzła po inicjalizacji.
+
+        Sprawdza, czy podane parametry są zgodne z wymaganiami
+        dla danego typu węzła. Rzuca wyjątek ValueError w przypadku
+        niespójności danych.
 
         Raises:
-            ValueError: If required parameters for the node type are missing.
+            ValueError: Gdy brakuje wymaganych parametrów dla danego typu węzła.
+        """
+        # Konwersja stringa na enum jeśli potrzebna
+        if isinstance(self.node_type, str):
+            self.node_type = NodeType(self.node_type)
+
+        self._validate_node_type_requirements()
+
+    def _validate_node_type_requirements(self) -> None:
+        """
+        Sprawdza wymagania parametrów dla danego typu węzła.
+
+        Raises:
+            ValueError: Gdy brakuje wymaganych parametrów.
         """
         if self.node_type == NodeType.SLACK:
             if self.voltage_magnitude is None:
                 raise ValueError(
-                    f"SLACK node '{self.id}' requires voltage_magnitude"
+                    f"Węzeł SLACK '{self.name}' wymaga zdefiniowanej "
+                    f"amplitudy napięcia (voltage_magnitude)."
                 )
             if self.voltage_angle is None:
                 raise ValueError(
-                    f"SLACK node '{self.id}' requires voltage_angle"
+                    f"Węzeł SLACK '{self.name}' wymaga zdefiniowanego "
+                    f"kąta napięcia (voltage_angle)."
                 )
+
         elif self.node_type == NodeType.PQ:
             if self.active_power is None:
                 raise ValueError(
-                    f"PQ node '{self.id}' requires active_power"
+                    f"Węzeł PQ '{self.name}' wymaga zdefiniowanej "
+                    f"mocy czynnej (active_power)."
                 )
             if self.reactive_power is None:
                 raise ValueError(
-                    f"PQ node '{self.id}' requires reactive_power"
+                    f"Węzeł PQ '{self.name}' wymaga zdefiniowanej "
+                    f"mocy biernej (reactive_power)."
                 )
+
         elif self.node_type == NodeType.PV:
             if self.active_power is None:
                 raise ValueError(
-                    f"PV node '{self.id}' requires active_power"
+                    f"Węzeł PV '{self.name}' wymaga zdefiniowanej "
+                    f"mocy czynnej (active_power)."
                 )
             if self.voltage_magnitude is None:
                 raise ValueError(
-                    f"PV node '{self.id}' requires voltage_magnitude"
+                    f"Węzeł PV '{self.name}' wymaga zdefiniowanej "
+                    f"amplitudy napięcia (voltage_magnitude)."
                 )
-
-    @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "Node":
-        """
-        Create a Node instance from a dictionary.
-
-        Args:
-            data: Dictionary containing node data.
-
-        Returns:
-            Node instance.
-
-        Raises:
-            ValueError: If node_type is missing or invalid.
-        """
-        raw_type = data.get("node_type")
-
-        if raw_type is None:
-            raise ValueError("Missing 'node_type' in data")
-
-        # Handle both string and NodeType enum inputs
-        if isinstance(raw_type, NodeType):
-            node_type = raw_type
-        elif isinstance(raw_type, str):
-            try:
-                node_type = NodeType(raw_type)
-            except ValueError:
-                valid_types = [nt.value for nt in NodeType]
-                raise ValueError(
-                    f"Unknown node_type: '{raw_type}'. "
-                    f"Valid types are: {valid_types}"
-                )
-        else:
-            raise ValueError(
-                f"node_type must be a string or NodeType enum, "
-                f"got {type(raw_type).__name__}"
-            )
-
-        return cls(
-            id=str(data.get("id", "")),
-            name=str(data.get("name", "")),
-            node_type=node_type,
-            voltage_level=float(data.get("voltage_level", 20.0)),
-            voltage_magnitude=data.get("voltage_magnitude"),
-            voltage_angle=data.get("voltage_angle"),
-            active_power=data.get("active_power"),
-            reactive_power=data.get("reactive_power"),
-            in_service=bool(data.get("in_service", True)),
-        )
 
     def validate(self) -> bool:
         """
-        Validate the node data.
+        Sprawdza poprawność danych węzła.
 
-        Checks:
-        - node_type is a NodeType enum instance
-        - id, name are non-empty strings
-        - voltage_level > 0
-        - Required parameters for node type are present and valid
+        Metoda weryfikuje, czy wszystkie wymagane parametry są
+        zdefiniowane i czy ich wartości mieszczą się w sensownych
+        zakresach fizycznych.
 
         Returns:
-            True if valid, False otherwise.
+            True jeśli dane węzła są poprawne, False w przeciwnym razie.
+
+        Examples:
+            >>> node = Node(
+            ...     name="GPZ-1",
+            ...     node_type=NodeType.PQ,
+            ...     voltage_level=110.0,
+            ...     active_power=10.0,
+            ...     reactive_power=5.0
+            ... )
+            >>> node.validate()
+            True
         """
-        # Check that node_type is a proper NodeType enum instance
-        if not isinstance(self.node_type, NodeType):
-            return False
+        try:
+            # Sprawdzenie wymagań typu węzła
+            self._validate_node_type_requirements()
 
-        # Validate required string fields are non-empty
-        if not self.id or not isinstance(self.id, str):
-            return False
-        if not self.name or not isinstance(self.name, str):
-            return False
-
-        # Validate voltage level
-        if self.voltage_level is None or self.voltage_level <= 0:
-            return False
-
-        # Validate type-specific requirements
-        if self.node_type == NodeType.SLACK:
-            if self.voltage_magnitude is None or self.voltage_angle is None:
-                return False
-            if self.voltage_magnitude <= 0:
-                return False
-        elif self.node_type == NodeType.PQ:
-            if self.active_power is None or self.reactive_power is None:
-                return False
-        elif self.node_type == NodeType.PV:
-            if self.active_power is None or self.voltage_magnitude is None:
-                return False
-            if self.voltage_magnitude <= 0:
+            # Walidacja poziomu napięcia
+            if self.voltage_level < 0:
                 return False
 
-        return True
+            # Walidacja amplitudy napięcia (powinna być dodatnia, typowo 0.9-1.1 pu)
+            if self.voltage_magnitude is not None:
+                if self.voltage_magnitude <= 0:
+                    return False
+
+            # Walidacja kąta napięcia (powinien być w zakresie -π do π)
+            if self.voltage_angle is not None:
+                import math
+                if not (-math.pi <= self.voltage_angle <= math.pi):
+                    return False
+
+            return True
+
+        except ValueError:
+            return False
 
     def to_dict(self) -> Dict[str, Any]:
         """
-        Convert the node to a dictionary representation.
+        Konwertuje węzeł do słownika.
+
+        Metoda serializuje obiekt węzła do postaci słownika,
+        który może być łatwo zapisany do formatu JSON lub
+        przekazany przez API.
 
         Returns:
-            Dictionary representation of the node.
+            Słownik zawierający wszystkie atrybuty węzła.
+
+        Examples:
+            >>> node = Node(
+            ...     id="123",
+            ...     name="GPZ-1",
+            ...     node_type=NodeType.SLACK,
+            ...     voltage_level=110.0,
+            ...     voltage_magnitude=1.0,
+            ...     voltage_angle=0.0
+            ... )
+            >>> data = node.to_dict()
+            >>> data["name"]
+            'GPZ-1'
         """
-        result = {
+        return {
             "id": self.id,
             "name": self.name,
             "node_type": self.node_type.value,
             "voltage_level": self.voltage_level,
-            "in_service": self.in_service,
+            "voltage_magnitude": self.voltage_magnitude,
+            "voltage_angle": self.voltage_angle,
+            "active_power": self.active_power,
+            "reactive_power": self.reactive_power,
         }
 
-        if self.voltage_magnitude is not None:
-            result["voltage_magnitude"] = self.voltage_magnitude
-        if self.voltage_angle is not None:
-            result["voltage_angle"] = self.voltage_angle
-        if self.active_power is not None:
-            result["active_power"] = self.active_power
-        if self.reactive_power is not None:
-            result["reactive_power"] = self.reactive_power
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "Node":
+        """
+        Tworzy obiekt węzła ze słownika.
 
-        return result
+        Metoda deserializuje słownik (np. odczytany z JSON)
+        do obiektu klasy Node.
+
+        Args:
+            data: Słownik zawierający atrybuty węzła.
+
+        Returns:
+            Nowy obiekt Node utworzony z danych słownika.
+
+        Raises:
+            KeyError: Gdy brakuje wymaganego klucza w słowniku.
+            ValueError: Gdy dane są niepoprawne.
+
+        Examples:
+            >>> data = {
+            ...     "id": "123",
+            ...     "name": "GPZ-1",
+            ...     "node_type": "PQ",
+            ...     "voltage_level": 110.0,
+            ...     "active_power": 10.0,
+            ...     "reactive_power": 5.0
+            ... }
+            >>> node = Node.from_dict(data)
+            >>> node.name
+            'GPZ-1'
+        """
+        # Konwersja typu węzła z stringa na enum
+        node_type_value = data.get("node_type", "PQ")
+        if isinstance(node_type_value, str):
+            node_type = NodeType(node_type_value)
+        else:
+            node_type = node_type_value
+
+        return cls(
+            id=data.get("id", str(uuid.uuid4())),
+            name=data.get("name", ""),
+            node_type=node_type,
+            voltage_level=data.get("voltage_level", 0.0),
+            voltage_magnitude=data.get("voltage_magnitude"),
+            voltage_angle=data.get("voltage_angle"),
+            active_power=data.get("active_power"),
+            reactive_power=data.get("reactive_power"),
+        )
+
+    def __repr__(self) -> str:
+        """
+        Zwraca czytelną reprezentację tekstową węzła.
+
+        Returns:
+            String z podstawowymi informacjami o węźle.
+        """
+        return (
+            f"Node(id='{self.id[:8]}...', name='{self.name}', "
+            f"type={self.node_type.value}, U={self.voltage_level}kV)"
+        )
