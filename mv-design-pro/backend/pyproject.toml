@@ -1,0 +1,79 @@
+[tool.poetry]
+name = "mv-design-pro-backend"
+version = "0.1.0"
+description = "MV-DESIGN PRO - Professional Medium Voltage Network Design System"
+authors = ["MV-Design Team"]
+readme = "README.md"
+packages = [{include = "src"}]
+
+[tool.poetry.dependencies]
+python = "^3.11"
+fastapi = "^0.109.0"
+uvicorn = {extras = ["standard"], version = "^0.27.0"}
+numpy = "^1.26.0"
+scipy = "^1.12.0"
+networkx = "^3.2.1"
+pydantic = "^2.5.0"
+pydantic-settings = "^2.1.0"
+sqlalchemy = "^2.0.25"
+asyncpg = "^0.29.0"
+motor = "^3.3.2"
+redis = "^5.0.1"
+python-multipart = "^0.0.6"
+python-jose = {extras = ["cryptography"], version = "^3.3.0"}
+passlib = {extras = ["bcrypt"], version = "^1.7.4"}
+httpx = "^0.26.0"
+celery = "^5.3.6"
+pandas = "^2.1.4"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^7.4.4"
+pytest-asyncio = "^0.23.3"
+pytest-cov = "^4.1.0"
+black = "^24.1.0"
+ruff = "^0.1.13"
+mypy = "^1.8.0"
+pre-commit = "^3.6.0"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.black]
+line-length = 100
+target-version = ['py311']
+include = '\.pyi?$'
+exclude = '''
+/(
+    \.eggs
+  | \.git
+  | \.hg
+  | \.mypy_cache
+  | \.tox
+  | \.venv
+  | _build
+  | buck-out
+  | build
+  | dist
+)/
+'''
+
+[tool.ruff]
+line-length = 100
+select = ["E", "F", "W", "I", "N", "UP", "B", "C4"]
+ignore = ["E501"]
+target-version = "py311"
+
+[tool.mypy]
+python_version = "3.11"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+plugins = ["pydantic.mypy"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
