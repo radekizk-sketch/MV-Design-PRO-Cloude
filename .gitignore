@@ -32,3 +32,17 @@ build/
 .eggs/
 venv/
 .venv/
+*$py.class
+*.so
+.Python
+*.egg-info/
+.eggs/
+dist/
+build/
+.pytest_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+*.egg
+venv/
+.env
