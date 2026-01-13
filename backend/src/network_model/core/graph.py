@@ -24,12 +24,16 @@ class NetworkGraph:
     Attributes:
         nodes: Słownik węzłów (node_id -> Node).
         branches: Słownik gałęzi (branch_id -> Branch).
-        _graph: Prywatny graf NetworkX (nieskierowany) do analiz topologicznych.
+        _graph: Prywatny multigraf NetworkX (nieskierowany) do analiz topologicznych.
 
     Notes:
-        Graf jest nieskierowany (nx.Graph), ponieważ topologia sieci SN
+        Graf jest nieskierowany (nx.MultiGraph), ponieważ topologia sieci SN
         jest nieskierowana. Kierunek przepływu mocy jest wynikiem solvera,
         nie cechą topologii.
+
+        MultiGraph pozwala na wiele gałęzi równoległych między tą samą parą
+        węzłów (np. dwie linie lub kable między stacjami). Każda krawędź
+        jest identyfikowana przez key=branch.id.
 
         Krawędzie w _graph odpowiadają tylko gałęziom z in_service=True.
         Gałęzie nieaktywne są przechowywane w słowniku branches, ale nie
@@ -40,7 +44,7 @@ class NetworkGraph:
         """Inicjalizuje pusty graf sieci."""
         self.nodes: Dict[str, Node] = {}
         self.branches: Dict[str, Branch] = {}
-        self._graph: nx.Graph = nx.Graph()
+        self._graph: nx.MultiGraph = nx.MultiGraph()
 
     def add_node(self, node: Node) -> None:
         """
@@ -123,6 +127,7 @@ class NetworkGraph:
             self._graph.add_edge(
                 branch.from_node_id,
                 branch.to_node_id,
+                key=branch.id,
                 branch_id=branch.id,
                 branch_type=branch.branch_type.value,
                 name=branch.name,
@@ -164,6 +169,10 @@ class NetworkGraph:
         """
         Usuwa gałąź z grafu sieci.
 
+        W przypadku MultiGraph, usuwa konkretną krawędź identyfikowaną
+        przez key=branch_id, nie wpływając na inne gałęzie równoległe
+        między tą samą parą węzłów.
+
         Args:
             branch_id: ID gałęzi do usunięcia.
 
@@ -177,12 +186,11 @@ class NetworkGraph:
 
         branch = self.branches[branch_id]
 
-        # Usuń krawędź z grafu NetworkX jeśli istnieje
-        if self._graph.has_edge(branch.from_node_id, branch.to_node_id):
-            # Sprawdź czy ta krawędź odpowiada tej gałęzi
-            edge_data = self._graph.get_edge_data(branch.from_node_id, branch.to_node_id)
-            if edge_data and edge_data.get("branch_id") == branch_id:
-                self._graph.remove_edge(branch.from_node_id, branch.to_node_id)
+        # Usuń krawędź z grafu NetworkX tylko jeśli gałąź była aktywna
+        if self._is_branch_in_service(branch):
+            # W MultiGraph usuwamy krawędź po kluczu (key=branch_id)
+            if self._graph.has_edge(branch.from_node_id, branch.to_node_id, key=branch_id):
+                self._graph.remove_edge(branch.from_node_id, branch.to_node_id, key=branch_id)
 
         # Usuń gałąź ze słownika
         del self.branches[branch_id]
@@ -287,6 +295,9 @@ class NetworkGraph:
         - Wszystkie węzły są osiągalne z dowolnego innego węzła
           poprzez aktywne gałęzie (in_service=True)
 
+        Analiza spójności jest wykonywana na grafie prostym utworzonym
+        z MultiGraph, aby wielokrotne krawędzie nie wpływały na wynik.
+
         Returns:
             True jeśli jest co najmniej 1 węzeł i graf jest spójny,
             False w przeciwnym razie.
@@ -294,7 +305,9 @@ class NetworkGraph:
         if len(self.nodes) == 0:
             return False
 
-        return nx.is_connected(self._graph)
+        # Konwertuj MultiGraph do prostego Graph dla analizy spójności
+        simple_graph = nx.Graph(self._graph)
+        return nx.is_connected(simple_graph)
 
     def find_islands(self) -> List[List[str]]:
         """
@@ -304,6 +317,9 @@ class NetworkGraph:
         spójności. Każdy komponent to grupa węzłów połączonych aktywnymi
         gałęziami.
 
+        Analiza jest wykonywana na grafie prostym utworzonym z MultiGraph,
+        aby wielokrotne krawędzie nie wpływały na topologię.
+
         Returns:
             Lista wysp, gdzie każda wyspa to lista ID węzłów.
             Węzły wewnątrz wyspy są posortowane alfabetycznie po ID.
@@ -312,8 +328,11 @@ class NetworkGraph:
         if len(self.nodes) == 0:
             return []
 
+        # Konwertuj MultiGraph do prostego Graph dla analizy spójności
+        simple_graph = nx.Graph(self._graph)
+
         # Znajdź komponenty spójności
-        components = list(nx.connected_components(self._graph))
+        components = list(nx.connected_components(simple_graph))
 
         # Posortuj węzły wewnątrz każdej wyspy
         islands = [sorted(list(component)) for component in components]
@@ -345,10 +364,11 @@ class NetworkGraph:
         """
         Przebudowuje graf NetworkX na podstawie nodes i branches.
 
-        Metoda tworzy nowy graf z węzłów i aktywnych gałęzi.
+        Metoda tworzy nowy MultiGraph z węzłów i aktywnych gałęzi.
+        Każda krawędź jest identyfikowana przez key=branch.id.
         Przydatne po zmianie statusu in_service gałęzi.
         """
-        self._graph = nx.Graph()
+        self._graph = nx.MultiGraph()
 
         # Dodaj wszystkie węzły
         for node_id in self.nodes:
@@ -360,6 +380,7 @@ class NetworkGraph:
                 self._graph.add_edge(
                     branch.from_node_id,
                     branch.to_node_id,
+                    key=branch.id,
                     branch_id=branch.id,
                     branch_type=branch.branch_type.value,
                     name=branch.name,

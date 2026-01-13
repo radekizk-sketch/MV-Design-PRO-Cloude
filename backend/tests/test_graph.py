@@ -648,9 +648,198 @@ class TestEdgeAttributes:
         branch = create_line_branch("AB", "A", "B", name="Linia AB")
         graph.add_branch(branch)
 
-        edge_data = graph._graph.get_edge_data("A", "B")
+        # W MultiGraph get_edge_data zwraca dict {key: {attrs}}
+        # Używamy key=branch.id aby pobrać atrybuty konkretnej krawędzi
+        edge_data = graph._graph.get_edge_data("A", "B", key="AB")
 
         assert edge_data is not None
         assert edge_data.get("branch_id") == "AB"
         assert edge_data.get("branch_type") == "LINE"
         assert edge_data.get("name") == "Linia AB"
+
+
+# =============================================================================
+# Test: parallel branches between same nodes
+# =============================================================================
+
+class TestParallelBranches:
+    """Testy obsługi gałęzi równoległych (MultiGraph)."""
+
+    def test_parallel_branches_between_same_nodes_are_supported(self):
+        """
+        Dwie gałęzie równoległe między tą samą parą węzłów
+        powinny być obsługiwane poprawnie.
+        """
+        graph = NetworkGraph()
+
+        # Dodaj węzły A i B
+        node_a = create_pq_node("A")
+        node_b = create_pq_node("B")
+        graph.add_node(node_a)
+        graph.add_node(node_b)
+
+        # Dodaj dwie gałęzie równoległe AB1 i AB2
+        branch_ab1 = create_line_branch("AB1", "A", "B", in_service=True, name="Linia 1")
+        branch_ab2 = create_line_branch("AB2", "A", "B", in_service=True, name="Linia 2")
+
+        graph.add_branch(branch_ab1)
+        graph.add_branch(branch_ab2)
+
+        # Obie gałęzie są w branches
+        assert "AB1" in graph.branches
+        assert "AB2" in graph.branches
+        assert len(graph.branches) == 2
+
+        # W MultiGraph istnieją DWIE krawędzie między A i B
+        # Sprawdzamy liczbę krawędzi między A-B
+        edges_ab = graph._graph.get_edge_data("A", "B")
+        assert edges_ab is not None
+        assert len(edges_ab) == 2  # Dwie krawędzie (dwa klucze)
+        assert "AB1" in edges_ab
+        assert "AB2" in edges_ab
+
+        # Topologia pozostaje taka sama - get_connected_nodes zwraca ["B"]
+        neighbors_a = graph.get_connected_nodes("A")
+        neighbor_ids = [n.id for n in neighbors_a]
+        assert neighbor_ids == ["B"]
+
+        # Graf jest spójny
+        assert graph.is_connected() is True
+
+        # Jedna wyspa z dwoma węzłami
+        islands = graph.find_islands()
+        assert len(islands) == 1
+        assert islands[0] == ["A", "B"]
+
+    def test_remove_branch_removes_only_one_parallel_edge(self):
+        """
+        Usunięcie jednej gałęzi równoległej nie usuwa innych
+        gałęzi między tą samą parą węzłów.
+        """
+        graph = NetworkGraph()
+
+        # Dodaj węzły A i B
+        node_a = create_pq_node("A")
+        node_b = create_pq_node("B")
+        graph.add_node(node_a)
+        graph.add_node(node_b)
+
+        # Dodaj dwie gałęzie równoległe AB1 i AB2
+        branch_ab1 = create_line_branch("AB1", "A", "B", in_service=True)
+        branch_ab2 = create_line_branch("AB2", "A", "B", in_service=True)
+
+        graph.add_branch(branch_ab1)
+        graph.add_branch(branch_ab2)
+
+        # Sprawdź, że są dwie krawędzie
+        edges_ab = graph._graph.get_edge_data("A", "B")
+        assert len(edges_ab) == 2
+
+        # Usuń pierwszą gałąź
+        graph.remove_branch("AB1")
+
+        # AB1 usunięta z branches
+        assert "AB1" not in graph.branches
+        assert "AB2" in graph.branches
+        assert len(graph.branches) == 1
+
+        # Pozostała jedna krawędź w MultiGraph
+        edges_ab = graph._graph.get_edge_data("A", "B")
+        assert edges_ab is not None
+        assert len(edges_ab) == 1
+        assert "AB2" in edges_ab
+        assert "AB1" not in edges_ab
+
+        # Graf nadal spójny
+        assert graph.is_connected() is True
+
+    def test_parallel_branches_with_one_inactive(self):
+        """
+        Jedna gałąź równoległa aktywna, druga nieaktywna.
+        """
+        graph = NetworkGraph()
+
+        node_a = create_pq_node("A")
+        node_b = create_pq_node("B")
+        graph.add_node(node_a)
+        graph.add_node(node_b)
+
+        # AB1 aktywna, AB2 nieaktywna
+        branch_ab1 = create_line_branch("AB1", "A", "B", in_service=True)
+        branch_ab2 = create_line_branch("AB2", "A", "B", in_service=False)
+
+        graph.add_branch(branch_ab1)
+        graph.add_branch(branch_ab2)
+
+        # Obie w branches
+        assert "AB1" in graph.branches
+        assert "AB2" in graph.branches
+
+        # Tylko jedna krawędź w grafie (aktywna)
+        edges_ab = graph._graph.get_edge_data("A", "B")
+        assert edges_ab is not None
+        assert len(edges_ab) == 1
+        assert "AB1" in edges_ab
+        assert "AB2" not in edges_ab
+
+        # Graf spójny dzięki aktywnej gałęzi
+        assert graph.is_connected() is True
+
+    def test_three_parallel_branches(self):
+        """
+        Trzy gałęzie równoległe między tą samą parą węzłów.
+        """
+        graph = NetworkGraph()
+
+        node_a = create_pq_node("A")
+        node_b = create_pq_node("B")
+        graph.add_node(node_a)
+        graph.add_node(node_b)
+
+        # Trzy gałęzie równoległe
+        branch_ab1 = create_line_branch("AB1", "A", "B")
+        branch_ab2 = create_line_branch("AB2", "A", "B")
+        branch_ab3 = create_line_branch("AB3", "A", "B")
+
+        graph.add_branch(branch_ab1)
+        graph.add_branch(branch_ab2)
+        graph.add_branch(branch_ab3)
+
+        # Wszystkie trzy krawędzie w MultiGraph
+        edges_ab = graph._graph.get_edge_data("A", "B")
+        assert len(edges_ab) == 3
+
+        # Usunięcie środkowej gałęzi
+        graph.remove_branch("AB2")
+
+        edges_ab = graph._graph.get_edge_data("A", "B")
+        assert len(edges_ab) == 2
+        assert "AB1" in edges_ab
+        assert "AB3" in edges_ab
+
+    def test_rebuild_graph_preserves_parallel_branches(self):
+        """
+        _rebuild_graph() zachowuje gałęzie równoległe.
+        """
+        graph = NetworkGraph()
+
+        node_a = create_pq_node("A")
+        node_b = create_pq_node("B")
+        graph.add_node(node_a)
+        graph.add_node(node_b)
+
+        branch_ab1 = create_line_branch("AB1", "A", "B", in_service=True)
+        branch_ab2 = create_line_branch("AB2", "A", "B", in_service=True)
+
+        graph.add_branch(branch_ab1)
+        graph.add_branch(branch_ab2)
+
+        # Przebuduj graf
+        graph._rebuild_graph()
+
+        # Sprawdź, że obie krawędzie są zachowane
+        edges_ab = graph._graph.get_edge_data("A", "B")
+        assert edges_ab is not None
+        assert len(edges_ab) == 2
+        assert "AB1" in edges_ab
+        assert "AB2" in edges_ab
