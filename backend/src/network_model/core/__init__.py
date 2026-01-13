@@ -2,11 +2,12 @@
 Moduł rdzeniowy modelu sieci.
 
 Zawiera podstawowe klasy reprezentujące elementy sieci elektroenergetycznej:
-węzły, gałęzie oraz transformatory (jako typ gałęzi).
+węzły, gałęzie, transformatory (jako typ gałęzi) oraz graf sieci.
 """
 
 from .node import Node, NodeType
 from .branch import BranchType, Branch, LineBranch, TransformerBranch
+from .graph import NetworkGraph
 
 __all__ = [
     "Node",
@@ -15,4 +16,5 @@ __all__ = [
     "Branch",
     "LineBranch",
     "TransformerBranch",
+    "NetworkGraph",
 ]

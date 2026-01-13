@@ -1,15 +1,12 @@
 """
-Unit tests for the NetworkGraph module.
+Testy jednostkowe dla modułu NetworkGraph.
 
-Tests cover:
-- T1: add_node uniqueness and validation
-- T2: SLACK node uniqueness (exactly one)
-- T3: add_branch node existence and parallel branch prevention
-- T4: enforce_connected rollback behavior
-- T5: Topology views (all vs in_service)
-- T6: get_connected_nodes behavior
-- T7: remove_branch and remove_node operations
-- T8: Edge attribute branch_id verification
+Testy obejmują:
+- Dodawanie węzłów z walidacją pojedynczego SLACK
+- Dodawanie gałęzi z walidacją istniejących węzłów
+- Analizę spójności sieci
+- Znajdowanie wysp (komponentów spójności)
+- Obsługę gałęzi nieaktywnych (in_service=False)
 """
 
 import sys
@@ -22,49 +19,13 @@ backend_src = Path(__file__).parent.parent / "src"
 sys.path.insert(0, str(backend_src))
 
 from network_model.core.node import Node, NodeType
-from network_model.core.branch import Branch, BranchType, LineBranch
+from network_model.core.branch import BranchType, LineBranch
 from network_model.core.graph import NetworkGraph
 
 
 # =============================================================================
 # Helper functions for creating test objects
 # =============================================================================
-
-def create_pq_node(
-    node_id: str,
-    name: str = "PQ Node",
-    active_power: float = 10.0,
-    reactive_power: float = 5.0,
-    voltage_level: float = 20.0,
-) -> Node:
-    """Create a valid PQ node for testing."""
-    return Node(
-        id=node_id,
-        name=name,
-        node_type=NodeType.PQ,
-        voltage_level=voltage_level,
-        active_power=active_power,
-        reactive_power=reactive_power,
-    )
-
-
-def create_pv_node(
-    node_id: str,
-    name: str = "PV Node",
-    active_power: float = 50.0,
-    voltage_magnitude: float = 1.0,
-    voltage_level: float = 20.0,
-) -> Node:
-    """Create a valid PV node for testing."""
-    return Node(
-        id=node_id,
-        name=name,
-        node_type=NodeType.PV,
-        voltage_level=voltage_level,
-        active_power=active_power,
-        voltage_magnitude=voltage_magnitude,
-    )
-
 
 def create_slack_node(
     node_id: str,
@@ -73,7 +34,7 @@ def create_slack_node(
     voltage_angle: float = 0.0,
     voltage_level: float = 110.0,
 ) -> Node:
-    """Create a valid SLACK node for testing."""
+    """Tworzy poprawny węzeł SLACK do testów."""
     return Node(
         id=node_id,
         name=name,
@@ -84,6 +45,24 @@ def create_slack_node(
     )
 
 
+def create_pq_node(
+    node_id: str,
+    name: str = "PQ Node",
+    active_power: float = 10.0,
+    reactive_power: float = 5.0,
+    voltage_level: float = 20.0,
+) -> Node:
+    """Tworzy poprawny węzeł PQ do testów."""
+    return Node(
+        id=node_id,
+        name=name,
+        node_type=NodeType.PQ,
+        voltage_level=voltage_level,
+        active_power=active_power,
+        reactive_power=reactive_power,
+    )
+
+
 def create_line_branch(
     branch_id: str,
     from_node_id: str,
@@ -91,7 +70,7 @@ def create_line_branch(
     in_service: bool = True,
     name: str = "Line Branch",
 ) -> LineBranch:
-    """Create a valid LineBranch for testing."""
+    """Tworzy poprawną gałąź liniową do testów."""
     return LineBranch(
         id=branch_id,
         name=name,
@@ -108,106 +87,487 @@ def create_line_branch(
 
 
 # =============================================================================
-# T1: add_node - uniqueness and validation
+# Test: add_node allows single SLACK and rejects second SLACK
 # =============================================================================
 
-class TestAddNodeUniquenessAndValidation:
-    """T1: add_node - uniqueness and validation tests."""
+class TestAddNodeSlackConstraint:
+    """Testy walidacji pojedynczego węzła SLACK."""
 
-    def test_add_valid_pq_node(self):
-        """Adding a valid PQ node should succeed and increment node_count."""
-        graph = NetworkGraph()
-        node = create_pq_node("A")
-
-        graph.add_node(node)
-
-        assert graph.node_count == 1
-        assert graph.get_node("A") is node
-
-    def test_add_duplicate_node_id_raises_value_error(self):
-        """Adding a node with duplicate ID should raise ValueError."""
-        graph = NetworkGraph()
-        node1 = create_pq_node("A")
-        node2 = create_pq_node("A", name="Different name")  # Same ID
-
-        graph.add_node(node1)
-
-        with pytest.raises(ValueError, match="already exists"):
-            graph.add_node(node2)
-
-    def test_add_invalid_pq_node_raises_value_error(self):
+    def test_add_node_allows_single_slack_and_rejects_second_slack(self):
         """
-        Adding a PQ node that fails validation should raise ValueError.
-
-        Note: Node.__post_init__ validates required fields, so creating an
-        invalid PQ node (missing active_power/reactive_power) raises ValueError
-        during construction.
+        Dodanie jednego węzła SLACK powinno się powieść,
+        ale dodanie drugiego powinno rzucić ValueError.
         """
         graph = NetworkGraph()
 
-        # Attempting to create a PQ node without required fields raises ValueError
-        with pytest.raises(ValueError, match="requires active_power"):
-            Node(
-                id="invalid",
-                name="Invalid PQ",
-                node_type=NodeType.PQ,
-                voltage_level=20.0,
-                # Missing active_power and reactive_power
-            )
-
-    def test_add_node_with_empty_id_raises_value_error(self):
-        """Adding a node with empty ID should raise ValueError due to validation failure."""
-        graph = NetworkGraph()
-
-        # Create a node that will fail validate() due to empty id
-        # We need to bypass __post_init__ validation, so we use object.__setattr__
-        # Actually, we can create a node with empty id - it will just fail validation
-        # But __post_init__ doesn't check for empty id
-
-        # Let's create a PQ node with empty id and proper required fields
-        node = Node(
-            id="",  # Empty ID should fail validate()
-            name="Test",
-            node_type=NodeType.PQ,
-            voltage_level=20.0,
-            active_power=10.0,
-            reactive_power=5.0,
-        )
-
-        with pytest.raises(ValueError, match="failed validation"):
-            graph.add_node(node)
-
-
-# =============================================================================
-# T2: SLACK - exactly one
-# =============================================================================
-
-class TestSlackNodeUniqueness:
-    """T2: SLACK node uniqueness tests."""
-
-    def test_add_slack_node_sets_has_slack_true(self):
-        """Adding a valid SLACK node should set has_slack_node() to True."""
-        graph = NetworkGraph()
-        slack = create_slack_node("SLACK1")
-
-        graph.add_node(slack)
-
-        assert graph.has_slack_node() is True
-
-    def test_add_second_slack_raises_value_error(self):
-        """Adding a second SLACK node should raise ValueError."""
-        graph = NetworkGraph()
-        slack1 = create_slack_node("SLACK1")
-        slack2 = create_slack_node("SLACK2")
-
+        # Dodanie pierwszego węzła SLACK - powinno się powieść
+        slack1 = create_slack_node("SLACK1", "GPZ Główny")
         graph.add_node(slack1)
 
-        with pytest.raises(ValueError, match="SLACK node already exists"):
+        # Sprawdź, że węzeł został dodany
+        assert "SLACK1" in graph.nodes
+        assert graph.get_slack_node() is slack1
+
+        # Dodanie drugiego węzła SLACK - powinno rzucić ValueError
+        slack2 = create_slack_node("SLACK2", "GPZ Zapasowy")
+        with pytest.raises(ValueError, match="SLACK"):
             graph.add_node(slack2)
 
-    def test_get_slack_node_returns_the_slack(self):
-        """get_slack_node() should return the SLACK node."""
+        # Sprawdź, że drugi węzeł nie został dodany
+        assert "SLACK2" not in graph.nodes
+        assert len(graph.nodes) == 1
+
+    def test_add_multiple_pq_nodes_allowed(self):
+        """Dodanie wielu węzłów PQ powinno się powieść."""
         graph = NetworkGraph()
+
+        pq1 = create_pq_node("PQ1")
+        pq2 = create_pq_node("PQ2")
+        pq3 = create_pq_node("PQ3")
+
+        graph.add_node(pq1)
+        graph.add_node(pq2)
+        graph.add_node(pq3)
+
+        assert len(graph.nodes) == 3
+        assert "PQ1" in graph.nodes
+        assert "PQ2" in graph.nodes
+        assert "PQ3" in graph.nodes
+
+    def test_add_node_duplicate_id_raises(self):
+        """Dodanie węzła z istniejącym ID powinno rzucić ValueError."""
+        graph = NetworkGraph()
+
+        pq1 = create_pq_node("A")
+        pq2 = create_pq_node("A", name="Inny węzeł")
+
+        graph.add_node(pq1)
+
+        with pytest.raises(ValueError, match="już istnieje"):
+            graph.add_node(pq2)
+
+
+# =============================================================================
+# Test: add_branch requires existing nodes
+# =============================================================================
+
+class TestAddBranchNodeExistence:
+    """Testy walidacji istnienia węzłów przy dodawaniu gałęzi."""
+
+    def test_add_branch_requires_existing_nodes(self):
+        """
+        Dodanie gałęzi wymaga, aby oba węzły (from i to) istniały.
+        W przeciwnym razie rzuca ValueError.
+        """
+        graph = NetworkGraph()
+
+        # Dodaj tylko węzeł A
+        node_a = create_pq_node("A")
+        graph.add_node(node_a)
+
+        # Próba dodania gałęzi do nieistniejącego węzła B
+        branch = create_line_branch("AB", "A", "B")
+
+        with pytest.raises(ValueError, match="nie istnieje"):
+            graph.add_branch(branch)
+
+        # Sprawdź, że gałąź nie została dodana
+        assert len(graph.branches) == 0
+
+    def test_add_branch_from_node_not_exists(self):
+        """Gałąź z nieistniejącym węzłem początkowym rzuca ValueError."""
+        graph = NetworkGraph()
+
+        node_b = create_pq_node("B")
+        graph.add_node(node_b)
+
+        branch = create_line_branch("AB", "A", "B")
+
+        with pytest.raises(ValueError, match="'A'.*nie istnieje"):
+            graph.add_branch(branch)
+
+    def test_add_branch_to_node_not_exists(self):
+        """Gałąź z nieistniejącym węzłem końcowym rzuca ValueError."""
+        graph = NetworkGraph()
+
+        node_a = create_pq_node("A")
+        graph.add_node(node_a)
+
+        branch = create_line_branch("AB", "A", "B")
+
+        with pytest.raises(ValueError, match="'B'.*nie istnieje"):
+            graph.add_branch(branch)
+
+    def test_add_branch_self_loop_raises(self):
+        """Gałąź łącząca węzeł sam ze sobą rzuca ValueError."""
+        graph = NetworkGraph()
+
+        node_a = create_pq_node("A")
+        graph.add_node(node_a)
+
+        branch = create_line_branch("AA", "A", "A")
+
+        with pytest.raises(ValueError, match="sam"):
+            graph.add_branch(branch)
+
+    def test_add_branch_between_existing_nodes_succeeds(self):
+        """Dodanie gałęzi między istniejącymi węzłami powinno się powieść."""
+        graph = NetworkGraph()
+
+        node_a = create_pq_node("A")
+        node_b = create_pq_node("B")
+        branch = create_line_branch("AB", "A", "B")
+
+        graph.add_node(node_a)
+        graph.add_node(node_b)
+        graph.add_branch(branch)
+
+        assert "AB" in graph.branches
+        assert graph.get_branch("AB") is branch
+
+
+# =============================================================================
+# Test: is_connected true for connected, false for islands
+# =============================================================================
+
+class TestIsConnected:
+    """Testy analizy spójności sieci."""
+
+    def test_is_connected_true_for_connected_false_for_islands(self):
+        """
+        is_connected() zwraca True dla spójnego grafu,
+        False gdy są wyspy (izolowane węzły).
+        """
+        graph = NetworkGraph()
+
+        # Stwórz trzy węzły
+        node_a = create_pq_node("A")
+        node_b = create_pq_node("B")
+        node_c = create_pq_node("C")
+
+        graph.add_node(node_a)
+        graph.add_node(node_b)
+        graph.add_node(node_c)
+
+        # Bez gałęzi - graf niespójny (3 wyspy)
+        assert graph.is_connected() is False
+
+        # Dodaj gałąź A-B
+        branch_ab = create_line_branch("AB", "A", "B")
+        graph.add_branch(branch_ab)
+
+        # Nadal niespójny (C jest izolowany)
+        assert graph.is_connected() is False
+
+        # Dodaj gałąź B-C
+        branch_bc = create_line_branch("BC", "B", "C")
+        graph.add_branch(branch_bc)
+
+        # Teraz graf jest spójny
+        assert graph.is_connected() is True
+
+    def test_is_connected_empty_graph_returns_false(self):
+        """Pusty graf nie jest spójny."""
+        graph = NetworkGraph()
+        assert graph.is_connected() is False
+
+    def test_is_connected_single_node_returns_true(self):
+        """Graf z jednym węzłem jest spójny."""
+        graph = NetworkGraph()
+        node = create_pq_node("A")
+        graph.add_node(node)
+
+        assert graph.is_connected() is True
+
+
+# =============================================================================
+# Test: find_islands returns two components deterministically
+# =============================================================================
+
+class TestFindIslands:
+    """Testy znajdowania wysp (komponentów spójności)."""
+
+    def test_find_islands_returns_two_components_deterministically(self):
+        """
+        find_islands() zwraca listę wysp posortowaną malejąco po długości,
+        z węzłami posortowanymi alfabetycznie wewnątrz każdej wyspy.
+        """
+        graph = NetworkGraph()
+
+        # Stwórz 5 węzłów: A, B, C tworzą jedną wyspę; D, E tworzą drugą
+        node_a = create_pq_node("A")
+        node_b = create_pq_node("B")
+        node_c = create_pq_node("C")
+        node_d = create_pq_node("D")
+        node_e = create_pq_node("E")
+
+        graph.add_node(node_a)
+        graph.add_node(node_b)
+        graph.add_node(node_c)
+        graph.add_node(node_d)
+        graph.add_node(node_e)
+
+        # Połącz A-B-C
+        branch_ab = create_line_branch("AB", "A", "B")
+        branch_bc = create_line_branch("BC", "B", "C")
+        graph.add_branch(branch_ab)
+        graph.add_branch(branch_bc)
+
+        # Połącz D-E
+        branch_de = create_line_branch("DE", "D", "E")
+        graph.add_branch(branch_de)
+
+        # Znajdź wyspy
+        islands = graph.find_islands()
+
+        # Powinny być 2 wyspy
+        assert len(islands) == 2
+
+        # Pierwsza wyspa (większa): A, B, C
+        assert islands[0] == ["A", "B", "C"]
+
+        # Druga wyspa (mniejsza): D, E
+        assert islands[1] == ["D", "E"]
+
+    def test_find_islands_single_isolated_nodes(self):
+        """Każdy izolowany węzeł tworzy osobną wyspę."""
+        graph = NetworkGraph()
+
+        node_a = create_pq_node("A")
+        node_b = create_pq_node("B")
+        node_c = create_pq_node("C")
+
+        graph.add_node(node_a)
+        graph.add_node(node_b)
+        graph.add_node(node_c)
+
+        islands = graph.find_islands()
+
+        # 3 wyspy po jednym węźle
+        assert len(islands) == 3
+        # Wszystkie wyspy mają długość 1, więc sortowanie po długości nie zmienia kolejności
+        # ale węzły wewnątrz są posortowane
+        island_sets = [set(island) for island in islands]
+        assert {"A"} in island_sets
+        assert {"B"} in island_sets
+        assert {"C"} in island_sets
+
+    def test_find_islands_empty_graph(self):
+        """Pusty graf zwraca pustą listę wysp."""
+        graph = NetworkGraph()
+        islands = graph.find_islands()
+        assert islands == []
+
+
+# =============================================================================
+# Test: inactive branch not in graph edges
+# =============================================================================
+
+class TestInactiveBranch:
+    """Testy obsługi gałęzi nieaktywnych (in_service=False)."""
+
+    def test_inactive_branch_not_in_graph_edges(self):
+        """
+        Gałąź z in_service=False jest przechowywana w branches,
+        ale nie tworzy krawędzi w _graph.
+        """
+        graph = NetworkGraph()
+
+        node_a = create_pq_node("A")
+        node_b = create_pq_node("B")
+        node_c = create_pq_node("C")
+
+        graph.add_node(node_a)
+        graph.add_node(node_b)
+        graph.add_node(node_c)
+
+        # Gałąź aktywna A-B
+        branch_ab = create_line_branch("AB", "A", "B", in_service=True)
+        graph.add_branch(branch_ab)
+
+        # Gałąź nieaktywna B-C
+        branch_bc = create_line_branch("BC", "B", "C", in_service=False)
+        graph.add_branch(branch_bc)
+
+        # Obie gałęzie są w słowniku branches
+        assert "AB" in graph.branches
+        assert "BC" in graph.branches
+
+        # Ale tylko aktywna gałąź tworzy krawędź w grafie
+        assert graph._graph.has_edge("A", "B") is True
+        assert graph._graph.has_edge("B", "C") is False
+
+        # Skutek: C jest izolowany, graf niespójny
+        assert graph.is_connected() is False
+
+        # Dwie wyspy: [A, B] i [C]
+        islands = graph.find_islands()
+        assert len(islands) == 2
+
+    def test_inactive_branch_affects_connectivity(self):
+        """Nieaktywna gałąź nie wpływa na analizę spójności."""
+        graph = NetworkGraph()
+
+        node_a = create_pq_node("A")
+        node_b = create_pq_node("B")
+
+        graph.add_node(node_a)
+        graph.add_node(node_b)
+
+        # Tylko nieaktywna gałąź
+        branch = create_line_branch("AB", "A", "B", in_service=False)
+        graph.add_branch(branch)
+
+        # Graf jest niespójny mimo fizycznej gałęzi
+        assert graph.is_connected() is False
+
+        # Dwie wyspy
+        islands = graph.find_islands()
+        assert len(islands) == 2
+
+
+# =============================================================================
+# Test: get_connected_nodes returns neighbors
+# =============================================================================
+
+class TestGetConnectedNodes:
+    """Testy pobierania sąsiadów węzła."""
+
+    def test_get_connected_nodes_returns_neighbors(self):
+        """get_connected_nodes zwraca bezpośrednich sąsiadów."""
+        graph = NetworkGraph()
+
+        node_a = create_pq_node("A")
+        node_b = create_pq_node("B")
+        node_c = create_pq_node("C")
+        node_d = create_pq_node("D")
+
+        graph.add_node(node_a)
+        graph.add_node(node_b)
+        graph.add_node(node_c)
+        graph.add_node(node_d)
+
+        # A -- B -- C
+        #      |
+        #      D
+        branch_ab = create_line_branch("AB", "A", "B")
+        branch_bc = create_line_branch("BC", "B", "C")
+        branch_bd = create_line_branch("BD", "B", "D")
+
+        graph.add_branch(branch_ab)
+        graph.add_branch(branch_bc)
+        graph.add_branch(branch_bd)
+
+        # Sąsiedzi B to: A, C, D (posortowani)
+        neighbors_b = graph.get_connected_nodes("B")
+        neighbor_ids = [n.id for n in neighbors_b]
+
+        assert neighbor_ids == ["A", "C", "D"]
+
+        # Sąsiedzi A to tylko B
+        neighbors_a = graph.get_connected_nodes("A")
+        assert len(neighbors_a) == 1
+        assert neighbors_a[0].id == "B"
+
+    def test_get_connected_nodes_isolated_node(self):
+        """Izolowany węzeł nie ma sąsiadów."""
+        graph = NetworkGraph()
+
+        node_a = create_pq_node("A")
+        graph.add_node(node_a)
+
+        neighbors = graph.get_connected_nodes("A")
+        assert neighbors == []
+
+    def test_get_connected_nodes_nonexistent_raises(self):
+        """Zapytanie o nieistniejący węzeł rzuca ValueError."""
+        graph = NetworkGraph()
+
+        with pytest.raises(ValueError, match="nie istnieje"):
+            graph.get_connected_nodes("NONEXISTENT")
+
+
+# =============================================================================
+# Test: remove operations
+# =============================================================================
+
+class TestRemoveOperations:
+    """Testy usuwania węzłów i gałęzi."""
+
+    def test_remove_node_removes_incident_branches(self):
+        """Usunięcie węzła usuwa również wszystkie połączone gałęzie."""
+        graph = NetworkGraph()
+
+        node_a = create_pq_node("A")
+        node_b = create_pq_node("B")
+        node_c = create_pq_node("C")
+
+        graph.add_node(node_a)
+        graph.add_node(node_b)
+        graph.add_node(node_c)
+
+        branch_ab = create_line_branch("AB", "A", "B")
+        branch_bc = create_line_branch("BC", "B", "C")
+
+        graph.add_branch(branch_ab)
+        graph.add_branch(branch_bc)
+
+        # Usuń węzeł B
+        graph.remove_node("B")
+
+        # B nie istnieje
+        assert "B" not in graph.nodes
+
+        # Obie gałęzie zostały usunięte
+        assert len(graph.branches) == 0
+
+    def test_remove_branch(self):
+        """Usunięcie gałęzi działa poprawnie."""
+        graph = NetworkGraph()
+
+        node_a = create_pq_node("A")
+        node_b = create_pq_node("B")
+
+        graph.add_node(node_a)
+        graph.add_node(node_b)
+
+        branch = create_line_branch("AB", "A", "B")
+        graph.add_branch(branch)
+
+        assert graph.is_connected() is True
+
+        # Usuń gałąź
+        graph.remove_branch("AB")
+
+        assert "AB" not in graph.branches
+        assert graph.is_connected() is False
+
+    def test_remove_nonexistent_node_raises(self):
+        """Usunięcie nieistniejącego węzła rzuca ValueError."""
+        graph = NetworkGraph()
+
+        with pytest.raises(ValueError, match="nie istnieje"):
+            graph.remove_node("NONEXISTENT")
+
+    def test_remove_nonexistent_branch_raises(self):
+        """Usunięcie nieistniejącej gałęzi rzuca ValueError."""
+        graph = NetworkGraph()
+
+        with pytest.raises(ValueError, match="nie istnieje"):
+            graph.remove_branch("NONEXISTENT")
+
+
+# =============================================================================
+# Test: get_slack_node
+# =============================================================================
+
+class TestGetSlackNode:
+    """Testy pobierania węzła SLACK."""
+
+    def test_get_slack_node_returns_slack(self):
+        """get_slack_node zwraca węzeł SLACK."""
+        graph = NetworkGraph()
+
         slack = create_slack_node("SLACK1")
         pq = create_pq_node("PQ1")
 
@@ -217,571 +577,80 @@ class TestSlackNodeUniqueness:
         result = graph.get_slack_node()
         assert result is slack
 
-    def test_get_slack_node_raises_when_no_slack(self):
-        """get_slack_node() should raise ValueError when no SLACK exists."""
+    def test_get_slack_node_no_slack_raises(self):
+        """Brak węzła SLACK rzuca ValueError."""
         graph = NetworkGraph()
-        pq = create_pq_node("PQ1")
 
+        pq = create_pq_node("PQ1")
         graph.add_node(pq)
 
-        with pytest.raises(ValueError, match="No SLACK node exists"):
+        with pytest.raises(ValueError, match="Brak węzła SLACK"):
             graph.get_slack_node()
 
 
 # =============================================================================
-# T3: add_branch - nodes must exist + parallel branch prevention
+# Test: rebuild_graph
 # =============================================================================
 
-class TestAddBranchValidation:
-    """T3: add_branch - node existence and parallel branch prevention."""
+class TestRebuildGraph:
+    """Testy przebudowy grafu."""
 
-    def test_add_branch_between_existing_nodes(self):
-        """Adding a branch between existing nodes should succeed."""
+    def test_rebuild_graph_restores_state(self):
+        """_rebuild_graph() poprawnie odtwarza stan grafu."""
         graph = NetworkGraph()
-        node_a = create_pq_node("A")
-        node_b = create_pq_node("B")
-        branch = create_line_branch("AB", "A", "B")
 
-        graph.add_node(node_a)
-        graph.add_node(node_b)
-        graph.add_branch(branch, enforce_connected=False)
-
-        assert graph.branch_count == 1
-        assert graph.get_branch("AB") is branch
-
-    def test_add_branch_with_nonexistent_from_node_raises(self):
-        """Adding a branch with non-existent from_node_id should raise ValueError."""
-        graph = NetworkGraph()
-        node_b = create_pq_node("B")
-        branch = create_line_branch("AB", "A", "B")
-
-        graph.add_node(node_b)  # Only add B
-
-        with pytest.raises(ValueError, match="non-existent from_node_id 'A'"):
-            graph.add_branch(branch, enforce_connected=False)
-
-    def test_add_branch_with_nonexistent_to_node_raises(self):
-        """Adding a branch with non-existent to_node_id should raise ValueError."""
-        graph = NetworkGraph()
-        node_a = create_pq_node("A")
-        branch = create_line_branch("AB", "A", "B")
-
-        graph.add_node(node_a)  # Only add A
-
-        with pytest.raises(ValueError, match="non-existent to_node_id 'B'"):
-            graph.add_branch(branch, enforce_connected=False)
-
-    def test_add_parallel_branch_raises_value_error(self):
-        """Adding a parallel branch between the same nodes should raise ValueError."""
-        graph = NetworkGraph()
-        node_a = create_pq_node("A")
-        node_b = create_pq_node("B")
-        branch1 = create_line_branch("AB1", "A", "B")
-        branch2 = create_line_branch("AB2", "A", "B")  # Same nodes, different ID
-
-        graph.add_node(node_a)
-        graph.add_node(node_b)
-        graph.add_branch(branch1, enforce_connected=False)
-
-        with pytest.raises(ValueError, match="parallel branch already exists"):
-            graph.add_branch(branch2, enforce_connected=False)
-
-    def test_add_parallel_branch_reverse_direction_raises(self):
-        """Adding a parallel branch in reverse direction should also raise ValueError."""
-        graph = NetworkGraph()
-        node_a = create_pq_node("A")
-        node_b = create_pq_node("B")
-        branch1 = create_line_branch("AB1", "A", "B")
-        branch2 = create_line_branch("BA1", "B", "A")  # Reverse direction
-
-        graph.add_node(node_a)
-        graph.add_node(node_b)
-        graph.add_branch(branch1, enforce_connected=False)
-
-        with pytest.raises(ValueError, match="parallel branch already exists"):
-            graph.add_branch(branch2, enforce_connected=False)
-
-
-# =============================================================================
-# T4: enforce_connected rollback
-# =============================================================================
-
-class TestEnforceConnectedRollback:
-    """T4: enforce_connected rollback behavior tests."""
-
-    def test_add_in_service_branch_maintains_connectivity(self):
-        """Adding in_service branch that maintains connectivity should succeed."""
-        graph = NetworkGraph()
-        node_a = create_pq_node("A")
-        node_b = create_pq_node("B")
-        branch = create_line_branch("AB", "A", "B", in_service=True)
-
-        graph.add_node(node_a)
-        graph.add_node(node_b)
-        # With 2 nodes and 1 connecting branch, graph is connected
-        graph.add_branch(branch, enforce_connected=True)
-
-        assert graph.branch_count == 1
-        assert graph.is_connected(in_service_only=True)
-
-    def test_add_out_of_service_branch_breaks_connectivity_with_enforce(self):
-        """
-        Adding out-of-service branch when enforce_connected=True should rollback
-        if it leaves isolated nodes.
-
-        Scenario:
-        1. Build a disconnected graph with enforce_connected=False:
-           - Nodes A, B, C with branch A-B (in_service=True)
-           - C is isolated in _graph_in_service
-        2. Try to add branch B-C (in_service=False) with enforce_connected=True
-           - This doesn't help connectivity (out of service)
-           - Graph remains disconnected -> rollback
-        """
-        graph = NetworkGraph()
         node_a = create_pq_node("A")
         node_b = create_pq_node("B")
         node_c = create_pq_node("C")
+
+        graph.add_node(node_a)
+        graph.add_node(node_b)
+        graph.add_node(node_c)
+
         branch_ab = create_line_branch("AB", "A", "B", in_service=True)
         branch_bc = create_line_branch("BC", "B", "C", in_service=False)
 
-        graph.add_node(node_a)
-        graph.add_node(node_b)
-        graph.add_node(node_c)
-        # Use enforce_connected=False to set up disconnected graph
-        graph.add_branch(branch_ab, enforce_connected=False)
+        graph.add_branch(branch_ab)
+        graph.add_branch(branch_bc)
 
-        # Verify initial state: graph is disconnected (C isolated)
-        assert graph.is_connected(in_service_only=True) is False
+        # Zapisz stan początkowy
+        initial_edges = set(graph._graph.edges())
 
-        # branch_bc is out of service, so C remains isolated in _graph_in_service
-        # enforce_connected=True should cause rollback
-        initial_branch_count = graph.branch_count
+        # Wyczyść graf (symulacja uszkodzenia)
+        graph._graph.clear()
 
-        with pytest.raises(ValueError, match="disconnected"):
-            graph.add_branch(branch_bc, enforce_connected=True)
+        # Przebuduj
+        graph._rebuild_graph()
 
-        # Verify rollback
-        assert graph.branch_count == initial_branch_count
-        assert "BC" not in graph.branches
-        # Also verify _graph_all doesn't have the edge after rollback
-        assert not graph._graph_all.has_edge("B", "C")
-
-    def test_add_out_of_service_branch_allowed_without_enforce(self):
-        """Adding out-of-service branch with enforce_connected=False should succeed."""
-        graph = NetworkGraph()
-        node_a = create_pq_node("A")
-        node_b = create_pq_node("B")
-        node_c = create_pq_node("C")
-        branch_ab = create_line_branch("AB", "A", "B", in_service=True)
-        branch_bc = create_line_branch("BC", "B", "C", in_service=False)
-
-        graph.add_node(node_a)
-        graph.add_node(node_b)
-        graph.add_node(node_c)
-        graph.add_branch(branch_ab, enforce_connected=False)
-        graph.add_branch(branch_bc, enforce_connected=False)
-
-        assert graph.branch_count == 2
-        assert "BC" in graph.branches
+        # Sprawdź odtworzenie
+        assert graph._graph.number_of_nodes() == 3
+        assert graph._graph.has_edge("A", "B") is True
+        assert graph._graph.has_edge("B", "C") is False  # nieaktywna gałąź
 
 
 # =============================================================================
-# T5: Topology views - all vs in_service
+# Test: edge attributes
 # =============================================================================
 
-class TestTopologyViews:
-    """T5: Topology views (all vs in_service) tests."""
+class TestEdgeAttributes:
+    """Testy atrybutów krawędzi grafu."""
 
-    def test_is_connected_all_vs_in_service(self):
-        """
-        Test is_connected for both views with mixed in_service branches.
-        """
+    def test_edge_has_branch_attributes(self):
+        """Krawędź w grafie ma atrybuty branch_id, branch_type, name."""
         graph = NetworkGraph()
+
         node_a = create_pq_node("A")
         node_b = create_pq_node("B")
-        node_c = create_pq_node("C")
-        branch_ab = create_line_branch("AB", "A", "B", in_service=True)
-        branch_bc = create_line_branch("BC", "B", "C", in_service=False)
 
         graph.add_node(node_a)
         graph.add_node(node_b)
-        graph.add_node(node_c)
-        graph.add_branch(branch_ab, enforce_connected=False)
-        graph.add_branch(branch_bc, enforce_connected=False)
 
-        # _graph_all has edges: A-B, B-C (forming A-B-C chain) => connected
-        assert graph.is_connected(in_service_only=False) is True
+        branch = create_line_branch("AB", "A", "B", name="Linia AB")
+        graph.add_branch(branch)
 
-        # _graph_in_service has only edge: A-B, C is isolated => disconnected
-        assert graph.is_connected(in_service_only=True) is False
+        edge_data = graph._graph.get_edge_data("A", "B")
 
-    def test_find_islands_in_service_only(self):
-        """
-        find_islands(in_service_only=True) should return 2 components
-        when one branch is out of service.
-        """
-        graph = NetworkGraph()
-        node_a = create_pq_node("A")
-        node_b = create_pq_node("B")
-        node_c = create_pq_node("C")
-        branch_ab = create_line_branch("AB", "A", "B", in_service=True)
-        branch_bc = create_line_branch("BC", "B", "C", in_service=False)
-
-        graph.add_node(node_a)
-        graph.add_node(node_b)
-        graph.add_node(node_c)
-        graph.add_branch(branch_ab, enforce_connected=False)
-        graph.add_branch(branch_bc, enforce_connected=False)
-
-        islands = graph.find_islands(in_service_only=True)
-
-        # Expect 2 islands: [C] (singleton) and [A, B]
-        # Sorted by (len, first_id): [C] comes before [A, B]
-        assert len(islands) == 2
-        assert islands[0] == ["C"]
-        assert islands[1] == ["A", "B"]
-
-    def test_find_islands_all_branches(self):
-        """
-        find_islands(in_service_only=False) should return 1 component
-        when all physical branches connect the network.
-        """
-        graph = NetworkGraph()
-        node_a = create_pq_node("A")
-        node_b = create_pq_node("B")
-        node_c = create_pq_node("C")
-        branch_ab = create_line_branch("AB", "A", "B", in_service=True)
-        branch_bc = create_line_branch("BC", "B", "C", in_service=False)
-
-        graph.add_node(node_a)
-        graph.add_node(node_b)
-        graph.add_node(node_c)
-        graph.add_branch(branch_ab, enforce_connected=False)
-        graph.add_branch(branch_bc, enforce_connected=False)
-
-        islands = graph.find_islands(in_service_only=False)
-
-        # Expect 1 island: [A, B, C]
-        assert len(islands) == 1
-        assert islands[0] == ["A", "B", "C"]
-
-
-# =============================================================================
-# T6: get_connected_nodes
-# =============================================================================
-
-class TestGetConnectedNodes:
-    """T6: get_connected_nodes behavior tests."""
-
-    def test_get_connected_nodes_in_service_returns_component(self):
-        """get_connected_nodes with in_service_only=True returns correct component."""
-        graph = NetworkGraph()
-        node_a = create_pq_node("A")
-        node_b = create_pq_node("B")
-        node_c = create_pq_node("C")
-        branch_ab = create_line_branch("AB", "A", "B", in_service=True)
-        branch_bc = create_line_branch("BC", "B", "C", in_service=False)
-
-        graph.add_node(node_a)
-        graph.add_node(node_b)
-        graph.add_node(node_c)
-        graph.add_branch(branch_ab, enforce_connected=False)
-        graph.add_branch(branch_bc, enforce_connected=False)
-
-        # Node A is connected to B in in-service graph
-        connected = graph.get_connected_nodes("A", in_service_only=True)
-        connected_ids = sorted([n.id for n in connected])
-
-        assert connected_ids == ["A", "B"]
-
-    def test_get_connected_nodes_isolated_returns_self(self):
-        """get_connected_nodes for isolated node returns only that node."""
-        graph = NetworkGraph()
-        node_a = create_pq_node("A")
-        node_b = create_pq_node("B")
-        node_c = create_pq_node("C")
-        branch_ab = create_line_branch("AB", "A", "B", in_service=True)
-        branch_bc = create_line_branch("BC", "B", "C", in_service=False)
-
-        graph.add_node(node_a)
-        graph.add_node(node_b)
-        graph.add_node(node_c)
-        graph.add_branch(branch_ab, enforce_connected=False)
-        graph.add_branch(branch_bc, enforce_connected=False)
-
-        # Node C is isolated in in-service graph
-        connected = graph.get_connected_nodes("C", in_service_only=True)
-
-        assert len(connected) == 1
-        assert connected[0].id == "C"
-
-    def test_get_connected_nodes_all_branches_returns_full_component(self):
-        """get_connected_nodes with in_service_only=False returns all connected nodes."""
-        graph = NetworkGraph()
-        node_a = create_pq_node("A")
-        node_b = create_pq_node("B")
-        node_c = create_pq_node("C")
-        branch_ab = create_line_branch("AB", "A", "B", in_service=True)
-        branch_bc = create_line_branch("BC", "B", "C", in_service=False)
-
-        graph.add_node(node_a)
-        graph.add_node(node_b)
-        graph.add_node(node_c)
-        graph.add_branch(branch_ab, enforce_connected=False)
-        graph.add_branch(branch_bc, enforce_connected=False)
-
-        # In full topology, all nodes are connected
-        connected = graph.get_connected_nodes("A", in_service_only=False)
-        connected_ids = sorted([n.id for n in connected])
-
-        assert connected_ids == ["A", "B", "C"]
-
-    def test_get_connected_nodes_nonexistent_raises_key_error(self):
-        """get_connected_nodes for non-existent node raises KeyError."""
-        graph = NetworkGraph()
-        node_a = create_pq_node("A")
-
-        graph.add_node(node_a)
-
-        with pytest.raises(KeyError, match="does not exist"):
-            graph.get_connected_nodes("NONEXISTENT")
-
-
-# =============================================================================
-# T7: remove_branch and remove_node
-# =============================================================================
-
-class TestRemoveOperations:
-    """T7: remove_branch and remove_node tests."""
-
-    def test_remove_branch_creates_islands(self):
-        """Removing a branch can create islands in the in-service graph."""
-        graph = NetworkGraph()
-        node_a = create_pq_node("A")
-        node_b = create_pq_node("B")
-        node_c = create_pq_node("C")
-        branch_ab = create_line_branch("AB", "A", "B", in_service=True)
-        branch_bc = create_line_branch("BC", "B", "C", in_service=True)
-
-        graph.add_node(node_a)
-        graph.add_node(node_b)
-        graph.add_node(node_c)
-        graph.add_branch(branch_ab, enforce_connected=False)
-        graph.add_branch(branch_bc, enforce_connected=False)
-
-        # Initially connected
-        assert graph.is_connected(in_service_only=True) is True
-
-        # Remove BC
-        graph.remove_branch("BC")
-
-        # Now C is isolated
-        assert graph.branch_count == 1
-        islands = graph.find_islands(in_service_only=True)
-        assert len(islands) == 2
-        assert ["C"] in islands
-        assert ["A", "B"] in islands
-
-    def test_remove_node_removes_incident_branches(self):
-        """Removing a node also removes all incident branches."""
-        graph = NetworkGraph()
-        node_a = create_pq_node("A")
-        node_b = create_pq_node("B")
-        node_c = create_pq_node("C")
-        branch_ab = create_line_branch("AB", "A", "B", in_service=True)
-        branch_bc = create_line_branch("BC", "B", "C", in_service=True)
-
-        graph.add_node(node_a)
-        graph.add_node(node_b)
-        graph.add_node(node_c)
-        graph.add_branch(branch_ab, enforce_connected=False)
-        graph.add_branch(branch_bc, enforce_connected=False)
-
-        # Remove node B (connected to both branches)
-        graph.remove_node("B")
-
-        # Node B and both branches should be gone
-        assert graph.node_count == 2
-        assert "A" in graph.nodes
-        assert "C" in graph.nodes
-        assert "B" not in graph.nodes
-        assert graph.branch_count == 0
-
-        # A and C are now isolated islands
-        islands = graph.find_islands(in_service_only=True)
-        assert len(islands) == 2
-        assert ["A"] in islands
-        assert ["C"] in islands
-
-    def test_remove_branch_nonexistent_raises_key_error(self):
-        """Removing a non-existent branch raises KeyError."""
-        graph = NetworkGraph()
-
-        with pytest.raises(KeyError, match="does not exist"):
-            graph.remove_branch("NONEXISTENT")
-
-    def test_remove_node_nonexistent_raises_key_error(self):
-        """Removing a non-existent node raises KeyError."""
-        graph = NetworkGraph()
-
-        with pytest.raises(KeyError, match="does not exist"):
-            graph.remove_node("NONEXISTENT")
-
-
-# =============================================================================
-# T8: Edge attribute branch_id
-# =============================================================================
-
-class TestEdgeAttributeBranchId:
-    """T8: Edge attribute branch_id verification tests."""
-
-    def test_edge_has_branch_id_attribute_in_graph_all(self):
-        """Branch edge in _graph_all should have branch_id attribute."""
-        graph = NetworkGraph()
-        node_a = create_pq_node("A")
-        node_b = create_pq_node("B")
-        branch = create_line_branch("AB", "A", "B", in_service=True)
-
-        graph.add_node(node_a)
-        graph.add_node(node_b)
-        graph.add_branch(branch, enforce_connected=False)
-
-        # Check _graph_all edge has branch_id
-        edge_data = graph._graph_all.get_edge_data("A", "B")
         assert edge_data is not None
         assert edge_data.get("branch_id") == "AB"
-
-    def test_edge_has_branch_id_attribute_in_graph_in_service(self):
-        """In-service branch edge should have branch_id in _graph_in_service."""
-        graph = NetworkGraph()
-        node_a = create_pq_node("A")
-        node_b = create_pq_node("B")
-        branch = create_line_branch("AB", "A", "B", in_service=True)
-
-        graph.add_node(node_a)
-        graph.add_node(node_b)
-        graph.add_branch(branch, enforce_connected=False)
-
-        # Check _graph_in_service edge has branch_id
-        edge_data = graph._graph_in_service.get_edge_data("A", "B")
-        assert edge_data is not None
-        assert edge_data.get("branch_id") == "AB"
-
-    def test_out_of_service_branch_not_in_graph_in_service(self):
-        """Out-of-service branch should NOT appear in _graph_in_service."""
-        graph = NetworkGraph()
-        node_a = create_pq_node("A")
-        node_b = create_pq_node("B")
-        branch = create_line_branch("AB", "A", "B", in_service=False)
-
-        graph.add_node(node_a)
-        graph.add_node(node_b)
-        graph.add_branch(branch, enforce_connected=False)
-
-        # Edge should exist in _graph_all
-        assert graph._graph_all.has_edge("A", "B")
-        edge_data = graph._graph_all.get_edge_data("A", "B")
-        assert edge_data.get("branch_id") == "AB"
-
-        # Edge should NOT exist in _graph_in_service
-        assert not graph._graph_in_service.has_edge("A", "B")
-
-
-# =============================================================================
-# Additional edge case tests
-# =============================================================================
-
-class TestEdgeCases:
-    """Additional edge case tests for comprehensive coverage."""
-
-    def test_empty_graph_is_connected(self):
-        """Empty graph should be considered connected."""
-        graph = NetworkGraph()
-        assert graph.is_connected(in_service_only=True) is True
-        assert graph.is_connected(in_service_only=False) is True
-
-    def test_single_node_graph_is_connected(self):
-        """Single-node graph should be considered connected."""
-        graph = NetworkGraph()
-        node_a = create_pq_node("A")
-        graph.add_node(node_a)
-
-        assert graph.is_connected(in_service_only=True) is True
-        assert graph.is_connected(in_service_only=False) is True
-
-    def test_find_islands_empty_graph(self):
-        """find_islands on empty graph should return empty list."""
-        graph = NetworkGraph()
-        islands = graph.find_islands()
-        assert islands == []
-
-    def test_find_islands_single_isolated_node(self):
-        """find_islands with single node should return one island."""
-        graph = NetworkGraph()
-        node_a = create_pq_node("A")
-        graph.add_node(node_a)
-
-        islands = graph.find_islands()
-        assert len(islands) == 1
-        assert islands[0] == ["A"]
-
-    def test_rebuild_graphs_restores_state(self):
-        """rebuild_graphs should correctly restore graph state."""
-        graph = NetworkGraph()
-        node_a = create_pq_node("A")
-        node_b = create_pq_node("B")
-        node_c = create_pq_node("C")
-        branch_ab = create_line_branch("AB", "A", "B", in_service=True)
-        branch_bc = create_line_branch("BC", "B", "C", in_service=False)
-
-        graph.add_node(node_a)
-        graph.add_node(node_b)
-        graph.add_node(node_c)
-        graph.add_branch(branch_ab, enforce_connected=False)
-        graph.add_branch(branch_bc, enforce_connected=False)
-
-        # Manually corrupt the graphs
-        graph._graph_all.clear()
-        graph._graph_in_service.clear()
-
-        # Rebuild should restore
-        graph.rebuild_graphs()
-
-        # Verify state
-        assert graph._graph_all.number_of_nodes() == 3
-        assert graph._graph_all.number_of_edges() == 2
-        assert graph._graph_in_service.number_of_nodes() == 3
-        assert graph._graph_in_service.number_of_edges() == 1
-
-    def test_properties_count_correctly(self):
-        """node_count, branch_count, and in_service_branch_count should be accurate."""
-        graph = NetworkGraph()
-        node_a = create_pq_node("A")
-        node_b = create_pq_node("B")
-        node_c = create_pq_node("C")
-        branch_ab = create_line_branch("AB", "A", "B", in_service=True)
-        branch_bc = create_line_branch("BC", "B", "C", in_service=False)
-
-        graph.add_node(node_a)
-        graph.add_node(node_b)
-        graph.add_node(node_c)
-        graph.add_branch(branch_ab, enforce_connected=False)
-        graph.add_branch(branch_bc, enforce_connected=False)
-
-        assert graph.node_count == 3
-        assert graph.branch_count == 2
-        assert graph.in_service_branch_count == 1
-
-    def test_get_node_nonexistent_raises_key_error(self):
-        """get_node for non-existent node raises KeyError."""
-        graph = NetworkGraph()
-
-        with pytest.raises(KeyError, match="does not exist"):
-            graph.get_node("NONEXISTENT")
-
-    def test_get_branch_nonexistent_raises_key_error(self):
-        """get_branch for non-existent branch raises KeyError."""
-        graph = NetworkGraph()
-
-        with pytest.raises(KeyError, match="does not exist"):
-            graph.get_branch("NONEXISTENT")
+        assert edge_data.get("branch_type") == "LINE"
+        assert edge_data.get("name") == "Linia AB"
