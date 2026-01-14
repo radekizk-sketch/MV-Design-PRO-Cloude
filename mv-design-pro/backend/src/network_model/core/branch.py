@@ -565,6 +565,75 @@ class TransformerBranch(Branch):
         z_base_lv = (self.voltage_lv_kv ** 2) / self.rated_power_mva
         return self.get_short_circuit_impedance_pu() * z_base_lv
 
+    def get_voltage_factor_c_max(self) -> float:
+        """
+        Get IEC 60909 maximum voltage factor c for LV side.
+
+        Returns:
+            Maximum voltage factor c.
+        """
+        self._validate_short_circuit_inputs()
+        if self.voltage_lv_kv <= 1.0:
+            return 1.05
+        if self.voltage_lv_kv <= 35.0:
+            return 1.10
+        return 1.10
+
+    def get_voltage_factor_c_min(self) -> float:
+        """
+        Get IEC 60909 minimum voltage factor c for LV side.
+
+        Returns:
+            Minimum voltage factor c.
+        """
+        self._validate_short_circuit_inputs()
+        if self.voltage_lv_kv <= 1.0:
+            return 0.95
+        if self.voltage_lv_kv <= 35.0:
+            return 1.00
+        return 1.00
+
+    def get_ikss_lv_ka(self, c: float) -> float:
+        """
+        Calculate IEC 60909 initial symmetrical short-circuit current on LV side.
+
+        Args:
+            c: Voltage factor.
+
+        Returns:
+            Initial symmetrical short-circuit current in kA on LV side.
+
+        Raises:
+            ValueError: If c <= 0.
+            ZeroDivisionError: If short-circuit impedance is zero.
+        """
+        if c <= 0:
+            raise ValueError("c must be > 0")
+        z_th_lv = self.get_short_circuit_impedance_ohm_lv()
+        if z_th_lv == 0 or abs(z_th_lv) == 0:
+            raise ZeroDivisionError("Short-circuit impedance is zero")
+        u_th = c * (self.voltage_lv_kv * 1e3) / math.sqrt(3)
+        ikss = u_th / abs(z_th_lv)
+        return ikss / 1000.0
+
+    def get_ikss_lv_cmax_ka(self) -> float:
+        """
+        Calculate Ik'' on LV side using maximum voltage factor c.
+
+        Returns:
+            Initial symmetrical short-circuit current in kA on LV side.
+        """
+        return self.get_ikss_lv_ka(self.get_voltage_factor_c_max())
+
+    def get_ikss_lv_cmin_ka(self) -> float:
+        """
+        Calculate Ik'' on LV side using minimum voltage factor c.
+
+        Returns:
+            Initial symmetrical short-circuit current in kA on LV side.
+        """
+        return self.get_ikss_lv_ka(self.get_voltage_factor_c_min())
+
     def to_dict(self) -> Dict[str, Any]:
         """
         Convert the transformer branch to a dictionary.
