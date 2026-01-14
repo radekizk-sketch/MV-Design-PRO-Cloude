@@ -5,6 +5,7 @@ Testy jednostkowe dla AdmittanceMatrixBuilder (Y-bus).
 import math
 
 import numpy as np
+import pytest
 
 from network_model.core.branch import BranchType, LineBranch, TransformerBranch
 from network_model.core.graph import NetworkGraph
@@ -221,6 +222,77 @@ def test_transformer_impedance_ohm_lv():
     z_expected = complex(rk_pu, xk_pu) * z_base_lv
 
     assert transformer.get_short_circuit_impedance_ohm_lv() == z_expected
+
+
+def test_voltage_factor_c_lv():
+    transformer = create_transformer_branch(
+        "T1",
+        "A",
+        "B",
+        rated_power_mva=25.0,
+        voltage_hv_kv=110.0,
+        voltage_lv_kv=0.4,
+        uk_percent=10.0,
+        pk_kw=120.0,
+    )
+
+    assert transformer.get_voltage_factor_c_max() == 1.05
+    assert transformer.get_voltage_factor_c_min() == 0.95
+
+
+def test_voltage_factor_c_mv():
+    transformer = create_transformer_branch(
+        "T1",
+        "A",
+        "B",
+        rated_power_mva=25.0,
+        voltage_hv_kv=110.0,
+        voltage_lv_kv=20.0,
+        uk_percent=10.0,
+        pk_kw=120.0,
+    )
+
+    assert transformer.get_voltage_factor_c_max() == 1.10
+    assert transformer.get_voltage_factor_c_min() == 1.00
+
+
+def test_ikss_lv_scales_with_c():
+    transformer = create_transformer_branch(
+        "T1",
+        "A",
+        "B",
+        rated_power_mva=20.0,
+        voltage_hv_kv=110.0,
+        voltage_lv_kv=20.0,
+        uk_percent=8.0,
+        pk_kw=60.0,
+    )
+
+    ik_c1 = transformer.get_ikss_lv_ka(c=1.0)
+    ik_cmax = transformer.get_ikss_lv_cmax_ka()
+    ik_cmin = transformer.get_ikss_lv_cmin_ka()
+
+    assert np.isclose(ik_cmax / ik_c1, 1.10)
+    assert np.isclose(ik_cmin / ik_c1, 1.00)
+    assert ik_cmax > ik_cmin
+
+
+def test_ikss_lv_rejects_nonpositive_c():
+    transformer = create_transformer_branch(
+        "T1",
+        "A",
+        "B",
+        rated_power_mva=20.0,
+        voltage_hv_kv=110.0,
+        voltage_lv_kv=20.0,
+        uk_percent=8.0,
+        pk_kw=60.0,
+    )
+
+    with pytest.raises(ValueError):
+        transformer.get_ikss_lv_ka(c=0.0)
+    with pytest.raises(ValueError):
+        transformer.get_ikss_lv_ka(c=-0.1)
 
 
 def test_transformer_stamping_between_two_nodes():
