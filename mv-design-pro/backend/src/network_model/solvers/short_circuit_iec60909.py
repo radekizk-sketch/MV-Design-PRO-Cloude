@@ -9,6 +9,10 @@ from network_model.core.graph import NetworkGraph
 from network_model.core.ybus import AdmittanceMatrixBuilder
 
 
+C_MIN: float = 0.95
+C_MAX: float = 1.10
+
+
 @dataclass(frozen=True)
 class ShortCircuitResult3PH:
     fault_node_id: str
@@ -60,4 +64,20 @@ class ShortCircuitIEC60909Solver:
             un_v=un_v,
             zkk_ohm=zkk,
             ikss_a=ikss,
+        )
+
+    @staticmethod
+    def compute_ikss_3ph_min(
+        graph: NetworkGraph, fault_node_id: str
+    ) -> ShortCircuitResult3PH:
+        return ShortCircuitIEC60909Solver.compute_ikss_3ph(
+            graph, fault_node_id, C_MIN
+        )
+
+    @staticmethod
+    def compute_ikss_3ph_max(
+        graph: NetworkGraph, fault_node_id: str
+    ) -> ShortCircuitResult3PH:
+        return ShortCircuitIEC60909Solver.compute_ikss_3ph(
+            graph, fault_node_id, C_MAX
         )
