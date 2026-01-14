@@ -12,7 +12,7 @@ from typing import Dict, Tuple
 
 import numpy as np
 
-from .branch import Branch, BranchType, LineBranch
+from .branch import Branch, BranchType, LineBranch, TransformerBranch
 from .graph import NetworkGraph
 
 
@@ -73,7 +73,14 @@ class AdmittanceMatrixBuilder:
         if isinstance(branch, LineBranch):
             return branch.get_series_admittance(), branch.get_shunt_admittance_per_end()
 
-        if branch.branch_type == BranchType.TRANSFORMER:
-            raise NotImplementedError("Transformer admittance is not implemented")
+        if isinstance(branch, TransformerBranch):
+            impedance = branch.get_short_circuit_impedance_ohm_lv()
+            if impedance == 0:
+                raise ZeroDivisionError(
+                    "Cannot compute transformer admittance: impedance is zero"
+                )
+            y_series = 1.0 / impedance
+            y_shunt_per_end = 0.0 + 0.0j
+            return y_series, y_shunt_per_end
 
         raise ValueError(f"Unsupported branch type: {branch.branch_type}")
