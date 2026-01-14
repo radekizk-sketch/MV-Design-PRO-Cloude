@@ -9,7 +9,11 @@ from network_model.core.branch import BranchType, TransformerBranch
 from network_model.core.graph import NetworkGraph
 from network_model.core.node import Node, NodeType
 from network_model.core.ybus import AdmittanceMatrixBuilder
-from network_model.solvers.short_circuit_iec60909 import ShortCircuitIEC60909Solver
+from network_model.solvers.short_circuit_iec60909 import (
+    C_MAX,
+    C_MIN,
+    ShortCircuitIEC60909Solver,
+)
 
 
 def create_pq_node(node_id: str, voltage_level: float) -> Node:
@@ -110,6 +114,47 @@ def test_ikss_increases_with_c_factor():
     )
 
     assert result_cmax.ikss_a > result_cmin.ikss_a
+
+
+def test_ikss_min_less_than_max():
+    graph = build_transformer_only_graph()
+
+    res_min = ShortCircuitIEC60909Solver.compute_ikss_3ph_min(
+        graph=graph,
+        fault_node_id="B",
+    )
+    res_max = ShortCircuitIEC60909Solver.compute_ikss_3ph_max(
+        graph=graph,
+        fault_node_id="B",
+    )
+
+    assert res_max.ikss_a > res_min.ikss_a
+
+
+def test_ikss_min_matches_wrapper_formula():
+    graph = build_transformer_only_graph()
+
+    res = ShortCircuitIEC60909Solver.compute_ikss_3ph_min(
+        graph=graph,
+        fault_node_id="B",
+    )
+    expected = (C_MIN * res.un_v) / (math.sqrt(3.0) * abs(res.zkk_ohm))
+
+    assert res.c_factor == C_MIN
+    assert res.ikss_a == pytest.approx(expected, rel=1e-12, abs=0.0)
+
+
+def test_ikss_max_matches_wrapper_formula():
+    graph = build_transformer_only_graph()
+
+    res = ShortCircuitIEC60909Solver.compute_ikss_3ph_max(
+        graph=graph,
+        fault_node_id="B",
+    )
+    expected = (C_MAX * res.un_v) / (math.sqrt(3.0) * abs(res.zkk_ohm))
+
+    assert res.c_factor == C_MAX
+    assert res.ikss_a == pytest.approx(expected, rel=1e-12, abs=0.0)
 
 
 def test_invalid_fault_node_raises():
