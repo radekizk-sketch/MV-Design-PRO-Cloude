@@ -501,6 +501,61 @@ class TransformerBranch(Branch):
 
         return True
 
+    def _validate_short_circuit_inputs(self) -> None:
+        if self.rated_power_mva <= 0:
+            raise ValueError("rated_power_mva must be > 0")
+        if self.voltage_lv_kv <= 0:
+            raise ValueError("voltage_lv_kv must be > 0")
+        if self.uk_percent <= 0:
+            raise ValueError("uk_percent must be > 0")
+        if self.pk_kw < 0:
+            raise ValueError("pk_kw must be >= 0")
+
+    def get_short_circuit_impedance_pu(self) -> complex:
+        """
+        Calculate short-circuit impedance in per-unit (IEC 60909).
+
+        Returns:
+            Complex short-circuit impedance Zk_pu = Rk_pu + jXk_pu.
+        """
+        self._validate_short_circuit_inputs()
+        r_pu = (self.pk_kw / 1000.0) / self.rated_power_mva
+        z_pu = self.uk_percent / 100.0
+        x_pu = math.sqrt(max(z_pu * z_pu - r_pu * r_pu, 0.0))
+        return complex(r_pu, x_pu)
+
+    def get_short_circuit_resistance_pu(self) -> float:
+        """
+        Calculate short-circuit resistance in per-unit (IEC 60909).
+
+        Returns:
+            Rk_pu value.
+        """
+        self._validate_short_circuit_inputs()
+        return (self.pk_kw / 1000.0) / self.rated_power_mva
+
+    def get_short_circuit_reactance_pu(self) -> float:
+        """
+        Calculate short-circuit reactance in per-unit (IEC 60909).
+
+        Returns:
+            Xk_pu value.
+        """
+        r_pu = self.get_short_circuit_resistance_pu()
+        z_pu = self.uk_percent / 100.0
+        return math.sqrt(max(z_pu * z_pu - r_pu * r_pu, 0.0))
+
+    def get_short_circuit_impedance_ohm_lv(self) -> complex:
+        """
+        Calculate short-circuit impedance in ohms on the LV side.
+
+        Returns:
+            Complex short-circuit impedance Zk_ohm on LV base.
+        """
+        self._validate_short_circuit_inputs()
+        z_base = (self.voltage_lv_kv ** 2) / self.rated_power_mva
+        return self.get_short_circuit_impedance_pu() * z_base
+
     def to_dict(self) -> Dict[str, Any]:
         """
         Convert the transformer branch to a dictionary.
