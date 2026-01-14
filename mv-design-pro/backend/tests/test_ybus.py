@@ -2,16 +2,11 @@
 Testy jednostkowe dla AdmittanceMatrixBuilder (Y-bus).
 """
 
-import sys
-from pathlib import Path
+import math
 
 import numpy as np
 
-# Add backend/src to path for imports
-backend_src = Path(__file__).parent.parent / "src"
-sys.path.insert(0, str(backend_src))
-
-from network_model.core.branch import BranchType, LineBranch
+from network_model.core.branch import BranchType, LineBranch, TransformerBranch
 from network_model.core.graph import NetworkGraph
 from network_model.core.node import Node, NodeType
 from network_model.core.ybus import AdmittanceMatrixBuilder
@@ -50,6 +45,37 @@ def create_line_branch(
         b_us_per_km=b_us_per_km,
         length_km=length_km,
         rated_current_a=200.0,
+    )
+
+
+def create_transformer_branch(
+    branch_id: str,
+    from_node_id: str,
+    to_node_id: str,
+    rated_power_mva: float,
+    voltage_hv_kv: float,
+    voltage_lv_kv: float,
+    uk_percent: float,
+    pk_kw: float,
+    in_service: bool = True,
+) -> TransformerBranch:
+    return TransformerBranch(
+        id=branch_id,
+        name=f"Transformer {branch_id}",
+        branch_type=BranchType.TRANSFORMER,
+        from_node_id=from_node_id,
+        to_node_id=to_node_id,
+        in_service=in_service,
+        rated_power_mva=rated_power_mva,
+        voltage_hv_kv=voltage_hv_kv,
+        voltage_lv_kv=voltage_lv_kv,
+        uk_percent=uk_percent,
+        pk_kw=pk_kw,
+        i0_percent=0.0,
+        p0_kw=0.0,
+        vector_group="Dyn11",
+        tap_position=0,
+        tap_step_percent=2.5,
     )
 
 
@@ -153,3 +179,102 @@ def test_ybus_includes_isolated_node_in_matrix_size():
 
     assert np.allclose(y_bus[c_index, :], 0.0)
     assert np.allclose(y_bus[:, c_index], 0.0)
+
+
+def test_transformer_zk_rk_xk_pu():
+    transformer = create_transformer_branch(
+        "T1",
+        "A",
+        "B",
+        rated_power_mva=25.0,
+        voltage_hv_kv=110.0,
+        voltage_lv_kv=20.0,
+        uk_percent=10.0,
+        pk_kw=120.0,
+    )
+
+    zk_pu = transformer.uk_percent / 100.0
+    rk_pu = (transformer.pk_kw / 1000.0) / transformer.rated_power_mva
+    xk_pu = math.sqrt(max(zk_pu * zk_pu - rk_pu * rk_pu, 0.0))
+
+    assert transformer.get_short_circuit_impedance_pu() == complex(rk_pu, xk_pu)
+    assert transformer.get_short_circuit_resistance_pu() == rk_pu
+    assert transformer.get_short_circuit_reactance_pu() == xk_pu
+
+
+def test_transformer_impedance_ohm_lv():
+    transformer = create_transformer_branch(
+        "T1",
+        "A",
+        "B",
+        rated_power_mva=16.0,
+        voltage_hv_kv=110.0,
+        voltage_lv_kv=15.0,
+        uk_percent=6.0,
+        pk_kw=40.0,
+    )
+
+    zk_pu = transformer.uk_percent / 100.0
+    rk_pu = (transformer.pk_kw / 1000.0) / transformer.rated_power_mva
+    xk_pu = math.sqrt(max(zk_pu * zk_pu - rk_pu * rk_pu, 0.0))
+    z_base_lv = (transformer.voltage_lv_kv ** 2) / transformer.rated_power_mva
+    z_expected = complex(rk_pu, xk_pu) * z_base_lv
+
+    assert transformer.get_short_circuit_impedance_ohm_lv() == z_expected
+
+
+def test_transformer_stamping_between_two_nodes():
+    graph = NetworkGraph()
+    graph.add_node(create_pq_node("A"))
+    graph.add_node(create_pq_node("B"))
+
+    transformer = create_transformer_branch(
+        "T1",
+        "A",
+        "B",
+        rated_power_mva=20.0,
+        voltage_hv_kv=110.0,
+        voltage_lv_kv=20.0,
+        uk_percent=8.0,
+        pk_kw=60.0,
+    )
+    graph.add_branch(transformer)
+
+    builder = AdmittanceMatrixBuilder(graph)
+    y_bus = builder.build()
+
+    y_series = 1.0 / transformer.get_short_circuit_impedance_ohm_lv()
+    expected = np.array(
+        [
+            [y_series, -y_series],
+            [-y_series, y_series],
+        ],
+        dtype=complex,
+    )
+
+    np.testing.assert_allclose(y_bus, expected)
+
+
+def test_transformer_ignored_when_out_of_service():
+    graph = NetworkGraph()
+    graph.add_node(create_pq_node("A"))
+    graph.add_node(create_pq_node("B"))
+
+    transformer = create_transformer_branch(
+        "T1",
+        "A",
+        "B",
+        rated_power_mva=20.0,
+        voltage_hv_kv=110.0,
+        voltage_lv_kv=20.0,
+        uk_percent=8.0,
+        pk_kw=60.0,
+        in_service=False,
+    )
+    graph.add_branch(transformer)
+
+    builder = AdmittanceMatrixBuilder(graph)
+    y_bus = builder.build()
+
+    expected = np.zeros((2, 2), dtype=complex)
+    np.testing.assert_allclose(y_bus, expected)

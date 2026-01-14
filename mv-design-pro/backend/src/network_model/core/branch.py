@@ -501,6 +501,70 @@ class TransformerBranch(Branch):
 
         return True
 
+    def _validate_short_circuit_inputs(self) -> None:
+        """
+        Validate inputs required for IEC 60909 short-circuit calculations.
+
+        Raises:
+            ValueError: If any required input is out of range.
+        """
+        if self.rated_power_mva <= 0:
+            raise ValueError("rated_power_mva must be > 0")
+        if self.uk_percent <= 0:
+            raise ValueError("uk_percent must be > 0")
+        if self.pk_kw < 0:
+            raise ValueError("pk_kw must be >= 0")
+        if self.voltage_lv_kv <= 0:
+            raise ValueError("voltage_lv_kv must be > 0")
+        if self.voltage_hv_kv <= 0:
+            raise ValueError("voltage_hv_kv must be > 0")
+
+    def get_short_circuit_impedance_pu(self) -> complex:
+        """
+        Calculate IEC 60909 short-circuit impedance in per unit.
+
+        Returns:
+            Complex short-circuit impedance in per unit (Rk_pu + jXk_pu).
+        """
+        self._validate_short_circuit_inputs()
+        z_pu = self.uk_percent / 100.0
+        r_pu = (self.pk_kw / 1000.0) / self.rated_power_mva
+        x_pu = math.sqrt(max(z_pu * z_pu - r_pu * r_pu, 0.0))
+        return complex(r_pu, x_pu)
+
+    def get_short_circuit_resistance_pu(self) -> float:
+        """
+        Calculate IEC 60909 short-circuit resistance in per unit.
+
+        Returns:
+            Short-circuit resistance in per unit.
+        """
+        self._validate_short_circuit_inputs()
+        return (self.pk_kw / 1000.0) / self.rated_power_mva
+
+    def get_short_circuit_reactance_pu(self) -> float:
+        """
+        Calculate IEC 60909 short-circuit reactance in per unit.
+
+        Returns:
+            Short-circuit reactance in per unit.
+        """
+        self._validate_short_circuit_inputs()
+        z_pu = self.uk_percent / 100.0
+        r_pu = (self.pk_kw / 1000.0) / self.rated_power_mva
+        return math.sqrt(max(z_pu * z_pu - r_pu * r_pu, 0.0))
+
+    def get_short_circuit_impedance_ohm_lv(self) -> complex:
+        """
+        Calculate IEC 60909 short-circuit impedance in ohms on LV side.
+
+        Returns:
+            Complex short-circuit impedance in ohms on LV side.
+        """
+        self._validate_short_circuit_inputs()
+        z_base_lv = (self.voltage_lv_kv ** 2) / self.rated_power_mva
+        return self.get_short_circuit_impedance_pu() * z_base_lv
+
     def to_dict(self) -> Dict[str, Any]:
         """
         Convert the transformer branch to a dictionary.
