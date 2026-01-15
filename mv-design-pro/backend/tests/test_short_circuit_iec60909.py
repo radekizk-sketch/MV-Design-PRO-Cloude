@@ -109,8 +109,7 @@ def build_transformer_only_graph(
         pk_kw=pk_kw,
     )
     graph.add_branch(transformer)
-    # Add a tiny reference to ground so the transformer-only Y-bus is invertible
-    # for tests without affecting results materially.
+    # tiny reference to ground so Y-bus is invertible in transformer-only tests
     graph.add_branch(create_reference_branch("REF", "B", "GND", r_ohm=1e9))
     return graph
 
