@@ -5,7 +5,7 @@ import math
 import numpy as np
 import pytest
 
-from network_model.core.branch import BranchType, TransformerBranch
+from network_model.core.branch import BranchType, LineBranch, TransformerBranch
 from network_model.core.graph import NetworkGraph
 from network_model.core.node import Node, NodeType
 from network_model.core.ybus import AdmittanceMatrixBuilder
@@ -24,6 +24,17 @@ def create_pq_node(node_id: str, voltage_level: float) -> Node:
         voltage_level=voltage_level,
         active_power=5.0,
         reactive_power=2.0,
+    )
+
+
+def create_reference_node(node_id: str, voltage_level: float) -> Node:
+    return Node(
+        id=node_id,
+        name=f"Reference {node_id}",
+        node_type=NodeType.PQ,
+        voltage_level=voltage_level,
+        active_power=0.0,
+        reactive_power=0.0,
     )
 
 
@@ -58,6 +69,26 @@ def create_transformer_branch(
     )
 
 
+def create_reference_branch(
+    branch_id: str,
+    from_node_id: str,
+    to_node_id: str,
+    r_ohm: float,
+) -> LineBranch:
+    return LineBranch(
+        id=branch_id,
+        name=f"Reference {branch_id}",
+        branch_type=BranchType.LINE,
+        from_node_id=from_node_id,
+        to_node_id=to_node_id,
+        r_ohm_per_km=r_ohm,
+        x_ohm_per_km=0.0,
+        b_us_per_km=0.0,
+        length_km=1.0,
+        rated_current_a=0.0,
+    )
+
+
 def build_transformer_only_graph(
     pk_kw: float = 120.0,
     uk_percent: float = 10.0,
@@ -65,6 +96,7 @@ def build_transformer_only_graph(
     graph = NetworkGraph()
     graph.add_node(create_pq_node("A", 110.0))
     graph.add_node(create_pq_node("B", 20.0))
+    graph.add_node(create_reference_node("GND", 20.0))
 
     transformer = create_transformer_branch(
         "T1",
@@ -77,6 +109,9 @@ def build_transformer_only_graph(
         pk_kw=pk_kw,
     )
     graph.add_branch(transformer)
+    # Add a tiny reference to ground so the transformer-only Y-bus is invertible
+    # for tests without affecting results materially.
+    graph.add_branch(create_reference_branch("REF", "B", "GND", r_ohm=1e9))
     return graph
 
 
