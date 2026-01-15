@@ -1,0 +1,35 @@
+name: Python Tests
+
+on:
+  push:
+    paths:
+      - 'mv-design-pro/backend/**'
+      - '.github/workflows/python-tests.yml'
+  pull_request:
+    paths:
+      - 'mv-design-pro/backend/**'
+      - '.github/workflows/python-tests.yml'
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: mv-design-pro/backend
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Poetry
+        uses: snok/install-poetry@v1
+
+      - name: Install dependencies
+        run: poetry install --with dev
+
+      - name: Run tests
+        run: poetry run pytest -q
