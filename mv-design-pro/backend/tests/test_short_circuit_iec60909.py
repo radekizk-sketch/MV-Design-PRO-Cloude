@@ -243,7 +243,7 @@ def test_sk_matches_formula():
 
 def test_increasing_rx_ratio_reduces_kappa_and_ip():
     graph_low_rx = build_transformer_only_graph(pk_kw=120.0)
-    graph_high_rx = build_transformer_only_graph(pk_kw=2400.0)
+    graph_high_rx = build_transformer_only_graph(pk_kw=600.0)
 
     result_low_rx = ShortCircuitIEC60909Solver.compute_3ph_short_circuit(
         graph=graph_low_rx,
