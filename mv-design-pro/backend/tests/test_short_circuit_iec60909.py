@@ -58,7 +58,10 @@ def create_transformer_branch(
     )
 
 
-def build_transformer_only_graph() -> NetworkGraph:
+def build_transformer_only_graph(
+    pk_kw: float = 120.0,
+    uk_percent: float = 10.0,
+) -> NetworkGraph:
     graph = NetworkGraph()
     graph.add_node(create_pq_node("A", 110.0))
     graph.add_node(create_pq_node("B", 20.0))
@@ -70,8 +73,8 @@ def build_transformer_only_graph() -> NetworkGraph:
         rated_power_mva=25.0,
         voltage_hv_kv=110.0,
         voltage_lv_kv=20.0,
-        uk_percent=10.0,
-        pk_kw=120.0,
+        uk_percent=uk_percent,
+        pk_kw=pk_kw,
     )
     graph.add_branch(transformer)
     return graph
@@ -239,22 +242,8 @@ def test_sk_matches_formula():
 
 
 def test_increasing_rx_ratio_reduces_kappa_and_ip():
-    graph_low_rx = build_transformer_only_graph()
-    graph_high_rx = NetworkGraph()
-    graph_high_rx.add_node(create_pq_node("A", 110.0))
-    graph_high_rx.add_node(create_pq_node("B", 20.0))
-    graph_high_rx.add_branch(
-        create_transformer_branch(
-            "T1",
-            "A",
-            "B",
-            rated_power_mva=25.0,
-            voltage_hv_kv=110.0,
-            voltage_lv_kv=20.0,
-            uk_percent=10.0,
-            pk_kw=2400.0,
-        )
-    )
+    graph_low_rx = build_transformer_only_graph(pk_kw=120.0)
+    graph_high_rx = build_transformer_only_graph(pk_kw=2400.0)
 
     result_low_rx = ShortCircuitIEC60909Solver.compute_3ph_short_circuit(
         graph=graph_low_rx,
