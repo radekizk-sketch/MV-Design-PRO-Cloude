@@ -1,4 +1,4 @@
-"""Tests for IEC 60909 short-circuit solver (3-phase Ik'')."""
+"""Tests for IEC 60909 short-circuit solver (3-phase Ik'', Ip, Ith, Sk'')."""
 
 import math
 
@@ -80,6 +80,7 @@ def build_transformer_only_graph() -> NetworkGraph:
 def test_ikss_3ph_transformer_only_matches_formula():
     graph = build_transformer_only_graph()
     c_factor = 1.1
+    tk_s = 1.0
 
     builder = AdmittanceMatrixBuilder(graph)
     y_bus = builder.build()
@@ -90,10 +91,11 @@ def test_ikss_3ph_transformer_only_matches_formula():
     un_v = graph.nodes["B"].voltage_level * 1000.0
     ikss_expected = (c_factor * un_v) / (math.sqrt(3.0) * abs(zkk))
 
-    result = ShortCircuitIEC60909Solver.compute_ikss_3ph(
+    result = ShortCircuitIEC60909Solver.compute_3ph_short_circuit(
         graph=graph,
         fault_node_id="B",
         c_factor=c_factor,
+        tk_s=tk_s,
     )
 
     assert np.isclose(result.ikss_a, ikss_expected)
@@ -101,16 +103,19 @@ def test_ikss_3ph_transformer_only_matches_formula():
 
 def test_ikss_increases_with_c_factor():
     graph = build_transformer_only_graph()
+    tk_s = 1.0
 
-    result_cmin = ShortCircuitIEC60909Solver.compute_ikss_3ph(
+    result_cmin = ShortCircuitIEC60909Solver.compute_3ph_short_circuit(
         graph=graph,
         fault_node_id="B",
         c_factor=0.95,
+        tk_s=tk_s,
     )
-    result_cmax = ShortCircuitIEC60909Solver.compute_ikss_3ph(
+    result_cmax = ShortCircuitIEC60909Solver.compute_3ph_short_circuit(
         graph=graph,
         fault_node_id="B",
         c_factor=1.10,
+        tk_s=tk_s,
     )
 
     assert result_cmax.ikss_a > result_cmin.ikss_a
@@ -118,14 +123,19 @@ def test_ikss_increases_with_c_factor():
 
 def test_ikss_min_less_than_max():
     graph = build_transformer_only_graph()
+    tk_s = 1.0
 
-    res_min = ShortCircuitIEC60909Solver.compute_ikss_3ph_min(
+    res_min = ShortCircuitIEC60909Solver.compute_3ph_short_circuit(
         graph=graph,
         fault_node_id="B",
+        c_factor=C_MIN,
+        tk_s=tk_s,
     )
-    res_max = ShortCircuitIEC60909Solver.compute_ikss_3ph_max(
+    res_max = ShortCircuitIEC60909Solver.compute_3ph_short_circuit(
         graph=graph,
         fault_node_id="B",
+        c_factor=C_MAX,
+        tk_s=tk_s,
     )
 
     assert res_max.ikss_a > res_min.ikss_a
@@ -133,10 +143,13 @@ def test_ikss_min_less_than_max():
 
 def test_ikss_min_matches_wrapper_formula():
     graph = build_transformer_only_graph()
+    tk_s = 1.0
 
-    res = ShortCircuitIEC60909Solver.compute_ikss_3ph_min(
+    res = ShortCircuitIEC60909Solver.compute_3ph_short_circuit(
         graph=graph,
         fault_node_id="B",
+        c_factor=C_MIN,
+        tk_s=tk_s,
     )
     expected = (C_MIN * res.un_v) / (math.sqrt(3.0) * abs(res.zkk_ohm))
 
@@ -146,10 +159,13 @@ def test_ikss_min_matches_wrapper_formula():
 
 def test_ikss_max_matches_wrapper_formula():
     graph = build_transformer_only_graph()
+    tk_s = 1.0
 
-    res = ShortCircuitIEC60909Solver.compute_ikss_3ph_max(
+    res = ShortCircuitIEC60909Solver.compute_3ph_short_circuit(
         graph=graph,
         fault_node_id="B",
+        c_factor=C_MAX,
+        tk_s=tk_s,
     )
     expected = (C_MAX * res.un_v) / (math.sqrt(3.0) * abs(res.zkk_ohm))
 
@@ -161,10 +177,11 @@ def test_invalid_fault_node_raises():
     graph = build_transformer_only_graph()
 
     with pytest.raises(ValueError, match="Fault node"):
-        ShortCircuitIEC60909Solver.compute_ikss_3ph(
+        ShortCircuitIEC60909Solver.compute_3ph_short_circuit(
             graph=graph,
             fault_node_id="missing",
             c_factor=1.0,
+            tk_s=1.0,
         )
 
 
@@ -173,8 +190,124 @@ def test_nonpositive_c_factor_raises(c_factor: float):
     graph = build_transformer_only_graph()
 
     with pytest.raises(ValueError, match="c_factor must be > 0"):
-        ShortCircuitIEC60909Solver.compute_ikss_3ph(
+        ShortCircuitIEC60909Solver.compute_3ph_short_circuit(
             graph=graph,
             fault_node_id="B",
             c_factor=c_factor,
+            tk_s=1.0,
         )
+
+
+@pytest.mark.parametrize("tk_s", [0.0, -1.0])
+def test_nonpositive_tk_raises(tk_s: float):
+    graph = build_transformer_only_graph()
+
+    with pytest.raises(ValueError, match="tk_s must be > 0"):
+        ShortCircuitIEC60909Solver.compute_3ph_short_circuit(
+            graph=graph,
+            fault_node_id="B",
+            c_factor=1.0,
+            tk_s=tk_s,
+        )
+
+
+def test_ip_exceeds_sqrt2_times_ikss():
+    graph = build_transformer_only_graph()
+
+    result = ShortCircuitIEC60909Solver.compute_3ph_short_circuit(
+        graph=graph,
+        fault_node_id="B",
+        c_factor=1.1,
+        tk_s=0.5,
+    )
+
+    assert result.ip_a > math.sqrt(2.0) * result.ikss_a
+
+
+def test_sk_matches_formula():
+    graph = build_transformer_only_graph()
+
+    result = ShortCircuitIEC60909Solver.compute_3ph_short_circuit(
+        graph=graph,
+        fault_node_id="B",
+        c_factor=1.1,
+        tk_s=1.0,
+    )
+
+    expected = (math.sqrt(3.0) * result.un_v * result.ikss_a) / 1_000_000.0
+    assert result.sk_mva == pytest.approx(expected, rel=1e-12, abs=0.0)
+
+
+def test_increasing_rx_ratio_reduces_kappa_and_ip():
+    graph_low_rx = build_transformer_only_graph()
+    graph_high_rx = NetworkGraph()
+    graph_high_rx.add_node(create_pq_node("A", 110.0))
+    graph_high_rx.add_node(create_pq_node("B", 20.0))
+    graph_high_rx.add_branch(
+        create_transformer_branch(
+            "T1",
+            "A",
+            "B",
+            rated_power_mva=25.0,
+            voltage_hv_kv=110.0,
+            voltage_lv_kv=20.0,
+            uk_percent=10.0,
+            pk_kw=2400.0,
+        )
+    )
+
+    result_low_rx = ShortCircuitIEC60909Solver.compute_3ph_short_circuit(
+        graph=graph_low_rx,
+        fault_node_id="B",
+        c_factor=1.0,
+        tk_s=1.0,
+    )
+    result_high_rx = ShortCircuitIEC60909Solver.compute_3ph_short_circuit(
+        graph=graph_high_rx,
+        fault_node_id="B",
+        c_factor=1.0,
+        tk_s=1.0,
+    )
+
+    assert result_high_rx.rx_ratio > result_low_rx.rx_ratio
+    assert result_high_rx.kappa < result_low_rx.kappa
+    assert result_high_rx.ip_a < result_low_rx.ip_a
+
+
+def test_ith_scales_with_time():
+    graph = build_transformer_only_graph()
+
+    result_t1 = ShortCircuitIEC60909Solver.compute_3ph_short_circuit(
+        graph=graph,
+        fault_node_id="B",
+        c_factor=1.0,
+        tk_s=1.0,
+    )
+    result_t4 = ShortCircuitIEC60909Solver.compute_3ph_short_circuit(
+        graph=graph,
+        fault_node_id="B",
+        c_factor=1.0,
+        tk_s=4.0,
+    )
+
+    assert result_t1.ith_a == pytest.approx(result_t1.ikss_a, rel=1e-12, abs=0.0)
+    assert result_t4.ith_a == pytest.approx(2.0 * result_t4.ikss_a, rel=1e-12, abs=0.0)
+
+
+def test_zkk_from_inverse_ybus():
+    graph = build_transformer_only_graph()
+
+    builder = AdmittanceMatrixBuilder(graph)
+    y_bus = builder.build()
+    z_bus = np.linalg.inv(y_bus)
+    node_index = builder.node_id_to_index["B"]
+    zkk_expected = z_bus[node_index, node_index]
+
+    result = ShortCircuitIEC60909Solver.compute_3ph_short_circuit(
+        graph=graph,
+        fault_node_id="B",
+        c_factor=1.0,
+        tk_s=1.0,
+    )
+
+    assert result.zkk_ohm == pytest.approx(zkk_expected)

@@ -20,25 +20,39 @@ class ShortCircuitResult3PH:
     un_v: float
     zkk_ohm: complex
     ikss_a: float
+    ip_a: float
+    ith_a: float
+    sk_mva: float
+    rx_ratio: float
+    kappa: float
+    tk_s: float
 
 
 class ShortCircuitIEC60909Solver:
     @staticmethod
-    def compute_ikss_3ph(
+    def compute_3ph_short_circuit(
         graph: NetworkGraph,
         fault_node_id: str,
         c_factor: float,
+        tk_s: float,
     ) -> ShortCircuitResult3PH:
         """
-        IEC 60909: initial symmetrical short-circuit current Ik'' for 3-phase fault.
+        IEC 60909: 3-phase short-circuit currents (Ik'', Ip, Ith) and Sk''.
 
         Ik'' = (c * Un) / (sqrt(3) * |Zkk|)
         where Zkk is diagonal element of Zbus = inv(Ybus).
+
+        kappa = 1.02 + 0.98 * exp(-3 * R/X)
+        Ip = kappa * sqrt(2) * Ik''
+        Ith = Ik'' * sqrt(tk)
+        Sk'' = sqrt(3) * Un * Ik''
         """
         if fault_node_id not in graph.nodes:
             raise ValueError(f"Fault node '{fault_node_id}' does not exist in graph")
         if c_factor <= 0:
             raise ValueError("c_factor must be > 0")
+        if tk_s <= 0:
+            raise ValueError("tk_s must be > 0")
 
         builder = AdmittanceMatrixBuilder(graph)
         y_bus = builder.build()
@@ -57,6 +71,14 @@ class ShortCircuitIEC60909Solver:
 
         un_v = graph.nodes[fault_node_id].voltage_level * 1000.0
         ikss = (c_factor * un_v) / (math.sqrt(3.0) * abs(zkk))
+        if zkk.imag == 0:
+            rx_ratio = math.inf
+        else:
+            rx_ratio = zkk.real / zkk.imag
+        kappa = 1.02 + 0.98 * math.exp(-3.0 * rx_ratio)
+        ip_a = kappa * math.sqrt(2.0) * ikss
+        ith_a = ikss * math.sqrt(tk_s)
+        sk_mva = (math.sqrt(3.0) * un_v * ikss) / 1_000_000.0
 
         return ShortCircuitResult3PH(
             fault_node_id=fault_node_id,
@@ -64,6 +86,31 @@ class ShortCircuitIEC60909Solver:
             un_v=un_v,
             zkk_ohm=zkk,
             ikss_a=ikss,
+            ip_a=ip_a,
+            ith_a=ith_a,
+            sk_mva=sk_mva,
+            rx_ratio=rx_ratio,
+            kappa=kappa,
+            tk_s=tk_s,
+        )
+
+    @staticmethod
+    def compute_ikss_3ph(
+        graph: NetworkGraph,
+        fault_node_id: str,
+        c_factor: float,
+    ) -> ShortCircuitResult3PH:
+        """
+        IEC 60909: initial symmetrical short-circuit current Ik'' for 3-phase fault.
+
+        Ik'' = (c * Un) / (sqrt(3) * |Zkk|)
+        where Zkk is diagonal element of Zbus = inv(Ybus).
+        """
+        return ShortCircuitIEC60909Solver.compute_3ph_short_circuit(
+            graph=graph,
+            fault_node_id=fault_node_id,
+            c_factor=c_factor,
+            tk_s=1.0,
         )
 
     @staticmethod
