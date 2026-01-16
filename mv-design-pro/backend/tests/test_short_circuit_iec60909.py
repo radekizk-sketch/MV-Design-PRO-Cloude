@@ -13,6 +13,7 @@ from network_model.solvers.short_circuit_iec60909 import (
     C_MAX,
     C_MIN,
     ShortCircuitIEC60909Solver,
+    ShortCircuitType,
 )
 
 
@@ -391,3 +392,74 @@ def test_zkk_from_inverse_ybus():
     )
 
     assert result.zkk_ohm == pytest.approx(zkk_expected)
+
+
+def build_z_bus(graph: NetworkGraph) -> np.ndarray:
+    builder = AdmittanceMatrixBuilder(graph)
+    y_bus = builder.build()
+    return np.linalg.inv(y_bus)
+
+
+def test_unbalanced_fault_currents_are_ordered():
+    graph = build_transformer_only_graph()
+    z1_bus = build_z_bus(graph)
+    z0_bus = z1_bus * 3.0
+
+    res_3ph = ShortCircuitIEC60909Solver.compute_3ph_short_circuit(
+        graph=graph,
+        fault_node_id="B",
+        c_factor=1.0,
+        tk_s=1.0,
+    )
+    res_2ph = ShortCircuitIEC60909Solver.compute_2ph_short_circuit(
+        graph=graph,
+        fault_node_id="B",
+        c_factor=1.0,
+        tk_s=1.0,
+    )
+    res_1ph = ShortCircuitIEC60909Solver.compute_1ph_short_circuit(
+        graph=graph,
+        fault_node_id="B",
+        c_factor=1.0,
+        tk_s=1.0,
+        z0_bus=z0_bus,
+    )
+
+    assert res_1ph.short_circuit_type == ShortCircuitType.SINGLE_PHASE_GROUND
+    assert res_2ph.short_circuit_type == ShortCircuitType.TWO_PHASE
+    assert res_1ph.ikss_a < res_2ph.ikss_a < res_3ph.ikss_a
+    assert res_1ph.ip_a < res_2ph.ip_a < res_3ph.ip_a
+    assert res_1ph.ith_a < res_2ph.ith_a < res_3ph.ith_a
+    assert res_1ph.ib_a < res_2ph.ib_a < res_3ph.ib_a
+
+
+def test_2ph_ground_depends_on_z0_and_requires_it():
+    graph = build_transformer_only_graph()
+    z1_bus = build_z_bus(graph)
+    z0_low = z1_bus * 0.5
+    z0_high = z1_bus * 5.0
+
+    res_low = ShortCircuitIEC60909Solver.compute_2ph_ground_short_circuit(
+        graph=graph,
+        fault_node_id="B",
+        c_factor=1.0,
+        tk_s=1.0,
+        z0_bus=z0_low,
+    )
+    res_high = ShortCircuitIEC60909Solver.compute_2ph_ground_short_circuit(
+        graph=graph,
+        fault_node_id="B",
+        c_factor=1.0,
+        tk_s=1.0,
+        z0_bus=z0_high,
+    )
+
+    assert res_low.ikss_a > res_high.ikss_a
+
+    with pytest.raises(ValueError, match="Z0 bus matrix is required"):
+        ShortCircuitIEC60909Solver.compute_2ph_ground_short_circuit(
+            graph=graph,
+            fault_node_id="B",
+            c_factor=1.0,
+            tk_s=1.0,
+        )
