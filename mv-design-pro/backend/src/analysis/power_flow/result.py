@@ -39,11 +39,17 @@ class PowerFlowResult:
     node_voltage_pu: dict[str, complex] = field(default_factory=dict)
     node_u_mag_pu: dict[str, float] = field(default_factory=dict)
     node_angle_rad: dict[str, float] = field(default_factory=dict)
+    node_voltage_kv: dict[str, float] = field(default_factory=dict)
     branch_current_pu: dict[str, complex] = field(default_factory=dict)
+    branch_current_ka: dict[str, float] = field(default_factory=dict)
     branch_s_from_pu: dict[str, complex] = field(default_factory=dict)
     branch_s_to_pu: dict[str, complex] = field(default_factory=dict)
+    branch_s_from_mva: dict[str, complex] = field(default_factory=dict)
+    branch_s_to_mva: dict[str, complex] = field(default_factory=dict)
     losses_total_pu: complex = 0.0 + 0.0j
     slack_power_pu: complex = 0.0 + 0.0j
+    violations: list[dict[str, Any]] = field(default_factory=list)
+    pv_to_pq_switches: list[dict[str, Any]] = field(default_factory=list)
     white_box_trace: dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -57,10 +63,16 @@ class PowerFlowResult:
             "node_voltage_pu": _sorted_complex_dict(self.node_voltage_pu),
             "node_u_mag_pu": _sorted_float_dict(self.node_u_mag_pu),
             "node_angle_rad": _sorted_float_dict(self.node_angle_rad),
+            "node_voltage_kv": _sorted_float_dict(self.node_voltage_kv),
             "branch_current_pu": _sorted_complex_dict(self.branch_current_pu),
+            "branch_current_ka": _sorted_float_dict(self.branch_current_ka),
             "branch_s_from_pu": _sorted_complex_dict(self.branch_s_from_pu),
             "branch_s_to_pu": _sorted_complex_dict(self.branch_s_to_pu),
+            "branch_s_from_mva": _sorted_complex_dict(self.branch_s_from_mva),
+            "branch_s_to_mva": _sorted_complex_dict(self.branch_s_to_mva),
             "losses_total_pu": _complex_to_dict(self.losses_total_pu),
             "slack_power_pu": _complex_to_dict(self.slack_power_pu),
+            "violations": _serialize_value(self.violations),
+            "pv_to_pq_switches": _serialize_value(self.pv_to_pq_switches),
             "white_box_trace": _serialize_value(self.white_box_trace),
         }
