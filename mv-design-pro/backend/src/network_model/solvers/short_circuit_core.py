@@ -13,7 +13,6 @@ from network_model.core.ybus import AdmittanceMatrixBuilder
 OMEGA_50HZ = 2.0 * math.pi * 50.0
 
 
-@dataclass(frozen=True)
 class ShortCircuitType(Enum):
     THREE_PHASE = "3F"
     SINGLE_PHASE_GROUND = "1F"
