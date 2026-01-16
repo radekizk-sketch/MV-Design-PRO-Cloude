@@ -112,6 +112,41 @@ Stanowi fundament pod kolejne funkcje PF, ale **nie zmienia fizyki** obliczeń I
 - Raportowanie jednostek rzeczywistych kV/kA, gdy `voltage_level` jest dostępne.
 - Brak wpływu na solver IEC 60909 (API + obliczenia + raporty pozostają nietknięte).
 
+### Opcje przyszłego rozwoju systemu (Roadmap)
+Poniższe opcje opisują **świadomie niezaimplementowane** funkcje i kierunki rozwoju.
+Sekcja ma charakter architektoniczny: **funkcje planowane ≠ funkcje dostępne**.
+Aktualny zakres obejmuje Power Flow v2 i IEC 60909; poniższe elementy nie są
+częścią obecnej funkcjonalności.
+
+#### 3.1. Protection (kolejny etap funkcjonalny)
+Planowany jest moduł zabezpieczeń, działający jako **konsument wyników** analitycznych:
+- zabezpieczenia nadprądowe 50/51 oraz 50N/51N,
+- selektywność czasowa na poziomie nastaw i porównań czasowych,
+- wykorzystanie wyników Power Flow (Ib, kierunki) oraz IEC 60909 (Ik min/max, Ip, Ith),
+- brak ingerencji w fizykę PF i SC — brak zmian w solverach, jedynie warstwa interpretacji.
+
+#### 3.2. Rozszerzenia Power Flow ponad v2
+PF v2 osiąga **PowerFactory parity minimum**. Poniższe elementy są
+rozszerzeniem klasy narzędzia, a nie poprawką błędów:
+- automatyczna regulacja transformatorów (OLTC),
+- modele obciążeń zależne od napięcia (ZIP),
+- alternatywne solwery i stabilizacja (FDLF, line-search),
+- scenariusze i analiza N-1.
+
+#### 3.3. Model danych (core model v2 – opcjonalnie)
+Opcjonalnie rozważana jest konsolidacja danych w modelu core:
+- ratingów,
+- zakresów tapów,
+- poziomów napięć.
+Obecnie obowiązuje **overlay specyfikacji** (zob. ADR-001: overlay vs core).
+Decyzja o rozbudowie core wymaga osobnego ADR i nie jest częścią bieżącego zakresu.
+
+#### 3.4. Analizy zaawansowane
+Długoterminowo rozważane są opcje:
+- sieci niesymetryczne (3-fazowe),
+- stabilność dynamiczna,
+- symulacje czasowe.
+
 ### Whitebox
 Transparentne obliczenia z pełną dokumentacją kroków pośrednich.
 
