@@ -85,8 +85,8 @@ Modelowanie sieci średniego napięcia z obsługą:
 ### Solvers
 - **Short Circuit** - obliczenia zwarciowe wg IEC 60909
 
-### Analysis (Power Flow Solver v1)
-Power Flow v1 jest osobnym komponentem analitycznym w `backend/src/analysis/power_flow`.
+### Analysis (Power Flow Solver v1 + v2)
+Power Flow v1/v2 jest osobnym komponentem analitycznym w `backend/src/analysis/power_flow`.
 Stanowi fundament pod kolejne funkcje PF, ale **nie zmienia fizyki** obliczeń IEC 60909.
 Łańcuch analiz jest logicznie uporządkowany: Power Flow → Short Circuit → Protection
 (zależność wyników, nie refaktoryzacja istniejących solverów).
@@ -104,12 +104,13 @@ Stanowi fundament pod kolejne funkcje PF, ale **nie zmienia fizyki** obliczeń I
 - Bilans mocy raportuje `slack_power_pu` i `sum_pq_spec_pu` wraz z notą kontrolną.
 - Obsługa wysp: liczona jest wyłącznie wyspa slack, reszta raportowana w trace.
 
-#### Ograniczenia PF v1
-- Brak węzłów PV i automatycznego przełączania PV↔PQ.
-- Brak limitów Q (Qmin/Qmax).
-- Brak OLTC i sterowania zaczepem (tap control).
-- Brak shuntów sterowanych i kompensacji jako elementów jawnych.
-- Brak raportowania limitów napięciowych/prądowych (U/I/S).
+#### PF v2 (rozszerzenie v1)
+- PV z ograniczeniami Q (Qmin/Qmax) i automatycznym PV↔PQ.
+- Off-nominal tap dla transformatorów (core lub overlay).
+- Shunty/kompensacja jako overlay specyfikacji.
+- Raportowanie limitów napięciowych/prądowych/mocy z rankingiem naruszeń.
+- Raportowanie jednostek rzeczywistych kV/kA, gdy `voltage_level` jest dostępne.
+- Brak wpływu na solver IEC 60909 (API + obliczenia + raporty pozostają nietknięte).
 
 ### Whitebox
 Transparentne obliczenia z pełną dokumentacją kroków pośrednich.
