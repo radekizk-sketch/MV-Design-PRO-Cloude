@@ -76,20 +76,21 @@ def compute_equivalent_impedance(
     z1 = z1_bus[node_index, node_index]
     z2 = z2_bus[node_index, node_index] if z2_bus is not None else z1
 
+    def require_z0_bus(message: str) -> complex:
+        if z0_bus is None:
+            raise ValueError(message)
+        return z0_bus[node_index, node_index]
+
     z0: complex | None = None
     if short_circuit_type == ShortCircuitType.THREE_PHASE:
         z_equiv = z1
     elif short_circuit_type == ShortCircuitType.TWO_PHASE:
         z_equiv = z1 + z2
     elif short_circuit_type == ShortCircuitType.SINGLE_PHASE_GROUND:
-        if z0_bus is None:
-            raise ValueError("Z0 bus matrix is required for 1F fault computation")
-        z0 = z0_bus[node_index, node_index]
+        z0 = require_z0_bus("Z0 bus matrix is required for 1F fault computation")
         z_equiv = z1 + z2 + z0
     elif short_circuit_type == ShortCircuitType.TWO_PHASE_GROUND:
-        if z0_bus is None:
-            raise ValueError("Z0 bus matrix is required for 2F+G fault computation")
-        z0 = z0_bus[node_index, node_index]
+        z0 = require_z0_bus("Z0 bus matrix is required for 2F+G fault computation")
         denominator = z2 + z0
         if abs(denominator) == 0:
             raise ZeroDivisionError("Z2 + Z0 is zero; cannot compute Ik''")
