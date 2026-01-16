@@ -26,6 +26,8 @@ class ShortCircuitResult3PH:
     rx_ratio: float
     kappa: float
     tk_s: float
+    ib_a: float
+    tb_s: float
 
 
 class ShortCircuitIEC60909Solver:
@@ -35,6 +37,7 @@ class ShortCircuitIEC60909Solver:
         fault_node_id: str,
         c_factor: float,
         tk_s: float,
+        tb_s: float = 0.1,
     ) -> ShortCircuitResult3PH:
         """
         IEC 60909: 3-phase short-circuit currents (Ik'', Ip, Ith) and Sk''.
@@ -53,6 +56,8 @@ class ShortCircuitIEC60909Solver:
             raise ValueError("c_factor must be > 0")
         if tk_s <= 0:
             raise ValueError("tk_s must be > 0")
+        if tb_s <= 0:
+            raise ValueError("tb_s must be > 0")
 
         builder = AdmittanceMatrixBuilder(graph)
         y_bus = builder.build()
@@ -79,6 +84,18 @@ class ShortCircuitIEC60909Solver:
         ip_a = kappa * math.sqrt(2.0) * ikss
         ith_a = ikss * math.sqrt(tk_s)
         sk_mva = (math.sqrt(3.0) * un_v * ikss) / 1_000_000.0
+        omega = 2.0 * math.pi * 50.0
+        r_ohm = zkk.real
+        x_ohm = zkk.imag
+        if r_ohm <= 0 or x_ohm <= 0:
+            ta_s = 0.0
+        else:
+            ta_s = x_ohm / (omega * r_ohm)
+        # Uproszczony IEC 60909: Ib jako RMS symetryczny w chwili tb,
+        # zanik składowej nieokresowej opisany wykładniczo przez Ta.
+        # Granice: tb -> inf oraz Ta -> 0 prowadzą do Ib -> Ik''.
+        exp_factor = 0.0 if ta_s <= 0 else math.exp(-tb_s / ta_s)
+        ib_a = ikss * math.sqrt(1.0 + ((kappa - 1.0) * exp_factor) ** 2)
 
         return ShortCircuitResult3PH(
             fault_node_id=fault_node_id,
@@ -92,6 +109,8 @@ class ShortCircuitIEC60909Solver:
             rx_ratio=rx_ratio,
             kappa=kappa,
             tk_s=tk_s,
+            ib_a=ib_a,
+            tb_s=tb_s,
         )
 
     @staticmethod
