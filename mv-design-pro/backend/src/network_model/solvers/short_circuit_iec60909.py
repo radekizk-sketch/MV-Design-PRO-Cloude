@@ -7,16 +7,20 @@ import numpy as np
 from network_model.core.graph import NetworkGraph
 from network_model.core.inverter import InverterSource
 from network_model.solvers.short_circuit_core import (
+    OMEGA_50HZ,
+    ShortCircuitPostProcessResult,
     ShortCircuitType,
     compute_equivalent_impedance,
     compute_ikss,
     compute_post_fault_quantities,
+    voltage_factor_for_fault,
 )
 from network_model.solvers.short_circuit_contributions import (
     ShortCircuitBranchContribution,
     ShortCircuitSourceContribution,
     SourceType,
 )
+from network_model.whitebox.tracer import WhiteBoxTracer
 
 
 C_MIN: float = 0.95
@@ -44,6 +48,7 @@ class ShortCircuitResult:
     ik_total_a: float = 0.0
     contributions: list[ShortCircuitSourceContribution] = field(default_factory=list)
     branch_contributions: list[ShortCircuitBranchContribution] | None = None
+    white_box_trace: list[dict] = field(default_factory=list)
 
     @property
     def ik_a(self) -> float:
@@ -81,6 +86,7 @@ class ShortCircuitIEC60909Solver:
         ik_inverters: float,
         contributions: list[ShortCircuitSourceContribution],
         branch_contributions: list[ShortCircuitBranchContribution] | None,
+        white_box_trace: list[dict],
     ) -> ShortCircuitResult:
         ik_total = ikss_thevenin + ik_inverters
         post = compute_post_fault_quantities(
@@ -111,7 +117,178 @@ class ShortCircuitIEC60909Solver:
             ik_total_a=ik_total,
             contributions=contributions,
             branch_contributions=branch_contributions,
+            white_box_trace=white_box_trace,
         )
+
+    @staticmethod
+    def _format_complex(value: complex) -> str:
+        real = f"{value.real:.6g}"
+        imag = f"{abs(value.imag):.6g}"
+        sign = "+" if value.imag >= 0 else "-"
+        return f"{real}{sign}j{imag}"
+
+    @staticmethod
+    def _format_float(value: float) -> str:
+        return f"{value:.6g}"
+
+    @staticmethod
+    def _build_white_box_trace(
+        *,
+        short_circuit_type: ShortCircuitType,
+        fault_node_id: str,
+        c_factor: float,
+        un_v: float,
+        tk_s: float,
+        tb_s: float,
+        z_equiv: complex,
+        z1: complex,
+        z2: complex,
+        z0: complex | None,
+        ikss_a: float,
+        post: ShortCircuitPostProcessResult,
+    ) -> list[dict]:
+        tracer = WhiteBoxTracer()
+        z_equiv_abs = abs(z_equiv)
+        voltage_factor = voltage_factor_for_fault(short_circuit_type)
+
+        z_inputs = {
+            "z1_ohm": z1,
+            "z2_ohm": z2,
+            "fault_node_id": fault_node_id,
+            "short_circuit_type": short_circuit_type.value,
+        }
+        if z0 is not None:
+            z_inputs["z0_ohm"] = z0
+
+        if short_circuit_type == ShortCircuitType.THREE_PHASE:
+            formula = "Z_k = Z_1"
+            substitution = f"{ShortCircuitIEC60909Solver._format_complex(z1)}"
+        elif short_circuit_type == ShortCircuitType.TWO_PHASE:
+            formula = "Z_k = Z_1 + Z_2"
+            substitution = (
+                f"{ShortCircuitIEC60909Solver._format_complex(z1)}"
+                f" + {ShortCircuitIEC60909Solver._format_complex(z2)}"
+            )
+        elif short_circuit_type == ShortCircuitType.SINGLE_PHASE_GROUND:
+            formula = "Z_k = Z_1 + Z_2 + Z_0"
+            substitution = (
+                f"{ShortCircuitIEC60909Solver._format_complex(z1)}"
+                f" + {ShortCircuitIEC60909Solver._format_complex(z2)}"
+                f" + {ShortCircuitIEC60909Solver._format_complex(z0 or 0)}"
+            )
+        else:
+            formula = "Z_k = Z_1 + (Z_2 \\cdot Z_0) / (Z_2 + Z_0)"
+            denominator = z2 + (z0 or 0)
+            substitution = (
+                f"{ShortCircuitIEC60909Solver._format_complex(z1)}"
+                f" + ({ShortCircuitIEC60909Solver._format_complex(z2)}"
+                f" * {ShortCircuitIEC60909Solver._format_complex(z0 or 0)})"
+                f" / ({ShortCircuitIEC60909Solver._format_complex(denominator)})"
+            )
+
+        tracer.add(
+            key="Zk",
+            title="Impedancja zastępcza w punkcie zwarcia",
+            formula_latex=formula,
+            inputs=z_inputs,
+            substitution=substitution,
+            result={"z_equiv_ohm": z_equiv},
+        )
+
+        tracer.add(
+            key="Ikss",
+            title="Prąd zwarciowy początkowy symetryczny",
+            formula_latex="I_{k}'' = (c \\cdot U_n \\cdot k_U) / |Z_k|",
+            inputs={
+                "c_factor": c_factor,
+                "un_v": un_v,
+                "voltage_factor": voltage_factor,
+                "z_equiv_abs_ohm": z_equiv_abs,
+            },
+            substitution=(
+                f"({ShortCircuitIEC60909Solver._format_float(c_factor)}"
+                f" * {ShortCircuitIEC60909Solver._format_float(un_v)}"
+                f" * {ShortCircuitIEC60909Solver._format_float(voltage_factor)})"
+                f" / {ShortCircuitIEC60909Solver._format_float(z_equiv_abs)}"
+            ),
+            result={"ikss_a": ikss_a},
+        )
+
+        r_ohm = z_equiv.real
+        x_ohm = z_equiv.imag
+        rx_ratio = post.rx_ratio
+        tracer.add(
+            key="kappa",
+            title="Współczynnik udaru",
+            formula_latex="\\kappa = 1.02 + 0.98 \\cdot e^{-3 R/X}",
+            inputs={"r_ohm": r_ohm, "x_ohm": x_ohm, "rx_ratio": rx_ratio},
+            substitution=(
+                f"1.02 + 0.98 * exp(-3 * {ShortCircuitIEC60909Solver._format_float(rx_ratio)})"
+            ),
+            result={"kappa": post.kappa},
+        )
+
+        tracer.add(
+            key="Ip",
+            title="Prąd udarowy",
+            formula_latex="I_p = \\kappa \\cdot \\sqrt{2} \\cdot I_{k}''",
+            inputs={"kappa": post.kappa, "ikss_a": ikss_a},
+            substitution=(
+                f"{ShortCircuitIEC60909Solver._format_float(post.kappa)}"
+                f" * sqrt(2) * {ShortCircuitIEC60909Solver._format_float(ikss_a)}"
+            ),
+            result={"ip_a": post.ip_a},
+        )
+
+        ta_s = 0.0 if r_ohm <= 0 or x_ohm <= 0 else x_ohm / (OMEGA_50HZ * r_ohm)
+        exp_factor = 0.0 if ta_s <= 0 else np.exp(-tb_s / ta_s)
+        tracer.add(
+            key="Ib",
+            title="Prąd zwarciowy do obliczeń cieplnych",
+            formula_latex=(
+                "I_b = I_{k}'' \\cdot \\sqrt{1 + ((\\kappa - 1)"
+                " \\cdot e^{-t_b/t_a})^2}"
+            ),
+            inputs={
+                "ikss_a": ikss_a,
+                "kappa": post.kappa,
+                "tb_s": tb_s,
+                "ta_s": ta_s,
+                "exp_factor": exp_factor,
+            },
+            substitution=(
+                f"{ShortCircuitIEC60909Solver._format_float(ikss_a)}"
+                f" * sqrt(1 + (({ShortCircuitIEC60909Solver._format_float(post.kappa)}"
+                f" - 1) * {ShortCircuitIEC60909Solver._format_float(exp_factor)})^2)"
+            ),
+            result={"ib_a": post.ib_a},
+        )
+
+        tracer.add(
+            key="Ith",
+            title="Prąd zastępczy cieplny",
+            formula_latex="I_{th} = I_{k}'' \\cdot \\sqrt{t_k}",
+            inputs={"ikss_a": ikss_a, "tk_s": tk_s},
+            substitution=(
+                f"{ShortCircuitIEC60909Solver._format_float(ikss_a)}"
+                f" * sqrt({ShortCircuitIEC60909Solver._format_float(tk_s)})"
+            ),
+            result={"ith_a": post.ith_a},
+        )
+
+        tracer.add(
+            key="Sk",
+            title="Moc zwarciowa",
+            formula_latex="S_k = \\sqrt{3} \\cdot U_n \\cdot I_{k}'' / 10^6",
+            inputs={"un_v": un_v, "ikss_a": ikss_a},
+            substitution=(
+                f"sqrt(3) * {ShortCircuitIEC60909Solver._format_float(un_v)}"
+                f" * {ShortCircuitIEC60909Solver._format_float(ikss_a)} / 1e6"
+            ),
+            result={"sk_mva": post.sk_mva},
+        )
+
+        return tracer.to_list()
 
     @staticmethod
     def _compute_inverter_contribution(
@@ -318,6 +495,27 @@ class ShortCircuitIEC60909Solver:
             short_circuit_type=ShortCircuitType.THREE_PHASE,
         )
         ik_total = ikss + ik_inverters
+        post = compute_post_fault_quantities(
+            ikss=ik_total,
+            un_v=un_v,
+            z_equiv=core.z_equiv,
+            tk_s=tk_s,
+            tb_s=tb_s,
+        )
+        white_box_trace = ShortCircuitIEC60909Solver._build_white_box_trace(
+            short_circuit_type=ShortCircuitType.THREE_PHASE,
+            fault_node_id=fault_node_id,
+            c_factor=c_factor,
+            un_v=un_v,
+            tk_s=tk_s,
+            tb_s=tb_s,
+            z_equiv=core.z_equiv,
+            z1=core.z1,
+            z2=core.z2,
+            z0=core.z0,
+            ikss_a=ik_total,
+            post=post,
+        )
         contributions = ShortCircuitIEC60909Solver._build_source_contributions(
             graph=graph,
             fault_node_id=fault_node_id,
@@ -346,6 +544,7 @@ class ShortCircuitIEC60909Solver:
             ik_inverters=ik_inverters,
             contributions=contributions,
             branch_contributions=branch_contributions,
+            white_box_trace=white_box_trace,
         )
 
     @staticmethod
@@ -430,6 +629,27 @@ class ShortCircuitIEC60909Solver:
             short_circuit_type=ShortCircuitType.SINGLE_PHASE_GROUND,
         )
         ik_total = ikss + ik_inverters
+        post = compute_post_fault_quantities(
+            ikss=ik_total,
+            un_v=un_v,
+            z_equiv=core.z_equiv,
+            tk_s=tk_s,
+            tb_s=tb_s,
+        )
+        white_box_trace = ShortCircuitIEC60909Solver._build_white_box_trace(
+            short_circuit_type=ShortCircuitType.SINGLE_PHASE_GROUND,
+            fault_node_id=fault_node_id,
+            c_factor=c_factor,
+            un_v=un_v,
+            tk_s=tk_s,
+            tb_s=tb_s,
+            z_equiv=core.z_equiv,
+            z1=core.z1,
+            z2=core.z2,
+            z0=core.z0,
+            ikss_a=ik_total,
+            post=post,
+        )
         contributions = ShortCircuitIEC60909Solver._build_source_contributions(
             graph=graph,
             fault_node_id=fault_node_id,
@@ -458,6 +678,7 @@ class ShortCircuitIEC60909Solver:
             ik_inverters=ik_inverters,
             contributions=contributions,
             branch_contributions=branch_contributions,
+            white_box_trace=white_box_trace,
         )
 
     @staticmethod
@@ -501,6 +722,27 @@ class ShortCircuitIEC60909Solver:
             short_circuit_type=ShortCircuitType.TWO_PHASE,
         )
         ik_total = ikss + ik_inverters
+        post = compute_post_fault_quantities(
+            ikss=ik_total,
+            un_v=un_v,
+            z_equiv=core.z_equiv,
+            tk_s=tk_s,
+            tb_s=tb_s,
+        )
+        white_box_trace = ShortCircuitIEC60909Solver._build_white_box_trace(
+            short_circuit_type=ShortCircuitType.TWO_PHASE,
+            fault_node_id=fault_node_id,
+            c_factor=c_factor,
+            un_v=un_v,
+            tk_s=tk_s,
+            tb_s=tb_s,
+            z_equiv=core.z_equiv,
+            z1=core.z1,
+            z2=core.z2,
+            z0=core.z0,
+            ikss_a=ik_total,
+            post=post,
+        )
         contributions = ShortCircuitIEC60909Solver._build_source_contributions(
             graph=graph,
             fault_node_id=fault_node_id,
@@ -529,6 +771,7 @@ class ShortCircuitIEC60909Solver:
             ik_inverters=ik_inverters,
             contributions=contributions,
             branch_contributions=branch_contributions,
+            white_box_trace=white_box_trace,
         )
 
     @staticmethod
@@ -576,6 +819,27 @@ class ShortCircuitIEC60909Solver:
             short_circuit_type=ShortCircuitType.TWO_PHASE_GROUND,
         )
         ik_total = ikss + ik_inverters
+        post = compute_post_fault_quantities(
+            ikss=ik_total,
+            un_v=un_v,
+            z_equiv=core.z_equiv,
+            tk_s=tk_s,
+            tb_s=tb_s,
+        )
+        white_box_trace = ShortCircuitIEC60909Solver._build_white_box_trace(
+            short_circuit_type=ShortCircuitType.TWO_PHASE_GROUND,
+            fault_node_id=fault_node_id,
+            c_factor=c_factor,
+            un_v=un_v,
+            tk_s=tk_s,
+            tb_s=tb_s,
+            z_equiv=core.z_equiv,
+            z1=core.z1,
+            z2=core.z2,
+            z0=core.z0,
+            ikss_a=ik_total,
+            post=post,
+        )
         contributions = ShortCircuitIEC60909Solver._build_source_contributions(
             graph=graph,
             fault_node_id=fault_node_id,
@@ -604,6 +868,7 @@ class ShortCircuitIEC60909Solver:
             ik_inverters=ik_inverters,
             contributions=contributions,
             branch_contributions=branch_contributions,
+            white_box_trace=white_box_trace,
         )
 
 
