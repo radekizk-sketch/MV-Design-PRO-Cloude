@@ -8,13 +8,12 @@ Professional Medium Voltage Network Design System - kompleksowe narzędzie do pr
 mv-design-pro/
 ├── backend/                    # Backend API (Python/FastAPI)
 │   ├── src/
+│   │   ├── analysis/           # Moduły analityczne (Power Flow v1)
 │   │   ├── network_model/      # Model sieci elektrycznej
 │   │   │   ├── core/           # Podstawowe klasy i struktury
 │   │   │   ├── elements/       # Elementy sieci (transformatory, linie, etc.)
 │   │   │   └── validation/     # Walidacja modelu sieci
-│   │   ├── solvers/            # Solvery obliczeniowe
-│   │   │   ├── power_flow/     # Rozpływ mocy
-│   │   │   └── short_circuit/  # Zwarcia
+│   │   ├── solvers/            # Solvery obliczeniowe (np. IEC 60909)
 │   │   ├── whitebox/           # Transparentne obliczenia
 │   │   ├── compliance/         # Zgodność z normami
 │   │   └── api/                # REST API endpoints
@@ -84,8 +83,33 @@ Modelowanie sieci średniego napięcia z obsługą:
 - Zabezpieczeń
 
 ### Solvers
-- **Power Flow** - analiza rozpływu mocy metodami Newton-Raphson i Gauss-Seidel
 - **Short Circuit** - obliczenia zwarciowe wg IEC 60909
+
+### Analysis (Power Flow Solver v1)
+Power Flow v1 jest osobnym komponentem analitycznym w `backend/src/analysis/power_flow`.
+Stanowi fundament pod kolejne funkcje PF, ale **nie zmienia fizyki** obliczeń IEC 60909.
+Łańcuch analiz jest logicznie uporządkowany: Power Flow → Short Circuit → Protection
+(zależność wyników, nie refaktoryzacja istniejących solverów).
+
+#### Publiczne API (stabilne w v1)
+- `PowerFlowInput`
+- `PowerFlowOptions`
+- `PowerFlowResult`
+- `PowerFlowSolver`
+- `solve_power_flow`
+
+#### Result API (PowerFactory-ready)
+- `to_dict()` zwraca JSON-ready output z deterministycznym sortowaniem kluczy.
+- `white_box_trace` zawiera pełny ślad iteracji, walidacji, wysp oraz Y-bus mapowań.
+- Bilans mocy raportuje `slack_power_pu` i `sum_pq_spec_pu` wraz z notą kontrolną.
+- Obsługa wysp: liczona jest wyłącznie wyspa slack, reszta raportowana w trace.
+
+#### Ograniczenia PF v1
+- Brak węzłów PV i automatycznego przełączania PV↔PQ.
+- Brak limitów Q (Qmin/Qmax).
+- Brak OLTC i sterowania zaczepem (tap control).
+- Brak shuntów sterowanych i kompensacji jako elementów jawnych.
+- Brak raportowania limitów napięciowych/prądowych (U/I/S).
 
 ### Whitebox
 Transparentne obliczenia z pełną dokumentacją kroków pośrednich.
