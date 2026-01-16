@@ -275,6 +275,43 @@ def test_sk_matches_formula():
     assert result.sk_mva == pytest.approx(expected, rel=1e-12, abs=0.0)
 
 
+def test_ib_is_ge_ikss_and_decays_with_time():
+    graph = build_transformer_only_graph(pk_kw=120.0)
+
+    res_short = ShortCircuitIEC60909Solver.compute_3ph_short_circuit(
+        graph=graph,
+        fault_node_id="B",
+        c_factor=1.0,
+        tk_s=1.0,
+        tb_s=0.02,
+    )
+    res_long = ShortCircuitIEC60909Solver.compute_3ph_short_circuit(
+        graph=graph,
+        fault_node_id="B",
+        c_factor=1.0,
+        tk_s=1.0,
+        tb_s=0.2,
+    )
+
+    assert res_short.ib_a >= res_short.ikss_a
+    assert res_long.ib_a >= res_long.ikss_a
+    assert res_short.ib_a >= res_long.ib_a
+
+
+def test_ib_equals_ikss_when_time_constant_is_zeroish():
+    graph = build_transformer_only_graph()
+
+    result = ShortCircuitIEC60909Solver.compute_3ph_short_circuit(
+        graph=graph,
+        fault_node_id="B",
+        c_factor=1.0,
+        tk_s=1.0,
+        tb_s=100.0,
+    )
+
+    assert result.ib_a == pytest.approx(result.ikss_a, rel=1e-8, abs=0.0)
+
+
 def test_increasing_rx_ratio_reduces_kappa_and_ip():
     graph_low_rx = build_transformer_only_graph(pk_kw=120.0)
     graph_high_rx = build_transformer_only_graph(pk_kw=300.0)
