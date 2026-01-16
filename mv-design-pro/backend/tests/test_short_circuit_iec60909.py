@@ -498,6 +498,33 @@ def test_unbalanced_fault_currents_are_ordered():
     assert res_1ph.ib_a < res_2ph.ib_a < res_3ph.ib_a
 
 
+def test_white_box_trace_has_expected_steps():
+    graph = build_transformer_only_graph()
+    z0_bus = build_z_bus(graph) * 3.0
+
+    res_3ph = ShortCircuitIEC60909Solver.compute_3ph_short_circuit(
+        graph=graph,
+        fault_node_id="B",
+        c_factor=1.0,
+        tk_s=1.0,
+    )
+    res_1ph = ShortCircuitIEC60909Solver.compute_1ph_short_circuit(
+        graph=graph,
+        fault_node_id="B",
+        c_factor=1.0,
+        tk_s=1.0,
+        z0_bus=z0_bus,
+    )
+
+    for result in (res_3ph, res_1ph):
+        assert isinstance(result.white_box_trace, list)
+        assert len(result.white_box_trace) >= 7
+        keys = [step["key"] for step in result.white_box_trace[:7]]
+        assert keys == ["Zk", "Ikss", "kappa", "Ip", "Ib", "Ith", "Sk"]
+        for step in result.white_box_trace[:7]:
+            assert {"key", "title", "formula_latex", "inputs", "substitution", "result"} <= step.keys()
+
+
 def test_2ph_ground_depends_on_z0_and_requires_it():
     graph = build_transformer_only_graph()
     z1_bus = build_z_bus(graph)
