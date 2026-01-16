@@ -12,6 +12,7 @@ import networkx as nx
 
 from .node import Node, NodeType
 from .branch import Branch
+from .inverter import InverterSource
 
 
 class NetworkGraph:
@@ -44,6 +45,7 @@ class NetworkGraph:
         """Inicjalizuje pusty graf sieci."""
         self.nodes: Dict[str, Node] = {}
         self.branches: Dict[str, Branch] = {}
+        self.inverter_sources: Dict[str, InverterSource] = {}
         self._graph: nx.MultiGraph = nx.MultiGraph()
 
     def add_node(self, node: Node) -> None:
@@ -132,6 +134,83 @@ class NetworkGraph:
                 branch_type=branch.branch_type.value,
                 name=branch.name,
             )
+
+    def add_inverter_source(self, source: InverterSource) -> None:
+        """
+        Dodaje źródło falownikowe do grafu sieci.
+
+        Args:
+            source: Źródło falownikowe do dodania.
+
+        Raises:
+            ValueError: Gdy źródło o podanym ID już istnieje.
+            ValueError: Gdy węzeł docelowy nie istnieje.
+        """
+        if source.id in self.inverter_sources:
+            raise ValueError(
+                f"Źródło falownikowe o ID '{source.id}' już istnieje w grafie."
+            )
+        if source.node_id not in self.nodes:
+            raise ValueError(
+                f"Węzeł '{source.node_id}' nie istnieje w grafie."
+            )
+        self.inverter_sources[source.id] = source
+
+    def remove_inverter_source(self, source_id: str) -> None:
+        """
+        Usuwa źródło falownikowe z grafu sieci.
+
+        Args:
+            source_id: ID źródła falownikowego.
+
+        Raises:
+            ValueError: Gdy źródło o podanym ID nie istnieje.
+        """
+        if source_id not in self.inverter_sources:
+            raise ValueError(
+                f"Źródło falownikowe o ID '{source_id}' nie istnieje w grafie."
+            )
+        del self.inverter_sources[source_id]
+
+    def get_inverter_sources_at_node(self, node_id: str) -> List[InverterSource]:
+        """
+        Zwraca listę aktywnych źródeł falownikowych w danym węźle.
+
+        Args:
+            node_id: ID węzła.
+
+        Returns:
+            Lista źródeł falownikowych posortowana deterministycznie po ID.
+
+        Raises:
+            ValueError: Gdy węzeł o podanym ID nie istnieje.
+        """
+        if node_id not in self.nodes:
+            raise ValueError(
+                f"Węzeł o ID '{node_id}' nie istnieje w grafie."
+            )
+        sources = [
+            source
+            for source in self.inverter_sources.values()
+            if source.node_id == node_id and self._is_inverter_in_service(source)
+        ]
+        sources.sort(key=lambda source: source.id)
+        return sources
+
+    def get_inverter_sources(self) -> List[InverterSource]:
+        """
+        Zwraca listę aktywnych źródeł falownikowych w całej sieci.
+
+        Returns:
+            Lista źródeł falownikowych posortowana deterministycznie po ID.
+        """
+        sources = [
+            source
+            for source in self.inverter_sources.values()
+            if self._is_inverter_in_service(source)
+        ]
+        sources.sort(key=lambda source: source.id)
+        return sources
 
     def remove_node(self, node_id: str) -> None:
         """
@@ -397,6 +476,18 @@ class NetworkGraph:
             True jeśli gałąź jest aktywna, False w przeciwnym razie.
         """
         return getattr(branch, "in_service", True)
+
+    def _is_inverter_in_service(self, source: InverterSource) -> bool:
+        """
+        Sprawdza czy źródło falownikowe jest aktywne (in_service).
+
+        Args:
+            source: Źródło falownikowe do sprawdzenia.
+
+        Returns:
+            True jeśli źródło jest aktywne, False w przeciwnym razie.
+        """
+        return getattr(source, "in_service", True)
 
     def __repr__(self) -> str:
         """Zwraca czytelną reprezentację tekstową grafu."""

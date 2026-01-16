@@ -8,6 +8,7 @@ węzły, gałęzie, transformatory (jako typ gałęzi) oraz graf sieci.
 from .node import Node, NodeType
 from .branch import BranchType, Branch, LineBranch, TransformerBranch
 from .graph import NetworkGraph
+from .inverter import InverterSource
 from .ybus import AdmittanceMatrixBuilder
 
 __all__ = [
@@ -18,5 +19,6 @@ __all__ = [
     "LineBranch",
     "TransformerBranch",
     "NetworkGraph",
+    "InverterSource",
     "AdmittanceMatrixBuilder",
 ]

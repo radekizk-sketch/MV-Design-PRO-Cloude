@@ -7,6 +7,7 @@ import pytest
 
 from network_model.core.branch import BranchType, LineBranch, TransformerBranch
 from network_model.core.graph import NetworkGraph
+from network_model.core.inverter import InverterSource
 from network_model.core.node import Node, NodeType
 from network_model.core.ybus import AdmittanceMatrixBuilder
 from network_model.solvers.short_circuit_iec60909 import (
@@ -87,6 +88,33 @@ def create_reference_branch(
         b_us_per_km=0.0,
         length_km=1.0,
         rated_current_a=0.0,
+    )
+
+
+def create_inverter_source(
+    source_id: str,
+    node_id: str,
+    in_rated_a: float,
+    k_sc: float = 1.2,
+    contributes_negative_sequence: bool = False,
+    contributes_zero_sequence: bool = False,
+    in_service: bool = True,
+) -> InverterSource:
+    return InverterSource(
+        id=source_id,
+        name=f"Inverter {source_id}",
+        node_id=node_id,
+        in_rated_a=in_rated_a,
+        k_sc=k_sc,
+        contributes_negative_sequence=contributes_negative_sequence,
+        contributes_zero_sequence=contributes_zero_sequence,
+        in_service=in_service,
+    )
+
+
+def find_contribution(contributions, source_id: str):
+    return next(
+        contrib for contrib in contributions if contrib.source_id == source_id
     )
 
 
@@ -500,3 +528,229 @@ def test_2ph_ground_depends_on_z0_and_requires_it():
             c_factor=1.0,
             tk_s=1.0,
         )
+
+
+def test_no_inverter_sources_keeps_ik_totals_equal():
+    graph = build_transformer_only_graph()
+
+    result = ShortCircuitIEC60909Solver.compute_3ph_short_circuit(
+        graph=graph,
+        fault_node_id="B",
+        c_factor=1.0,
+        tk_s=1.0,
+    )
+
+    assert result.ik_inverters_a == 0.0
+    assert result.ik_total_a == pytest.approx(result.ikss_a, rel=1e-12, abs=0.0)
+    assert result.ik_thevenin_a == pytest.approx(result.ikss_a, rel=1e-12, abs=0.0)
+
+
+def test_inverter_adds_current_to_3ph_fault():
+    graph = build_transformer_only_graph()
+    inverter = create_inverter_source("INV-1", "B", in_rated_a=120.0, k_sc=1.15)
+    graph.add_inverter_source(inverter)
+
+    result = ShortCircuitIEC60909Solver.compute_3ph_short_circuit(
+        graph=graph,
+        fault_node_id="B",
+        c_factor=1.0,
+        tk_s=1.0,
+    )
+
+    expected_inv = inverter.k_sc * inverter.in_rated_a
+    assert result.ik_inverters_a == pytest.approx(expected_inv, rel=1e-12, abs=0.0)
+    assert result.ik_total_a == pytest.approx(
+        result.ik_thevenin_a + expected_inv, rel=1e-12, abs=0.0
+    )
+
+
+def test_inverter_zero_sequence_controls_1ph_and_2ph_ground():
+    graph_no_zero = build_transformer_only_graph()
+    inverter = create_inverter_source("INV-2", "B", in_rated_a=90.0, k_sc=1.1)
+    graph_no_zero.add_inverter_source(inverter)
+    z0_bus = build_z_bus(graph_no_zero) * 3.0
+
+    res_1ph_no_zero = ShortCircuitIEC60909Solver.compute_1ph_short_circuit(
+        graph=graph_no_zero,
+        fault_node_id="B",
+        c_factor=1.0,
+        tk_s=1.0,
+        z0_bus=z0_bus,
+    )
+    res_2phg_no_zero = ShortCircuitIEC60909Solver.compute_2ph_ground_short_circuit(
+        graph=graph_no_zero,
+        fault_node_id="B",
+        c_factor=1.0,
+        tk_s=1.0,
+        z0_bus=z0_bus,
+    )
+
+    assert res_1ph_no_zero.ik_inverters_a == 0.0
+    assert res_2phg_no_zero.ik_inverters_a == 0.0
+
+    graph_with_zero = build_transformer_only_graph()
+    inverter_zero = create_inverter_source(
+        "INV-3",
+        "B",
+        in_rated_a=90.0,
+        k_sc=1.1,
+        contributes_zero_sequence=True,
+    )
+    graph_with_zero.add_inverter_source(inverter_zero)
+    z0_bus = build_z_bus(graph_with_zero) * 3.0
+
+    res_1ph_zero = ShortCircuitIEC60909Solver.compute_1ph_short_circuit(
+        graph=graph_with_zero,
+        fault_node_id="B",
+        c_factor=1.0,
+        tk_s=1.0,
+        z0_bus=z0_bus,
+    )
+    res_2phg_zero = ShortCircuitIEC60909Solver.compute_2ph_ground_short_circuit(
+        graph=graph_with_zero,
+        fault_node_id="B",
+        c_factor=1.0,
+        tk_s=1.0,
+        z0_bus=z0_bus,
+    )
+
+    expected_inv = inverter_zero.k_sc * inverter_zero.in_rated_a
+    assert res_1ph_zero.ik_inverters_a == pytest.approx(expected_inv, rel=1e-12, abs=0.0)
+    assert res_2phg_zero.ik_inverters_a == pytest.approx(
+        expected_inv, rel=1e-12, abs=0.0
+    )
+
+
+def test_inverter_contribution_is_deterministic():
+    graph_a = build_transformer_only_graph()
+    graph_b = build_transformer_only_graph()
+    inv1 = create_inverter_source("INV-A", "B", in_rated_a=50.0, k_sc=1.2)
+    inv2 = create_inverter_source("INV-B", "B", in_rated_a=80.0, k_sc=1.1)
+
+    graph_a.add_inverter_source(inv1)
+    graph_a.add_inverter_source(inv2)
+    graph_b.add_inverter_source(inv2)
+    graph_b.add_inverter_source(inv1)
+
+    res_a = ShortCircuitIEC60909Solver.compute_3ph_short_circuit(
+        graph=graph_a,
+        fault_node_id="B",
+        c_factor=1.0,
+        tk_s=1.0,
+    )
+    res_b = ShortCircuitIEC60909Solver.compute_3ph_short_circuit(
+        graph=graph_b,
+        fault_node_id="B",
+        c_factor=1.0,
+        tk_s=1.0,
+    )
+
+    assert res_a.ik_inverters_a == pytest.approx(res_b.ik_inverters_a, rel=1e-12, abs=0.0)
+    assert res_a.ik_total_a == pytest.approx(res_b.ik_total_a, rel=1e-12, abs=0.0)
+
+
+def test_contributions_contains_grid_and_inverters():
+    graph = build_transformer_only_graph()
+    inv_a = create_inverter_source("INV-A", "A", in_rated_a=50.0, k_sc=1.2)
+    inv_b = create_inverter_source("INV-B", "B", in_rated_a=80.0, k_sc=1.1)
+    graph.add_inverter_source(inv_a)
+    graph.add_inverter_source(inv_b)
+
+    result = ShortCircuitIEC60909Solver.compute_3ph_short_circuit(
+        graph=graph,
+        fault_node_id="B",
+        c_factor=1.0,
+        tk_s=1.0,
+    )
+
+    grid = find_contribution(result.contributions, "THEVENIN_GRID")
+    contrib_a = find_contribution(result.contributions, "INV-A")
+    contrib_b = find_contribution(result.contributions, "INV-B")
+
+    assert grid.i_contrib_a == pytest.approx(result.ik_thevenin_a, rel=1e-12, abs=0.0)
+    assert contrib_a.i_contrib_a == pytest.approx(inv_a.k_sc * inv_a.in_rated_a, rel=1e-12, abs=0.0)
+    assert contrib_b.i_contrib_a == pytest.approx(inv_b.k_sc * inv_b.in_rated_a, rel=1e-12, abs=0.0)
+    total_share = sum(contrib.share for contrib in result.contributions)
+    assert total_share == pytest.approx(1.0, rel=1e-12, abs=0.0)
+
+
+def test_contributions_deterministic_order():
+    graph_a = build_transformer_only_graph()
+    graph_b = build_transformer_only_graph()
+    inv_a = create_inverter_source("INV-A", "A", in_rated_a=40.0, k_sc=1.1)
+    inv_b = create_inverter_source("INV-B", "B", in_rated_a=70.0, k_sc=1.2)
+    graph_a.add_inverter_source(inv_a)
+    graph_a.add_inverter_source(inv_b)
+    graph_b.add_inverter_source(inv_b)
+    graph_b.add_inverter_source(inv_a)
+
+    res_a = ShortCircuitIEC60909Solver.compute_3ph_short_circuit(
+        graph=graph_a,
+        fault_node_id="B",
+        c_factor=1.0,
+        tk_s=1.0,
+    )
+    res_b = ShortCircuitIEC60909Solver.compute_3ph_short_circuit(
+        graph=graph_b,
+        fault_node_id="B",
+        c_factor=1.0,
+        tk_s=1.0,
+    )
+
+    assert res_a.contributions == res_b.contributions
+
+
+def test_contributions_respect_fault_type_flags():
+    graph = build_transformer_only_graph()
+    inverter = create_inverter_source("INV-Z", "B", in_rated_a=90.0, k_sc=1.1)
+    graph.add_inverter_source(inverter)
+    z0_bus = build_z_bus(graph) * 3.0
+
+    res_1ph = ShortCircuitIEC60909Solver.compute_1ph_short_circuit(
+        graph=graph,
+        fault_node_id="B",
+        c_factor=1.0,
+        tk_s=1.0,
+        z0_bus=z0_bus,
+    )
+    inv_contrib = find_contribution(res_1ph.contributions, "INV-Z")
+    assert inv_contrib.i_contrib_a == 0.0
+
+    graph_with_zero = build_transformer_only_graph()
+    inverter_zero = create_inverter_source(
+        "INV-Z",
+        "B",
+        in_rated_a=90.0,
+        k_sc=1.1,
+        contributes_zero_sequence=True,
+    )
+    graph_with_zero.add_inverter_source(inverter_zero)
+    z0_bus = build_z_bus(graph_with_zero) * 3.0
+
+    res_1ph_zero = ShortCircuitIEC60909Solver.compute_1ph_short_circuit(
+        graph=graph_with_zero,
+        fault_node_id="B",
+        c_factor=1.0,
+        tk_s=1.0,
+        z0_bus=z0_bus,
+    )
+    inv_contrib_zero = find_contribution(res_1ph_zero.contributions, "INV-Z")
+    expected = inverter_zero.k_sc * inverter_zero.in_rated_a
+    assert inv_contrib_zero.i_contrib_a == pytest.approx(expected, rel=1e-12, abs=0.0)
+
+
+def test_branch_contributions_basic():
+    graph = build_transformer_only_graph()
+    inverter = create_inverter_source("INV-BC", "A", in_rated_a=50.0, k_sc=1.1)
+    graph.add_inverter_source(inverter)
+
+    result = ShortCircuitIEC60909Solver.compute_3ph_short_circuit(
+        graph=graph,
+        fault_node_id="B",
+        c_factor=1.0,
+        tk_s=1.0,
+        include_branch_contributions=True,
+    )
+
+    assert result.branch_contributions is not None
+    assert len(result.branch_contributions) > 0
