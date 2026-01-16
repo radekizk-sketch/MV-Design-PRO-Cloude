@@ -276,6 +276,43 @@ def test_sk_matches_formula():
     assert result.sk_mva == pytest.approx(expected, rel=1e-12, abs=0.0)
 
 
+def test_post_processing_quantities_match_ikss_formula():
+    graph = build_transformer_only_graph()
+    tb_s = 0.1
+    tk_s = 0.4
+
+    result = ShortCircuitIEC60909Solver.compute_3ph_short_circuit(
+        graph=graph,
+        fault_node_id="B",
+        c_factor=1.05,
+        tk_s=tk_s,
+        tb_s=tb_s,
+    )
+
+    rx_ratio = (
+        math.inf
+        if result.zkk_ohm.imag == 0
+        else result.zkk_ohm.real / result.zkk_ohm.imag
+    )
+    kappa = 1.02 + 0.98 * math.exp(-3.0 * rx_ratio)
+    ip_expected = kappa * math.sqrt(2.0) * result.ikss_a
+    ith_expected = result.ikss_a * math.sqrt(tk_s)
+    sk_expected = (math.sqrt(3.0) * result.un_v * result.ikss_a) / 1_000_000.0
+
+    omega = 2.0 * math.pi * 50.0
+    r_ohm = result.zkk_ohm.real
+    x_ohm = result.zkk_ohm.imag
+    ta_s = 0.0 if r_ohm <= 0 or x_ohm <= 0 else x_ohm / (omega * r_ohm)
+    exp_factor = 0.0 if ta_s <= 0 else math.exp(-tb_s / ta_s)
+    ib_expected = result.ikss_a * math.sqrt(1.0 + ((kappa - 1.0) * exp_factor) ** 2)
+
+    assert result.kappa == pytest.approx(kappa, rel=1e-12, abs=0.0)
+    assert result.ip_a == pytest.approx(ip_expected, rel=1e-12, abs=0.0)
+    assert result.ith_a == pytest.approx(ith_expected, rel=1e-12, abs=0.0)
+    assert result.sk_mva == pytest.approx(sk_expected, rel=1e-12, abs=0.0)
+    assert result.ib_a == pytest.approx(ib_expected, rel=1e-12, abs=0.0)
+
+
 def test_ib_is_ge_ikss_and_decays_with_time():
     graph = build_transformer_only_graph(pk_kw=120.0)
 
