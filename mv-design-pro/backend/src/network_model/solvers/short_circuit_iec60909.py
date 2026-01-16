@@ -1,25 +1,20 @@
 from __future__ import annotations
 
-import math
 from dataclasses import dataclass
-from enum import Enum
 
 import numpy as np
 
 from network_model.core.graph import NetworkGraph
-from network_model.core.ybus import AdmittanceMatrixBuilder
+from network_model.solvers.short_circuit_core import (
+    ShortCircuitType,
+    compute_equivalent_impedance,
+    compute_ikss,
+    compute_post_fault_quantities,
+)
 
 
 C_MIN: float = 0.95
 C_MAX: float = 1.10
-
-
-@dataclass(frozen=True)
-class ShortCircuitType(Enum):
-    THREE_PHASE = "3F"
-    SINGLE_PHASE_GROUND = "1F"
-    TWO_PHASE = "2F"
-    TWO_PHASE_GROUND = "2F+G"
 
 
 @dataclass(frozen=True)
@@ -39,21 +34,28 @@ class ShortCircuitResult:
     ib_a: float
     tb_s: float
 
+    @property
+    def ik_a(self) -> float:
+        return self.ikss_a
+
+    @property
+    def ip(self) -> float:
+        return self.ip_a
+
+    @property
+    def ith(self) -> float:
+        return self.ith_a
+
+    @property
+    def ib(self) -> float:
+        return self.ib_a
+
+    @property
+    def sk(self) -> float:
+        return self.sk_mva
+
 
 class ShortCircuitIEC60909Solver:
-    @staticmethod
-    def _build_zbus(graph: NetworkGraph) -> tuple[AdmittanceMatrixBuilder, np.ndarray]:
-        builder = AdmittanceMatrixBuilder(graph)
-        y_bus = builder.build()
-
-        try:
-            z_bus = np.linalg.inv(y_bus)
-        except np.linalg.LinAlgError as exc:
-            raise ValueError(
-                "Y-bus is singular; cannot compute Z-bus for short-circuit"
-            ) from exc
-        return builder, z_bus
-
     @staticmethod
     def _compute_fault_result(
         *,
@@ -66,24 +68,13 @@ class ShortCircuitIEC60909Solver:
         z_equiv: complex,
         ikss: float,
     ) -> ShortCircuitResult:
-        if z_equiv.imag == 0:
-            rx_ratio = math.inf
-        else:
-            rx_ratio = z_equiv.real / z_equiv.imag
-        kappa = 1.02 + 0.98 * math.exp(-3.0 * rx_ratio)
-        ip_a = kappa * math.sqrt(2.0) * ikss
-        ith_a = ikss * math.sqrt(tk_s)
-        sk_mva = (math.sqrt(3.0) * un_v * ikss) / 1_000_000.0
-        omega = 2.0 * math.pi * 50.0
-        r_ohm = z_equiv.real
-        x_ohm = z_equiv.imag
-        if r_ohm <= 0 or x_ohm <= 0:
-            ta_s = 0.0
-        else:
-            ta_s = x_ohm / (omega * r_ohm)
-        # IEC 60909: Ib jako RMS symetryczny w chwili tb.
-        exp_factor = 0.0 if ta_s <= 0 else math.exp(-tb_s / ta_s)
-        ib_a = ikss * math.sqrt(1.0 + ((kappa - 1.0) * exp_factor) ** 2)
+        post = compute_post_fault_quantities(
+            ikss=ikss,
+            un_v=un_v,
+            z_equiv=z_equiv,
+            tk_s=tk_s,
+            tb_s=tb_s,
+        )
 
         return ShortCircuitResult(
             short_circuit_type=short_circuit_type,
@@ -92,13 +83,13 @@ class ShortCircuitIEC60909Solver:
             un_v=un_v,
             zkk_ohm=z_equiv,
             ikss_a=ikss,
-            ip_a=ip_a,
-            ith_a=ith_a,
-            sk_mva=sk_mva,
-            rx_ratio=rx_ratio,
-            kappa=kappa,
+            ip_a=post.ip_a,
+            ith_a=post.ith_a,
+            sk_mva=post.sk_mva,
+            rx_ratio=post.rx_ratio,
+            kappa=post.kappa,
             tk_s=tk_s,
-            ib_a=ib_a,
+            ib_a=post.ib_a,
             tb_s=tb_s,
         )
 
@@ -130,15 +121,18 @@ class ShortCircuitIEC60909Solver:
         if tb_s <= 0:
             raise ValueError("tb_s must be > 0")
 
-        builder, z_bus = ShortCircuitIEC60909Solver._build_zbus(graph)
-
-        node_index = builder.node_id_to_index[fault_node_id]
-        zkk = z_bus[node_index, node_index]
-        if abs(zkk) == 0:
-            raise ZeroDivisionError("Zkk is zero; cannot compute Ik''")
-
+        core = compute_equivalent_impedance(
+            graph=graph,
+            fault_node_id=fault_node_id,
+            short_circuit_type=ShortCircuitType.THREE_PHASE,
+        )
         un_v = graph.nodes[fault_node_id].voltage_level * 1000.0
-        ikss = (c_factor * un_v) / (math.sqrt(3.0) * abs(zkk))
+        ikss = compute_ikss(
+            un_v=un_v,
+            c_factor=c_factor,
+            short_circuit_type=ShortCircuitType.THREE_PHASE,
+            z_equiv=core.z_equiv,
+        )
         return ShortCircuitIEC60909Solver._compute_fault_result(
             short_circuit_type=ShortCircuitType.THREE_PHASE,
             fault_node_id=fault_node_id,
@@ -146,7 +140,7 @@ class ShortCircuitIEC60909Solver:
             tk_s=tk_s,
             tb_s=tb_s,
             un_v=un_v,
-            z_equiv=zkk,
+            z_equiv=core.z_equiv,
             ikss=ikss,
         )
 
@@ -210,17 +204,19 @@ class ShortCircuitIEC60909Solver:
         if tb_s <= 0:
             raise ValueError("tb_s must be > 0")
 
-        builder, z1_bus = ShortCircuitIEC60909Solver._build_zbus(graph)
-        node_index = builder.node_id_to_index[fault_node_id]
-        z1 = z1_bus[node_index, node_index]
-        z2 = z1_bus[node_index, node_index]
-        z0 = z0_bus[node_index, node_index]
-        z_equiv = z1 + z2 + z0
-        if abs(z_equiv) == 0:
-            raise ZeroDivisionError("Z1 + Z2 + Z0 is zero; cannot compute Ik''")
-
+        core = compute_equivalent_impedance(
+            graph=graph,
+            fault_node_id=fault_node_id,
+            short_circuit_type=ShortCircuitType.SINGLE_PHASE_GROUND,
+            z0_bus=z0_bus,
+        )
         un_v = graph.nodes[fault_node_id].voltage_level * 1000.0
-        ikss = (c_factor * un_v) / abs(z_equiv)
+        ikss = compute_ikss(
+            un_v=un_v,
+            c_factor=c_factor,
+            short_circuit_type=ShortCircuitType.SINGLE_PHASE_GROUND,
+            z_equiv=core.z_equiv,
+        )
         return ShortCircuitIEC60909Solver._compute_fault_result(
             short_circuit_type=ShortCircuitType.SINGLE_PHASE_GROUND,
             fault_node_id=fault_node_id,
@@ -228,7 +224,7 @@ class ShortCircuitIEC60909Solver:
             tk_s=tk_s,
             tb_s=tb_s,
             un_v=un_v,
-            z_equiv=z_equiv,
+            z_equiv=core.z_equiv,
             ikss=ikss,
         )
 
@@ -254,16 +250,18 @@ class ShortCircuitIEC60909Solver:
         if tb_s <= 0:
             raise ValueError("tb_s must be > 0")
 
-        builder, z1_bus = ShortCircuitIEC60909Solver._build_zbus(graph)
-        node_index = builder.node_id_to_index[fault_node_id]
-        z1 = z1_bus[node_index, node_index]
-        z2 = z1_bus[node_index, node_index]
-        z_equiv = z1 + z2
-        if abs(z_equiv) == 0:
-            raise ZeroDivisionError("Z1 + Z2 is zero; cannot compute Ik''")
-
+        core = compute_equivalent_impedance(
+            graph=graph,
+            fault_node_id=fault_node_id,
+            short_circuit_type=ShortCircuitType.TWO_PHASE,
+        )
         un_v = graph.nodes[fault_node_id].voltage_level * 1000.0
-        ikss = (c_factor * un_v) / abs(z_equiv)
+        ikss = compute_ikss(
+            un_v=un_v,
+            c_factor=c_factor,
+            short_circuit_type=ShortCircuitType.TWO_PHASE,
+            z_equiv=core.z_equiv,
+        )
         return ShortCircuitIEC60909Solver._compute_fault_result(
             short_circuit_type=ShortCircuitType.TWO_PHASE,
             fault_node_id=fault_node_id,
@@ -271,7 +269,7 @@ class ShortCircuitIEC60909Solver:
             tk_s=tk_s,
             tb_s=tb_s,
             un_v=un_v,
-            z_equiv=z_equiv,
+            z_equiv=core.z_equiv,
             ikss=ikss,
         )
 
@@ -300,17 +298,19 @@ class ShortCircuitIEC60909Solver:
         if tb_s <= 0:
             raise ValueError("tb_s must be > 0")
 
-        builder, z1_bus = ShortCircuitIEC60909Solver._build_zbus(graph)
-        node_index = builder.node_id_to_index[fault_node_id]
-        z1 = z1_bus[node_index, node_index]
-        z2 = z1_bus[node_index, node_index]
-        z0 = z0_bus[node_index, node_index]
-        z_equiv = z1 + z2 + z0
-        if abs(z_equiv) == 0:
-            raise ZeroDivisionError("Z1 + Z2 + Z0 is zero; cannot compute Ik''")
-
+        core = compute_equivalent_impedance(
+            graph=graph,
+            fault_node_id=fault_node_id,
+            short_circuit_type=ShortCircuitType.TWO_PHASE_GROUND,
+            z0_bus=z0_bus,
+        )
         un_v = graph.nodes[fault_node_id].voltage_level * 1000.0
-        ikss = (c_factor * un_v) / abs(z_equiv)
+        ikss = compute_ikss(
+            un_v=un_v,
+            c_factor=c_factor,
+            short_circuit_type=ShortCircuitType.TWO_PHASE_GROUND,
+            z_equiv=core.z_equiv,
+        )
         return ShortCircuitIEC60909Solver._compute_fault_result(
             short_circuit_type=ShortCircuitType.TWO_PHASE_GROUND,
             fault_node_id=fault_node_id,
@@ -318,7 +318,7 @@ class ShortCircuitIEC60909Solver:
             tk_s=tk_s,
             tb_s=tb_s,
             un_v=un_v,
-            z_equiv=z_equiv,
+            z_equiv=core.z_equiv,
             ikss=ikss,
         )
 
