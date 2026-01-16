@@ -27,8 +27,69 @@ C_MIN: float = 0.95
 C_MAX: float = 1.10
 
 
+# -----------------------------------------------------------------------------
+# Result API Contract - Stabilne pola wyniku IEC 60909
+# Poniższa lista definiuje gwarantowany kontrakt pól w to_dict().
+# -----------------------------------------------------------------------------
+EXPECTED_SHORT_CIRCUIT_RESULT_KEYS: list[str] = [
+    "short_circuit_type",
+    "fault_node_id",
+    "c_factor",
+    "un_v",
+    "zkk_ohm",
+    "rx_ratio",
+    "kappa",
+    "tk_s",
+    "tb_s",
+    "ikss_a",
+    "ip_a",
+    "ith_a",
+    "ib_a",
+    "sk_mva",
+    "ik_thevenin_a",
+    "ik_inverters_a",
+    "ik_total_a",
+    "contributions",
+    "branch_contributions",
+    "white_box_trace",
+]
+
+
 @dataclass(frozen=True)
 class ShortCircuitResult:
+    """
+    Wynik obliczeń zwarciowych IEC 60909.
+
+    Canonical API fields (jednostki SI / branżowe):
+        short_circuit_type: ShortCircuitType - typ zwarcia (3F/2F/1F/2F+G)
+        fault_node_id: str - identyfikator węzła zwarcia
+        c_factor: float - współczynnik napięciowy c (0.95–1.10)
+        un_v: float - napięcie znamionowe w punkcie zwarcia [V]
+        zkk_ohm: complex - impedancja zastępcza w punkcie zwarcia Zk [Ω]
+        rx_ratio: float - stosunek R/X impedancji zastępczej [-]
+        kappa: float - współczynnik udaru κ [-]
+        tk_s: float - czas trwania zwarcia [s]
+        tb_s: float - czas do obliczenia prądu Ib [s]
+        ikss_a: float - prąd zwarciowy początkowy Ik'' [A]
+        ip_a: float - prąd udarowy Ip [A]
+        ith_a: float - prąd zastępczy cieplny Ith [A]
+        ib_a: float - prąd zwarciowy do obliczeń cieplnych Ib [A]
+        sk_mva: float - moc zwarciowa Sk'' [MVA]
+        ik_thevenin_a: float - wkład sieci Thevenina [A]
+        ik_inverters_a: float - wkład źródeł falownikowych [A]
+        ik_total_a: float - całkowity prąd zwarciowy [A]
+        contributions: list[ShortCircuitSourceContribution] - wkłady źródeł
+        branch_contributions: list[ShortCircuitBranchContribution] | None - wkłady gałęzi
+        white_box_trace: list[dict] - szczegółowy ślad obliczeń
+
+    Aliasy (dla kompatybilności):
+        ik_a -> ikss_a
+        ip -> ip_a
+        ith -> ith_a
+        ib -> ib_a
+        sk -> sk_mva
+    """
+
     short_circuit_type: ShortCircuitType
     fault_node_id: str
     c_factor: float
@@ -50,25 +111,96 @@ class ShortCircuitResult:
     branch_contributions: list[ShortCircuitBranchContribution] | None = None
     white_box_trace: list[dict] = field(default_factory=list)
 
+    # -------------------------------------------------------------------------
+    # Aliasy dla kompatybilności wstecznej (preferuj canonical: ikss_a, ip_a, ...)
+    # -------------------------------------------------------------------------
     @property
     def ik_a(self) -> float:
+        """Alias dla ikss_a (canonical)."""
         return self.ikss_a
 
     @property
     def ip(self) -> float:
+        """Alias dla ip_a (canonical)."""
         return self.ip_a
 
     @property
     def ith(self) -> float:
+        """Alias dla ith_a (canonical)."""
         return self.ith_a
 
     @property
     def ib(self) -> float:
+        """Alias dla ib_a (canonical)."""
         return self.ib_a
 
     @property
     def sk(self) -> float:
+        """Alias dla sk_mva (canonical)."""
         return self.sk_mva
+
+    # -------------------------------------------------------------------------
+    # Serializacja JSON-ready
+    # -------------------------------------------------------------------------
+    def to_dict(self) -> dict:
+        """
+        Zwraca wynik jako dict z czystymi typami JSON.
+
+        complex -> {"re": float, "im": float}
+        Enum -> str (value)
+        dataclass contributions -> list[dict]
+        numpy types -> native Python types
+        """
+
+        def serialize_complex(c: complex) -> dict:
+            return {"re": float(c.real), "im": float(c.imag)}
+
+        def serialize_contribution(contrib: ShortCircuitSourceContribution) -> dict:
+            return contrib.to_dict()
+
+        def serialize_branch_contribution(
+            contrib: ShortCircuitBranchContribution,
+        ) -> dict:
+            return contrib.to_dict()
+
+        def serialize_value(val):
+            """Rekurencyjnie konwertuje wartości do typów JSON-ready."""
+            if isinstance(val, complex):
+                return serialize_complex(val)
+            if hasattr(val, "item"):  # numpy scalar
+                return val.item()
+            if isinstance(val, dict):
+                return {k: serialize_value(v) for k, v in val.items()}
+            if isinstance(val, list):
+                return [serialize_value(v) for v in val]
+            return val
+
+        return {
+            "short_circuit_type": self.short_circuit_type.value,
+            "fault_node_id": self.fault_node_id,
+            "c_factor": float(self.c_factor),
+            "un_v": float(self.un_v),
+            "zkk_ohm": serialize_complex(self.zkk_ohm),
+            "rx_ratio": float(self.rx_ratio),
+            "kappa": float(self.kappa),
+            "tk_s": float(self.tk_s),
+            "tb_s": float(self.tb_s),
+            "ikss_a": float(self.ikss_a),
+            "ip_a": float(self.ip_a),
+            "ith_a": float(self.ith_a),
+            "ib_a": float(self.ib_a),
+            "sk_mva": float(self.sk_mva),
+            "ik_thevenin_a": float(self.ik_thevenin_a),
+            "ik_inverters_a": float(self.ik_inverters_a),
+            "ik_total_a": float(self.ik_total_a),
+            "contributions": [serialize_contribution(c) for c in self.contributions],
+            "branch_contributions": (
+                [serialize_branch_contribution(c) for c in self.branch_contributions]
+                if self.branch_contributions is not None
+                else None
+            ),
+            "white_box_trace": serialize_value(list(self.white_box_trace)),
+        }
 
 
 class ShortCircuitIEC60909Solver:
