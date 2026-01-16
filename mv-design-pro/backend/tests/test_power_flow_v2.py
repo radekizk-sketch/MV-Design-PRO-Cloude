@@ -1,5 +1,3 @@
-import pytest
-
 from analysis.power_flow import (
     BusVoltageLimitSpec,
     PQSpec,
@@ -14,6 +12,12 @@ from analysis.power_flow import (
 from network_model.core.branch import BranchType, LineBranch, TransformerBranch
 from network_model.core.graph import NetworkGraph
 from network_model.core.node import Node, NodeType
+
+
+def _assert_basic_trace(result: object) -> None:
+    trace = result.white_box_trace
+    for key in ("ybus", "nr_iterations", "power_balance", "islands", "v2_feature_flags"):
+        assert key in trace
 
 
 def _make_slack_node(node_id: str, voltage_kv: float = 10.0) -> Node:
@@ -33,6 +37,18 @@ def _make_pq_node(node_id: str, voltage_kv: float = 10.0) -> Node:
         name=node_id,
         node_type=NodeType.PQ,
         voltage_level=voltage_kv,
+        active_power=0.0,
+        reactive_power=0.0,
+    )
+
+
+def _make_pv_node(node_id: str, voltage_kv: float = 10.0) -> Node:
+    return Node(
+        id=node_id,
+        name=node_id,
+        node_type=NodeType.PV,
+        voltage_level=voltage_kv,
+        voltage_magnitude=1.0,
         active_power=0.0,
         reactive_power=0.0,
     )
@@ -79,10 +95,47 @@ def _add_transformer(
     )
 
 
+def test_pv_stays_pv_when_q_within_limits() -> None:
+    graph = NetworkGraph()
+    graph.add_node(_make_slack_node("A"))
+    graph.add_node(_make_pv_node("B"))
+    graph.add_node(_make_pq_node("C"))
+    _add_line(graph, "L1", "A", "B")
+    _add_line(graph, "L2", "B", "C")
+
+    pf_input = PowerFlowInput(
+        graph=graph,
+        base_mva=10.0,
+        slack=SlackSpec(node_id="A", u_pu=1.0, angle_rad=0.0),
+        pq=[PQSpec(node_id="C", p_mw=1.0, q_mvar=0.4)],
+        pv=[
+            PVSpec(
+                node_id="B",
+                p_mw=-1.0,
+                u_pu=1.02,
+                q_min_mvar=-5.0,
+                q_max_mvar=5.0,
+            )
+        ],
+        options=PowerFlowOptions(max_iter=30),
+    )
+
+    result = PowerFlowSolver().solve(pf_input)
+
+    assert result.converged is True
+    assert result.iterations <= pf_input.options.max_iter
+    assert result.pv_to_pq_switches == []
+    assert result.white_box_trace["v2_feature_flags"]["pv_enabled"] is True
+    assert all(
+        not entry.get("pv_to_pq_optional") for entry in result.white_box_trace["nr_iterations"]
+    )
+    _assert_basic_trace(result)
+
+
 def test_pv_q_limits_trigger_pv_to_pq_switch() -> None:
     graph = NetworkGraph()
     graph.add_node(_make_slack_node("A"))
-    graph.add_node(_make_pq_node("B"))
+    graph.add_node(_make_pv_node("B"))
     graph.add_node(_make_pq_node("C"))
     _add_line(graph, "L1", "A", "B")
     _add_line(graph, "L2", "B", "C")
@@ -107,9 +160,15 @@ def test_pv_q_limits_trigger_pv_to_pq_switch() -> None:
     result = PowerFlowSolver().solve(pf_input)
 
     assert result.converged is True
+    assert result.iterations <= pf_input.options.max_iter
     assert any(
         switch["node_id"] == "B" for switch in result.pv_to_pq_switches
     )
+    assert any(
+        entry.get("pv_to_pq_optional") for entry in result.white_box_trace["nr_iterations"]
+    )
+    assert result.white_box_trace["v2_feature_flags"]["pv_enabled"] is True
+    _assert_basic_trace(result)
 
 
 def test_transformer_tap_ratio_changes_secondary_voltage() -> None:
@@ -138,9 +197,10 @@ def test_transformer_tap_ratio_changes_secondary_voltage() -> None:
     tap_result = PowerFlowSolver().solve(tap_input)
 
     assert tap_result.converged is True
-    assert tap_result.node_u_mag_pu["B"] != pytest.approx(
-        base_result.node_u_mag_pu["B"]
-    )
+    assert tap_result.iterations <= tap_input.options.max_iter
+    assert tap_result.node_u_mag_pu["B"] < base_result.node_u_mag_pu["B"]
+    assert tap_result.white_box_trace["applied_taps"]
+    _assert_basic_trace(tap_result)
 
 
 def test_shunt_increases_voltage_magnitude() -> None:
@@ -169,7 +229,10 @@ def test_shunt_increases_voltage_magnitude() -> None:
     shunt_result = PowerFlowSolver().solve(shunt_input)
 
     assert shunt_result.converged is True
+    assert shunt_result.iterations <= shunt_input.options.max_iter
     assert shunt_result.node_u_mag_pu["B"] > base_result.node_u_mag_pu["B"]
+    assert shunt_result.white_box_trace["applied_shunts"]
+    _assert_basic_trace(shunt_result)
 
 
 def test_voltage_limit_violation_ranking() -> None:
@@ -188,6 +251,57 @@ def test_voltage_limit_violation_ranking() -> None:
     )
     result = PowerFlowSolver().solve(pf_input)
 
+    assert result.converged is True
+    assert result.iterations <= pf_input.options.max_iter
     assert result.violations
-    assert result.violations[0]["type"] == "bus_voltage"
+    violation = result.violations[0]
+    for key in ("type", "id", "value", "limit", "severity", "direction"):
+        assert key in violation
+    assert violation["type"] == "bus_voltage"
     assert result.violations[0]["severity"] >= result.violations[-1]["severity"]
+    _assert_basic_trace(result)
+
+
+def test_non_convergence_returns_best_effort_and_cause() -> None:
+    graph = NetworkGraph()
+    graph.add_node(_make_slack_node("A"))
+    graph.add_node(_make_pq_node("B"))
+    _add_line(graph, "L1", "A", "B")
+
+    pf_input = PowerFlowInput(
+        graph=graph,
+        base_mva=10.0,
+        slack=SlackSpec(node_id="A", u_pu=1.0, angle_rad=0.0),
+        pq=[PQSpec(node_id="B", p_mw=20.0, q_mvar=10.0)],
+        options=PowerFlowOptions(max_iter=5, damping=0.0),
+    )
+    result = PowerFlowSolver().solve(pf_input)
+
+    assert result.converged is False
+    assert result.iterations <= pf_input.options.max_iter
+    assert result.node_voltage_pu
+    assert result.white_box_trace["nr_iterations"]
+    assert result.white_box_trace["nr_iterations"][-1]["cause_if_failed_optional"]
+    assert result.white_box_trace["nr_iterations"][-1]["max_mismatch_pu"] >= 0.0
+    _assert_basic_trace(result)
+
+
+def test_v2_regression_with_basic_slack_pq_case() -> None:
+    graph = NetworkGraph()
+    graph.add_node(_make_slack_node("A"))
+    graph.add_node(_make_pq_node("B"))
+    _add_line(graph, "L1", "A", "B")
+
+    pf_input = PowerFlowInput(
+        graph=graph,
+        base_mva=10.0,
+        slack=SlackSpec(node_id="A", u_pu=1.0, angle_rad=0.0),
+        pq=[PQSpec(node_id="B", p_mw=1.0, q_mvar=0.3)],
+        options=PowerFlowOptions(max_iter=25),
+    )
+    result = PowerFlowSolver().solve(pf_input)
+
+    assert result.converged is True
+    assert result.iterations <= pf_input.options.max_iter
+    assert result.white_box_trace["v2_feature_flags"]["pv_enabled"] is False
+    _assert_basic_trace(result)
