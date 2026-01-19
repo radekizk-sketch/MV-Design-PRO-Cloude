@@ -8,6 +8,7 @@ Professional Medium Voltage Network Design System - kompleksowe narzędzie do pr
 mv-design-pro/
 ├── backend/                    # Backend API (Python/FastAPI)
 │   ├── src/
+│   │   ├── domain/             # Warstwa domenowa (Project/Case/StudyRun) + UnitSystem
 │   │   ├── analysis/           # Moduły analityczne (Power Flow v1)
 │   │   ├── network_model/      # Model sieci elektrycznej
 │   │   │   ├── core/           # Podstawowe klasy i struktury
@@ -81,6 +82,11 @@ Modelowanie sieci średniego napięcia z obsługą:
 - Linii kablowych i napowietrznych
 - Rozdzielnic i pól rozdzielczych
 - Zabezpieczeń
+
+### Domain Layer
+Warstwa domenowa obejmuje Project/Network/OperatingCase/StudyCase/Scenario/StudyRun oraz
+centralny system jednostek (`UnitSystem`, `BaseQuantities`). W dokumentacji i API
+konsekwentnie używamy terminu **„PCC – punkt wspólnego przyłączenia”**.
 
 ### Solvers
 - **Short Circuit** - obliczenia zwarciowe wg IEC 60909
