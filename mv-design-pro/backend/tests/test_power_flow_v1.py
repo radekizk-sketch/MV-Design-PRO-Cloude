@@ -7,6 +7,12 @@ from network_model.core.graph import NetworkGraph
 from network_model.core.node import Node, NodeType
 
 
+def _assert_basic_trace(result: object) -> None:
+    trace = result.white_box_trace
+    for key in ("ybus", "nr_iterations", "power_balance", "islands"):
+        assert key in trace
+
+
 def _make_slack_node(node_id: str, voltage_kv: float = 10.0) -> Node:
     return Node(
         id=node_id,
@@ -70,6 +76,7 @@ def test_two_bus_converges_and_voltage_drops() -> None:
     assert result.converged is True
     assert abs(result.node_voltage_pu["B"]) < abs(result.node_voltage_pu["A"])
     assert result.iterations <= pf_input.options.max_iter
+    _assert_basic_trace(result)
 
 
 def test_three_bus_radial_voltage_profile() -> None:
@@ -93,7 +100,10 @@ def test_three_bus_radial_voltage_profile() -> None:
     v_b = abs(result.node_voltage_pu["B"])
     v_c = abs(result.node_voltage_pu["C"])
 
+    assert result.converged is True
+    assert result.iterations <= pf_input.options.max_iter
     assert v_c <= v_b <= v_slack + 1e-12
+    _assert_basic_trace(result)
 
 
 def test_three_bus_mesh_converges() -> None:
@@ -115,6 +125,8 @@ def test_three_bus_mesh_converges() -> None:
     result = PowerFlowSolver().solve(pf_input)
 
     assert result.converged is True
+    assert result.iterations <= pf_input.options.max_iter
+    _assert_basic_trace(result)
 
 
 def test_duplicate_pq_spec_validation() -> None:
@@ -154,7 +166,31 @@ def test_island_without_slack_is_reported() -> None:
     )
     result = PowerFlowSolver().solve(pf_input)
 
+    assert result.converged is True
+    assert result.iterations <= pf_input.options.max_iter
     assert "C" in result.white_box_trace["islands"]["not_solved_island_nodes"]
     assert "D" in result.white_box_trace["islands"]["not_solved_island_nodes"]
     assert "C" not in result.node_voltage_pu
     assert "D" not in result.node_voltage_pu
+    _assert_basic_trace(result)
+
+
+def test_power_flow_results_are_deterministic() -> None:
+    graph = NetworkGraph()
+    graph.add_node(_make_slack_node("A"))
+    graph.add_node(_make_pq_node("B"))
+    _add_line(graph, "L1", "A", "B")
+
+    pf_input = _solve_power_flow(
+        graph, [PQSpec(node_id="B", p_mw=1.5, q_mvar=0.7)]
+    )
+
+    result1 = PowerFlowSolver().solve(pf_input)
+    result2 = PowerFlowSolver().solve(pf_input)
+
+    assert result1.converged is True
+    assert result1.iterations <= pf_input.options.max_iter
+    _assert_basic_trace(result1)
+    assert result1.to_dict() == result2.to_dict()
+    serialized_voltage = result1.to_dict()["node_voltage_pu"]["A"]
+    assert set(serialized_voltage.keys()) == {"re", "im"}
