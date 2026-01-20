@@ -5,7 +5,7 @@ from datetime import datetime
 from typing import Any
 from uuid import UUID
 
-from sqlalchemy import Boolean, DateTime, Float, ForeignKey, String, Text
+from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Index, String, Text, UniqueConstraint
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 from sqlalchemy.types import TypeDecorator
@@ -214,6 +214,37 @@ class ScenarioORM(Base):
     metadata_jsonb: Mapped[dict[str, Any]] = mapped_column(DeterministicJSON(), nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+
+class AnalysisRunORM(Base):
+    __tablename__ = "analysis_runs"
+    __table_args__ = (
+        UniqueConstraint(
+            "project_id",
+            "operating_case_id",
+            "analysis_type",
+            "input_hash",
+            name="uq_analysis_runs_deterministic",
+        ),
+        Index("ix_analysis_runs_input_hash", "input_hash"),
+    )
+
+    id: Mapped[UUID] = mapped_column(GUID(), primary_key=True)
+    project_id: Mapped[UUID] = mapped_column(GUID(), ForeignKey("projects.id"), nullable=False)
+    operating_case_id: Mapped[UUID] = mapped_column(
+        GUID(), ForeignKey("operating_cases.id"), nullable=False
+    )
+    analysis_type: Mapped[str] = mapped_column(String(20), nullable=False)
+    status: Mapped[str] = mapped_column(String(20), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    input_snapshot: Mapped[dict[str, Any]] = mapped_column(DeterministicJSON(), nullable=False)
+    input_hash: Mapped[str] = mapped_column(String(128), nullable=False)
+    result_summary: Mapped[dict[str, Any]] = mapped_column(
+        DeterministicJSON(), nullable=False, default=dict
+    )
+    error_message: Mapped[str | None] = mapped_column(Text)
 
 
 class StudyRunORM(Base):
