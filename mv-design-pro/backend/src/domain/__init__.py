@@ -14,6 +14,7 @@ from .sources import Source
 from .substation import SubstationMetadata
 from .units import BaseQuantities, UnitSystem
 from .validation import ValidationIssue, ValidationReport
+from .sld import SldAnnotation, SldBranchSymbol, SldDiagram, SldNodeSymbol
 
 __all__ = [
     "BaseQuantities",
@@ -27,6 +28,10 @@ __all__ = [
     "StudyCase",
     "StudyRun",
     "SubstationMetadata",
+    "SldAnnotation",
+    "SldBranchSymbol",
+    "SldDiagram",
+    "SldNodeSymbol",
     "UnitSystem",
     "ValidationIssue",
     "ValidationReport",

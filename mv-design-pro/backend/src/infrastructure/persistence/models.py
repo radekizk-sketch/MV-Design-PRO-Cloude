@@ -247,5 +247,41 @@ class SldDiagramORM(Base):
     project_id: Mapped[UUID] = mapped_column(GUID(), ForeignKey("projects.id"), nullable=False)
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     sld_jsonb: Mapped[dict[str, Any]] = mapped_column(DeterministicJSON(), nullable=False)
+    dirty_flag: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+
+class SldNodeSymbolORM(Base):
+    __tablename__ = "sld_node_symbols"
+
+    id: Mapped[UUID] = mapped_column(GUID(), primary_key=True)
+    diagram_id: Mapped[UUID] = mapped_column(GUID(), ForeignKey("sld_diagrams.id"))
+    node_id: Mapped[UUID] = mapped_column(GUID(), nullable=False)
+    x: Mapped[float] = mapped_column(Float, nullable=False)
+    y: Mapped[float] = mapped_column(Float, nullable=False)
+    label: Mapped[str | None] = mapped_column(String(255))
+    is_pcc: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+
+
+class SldBranchSymbolORM(Base):
+    __tablename__ = "sld_branch_symbols"
+
+    id: Mapped[UUID] = mapped_column(GUID(), primary_key=True)
+    diagram_id: Mapped[UUID] = mapped_column(GUID(), ForeignKey("sld_diagrams.id"))
+    branch_id: Mapped[UUID] = mapped_column(GUID(), nullable=False)
+    from_node_id: Mapped[UUID] = mapped_column(GUID(), nullable=False)
+    to_node_id: Mapped[UUID] = mapped_column(GUID(), nullable=False)
+    points_jsonb: Mapped[list[dict[str, Any]]] = mapped_column(
+        DeterministicJSON(), nullable=False, default=list
+    )
+
+
+class SldAnnotationORM(Base):
+    __tablename__ = "sld_annotations"
+
+    id: Mapped[UUID] = mapped_column(GUID(), primary_key=True)
+    diagram_id: Mapped[UUID] = mapped_column(GUID(), ForeignKey("sld_diagrams.id"))
+    text: Mapped[str] = mapped_column(Text, nullable=False)
+    x: Mapped[float] = mapped_column(Float, nullable=False)
+    y: Mapped[float] = mapped_column(Float, nullable=False)

@@ -13,6 +13,7 @@ from analysis.power_flow.types import (
     PVSpec,
     SlackSpec,
 )
+from application.sld.layout import build_auto_layout_diagram
 from domain.models import (
     OperatingCase,
     Project,
@@ -21,6 +22,7 @@ from domain.models import (
     new_project,
     new_study_case,
 )
+from domain.sld import SldBranchSymbol, SldDiagram, SldNodeSymbol
 from domain.validation import ValidationIssue, ValidationReport
 from infrastructure.persistence.unit_of_work import UnitOfWork
 from network_model.core import Branch, NetworkGraph, Node
@@ -107,6 +109,7 @@ class NetworkWizardService:
                 "attrs": attrs,
             }
             uow.network.add_node(project_id, node, commit=False)
+            self._mark_sld_dirty(uow, project_id)
         return node
 
     def update_node(self, project_id: UUID, node_id: UUID, patch: dict) -> dict:
@@ -121,6 +124,7 @@ class NetworkWizardService:
                 patch = dict(patch)
                 patch["attrs"] = self._normalize_node_attrs(node_type, attrs)
             updated = uow.network.update_node(node_id, patch, commit=False)
+            self._mark_sld_dirty(uow, project_id)
         if updated is None:
             raise NotFound(f"Node {node_id} not found")
         return updated
@@ -135,6 +139,7 @@ class NetworkWizardService:
             ):
                 raise Conflict("Cannot delete node with connected branches")
             uow.network.delete_node(node_id, commit=False)
+            self._mark_sld_dirty(uow, project_id)
 
     def add_branch(self, project_id: UUID, payload: BranchPayload) -> dict:
         with self._uow_factory() as uow:
@@ -150,6 +155,7 @@ class NetworkWizardService:
                 "params": payload.params,
             }
             uow.network.add_branch(project_id, branch, commit=False)
+            self._mark_sld_dirty(uow, project_id)
         return branch
 
     def update_branch(self, project_id: UUID, branch_id: UUID, patch: dict) -> dict:
@@ -159,6 +165,7 @@ class NetworkWizardService:
             if existing is None or existing["project_id"] != project_id:
                 raise NotFound(f"Branch {branch_id} not found")
             updated = uow.network.update_branch(branch_id, patch, commit=False)
+            self._mark_sld_dirty(uow, project_id)
         if updated is None:
             raise NotFound(f"Branch {branch_id} not found")
         return updated
@@ -167,6 +174,7 @@ class NetworkWizardService:
         with self._uow_factory() as uow:
             self._ensure_project(uow, project_id)
             uow.network.delete_branch(branch_id, commit=False)
+            self._mark_sld_dirty(uow, project_id)
 
     def set_in_service(self, project_id: UUID, element_id: UUID, in_service: bool) -> None:
         with self._uow_factory() as uow:
@@ -178,6 +186,7 @@ class NetworkWizardService:
                 uow.network.update_branch(
                     element_id, {"in_service": in_service}, commit=False
                 )
+                self._mark_sld_dirty(uow, project_id)
                 return
             node = uow.network.get_node(element_id)
             if node is None or node["project_id"] != project_id:
@@ -185,6 +194,7 @@ class NetworkWizardService:
             attrs = dict(node.get("attrs") or {})
             attrs["in_service"] = in_service
             uow.network.update_node(element_id, {"attrs": attrs}, commit=False)
+            self._mark_sld_dirty(uow, project_id)
 
     def set_pcc(self, project_id: UUID, node_id: UUID) -> None:
         with self._uow_factory() as uow:
@@ -193,6 +203,7 @@ class NetworkWizardService:
             if node is None or node["project_id"] != project_id:
                 raise NotFound(f"Node {node_id} not found")
             uow.wizard.set_pcc(project_id, node_id, commit=False)
+            self._mark_sld_dirty(uow, project_id)
 
     def get_pcc(self, project_id: UUID) -> UUID | None:
         with self._uow_factory() as uow:
@@ -810,6 +821,80 @@ class NetworkWizardService:
             schema_version=project.schema_version,
         )
 
+    def create_sld(self, project_id: UUID, name: str, mode: str = "auto") -> UUID:
+        if mode not in {"auto", "manual"}:
+            raise Conflict(f"Unsupported SLD mode: {mode}")
+        with self._uow_factory() as uow:
+            self._ensure_project(uow, project_id)
+            nodes = uow.network.list_nodes(project_id)
+            branches = uow.network.list_branches(project_id)
+            settings = uow.wizard.get_settings(project_id)
+            pcc_node_id = settings.get("pcc_node_id")
+
+            if mode == "auto":
+                diagram = build_auto_layout_diagram(
+                    project_id=project_id,
+                    name=name,
+                    nodes=nodes,
+                    branches=branches,
+                    pcc_node_id=pcc_node_id,
+                    diagram_id=uuid4(),
+                )
+            else:
+                diagram = self._build_manual_sld(project_id, name, nodes, branches, pcc_node_id)
+
+            uow.sld.save(
+                project_id=project_id,
+                name=name,
+                payload=diagram.to_payload(),
+                sld_id=diagram.id,
+                commit=False,
+            )
+        return diagram.id
+
+    def auto_layout_sld(self, project_id: UUID, diagram_id: UUID) -> dict:
+        with self._uow_factory() as uow:
+            self._ensure_project(uow, project_id)
+            diagram = uow.sld.get(diagram_id)
+            if diagram is None or diagram["project_id"] != project_id:
+                raise NotFound(f"SLD diagram {diagram_id} not found")
+            nodes = uow.network.list_nodes(project_id)
+            branches = uow.network.list_branches(project_id)
+            settings = uow.wizard.get_settings(project_id)
+            pcc_node_id = settings.get("pcc_node_id")
+            annotations = diagram["payload"].get("annotations", [])
+
+            rebuilt = build_auto_layout_diagram(
+                project_id=project_id,
+                name=diagram["name"],
+                nodes=nodes,
+                branches=branches,
+                pcc_node_id=pcc_node_id,
+                diagram_id=diagram_id,
+                annotations=annotations,
+            )
+            payload = rebuilt.to_payload()
+            payload["dirty_flag"] = False
+            uow.sld.update_payload(diagram_id, payload, commit=False)
+        return payload
+
+    def bind_sld(self, project_id: UUID, diagram_id: UUID) -> dict:
+        return self.auto_layout_sld(project_id, diagram_id)
+
+    def export_sld(self, project_id: UUID, diagram_id: UUID) -> dict:
+        with self._uow_factory() as uow:
+            self._ensure_project(uow, project_id)
+            diagram = uow.sld.get(diagram_id)
+            if diagram is None or diagram["project_id"] != project_id:
+                raise NotFound(f"SLD diagram {diagram_id} not found")
+            return diagram["payload"]
+
+    def import_sld(self, project_id: UUID, payload: dict) -> UUID:
+        name = payload.get("name") or "Imported SLD"
+        with self._uow_factory() as uow:
+            self._ensure_project(uow, project_id)
+            return uow.sld.save(project_id=project_id, name=name, payload=payload)
+
     def import_network(
         self, project_id: UUID, payload: dict, mode: str = "merge"
     ) -> ImportReport:
@@ -1024,6 +1109,7 @@ class NetworkWizardService:
                     )
                 except ValueError as exc:
                     errors.append(str(exc))
+            self._mark_sld_dirty(uow, project_id)
 
         validation = self.validate_network(project_id)
         return ImportReport(
@@ -1074,6 +1160,7 @@ class NetworkWizardService:
                     skipped["branches"] = skipped.get("branches", 0) + 1
                 else:
                     created, updated = self._bump_counts(result, created, updated, "branches")
+            self._mark_sld_dirty(uow, project_id)
 
         validation = self.validate_network(project_id)
         return ImportReport(
@@ -1087,6 +1174,51 @@ class NetworkWizardService:
     def _ensure_project(self, uow: UnitOfWork, project_id: UUID) -> None:
         if uow.projects.get(project_id) is None:
             raise NotFound(f"Project {project_id} not found")
+
+    def _mark_sld_dirty(self, uow: UnitOfWork, project_id: UUID) -> None:
+        if uow.sld is None:
+            return
+        uow.sld.mark_dirty_by_project(project_id, commit=False)
+
+    def _build_manual_sld(
+        self,
+        project_id: UUID,
+        name: str,
+        nodes: list[dict],
+        branches: list[dict],
+        pcc_node_id: UUID | None,
+    ) -> SldDiagram:
+        node_symbols = [
+            SldNodeSymbol(
+                id=uuid4(),
+                node_id=node["id"],
+                x=0.0,
+                y=0.0,
+                label=node.get("name"),
+                is_pcc=node["id"] == pcc_node_id,
+            )
+            for node in sorted(nodes, key=lambda item: str(item["id"]))
+        ]
+        branch_symbols = [
+            SldBranchSymbol(
+                id=uuid4(),
+                branch_id=branch["id"],
+                from_node_id=branch["from_node_id"],
+                to_node_id=branch["to_node_id"],
+                points=((0.0, 0.0), (0.0, 0.0)),
+            )
+            for branch in sorted(branches, key=lambda item: str(item["id"]))
+        ]
+        return SldDiagram(
+            id=uuid4(),
+            project_id=project_id,
+            name=name,
+            nodes=tuple(node_symbols),
+            branches=tuple(branch_symbols),
+            annotations=tuple(),
+            pcc_node_id=pcc_node_id,
+            dirty_flag=False,
+        )
 
     def _normalize_node_type(self, node_type: str) -> str | None:
         node_type_upper = node_type.upper()
