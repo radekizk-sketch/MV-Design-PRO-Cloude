@@ -3,11 +3,12 @@ from __future__ import annotations
 from typing import Any
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 
 from api.dependencies import get_uow_factory
 from application.analysis_run import (
     AnalysisRunDetailDTO,
+    AnalysisRunExportService,
     AnalysisRunService,
     AnalysisRunSummaryDTO,
     OverlayDTO,
@@ -30,6 +31,10 @@ router = APIRouter()
 
 def _build_service(uow_factory: Any) -> AnalysisRunService:
     return AnalysisRunService(uow_factory)
+
+
+def _build_export_service(uow_factory: Any) -> AnalysisRunExportService:
+    return AnalysisRunExportService(uow_factory)
 
 
 @router.get("/projects/{project_id}/analysis-runs")
@@ -187,3 +192,57 @@ def get_analysis_run_trace_summary(
         warnings=summary.get("warnings", []),
     )
     return canonicalize_json(dto.to_dict())
+
+
+@router.get("/projects/{project_id}/analysis-runs/{run_id}/export/docx")
+def export_analysis_run_docx(
+    project_id: UUID,
+    run_id: UUID,
+    uow_factory=Depends(get_uow_factory),
+) -> Response:
+    service = _build_export_service(uow_factory)
+    try:
+        bundle = service.export_run_bundle(run_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    if bundle.get("project", {}).get("id") != str(project_id):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="AnalysisRun not found in project",
+        )
+    try:
+        payload = service._render_docx(bundle)
+    except ImportError as exc:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(exc)) from exc
+    headers = {
+        "Content-Disposition": f'attachment; filename="analysis_run_{run_id}.docx"'
+    }
+    return Response(
+        content=payload,
+        media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        headers=headers,
+    )
+
+
+@router.get("/projects/{project_id}/analysis-runs/{run_id}/export/pdf")
+def export_analysis_run_pdf(
+    project_id: UUID,
+    run_id: UUID,
+    uow_factory=Depends(get_uow_factory),
+) -> Response:
+    service = _build_export_service(uow_factory)
+    try:
+        bundle = service.export_run_bundle(run_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    if bundle.get("project", {}).get("id") != str(project_id):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="AnalysisRun not found in project",
+        )
+    try:
+        payload = service._render_pdf(bundle)
+    except ImportError as exc:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(exc)) from exc
+    headers = {"Content-Disposition": f'attachment; filename="analysis_run_{run_id}.pdf"'}
+    return Response(content=payload, media_type="application/pdf", headers=headers)
