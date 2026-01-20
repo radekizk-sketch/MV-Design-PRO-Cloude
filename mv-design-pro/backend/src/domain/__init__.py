@@ -1,5 +1,6 @@
 """Domain layer for MV-DESIGN-PRO."""
 
+from .analysis_run import AnalysisRun
 from .models import (
     Network,
     OperatingCase,
@@ -19,6 +20,7 @@ from .sld import SldAnnotation, SldBranchSymbol, SldDiagram, SldNodeSymbol
 __all__ = [
     "BaseQuantities",
     "Grounding",
+    "AnalysisRun",
     "Limits",
     "Network",
     "OperatingCase",

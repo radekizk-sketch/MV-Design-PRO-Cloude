@@ -6,10 +6,12 @@ from typing import Callable
 from sqlalchemy.orm import Session, sessionmaker
 
 from infrastructure.persistence.repositories import (
+    AnalysisRunRepository,
     CaseRepository,
     NetworkRepository,
     NetworkWizardRepository,
     ProjectRepository,
+    ResultRepository,
     SldRepository,
 )
 
@@ -23,6 +25,8 @@ class UnitOfWork(AbstractContextManager["UnitOfWork"]):
         self.cases: CaseRepository | None = None
         self.wizard: NetworkWizardRepository | None = None
         self.sld: SldRepository | None = None
+        self.results: ResultRepository | None = None
+        self.analysis_runs: AnalysisRunRepository | None = None
 
     def __enter__(self) -> "UnitOfWork":
         self.session = self._session_factory()
@@ -31,6 +35,8 @@ class UnitOfWork(AbstractContextManager["UnitOfWork"]):
         self.cases = CaseRepository(self.session)
         self.wizard = NetworkWizardRepository(self.session)
         self.sld = SldRepository(self.session)
+        self.results = ResultRepository(self.session)
+        self.analysis_runs = AnalysisRunRepository(self.session)
         return self
 
     def __exit__(self, exc_type, exc, tb) -> bool:
