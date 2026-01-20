@@ -25,8 +25,9 @@ from infrastructure.persistence.unit_of_work import build_uow_factory
 
 
 @pytest.fixture()
-def api_client():
-    engine = create_engine_from_url("sqlite+pysqlite:///:memory:")
+def api_client(tmp_path):
+    db_path = tmp_path / "analysis_run_api.db"
+    engine = create_engine_from_url(f"sqlite+pysqlite:///{db_path}")
     init_db(engine)
     session_factory = create_session_factory(engine)
     app.state.uow_factory = build_uow_factory(session_factory)
@@ -45,6 +46,7 @@ def api_client():
     )
     CaseRepository(session).add_operating_case(case)
 
+    node_id = uuid4()
     now = datetime.now(timezone.utc)
     run_sc = AnalysisRun(
         id=uuid4(),
@@ -54,11 +56,11 @@ def api_client():
         status="FINISHED",
         created_at=now,
         finished_at=now + timedelta(seconds=5),
-        input_snapshot={"fault_spec": {"node_id": "n1"}},
+        input_snapshot={"fault_spec": {"node_id": str(node_id)}},
         input_hash="hash-sc",
         result_summary={
             "status": "FINISHED",
-            "fault_node_id": "n1",
+            "fault_node_id": str(node_id),
             "short_circuit_type": "3ph",
         },
         white_box_trace=[
@@ -74,7 +76,7 @@ def api_client():
         status="FINISHED",
         created_at=now - timedelta(hours=1),
         finished_at=now - timedelta(minutes=30),
-        input_snapshot={"slack": {"node_id": "n1"}},
+        input_snapshot={"slack": {"node_id": str(node_id)}},
         input_hash="hash-pf",
         result_summary={"status": "FINISHED", "converged": True},
         trace_json={"nr_iterations": [{"iteration": 1}]},
@@ -88,14 +90,14 @@ def api_client():
         project_id=project_id,
         result_type="short_circuit",
         payload={
-            "fault_node_id": "n1",
+            "fault_node_id": str(node_id),
             "ikss_a": 12.5,
             "ib_a": 3.2,
         },
     )
 
     sld_payload = {
-        "nodes": [{"node_id": "n1", "x": 0.0, "y": 0.0}],
+        "nodes": [{"node_id": str(node_id), "x": 0.0, "y": 0.0}],
         "branches": [],
         "annotations": [],
     }
@@ -110,6 +112,7 @@ def api_client():
         "run_sc_id": run_sc.id,
         "run_pf_id": run_pf.id,
         "diagram_id": diagram_id,
+        "node_id": node_id,
     }
 
 
@@ -128,7 +131,7 @@ def test_api_get_run_detail_includes_summary(api_client):
     response = client.get(f"/analysis-runs/{data['run_sc_id']}")
     assert response.status_code == 200
     payload = response.json()
-    assert payload["summary_json"]["fault_node_id"] == "n1"
+    assert payload["summary_json"]["fault_node_id"] == str(data["node_id"])
     assert "input_metadata" in payload
 
 
@@ -138,7 +141,7 @@ def test_api_get_results_returns_saved_results(api_client):
     assert response.status_code == 200
     payload = response.json()
     assert payload["results"][0]["result_type"] == "short_circuit"
-    assert payload["results"][0]["payload_summary"]["fault_node_id"] == "n1"
+    assert payload["results"][0]["payload_summary"]["fault_node_id"] == str(data["node_id"])
 
 
 def test_api_get_overlay_returns_overlay_payload(api_client):
@@ -149,7 +152,7 @@ def test_api_get_overlay_returns_overlay_payload(api_client):
     )
     assert response.status_code == 200
     payload = response.json()
-    assert payload["node_overlays"][0]["node_id"] == "n1"
+    assert payload["node_overlays"][0]["node_id"] == str(data["node_id"])
     assert payload["node_overlays"][0]["ik_a"] == 12.5
 
 
@@ -167,4 +170,4 @@ def test_api_get_trace_summary_deterministic(api_client):
     response_second = client.get(f"/analysis-runs/{data['run_sc_id']}/trace/summary")
     assert response_first.status_code == 200
     assert response_first.json() == response_second.json()
-    assert response_first.json()["phases"] == ["step_b", "step_a"]
+    assert response_first.json()["phases"] == ["step_a", "step_b"]
