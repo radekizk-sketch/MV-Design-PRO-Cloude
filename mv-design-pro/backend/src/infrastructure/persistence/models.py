@@ -5,7 +5,7 @@ from datetime import datetime
 from typing import Any
 from uuid import UUID
 
-from sqlalchemy import Boolean, DateTime, Float, ForeignKey, String, Text
+from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Index, String, Text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 from sqlalchemy.types import TypeDecorator
@@ -240,12 +240,103 @@ class StudyResultORM(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
 
 
+class AnalysisRunORM(Base):
+    __tablename__ = "analysis_runs"
+    __table_args__ = (
+        Index("ix_analysis_runs_project_id", "project_id"),
+        Index("ix_analysis_runs_type_status", "analysis_type", "status"),
+        Index("ix_analysis_runs_created_at", "created_at"),
+    )
+
+    id: Mapped[UUID] = mapped_column(GUID(), primary_key=True)
+    project_id: Mapped[UUID] = mapped_column(GUID(), ForeignKey("projects.id"), nullable=False)
+    case_id: Mapped[UUID | None] = mapped_column(GUID(), nullable=True)
+    analysis_type: Mapped[str] = mapped_column(String(50), nullable=False)
+    status: Mapped[str] = mapped_column(String(50), nullable=False)
+    input_snapshot_jsonb: Mapped[dict[str, Any]] = mapped_column(
+        DeterministicJSON(), nullable=False
+    )
+    result_summary_jsonb: Mapped[dict[str, Any] | None] = mapped_column(
+        DeterministicJSON(), nullable=True
+    )
+    error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+
 class SldDiagramORM(Base):
     __tablename__ = "sld_diagrams"
+    __table_args__ = (Index("ix_sld_diagrams_project_id", "project_id"),)
 
     id: Mapped[UUID] = mapped_column(GUID(), primary_key=True)
     project_id: Mapped[UUID] = mapped_column(GUID(), ForeignKey("projects.id"), nullable=False)
     name: Mapped[str] = mapped_column(String(255), nullable=False)
-    sld_jsonb: Mapped[dict[str, Any]] = mapped_column(DeterministicJSON(), nullable=False)
+    version: Mapped[str] = mapped_column(String(50), nullable=False, default="1.0")
+    layout_meta_jsonb: Mapped[dict[str, Any]] = mapped_column(
+        DeterministicJSON(), nullable=False, default=dict
+    )
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+
+class SldNodeSymbolORM(Base):
+    __tablename__ = "sld_node_symbols"
+    __table_args__ = (
+        Index("ix_sld_node_symbols_diagram_id", "diagram_id"),
+        Index("ix_sld_node_symbols_network_node_id", "network_node_id"),
+    )
+
+    id: Mapped[UUID] = mapped_column(GUID(), primary_key=True)
+    diagram_id: Mapped[UUID] = mapped_column(
+        GUID(), ForeignKey("sld_diagrams.id"), nullable=False
+    )
+    network_node_id: Mapped[UUID] = mapped_column(GUID(), nullable=False)
+    symbol_type: Mapped[str] = mapped_column(String(100), nullable=False)
+    x: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
+    y: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
+    rotation: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
+    style_jsonb: Mapped[dict[str, Any]] = mapped_column(
+        DeterministicJSON(), nullable=False, default=dict
+    )
+
+
+class SldBranchSymbolORM(Base):
+    __tablename__ = "sld_branch_symbols"
+    __table_args__ = (
+        Index("ix_sld_branch_symbols_diagram_id", "diagram_id"),
+        Index("ix_sld_branch_symbols_network_branch_id", "network_branch_id"),
+    )
+
+    id: Mapped[UUID] = mapped_column(GUID(), primary_key=True)
+    diagram_id: Mapped[UUID] = mapped_column(
+        GUID(), ForeignKey("sld_diagrams.id"), nullable=False
+    )
+    network_branch_id: Mapped[UUID] = mapped_column(GUID(), nullable=False)
+    from_symbol_id: Mapped[UUID] = mapped_column(
+        GUID(), ForeignKey("sld_node_symbols.id"), nullable=False
+    )
+    to_symbol_id: Mapped[UUID] = mapped_column(
+        GUID(), ForeignKey("sld_node_symbols.id"), nullable=False
+    )
+    routing_jsonb: Mapped[list[dict[str, Any]]] = mapped_column(
+        DeterministicJSON(), nullable=False, default=list
+    )
+    style_jsonb: Mapped[dict[str, Any]] = mapped_column(
+        DeterministicJSON(), nullable=False, default=dict
+    )
+
+
+class SldAnnotationORM(Base):
+    __tablename__ = "sld_annotations"
+    __table_args__ = (Index("ix_sld_annotations_diagram_id", "diagram_id"),)
+
+    id: Mapped[UUID] = mapped_column(GUID(), primary_key=True)
+    diagram_id: Mapped[UUID] = mapped_column(
+        GUID(), ForeignKey("sld_diagrams.id"), nullable=False
+    )
+    text: Mapped[str] = mapped_column(String(500), nullable=False)
+    x: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
+    y: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
+    style_jsonb: Mapped[dict[str, Any]] = mapped_column(
+        DeterministicJSON(), nullable=False, default=dict
+    )

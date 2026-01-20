@@ -1,3 +1,4 @@
+from .analysis_run_repository import AnalysisRunRepository
 from .case_repository import CaseRepository
 from .network_repository import NetworkRepository
 from .network_wizard_repository import NetworkWizardRepository
@@ -12,6 +13,7 @@ __all__ = [
     "NetworkWizardRepository",
     "ProjectRepository",
     "ResultRepository",
+    "AnalysisRunRepository",
     "SldRepository",
     "StudyRunRepository",
 ]

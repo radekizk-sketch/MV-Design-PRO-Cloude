@@ -13,6 +13,11 @@ from analysis.power_flow.types import (
     PVSpec,
     SlackSpec,
 )
+from analysis.power_flow.solver import PowerFlowSolver
+from application.sld.overlay import ResultSldOverlayBuilder
+from domain.analysis_run import AnalysisRun
+from application.sld.dtos import SldDiagramDTO
+from application.sld.layout import build_deterministic_layout
 from domain.models import (
     OperatingCase,
     Project,
@@ -21,9 +26,14 @@ from domain.models import (
     new_project,
     new_study_case,
 )
+from domain.sld import SldAnnotation, SldBranchSymbol, SldDiagram, SldNodeSymbol
 from domain.validation import ValidationIssue, ValidationReport
 from infrastructure.persistence.unit_of_work import UnitOfWork
 from network_model.core import Branch, NetworkGraph, Node
+from network_model.solvers.short_circuit_iec60909 import (
+    C_MAX,
+    ShortCircuitIEC60909Solver,
+)
 
 from .dtos import (
     BranchPayload,
@@ -107,6 +117,7 @@ class NetworkWizardService:
                 "attrs": attrs,
             }
             uow.network.add_node(project_id, node, commit=False)
+            self._mark_sld_dirty(uow, project_id)
         return node
 
     def update_node(self, project_id: UUID, node_id: UUID, patch: dict) -> dict:
@@ -121,6 +132,7 @@ class NetworkWizardService:
                 patch = dict(patch)
                 patch["attrs"] = self._normalize_node_attrs(node_type, attrs)
             updated = uow.network.update_node(node_id, patch, commit=False)
+            self._mark_sld_dirty(uow, project_id)
         if updated is None:
             raise NotFound(f"Node {node_id} not found")
         return updated
@@ -135,6 +147,7 @@ class NetworkWizardService:
             ):
                 raise Conflict("Cannot delete node with connected branches")
             uow.network.delete_node(node_id, commit=False)
+            self._mark_sld_dirty(uow, project_id)
 
     def add_branch(self, project_id: UUID, payload: BranchPayload) -> dict:
         with self._uow_factory() as uow:
@@ -150,6 +163,7 @@ class NetworkWizardService:
                 "params": payload.params,
             }
             uow.network.add_branch(project_id, branch, commit=False)
+            self._mark_sld_dirty(uow, project_id)
         return branch
 
     def update_branch(self, project_id: UUID, branch_id: UUID, patch: dict) -> dict:
@@ -159,6 +173,7 @@ class NetworkWizardService:
             if existing is None or existing["project_id"] != project_id:
                 raise NotFound(f"Branch {branch_id} not found")
             updated = uow.network.update_branch(branch_id, patch, commit=False)
+            self._mark_sld_dirty(uow, project_id)
         if updated is None:
             raise NotFound(f"Branch {branch_id} not found")
         return updated
@@ -167,6 +182,7 @@ class NetworkWizardService:
         with self._uow_factory() as uow:
             self._ensure_project(uow, project_id)
             uow.network.delete_branch(branch_id, commit=False)
+            self._mark_sld_dirty(uow, project_id)
 
     def set_in_service(self, project_id: UUID, element_id: UUID, in_service: bool) -> None:
         with self._uow_factory() as uow:
@@ -1024,6 +1040,7 @@ class NetworkWizardService:
                     )
                 except ValueError as exc:
                     errors.append(str(exc))
+            self._mark_sld_dirty(uow, project_id)
 
         validation = self.validate_network(project_id)
         return ImportReport(
@@ -1074,6 +1091,7 @@ class NetworkWizardService:
                     skipped["branches"] = skipped.get("branches", 0) + 1
                 else:
                     created, updated = self._bump_counts(result, created, updated, "branches")
+            self._mark_sld_dirty(uow, project_id)
 
         validation = self.validate_network(project_id)
         return ImportReport(
@@ -1084,9 +1102,577 @@ class NetworkWizardService:
             validation=validation,
         )
 
+    def create_sld(self, project_id: UUID, name: str, mode: str = "auto") -> dict:
+        with self._uow_factory() as uow:
+            self._ensure_project(uow, project_id)
+            layout_meta = {"dirty": False, "mode": mode, "layout": {"algorithm": "baseline"}}
+            diagram = uow.sld.create_diagram(
+                project_id, name, layout_meta=layout_meta, commit=False
+            )
+            self._bind_sld_symbols(uow, project_id, diagram.id)
+            if mode == "auto":
+                self._auto_layout_sld(uow, project_id, diagram.id, options=None)
+        return self.export_sld_json(project_id, diagram.id)
+
+    def auto_layout_sld(
+        self,
+        project_id: UUID,
+        diagram_id: UUID,
+        options: dict | None = None,
+    ) -> dict:
+        with self._uow_factory() as uow:
+            self._ensure_project(uow, project_id)
+            diagram = uow.sld.get_diagram(diagram_id)
+            if diagram is None or diagram.project_id != project_id:
+                raise NotFound(f"SLD diagram {diagram_id} not found")
+            self._bind_sld_symbols(uow, project_id, diagram_id)
+            self._auto_layout_sld(uow, project_id, diagram_id, options=options)
+        return self.export_sld_json(project_id, diagram_id)
+
+    def bind_sld_symbols(self, project_id: UUID, diagram_id: UUID) -> None:
+        with self._uow_factory() as uow:
+            self._ensure_project(uow, project_id)
+            diagram = uow.sld.get_diagram(diagram_id)
+            if diagram is None or diagram.project_id != project_id:
+                raise NotFound(f"SLD diagram {diagram_id} not found")
+            self._bind_sld_symbols(uow, project_id, diagram_id)
+
+    def export_sld_json(self, project_id: UUID, diagram_id: UUID) -> dict:
+        with self._uow_factory() as uow:
+            self._ensure_project(uow, project_id)
+            diagram = uow.sld.get_diagram(diagram_id)
+            if diagram is None or diagram.project_id != project_id:
+                raise NotFound(f"SLD diagram {diagram_id} not found")
+            node_symbols = uow.sld.list_node_symbols(diagram_id)
+            branch_symbols = uow.sld.list_branch_symbols(diagram_id)
+            annotations = uow.sld.list_annotations(diagram_id)
+        node_symbols.sort(key=lambda item: str(item.network_node_id))
+        branch_symbols.sort(key=lambda item: str(item.network_branch_id))
+        annotations.sort(key=lambda item: str(item.id))
+        return SldDiagramDTO(
+            diagram=diagram,
+            node_symbols=node_symbols,
+            branch_symbols=branch_symbols,
+            annotations=annotations,
+        ).to_dict()
+
+    def import_sld_json(
+        self, project_id: UUID, payload: dict, mode: str = "merge"
+    ) -> dict:
+        if mode not in {"merge", "replace"}:
+            raise Conflict(f"Unsupported import mode: {mode}")
+        diagram_payload = payload.get("diagram") or {}
+        diagram_id = diagram_payload.get("id")
+        with self._uow_factory() as uow:
+            self._ensure_project(uow, project_id)
+            diagram: SldDiagram | None = None
+            if diagram_id:
+                diagram = uow.sld.get_diagram(UUID(str(diagram_id)))
+                if diagram is not None and diagram.project_id != project_id:
+                    raise Conflict("Diagram belongs to a different project")
+            if diagram is None:
+                diagram = uow.sld.create_diagram(
+                    project_id=project_id,
+                    name=str(diagram_payload.get("name", "SLD")),
+                    version=str(diagram_payload.get("version", "1.0")),
+                    layout_meta=diagram_payload.get("layout_meta") or {},
+                    diagram_id=UUID(str(diagram_id)) if diagram_id else None,
+                    commit=False,
+                )
+            else:
+                updated = SldDiagram(
+                    id=diagram.id,
+                    project_id=diagram.project_id,
+                    name=str(diagram_payload.get("name", diagram.name)),
+                    version=str(diagram_payload.get("version", diagram.version)),
+                    layout_meta=diagram_payload.get("layout_meta") or diagram.layout_meta,
+                    created_at=diagram.created_at,
+                    updated_at=datetime.now(timezone.utc),
+                )
+                uow.sld.update_diagram(updated, commit=False)
+                diagram = updated
+
+            if mode == "replace":
+                uow.sld.clear_symbols(diagram.id, commit=False)
+
+            node_symbols: list[SldNodeSymbol] = []
+            for node in payload.get("nodes", []):
+                network_node_id = node.get("network_node_id")
+                if not network_node_id:
+                    continue
+                node_symbols.append(
+                    SldNodeSymbol(
+                        id=UUID(str(node["id"])) if node.get("id") else uuid4(),
+                        diagram_id=diagram.id,
+                        network_node_id=UUID(str(network_node_id)),
+                        symbol_type=str(node.get("symbol_type", "NODE")),
+                        x=float(node.get("x", 0.0)),
+                        y=float(node.get("y", 0.0)),
+                        rotation=float(node.get("rotation", 0.0)),
+                        style=node.get("style") or {},
+                    )
+                )
+            uow.sld.upsert_node_symbols(diagram.id, node_symbols, commit=False)
+
+            branch_symbols: list[SldBranchSymbol] = []
+            for branch in payload.get("branches", []):
+                network_branch_id = branch.get("network_branch_id")
+                from_symbol_id = branch.get("from_symbol_id")
+                to_symbol_id = branch.get("to_symbol_id")
+                if not network_branch_id or not from_symbol_id or not to_symbol_id:
+                    continue
+                branch_symbols.append(
+                    SldBranchSymbol(
+                        id=UUID(str(branch["id"])) if branch.get("id") else uuid4(),
+                        diagram_id=diagram.id,
+                        network_branch_id=UUID(str(network_branch_id)),
+                        from_symbol_id=UUID(str(from_symbol_id)),
+                        to_symbol_id=UUID(str(to_symbol_id)),
+                        routing=list(branch.get("routing") or []),
+                        style=branch.get("style") or {},
+                    )
+                )
+            uow.sld.upsert_branch_symbols(diagram.id, branch_symbols, commit=False)
+
+            annotations: list[SldAnnotation] = []
+            for annotation in payload.get("annotations", []):
+                if not annotation.get("text"):
+                    continue
+                annotations.append(
+                    SldAnnotation(
+                        id=UUID(str(annotation["id"])) if annotation.get("id") else uuid4(),
+                        diagram_id=diagram.id,
+                        text=str(annotation.get("text", "")),
+                        x=float(annotation.get("x", 0.0)),
+                        y=float(annotation.get("y", 0.0)),
+                        style=annotation.get("style") or {},
+                    )
+                )
+            uow.sld.upsert_annotations(diagram.id, annotations, commit=False)
+        return self.export_sld_json(project_id, diagram.id)
+
+    def create_power_flow_run(
+        self,
+        project_id: UUID,
+        case_id: UUID,
+        options: dict | None = None,
+    ) -> AnalysisRun:
+        return self._create_analysis_run(
+            project_id=project_id,
+            case_id=case_id,
+            analysis_type="PF",
+            fault_spec=None,
+            options=options,
+        )
+
+    def create_short_circuit_run(
+        self,
+        project_id: UUID,
+        case_id: UUID,
+        fault_spec: dict,
+        options: dict | None = None,
+    ) -> AnalysisRun:
+        return self._create_analysis_run(
+            project_id=project_id,
+            case_id=case_id,
+            analysis_type="SC",
+            fault_spec=fault_spec,
+            options=options,
+        )
+
+    def execute_analysis_run(self, run_id: UUID) -> AnalysisRun:
+        with self._uow_factory() as uow:
+            run = uow.analysis_runs.get(run_id)
+            if run is None:
+                raise NotFound(f"AnalysisRun {run_id} not found")
+            if run.status in {"FINISHED", "FAILED"}:
+                return run
+            uow.analysis_runs.update_status(run_id, "RUNNING", commit=False)
+
+            try:
+                if run.analysis_type == "PF":
+                    options = (run.input_snapshot_json or {}).get("options") or {}
+                    pf_input = self.build_power_flow_input(
+                        run.project_id, run.case_id, options=options
+                    )
+                    result = PowerFlowSolver().solve(pf_input)
+                    summary = self._summarize_power_flow_result(result.to_dict())
+                elif run.analysis_type == "SC":
+                    snapshot = run.input_snapshot_json or {}
+                    fault_spec = snapshot.get("fault_spec") or {}
+                    options = snapshot.get("options") or {}
+                    sc_input = self.build_short_circuit_input(
+                        run.project_id,
+                        run.case_id,
+                        fault_spec=fault_spec,
+                        options=options,
+                    )
+                    result = self._solve_short_circuit(sc_input)
+                    summary = self._summarize_short_circuit_result(result.to_dict())
+                else:
+                    raise ValueError(f"Unsupported analysis type: {run.analysis_type}")
+            except Exception as exc:
+                return uow.analysis_runs.update_status(
+                    run_id, "FAILED", error=str(exc), commit=False
+                )
+
+            return uow.analysis_runs.update_status(
+                run_id, "FINISHED", result_summary=summary, commit=False
+            )
+
+    def get_analysis_run(self, run_id: UUID) -> AnalysisRun:
+        with self._uow_factory() as uow:
+            run = uow.analysis_runs.get(run_id)
+        if run is None:
+            raise NotFound(f"AnalysisRun {run_id} not found")
+        return run
+
+    def list_analysis_runs(
+        self, project_id: UUID, analysis_type: str | None = None
+    ) -> list[AnalysisRun]:
+        with self._uow_factory() as uow:
+            self._ensure_project(uow, project_id)
+            return uow.analysis_runs.list(project_id, analysis_type=analysis_type)
+
+    def get_sld_overlay_for_run(
+        self, project_id: UUID, diagram_id: UUID, run_id: UUID
+    ) -> dict:
+        with self._uow_factory() as uow:
+            self._ensure_project(uow, project_id)
+            diagram = uow.sld.get_diagram(diagram_id)
+            if diagram is None or diagram.project_id != project_id:
+                raise NotFound(f"SLD diagram {diagram_id} not found")
+            run = uow.analysis_runs.get(run_id)
+            if run is None or run.project_id != project_id:
+                raise NotFound(f"AnalysisRun {run_id} not found")
+            node_symbols = uow.sld.list_node_symbols(diagram_id)
+            branch_symbols = uow.sld.list_branch_symbols(diagram_id)
+            settings = uow.wizard.get_settings(project_id)
+            limits = settings.get("limits") or {}
+        builder = ResultSldOverlayBuilder(limits=limits)
+        return builder.build(
+            diagram=diagram,
+            node_symbols=node_symbols,
+            branch_symbols=branch_symbols,
+            result_dict=run.result_summary_json or {},
+            analysis_type=run.analysis_type,
+            run_id=str(run.id),
+        )
+
     def _ensure_project(self, uow: UnitOfWork, project_id: UUID) -> None:
         if uow.projects.get(project_id) is None:
             raise NotFound(f"Project {project_id} not found")
+
+    def _create_analysis_run(
+        self,
+        *,
+        project_id: UUID,
+        case_id: UUID,
+        analysis_type: str,
+        fault_spec: dict | None,
+        options: dict | None,
+    ) -> AnalysisRun:
+        input_snapshot: dict[str, Any] = {}
+        error_message: str | None = None
+        status = "REQUESTED"
+        try:
+            if analysis_type == "PF":
+                pf_input = self.build_power_flow_input(
+                    project_id, case_id, options=options
+                )
+                input_snapshot = pf_input.to_dict()
+            elif analysis_type == "SC":
+                if fault_spec is None:
+                    raise ValueError("fault_spec is required for short circuit runs")
+                sc_input = self.build_short_circuit_input(
+                    project_id, case_id, fault_spec=fault_spec, options=options
+                )
+                input_snapshot = sc_input.to_dict()
+            else:
+                raise ValueError(f"Unsupported analysis type: {analysis_type}")
+        except Exception as exc:
+            status = "FAILED"
+            error_message = str(exc)
+
+        canonical_snapshot = self._canonical_json(input_snapshot)
+        run_id = self._build_run_id(
+            project_id=project_id,
+            analysis_type=analysis_type,
+            case_id=case_id,
+            input_snapshot=canonical_snapshot,
+        )
+        now = datetime.now(timezone.utc)
+        run = AnalysisRun(
+            id=run_id,
+            project_id=project_id,
+            case_id=case_id,
+            analysis_type=analysis_type,
+            status=status,
+            input_snapshot_json=canonical_snapshot,
+            result_summary_json=None,
+            error_message=error_message,
+            created_at=now,
+            updated_at=now,
+        )
+
+        with self._uow_factory() as uow:
+            self._ensure_project(uow, project_id)
+            uow.analysis_runs.create(run, commit=False)
+            if status == "REQUESTED":
+                return uow.analysis_runs.update_status(run_id, "VALIDATED", commit=False)
+        return run
+
+    def _build_run_id(
+        self,
+        *,
+        project_id: UUID,
+        analysis_type: str,
+        case_id: UUID | None,
+        input_snapshot: dict,
+    ) -> UUID:
+        payload = {
+            "analysis_type": analysis_type,
+            "case_id": str(case_id) if case_id else None,
+            "input_snapshot": input_snapshot,
+        }
+        payload_str = json.dumps(payload, sort_keys=True, separators=(",", ":"))
+        return uuid5(project_id, payload_str)
+
+    def _canonical_json(self, payload: dict) -> dict:
+        payload_str = json.dumps(payload or {}, sort_keys=True, separators=(",", ":"))
+        return json.loads(payload_str)
+
+    def _summarize_power_flow_result(self, result: dict[str, Any]) -> dict[str, Any]:
+        summary = {
+            "converged": result.get("converged"),
+            "iterations": result.get("iterations"),
+            "tolerance": result.get("tolerance"),
+            "max_mismatch_pu": result.get("max_mismatch_pu"),
+            "base_mva": result.get("base_mva"),
+            "slack_node_id": result.get("slack_node_id"),
+            "node_u_mag_pu": result.get("node_u_mag_pu", {}),
+            "node_voltage_kv": result.get("node_voltage_kv", {}),
+            "node_angle_rad": result.get("node_angle_rad", {}),
+            "branch_current_ka": result.get("branch_current_ka", {}),
+        }
+        return self._canonical_json(summary)
+
+    def _summarize_short_circuit_result(self, result: dict[str, Any]) -> dict[str, Any]:
+        summary = {
+            "short_circuit_type": result.get("short_circuit_type"),
+            "fault_node_id": result.get("fault_node_id"),
+            "c_factor": result.get("c_factor"),
+            "un_v": result.get("un_v"),
+            "ikss_a": result.get("ikss_a"),
+            "ip_a": result.get("ip_a"),
+            "ith_a": result.get("ith_a"),
+            "sk_mva": result.get("sk_mva"),
+            "ik_total_a": result.get("ik_total_a"),
+            "ik_thevenin_a": result.get("ik_thevenin_a"),
+            "branch_contributions": result.get("branch_contributions"),
+        }
+        return self._canonical_json(summary)
+
+    def _solve_short_circuit(self, sc_input: ShortCircuitInput):
+        fault_spec = sc_input.fault_spec or {}
+        fault_type = str(fault_spec.get("fault_type", "3F")).upper()
+        c_factor = float(fault_spec.get("cmax") or fault_spec.get("c_factor") or C_MAX)
+        tk_s = float(sc_input.options.get("tk_s", 1.0))
+        tb_s = float(sc_input.options.get("tb_s", 0.1))
+        fault_node_id = str(fault_spec.get("node_id") or sc_input.pcc_node_id)
+
+        if fault_type in {"3F", "3PH"}:
+            return ShortCircuitIEC60909Solver.compute_3ph_short_circuit(
+                sc_input.graph,
+                fault_node_id=fault_node_id,
+                c_factor=c_factor,
+                tk_s=tk_s,
+                tb_s=tb_s,
+                include_branch_contributions=True,
+            )
+        raise ValueError(f"Unsupported fault_type: {fault_type}")
+
+    def _bind_sld_symbols(self, uow: UnitOfWork, project_id: UUID, diagram_id: UUID) -> None:
+        nodes = uow.network.list_nodes(project_id)
+        branches = uow.network.list_branches(project_id)
+        settings = uow.wizard.get_settings(project_id)
+        pcc_node_id = settings.get("pcc_node_id")
+
+        existing_nodes = uow.sld.list_node_symbols(diagram_id)
+        node_map = {symbol.network_node_id: symbol for symbol in existing_nodes}
+        node_symbols: list[SldNodeSymbol] = []
+        for node in nodes:
+            node_id = node["id"]
+            symbol_type = self._symbol_type_for_node(node, pcc_node_id)
+            existing = node_map.get(node_id)
+            if existing is None:
+                node_symbols.append(
+                    SldNodeSymbol(
+                        id=uuid4(),
+                        diagram_id=diagram_id,
+                        network_node_id=node_id,
+                        symbol_type=symbol_type,
+                        x=0.0,
+                        y=0.0,
+                        rotation=0.0,
+                        style={},
+                    )
+                )
+            else:
+                node_symbols.append(
+                    SldNodeSymbol(
+                        id=existing.id,
+                        diagram_id=diagram_id,
+                        network_node_id=existing.network_node_id,
+                        symbol_type=symbol_type,
+                        x=existing.x,
+                        y=existing.y,
+                        rotation=existing.rotation,
+                        style=existing.style,
+                    )
+                )
+        uow.sld.upsert_node_symbols(diagram_id, node_symbols, commit=False)
+
+        node_symbol_map = {symbol.network_node_id: symbol.id for symbol in node_symbols}
+        existing_branches = uow.sld.list_branch_symbols(diagram_id)
+        branch_map = {
+            symbol.network_branch_id: symbol for symbol in existing_branches
+        }
+        branch_symbols: list[SldBranchSymbol] = []
+        for branch in branches:
+            branch_id = branch["id"]
+            from_id = branch["from_node_id"]
+            to_id = branch["to_node_id"]
+            from_symbol_id = node_symbol_map.get(from_id)
+            to_symbol_id = node_symbol_map.get(to_id)
+            if from_symbol_id is None or to_symbol_id is None:
+                continue
+            existing = branch_map.get(branch_id)
+            if existing is None:
+                branch_symbols.append(
+                    SldBranchSymbol(
+                        id=uuid4(),
+                        diagram_id=diagram_id,
+                        network_branch_id=branch_id,
+                        from_symbol_id=from_symbol_id,
+                        to_symbol_id=to_symbol_id,
+                        routing=[],
+                        style={},
+                    )
+                )
+            else:
+                branch_symbols.append(
+                    SldBranchSymbol(
+                        id=existing.id,
+                        diagram_id=diagram_id,
+                        network_branch_id=existing.network_branch_id,
+                        from_symbol_id=from_symbol_id,
+                        to_symbol_id=to_symbol_id,
+                        routing=existing.routing,
+                        style=existing.style,
+                    )
+                )
+        uow.sld.upsert_branch_symbols(diagram_id, branch_symbols, commit=False)
+
+    def _auto_layout_sld(
+        self,
+        uow: UnitOfWork,
+        project_id: UUID,
+        diagram_id: UUID,
+        options: dict | None,
+    ) -> None:
+        nodes = uow.network.list_nodes(project_id)
+        branches = uow.network.list_branches(project_id)
+        settings = uow.wizard.get_settings(project_id)
+        pcc_node_id = settings.get("pcc_node_id")
+        step_x = float((options or {}).get("step_x", 240.0))
+        step_y = float((options or {}).get("step_y", 140.0))
+        positions, routing = build_deterministic_layout(
+            nodes=nodes,
+            branches=branches,
+            pcc_node_id=pcc_node_id,
+            step_x=step_x,
+            step_y=step_y,
+        )
+        node_symbols = uow.sld.list_node_symbols(diagram_id)
+        updated_nodes: list[SldNodeSymbol] = []
+        for symbol in node_symbols:
+            pos = positions.get(symbol.network_node_id)
+            if pos is None:
+                updated_nodes.append(symbol)
+                continue
+            updated_nodes.append(
+                SldNodeSymbol(
+                    id=symbol.id,
+                    diagram_id=symbol.diagram_id,
+                    network_node_id=symbol.network_node_id,
+                    symbol_type=symbol.symbol_type,
+                    x=pos[0],
+                    y=pos[1],
+                    rotation=symbol.rotation,
+                    style=symbol.style,
+                )
+            )
+        uow.sld.upsert_node_symbols(diagram_id, updated_nodes, commit=False)
+
+        branch_symbols = uow.sld.list_branch_symbols(diagram_id)
+        updated_branches: list[SldBranchSymbol] = []
+        for symbol in branch_symbols:
+            new_routing = routing.get(symbol.network_branch_id, symbol.routing)
+            updated_branches.append(
+                SldBranchSymbol(
+                    id=symbol.id,
+                    diagram_id=symbol.diagram_id,
+                    network_branch_id=symbol.network_branch_id,
+                    from_symbol_id=symbol.from_symbol_id,
+                    to_symbol_id=symbol.to_symbol_id,
+                    routing=new_routing,
+                    style=symbol.style,
+                )
+            )
+        uow.sld.upsert_branch_symbols(diagram_id, updated_branches, commit=False)
+
+        diagram = uow.sld.get_diagram(diagram_id)
+        if diagram is None:
+            return
+        layout_meta = dict(diagram.layout_meta or {})
+        layout_meta.update(
+            {
+                "dirty": False,
+                "layout": {
+                    "algorithm": "baseline",
+                    "step_x": step_x,
+                    "step_y": step_y,
+                },
+            }
+        )
+        updated_diagram = SldDiagram(
+            id=diagram.id,
+            project_id=diagram.project_id,
+            name=diagram.name,
+            version=diagram.version,
+            layout_meta=layout_meta,
+            created_at=diagram.created_at,
+            updated_at=datetime.now(timezone.utc),
+        )
+        uow.sld.update_diagram(updated_diagram, commit=False)
+
+    def _mark_sld_dirty(self, uow: UnitOfWork, project_id: UUID) -> None:
+        if uow.sld is None:
+            return
+        uow.sld.mark_project_dirty(project_id, commit=False)
+
+    def _symbol_type_for_node(self, node: dict, pcc_node_id: UUID | None) -> str:
+        node_type = str(node.get("node_type", "")).upper()
+        if pcc_node_id is not None and node.get("id") == pcc_node_id:
+            return "PCC"
+        if node_type == "SLACK":
+            return "BUS"
+        if node_type == "PV":
+            return "GEN"
+        if node_type == "PQ":
+            return "LOAD"
+        return "NODE"
 
     def _normalize_node_type(self, node_type: str) -> str | None:
         node_type_upper = node_type.upper()

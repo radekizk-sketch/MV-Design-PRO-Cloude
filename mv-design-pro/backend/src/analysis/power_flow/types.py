@@ -81,3 +81,63 @@ class PowerFlowInput:
 
     def typed_graph(self) -> "NetworkGraph":
         return self.graph
+
+    def to_dict(self) -> dict:
+        pq_payload = [
+            {"node_id": spec.node_id, "p_mw": spec.p_mw, "q_mvar": spec.q_mvar}
+            for spec in self.pq
+        ]
+        pv_payload = [
+            {
+                "node_id": spec.node_id,
+                "p_mw": spec.p_mw,
+                "u_pu": spec.u_pu,
+                "q_min_mvar": spec.q_min_mvar,
+                "q_max_mvar": spec.q_max_mvar,
+            }
+            for spec in self.pv
+        ]
+        shunts_payload = [
+            {"node_id": spec.node_id, "b_pu": spec.b_pu} for spec in self.shunts
+        ]
+        taps_payload = [
+            {"branch_id": spec.branch_id, "tap_ratio": spec.tap_ratio} for spec in self.taps
+        ]
+        bus_limits_payload = [
+            {
+                "node_id": spec.node_id,
+                "u_min_pu": spec.u_min_pu,
+                "u_max_pu": spec.u_max_pu,
+            }
+            for spec in self.bus_limits
+        ]
+        branch_limits_payload = [
+            {
+                "branch_id": spec.branch_id,
+                "s_max_mva": spec.s_max_mva,
+                "i_max_ka": spec.i_max_ka,
+            }
+            for spec in self.branch_limits
+        ]
+        pq_payload.sort(key=lambda item: item["node_id"])
+        pv_payload.sort(key=lambda item: item["node_id"])
+        shunts_payload.sort(key=lambda item: item["node_id"])
+        taps_payload.sort(key=lambda item: item["branch_id"])
+        bus_limits_payload.sort(key=lambda item: item["node_id"])
+        branch_limits_payload.sort(key=lambda item: item["branch_id"])
+
+        return {
+            "base_mva": self.base_mva,
+            "slack": {
+                "node_id": self.slack.node_id,
+                "u_pu": self.slack.u_pu,
+                "angle_rad": self.slack.angle_rad,
+            },
+            "pq": pq_payload,
+            "pv": pv_payload,
+            "shunts": shunts_payload,
+            "taps": taps_payload,
+            "bus_limits": bus_limits_payload,
+            "branch_limits": branch_limits_payload,
+            "options": self.options.__dict__,
+        }

@@ -108,3 +108,22 @@ class ShortCircuitInput:
     limits: dict[str, Any]
     fault_spec: dict[str, Any]
     options: dict[str, Any] = field(default_factory=dict)
+
+    def to_dict(self) -> dict[str, Any]:
+        sources = sorted(
+            [dict(item) for item in self.sources], key=lambda item: str(item.get("id"))
+        )
+        loads = sorted(
+            [dict(item) for item in self.loads], key=lambda item: str(item.get("id"))
+        )
+        fault_spec = dict(self.fault_spec or {})
+        return {
+            "base_mva": self.base_mva,
+            "pcc_node_id": self.pcc_node_id,
+            "sources": sources,
+            "loads": loads,
+            "grounding": dict(self.grounding or {}),
+            "limits": dict(self.limits or {}),
+            "fault_spec": fault_spec,
+            "options": dict(self.options or {}),
+        }
