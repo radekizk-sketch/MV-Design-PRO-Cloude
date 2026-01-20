@@ -88,6 +88,32 @@ Warstwa domenowa obejmuje Project/Network/OperatingCase/StudyCase/Scenario/Study
 centralny system jednostek (`UnitSystem`, `BaseQuantities`). W dokumentacji i API
 konsekwentnie używamy terminu **„PCC – punkt wspólnego przyłączenia”**.
 
+### Network Wizard Service (Application Layer)
+Warstwa aplikacyjna `NetworkWizardService` dostarcza deterministyczny kreator sieci bez UI,
+przeznaczony do wykorzystania przez przyszłe API/GUI/CLI. Obejmuje:
+- CRUD projektów, węzłów i gałęzi sieci (pełna persystencja w DB),
+- zarządzanie PCC – punkt wspólnego przyłączenia oraz źródłami,
+- CRUD OperatingCase i StudyCase,
+- walidacje industrial-grade (spójność topologii, kompletność danych PF/SC, jednostki),
+- import/eksport modelu sieci w JSON i CSV,
+- budowę `NetworkGraph` oraz wejść solverów PF/SC jako czyste DTO (bez uruchamiania solverów).
+
+Format eksportu/importu (JSON) obejmuje:
+- `project` (meta), `nodes`, `branches`, `operating_cases`, `study_cases`,
+- `pcc_node_id`, `sources`, `loads`, `grounding`, `limits`, `schema_version`, `export_version`.
+- `line_types`, `cable_types`, `transformer_types`, `switching_states`.
+
+CSV minimalny:
+- nodes: `id` (opcjonalnie), `name`, `node_type`, `base_kv`, `attrs_json`,
+- branches: `id` (opcjonalnie), `name`, `branch_type`, `from_node_id`, `to_node_id`,
+  `in_service`, `params_json`.
+
+Granice UI vs backend:
+- Kreator nie zawiera UI ani uruchamiania solverów,
+- Dostarcza deterministyczne DTO i walidacje dla warstw API/GUI/CLI.
+- Warstwa aplikacyjna persystuje PCC – punkt wspólnego przyłączenia, źródła, odbiory,
+  uziemienie/neutral oraz limity operacyjne.
+
 ### Solvers
 - **Short Circuit** - obliczenia zwarciowe wg IEC 60909
 

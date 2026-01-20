@@ -1,0 +1,310 @@
+from __future__ import annotations
+
+from uuid import UUID, uuid4
+
+from sqlalchemy import delete, select
+from sqlalchemy.orm import Session
+
+from infrastructure.persistence.models import (
+    CableTypeORM,
+    LineTypeORM,
+    NetworkLoadORM,
+    NetworkSourceORM,
+    OperatingCaseORM,
+    ProjectSettingsORM,
+    SwitchingStateORM,
+    TransformerTypeORM,
+)
+
+
+class NetworkWizardRepository:
+    def __init__(self, session: Session) -> None:
+        self._session = session
+
+    def get_settings(self, project_id: UUID) -> dict:
+        stmt = select(ProjectSettingsORM).where(ProjectSettingsORM.project_id == project_id)
+        row = self._session.execute(stmt).scalar_one_or_none()
+        if row is None:
+            return {
+                "project_id": project_id,
+                "pcc_node_id": None,
+                "grounding": {},
+                "limits": {},
+            }
+        return {
+            "project_id": row.project_id,
+            "pcc_node_id": row.pcc_node_id,
+            "grounding": row.grounding_jsonb,
+            "limits": row.limits_jsonb,
+        }
+
+    def upsert_settings(
+        self,
+        project_id: UUID,
+        *,
+        pcc_node_id: UUID | None,
+        grounding: dict,
+        limits: dict,
+        commit: bool = True,
+    ) -> None:
+        stmt = select(ProjectSettingsORM).where(ProjectSettingsORM.project_id == project_id)
+        row = self._session.execute(stmt).scalar_one_or_none()
+        if row is None:
+            self._session.add(
+                ProjectSettingsORM(
+                    project_id=project_id,
+                    pcc_node_id=pcc_node_id,
+                    grounding_jsonb=grounding,
+                    limits_jsonb=limits,
+                )
+            )
+        else:
+            row.pcc_node_id = pcc_node_id
+            row.grounding_jsonb = grounding
+            row.limits_jsonb = limits
+        if commit:
+            self._session.commit()
+
+    def set_pcc(self, project_id: UUID, node_id: UUID | None, *, commit: bool = True) -> None:
+        settings = self.get_settings(project_id)
+        self.upsert_settings(
+            project_id,
+            pcc_node_id=node_id,
+            grounding=settings["grounding"],
+            limits=settings["limits"],
+            commit=commit,
+        )
+
+    def set_grounding(self, project_id: UUID, grounding: dict, *, commit: bool = True) -> None:
+        settings = self.get_settings(project_id)
+        self.upsert_settings(
+            project_id,
+            pcc_node_id=settings["pcc_node_id"],
+            grounding=grounding,
+            limits=settings["limits"],
+            commit=commit,
+        )
+
+    def set_limits(self, project_id: UUID, limits: dict, *, commit: bool = True) -> None:
+        settings = self.get_settings(project_id)
+        self.upsert_settings(
+            project_id,
+            pcc_node_id=settings["pcc_node_id"],
+            grounding=settings["grounding"],
+            limits=limits,
+            commit=commit,
+        )
+
+    def list_sources(self, project_id: UUID) -> list[dict]:
+        stmt = select(NetworkSourceORM).where(NetworkSourceORM.project_id == project_id)
+        rows = self._session.execute(stmt).scalars().all()
+        return [
+            {
+                "id": row.id,
+                "project_id": row.project_id,
+                "node_id": row.node_id,
+                "source_type": row.source_type,
+                "payload": row.payload_jsonb,
+                "in_service": row.in_service,
+            }
+            for row in rows
+        ]
+
+    def list_loads(self, project_id: UUID) -> list[dict]:
+        stmt = select(NetworkLoadORM).where(NetworkLoadORM.project_id == project_id)
+        rows = self._session.execute(stmt).scalars().all()
+        return [
+            {
+                "id": row.id,
+                "project_id": row.project_id,
+                "node_id": row.node_id,
+                "payload": row.payload_jsonb,
+                "in_service": row.in_service,
+            }
+            for row in rows
+        ]
+
+    def upsert_source(self, project_id: UUID, payload: dict, *, commit: bool = True) -> None:
+        stmt = select(NetworkSourceORM).where(NetworkSourceORM.id == payload["id"])
+        row = self._session.execute(stmt).scalar_one_or_none()
+        if row is None:
+            self._session.add(
+                NetworkSourceORM(
+                    id=payload["id"],
+                    project_id=project_id,
+                    node_id=payload["node_id"],
+                    source_type=payload["source_type"],
+                    payload_jsonb=payload["payload"],
+                    in_service=payload.get("in_service", True),
+                )
+            )
+        else:
+            row.node_id = payload["node_id"]
+            row.source_type = payload["source_type"]
+            row.payload_jsonb = payload["payload"]
+            row.in_service = payload.get("in_service", True)
+        if commit:
+            self._session.commit()
+
+    def delete_source(self, source_id: UUID, *, commit: bool = True) -> None:
+        stmt = select(NetworkSourceORM).where(NetworkSourceORM.id == source_id)
+        row = self._session.execute(stmt).scalar_one_or_none()
+        if row is None:
+            return
+        self._session.delete(row)
+        if commit:
+            self._session.commit()
+
+    def upsert_load(self, project_id: UUID, payload: dict, *, commit: bool = True) -> None:
+        stmt = select(NetworkLoadORM).where(NetworkLoadORM.id == payload["id"])
+        row = self._session.execute(stmt).scalar_one_or_none()
+        if row is None:
+            self._session.add(
+                NetworkLoadORM(
+                    id=payload["id"],
+                    project_id=project_id,
+                    node_id=payload["node_id"],
+                    payload_jsonb=payload["payload"],
+                    in_service=payload.get("in_service", True),
+                )
+            )
+        else:
+            row.node_id = payload["node_id"]
+            row.payload_jsonb = payload["payload"]
+            row.in_service = payload.get("in_service", True)
+        if commit:
+            self._session.commit()
+
+    def delete_load(self, load_id: UUID, *, commit: bool = True) -> None:
+        stmt = select(NetworkLoadORM).where(NetworkLoadORM.id == load_id)
+        row = self._session.execute(stmt).scalar_one_or_none()
+        if row is None:
+            return
+        self._session.delete(row)
+        if commit:
+            self._session.commit()
+
+    def delete_sources_by_project(self, project_id: UUID, *, commit: bool = True) -> None:
+        self._session.query(NetworkSourceORM).filter(
+            NetworkSourceORM.project_id == project_id
+        ).delete()
+        if commit:
+            self._session.commit()
+
+    def delete_loads_by_project(self, project_id: UUID, *, commit: bool = True) -> None:
+        self._session.query(NetworkLoadORM).filter(
+            NetworkLoadORM.project_id == project_id
+        ).delete()
+        if commit:
+            self._session.commit()
+
+    def list_line_types(self) -> list[dict]:
+        rows = self._session.execute(select(LineTypeORM)).scalars().all()
+        return [{"id": row.id, "name": row.name, "params": row.params_jsonb} for row in rows]
+
+    def list_cable_types(self) -> list[dict]:
+        rows = self._session.execute(select(CableTypeORM)).scalars().all()
+        return [{"id": row.id, "name": row.name, "params": row.params_jsonb} for row in rows]
+
+    def list_transformer_types(self) -> list[dict]:
+        rows = self._session.execute(select(TransformerTypeORM)).scalars().all()
+        return [{"id": row.id, "name": row.name, "params": row.params_jsonb} for row in rows]
+
+    def upsert_line_type(self, payload: dict, *, commit: bool = True) -> None:
+        stmt = select(LineTypeORM).where(LineTypeORM.id == payload["id"])
+        row = self._session.execute(stmt).scalar_one_or_none()
+        if row is None:
+            self._session.add(
+                LineTypeORM(id=payload["id"], name=payload["name"], params_jsonb=payload["params"])
+            )
+        else:
+            row.name = payload["name"]
+            row.params_jsonb = payload["params"]
+        if commit:
+            self._session.commit()
+
+    def upsert_cable_type(self, payload: dict, *, commit: bool = True) -> None:
+        stmt = select(CableTypeORM).where(CableTypeORM.id == payload["id"])
+        row = self._session.execute(stmt).scalar_one_or_none()
+        if row is None:
+            self._session.add(
+                CableTypeORM(id=payload["id"], name=payload["name"], params_jsonb=payload["params"])
+            )
+        else:
+            row.name = payload["name"]
+            row.params_jsonb = payload["params"]
+        if commit:
+            self._session.commit()
+
+    def upsert_transformer_type(self, payload: dict, *, commit: bool = True) -> None:
+        stmt = select(TransformerTypeORM).where(TransformerTypeORM.id == payload["id"])
+        row = self._session.execute(stmt).scalar_one_or_none()
+        if row is None:
+            self._session.add(
+                TransformerTypeORM(
+                    id=payload["id"], name=payload["name"], params_jsonb=payload["params"]
+                )
+            )
+        else:
+            row.name = payload["name"]
+            row.params_jsonb = payload["params"]
+        if commit:
+            self._session.commit()
+
+    def set_switching_state(
+        self,
+        case_id: UUID,
+        element_id: UUID,
+        element_type: str,
+        in_service: bool,
+        *,
+        commit: bool = True,
+    ) -> None:
+        stmt = select(SwitchingStateORM).where(
+            SwitchingStateORM.case_id == case_id,
+            SwitchingStateORM.element_id == element_id,
+            SwitchingStateORM.element_type == element_type,
+        )
+        row = self._session.execute(stmt).scalar_one_or_none()
+        if row is None:
+            self._session.add(
+                SwitchingStateORM(
+                    id=uuid4(),
+                    case_id=case_id,
+                    element_id=element_id,
+                    element_type=element_type,
+                    in_service=in_service,
+                )
+            )
+        else:
+            row.in_service = in_service
+        if commit:
+            self._session.commit()
+
+    def list_switching_states(self, case_id: UUID) -> list[dict]:
+        stmt = select(SwitchingStateORM).where(SwitchingStateORM.case_id == case_id)
+        rows = self._session.execute(stmt).scalars().all()
+        return [
+            {
+                "id": row.id,
+                "case_id": row.case_id,
+                "element_id": row.element_id,
+                "element_type": row.element_type,
+                "in_service": row.in_service,
+            }
+            for row in rows
+        ]
+
+    def delete_switching_states(self, case_id: UUID, *, commit: bool = True) -> None:
+        self._session.execute(delete(SwitchingStateORM).where(SwitchingStateORM.case_id == case_id))
+        if commit:
+            self._session.commit()
+
+    def delete_switching_states_by_project(self, project_id: UUID, *, commit: bool = True) -> None:
+        self._session.query(SwitchingStateORM).filter(
+            SwitchingStateORM.case_id.in_(
+                select(OperatingCaseORM.id).where(OperatingCaseORM.project_id == project_id)
+            )
+        ).delete()
+        if commit:
+            self._session.commit()
