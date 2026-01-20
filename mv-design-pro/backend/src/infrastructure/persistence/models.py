@@ -229,6 +229,29 @@ class StudyRunORM(Base):
     finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
+class AnalysisRunORM(Base):
+    __tablename__ = "analysis_runs"
+
+    id: Mapped[UUID] = mapped_column(GUID(), primary_key=True)
+    project_id: Mapped[UUID] = mapped_column(GUID(), ForeignKey("projects.id"), nullable=False)
+    case_id: Mapped[UUID | None] = mapped_column(
+        GUID(), ForeignKey("operating_cases.id"), nullable=True
+    )
+    analysis_type: Mapped[str] = mapped_column(String(10), nullable=False)
+    status: Mapped[str] = mapped_column(String(50), nullable=False)
+    input_snapshot_jsonb: Mapped[dict[str, Any]] = mapped_column(
+        DeterministicJSON(), nullable=False
+    )
+    input_hash: Mapped[str] = mapped_column(String(128), nullable=False)
+    result_summary_jsonb: Mapped[dict[str, Any] | None] = mapped_column(
+        DeterministicJSON(), nullable=True
+    )
+    error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
 class StudyResultORM(Base):
     __tablename__ = "study_results"
 

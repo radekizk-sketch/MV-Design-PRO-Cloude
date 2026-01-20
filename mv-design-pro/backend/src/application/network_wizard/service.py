@@ -13,7 +13,15 @@ from analysis.power_flow.types import (
     PVSpec,
     SlackSpec,
 )
+from application.analysis_run.hashing import (
+    canonicalize,
+    compute_input_hash,
+    to_canonical_json,
+)
+from application.analysis_run.summary import summarize_pf_result, summarize_sc_result
 from application.sld.layout import build_auto_layout_diagram
+from application.sld.overlay import ResultSldOverlayBuilder
+from domain.analysis_run import AnalysisRun
 from domain.models import (
     OperatingCase,
     Project,
@@ -762,6 +770,131 @@ class NetworkWizardService:
             fault_spec=fault_spec,
             options=options or {},
         )
+
+    def create_power_flow_run(
+        self,
+        project_id: UUID,
+        operating_case_id: UUID,
+        options: dict | None = None,
+    ) -> AnalysisRun:
+        snapshot = self._build_analysis_run_snapshot(
+            project_id=project_id,
+            operating_case_id=operating_case_id,
+            analysis_type="PF",
+            fault_spec=None,
+            options=options,
+        )
+        canonical_json = to_canonical_json(snapshot)
+        input_hash = compute_input_hash(canonical_json)
+        run = AnalysisRun(
+            id=uuid4(),
+            project_id=project_id,
+            case_id=operating_case_id,
+            analysis_type="PF",
+            status="REQUESTED",
+            input_snapshot_json=canonicalize(snapshot),
+            input_hash=input_hash,
+        )
+        with self._uow_factory() as uow:
+            uow.analysis_runs.add(run)
+        return run
+
+    def create_short_circuit_run(
+        self,
+        project_id: UUID,
+        operating_case_id: UUID,
+        fault_spec: dict,
+        options: dict | None = None,
+    ) -> AnalysisRun:
+        snapshot = self._build_analysis_run_snapshot(
+            project_id=project_id,
+            operating_case_id=operating_case_id,
+            analysis_type="SC",
+            fault_spec=fault_spec,
+            options=options,
+        )
+        canonical_json = to_canonical_json(snapshot)
+        input_hash = compute_input_hash(canonical_json)
+        run = AnalysisRun(
+            id=uuid4(),
+            project_id=project_id,
+            case_id=operating_case_id,
+            analysis_type="SC",
+            status="REQUESTED",
+            input_snapshot_json=canonicalize(snapshot),
+            input_hash=input_hash,
+        )
+        with self._uow_factory() as uow:
+            uow.analysis_runs.add(run)
+        return run
+
+    def execute_analysis_run(self, run_id: UUID) -> AnalysisRun:
+        run = self.get_analysis_run(run_id)
+        with self._uow_factory() as uow:
+            uow.analysis_runs.update_status(run_id, "RUNNING")
+        try:
+            if run.analysis_type == "PF":
+                summary = self._execute_power_flow_run(run)
+            elif run.analysis_type == "SC":
+                summary = self._execute_short_circuit_run(run)
+            else:
+                raise ValueError(f"Unsupported analysis type: {run.analysis_type}")
+            finished_at = datetime.now(timezone.utc)
+            summary["run_id"] = str(run.id)
+            summary["input_hash"] = run.input_hash
+            summary["timestamp"] = finished_at.isoformat()
+            with self._uow_factory() as uow:
+                uow.analysis_runs.update_status(
+                    run_id,
+                    "FINISHED",
+                    result_summary=summary,
+                    finished_at=finished_at,
+                )
+        except Exception as exc:
+            finished_at = datetime.now(timezone.utc)
+            with self._uow_factory() as uow:
+                uow.analysis_runs.update_status(
+                    run_id,
+                    "FAILED",
+                    error_message=str(exc),
+                    finished_at=finished_at,
+                )
+        return self.get_analysis_run(run_id)
+
+    def get_analysis_run(self, run_id: UUID) -> AnalysisRun:
+        with self._uow_factory() as uow:
+            run = uow.analysis_runs.get(run_id)
+        if run is None:
+            raise NotFound(f"AnalysisRun {run_id} not found")
+        return run
+
+    def list_analysis_runs(
+        self, project_id: UUID, analysis_type: str | None = None
+    ) -> list[AnalysisRun]:
+        with self._uow_factory() as uow:
+            self._ensure_project(uow, project_id)
+            return uow.analysis_runs.list_by_project(project_id, analysis_type=analysis_type)
+
+    def get_sld_overlay_for_run(
+        self, project_id: UUID, diagram_id: UUID, run_id: UUID
+    ) -> dict[str, Any]:
+        run = self.get_analysis_run(run_id)
+        if run.project_id != project_id:
+            raise NotFound(f"AnalysisRun {run_id} not found for project {project_id}")
+        with self._uow_factory() as uow:
+            diagram = uow.sld.get(diagram_id)
+        if diagram is None or diagram["project_id"] != project_id:
+            raise NotFound(f"SLD diagram {diagram_id} not found")
+        overlay = {"nodes": [], "branches": []}
+        if run.analysis_type == "SC" and run.result_summary_json:
+            overlay = ResultSldOverlayBuilder().build_short_circuit_overlay(
+                diagram.get("payload"), run.result_summary_json
+            )
+        return {
+            "diagram_id": str(diagram_id),
+            "node_overlays": overlay.get("nodes", []),
+            "branch_overlays": overlay.get("branches", []),
+        }
 
     def export_network(self, project_id: UUID) -> dict:
         with self._uow_factory() as uow:
@@ -1580,6 +1713,157 @@ class NetworkWizardService:
             "name": case.name,
             "payload": case.study_payload,
         }
+
+    def _build_analysis_run_snapshot(
+        self,
+        *,
+        project_id: UUID,
+        operating_case_id: UUID,
+        analysis_type: str,
+        fault_spec: dict | None,
+        options: dict | None,
+    ) -> dict[str, Any]:
+        with self._uow_factory() as uow:
+            self._ensure_project(uow, project_id)
+            case = uow.cases.get_operating_case(operating_case_id)
+            if case is None or case.project_id != project_id:
+                raise NotFound(f"OperatingCase {operating_case_id} not found")
+            nodes = uow.network.list_nodes(project_id)
+            branches = uow.network.list_branches(project_id)
+            settings = uow.wizard.get_settings(project_id)
+            sources = uow.wizard.list_sources(project_id)
+            loads = uow.wizard.list_loads(project_id)
+            switching_states = uow.wizard.list_switching_states(operating_case_id)
+
+        nodes_payload = sorted(
+            (self._serialize_node(node) for node in nodes), key=lambda item: item["id"]
+        )
+        branches_payload = sorted(
+            (self._serialize_branch(branch) for branch in branches),
+            key=lambda item: item["id"],
+        )
+        sources_payload = sorted(self._normalize_source_dicts(sources), key=lambda item: item["id"])
+        loads_payload = sorted(self._normalize_load_dicts(loads), key=lambda item: item["id"])
+        switching_payload = sorted(
+            (
+                {
+                    "id": str(state["id"]),
+                    "case_id": str(state["case_id"]),
+                    "element_id": str(state["element_id"]),
+                    "element_type": state["element_type"],
+                    "in_service": bool(state["in_service"]),
+                }
+                for state in switching_states
+            ),
+            key=lambda item: (item["element_type"], item["element_id"]),
+        )
+
+        normalized_fault_spec = self._normalize_fault_spec(fault_spec)
+        return {
+            "project_id": str(project_id),
+            "case_id": str(operating_case_id),
+            "analysis_type": analysis_type,
+            "case_payload": case.case_payload,
+            "settings": {
+                "pcc_node_id": str(settings.get("pcc_node_id"))
+                if settings.get("pcc_node_id")
+                else None,
+                "grounding": settings.get("grounding") or {},
+                "limits": settings.get("limits") or {},
+            },
+            "nodes": nodes_payload,
+            "branches": branches_payload,
+            "sources": sources_payload,
+            "loads": loads_payload,
+            "switching_states": switching_payload,
+            "fault_spec": normalized_fault_spec,
+            "options": options or {},
+        }
+
+    def _execute_power_flow_run(self, run: AnalysisRun) -> dict[str, Any]:
+        snapshot = run.input_snapshot_json or {}
+        options = snapshot.get("options") or {}
+        from analysis.power_flow import solve_power_flow
+
+        pf_input = self.build_power_flow_input(run.project_id, run.case_id, options=options)
+        result = solve_power_flow(pf_input)
+        result_dict = result.to_dict()
+        summary = summarize_pf_result(result_dict)
+        return summary
+
+    def _execute_short_circuit_run(self, run: AnalysisRun) -> dict[str, Any]:
+        snapshot = run.input_snapshot_json or {}
+        fault_spec = snapshot.get("fault_spec") or {}
+        options = snapshot.get("options") or {}
+        sc_input = self.build_short_circuit_input(
+            run.project_id, run.case_id, fault_spec, options=options
+        )
+        result = self._solve_short_circuit(sc_input, fault_spec, options)
+        result_dict = result.to_dict()
+        summary = summarize_sc_result(result_dict)
+        summary["fault_node_id"] = result_dict.get("fault_node_id")
+        summary["ikss_a"] = result_dict.get("ikss_a")
+        summary["ip_a"] = result_dict.get("ip_a")
+        summary["ith_a"] = result_dict.get("ith_a")
+        return summary
+
+    def _solve_short_circuit(
+        self, sc_input: ShortCircuitInput, fault_spec: dict, options: dict
+    ) -> Any:
+        from network_model.solvers import ShortCircuitIEC60909Solver
+
+        fault_type = str(fault_spec.get("fault_type") or "3F").upper()
+        fault_node_id = fault_spec.get("node_id")
+        if fault_node_id is None:
+            raise ValueError("Short-circuit fault_spec requires node_id")
+        fault_node_id = str(fault_node_id)
+        c_factor = self._select_c_factor(fault_spec)
+        tk_s = float(options.get("tk_s", fault_spec.get("tk_s", 1.0)))
+        tb_s = float(options.get("tb_s", fault_spec.get("tb_s", 0.1)))
+        include_branch_contributions = bool(options.get("include_branch_contributions", False))
+
+        if fault_type in {"3F", "3PH", "3PHASE"}:
+            return ShortCircuitIEC60909Solver.compute_3ph_short_circuit(
+                sc_input.graph,
+                fault_node_id=fault_node_id,
+                c_factor=c_factor,
+                tk_s=tk_s,
+                tb_s=tb_s,
+                include_branch_contributions=include_branch_contributions,
+            )
+        if fault_type in {"2F", "2PH"}:
+            return ShortCircuitIEC60909Solver.compute_2ph_short_circuit(
+                sc_input.graph,
+                fault_node_id=fault_node_id,
+                c_factor=c_factor,
+                tk_s=tk_s,
+                tb_s=tb_s,
+                include_branch_contributions=include_branch_contributions,
+            )
+        if fault_type in {"1F", "1F-G", "1FG", "1PH", "1PH-G"}:
+            raise ValueError("1F faults require zero-sequence data (z0_bus) to compute")
+        if fault_type in {"2F+G", "2FG", "2PH+G", "2PH-G"}:
+            raise ValueError("2F+G faults require zero-sequence data (z0_bus) to compute")
+        raise ValueError(f"Unsupported fault type: {fault_type}")
+
+    def _select_c_factor(self, fault_spec: dict) -> float:
+        if fault_spec.get("cmax") is not None:
+            return float(fault_spec["cmax"])
+        if fault_spec.get("cmin") is not None:
+            return float(fault_spec["cmin"])
+        return 1.10
+
+    def _normalize_fault_spec(self, fault_spec: dict | None) -> dict | None:
+        if fault_spec is None:
+            return None
+        normalized = dict(fault_spec)
+        if normalized.get("node_id") is not None:
+            normalized["node_id"] = str(UUID(str(normalized["node_id"])))
+        if normalized.get("branch_id") is not None:
+            normalized["branch_id"] = str(UUID(str(normalized["branch_id"])))
+        if normalized.get("fault_type") is not None:
+            normalized["fault_type"] = str(normalized["fault_type"])
+        return normalized
 
     def _canonicalize(self, value: Any) -> Any:
         if isinstance(value, dict):

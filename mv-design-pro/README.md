@@ -114,6 +114,17 @@ Granice UI vs backend:
 - Warstwa aplikacyjna persystuje PCC – punkt wspólnego przyłączenia, źródła, odbiory,
   uziemienie/neutral oraz limity operacyjne.
 
+### AnalysisRun lifecycle (PF + SC)
+Warstwa aplikacyjna zapewnia audytowalny lifecycle uruchomień analiz PF/SC jako
+`AnalysisRun` z deterministycznym snapshotem wejść:
+- Statusy: `REQUESTED` → `VALIDATED` → `RUNNING` → `FINISHED` / `FAILED`.
+- `input_snapshot_json` i `input_hash` (SHA256 z canonical JSON) identyfikują wejście
+  bez losowych pól.
+- `result_summary_json` przechowuje lekki podzbiór wyników (np. napięcia węzłów PF,
+  Ik''/Ip/Ith dla SC) mapowany po `node_id`.
+- PCC – punkt wspólnego przyłączenia pozostaje wymaganym elementem walidacji wejść.
+- Solvery PF/SC są izolowane od DB/UI – nie znają persystencji ani prezentacji.
+
 ### Solvers
 - **Short Circuit** - obliczenia zwarciowe wg IEC 60909
 

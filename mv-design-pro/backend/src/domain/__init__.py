@@ -1,13 +1,7 @@
 """Domain layer for MV-DESIGN-PRO."""
 
-from .models import (
-    Network,
-    OperatingCase,
-    Project,
-    Scenario,
-    StudyCase,
-    StudyRun,
-)
+from .analysis_run import AnalysisRun
+from .models import Network, OperatingCase, Project, Scenario, StudyCase, StudyRun
 from .grounding import Grounding
 from .limits import Limits
 from .sources import Source
@@ -20,6 +14,7 @@ __all__ = [
     "BaseQuantities",
     "Grounding",
     "Limits",
+    "AnalysisRun",
     "Network",
     "OperatingCase",
     "Project",
