@@ -23,6 +23,8 @@ class AnalysisRun:
     input_snapshot: dict = field(default_factory=dict)
     input_hash: str = ""
     result_summary: dict = field(default_factory=dict)
+    trace_json: dict | list | None = None
+    white_box_trace: list[dict] | None = None
     error_message: str | None = None
 
 

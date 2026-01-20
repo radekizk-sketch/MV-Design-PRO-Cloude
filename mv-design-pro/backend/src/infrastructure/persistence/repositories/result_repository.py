@@ -39,7 +39,11 @@ class ResultRepository:
         return result_id
 
     def list_results(self, run_id: UUID) -> list[dict]:
-        stmt = select(StudyResultORM).where(StudyResultORM.run_id == run_id)
+        stmt = (
+            select(StudyResultORM)
+            .where(StudyResultORM.run_id == run_id)
+            .order_by(StudyResultORM.created_at, StudyResultORM.id)
+        )
         rows = self._session.execute(stmt).scalars().all()
         return [
             {

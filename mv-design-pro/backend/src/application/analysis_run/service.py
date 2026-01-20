@@ -180,9 +180,14 @@ class AnalysisRunService:
             "iterations": payload.get("iterations"),
             "node_u_pu": payload.get("node_u_mag_pu", {}),
         }
+        trace_json = payload.get("white_box_trace")
         finished_at = datetime.now(timezone.utc)
         return uow.analysis_runs.update_status(
-            run.id, "FINISHED", finished_at=finished_at, result_summary=summary
+            run.id,
+            "FINISHED",
+            finished_at=finished_at,
+            result_summary=summary,
+            trace_json=trace_json,
         )
 
     def _execute_short_circuit(self, uow: UnitOfWork, run: AnalysisRun) -> AnalysisRun:
@@ -212,9 +217,14 @@ class AnalysisRunService:
             "ikss_a": payload.get("ikss_a"),
             "pcc_node_id": sc_input["pcc_node_id"],
         }
+        white_box_trace = payload.get("white_box_trace")
         finished_at = datetime.now(timezone.utc)
         return uow.analysis_runs.update_status(
-            run.id, "FINISHED", finished_at=finished_at, result_summary=summary
+            run.id,
+            "FINISHED",
+            finished_at=finished_at,
+            result_summary=summary,
+            white_box_trace=white_box_trace,
         )
 
     def _fail_run(
