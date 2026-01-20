@@ -191,5 +191,24 @@ def test_sld_repository() -> None:
     diagrams = repo.list_by_project(project.id)
 
     assert diagrams[0]["id"] == sld_id
-    assert diagrams[0]["payload"] == {"nodes": []}
+    assert diagrams[0]["payload"] == {
+        "version": 1,
+        "name": "Main",
+        "nodes": [],
+        "branches": [],
+        "annotations": [],
+        "dirty_flag": False,
+    }
+
+    loaded = repo.get(sld_id)
+    assert loaded is not None
+    assert loaded["payload"]["nodes"] == []
+
+    repo.update_payload(
+        sld_id,
+        {"nodes": [], "branches": [], "annotations": [], "dirty_flag": True},
+    )
+    updated = repo.get(sld_id)
+    assert updated is not None
+    assert updated["payload"]["dirty_flag"] is True
     session.close()
