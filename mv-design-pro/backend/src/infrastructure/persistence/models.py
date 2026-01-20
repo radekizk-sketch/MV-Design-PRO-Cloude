@@ -77,8 +77,31 @@ class ProjectORM(Base):
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     schema_version: Mapped[str] = mapped_column(String(50), nullable=False)
+    pcc_node_id: Mapped[UUID | None] = mapped_column(
+        GUID(), ForeignKey("network_nodes.id", use_alter=True, name="fk_projects_pcc_node")
+    )
+    sources_jsonb: Mapped[list[dict[str, Any]]] = mapped_column(
+        DeterministicJSON(), nullable=False, default=list
+    )
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+
+class ProjectSettingsORM(Base):
+    __tablename__ = "project_settings"
+
+    project_id: Mapped[UUID] = mapped_column(
+        GUID(), ForeignKey("projects.id"), primary_key=True
+    )
+    pcc_node_id: Mapped[UUID | None] = mapped_column(
+        GUID(), ForeignKey("network_nodes.id", use_alter=True, name="fk_settings_pcc_node")
+    )
+    grounding_jsonb: Mapped[dict[str, Any]] = mapped_column(
+        DeterministicJSON(), nullable=False, default=dict
+    )
+    limits_jsonb: Mapped[dict[str, Any]] = mapped_column(
+        DeterministicJSON(), nullable=False, default=dict
+    )
 
 
 class NetworkNodeORM(Base):
@@ -103,6 +126,61 @@ class NetworkBranchORM(Base):
     to_node_id: Mapped[UUID] = mapped_column(GUID(), ForeignKey("network_nodes.id"))
     in_service: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     params_jsonb: Mapped[dict[str, Any]] = mapped_column(DeterministicJSON(), nullable=False)
+
+
+class NetworkSourceORM(Base):
+    __tablename__ = "network_sources"
+
+    id: Mapped[UUID] = mapped_column(GUID(), primary_key=True)
+    project_id: Mapped[UUID] = mapped_column(GUID(), ForeignKey("projects.id"), nullable=False)
+    node_id: Mapped[UUID] = mapped_column(GUID(), ForeignKey("network_nodes.id"), nullable=False)
+    source_type: Mapped[str] = mapped_column(String(100), nullable=False)
+    payload_jsonb: Mapped[dict[str, Any]] = mapped_column(DeterministicJSON(), nullable=False)
+    in_service: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+
+
+class NetworkLoadORM(Base):
+    __tablename__ = "network_loads"
+
+    id: Mapped[UUID] = mapped_column(GUID(), primary_key=True)
+    project_id: Mapped[UUID] = mapped_column(GUID(), ForeignKey("projects.id"), nullable=False)
+    node_id: Mapped[UUID] = mapped_column(GUID(), ForeignKey("network_nodes.id"), nullable=False)
+    payload_jsonb: Mapped[dict[str, Any]] = mapped_column(DeterministicJSON(), nullable=False)
+    in_service: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+
+
+class LineTypeORM(Base):
+    __tablename__ = "line_types"
+
+    id: Mapped[UUID] = mapped_column(GUID(), primary_key=True)
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    params_jsonb: Mapped[dict[str, Any]] = mapped_column(DeterministicJSON(), nullable=False)
+
+
+class CableTypeORM(Base):
+    __tablename__ = "cable_types"
+
+    id: Mapped[UUID] = mapped_column(GUID(), primary_key=True)
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    params_jsonb: Mapped[dict[str, Any]] = mapped_column(DeterministicJSON(), nullable=False)
+
+
+class TransformerTypeORM(Base):
+    __tablename__ = "transformer_types"
+
+    id: Mapped[UUID] = mapped_column(GUID(), primary_key=True)
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    params_jsonb: Mapped[dict[str, Any]] = mapped_column(DeterministicJSON(), nullable=False)
+
+
+class SwitchingStateORM(Base):
+    __tablename__ = "network_switching_states"
+
+    id: Mapped[UUID] = mapped_column(GUID(), primary_key=True)
+    case_id: Mapped[UUID] = mapped_column(GUID(), ForeignKey("operating_cases.id"))
+    element_id: Mapped[UUID] = mapped_column(GUID(), nullable=False)
+    element_type: Mapped[str] = mapped_column(String(50), nullable=False)
+    in_service: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
 
 
 class OperatingCaseORM(Base):

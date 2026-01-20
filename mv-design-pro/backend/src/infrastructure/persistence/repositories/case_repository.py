@@ -13,7 +13,7 @@ class CaseRepository:
     def __init__(self, session: Session) -> None:
         self._session = session
 
-    def add_operating_case(self, case: OperatingCase) -> None:
+    def add_operating_case(self, case: OperatingCase, *, commit: bool = True) -> None:
         self._session.add(
             OperatingCaseORM(
                 id=case.id,
@@ -24,7 +24,8 @@ class CaseRepository:
                 updated_at=case.updated_at,
             )
         )
-        self._session.commit()
+        if commit:
+            self._session.commit()
 
     def get_operating_case(self, case_id: UUID) -> OperatingCase | None:
         stmt = select(OperatingCaseORM).where(OperatingCaseORM.id == case_id)
@@ -55,7 +56,16 @@ class CaseRepository:
             for row in rows
         ]
 
-    def add_study_case(self, case: StudyCase) -> None:
+    def update_operating_case(self, case: OperatingCase, *, commit: bool = True) -> None:
+        stmt = select(OperatingCaseORM).where(OperatingCaseORM.id == case.id)
+        row = self._session.execute(stmt).scalar_one()
+        row.name = case.name
+        row.case_jsonb = case.case_payload
+        row.updated_at = case.updated_at
+        if commit:
+            self._session.commit()
+
+    def add_study_case(self, case: StudyCase, *, commit: bool = True) -> None:
         self._session.add(
             StudyCaseORM(
                 id=case.id,
@@ -66,7 +76,31 @@ class CaseRepository:
                 updated_at=case.updated_at,
             )
         )
-        self._session.commit()
+        if commit:
+            self._session.commit()
+
+    def update_study_case(self, case: StudyCase, *, commit: bool = True) -> None:
+        stmt = select(StudyCaseORM).where(StudyCaseORM.id == case.id)
+        row = self._session.execute(stmt).scalar_one()
+        row.name = case.name
+        row.study_jsonb = case.study_payload
+        row.updated_at = case.updated_at
+        if commit:
+            self._session.commit()
+
+    def delete_operating_cases_by_project(self, project_id: UUID, *, commit: bool = True) -> None:
+        self._session.query(OperatingCaseORM).filter(
+            OperatingCaseORM.project_id == project_id
+        ).delete()
+        if commit:
+            self._session.commit()
+
+    def delete_study_cases_by_project(self, project_id: UUID, *, commit: bool = True) -> None:
+        self._session.query(StudyCaseORM).filter(
+            StudyCaseORM.project_id == project_id
+        ).delete()
+        if commit:
+            self._session.commit()
 
     def get_study_case(self, case_id: UUID) -> StudyCase | None:
         stmt = select(StudyCaseORM).where(StudyCaseORM.id == case_id)
