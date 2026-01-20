@@ -3,6 +3,8 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from api.analysis_runs import router as analysis_runs_router
+
 app = FastAPI(
     title="MV-DESIGN PRO API",
     description="Professional Medium Voltage Network Design System API",
@@ -19,6 +21,8 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+app.include_router(analysis_runs_router)
 
 
 @app.get("/")

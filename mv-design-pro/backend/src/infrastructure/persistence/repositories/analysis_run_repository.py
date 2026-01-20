@@ -30,6 +30,8 @@ class AnalysisRunRepository:
                 input_snapshot=run.input_snapshot,
                 input_hash=run.input_hash,
                 result_summary=run.result_summary,
+                trace_json=run.trace_json,
+                white_box_trace=run.white_box_trace,
                 error_message=run.error_message,
             )
         )
@@ -43,7 +45,11 @@ class AnalysisRunRepository:
     def list_by_project(
         self, project_id: UUID, filters: dict[str, Any] | None = None
     ) -> list[AnalysisRun]:
-        stmt = select(AnalysisRunORM).where(AnalysisRunORM.project_id == project_id)
+        stmt = (
+            select(AnalysisRunORM)
+            .where(AnalysisRunORM.project_id == project_id)
+            .order_by(AnalysisRunORM.created_at.desc(), AnalysisRunORM.id.desc())
+        )
         filters = filters or {}
         if analysis_type := filters.get("analysis_type"):
             stmt = stmt.where(AnalysisRunORM.analysis_type == analysis_type)
@@ -80,6 +86,8 @@ class AnalysisRunRepository:
         finished_at: datetime | None = None,
         error_message: str | None = None,
         result_summary: dict | None = None,
+        trace_json: dict | list | None = None,
+        white_box_trace: list[dict] | None = None,
     ) -> AnalysisRun:
         stmt = select(AnalysisRunORM).where(AnalysisRunORM.id == run_id)
         row = self._session.execute(stmt).scalar_one()
@@ -92,6 +100,10 @@ class AnalysisRunRepository:
             row.error_message = error_message
         if result_summary is not None:
             row.result_summary = result_summary
+        if trace_json is not None:
+            row.trace_json = trace_json
+        if white_box_trace is not None:
+            row.white_box_trace = white_box_trace
         self._session.commit()
         return self._to_domain(row)
 
@@ -108,5 +120,7 @@ class AnalysisRunRepository:
             input_snapshot=row.input_snapshot,
             input_hash=row.input_hash,
             result_summary=row.result_summary,
+            trace_json=row.trace_json,
+            white_box_trace=row.white_box_trace,
             error_message=row.error_message,
         )

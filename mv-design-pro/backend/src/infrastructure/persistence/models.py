@@ -244,6 +244,12 @@ class AnalysisRunORM(Base):
     result_summary: Mapped[dict[str, Any]] = mapped_column(
         DeterministicJSON(), nullable=False, default=dict
     )
+    trace_json: Mapped[dict[str, Any] | list[dict[str, Any]] | None] = mapped_column(
+        DeterministicJSON(), nullable=True
+    )
+    white_box_trace: Mapped[list[dict[str, Any]] | None] = mapped_column(
+        DeterministicJSON(), nullable=True
+    )
     error_message: Mapped[str | None] = mapped_column(Text)
 
 
