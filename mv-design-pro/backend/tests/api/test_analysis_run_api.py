@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
+from importlib.util import find_spec
 from uuid import uuid4
 
 import pytest
@@ -22,6 +23,9 @@ from infrastructure.persistence.repositories import (
     SldRepository,
 )
 from infrastructure.persistence.unit_of_work import build_uow_factory
+
+_DOCX_AVAILABLE = find_spec("docx") is not None
+_PDF_AVAILABLE = find_spec("reportlab") is not None
 
 
 @pytest.fixture()
@@ -171,3 +175,28 @@ def test_api_get_trace_summary_deterministic(api_client):
     assert response_first.status_code == 200
     assert response_first.json() == response_second.json()
     assert response_first.json()["phases"] == ["step_a", "step_b"]
+
+
+@pytest.mark.skipif(not _DOCX_AVAILABLE, reason="python-docx is not installed")
+def test_export_docx_returns_file(api_client):
+    client, data = api_client
+    response = client.get(
+        f"/projects/{data['project_id']}/analysis-runs/{data['run_sc_id']}/export/docx"
+    )
+    assert response.status_code == 200
+    assert (
+        response.headers["content-type"]
+        == "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+    )
+    assert response.content
+
+
+@pytest.mark.skipif(not _PDF_AVAILABLE, reason="reportlab is not installed")
+def test_export_pdf_returns_file(api_client):
+    client, data = api_client
+    response = client.get(
+        f"/projects/{data['project_id']}/analysis-runs/{data['run_sc_id']}/export/pdf"
+    )
+    assert response.status_code == 200
+    assert response.headers["content-type"] == "application/pdf"
+    assert response.content
