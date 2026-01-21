@@ -47,6 +47,8 @@ def _build_export_service() -> tuple[AnalysisRunExportService, dict[str, UUID]]:
 
     now = datetime.now(timezone.utc)
     run_id = uuid4()
+    node_id = uuid4()
+    node_id_str = str(node_id)
     run = AnalysisRun(
         id=run_id,
         project_id=project_id,
@@ -56,7 +58,7 @@ def _build_export_service() -> tuple[AnalysisRunExportService, dict[str, UUID]]:
         created_at=now,
         started_at=now,
         finished_at=now,
-        input_snapshot={"fault_spec": {"node_id": str(uuid4())}},
+        input_snapshot={"fault_spec": {"node_id": node_id_str}},
         input_hash="hash-sc",
         result_summary={"status": "FINISHED", "pcc_node_id": str(uuid4())},
         white_box_trace=[
@@ -70,11 +72,11 @@ def _build_export_service() -> tuple[AnalysisRunExportService, dict[str, UUID]]:
         run_id=run_id,
         project_id=project_id,
         result_type="short_circuit",
-        payload={"fault_node_id": "N1", "ikss_a": 12.5},
+        payload={"fault_node_id": node_id_str, "ikss_a": 12.5},
     )
 
     sld_payload = {
-        "nodes": [{"node_id": "N1", "x": 0.0, "y": 0.0}],
+        "nodes": [{"node_id": node_id_str, "x": 0.0, "y": 0.0}],
         "branches": [],
         "annotations": [],
     }
