@@ -16,9 +16,11 @@ from .read_model import (
     minimize_summary,
 )
 from .service import AnalysisRunService
+from .export_service import AnalysisRunExportService
 
 __all__ = [
     "AnalysisRunDetailDTO",
+    "AnalysisRunExportService",
     "AnalysisRunService",
     "AnalysisRunSummaryDTO",
     "OverlayDTO",
