@@ -4,7 +4,6 @@ from typing import Any
 
 import numpy as np
 
-from network_model.core.branch import LineBranch, TransformerBranch
 from network_model.core.graph import NetworkGraph
 
 from ._internal import (
@@ -17,8 +16,6 @@ from ._internal import (
     compute_power_injections,
     newton_raphson_solve,
     newton_raphson_solve_v2,
-    options_to_trace,
-    validate_input,
 )
 from .result import PowerFlowResult
 from .types import PowerFlowInput
@@ -28,14 +25,6 @@ class PowerFlowSolver:
     def solve(self, pf_input: PowerFlowInput) -> PowerFlowResult:
         graph: NetworkGraph = pf_input.typed_graph()
         options = pf_input.options
-
-        validation_warnings: list[str] = []
-        validation_errors: list[str] = []
-
-        if options.validate:
-            validation_warnings, validation_errors = validate_input(pf_input)
-            if validation_errors:
-                raise ValueError("; ".join(validation_errors))
 
         slack_island_nodes, not_solved_nodes = build_slack_island(
             graph, pf_input.slack.node_id
@@ -139,6 +128,9 @@ class PowerFlowSolver:
                     }
                 )
 
+        if not converged:
+            raise ValueError("Power flow did not converge.")
+
         node_voltage = {
             node_id: v[node_index_map[node_id]]
             for node_id in slack_island_nodes
@@ -161,14 +153,14 @@ class PowerFlowSolver:
             {entry["branch_id"]: entry["tap_ratio"] for entry in applied_taps},
         )
 
+        if branch_flow_note:
+            losses_total = 0.0 + 0.0j
+
         node_voltage_kv: dict[str, float] = {}
-        missing_voltage_base_nodes: list[str] = []
         for node_id, voltage in node_voltage.items():
             voltage_level = graph.nodes[node_id].voltage_level
             if voltage_level and voltage_level > 0:
                 node_voltage_kv[node_id] = float(abs(voltage) * voltage_level)
-            else:
-                missing_voltage_base_nodes.append(node_id)
 
         branch_current_ka: dict[str, float] = {}
         for branch_id, current_pu in branch_current.items():
@@ -191,92 +183,22 @@ class PowerFlowSolver:
         slack_power = complex(p_calc[slack_index], q_calc[slack_index])
         sum_pq_spec = complex(float(np.sum(p_spec)), float(np.sum(q_spec)))
 
-        if branch_flow_note:
-            balance_note = (
-                "Power balance uses slack and PQ specs only; branch losses not computed."
-            )
-            losses_total = 0.0 + 0.0j
-        else:
-            balance_error = (slack_power + sum_pq_spec) - losses_total
-            balance_note = (
-                "Balance check: slack + PQ specs - losses = "
-                f"{balance_error.real:.6g}+j{balance_error.imag:.6g} pu."
-            )
-
-        white_box_trace: dict[str, Any] = {
-            "options": options_to_trace(options),
-            "validation": {
-                "warnings": sorted(validation_warnings),
-                "errors": sorted(validation_errors),
-            },
+        solver_trace: dict[str, Any] = {
             "islands": {
                 "slack_island_nodes": sorted(slack_island_nodes),
                 "not_solved_island_nodes": sorted(not_solved_nodes),
             },
             "ybus": ybus_trace,
             "nr_iterations": nr_trace,
-            "v2_functions_used": [
-                "build_power_spec_v2" if pf_input.pv else "build_power_spec",
-                "newton_raphson_solve_v2" if pf_input.pv else "newton_raphson_solve",
-                "build_ybus_pu",
-                "apply_shunts_pu",
-                "apply_tap_ratio",
-                "compute_branch_flows",
-                "build_violations",
-            ],
-            "v2_feature_flags": {
-                "pv_enabled": bool(pf_input.pv),
-                "q_limits": bool(pf_input.pv),
-                "tap_enabled": bool(applied_taps),
-                "shunts_enabled": bool(applied_shunts),
-                "violations_enabled": bool(pf_input.bus_limits or pf_input.branch_limits),
-                "units_enabled": any(
-                    graph.nodes[node_id].voltage_level > 0 for node_id in slack_island_nodes
-                ),
-            },
-            "source_of_data": {
-                "p_spec": "overlay.pq + overlay.pv",
-                "q_spec": "overlay.pq",
-                "pv_voltage_setpoints": "overlay.pv",
-                "pv_q_limits": "overlay.pv",
-                "shunts": "overlay.shunts",
-                "taps": "core.transformer.tap_position when non-zero; overlay.taps otherwise",
-                "bus_limits": "overlay.bus_limits",
-                "branch_limits": "overlay.branch_limits + core.ratings",
-                "voltage_base": "core.node.voltage_level",
-            },
-            "pv_to_pq_switches": pv_to_pq_switches,
             "applied_taps": applied_taps,
             "applied_shunts": applied_shunts,
             "power_balance": {
                 "sum_pq_spec_pu": sum_pq_spec,
                 "slack_power_pu": slack_power,
                 "losses_total_pu": losses_total,
-                "balance_check_note": balance_note,
+                "branch_flow_note": branch_flow_note,
             },
         }
-
-        if branch_flow_note:
-            white_box_trace["power_balance"]["balance_check_note"] = (
-                balance_note + " " + branch_flow_note
-            )
-
-        violations = _build_violations(
-            node_u_mag,
-            pf_input.bus_limits,
-            branch_s_from_mva,
-            branch_s_to_mva,
-            branch_current_ka,
-            pf_input.branch_limits,
-            graph,
-        )
-
-        white_box_trace["violations_summary"] = _summarize_violations(violations)
-        if missing_voltage_base_nodes:
-            white_box_trace["units"] = {
-                "missing_voltage_level_nodes": sorted(missing_voltage_base_nodes),
-                "note": "kV/kA conversions unavailable where voltage_level is missing or zero.",
-            }
 
         return PowerFlowResult(
             converged=converged,
@@ -295,114 +217,12 @@ class PowerFlowSolver:
             branch_current_ka=branch_current_ka,
             branch_s_from_mva=branch_s_from_mva,
             branch_s_to_mva=branch_s_to_mva,
-            violations=violations,
             pv_to_pq_switches=pv_to_pq_switches,
             losses_total_pu=losses_total,
             slack_power_pu=slack_power,
-            white_box_trace=white_box_trace,
+            solver_trace=solver_trace,
         )
 
 
 def solve_power_flow(pf_input: PowerFlowInput) -> PowerFlowResult:
     return PowerFlowSolver().solve(pf_input)
-
-
-def _build_violations(
-    node_u_mag_pu: dict[str, float],
-    bus_limits: list[Any],
-    branch_s_from_mva: dict[str, complex],
-    branch_s_to_mva: dict[str, complex],
-    branch_current_ka: dict[str, float],
-    branch_limits: list[Any],
-    graph: NetworkGraph,
-) -> list[dict[str, Any]]:
-    violations: list[dict[str, Any]] = []
-
-    for limit in bus_limits:
-        if limit.node_id not in node_u_mag_pu:
-            continue
-        value = node_u_mag_pu[limit.node_id]
-        if value < limit.u_min_pu:
-            violations.append(
-                {
-                    "type": "bus_voltage",
-                    "id": limit.node_id,
-                    "value": float(value),
-                    "limit": float(limit.u_min_pu),
-                    "severity": float(value / limit.u_min_pu),
-                    "direction": "under",
-                }
-            )
-        if value > limit.u_max_pu:
-            violations.append(
-                {
-                    "type": "bus_voltage",
-                    "id": limit.node_id,
-                    "value": float(value),
-                    "limit": float(limit.u_max_pu),
-                    "severity": float(value / limit.u_max_pu),
-                    "direction": "over",
-                }
-            )
-
-    branch_limit_map = {limit.branch_id: limit for limit in branch_limits}
-
-    for branch_id, branch in graph.branches.items():
-        if not branch.in_service:
-            continue
-        if branch_id not in branch_s_from_mva and branch_id not in branch_s_to_mva:
-            continue
-        s_limit = None
-        i_limit = None
-
-        if branch_id in branch_limit_map:
-            spec = branch_limit_map[branch_id]
-            s_limit = spec.s_max_mva
-            i_limit = spec.i_max_ka
-        else:
-            if isinstance(branch, TransformerBranch) and branch.rated_power_mva > 0:
-                s_limit = branch.rated_power_mva
-            if isinstance(branch, LineBranch) and branch.rated_current_a > 0:
-                i_limit = branch.rated_current_a / 1000.0
-
-        if s_limit is not None:
-            s_from = abs(branch_s_from_mva.get(branch_id, 0.0 + 0.0j))
-            s_to = abs(branch_s_to_mva.get(branch_id, 0.0 + 0.0j))
-            s_value = max(s_from, s_to)
-            if s_value > s_limit:
-                violations.append(
-                    {
-                        "type": "branch_loading",
-                        "id": branch_id,
-                        "value": float(s_value),
-                        "limit": float(s_limit),
-                        "severity": float(s_value / s_limit),
-                        "direction": "over",
-                    }
-                )
-
-        if i_limit is not None and branch_id in branch_current_ka:
-            i_value = branch_current_ka[branch_id]
-            if i_value > i_limit:
-                violations.append(
-                    {
-                        "type": "branch_current",
-                        "id": branch_id,
-                        "value": float(i_value),
-                        "limit": float(i_limit),
-                        "severity": float(i_value / i_limit),
-                        "direction": "over",
-                    }
-                )
-
-    violations.sort(key=lambda item: item["severity"], reverse=True)
-    return violations
-
-
-def _summarize_violations(violations: list[dict[str, Any]]) -> dict[str, Any]:
-    summary: dict[str, Any] = {"count": len(violations), "by_type": {}}
-    for violation in violations:
-        summary["by_type"].setdefault(violation["type"], 0)
-        summary["by_type"][violation["type"]] += 1
-    summary["top"] = violations[:3]
-    return summary

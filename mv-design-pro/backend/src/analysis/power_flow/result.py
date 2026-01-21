@@ -48,9 +48,8 @@ class PowerFlowResult:
     branch_s_to_mva: dict[str, complex] = field(default_factory=dict)
     losses_total_pu: complex = 0.0 + 0.0j
     slack_power_pu: complex = 0.0 + 0.0j
-    violations: list[dict[str, Any]] = field(default_factory=list)
     pv_to_pq_switches: list[dict[str, Any]] = field(default_factory=list)
-    white_box_trace: dict[str, Any] = field(default_factory=dict)
+    solver_trace: dict[str, Any] = field(default_factory=dict, repr=False)
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -72,7 +71,5 @@ class PowerFlowResult:
             "branch_s_to_mva": _sorted_complex_dict(self.branch_s_to_mva),
             "losses_total_pu": _complex_to_dict(self.losses_total_pu),
             "slack_power_pu": _complex_to_dict(self.slack_power_pu),
-            "violations": _serialize_value(self.violations),
             "pv_to_pq_switches": _serialize_value(self.pv_to_pq_switches),
-            "white_box_trace": _serialize_value(self.white_box_trace),
         }

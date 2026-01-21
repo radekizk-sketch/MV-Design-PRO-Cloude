@@ -10,6 +10,7 @@ from uuid import UUID
 from analysis.power_flow import PowerFlowSolver
 from analysis.power_flow._internal import build_slack_island, validate_input
 from analysis.power_flow.types import PowerFlowInput, PowerFlowOptions, PQSpec, PVSpec, SlackSpec
+from analysis.power_flow_checks import analyze_power_flow
 from application.sld.overlay import ResultSldOverlayBuilder
 from domain.analysis_run import AnalysisRun, new_analysis_run
 from domain.validation import ValidationIssue, ValidationReport
@@ -168,6 +169,7 @@ class AnalysisRunService:
             return self._fail_run(uow, run, str(exc))
 
         payload = result.to_dict()
+        payload.update(analyze_power_flow(pf_input, result))
         uow.results.add_result(
             run_id=run.id,
             project_id=run.project_id,
