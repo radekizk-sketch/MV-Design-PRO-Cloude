@@ -5,29 +5,7 @@ Professional Medium Voltage Network Design System - kompleksowe narzędzie do pr
 ## Struktura projektu
 
 ```
-mv-design-pro/
-├── backend/                    # Backend API (Python/FastAPI)
-│   ├── src/
-│   │   ├── domain/             # Warstwa domenowa (Project/Case/StudyRun) + UnitSystem
-│   │   ├── analysis/           # Moduły analityczne (Power Flow v1)
-│   │   ├── network_model/      # Model sieci elektrycznej
-│   │   │   ├── core/           # Podstawowe klasy i struktury
-│   │   │   ├── elements/       # Elementy sieci (transformatory, linie, etc.)
-│   │   │   └── validation/     # Walidacja modelu sieci
-│   │   ├── solvers/            # Solvery obliczeniowe (np. IEC 60909)
-│   │   ├── whitebox/           # Transparentne obliczenia
-│   │   ├── compliance/         # Zgodność z normami
-│   │   └── api/                # REST API endpoints
-│   ├── tests/                  # Testy jednostkowe i integracyjne
-│   └── pyproject.toml          # Konfiguracja Poetry
-├── frontend/                   # Frontend (React/TypeScript)
-│   ├── src/
-│   │   ├── components/         # Komponenty React
-│   │   ├── stores/             # Zustand stores
-│   │   └── api/                # Klient API
-│   └── package.json
-├── docker-compose.yml          # Konfiguracja Docker
-└── README.md
+
 ```
 
 ## Wymagania
