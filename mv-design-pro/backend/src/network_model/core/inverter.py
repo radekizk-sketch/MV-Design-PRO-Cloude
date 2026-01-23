@@ -30,3 +30,36 @@ class InverterSource:
         Zwraca RMS wkład prądowy do zwarcia: Ik = k_sc * In.
         """
         return self.k_sc * self.in_rated_a
+
+    def to_dict(self) -> dict:
+        """
+        Serializes inverter source to a dictionary.
+        """
+        return {
+            "id": self.id,
+            "name": self.name,
+            "node_id": self.node_id,
+            "in_rated_a": self.in_rated_a,
+            "k_sc": self.k_sc,
+            "contributes_negative_sequence": self.contributes_negative_sequence,
+            "contributes_zero_sequence": self.contributes_zero_sequence,
+            "in_service": self.in_service,
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict) -> "InverterSource":
+        """
+        Deserializes inverter source from a dictionary.
+        """
+        return cls(
+            id=str(data.get("id", str(uuid.uuid4()))),
+            name=str(data.get("name", "")),
+            node_id=str(data.get("node_id", "")),
+            in_rated_a=float(data.get("in_rated_a", 0.0)),
+            k_sc=float(data.get("k_sc", 1.1)),
+            contributes_negative_sequence=bool(
+                data.get("contributes_negative_sequence", False)
+            ),
+            contributes_zero_sequence=bool(data.get("contributes_zero_sequence", False)),
+            in_service=bool(data.get("in_service", True)),
+        )
