@@ -18,6 +18,7 @@ def to_run_envelope(
     protection_input: ProtectionInput,
     *,
     outputs: dict[str, Any],
+    artifacts: tuple[ArtifactRef, ...] | None = None,
     run_id: str | None = None,
     case_id: str | None = None,
     base_snapshot_id: str | None = None,
@@ -26,12 +27,14 @@ def to_run_envelope(
 ) -> AnalysisRunEnvelope:
     analysis_type = "protection.overcurrent.v0"
     input_payload = protection_input.to_dict()
-    input_fingerprint = fingerprint_json(
+    input_fingerprint = fingerprint_json(input_payload)
+    run_fingerprint = fingerprint_json(
         {"analysis_type": analysis_type, "inputs": input_payload, "outputs": outputs}
     )
-    resolved_run_id = run_id or f"{analysis_type}:{input_fingerprint}"
-    artifact_id = f"protection_input:{input_fingerprint}"
-    artifacts = (ArtifactRef(type="protection_input", id=artifact_id),)
+    resolved_run_id = run_id or f"{analysis_type}:{run_fingerprint}"
+    resolved_artifacts = artifacts or (
+        ArtifactRef(type="protection_input", id=f"protection_input:{input_fingerprint}"),
+    )
     inputs = InputsRef(
         base_snapshot_id=base_snapshot_id,
         spec_ref=None,
@@ -46,7 +49,7 @@ def to_run_envelope(
         "analysis_type": analysis_type,
         "case_id": case_id,
         "inputs": inputs.to_dict(),
-        "artifacts": [artifact.to_dict() for artifact in artifacts],
+        "artifacts": [artifact.to_dict() for artifact in resolved_artifacts],
         "trace": trace.to_dict() if trace else None,
         "created_at_utc": created_at_utc,
         "fingerprint": "",
@@ -57,7 +60,7 @@ def to_run_envelope(
         analysis_type=analysis_type,
         case_id=case_id,
         inputs=inputs,
-        artifacts=artifacts,
+        artifacts=resolved_artifacts,
         trace=trace,
         created_at_utc=created_at_utc,
         fingerprint=fingerprint,
