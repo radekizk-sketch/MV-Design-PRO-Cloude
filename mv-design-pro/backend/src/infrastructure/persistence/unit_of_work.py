@@ -8,6 +8,9 @@ from sqlalchemy.orm import Session, sessionmaker
 from infrastructure.persistence.repositories import (
     AnalysisRunRepository,
     CaseRepository,
+    DesignEvidenceRepository,
+    DesignProposalRepository,
+    DesignSpecRepository,
     NetworkRepository,
     NetworkWizardRepository,
     ProjectRepository,
@@ -29,6 +32,9 @@ class UnitOfWork(AbstractContextManager["UnitOfWork"]):
         self.results: ResultRepository | None = None
         self.analysis_runs: AnalysisRunRepository | None = None
         self.snapshots: SnapshotRepository | None = None
+        self.design_specs: DesignSpecRepository | None = None
+        self.design_proposals: DesignProposalRepository | None = None
+        self.design_evidence: DesignEvidenceRepository | None = None
 
     def __enter__(self) -> "UnitOfWork":
         self.session = self._session_factory()
@@ -40,6 +46,9 @@ class UnitOfWork(AbstractContextManager["UnitOfWork"]):
         self.results = ResultRepository(self.session)
         self.analysis_runs = AnalysisRunRepository(self.session)
         self.snapshots = SnapshotRepository(self.session)
+        self.design_specs = DesignSpecRepository(self.session)
+        self.design_proposals = DesignProposalRepository(self.session)
+        self.design_evidence = DesignEvidenceRepository(self.session)
         return self
 
     def __exit__(self, exc_type, exc, tb) -> bool:
