@@ -5,6 +5,7 @@ from uuid import UUID
 
 from application.analyses.design_synth.envelope_adapter import to_run_envelope
 from application.analyses.design_synth.result import DesignSynthRunResult
+from tests.utils.determinism import assert_deterministic
 
 
 def test_design_synth_run_envelope_adapter_is_deterministic() -> None:
@@ -27,3 +28,4 @@ def test_design_synth_run_envelope_adapter_is_deterministic() -> None:
     assert len(envelope.artifacts) == 3
     assert envelope.inputs.base_snapshot_id == "snapshot-123"
     assert envelope.fingerprint == envelope_repeat.fingerprint
+    assert_deterministic(envelope.to_dict(), envelope_repeat.to_dict(), scrub_keys=())

@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import copy
 import sys
 from pathlib import Path
 from uuid import UUID
@@ -11,17 +10,8 @@ sys.path.insert(0, str(backend_src))
 
 from application.analyses.design_synth.pipeline import run_connection_study
 from application.analyses.design_synth.service import DesignSynthService
-from application.network_wizard import NetworkWizardService
-from infrastructure.persistence.db import create_engine_from_url, create_session_factory, init_db
-from infrastructure.persistence.unit_of_work import build_uow_factory
-
-
-def _build_uow_factory() -> tuple[callable, NetworkWizardService, DesignSynthService]:
-    engine = create_engine_from_url("sqlite+pysqlite:///:memory:")
-    init_db(engine)
-    session_factory = create_session_factory(engine)
-    uow_factory = build_uow_factory(session_factory)
-    return uow_factory, NetworkWizardService(uow_factory), DesignSynthService(uow_factory)
+from application.network_wizard.service import NetworkWizardService
+from tests.utils.determinism import assert_deterministic
 
 
 def _create_case(wizard: NetworkWizardService) -> UUID:
@@ -30,20 +20,9 @@ def _create_case(wizard: NetworkWizardService) -> UUID:
     return case.id
 
 
-def _scrub_evidence(evidence_json: dict) -> dict:
-    scrubbed = copy.deepcopy(evidence_json)
-    scrubbed.get("meta", {}).pop("created_at_utc", None)
-    outputs = scrubbed.get("outputs", {})
-    outputs.pop("design_spec_id", None)
-    outputs.pop("design_proposal_id", None)
-    refs = scrubbed.get("refs", {})
-    for artifact in refs.get("artifact_refs", []):
-        artifact.pop("id", None)
-    return scrubbed
-
-
-def test_design_synth_m3_evidence_trace_deterministic() -> None:
-    uow_factory, wizard, service = _build_uow_factory()
+def test_design_synth_m3_evidence_trace_deterministic(uow_factory) -> None:
+    wizard = NetworkWizardService(uow_factory)
+    service = DesignSynthService(uow_factory)
     case_id = _create_case(wizard)
 
     spec_payload = {
@@ -93,6 +72,14 @@ def test_design_synth_m3_evidence_trace_deterministic() -> None:
     ]
     assert [step["name"] for step in first_evidence["transformations"]] == expected_step_names
 
-    scrubbed_first = _scrub_evidence(first_evidence)
-    scrubbed_second = _scrub_evidence(second_evidence)
-    assert scrubbed_first["transformations"] == scrubbed_second["transformations"]
+    assert_deterministic(
+        first_evidence,
+        second_evidence,
+        scrub_keys=(),
+        scrub_paths=(
+            "meta.created_at_utc",
+            "outputs.design_spec_id",
+            "outputs.design_proposal_id",
+            "refs.artifact_refs.*.id",
+        ),
+    )
