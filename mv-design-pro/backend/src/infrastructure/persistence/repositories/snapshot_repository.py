@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
-from sqlalchemy import select
+from sqlalchemy import desc, select
 from sqlalchemy.orm import Session
 
 from infrastructure.persistence.models import NetworkSnapshotORM
@@ -31,6 +31,14 @@ class SnapshotRepository:
 
     def get_snapshot(self, snapshot_id: str) -> NetworkSnapshot | None:
         stmt = select(NetworkSnapshotORM).where(NetworkSnapshotORM.snapshot_id == snapshot_id)
+        row = self._session.execute(stmt).scalar_one_or_none()
+        if row is None:
+            return None
+        payload = _hydrate_payload(row)
+        return NetworkSnapshot.from_dict(payload)
+
+    def get_latest_snapshot(self) -> NetworkSnapshot | None:
+        stmt = select(NetworkSnapshotORM).order_by(desc(NetworkSnapshotORM.created_at)).limit(1)
         row = self._session.execute(stmt).scalar_one_or_none()
         if row is None:
             return None
