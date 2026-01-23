@@ -146,10 +146,14 @@ def test_analysis_run_lifecycle_sc() -> None:
     executed = service.execute_run(run.id)
 
     results = service.get_results(run.id)
+    payload = results[0]["payload"]
 
     assert executed.status == "FINISHED"
     assert executed.result_summary
     assert results
+    assert run.input_snapshot["snapshot_id"] == case.case_payload["active_snapshot_id"]
+    assert "white_box_trace" in payload
+    assert payload["white_box_trace"]
 
 
 def test_validation_missing_slack() -> None:
@@ -266,6 +270,39 @@ def test_short_circuit_blocked_in_nn_mode() -> None:
     assert executed.status == "FAILED"
     payload = json.loads(executed.error_message or "{}")
     assert payload["errors"][0]["code"] == "project_design_mode.forbidden"
+
+
+def test_short_circuit_requires_grid_supply_flag() -> None:
+    wizard, service = _build_services()
+    project = wizard.create_project("SC Grid Supply")
+    slack_node, _ = _create_basic_network(wizard, project.id)
+    wizard.set_pcc(project.id, slack_node["id"])
+    wizard.add_source(
+        project.id,
+        SourcePayload(
+            name="Grid",
+            node_id=slack_node["id"],
+            source_type="GRID",
+            payload={"name": "Grid"},
+        ),
+    )
+    case = wizard.create_operating_case(
+        project.id,
+        "Normal",
+        {
+            "base_mva": 100.0,
+            "active_snapshot_id": str(uuid4()),
+            "project_design_mode": ProjectDesignMode.SN_NETWORK.value,
+        },
+    )
+
+    fault_spec = {"fault_type": "3F", "node_id": str(slack_node["id"])}
+    run = service.create_short_circuit_run(project.id, case.id, fault_spec)
+    executed = service.execute_run(run.id)
+
+    assert executed.status == "FAILED"
+    payload = json.loads(executed.error_message or "{}")
+    assert payload["errors"][0]["code"] == "source.grid_supply_missing"
 
 
 def test_fault_loop_blocked_in_sn_mode() -> None:

@@ -382,6 +382,9 @@ class AnalysisRunService:
                 if fault_spec.get("branch_id") is not None
                 else None,
                 "position_percent": fault_spec.get("position_percent"),
+                "c_factor": fault_spec.get("c_factor"),
+                "tk_s": fault_spec.get("tk_s"),
+                "tb_s": fault_spec.get("tb_s"),
             },
             "grounding": settings.get("grounding") or {},
             "limits": settings.get("limits") or {},
@@ -543,6 +546,32 @@ class AnalysisRunService:
                     message="Short-circuit requires at least one GRID source",
                 )
             )
+        grid_supply_sources = [
+            src
+            for src in in_service_sources
+            if src.get("source_type") == "GRID"
+            and (src.get("payload") or {}).get("grid_supply") is True
+        ]
+        if not grid_supply_sources:
+            report = report.with_error(
+                ValidationIssue(
+                    code="source.grid_supply_missing",
+                    message="Short-circuit requires GRID source with grid_supply flag",
+                )
+            )
+        if pcc_node_id:
+            pcc_sources = [
+                src
+                for src in grid_supply_sources
+                if str(src.get("node_id")) == str(pcc_node_id)
+            ]
+            if not pcc_sources:
+                report = report.with_error(
+                    ValidationIssue(
+                        code="source.pcc_missing",
+                        message="PCC must have GRID supply source",
+                    )
+                )
 
         graph = sc_input.get("graph")
         if graph is not None:
@@ -642,41 +671,49 @@ class AnalysisRunService:
         if fault_type == ShortCircuitType.THREE_PHASE:
             c_factor = float(fault_spec.get("c_factor", 1.0))
             tk_s = float(fault_spec.get("tk_s", 1.0))
+            tb_s = float(fault_spec.get("tb_s", 0.1))
             return ShortCircuitIEC60909Solver.compute_3ph_short_circuit(
                 graph=graph,
                 fault_node_id=fault_node_id,
                 c_factor=c_factor,
                 tk_s=tk_s,
+                tb_s=tb_s,
                 include_branch_contributions=include_branch,
             )
         if fault_type == ShortCircuitType.SINGLE_PHASE_GROUND:
             c_factor = float(fault_spec.get("c_factor", 1.0))
             tk_s = float(fault_spec.get("tk_s", 1.0))
+            tb_s = float(fault_spec.get("tb_s", 0.1))
             return ShortCircuitIEC60909Solver.compute_1ph_short_circuit(
                 graph=graph,
                 fault_node_id=fault_node_id,
                 c_factor=c_factor,
                 tk_s=tk_s,
+                tb_s=tb_s,
                 include_branch_contributions=include_branch,
             )
         if fault_type == ShortCircuitType.TWO_PHASE:
             c_factor = float(fault_spec.get("c_factor", 1.0))
             tk_s = float(fault_spec.get("tk_s", 1.0))
+            tb_s = float(fault_spec.get("tb_s", 0.1))
             return ShortCircuitIEC60909Solver.compute_2ph_short_circuit(
                 graph=graph,
                 fault_node_id=fault_node_id,
                 c_factor=c_factor,
                 tk_s=tk_s,
+                tb_s=tb_s,
                 include_branch_contributions=include_branch,
             )
         if fault_type == ShortCircuitType.TWO_PHASE_GROUND:
             c_factor = float(fault_spec.get("c_factor", 1.0))
             tk_s = float(fault_spec.get("tk_s", 1.0))
+            tb_s = float(fault_spec.get("tb_s", 0.1))
             return ShortCircuitIEC60909Solver.compute_2ph_ground_short_circuit(
                 graph=graph,
                 fault_node_id=fault_node_id,
                 c_factor=c_factor,
                 tk_s=tk_s,
+                tb_s=tb_s,
                 include_branch_contributions=include_branch,
             )
         raise ValueError(f"Unsupported fault type: {fault_spec.get('fault_type')}")
