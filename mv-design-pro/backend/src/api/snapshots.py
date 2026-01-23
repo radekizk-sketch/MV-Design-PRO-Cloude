@@ -1,0 +1,45 @@
+from __future__ import annotations
+
+from typing import Any
+
+from fastapi import APIRouter, Depends, HTTPException, status
+
+from api.dependencies import get_uow_factory
+from application.analysis_run.read_model import canonicalize_json
+from application.snapshots import SnapshotService
+
+router = APIRouter()
+
+
+def _build_service(uow_factory: Any) -> SnapshotService:
+    return SnapshotService(uow_factory)
+
+
+@router.get("/snapshots/{snapshot_id}")
+def get_snapshot(
+    snapshot_id: str,
+    uow_factory=Depends(get_uow_factory),
+) -> dict[str, Any]:
+    service = _build_service(uow_factory)
+    try:
+        snapshot = service.get_snapshot(snapshot_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    return canonicalize_json(snapshot.to_dict())
+
+
+@router.post("/snapshots/{snapshot_id}/actions")
+def submit_snapshot_action(
+    snapshot_id: str,
+    payload: dict[str, Any],
+    uow_factory=Depends(get_uow_factory),
+) -> dict[str, Any]:
+    service = _build_service(uow_factory)
+    try:
+        result, new_snapshot_id = service.submit_action(snapshot_id, payload)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    response: dict[str, Any] = {"result": result.to_dict()}
+    if new_snapshot_id is not None:
+        response["new_snapshot_id"] = new_snapshot_id
+    return canonicalize_json(response)

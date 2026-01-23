@@ -37,6 +37,46 @@ backend/src/network_model/core/
 - **Jak odczytujemy:** snapshot jest odtwarzany read-only z `snapshot_json` i metadanych w bazie; brak mutacji in-place.
 - **Lineage i audyt:** `parent_snapshot_id` buduje łańcuch pochodzenia snapshotów, który można listować dla potrzeb audytu i historii zmian.
 
+### 2.4 Read-Only Snapshot API + Submit Actions
+
+Minimalne API backendu wspiera pełny przepływ:
+**snapshot → action → validate → apply → new snapshot → persist → fetch**.
+
+**GET /snapshots/{snapshot_id}** zwraca pełny `NetworkSnapshot` z metadanymi:
+
+```json
+{
+  "meta": {
+    "snapshot_id": "snap-1",
+    "parent_snapshot_id": null,
+    "created_at": "2024-01-01T00:00:00+00:00",
+    "schema_version": "v1"
+  },
+  "graph": {
+    "nodes": [],
+    "branches": [],
+    "inverter_sources": [],
+    "pcc_node_id": null
+  }
+}
+```
+
+**POST /snapshots/{snapshot_id}/actions** przyjmuje `ActionEnvelope`, waliduje go i zwraca
+`ActionResult` wraz z `new_snapshot_id` tylko dla akcji zaakceptowanych:
+
+```json
+{
+  "result": {
+    "status": "accepted",
+    "action_id": "action-1",
+    "parent_snapshot_id": "snap-1",
+    "errors": [],
+    "warnings": []
+  },
+  "new_snapshot_id": "action-1"
+}
+```
+
 ## 3. Komponenty
 
 ### 3.1 Node (`node.py`)

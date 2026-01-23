@@ -4,6 +4,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from api.analysis_runs import router as analysis_runs_router
+from api.snapshots import router as snapshots_router
 
 app = FastAPI(
     title="MV-DESIGN PRO API",
@@ -23,6 +24,7 @@ app.add_middleware(
 )
 
 app.include_router(analysis_runs_router)
+app.include_router(snapshots_router)
 
 
 @app.get("/")
