@@ -144,6 +144,8 @@ z kodem `batch_aborted`, natomiast akcja błędna zawiera własne kody i ścież
 
 DesignSynth przechowuje artefakty case-level (bez mutacji domeny Core): **DesignSpec**, **DesignProposal** oraz **DesignEvidence**. Są one zapisywane w tabelach `design_specs`, `design_proposals`, `design_evidence` i służą jako audytowalne, deterministycznie serializowane (JSON-safe) wejścia/wyjścia dla procesu projektowania na poziomie OperatingCase (case_id + snapshot_id). W Core nie ma logiki solverów ani fizyki powiązanej z tymi artefaktami.
 
+DesignSynth M2 rozszerza to o deterministyczny pipeline „connection study” (spec → proposal → evidence → report). Pipeline działa w warstwie application jako orkiestracja (bez solverów), zapisuje artefakty case-level oraz generuje raport JSON z sekcją **„PCC – punkt wspólnego przyłączenia”**, założeniami i ograniczeniami. Raport zawiera fingerprint wyliczony z kanonicznego JSON, co zapewnia powtarzalność i audytowalność.
+
 ## 3. Komponenty
 
 ### 3.1 Node (`node.py`)
