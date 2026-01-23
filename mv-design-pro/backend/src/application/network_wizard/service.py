@@ -1248,16 +1248,6 @@ class NetworkWizardService:
             return "PQ"
         return None
 
-
-def _parse_project_design_mode(
-    value: str | ProjectDesignMode | None,
-) -> ProjectDesignMode | None:
-    if value is None:
-        return None
-    if isinstance(value, ProjectDesignMode):
-        return value
-    return ProjectDesignMode(str(value))
-
     def _node_attrs_from_node(self, node: dict) -> dict[str, Any]:
         attrs = dict(node.get("attrs") or {})
         mapped: dict[str, Any] = {}
@@ -1899,3 +1889,13 @@ def _parse_project_design_mode(
         with self._uow_factory() as uow:
             nodes = uow.network.list_nodes(project_id)
         return {node["id"]: node for node in nodes}
+
+
+def _parse_project_design_mode(
+    value: str | ProjectDesignMode | None,
+) -> ProjectDesignMode | None:
+    if value is None:
+        return None
+    if isinstance(value, ProjectDesignMode):
+        return value
+    return ProjectDesignMode(str(value))
