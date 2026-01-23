@@ -3,29 +3,16 @@ from __future__ import annotations
 from uuid import uuid4
 
 import pytest
-from fastapi.testclient import TestClient
 
-from api.main import app
 from domain.models import OperatingCase, Project
 from domain.project_design_mode import ProjectDesignMode
-from infrastructure.persistence.db import (
-    create_engine_from_url,
-    create_session_factory,
-    init_db,
-)
-from infrastructure.persistence.repositories import CaseRepository, ProjectRepository
-from infrastructure.persistence.unit_of_work import build_uow_factory
+from infrastructure.persistence.repositories.case_repository import CaseRepository
+from infrastructure.persistence.repositories.project_repository import ProjectRepository
 
 
 @pytest.fixture()
-def api_client(tmp_path):
-    db_path = tmp_path / "design_synth_api.db"
-    engine = create_engine_from_url(f"sqlite+pysqlite:///{db_path}")
-    init_db(engine)
-    session_factory = create_session_factory(engine)
-    app.state.uow_factory = build_uow_factory(session_factory)
-
-    session = session_factory()
+def api_client(app_client, db_session_factory):
+    session = db_session_factory()
     project_id = uuid4()
     project = Project(id=project_id, name="Project")
     ProjectRepository(session).add(project)
@@ -41,8 +28,7 @@ def api_client(tmp_path):
     CaseRepository(session).add_operating_case(case)
     session.close()
 
-    client = TestClient(app)
-    return client, case_id
+    return app_client, case_id
 
 
 def test_connection_study_happy_path(api_client):
