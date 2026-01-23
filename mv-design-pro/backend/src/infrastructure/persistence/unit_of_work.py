@@ -5,19 +5,23 @@ from typing import Callable
 
 from sqlalchemy.orm import Session, sessionmaker
 
-from infrastructure.persistence.repositories import (
-    AnalysisRunRepository,
-    CaseRepository,
+from infrastructure.persistence.repositories.analysis_run_repository import AnalysisRunRepository
+from infrastructure.persistence.repositories.case_repository import CaseRepository
+from infrastructure.persistence.repositories.design_evidence_repository import (
     DesignEvidenceRepository,
-    DesignProposalRepository,
-    DesignSpecRepository,
-    NetworkRepository,
-    NetworkWizardRepository,
-    ProjectRepository,
-    ResultRepository,
-    SnapshotRepository,
-    SldRepository,
 )
+from infrastructure.persistence.repositories.design_proposal_repository import (
+    DesignProposalRepository,
+)
+from infrastructure.persistence.repositories.design_spec_repository import DesignSpecRepository
+from infrastructure.persistence.repositories.network_repository import NetworkRepository
+from infrastructure.persistence.repositories.network_wizard_repository import (
+    NetworkWizardRepository,
+)
+from infrastructure.persistence.repositories.project_repository import ProjectRepository
+from infrastructure.persistence.repositories.result_repository import ResultRepository
+from infrastructure.persistence.repositories.snapshot_repository import SnapshotRepository
+from infrastructure.persistence.repositories.sld_repository import SldRepository
 
 
 class UnitOfWork(AbstractContextManager["UnitOfWork"]):

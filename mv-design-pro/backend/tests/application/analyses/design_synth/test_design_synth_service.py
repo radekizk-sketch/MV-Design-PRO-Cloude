@@ -8,7 +8,7 @@ from uuid import UUID
 backend_src = Path(__file__).parents[4] / "src"
 sys.path.insert(0, str(backend_src))
 
-from application.analyses.design_synth import DesignSynthService
+from application.analyses.design_synth.service import DesignSynthService
 from application.network_wizard import NetworkWizardService
 from infrastructure.persistence.db import create_engine_from_url, create_session_factory, init_db
 from infrastructure.persistence.unit_of_work import build_uow_factory
