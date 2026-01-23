@@ -10,6 +10,15 @@ from .branch import BranchType, Branch, LineBranch, TransformerBranch
 from .graph import NetworkGraph
 from .inverter import InverterSource
 from .snapshot import NetworkSnapshot, SnapshotMeta, create_network_snapshot
+from .action_envelope import (
+    ActionEnvelope,
+    ActionId,
+    ActionIssue,
+    ActionResult,
+    ParentSnapshotId,
+    EntityId,
+    validate_action_envelope,
+)
 from .ybus import AdmittanceMatrixBuilder
 
 __all__ = [
@@ -24,5 +33,12 @@ __all__ = [
     "NetworkSnapshot",
     "SnapshotMeta",
     "create_network_snapshot",
+    "ActionEnvelope",
+    "ActionId",
+    "ActionIssue",
+    "ActionResult",
+    "ParentSnapshotId",
+    "EntityId",
+    "validate_action_envelope",
     "AdmittanceMatrixBuilder",
 ]
