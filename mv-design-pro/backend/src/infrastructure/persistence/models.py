@@ -37,11 +37,32 @@ class GUID(TypeDecorator[UUID]):
         return UUID(value)
 
 
+def _stable_sort_key(value: Any) -> str:
+    if isinstance(value, dict):
+        for key in ("id", "snapshot_id", "node_id", "branch_id", "name"):
+            if key in value and value[key] is not None:
+                return str(value[key])
+    return str(value)
+
+
 def _canonicalize(value: Any) -> Any:
     if isinstance(value, dict):
         return {key: _canonicalize(value[key]) for key in sorted(value)}
     if isinstance(value, list):
         return [_canonicalize(item) for item in value]
+    if isinstance(value, tuple):
+        return [_canonicalize(item) for item in value]
+    if isinstance(value, set):
+        return sorted((_canonicalize(item) for item in value), key=_stable_sort_key)
+    try:
+        import numpy as np
+
+        if isinstance(value, np.ndarray):
+            return _canonicalize(value.tolist())
+        if isinstance(value, np.generic):
+            return value.item()
+    except ImportError:
+        pass
     return value
 
 
@@ -85,6 +106,16 @@ class ProjectORM(Base):
     )
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+
+class NetworkSnapshotORM(Base):
+    __tablename__ = "network_snapshots"
+
+    snapshot_id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    parent_snapshot_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    schema_version: Mapped[str | None] = mapped_column(String(50))
+    snapshot_json: Mapped[dict[str, Any]] = mapped_column(DeterministicJSON(), nullable=False)
 
 
 class ProjectSettingsORM(Base):

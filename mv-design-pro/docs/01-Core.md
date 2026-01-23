@@ -31,6 +31,12 @@ backend/src/network_model/core/
 - **Brak analiz** - Core nie wykonuje obliczeń rozpływu ani zwarć
 - **Brak persystencji** - Core nie zna bazy danych
 
+### 2.3 Snapshot Store (Persistence)
+
+- **Co zapisujemy:** pełny `NetworkSnapshot` (meta + graph) w formie deterministycznego JSON, wraz z `snapshot_id`, `parent_snapshot_id`, `created_at`, `schema_version`.
+- **Jak odczytujemy:** snapshot jest odtwarzany read-only z `snapshot_json` i metadanych w bazie; brak mutacji in-place.
+- **Lineage i audyt:** `parent_snapshot_id` buduje łańcuch pochodzenia snapshotów, który można listować dla potrzeb audytu i historii zmian.
+
 ## 3. Komponenty
 
 ### 3.1 Node (`node.py`)

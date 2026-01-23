@@ -1,0 +1,89 @@
+from __future__ import annotations
+
+from datetime import datetime, timezone
+
+from sqlalchemy import select
+from sqlalchemy.orm import Session
+
+from infrastructure.persistence.models import NetworkSnapshotORM
+from network_model.core.snapshot import NetworkSnapshot, SnapshotMeta
+
+
+class SnapshotRepository:
+    def __init__(self, session: Session) -> None:
+        self._session = session
+
+    def add_snapshot(self, snapshot: NetworkSnapshot, *, commit: bool = True) -> None:
+        payload = snapshot.to_dict()
+        meta = snapshot.meta
+        created_at = _parse_created_at(meta.created_at)
+        self._session.add(
+            NetworkSnapshotORM(
+                snapshot_id=meta.snapshot_id,
+                parent_snapshot_id=meta.parent_snapshot_id,
+                created_at=created_at,
+                schema_version=meta.schema_version,
+                snapshot_json=payload,
+            )
+        )
+        if commit:
+            self._session.commit()
+
+    def get_snapshot(self, snapshot_id: str) -> NetworkSnapshot | None:
+        stmt = select(NetworkSnapshotORM).where(NetworkSnapshotORM.snapshot_id == snapshot_id)
+        row = self._session.execute(stmt).scalar_one_or_none()
+        if row is None:
+            return None
+        payload = _hydrate_payload(row)
+        return NetworkSnapshot.from_dict(payload)
+
+    def list_lineage(self, snapshot_id: str) -> list[SnapshotMeta]:
+        lineage: list[SnapshotMeta] = []
+        current_id: str | None = snapshot_id
+        while current_id is not None:
+            stmt = select(NetworkSnapshotORM).where(
+                NetworkSnapshotORM.snapshot_id == current_id
+            )
+            row = self._session.execute(stmt).scalar_one_or_none()
+            if row is None:
+                break
+            lineage.append(_meta_from_row(row))
+            current_id = row.parent_snapshot_id
+        return list(reversed(lineage))
+
+
+def _parse_created_at(value: str) -> datetime:
+    try:
+        parsed = datetime.fromisoformat(value)
+    except ValueError:
+        parsed = datetime.now(timezone.utc)
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    return parsed
+
+
+def _meta_from_row(row: NetworkSnapshotORM) -> SnapshotMeta:
+    return SnapshotMeta(
+        snapshot_id=row.snapshot_id,
+        parent_snapshot_id=row.parent_snapshot_id,
+        created_at=row.created_at.isoformat(),
+        schema_version=row.schema_version,
+    )
+
+
+def _hydrate_payload(row: NetworkSnapshotORM) -> dict:
+    payload = row.snapshot_json
+    if not isinstance(payload, dict):
+        payload = {}
+    payload = dict(payload)
+    meta = payload.get("meta")
+    if not isinstance(meta, dict):
+        payload["meta"] = _meta_from_row(row).to_dict()
+        return payload
+    meta = dict(meta)
+    meta.setdefault("snapshot_id", row.snapshot_id)
+    meta.setdefault("parent_snapshot_id", row.parent_snapshot_id)
+    meta.setdefault("created_at", row.created_at.isoformat())
+    meta.setdefault("schema_version", row.schema_version)
+    payload["meta"] = meta
+    return payload
