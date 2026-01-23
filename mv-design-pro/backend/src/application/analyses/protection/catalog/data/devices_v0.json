@@ -3,7 +3,7 @@
   "devices": [
     {
       "device_id": "ACME_REX500_v1",
-      "vendor": "ACME",
+      "vendor": "ABB",
       "model": "REX-500",
       "functions_supported": ["50", "51", "50N", "51N"],
       "curves_supported": ["IEC_NI"],
@@ -22,7 +22,7 @@
     },
     {
       "device_id": "ACME_REX200_v1",
-      "vendor": "ACME",
+      "vendor": "ABB",
       "model": "REX-200",
       "functions_supported": ["50", "51"],
       "curves_supported": ["IEC_NI"],

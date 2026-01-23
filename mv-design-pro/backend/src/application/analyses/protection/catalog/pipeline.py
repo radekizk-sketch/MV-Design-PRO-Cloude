@@ -9,9 +9,12 @@ from application.analyses.protection.catalog.catalog_store import load_device_ca
 from application.analyses.protection.catalog.envelope_adapter import to_run_envelope
 from application.analyses.protection.catalog.mapper import map_requirement_to_device
 from application.analyses.protection.catalog.models import (
+    DeviceCapability,
     DeviceMappingResult,
     ProtectionRequirementV0,
 )
+from application.analyses.protection.catalog.vendors.abb_v0 import VENDOR, build_adapter
+from application.analyses.protection.catalog.vendors.base import VendorAdapter
 from application.analyses.run_envelope import AnalysisRunEnvelope
 from application.analyses.run_index import index_run
 from infrastructure.persistence.unit_of_work import UnitOfWork
@@ -36,10 +39,19 @@ def run_device_mapping_v0(
             mapped_settings={},
             assumptions=("MAPPING_SKIPPED_NO_DEVICE",),
         )
+        vendor_mapping = _build_vendor_mapping(
+            mapping_result=mapping_result, capability=None
+        )
         status = "FAILED"
     else:
         mapping_result = map_requirement_to_device(requirement, capability)
-        status = "SUCCEEDED" if mapping_result.compatible else "DEGRADED"
+        vendor_mapping = _build_vendor_mapping(
+            mapping_result=mapping_result, capability=capability
+        )
+        if mapping_result.compatible and vendor_mapping["vendor_violations"]:
+            status = "DEGRADED"
+        else:
+            status = "SUCCEEDED" if mapping_result.compatible else "DEGRADED"
 
     requirement_payload = requirement.to_dict()
     requirement_hash = fingerprint_json(requirement_payload)
@@ -50,6 +62,7 @@ def run_device_mapping_v0(
         requirement=requirement_payload,
         capability=capability.to_dict() if capability else None,
         mapping=mapping_result.to_dict(),
+        vendor_mapping=vendor_mapping,
         status=status,
     )
     report_fingerprint = report["fingerprint"]
@@ -59,6 +72,7 @@ def run_device_mapping_v0(
         requirement=requirement_payload,
         capability=capability.to_dict() if capability else None,
         mapping=mapping_result.to_dict(),
+        vendor_mapping=vendor_mapping,
         report_fingerprint=report_fingerprint,
         status=status,
     )
@@ -140,6 +154,7 @@ def _build_mapping_report(
     requirement: dict[str, Any],
     capability: dict[str, Any] | None,
     mapping: dict[str, Any],
+    vendor_mapping: dict[str, Any],
     status: str,
 ) -> dict[str, Any]:
     report_body = {
@@ -151,6 +166,7 @@ def _build_mapping_report(
         },
         "capability": capability,
         "mapping": mapping,
+        "vendor_mapping": vendor_mapping,
         "status": status,
     }
     report_body = canonicalize_json(report_body)
@@ -164,6 +180,7 @@ def _build_trace_inline(
     requirement: dict[str, Any],
     capability: dict[str, Any] | None,
     mapping: dict[str, Any],
+    vendor_mapping: dict[str, Any],
     report_fingerprint: str,
     status: str,
 ) -> dict[str, Any]:
@@ -191,6 +208,16 @@ def _build_trace_inline(
             "mapped_settings": mapping.get("mapped_settings"),
         },
         {
+            "step": "vendor_validate_and_map",
+            "vendor": vendor_mapping.get("vendor"),
+            "device_id": capability.get("device_id") if capability else None,
+            "logical_keys": sorted(mapping.get("mapped_settings", {}).keys()),
+            "vendor_violations": vendor_mapping.get("vendor_violations"),
+            "vendor_setting_keys": sorted(
+                vendor_mapping.get("vendor_settings", {}).keys()
+            ),
+        },
+        {
             "step": "build_report",
             "report_fingerprint": report_fingerprint,
         },
@@ -201,3 +228,47 @@ def _build_trace_inline(
     ]
     return {"steps": canonicalize_json(steps)}
 
+
+def _resolve_vendor_adapter(vendor: str) -> VendorAdapter | None:
+    if vendor == VENDOR:
+        return build_adapter()
+    return None
+
+
+def _build_vendor_mapping(
+    *,
+    mapping_result: DeviceMappingResult,
+    capability: DeviceCapability | None,
+) -> dict[str, Any]:
+    if capability is None:
+        return {
+            "vendor": "UNKNOWN",
+            "vendor_settings": {},
+            "vendor_violations": ["VENDOR_DEVICE_NOT_FOUND"],
+            "vendor_assumptions": [],
+        }
+    adapter = _resolve_vendor_adapter(capability.vendor)
+    if adapter is None:
+        return {
+            "vendor": capability.vendor,
+            "vendor_settings": {},
+            "vendor_violations": ["VENDOR_ADAPTER_NOT_FOUND"],
+            "vendor_assumptions": [],
+        }
+    _, violations = adapter.validate_vendor_support(
+        mapping_result.mapped_settings, device=capability
+    )
+    vendor_settings: dict[str, Any] = {}
+    vendor_assumptions: list[str] = []
+    if not violations and mapping_result.compatible:
+        vendor_settings = adapter.map_logical_to_vendor(
+            mapping_result.mapped_settings,
+            device=capability,
+        )
+        vendor_assumptions = ["VENDOR_KEYS_SYMBOLIC_V0"]
+    return {
+        "vendor": adapter.vendor_name(),
+        "vendor_settings": vendor_settings,
+        "vendor_violations": list(violations),
+        "vendor_assumptions": vendor_assumptions,
+    }
