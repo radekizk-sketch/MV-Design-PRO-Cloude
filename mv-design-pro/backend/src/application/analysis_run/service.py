@@ -15,7 +15,13 @@ from domain.analysis_run import AnalysisRun, new_analysis_run
 from domain.project_design_mode import ProjectDesignMode
 from domain.validation import ValidationIssue, ValidationReport
 from infrastructure.persistence.unit_of_work import UnitOfWork
-from network_model.core import Branch, InverterSource, NetworkGraph, Node
+from network_model.core import (
+    Branch,
+    InverterSource,
+    NetworkGraph,
+    Node,
+    create_network_snapshot,
+)
 from network_model.solvers import ShortCircuitIEC60909Solver, ShortCircuitType
 
 
@@ -222,6 +228,23 @@ class AnalysisRunService:
         )
 
     def _execute_short_circuit_sn(self, uow: UnitOfWork, run: AnalysisRun) -> AnalysisRun:
+        case = uow.cases.get_operating_case(run.operating_case_id)
+        if case is None:
+            return self._fail_run(
+                uow,
+                run,
+                ValidationReport().with_error(
+                    ValidationIssue(
+                        code="short_circuit.case_missing",
+                        message="OperatingCase not found for short_circuit_sn execution",
+                    )
+                ),
+            )
+        self._resolve_snapshot_id_for_run(
+            case=case,
+            project_id=run.project_id,
+            uow=uow,
+        )
         sc_input = self._build_short_circuit_input(run)
         report = self._validate_short_circuit_input(sc_input)
         if not report.is_valid:
@@ -366,7 +389,11 @@ class AnalysisRunService:
             loads = uow.wizard.list_loads(project_id)
 
         base_mva = float(case.case_payload.get("base_mva", 100.0))
-        snapshot_id = self._get_snapshot_id(case)
+        snapshot_id = self._resolve_snapshot_id_for_run(
+            case=case,
+            project_id=project_id,
+            uow=uow,
+        )
         return {
             "snapshot_id": snapshot_id,
             "base_mva": base_mva,
@@ -382,6 +409,9 @@ class AnalysisRunService:
                 if fault_spec.get("branch_id") is not None
                 else None,
                 "position_percent": fault_spec.get("position_percent"),
+                "c_factor": fault_spec.get("c_factor"),
+                "tk_s": fault_spec.get("tk_s"),
+                "tb_s": fault_spec.get("tb_s"),
             },
             "grounding": settings.get("grounding") or {},
             "limits": settings.get("limits") or {},
@@ -543,6 +573,32 @@ class AnalysisRunService:
                     message="Short-circuit requires at least one GRID source",
                 )
             )
+        grid_supply_sources = [
+            src
+            for src in in_service_sources
+            if src.get("source_type") == "GRID"
+            and (src.get("payload") or {}).get("grid_supply") is True
+        ]
+        if not grid_supply_sources:
+            report = report.with_error(
+                ValidationIssue(
+                    code="source.grid_supply_missing",
+                    message="Short-circuit requires GRID source with grid_supply flag",
+                )
+            )
+        if pcc_node_id:
+            pcc_sources = [
+                src
+                for src in grid_supply_sources
+                if str(src.get("node_id")) == str(pcc_node_id)
+            ]
+            if not pcc_sources:
+                report = report.with_error(
+                    ValidationIssue(
+                        code="source.pcc_missing",
+                        message="PCC must have GRID supply source",
+                    )
+                )
 
         graph = sc_input.get("graph")
         if graph is not None:
@@ -633,50 +689,110 @@ class AnalysisRunService:
             raise ValueError(f"OperatingCase {case.id} has no active_snapshot_id")
         return str(snapshot_id)
 
+    def _resolve_snapshot_id_for_run(
+        self,
+        *,
+        case: Any,
+        project_id: UUID,
+        uow: UnitOfWork,
+    ) -> str:
+        snapshot_id = (case.case_payload or {}).get("active_snapshot_id")
+        snapshot_id_str = str(snapshot_id) if snapshot_id else None
+        if snapshot_id_str:
+            existing_snapshot = uow.snapshots.get_snapshot(snapshot_id_str)
+            if existing_snapshot is not None:
+                return snapshot_id_str
+
+        graph = self._build_network_graph(project_id, case.id)
+        settings = uow.wizard.get_settings(project_id)
+        pcc_node_id = settings.get("pcc_node_id")
+        if pcc_node_id:
+            graph.pcc_node_id = str(pcc_node_id)
+        sources = uow.wizard.list_sources(project_id)
+        for source in sources:
+            if source.get("source_type") == "GRID":
+                continue
+            if not source.get("in_service", True):
+                continue
+            payload = source.get("payload") or {}
+            inverter = InverterSource(
+                id=str(source.get("id")),
+                name=payload.get("name", source.get("name", "")),
+                node_id=str(source.get("node_id")),
+                in_rated_a=float(payload.get("in_rated_a", 0.0)),
+                k_sc=float(payload.get("k_sc", 1.1)),
+                contributes_negative_sequence=bool(
+                    payload.get("contributes_negative_sequence", False)
+                ),
+                contributes_zero_sequence=bool(
+                    payload.get("contributes_zero_sequence", False)
+                ),
+                in_service=bool(source.get("in_service", True)),
+            )
+            if inverter.node_id in graph.nodes:
+                graph.add_inverter_source(inverter)
+
+        snapshot = create_network_snapshot(
+            graph,
+            snapshot_id=snapshot_id_str,
+        )
+        uow.snapshots.add_snapshot(snapshot, commit=False)
+        return snapshot.meta.snapshot_id
+
     def _solve_short_circuit(self, sc_input: dict[str, Any]):
         graph = sc_input["graph"]
         fault_spec = sc_input.get("fault_spec") or {}
         fault_type = self._map_fault_type(fault_spec.get("fault_type"))
         fault_node_id = self._resolve_fault_node_id(graph, fault_spec)
         include_branch = bool((sc_input.get("options") or {}).get("include_branch"))
+        def _fallback(value: Any, default: float) -> float:
+            return float(default if value is None else value)
         if fault_type == ShortCircuitType.THREE_PHASE:
-            c_factor = float(fault_spec.get("c_factor", 1.0))
-            tk_s = float(fault_spec.get("tk_s", 1.0))
+            c_factor = _fallback(fault_spec.get("c_factor"), 1.0)
+            tk_s = _fallback(fault_spec.get("tk_s"), 1.0)
+            tb_s = _fallback(fault_spec.get("tb_s"), 0.1)
             return ShortCircuitIEC60909Solver.compute_3ph_short_circuit(
                 graph=graph,
                 fault_node_id=fault_node_id,
                 c_factor=c_factor,
                 tk_s=tk_s,
+                tb_s=tb_s,
                 include_branch_contributions=include_branch,
             )
         if fault_type == ShortCircuitType.SINGLE_PHASE_GROUND:
-            c_factor = float(fault_spec.get("c_factor", 1.0))
-            tk_s = float(fault_spec.get("tk_s", 1.0))
+            c_factor = _fallback(fault_spec.get("c_factor"), 1.0)
+            tk_s = _fallback(fault_spec.get("tk_s"), 1.0)
+            tb_s = _fallback(fault_spec.get("tb_s"), 0.1)
             return ShortCircuitIEC60909Solver.compute_1ph_short_circuit(
                 graph=graph,
                 fault_node_id=fault_node_id,
                 c_factor=c_factor,
                 tk_s=tk_s,
+                tb_s=tb_s,
                 include_branch_contributions=include_branch,
             )
         if fault_type == ShortCircuitType.TWO_PHASE:
-            c_factor = float(fault_spec.get("c_factor", 1.0))
-            tk_s = float(fault_spec.get("tk_s", 1.0))
+            c_factor = _fallback(fault_spec.get("c_factor"), 1.0)
+            tk_s = _fallback(fault_spec.get("tk_s"), 1.0)
+            tb_s = _fallback(fault_spec.get("tb_s"), 0.1)
             return ShortCircuitIEC60909Solver.compute_2ph_short_circuit(
                 graph=graph,
                 fault_node_id=fault_node_id,
                 c_factor=c_factor,
                 tk_s=tk_s,
+                tb_s=tb_s,
                 include_branch_contributions=include_branch,
             )
         if fault_type == ShortCircuitType.TWO_PHASE_GROUND:
-            c_factor = float(fault_spec.get("c_factor", 1.0))
-            tk_s = float(fault_spec.get("tk_s", 1.0))
+            c_factor = _fallback(fault_spec.get("c_factor"), 1.0)
+            tk_s = _fallback(fault_spec.get("tk_s"), 1.0)
+            tb_s = _fallback(fault_spec.get("tb_s"), 0.1)
             return ShortCircuitIEC60909Solver.compute_2ph_ground_short_circuit(
                 graph=graph,
                 fault_node_id=fault_node_id,
                 c_factor=c_factor,
                 tk_s=tk_s,
+                tb_s=tb_s,
                 include_branch_contributions=include_branch,
             )
         raise ValueError(f"Unsupported fault type: {fault_spec.get('fault_type')}")
