@@ -18,7 +18,7 @@ jobs:
         run: pipx install poetry
       - name: Install dependencies
         working-directory: mv-design-pro/backend
-        run: poetry install --with dev --no-interaction
+        run: poetry install --with dev --no-interaction --sync
       - name: Run pytest
         working-directory: mv-design-pro/backend
         run: poetry run pytest -q

@@ -17,6 +17,8 @@ def _build_graph() -> NetworkGraph:
             name="Node B",
             node_type=NodeType.PQ,
             voltage_level=15.0,
+            active_power=1.0,
+            reactive_power=0.5,
         )
     )
     graph.add_node(
@@ -25,6 +27,8 @@ def _build_graph() -> NetworkGraph:
             name="Node A",
             node_type=NodeType.SLACK,
             voltage_level=15.0,
+            voltage_magnitude=1.0,
+            voltage_angle=0.0,
         )
     )
     graph.add_branch(
