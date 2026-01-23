@@ -10,6 +10,7 @@ from fastapi.testclient import TestClient
 from api.main import app
 from domain.analysis_run import AnalysisRun
 from domain.models import OperatingCase, Project
+from domain.project_design_mode import ProjectDesignMode
 from infrastructure.persistence.db import (
     create_engine_from_url,
     create_session_factory,
@@ -46,7 +47,8 @@ def api_client(tmp_path):
         id=operating_case_id,
         project_id=project_id,
         name="Base",
-        case_payload={"base_mva": 100.0},
+        case_payload={"base_mva": 100.0, "active_snapshot_id": str(uuid4())},
+        project_design_mode=ProjectDesignMode.SN_NETWORK,
     )
     CaseRepository(session).add_operating_case(case)
 
@@ -56,11 +58,14 @@ def api_client(tmp_path):
         id=uuid4(),
         project_id=project_id,
         operating_case_id=operating_case_id,
-        analysis_type="SC",
+        analysis_type="short_circuit_sn",
         status="FINISHED",
         created_at=now,
         finished_at=now + timedelta(seconds=5),
-        input_snapshot={"fault_spec": {"node_id": str(node_id)}},
+        input_snapshot={
+            "snapshot_id": str(uuid4()),
+            "fault_spec": {"node_id": str(node_id)},
+        },
         input_hash="hash-sc",
         result_summary={
             "status": "FINISHED",
@@ -92,7 +97,7 @@ def api_client(tmp_path):
     ResultRepository(session).add_result(
         run_id=run_sc.id,
         project_id=project_id,
-        result_type="short_circuit",
+        result_type="short_circuit_sn",
         payload={
             "fault_node_id": str(node_id),
             "ikss_a": 12.5,
@@ -144,7 +149,7 @@ def test_api_get_results_returns_saved_results(api_client):
     response = client.get(f"/analysis-runs/{data['run_sc_id']}/results")
     assert response.status_code == 200
     payload = response.json()
-    assert payload["results"][0]["result_type"] == "short_circuit"
+    assert payload["results"][0]["result_type"] == "short_circuit_sn"
     assert payload["results"][0]["payload_summary"]["fault_node_id"] == str(data["node_id"])
 
 

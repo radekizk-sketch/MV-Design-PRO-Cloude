@@ -221,6 +221,7 @@ class OperatingCaseORM(Base):
     project_id: Mapped[UUID] = mapped_column(GUID(), ForeignKey("projects.id"), nullable=False)
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     case_jsonb: Mapped[dict[str, Any]] = mapped_column(DeterministicJSON(), nullable=False)
+    project_design_mode: Mapped[str | None] = mapped_column(String(32), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
 

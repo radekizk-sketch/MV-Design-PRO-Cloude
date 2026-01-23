@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import sys
 from pathlib import Path
 from uuid import UUID, uuid4
@@ -18,6 +19,7 @@ from application.network_wizard.dtos import (
     NodePayload,
     SourcePayload,
 )
+from domain.project_design_mode import ProjectDesignMode
 from infrastructure.persistence.db import create_engine_from_url, create_session_factory, init_db
 from infrastructure.persistence.unit_of_work import build_uow_factory
 
@@ -102,7 +104,15 @@ def test_analysis_run_lifecycle_pf() -> None:
             payload={"name": "Load", "p_mw": 1.0, "q_mvar": 0.5},
         ),
     )
-    case = wizard.create_operating_case(project.id, "Normal", {"base_mva": 100.0})
+    case = wizard.create_operating_case(
+        project.id,
+        "Normal",
+        {
+            "base_mva": 100.0,
+            "active_snapshot_id": str(uuid4()),
+            "project_design_mode": ProjectDesignMode.SN_NETWORK.value,
+        },
+    )
 
     run = service.create_power_flow_run(project.id, case.id)
     executed = service.execute_run(run.id)
@@ -121,7 +131,15 @@ def test_analysis_run_lifecycle_sc() -> None:
     slack_node, _ = _create_basic_network(wizard, project.id)
     wizard.set_pcc(project.id, slack_node["id"])
     _add_grid_source(wizard, project.id, slack_node["id"])
-    case = wizard.create_operating_case(project.id, "Normal", {"base_mva": 100.0})
+    case = wizard.create_operating_case(
+        project.id,
+        "Normal",
+        {
+            "base_mva": 100.0,
+            "active_snapshot_id": str(uuid4()),
+            "project_design_mode": ProjectDesignMode.SN_NETWORK.value,
+        },
+    )
 
     fault_spec = {"fault_type": "3F", "node_id": str(slack_node["id"])}
     run = service.create_short_circuit_run(project.id, case.id, fault_spec)
@@ -146,7 +164,15 @@ def test_validation_missing_slack() -> None:
             attrs={"active_power_mw": 1.0, "reactive_power_mvar": 0.5},
         ),
     )
-    case = wizard.create_operating_case(project.id, "Normal", {"base_mva": 100.0})
+    case = wizard.create_operating_case(
+        project.id,
+        "Normal",
+        {
+            "base_mva": 100.0,
+            "active_snapshot_id": str(uuid4()),
+            "project_design_mode": ProjectDesignMode.SN_NETWORK.value,
+        },
+    )
 
     run = service.create_power_flow_run(project.id, case.id)
     executed = service.execute_run(run.id)
@@ -160,7 +186,15 @@ def test_validation_missing_pcc() -> None:
     project = wizard.create_project("Missing PCC")
     slack_node, _ = _create_basic_network(wizard, project.id)
     _add_grid_source(wizard, project.id, slack_node["id"])
-    case = wizard.create_operating_case(project.id, "Normal", {"base_mva": 100.0})
+    case = wizard.create_operating_case(
+        project.id,
+        "Normal",
+        {
+            "base_mva": 100.0,
+            "active_snapshot_id": str(uuid4()),
+            "project_design_mode": ProjectDesignMode.SN_NETWORK.value,
+        },
+    )
 
     fault_spec = {"fault_type": "3F", "node_id": str(slack_node["id"])}
     run = service.create_short_circuit_run(project.id, case.id, fault_spec)
@@ -183,7 +217,15 @@ def test_failed_run_sets_status(monkeypatch: pytest.MonkeyPatch) -> None:
             payload={"name": "Load", "p_mw": 1.0, "q_mvar": 0.5},
         ),
     )
-    case = wizard.create_operating_case(project.id, "Normal", {"base_mva": 100.0})
+    case = wizard.create_operating_case(
+        project.id,
+        "Normal",
+        {
+            "base_mva": 100.0,
+            "active_snapshot_id": str(uuid4()),
+            "project_design_mode": ProjectDesignMode.SN_NETWORK.value,
+        },
+    )
 
     run = service.create_power_flow_run(project.id, case.id)
 
@@ -199,3 +241,104 @@ def test_failed_run_sets_status(monkeypatch: pytest.MonkeyPatch) -> None:
     assert executed.status == "FAILED"
     assert executed.finished_at is not None
     assert "boom" in (executed.error_message or "")
+
+
+def test_short_circuit_blocked_in_nn_mode() -> None:
+    wizard, service = _build_services()
+    project = wizard.create_project("Gate NN")
+    slack_node, _ = _create_basic_network(wizard, project.id)
+    wizard.set_pcc(project.id, slack_node["id"])
+    _add_grid_source(wizard, project.id, slack_node["id"])
+    case = wizard.create_operating_case(
+        project.id,
+        "NN Case",
+        {
+            "base_mva": 100.0,
+            "active_snapshot_id": str(uuid4()),
+            "project_design_mode": ProjectDesignMode.NN_NETWORK.value,
+        },
+    )
+
+    fault_spec = {"fault_type": "3F", "node_id": str(slack_node["id"])}
+    run = service.create_short_circuit_run(project.id, case.id, fault_spec)
+    executed = service.execute_run(run.id)
+
+    assert executed.status == "FAILED"
+    payload = json.loads(executed.error_message or "{}")
+    assert payload["errors"][0]["code"] == "project_design_mode.forbidden"
+
+
+def test_fault_loop_blocked_in_sn_mode() -> None:
+    wizard, service = _build_services()
+    project = wizard.create_project("Gate SN")
+    slack_node, _ = _create_basic_network(wizard, project.id)
+    wizard.set_pcc(project.id, slack_node["id"])
+    _add_grid_source(wizard, project.id, slack_node["id"])
+    case = wizard.create_operating_case(
+        project.id,
+        "SN Case",
+        {
+            "base_mva": 100.0,
+            "active_snapshot_id": str(uuid4()),
+            "project_design_mode": ProjectDesignMode.SN_NETWORK.value,
+        },
+    )
+
+    run = service.create_fault_loop_run(project.id, case.id)
+    executed = service.execute_run(run.id)
+
+    assert executed.status == "FAILED"
+    payload = json.loads(executed.error_message or "{}")
+    assert payload["errors"][0]["code"] == "project_design_mode.forbidden"
+
+
+def test_missing_project_design_mode_fails() -> None:
+    wizard, service = _build_services()
+    project = wizard.create_project("Missing Mode")
+    slack_node, _ = _create_basic_network(wizard, project.id)
+    wizard.set_pcc(project.id, slack_node["id"])
+    _add_grid_source(wizard, project.id, slack_node["id"])
+    case = wizard.create_operating_case(
+        project.id,
+        "Missing Mode Case",
+        {
+            "base_mva": 100.0,
+            "active_snapshot_id": str(uuid4()),
+        },
+    )
+
+    fault_spec = {"fault_type": "3F", "node_id": str(slack_node["id"])}
+    run = service.create_short_circuit_run(project.id, case.id, fault_spec)
+    executed = service.execute_run(run.id)
+
+    assert executed.status == "FAILED"
+    payload = json.loads(executed.error_message or "{}")
+    assert payload["errors"][0]["code"] == "project_design_mode.missing"
+
+
+def test_short_circuit_results_are_deterministic() -> None:
+    wizard, service = _build_services()
+    project = wizard.create_project("Determinism")
+    slack_node, _ = _create_basic_network(wizard, project.id)
+    wizard.set_pcc(project.id, slack_node["id"])
+    _add_grid_source(wizard, project.id, slack_node["id"])
+    case = wizard.create_operating_case(
+        project.id,
+        "Determinism Case",
+        {
+            "base_mva": 100.0,
+            "active_snapshot_id": str(uuid4()),
+            "project_design_mode": ProjectDesignMode.SN_NETWORK.value,
+        },
+    )
+
+    fault_spec = {"fault_type": "3F", "node_id": str(slack_node["id"])}
+    run = service.create_short_circuit_run(project.id, case.id, fault_spec)
+    first = service.execute_run(run.id)
+    first_results = service.get_results(run.id)
+    second = service.execute_run(run.id)
+    second_results = service.get_results(run.id)
+
+    assert first.status == "FINISHED"
+    assert second.status == "FINISHED"
+    assert first_results == second_results

@@ -4,6 +4,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from uuid import UUID, uuid4
 
+from domain.project_design_mode import ProjectDesignMode
 
 @dataclass(frozen=True)
 class Project:
@@ -30,6 +31,7 @@ class OperatingCase:
     project_id: UUID
     name: str
     case_payload: dict
+    project_design_mode: ProjectDesignMode | None = None
     revision: int = 1
     created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
     updated_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
@@ -76,8 +78,19 @@ def new_network(project_id: UUID, name: str) -> Network:
     return Network(id=uuid4(), project_id=project_id, name=name)
 
 
-def new_operating_case(project_id: UUID, name: str, case_payload: dict) -> OperatingCase:
-    return OperatingCase(id=uuid4(), project_id=project_id, name=name, case_payload=case_payload)
+def new_operating_case(
+    project_id: UUID,
+    name: str,
+    case_payload: dict,
+    project_design_mode: ProjectDesignMode | None = None,
+) -> OperatingCase:
+    return OperatingCase(
+        id=uuid4(),
+        project_id=project_id,
+        name=name,
+        case_payload=case_payload,
+        project_design_mode=project_design_mode,
+    )
 
 
 def new_study_case(project_id: UUID, name: str, study_payload: dict) -> StudyCase:

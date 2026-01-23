@@ -114,7 +114,7 @@ class AnalysisRunExportService:
         diagram = diagrams[0]
         sc_result_payload = None
         for result in results:
-            if result.get("result_type") == "short_circuit":
+            if result.get("result_type") == "short_circuit_sn":
                 sc_result_payload = result.get("payload")
                 break
         if sc_result_payload is None:

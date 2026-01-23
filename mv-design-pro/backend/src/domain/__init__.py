@@ -9,6 +9,7 @@ from .models import (
     StudyCase,
     StudyRun,
 )
+from .project_design_mode import ProjectDesignMode
 from .grounding import Grounding
 from .limits import Limits
 from .sources import Source
@@ -25,6 +26,7 @@ __all__ = [
     "Network",
     "OperatingCase",
     "Project",
+    "ProjectDesignMode",
     "Scenario",
     "Source",
     "StudyCase",

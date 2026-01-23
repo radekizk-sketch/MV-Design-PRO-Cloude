@@ -147,6 +147,7 @@ def _update_case_snapshot(case: OperatingCase, snapshot_id: str) -> OperatingCas
         project_id=case.project_id,
         name=case.name,
         case_payload=payload,
+        project_design_mode=case.project_design_mode,
         revision=case.revision,
         created_at=case.created_at,
         updated_at=datetime.now(timezone.utc),
