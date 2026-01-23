@@ -1,0 +1,22 @@
+from __future__ import annotations
+
+from typing import Callable
+
+from application.analyses.design_synth.envelope_adapter import (
+    to_run_envelope as design_synth_to_run_envelope,
+)
+from application.analyses.iec60909.envelope_adapter import (
+    to_run_envelope as iec60909_to_run_envelope,
+)
+from application.analyses.run_envelope import AnalysisRunEnvelope
+
+AdapterFn = Callable[..., AnalysisRunEnvelope]
+
+RUN_ENVELOPE_ADAPTERS: dict[str, AdapterFn] = {
+    "design_synth.connection_study": design_synth_to_run_envelope,
+    "short_circuit.iec60909": iec60909_to_run_envelope,
+}
+
+
+def get_run_envelope_adapter(analysis_type: str) -> AdapterFn | None:
+    return RUN_ENVELOPE_ADAPTERS.get(analysis_type)
