@@ -35,12 +35,12 @@ It is not an implementation task list, not a solver specification, and not a sub
 - White-box traceability must be preserved end-to-end.
 
 ## Deliverables
-- ExecPlan-00 through ExecPlan-12 (stage plans).
+- ExecPlan-00 through ExecPlan-13 (stage plans).
 - Repository hygiene specification (KEEP / REMOVE / CREATE).
 - Updated AGENTS.md and .agent/PLANS.md.
 
 ## NOW vs LATER
-NOW is defined by stage ExecPlans 00–11. LATER is defined exclusively in ExecPlan-12.
+NOW is defined by stage ExecPlans 00–11. LATER is defined exclusively in ExecPlan-12, including controlled extensions such as ExecPlan-13.
 
 ## Progress
 - [ ] Master plan acknowledged by maintainers.
@@ -458,4 +458,35 @@ It is not active scope or an implementation plan.
 ## Progress
 - [ ] Deferred capabilities listed.
 - [ ] Prerequisites captured.
+```
+
+```md
+# ExecPlan-13: DesignSynth (Project Designer) — Case-level Connection Study Pipeline
+
+## Purpose
+Define a case-level orchestration pipeline that synthesizes connection-study design proposals and evidence without adding new physics outside solvers.
+
+## What this IS
+A controlled extension plan that introduces DesignSynth artifacts, stage pipeline (D1–D6), and evidence requirements aligned to frozen architecture.
+
+## What this is NOT
+It is not a solver, UI specification, or domain mutation path; all physics remain within core solvers.
+
+## NOW
+- Define DesignSynth scope, artifacts, pipeline stages, and acceptance criteria.
+- Define interfaces to Wizard actions, Snapshot Store, and AnalysisRuns.
+- Define evidence requirements and governance gates.
+
+## LATER
+- Implement staged milestones (M1+) starting with D1 Cable sizing MVP.
+
+## Dependencies
+- ExecPlan-01, ExecPlan-07, ExecPlan-08, ExecPlan-09, ExecPlan-10, ExecPlan-11, ExecPlan-12.
+
+## Guardrails
+- NOT-A-SOLVER is absolute; DesignSynth consumes solver results only.
+- Snapshot immutability and frozen contracts remain intact.
+
+## Progress
+- [ ] DesignSynth stage plan documented and approved.
 ```
