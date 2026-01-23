@@ -5,11 +5,20 @@ from typing import Any, Callable
 
 from application.analyses.design_synth.canonical import canonicalize_json
 from application.analyses.design_synth.fingerprint import fingerprint_json
+from application.analyses.protection.overcurrent.calculator import (
+    OvercurrentConfigV0,
+    compute_overcurrent_settings,
+)
 from application.analyses.protection.overcurrent.envelope_adapter import to_run_envelope
 from application.analyses.protection.overcurrent.input_adapter import build_protection_input
 from application.analyses.protection.overcurrent.inputs import ProtectionInput
+from application.analyses.protection.overcurrent.reporting import (
+    build_overcurrent_report_v0,
+)
+from application.analyses.protection.overcurrent.settings import OvercurrentSettingsV0
 from application.analyses.run_envelope import AnalysisRunEnvelope
-from application.analyses.run_index import index_run
+from application.analyses.run_envelope import ArtifactRef, InputsRef, TraceRef, fingerprint_envelope
+from application.analyses.run_index import AnalysisRunIndexEntry, index_run
 from infrastructure.persistence.unit_of_work import UnitOfWork
 from network_model.solvers.short_circuit_core import ShortCircuitType
 from network_model.solvers.short_circuit_iec60909 import ShortCircuitResult
@@ -48,6 +57,103 @@ def run_overcurrent_skeleton(
         created_at_utc=datetime.now(timezone.utc).isoformat(),
     )
     _persist_run_index(envelope, protection_input, uow_factory=uow_factory)
+    return envelope
+
+
+def run_overcurrent_v0(
+    *,
+    sc_run_id: str,
+    pcc: dict[str, Any],
+    topology_ref: dict[str, Any] | None,
+    uow_factory: Callable[[], UnitOfWork],
+    config: OvercurrentConfigV0 | None = None,
+) -> AnalysisRunEnvelope:
+    entry = _read_short_circuit_index_entry(sc_run_id, uow_factory=uow_factory)
+    sc_payload = _extract_short_circuit_payload(entry.meta_json)
+    sc_result = _build_short_circuit_result(sc_payload)
+    object.__setattr__(sc_result, "run_id", sc_run_id)
+
+    protection_input = build_protection_input(
+        sc_result,
+        case_id=entry.case_id,
+        base_snapshot_id=entry.base_snapshot_id,
+        pcc=pcc,
+        topology_ref=topology_ref,
+    )
+    settings = compute_overcurrent_settings(protection_input, config=config)
+    report_json = build_overcurrent_report_v0(
+        protection_input,
+        settings,
+        run_meta={"source_run_id": sc_run_id},
+    )
+    report_fingerprint = report_json["fingerprint"]
+    status = "SUCCEEDED" if not settings.warnings else "DEGRADED"
+
+    input_fingerprint = fingerprint_json(protection_input.to_dict())
+    settings_fingerprint = fingerprint_json(settings.to_dict())
+    run_id = _build_run_id(
+        protection_input, settings, report_fingerprint, analysis_type="protection.overcurrent.v0"
+    )
+    artifacts = (
+        ArtifactRef(
+            type="protection_input",
+            id=f"protection_input:{input_fingerprint}",
+        ),
+        ArtifactRef(
+            type="protection_settings_v0",
+            id=f"protection_settings_v0:{settings_fingerprint}",
+        ),
+        ArtifactRef(
+            type="protection_report_v0",
+            id=f"protection_report_v0:{report_fingerprint}",
+        ),
+    )
+    trace_inline = _build_trace_overcurrent_v0(
+        sc_run_id=sc_run_id,
+        sc_payload=sc_payload,
+        protection_input=protection_input,
+        settings=settings,
+        report_json=report_json,
+        report_fingerprint=report_fingerprint,
+        status=status,
+    )
+
+    created_at_utc = datetime.now(timezone.utc).isoformat()
+    inputs = InputsRef(
+        base_snapshot_id=entry.base_snapshot_id,
+        spec_ref=None,
+        inline=protection_input.to_dict(),
+    )
+    trace = TraceRef(type="white_box", id=None, inline=trace_inline)
+    envelope_dict = {
+        "schema_version": "v0",
+        "run_id": run_id,
+        "analysis_type": "protection.overcurrent.v0",
+        "case_id": entry.case_id,
+        "inputs": inputs.to_dict(),
+        "artifacts": [artifact.to_dict() for artifact in artifacts],
+        "trace": trace.to_dict(),
+        "created_at_utc": created_at_utc,
+        "fingerprint": "",
+    }
+    fingerprint = fingerprint_envelope(envelope_dict)
+    envelope = AnalysisRunEnvelope(
+        run_id=run_id,
+        analysis_type="protection.overcurrent.v0",
+        case_id=entry.case_id,
+        inputs=inputs,
+        artifacts=artifacts,
+        trace=trace,
+        created_at_utc=created_at_utc,
+        fingerprint=fingerprint,
+    )
+    _persist_run_index_v0(
+        envelope,
+        protection_input,
+        report_fingerprint=report_fingerprint,
+        status=status,
+        uow_factory=uow_factory,
+    )
     return envelope
 
 
@@ -113,6 +219,49 @@ def _build_trace_inline() -> dict[str, Any]:
     return {"steps": steps}
 
 
+def _build_trace_overcurrent_v0(
+    *,
+    sc_run_id: str,
+    sc_payload: dict[str, Any],
+    protection_input: ProtectionInput,
+    settings: OvercurrentSettingsV0,
+    report_json: dict[str, Any],
+    report_fingerprint: str,
+    status: str,
+) -> dict[str, Any]:
+    steps = [
+        {
+            "step": "read_short_circuit_run",
+            "run_id": sc_run_id,
+            "analysis_type": "short_circuit.iec60909",
+            "payload_keys": sorted(sc_payload.keys()),
+        },
+        {
+            "step": "build_protection_input",
+            "fault_levels": protection_input.fault_levels,
+            "pcc": protection_input.pcc,
+            "source_run_id": protection_input.source_run_id,
+        },
+        {
+            "step": "compute_settings",
+            "curve": settings.curve,
+            "assumptions": settings.assumptions,
+            "warnings": settings.warnings,
+            "settings": settings.to_dict(),
+        },
+        {
+            "step": "build_report",
+            "report_fingerprint": report_fingerprint,
+            "report": report_json,
+        },
+        {
+            "step": "index_run",
+            "status": status,
+        },
+    ]
+    return {"steps": canonicalize_json(steps)}
+
+
 def _build_deterministic_run_id(
     protection_input: ProtectionInput, outputs: dict[str, Any]
 ) -> str:
@@ -123,6 +272,23 @@ def _build_deterministic_run_id(
     }
     fingerprint = fingerprint_json(payload)
     return f"protection.overcurrent.v0:{fingerprint}"
+
+
+def _build_run_id(
+    protection_input: ProtectionInput,
+    settings: OvercurrentSettingsV0,
+    report_fingerprint: str,
+    *,
+    analysis_type: str,
+) -> str:
+    payload = {
+        "analysis_type": analysis_type,
+        "inputs": protection_input.to_dict(),
+        "settings": settings.to_dict(),
+        "report_fingerprint": report_fingerprint,
+    }
+    fingerprint = fingerprint_json(payload)
+    return f"{analysis_type}:{fingerprint}"
 
 
 def _persist_run_index(
@@ -143,3 +309,44 @@ def _persist_run_index(
     with uow_factory() as uow:
         if uow.analysis_runs_index.get(entry.run_id) is None:
             uow.analysis_runs_index.add(entry)
+
+
+def _persist_run_index_v0(
+    envelope: AnalysisRunEnvelope,
+    protection_input: ProtectionInput,
+    *,
+    report_fingerprint: str,
+    status: str,
+    uow_factory,
+) -> None:
+    entry = _build_index_entry_v0(
+        envelope,
+        protection_input,
+        report_fingerprint=report_fingerprint,
+        status=status,
+    )
+    with uow_factory() as uow:
+        if uow.analysis_runs_index.get(entry.run_id) is None:
+            uow.analysis_runs_index.add(entry)
+
+
+def _build_index_entry_v0(
+    envelope: AnalysisRunEnvelope,
+    protection_input: ProtectionInput,
+    *,
+    report_fingerprint: str,
+    status: str,
+) -> AnalysisRunIndexEntry:
+    entry = index_run(
+        envelope,
+        primary_artifact_type="protection_report_v0",
+        primary_artifact_id=f"protection_report_v0:{report_fingerprint}",
+        base_snapshot_id=protection_input.base_snapshot_id,
+        case_id=protection_input.case_id,
+        status=status,
+        meta={
+            "source_run_id": protection_input.source_run_id,
+            "report_fingerprint": report_fingerprint,
+        },
+    )
+    return entry
