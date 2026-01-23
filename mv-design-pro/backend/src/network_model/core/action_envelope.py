@@ -43,6 +43,7 @@ class ActionEnvelope:
     action_type: str
     payload: dict[str, Any]
     created_at: str
+    status: str | None = None
     actor: str | None = None
     schema_version: str | int | None = None
 
@@ -53,6 +54,7 @@ class ActionEnvelope:
             "action_type": self.action_type,
             "payload": self.payload,
             "created_at": self.created_at,
+            "status": self.status,
             "actor": self.actor,
             "schema_version": self.schema_version,
         }
@@ -65,6 +67,7 @@ class ActionEnvelope:
             action_type=str(data["action_type"]),
             payload=dict(data.get("payload", {})),
             created_at=str(data["created_at"]),
+            status=data.get("status"),
             actor=data.get("actor"),
             schema_version=data.get("schema_version"),
         )
@@ -340,4 +343,4 @@ def _validate_referential_integrity(
 
 
 def _entity_ids(graph: NetworkGraph) -> set[str]:
-    return set(graph.nodes) | set(graph.branches) | set(graph.inverter_sources)
+    return set(graph.branches) | set(graph.inverter_sources)
