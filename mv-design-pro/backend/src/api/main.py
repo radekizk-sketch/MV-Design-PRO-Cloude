@@ -5,6 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from api.analysis_runs import router as analysis_runs_router
 from api.cases import router as cases_router
+from api.design_synth import router as design_synth_router
 from api.snapshots import router as snapshots_router
 
 app = FastAPI(
@@ -26,6 +27,7 @@ app.add_middleware(
 
 app.include_router(analysis_runs_router)
 app.include_router(cases_router)
+app.include_router(design_synth_router)
 app.include_router(snapshots_router)
 
 
