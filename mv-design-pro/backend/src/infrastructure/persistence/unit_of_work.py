@@ -12,6 +12,7 @@ from infrastructure.persistence.repositories import (
     NetworkWizardRepository,
     ProjectRepository,
     ResultRepository,
+    SnapshotRepository,
     SldRepository,
 )
 
@@ -27,6 +28,7 @@ class UnitOfWork(AbstractContextManager["UnitOfWork"]):
         self.sld: SldRepository | None = None
         self.results: ResultRepository | None = None
         self.analysis_runs: AnalysisRunRepository | None = None
+        self.snapshots: SnapshotRepository | None = None
 
     def __enter__(self) -> "UnitOfWork":
         self.session = self._session_factory()
@@ -37,6 +39,7 @@ class UnitOfWork(AbstractContextManager["UnitOfWork"]):
         self.sld = SldRepository(self.session)
         self.results = ResultRepository(self.session)
         self.analysis_runs = AnalysisRunRepository(self.session)
+        self.snapshots = SnapshotRepository(self.session)
         return self
 
     def __exit__(self, exc_type, exc, tb) -> bool:
