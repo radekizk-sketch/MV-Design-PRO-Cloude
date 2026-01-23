@@ -22,6 +22,7 @@ from domain.models import (
     new_project,
     new_study_case,
 )
+from domain.project_design_mode import ProjectDesignMode
 from domain.sld import SldBranchSymbol, SldDiagram, SldNodeSymbol
 from domain.validation import ValidationIssue, ValidationReport
 from infrastructure.persistence.unit_of_work import UnitOfWork
@@ -404,7 +405,12 @@ class NetworkWizardService:
             return bool(attrs.get("in_service", True))
 
     def create_operating_case(self, project_id: UUID, name: str, payload: dict) -> OperatingCase:
-        case = new_operating_case(project_id, name, payload)
+        project_design_mode = _parse_project_design_mode(payload.get("project_design_mode"))
+        case_payload = dict(payload)
+        case_payload.pop("project_design_mode", None)
+        case = new_operating_case(
+            project_id, name, case_payload, project_design_mode=project_design_mode
+        )
         with self._uow_factory() as uow:
             self._ensure_project(uow, project_id)
             uow.cases.add_operating_case(case, commit=False)
@@ -421,6 +427,9 @@ class NetworkWizardService:
                 project_id=existing.project_id,
                 name=patch.get("name", existing.name),
                 case_payload=patch.get("case_payload", existing.case_payload),
+                project_design_mode=_parse_project_design_mode(
+                    patch.get("project_design_mode", existing.project_design_mode)
+                ),
                 created_at=existing.created_at,
                 updated_at=datetime.now(timezone.utc),
             )
@@ -440,7 +449,12 @@ class NetworkWizardService:
             existing = uow.cases.get_operating_case(case_id)
             if existing is None or existing.project_id != project_id:
                 raise NotFound(f"OperatingCase {case_id} not found")
-            clone = new_operating_case(project_id, new_name, existing.case_payload)
+            clone = new_operating_case(
+                project_id,
+                new_name,
+                existing.case_payload,
+                project_design_mode=existing.project_design_mode,
+            )
             uow.cases.add_operating_case(clone, commit=False)
         return clone
 
@@ -1234,6 +1248,16 @@ class NetworkWizardService:
             return "PQ"
         return None
 
+
+def _parse_project_design_mode(
+    value: str | ProjectDesignMode | None,
+) -> ProjectDesignMode | None:
+    if value is None:
+        return None
+    if isinstance(value, ProjectDesignMode):
+        return value
+    return ProjectDesignMode(str(value))
+
     def _node_attrs_from_node(self, node: dict) -> dict[str, Any]:
         attrs = dict(node.get("attrs") or {})
         mapped: dict[str, Any] = {}
@@ -1653,6 +1677,11 @@ class NetworkWizardService:
             raise ValueError("Operating case name is required")
         case_id = case_data.get("id")
         payload = case_data.get("payload") or case_data.get("case_payload") or {}
+        project_design_mode = _parse_project_design_mode(
+            case_data.get("project_design_mode", payload.get("project_design_mode"))
+        )
+        payload = dict(payload)
+        payload.pop("project_design_mode", None)
         if case_id:
             case_id = UUID(str(case_id))
         else:
@@ -1664,6 +1693,7 @@ class NetworkWizardService:
                 project_id=project_id,
                 name=name,
                 case_payload=payload,
+                project_design_mode=project_design_mode,
             )
             uow.cases.add_operating_case(case, commit=False)
             return "created"
@@ -1673,6 +1703,7 @@ class NetworkWizardService:
             existing,
             name=name,
             case_payload=payload,
+            project_design_mode=project_design_mode or existing.project_design_mode,
             updated_at=datetime.now(timezone.utc),
         )
         uow.cases.update_operating_case(updated, commit=False)

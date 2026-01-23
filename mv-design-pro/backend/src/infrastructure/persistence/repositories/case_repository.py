@@ -6,6 +6,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from domain.models import OperatingCase, StudyCase
+from domain.project_design_mode import ProjectDesignMode
 from infrastructure.persistence.models import OperatingCaseORM, StudyCaseORM
 
 
@@ -20,6 +21,9 @@ class CaseRepository:
                 project_id=case.project_id,
                 name=case.name,
                 case_jsonb=case.case_payload,
+                project_design_mode=case.project_design_mode.value
+                if case.project_design_mode is not None
+                else None,
                 created_at=case.created_at,
                 updated_at=case.updated_at,
             )
@@ -37,6 +41,9 @@ class CaseRepository:
             project_id=row.project_id,
             name=row.name,
             case_payload=row.case_jsonb,
+            project_design_mode=ProjectDesignMode(row.project_design_mode)
+            if row.project_design_mode
+            else None,
             created_at=row.created_at,
             updated_at=row.updated_at,
         )
@@ -50,6 +57,9 @@ class CaseRepository:
                 project_id=row.project_id,
                 name=row.name,
                 case_payload=row.case_jsonb,
+                project_design_mode=ProjectDesignMode(row.project_design_mode)
+                if row.project_design_mode
+                else None,
                 created_at=row.created_at,
                 updated_at=row.updated_at,
             )
@@ -61,6 +71,9 @@ class CaseRepository:
         row = self._session.execute(stmt).scalar_one()
         row.name = case.name
         row.case_jsonb = case.case_payload
+        row.project_design_mode = (
+            case.project_design_mode.value if case.project_design_mode is not None else None
+        )
         row.updated_at = case.updated_at
         if commit:
             self._session.commit()

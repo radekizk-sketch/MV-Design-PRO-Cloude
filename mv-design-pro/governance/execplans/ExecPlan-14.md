@@ -14,10 +14,10 @@ The system will:
 
 ## Progress
 
-- [ ] (INIT) Define ProjectDesignMode gate for all short-circuit workflows (SN_NETWORK vs NN_NETWORK).
+- [x] (INIT) Define ProjectDesignMode gate for all short-circuit workflows (SN_NETWORK vs NN_NETWORK).
 - [ ] Specify SN short-circuit scope, inputs, and frozen outputs (IEC/PN-EN 60909).
 - [ ] Specify nn fault-loop / ADS scope, inputs, and outputs (separate methodology).
-- [ ] Define case-level Run types and result container storage rules (no domain mutation).
+- [x] Define case-level Run types and result container storage rules (no domain mutation).
 - [ ] Define evidence and acceptance scenarios for SN and nn separately.
 - [ ] Produce implementation map (PR-by-PR) for adding or wiring these analyses without touching frozen solver result APIs.
 

@@ -12,6 +12,7 @@ from analysis.power_flow._internal import build_slack_island, validate_input
 from analysis.power_flow.types import PowerFlowInput, PowerFlowOptions, PQSpec, PVSpec, SlackSpec
 from application.sld.overlay import ResultSldOverlayBuilder
 from domain.analysis_run import AnalysisRun, new_analysis_run
+from domain.project_design_mode import ProjectDesignMode
 from domain.validation import ValidationIssue, ValidationReport
 from infrastructure.persistence.unit_of_work import UnitOfWork
 from network_model.core import Branch, InverterSource, NetworkGraph, Node
@@ -91,14 +92,38 @@ class AnalysisRunService:
         input_hash = compute_input_hash(snapshot)
         with self._uow_factory() as uow:
             existing = uow.analysis_runs.get_by_deterministic_key(
-                project_id, operating_case_id, "SC", input_hash
+                project_id, operating_case_id, "short_circuit_sn", input_hash
             )
             if existing:
                 return existing
             run = new_analysis_run(
                 project_id=project_id,
                 operating_case_id=operating_case_id,
-                analysis_type="SC",
+                analysis_type="short_circuit_sn",
+                input_snapshot=snapshot,
+                input_hash=input_hash,
+            )
+            uow.analysis_runs.create(run)
+        return run
+
+    def create_fault_loop_run(
+        self,
+        project_id: UUID,
+        operating_case_id: UUID,
+        options: dict | None = None,
+    ) -> AnalysisRun:
+        snapshot = self._build_fault_loop_snapshot(project_id, operating_case_id, options)
+        input_hash = compute_input_hash(snapshot)
+        with self._uow_factory() as uow:
+            existing = uow.analysis_runs.get_by_deterministic_key(
+                project_id, operating_case_id, "fault_loop_nn", input_hash
+            )
+            if existing:
+                return existing
+            run = new_analysis_run(
+                project_id=project_id,
+                operating_case_id=operating_case_id,
+                analysis_type="fault_loop_nn",
                 input_snapshot=snapshot,
                 input_hash=input_hash,
             )
@@ -113,11 +138,17 @@ class AnalysisRunService:
             if run.status in {"FINISHED", "FAILED", "RUNNING"}:
                 return run
 
+            design_mode_report = self._validate_project_design_mode(uow, run)
+            if not design_mode_report.is_valid:
+                return self._fail_run(uow, run, design_mode_report)
+
             run = uow.analysis_runs.update_status(run_id, "VALIDATED")
             if run.analysis_type == "PF":
                 return self._execute_power_flow(uow, run)
-            if run.analysis_type == "SC":
-                return self._execute_short_circuit(uow, run)
+            if run.analysis_type == "short_circuit_sn":
+                return self._execute_short_circuit_sn(uow, run)
+            if run.analysis_type == "fault_loop_nn":
+                return self._execute_fault_loop_nn(uow, run)
             raise ValueError(f"Unsupported analysis_type: {run.analysis_type}")
 
     def get_run(self, run_id: UUID) -> AnalysisRun:
@@ -147,7 +178,7 @@ class AnalysisRunService:
             results = uow.results.list_results(run_id)
         result_payload = None
         for result in results:
-            if result.get("result_type") == "short_circuit":
+            if result.get("result_type") == "short_circuit_sn":
                 result_payload = result.get("payload")
                 break
         return self._overlay_builder.build_short_circuit_overlay(
@@ -190,7 +221,7 @@ class AnalysisRunService:
             trace_json=trace_json,
         )
 
-    def _execute_short_circuit(self, uow: UnitOfWork, run: AnalysisRun) -> AnalysisRun:
+    def _execute_short_circuit_sn(self, uow: UnitOfWork, run: AnalysisRun) -> AnalysisRun:
         sc_input = self._build_short_circuit_input(run)
         report = self._validate_short_circuit_input(sc_input)
         if not report.is_valid:
@@ -207,7 +238,7 @@ class AnalysisRunService:
         uow.results.add_result(
             run_id=run.id,
             project_id=run.project_id,
-            result_type="short_circuit",
+            result_type="short_circuit_sn",
             payload=payload,
         )
         summary = {
@@ -227,11 +258,24 @@ class AnalysisRunService:
             white_box_trace=white_box_trace,
         )
 
+    def _execute_fault_loop_nn(self, uow: UnitOfWork, run: AnalysisRun) -> AnalysisRun:
+        snapshot = run.input_snapshot
+        report = self._validate_fault_loop_input(snapshot)
+        if not report.is_valid:
+            return self._fail_run(uow, run, report)
+        report = report.with_error(
+            ValidationIssue(
+                code="nn.solver.unavailable",
+                message="Fault-loop nn solver is not implemented in this milestone",
+            )
+        )
+        return self._fail_run(uow, run, report)
+
     def _fail_run(
         self, uow: UnitOfWork, run: AnalysisRun, message: str | ValidationReport
     ) -> AnalysisRun:
         if isinstance(message, ValidationReport):
-            error_message = "; ".join(issue.message for issue in message.errors)
+            error_message = json.dumps(message.to_dict(), sort_keys=True)
         else:
             error_message = str(message)
         finished_at = datetime.now(timezone.utc)
@@ -259,6 +303,7 @@ class AnalysisRunService:
             nodes = uow.network.list_nodes(project_id)
 
         base_mva = float(case.case_payload.get("base_mva", 100.0))
+        snapshot_id = self._get_snapshot_id(case)
         slack_node_id = settings.get("pcc_node_id") or self._select_slack_node_id(nodes)
         slack_attrs = self._lookup_node_attrs(nodes, slack_node_id) if slack_node_id else {}
         slack_spec = {
@@ -297,6 +342,7 @@ class AnalysisRunService:
         pv_specs.sort(key=lambda spec: spec["node_id"])
 
         return {
+            "snapshot_id": snapshot_id,
             "base_mva": base_mva,
             "slack": slack_spec,
             "pq": pq_specs,
@@ -320,7 +366,9 @@ class AnalysisRunService:
             loads = uow.wizard.list_loads(project_id)
 
         base_mva = float(case.case_payload.get("base_mva", 100.0))
+        snapshot_id = self._get_snapshot_id(case)
         return {
+            "snapshot_id": snapshot_id,
             "base_mva": base_mva,
             "pcc_node_id": str(settings.get("pcc_node_id"))
             if settings.get("pcc_node_id")
@@ -339,6 +387,23 @@ class AnalysisRunService:
             "limits": settings.get("limits") or {},
             "sources": self._normalize_sources(sources),
             "loads": self._normalize_loads(loads),
+            "options": options or {},
+        }
+
+    def _build_fault_loop_snapshot(
+        self,
+        project_id: UUID,
+        operating_case_id: UUID,
+        options: dict | None = None,
+    ) -> dict[str, Any]:
+        with self._uow_factory() as uow:
+            case = uow.cases.get_operating_case(operating_case_id)
+            if case is None or case.project_id != project_id:
+                raise ValueError(f"OperatingCase {operating_case_id} not found")
+        snapshot_id = self._get_snapshot_id(case)
+        return {
+            "snapshot_id": snapshot_id,
+            "nn_inputs": case.case_payload.get("nn_inputs", {}),
             "options": options or {},
         }
 
@@ -498,6 +563,75 @@ class AnalysisRunService:
                     )
                 )
         return report
+
+    def _validate_fault_loop_input(self, snapshot: dict[str, Any]) -> ValidationReport:
+        report = ValidationReport()
+        nn_inputs = snapshot.get("nn_inputs") or {}
+        if not nn_inputs:
+            return report.with_error(
+                ValidationIssue(
+                    code="nn.input.missing",
+                    message="NN fault-loop requires nn_inputs to be provided",
+                )
+            )
+        if not nn_inputs.get("network_type"):
+            report = report.with_error(
+                ValidationIssue(
+                    code="nn.input.network_type_missing",
+                    message="NN fault-loop requires network_type",
+                )
+            )
+        if not nn_inputs.get("targets"):
+            report = report.with_error(
+                ValidationIssue(
+                    code="nn.input.targets_missing",
+                    message="NN fault-loop requires targets list",
+                )
+            )
+        return report
+
+    def _validate_project_design_mode(
+        self, uow: UnitOfWork, run: AnalysisRun
+    ) -> ValidationReport:
+        if run.analysis_type not in {"short_circuit_sn", "fault_loop_nn"}:
+            return ValidationReport()
+        case = uow.cases.get_operating_case(run.operating_case_id)
+        if case is None:
+            return ValidationReport().with_error(
+                ValidationIssue(
+                    code="project_design_mode.case_missing",
+                    message="OperatingCase not found for ProjectDesignMode gate",
+                )
+            )
+        mode = case.project_design_mode
+        if mode is None:
+            return ValidationReport().with_error(
+                ValidationIssue(
+                    code="project_design_mode.missing",
+                    message="ProjectDesignMode is required to execute this analysis",
+                )
+            )
+        if run.analysis_type == "short_circuit_sn" and mode != ProjectDesignMode.SN_NETWORK:
+            return ValidationReport().with_error(
+                ValidationIssue(
+                    code="project_design_mode.forbidden",
+                    message="short_circuit_sn is only allowed for SN_NETWORK",
+                )
+            )
+        if run.analysis_type == "fault_loop_nn" and mode != ProjectDesignMode.NN_NETWORK:
+            return ValidationReport().with_error(
+                ValidationIssue(
+                    code="project_design_mode.forbidden",
+                    message="fault_loop_nn is only allowed for NN_NETWORK",
+                )
+            )
+        return ValidationReport()
+
+    def _get_snapshot_id(self, case: Any) -> str:
+        snapshot_id = (case.case_payload or {}).get("active_snapshot_id")
+        if not snapshot_id:
+            raise ValueError(f"OperatingCase {case.id} has no active_snapshot_id")
+        return str(snapshot_id)
 
     def _solve_short_circuit(self, sc_input: dict[str, Any]):
         graph = sc_input["graph"]

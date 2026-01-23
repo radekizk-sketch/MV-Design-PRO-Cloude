@@ -6,7 +6,7 @@ from typing import Literal
 from uuid import UUID, uuid4
 
 
-AnalysisType = Literal["PF", "SC"]
+AnalysisType = Literal["PF", "short_circuit_sn", "fault_loop_nn"]
 AnalysisRunStatus = Literal["CREATED", "VALIDATED", "RUNNING", "FINISHED", "FAILED"]
 
 

@@ -14,6 +14,7 @@ sys.path.insert(0, str(backend_src))
 from application.analysis_run import AnalysisRunExportService
 from domain.analysis_run import AnalysisRun
 from domain.models import OperatingCase, Project
+from domain.project_design_mode import ProjectDesignMode
 from infrastructure.persistence.db import create_engine_from_url, create_session_factory, init_db
 from infrastructure.persistence.repositories import (
     AnalysisRunRepository,
@@ -41,7 +42,8 @@ def _build_export_service() -> tuple[AnalysisRunExportService, dict[str, UUID]]:
         id=case_id,
         project_id=project_id,
         name="Base",
-        case_payload={"base_mva": 100.0},
+        case_payload={"base_mva": 100.0, "active_snapshot_id": str(uuid4())},
+        project_design_mode=ProjectDesignMode.SN_NETWORK,
     )
     CaseRepository(session).add_operating_case(case)
 
@@ -53,12 +55,15 @@ def _build_export_service() -> tuple[AnalysisRunExportService, dict[str, UUID]]:
         id=run_id,
         project_id=project_id,
         operating_case_id=case_id,
-        analysis_type="SC",
+        analysis_type="short_circuit_sn",
         status="FINISHED",
         created_at=now,
         started_at=now,
         finished_at=now,
-        input_snapshot={"fault_spec": {"node_id": node_id_str}},
+        input_snapshot={
+            "snapshot_id": str(uuid4()),
+            "fault_spec": {"node_id": node_id_str},
+        },
         input_hash="hash-sc",
         result_summary={"status": "FINISHED", "pcc_node_id": str(uuid4())},
         white_box_trace=[
@@ -71,7 +76,7 @@ def _build_export_service() -> tuple[AnalysisRunExportService, dict[str, UUID]]:
     ResultRepository(session).add_result(
         run_id=run_id,
         project_id=project_id,
-        result_type="short_circuit",
+        result_type="short_circuit_sn",
         payload={"fault_node_id": node_id_str, "ikss_a": 12.5},
     )
 

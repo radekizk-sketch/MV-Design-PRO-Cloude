@@ -108,7 +108,7 @@ class AnalysisRun:
     id: UUID
     project_id: UUID
     operating_case_id: UUID
-    analysis_type: Literal["PF", "SC"]  # Power Flow lub Short Circuit
+    analysis_type: Literal["PF", "short_circuit_sn", "fault_loop_nn"]
     status: Literal["CREATED", "VALIDATED", "RUNNING", "FINISHED", "FAILED"]
     created_at: datetime
     started_at: datetime | None
@@ -120,6 +120,8 @@ class AnalysisRun:
     white_box_trace: list[dict] | None
     error_message: str | None
 ```
+
+Analyses are gated by ProjectDesignMode.
 
 ### 5.2 Cykl Życia AnalysisRun
 
@@ -163,7 +165,7 @@ Jeśli dla tego samego `(project_id, case_id, analysis_type, input_hash)` istnie
 - Straty
 - Violations
 
-### 6.2 Short Circuit (SC)
+### 6.2 Short Circuit SN (short_circuit_sn)
 
 **Wejście:**
 - NetworkGraph
@@ -175,6 +177,14 @@ Jeśli dla tego samego `(project_id, case_id, analysis_type, input_hash)` istnie
 - Moc zwarciowa
 - Wkłady poszczególnych źródeł
 - White-box trace
+
+### 6.3 Fault Loop NN (fault_loop_nn)
+
+**Wejście:**
+- Dane nn (np. typ sieci, obwody docelowe)
+
+**Wyjście:**
+- Oddzielny wynik w kontenerze nn (osobny od SN)
 
 ## 7. Zabezpieczenia (Protection Analysis)
 

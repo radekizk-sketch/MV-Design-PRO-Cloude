@@ -32,6 +32,7 @@ CREATE TABLE operating_cases (
     project_id UUID NOT NULL REFERENCES projects(id),
     name VARCHAR(255) NOT NULL,
     case_jsonb JSONB NOT NULL,
+    project_design_mode VARCHAR(32),
     created_at TIMESTAMPTZ NOT NULL,
     updated_at TIMESTAMPTZ NOT NULL
 );

@@ -62,7 +62,7 @@ def build_input_metadata(snapshot: dict[str, Any]) -> dict[str, Any]:
 
 
 def get_run_trace(run: AnalysisRun) -> dict[str, Any] | list[dict[str, Any]] | None:
-    if run.analysis_type == "SC":
+    if run.analysis_type == "short_circuit_sn":
         return run.white_box_trace
     if run.analysis_type == "PF":
         return run.trace_json
