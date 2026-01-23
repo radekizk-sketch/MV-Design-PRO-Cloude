@@ -4,7 +4,17 @@ version = "0.1.0"
 description = "MV-DESIGN PRO - Professional Medium Voltage Network Design System"
 authors = ["MV-Design Team"]
 readme = "README.md"
-packages = [{include = "src"}]
+packages = [
+    {include = "api", from = "src"},
+    {include = "application", from = "src"},
+    {include = "analysis", from = "src"},
+    {include = "compliance", from = "src"},
+    {include = "domain", from = "src"},
+    {include = "infrastructure", from = "src"},
+    {include = "network_model", from = "src"},
+    {include = "solvers", from = "src"},
+    {include = "whitebox", from = "src"},
+]
 
 [tool.poetry.dependencies]
 python = "^3.11"
