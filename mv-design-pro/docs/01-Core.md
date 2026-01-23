@@ -107,6 +107,16 @@ jest niepoprawna, cały batch jest odrzucony (atomiczność) i nie powstaje żad
 }
 ```
 
+## SLD (PR-08) — Deterministic Projection
+
+SLD jest deterministyczną projekcją snapshotu sieci (NetworkSnapshot). Nie jest solverem, nie wykonuje obliczeń elektrycznych i nie stosuje heurystyk layoutu w PR-08.
+
+Zasada dostępu CASE-aware:
+
+**Case → active_snapshot_id → SLD**
+
+SLD jest read-only, w pełni odtwarzalny dla identycznych wejść, a elementy `in_service=false` są wykluczane z projekcji (bez placeholderów).
+
 Odpowiedź zawiera wynik batcha i listę wyników dla każdej akcji:
 
 ```json
