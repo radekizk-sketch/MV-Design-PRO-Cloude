@@ -198,6 +198,40 @@ Większość klas core używa `@dataclass` z domyślną mutowalnością dla wygo
 - **Wyniki obliczeń** używają `@dataclass(frozen=True)` (np. ShortCircuitResult)
 - **Encje domenowe** używają `frozen=True` (np. Project, AnalysisRun)
 
+## 5. Action Envelope (Edycje domeny)
+
+Core udostępnia kanoniczny **Action Envelope** jako append-only opis intencjonalnych zmian w domenie.
+Akcje są wiązane z `parent_snapshot_id` i podlegają **deterministycznej walidacji strukturalnej**.
+Brak tu fizyki i norm — tylko struktura oraz referencje do encji snapshotu.
+
+### 5.1 Pola Action Envelope
+
+- `action_id` (UUID string)
+- `parent_snapshot_id` (string)
+- `action_type` (enumerated string)
+- `payload` (dict)
+- `created_at` (ISO 8601)
+- `actor` (optional string)
+- `schema_version` (optional string/int)
+
+### 5.2 MVP Action Types
+
+- `create_node` — minimalny payload: `node_type` + wymagane pola zależne od typu
+- `create_branch` — `from_node_id`, `to_node_id`, `branch_kind`
+- `set_in_service` — `entity_id`, `in_service` (bool)
+- `set_pcc` — `node_id`
+
+### 5.3 ActionResult (accept/reject)
+
+Walidator zwraca `ActionResult`:
+- `status`: `"accepted"` lub `"rejected"`
+- `action_id`, `parent_snapshot_id`
+- `errors`: lista `{code, message, path}` (pusta dla accepted)
+- `warnings`: opcjonalna lista (domyślnie pusta)
+
+Przykładowe kody błędów: `missing_field`, `invalid_type`, `unknown_action_type`,
+`missing_payload_key`, `unknown_node`, `unknown_entity`.
+
 ### 4.2 Snapshot Pattern
 
 Dla obliczeń stosujemy wzorzec snapshot:
