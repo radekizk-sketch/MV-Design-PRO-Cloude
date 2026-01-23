@@ -2,15 +2,15 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 from typing import Any, Callable
-from uuid import UUID
+from uuid import UUID, uuid4
 
 from application.analyses.design_synth.canonical import canonicalize_json
-from application.analyses.design_synth.reporting import (
-    PCC_SECTION_TITLE,
-    build_connection_study_report,
-)
+from application.analyses.design_synth.evidence_m3 import build_evidence_payload
+from application.analyses.design_synth.fingerprint import fingerprint_json
+from application.analyses.design_synth.reporting import build_connection_study_report
 from application.analyses.design_synth.result import DesignSynthRunResult
 from application.analyses.design_synth.service import DesignSynthService
+from application.analyses.design_synth.trace import DesignSynthTrace, TraceStep
 from infrastructure.persistence.unit_of_work import UnitOfWork
 
 
@@ -34,14 +34,35 @@ def run_connection_study(
     )
     proposal = service.get_proposal(proposal_id)
 
-    evidence_payload = _build_evidence_payload(
-        case_id, base_snapshot_id, spec.spec_json, proposal.proposal_json
+    report_json = build_connection_study_report(spec, proposal)
+    report_fingerprint = fingerprint_json(report_json)
+    report_json_with_fingerprint = canonicalize_json(
+        {**report_json, "fingerprint": report_fingerprint}
     )
-    evidence_id = service.create_evidence(case_id, base_snapshot_id, evidence_payload)
-    evidence = service.get_evidence(evidence_id)
+    spec_payload_canonical = canonicalize_json(spec.spec_json)
+    pcc_payload = _extract_pcc(spec_payload_canonical)
+    trace = _build_trace(
+        spec_payload_canonical, proposal.proposal_json, report_json, report_fingerprint
+    )
 
-    report_json = build_connection_study_report(spec, proposal, evidence)
+    evidence_id = uuid4()
     created_at = datetime.now(timezone.utc)
+    evidence_payload = build_evidence_payload(
+        case_id=str(case_id),
+        base_snapshot_id=base_snapshot_id,
+        spec_payload_canonical=spec_payload_canonical,
+        pcc=pcc_payload,
+        trace=trace,
+        design_spec_id=str(spec_id),
+        design_proposal_id=str(proposal_id),
+        design_evidence_id=str(evidence_id),
+        report_json=report_json,
+        report_fingerprint=report_fingerprint,
+        created_at_utc_iso=created_at.isoformat(),
+    )
+    service.create_evidence(
+        case_id, base_snapshot_id, evidence_payload, evidence_id=evidence_id
+    )
 
     return DesignSynthRunResult(
         case_id=case_id,
@@ -49,7 +70,7 @@ def run_connection_study(
         design_spec_id=spec_id,
         design_proposal_id=proposal_id,
         design_evidence_id=evidence_id,
-        report_json=report_json,
+        report_json=report_json_with_fingerprint,
         created_at=created_at,
     )
 
@@ -75,44 +96,45 @@ def _build_proposal_payload(spec_payload: dict[str, Any]) -> dict[str, Any]:
     return canonicalize_json(proposal)
 
 
-def _build_evidence_payload(
-    case_id: UUID,
-    base_snapshot_id: str,
+def _build_trace(
     spec_payload: dict[str, Any],
     proposal_payload: dict[str, Any],
-) -> dict[str, Any]:
-    evidence = {
-        "inputs": {
-            "case_id": str(case_id),
-            "base_snapshot_id": base_snapshot_id,
-            "spec": spec_payload,
-        },
-        "outputs": {
-            "proposal": proposal_payload,
-        },
-        "trace": {
-            "steps": [
-                {
-                    "name": "spec_to_proposal",
-                    "status": "ok",
-                },
-                {
-                    "name": "proposal_to_report",
-                    "status": "ok",
-                },
-            ]
-        },
-        "references": {
-            "snapshot_id": base_snapshot_id,
-            "analysis_runs": [],
-        },
-        "metadata": {
-            "pipeline": "DesignSynth M2 connection study",
-            "standard": "DIgSILENT PowerFactory",
-            "pcc_label": PCC_SECTION_TITLE,
-        },
-    }
-    return canonicalize_json(evidence)
+    report_json: dict[str, Any],
+    report_fingerprint: str,
+) -> DesignSynthTrace:
+    steps = (
+        TraceStep(
+            name="normalize_spec",
+            version="M3",
+            inputs={"raw_spec_keys": sorted(spec_payload.keys())},
+            outputs={
+                "canonical_spec_keys": sorted(spec_payload.keys()),
+                "pcc": _extract_pcc(spec_payload),
+            },
+        ),
+        TraceStep(
+            name="generate_proposal",
+            version="M3",
+            inputs={"spec_keys": sorted(spec_payload.keys())},
+            outputs={"proposal_keys": sorted(proposal_payload.keys())},
+        ),
+        TraceStep(
+            name="build_report",
+            version="M3",
+            inputs={"report_sections": sorted(report_json.keys())},
+            outputs={
+                "report_keys": sorted(report_json.keys()),
+                "report_fingerprint": report_fingerprint,
+            },
+        ),
+        TraceStep(
+            name="persist_artifacts",
+            version="M3",
+            inputs={"artifact_types": ["design_spec", "design_proposal", "design_evidence"]},
+            outputs={"artifact_count": 3},
+        ),
+    )
+    return DesignSynthTrace(steps=steps)
 
 
 def _extract_pcc(spec_payload: dict[str, Any]) -> dict[str, Any]:
