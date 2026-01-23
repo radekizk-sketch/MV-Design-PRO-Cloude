@@ -29,9 +29,12 @@ def map_requirement_to_device(
         "I50N": req.i_inst_50n_a,
         "CURVE": req.curve,
     }
+    assumptions = ["LOGICAL_MAPPING_ONLY", "NO_VENDOR_PARAM_IDS"]
+    if cap.meta.get("unverified"):
+        assumptions.append("UNVERIFIED_MODEL")
     return DeviceMappingResult(
         compatible=True,
         violations=(),
         mapped_settings=mapped_settings,
-        assumptions=("LOGICAL_MAPPING_ONLY", "NO_VENDOR_PARAM_IDS"),
+        assumptions=tuple(assumptions),
     )
