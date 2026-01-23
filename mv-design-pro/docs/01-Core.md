@@ -204,6 +204,8 @@ Dla obliczeń stosujemy wzorzec snapshot:
 1. `NetworkWizardService` buduje `NetworkGraph` z persystencji
 2. `NetworkGraph` jest przekazywany do solvera jako read-only snapshot
 3. Solver nie modyfikuje grafu, tylko go czyta
+4. Snapshot ma backendowe metadane (`snapshot_id`, opcjonalny `parent_snapshot_id`,
+   `created_at`, opcjonalny `schema_version`) dla jednoznacznej identyfikacji i linii czasu
 
 ## 5. Granice Odpowiedzialności
 

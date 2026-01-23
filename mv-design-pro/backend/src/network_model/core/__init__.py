@@ -9,6 +9,7 @@ from .node import Node, NodeType
 from .branch import BranchType, Branch, LineBranch, TransformerBranch
 from .graph import NetworkGraph
 from .inverter import InverterSource
+from .snapshot import NetworkSnapshot, SnapshotMeta, create_network_snapshot
 from .ybus import AdmittanceMatrixBuilder
 
 __all__ = [
@@ -20,5 +21,8 @@ __all__ = [
     "TransformerBranch",
     "NetworkGraph",
     "InverterSource",
+    "NetworkSnapshot",
+    "SnapshotMeta",
+    "create_network_snapshot",
     "AdmittanceMatrixBuilder",
 ]
