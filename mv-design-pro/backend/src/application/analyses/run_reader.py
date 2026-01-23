@@ -17,6 +17,7 @@ def read_run_envelope(
     if analysis_type == "design_synth.connection_study":
         return _read_design_synth_connection_study(run_id, uow_factory=uow_factory)
     if analysis_type == "short_circuit.iec60909":
+        # TODO: Add persistence-backed lookup for IEC 60909 runs when available.
         raise ValueError("Run not found")
     raise ValueError("Unsupported analysis_type")
 

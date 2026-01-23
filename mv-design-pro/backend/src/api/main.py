@@ -4,6 +4,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from api.analysis_runs import router as analysis_runs_router
+from api.analysis_runs_index import router as analysis_runs_index_router
 from api.analysis_runs_read import router as analysis_runs_read_router
 from api.cases import router as cases_router
 from api.design_synth import router as design_synth_router
@@ -27,6 +28,7 @@ app.add_middleware(
 )
 
 app.include_router(analysis_runs_router)
+app.include_router(analysis_runs_index_router)
 app.include_router(analysis_runs_read_router)
 app.include_router(cases_router)
 app.include_router(design_synth_router)
