@@ -75,9 +75,14 @@ class DesignSynthService:
         return proposal
 
     def create_evidence(
-        self, case_id: UUID, snapshot_id: str, evidence_payload: dict
+        self,
+        case_id: UUID,
+        snapshot_id: str,
+        evidence_payload: dict,
+        *,
+        evidence_id: UUID | None = None,
     ) -> UUID:
-        evidence_id = uuid4()
+        evidence_id = evidence_id or uuid4()
         now = datetime.now(timezone.utc)
         evidence = DesignEvidence(
             id=evidence_id,
