@@ -13,12 +13,24 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          python-version: '3.11.x'
+          cache: pip
+          cache-dependency-path: mv-design-pro/backend/poetry.lock
       - name: Install Poetry
         run: pipx install poetry
+      - name: Cache Poetry and virtualenv
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/pypoetry
+            ~/.cache/pip
+            ~/.cache/pypoetry/virtualenvs
+          key: poetry-${{ runner.os }}-${{ hashFiles('mv-design-pro/backend/poetry.lock') }}
+          restore-keys: |
+            poetry-${{ runner.os }}-
       - name: Install dependencies
         working-directory: mv-design-pro/backend
-        run: poetry install --with dev --no-interaction --sync
+        run: poetry install --no-interaction --with dev
       - name: Run pytest
         working-directory: mv-design-pro/backend
         run: poetry run pytest -q
