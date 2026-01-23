@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Dict
+from typing import Any, Dict, Iterable
 
 
 def _complex_to_dict(value: complex) -> dict[str, float]:
@@ -16,15 +16,26 @@ def _sorted_float_dict(values: Dict[str, float]) -> dict[str, float]:
     return {key: float(values[key]) for key in sorted(values.keys())}
 
 
+def _sorted_keys(values: Iterable[str]) -> list[str]:
+    return sorted(values)
+
+
 def _serialize_value(value: Any) -> Any:
     if isinstance(value, complex):
         return _complex_to_dict(value)
     if hasattr(value, "item"):
-        return value.item()
+        return _serialize_value(value.item())
+    if hasattr(value, "tolist"):
+        return _serialize_value(value.tolist())
     if isinstance(value, dict):
-        return {key: _serialize_value(val) for key, val in value.items()}
-    if isinstance(value, list):
+        return {
+            key: _serialize_value(value[key])
+            for key in _sorted_keys(value.keys())
+        }
+    if isinstance(value, (list, tuple)):
         return [_serialize_value(item) for item in value]
+    if isinstance(value, set):
+        return [_serialize_value(item) for item in sorted(value)]
     return value
 
 
