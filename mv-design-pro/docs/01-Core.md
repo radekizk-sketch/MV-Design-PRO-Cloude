@@ -77,6 +77,59 @@ Minimalne API backendu wspiera pełny przepływ:
 }
 ```
 
+### 2.5 Batch Actions (Transaction)
+
+Batch actions pozwalają na transakcyjne zastosowanie listy akcji do jednego snapshotu.
+Backend waliduje listę w podanej kolejności na „working snapshot” i tworzy dokładnie
+jeden nowy snapshot dopiero po pełnym sukcesie wszystkich akcji. Jeśli dowolna akcja
+jest niepoprawna, cały batch jest odrzucony (atomiczność) i nie powstaje żaden nowy snapshot.
+
+**POST /snapshots/{snapshot_id}/actions:batch** przyjmuje listę `ActionEnvelope`:
+
+```json
+{
+  "actions": [
+    {
+      "action_id": "batch-action-1",
+      "parent_snapshot_id": "snap-1",
+      "action_type": "create_node",
+      "payload": {
+        "id": "node-3",
+        "name": "Node 3",
+        "node_type": "PQ",
+        "voltage_level": 15.0,
+        "active_power": 2.0,
+        "reactive_power": 1.0
+      },
+      "created_at": "2024-01-02T00:00:00+00:00"
+    }
+  ]
+}
+```
+
+Odpowiedź zawiera wynik batcha i listę wyników dla każdej akcji:
+
+```json
+{
+  "status": "accepted",
+  "parent_snapshot_id": "snap-1",
+  "new_snapshot_id": "snap-2",
+  "action_results": [
+    {
+      "status": "accepted",
+      "action_id": "batch-action-1",
+      "parent_snapshot_id": "snap-1",
+      "errors": [],
+      "warnings": []
+    }
+  ],
+  "errors": []
+}
+```
+
+W przypadku błędu cały batch jest odrzucony, a akcje oznaczane są jako `rejected`
+z kodem `batch_aborted`, natomiast akcja błędna zawiera własne kody i ścieżki błędów.
+
 ## 3. Komponenty
 
 ### 3.1 Node (`node.py`)

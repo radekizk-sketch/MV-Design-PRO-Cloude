@@ -125,6 +125,37 @@ class ActionResult:
         )
 
 
+@dataclass(frozen=True)
+class BatchActionResult:
+    status: str
+    parent_snapshot_id: ParentSnapshotId
+    action_results: list[ActionResult]
+    new_snapshot_id: str | None = None
+    errors: list[ActionIssue] = field(default_factory=list)
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "status": self.status,
+            "parent_snapshot_id": self.parent_snapshot_id,
+            "new_snapshot_id": self.new_snapshot_id,
+            "action_results": [result.to_dict() for result in self.action_results],
+            "errors": [issue.to_dict() for issue in self.errors],
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> "BatchActionResult":
+        return cls(
+            status=str(data["status"]),
+            parent_snapshot_id=str(data["parent_snapshot_id"]),
+            new_snapshot_id=data.get("new_snapshot_id"),
+            action_results=[
+                ActionResult.from_dict(result)
+                for result in data.get("action_results", [])
+            ],
+            errors=[ActionIssue.from_dict(err) for err in data.get("errors", [])],
+        )
+
+
 def validate_action_envelope(
     envelope: ActionEnvelope, snapshot: NetworkSnapshot
 ) -> ActionResult:

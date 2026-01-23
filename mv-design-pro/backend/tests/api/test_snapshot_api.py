@@ -11,6 +11,7 @@ from infrastructure.persistence.db import (
     create_session_factory,
     init_db,
 )
+from infrastructure.persistence.models import NetworkSnapshotORM
 from infrastructure.persistence.repositories import SnapshotRepository
 from infrastructure.persistence.unit_of_work import build_uow_factory
 from network_model.core import Branch, BranchType, NetworkGraph, Node, NodeType
@@ -72,11 +73,11 @@ def api_client(tmp_path):
     session.close()
 
     client = TestClient(app)
-    return client, snapshot
+    return client, snapshot, session_factory
 
 
 def test_get_snapshot_returns_persisted_snapshot(api_client):
-    client, snapshot = api_client
+    client, snapshot, _session_factory = api_client
 
     response = client.get(f"/snapshots/{snapshot.meta.snapshot_id}")
 
@@ -86,7 +87,7 @@ def test_get_snapshot_returns_persisted_snapshot(api_client):
 
 
 def test_submit_action_accepts_and_creates_snapshot(api_client):
-    client, snapshot = api_client
+    client, snapshot, _session_factory = api_client
     action_payload = {
         "action_id": "action-1",
         "parent_snapshot_id": snapshot.meta.snapshot_id,
@@ -120,7 +121,7 @@ def test_submit_action_accepts_and_creates_snapshot(api_client):
 
 
 def test_submit_action_rejects_invalid_reference(api_client):
-    client, snapshot = api_client
+    client, snapshot, _session_factory = api_client
     action_payload = {
         "action_id": "action-2",
         "parent_snapshot_id": snapshot.meta.snapshot_id,
@@ -145,7 +146,7 @@ def test_submit_action_rejects_invalid_reference(api_client):
 
 
 def test_submit_action_is_deterministic_on_same_parent(api_client):
-    client, snapshot = api_client
+    client, snapshot, _session_factory = api_client
     created_at = datetime(2024, 1, 2, tzinfo=timezone.utc).isoformat()
     base_payload = {
         "parent_snapshot_id": snapshot.meta.snapshot_id,
@@ -180,3 +181,240 @@ def test_submit_action_is_deterministic_on_same_parent(api_client):
     snapshot_second = client.get("/snapshots/action-4").json()
 
     assert snapshot_first["graph"] == snapshot_second["graph"]
+
+
+def test_submit_batch_actions_accepts_and_creates_snapshot(api_client):
+    client, snapshot, _session_factory = api_client
+    action_payload = [
+        {
+            "action_id": "batch-action-1",
+            "parent_snapshot_id": snapshot.meta.snapshot_id,
+            "action_type": "create_node",
+            "payload": {
+                "id": "node-3",
+                "name": "Node 3",
+                "node_type": "PQ",
+                "voltage_level": 15.0,
+                "active_power": 2.0,
+                "reactive_power": 1.0,
+            },
+            "created_at": "2024-01-02T00:00:00+00:00",
+        },
+        {
+            "action_id": "batch-action-2",
+            "parent_snapshot_id": snapshot.meta.snapshot_id,
+            "action_type": "create_node",
+            "payload": {
+                "id": "node-4",
+                "name": "Node 4",
+                "node_type": "PQ",
+                "voltage_level": 15.0,
+                "active_power": 1.5,
+                "reactive_power": 0.75,
+            },
+            "created_at": "2024-01-02T00:01:00+00:00",
+        },
+        {
+            "action_id": "batch-action-3",
+            "parent_snapshot_id": snapshot.meta.snapshot_id,
+            "action_type": "create_branch",
+            "payload": {
+                "id": "branch-2",
+                "from_node_id": "node-3",
+                "to_node_id": "node-4",
+                "branch_kind": "LINE",
+                "in_service": True,
+            },
+            "created_at": "2024-01-02T00:02:00+00:00",
+        },
+        {
+            "action_id": "batch-action-4",
+            "parent_snapshot_id": snapshot.meta.snapshot_id,
+            "action_type": "set_pcc",
+            "payload": {"node_id": "node-3"},
+            "created_at": "2024-01-02T00:03:00+00:00",
+        },
+    ]
+
+    response = client.post(
+        f"/snapshots/{snapshot.meta.snapshot_id}/actions:batch",
+        json={"actions": action_payload},
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["status"] == "accepted"
+    assert payload["new_snapshot_id"]
+    assert len(payload["action_results"]) == 4
+    assert all(result["status"] == "accepted" for result in payload["action_results"])
+
+    new_snapshot_id = payload["new_snapshot_id"]
+    snapshot_response = client.get(f"/snapshots/{new_snapshot_id}")
+    assert snapshot_response.status_code == 200
+    graph = snapshot_response.json()["graph"]
+    assert {"node-3", "node-4"}.issubset({node["id"] for node in graph["nodes"]})
+    assert "branch-2" in {branch["id"] for branch in graph["branches"]}
+    assert graph["pcc_node_id"] == "node-3"
+
+    parent_response = client.get(f"/snapshots/{snapshot.meta.snapshot_id}")
+    assert parent_response.status_code == 200
+    parent_graph = parent_response.json()["graph"]
+    assert "node-3" not in {node["id"] for node in parent_graph["nodes"]}
+    assert parent_graph["pcc_node_id"] is None
+
+
+def test_submit_batch_actions_rejects_invalid_reference(api_client):
+    client, snapshot, session_factory = api_client
+    action_payload = [
+        {
+            "action_id": "batch-action-5",
+            "parent_snapshot_id": snapshot.meta.snapshot_id,
+            "action_type": "create_node",
+            "payload": {
+                "id": "node-5",
+                "name": "Node 5",
+                "node_type": "PQ",
+                "voltage_level": 15.0,
+                "active_power": 2.0,
+                "reactive_power": 1.0,
+            },
+            "created_at": "2024-01-03T00:00:00+00:00",
+        },
+        {
+            "action_id": "batch-action-6",
+            "parent_snapshot_id": snapshot.meta.snapshot_id,
+            "action_type": "create_branch",
+            "payload": {
+                "id": "branch-3",
+                "from_node_id": "missing-node",
+                "to_node_id": "node-5",
+                "branch_kind": "LINE",
+                "in_service": True,
+            },
+            "created_at": "2024-01-03T00:01:00+00:00",
+        },
+    ]
+
+    response = client.post(
+        f"/snapshots/{snapshot.meta.snapshot_id}/actions:batch",
+        json={"actions": action_payload},
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["status"] == "rejected"
+    assert payload["new_snapshot_id"] is None
+    assert len(payload["action_results"]) == 2
+    assert payload["action_results"][0]["errors"][0]["code"] == "batch_aborted"
+    assert payload["action_results"][1]["errors"][0]["code"] == "unknown_node"
+    assert payload["action_results"][1]["errors"][0]["path"] == "payload.from_node_id"
+
+    session = session_factory()
+    count = session.query(NetworkSnapshotORM).count()
+    session.close()
+    assert count == 1
+
+
+def test_submit_batch_actions_is_deterministic_on_same_parent(api_client):
+    client, snapshot, _session_factory = api_client
+    actions = [
+        {
+            "action_id": "batch-action-7",
+            "parent_snapshot_id": snapshot.meta.snapshot_id,
+            "action_type": "create_node",
+            "payload": {
+                "id": "node-6",
+                "name": "Node 6",
+                "node_type": "PQ",
+                "voltage_level": 15.0,
+                "active_power": 1.0,
+                "reactive_power": 0.5,
+            },
+            "created_at": "2024-01-04T00:00:00+00:00",
+        },
+        {
+            "action_id": "batch-action-8",
+            "parent_snapshot_id": snapshot.meta.snapshot_id,
+            "action_type": "create_branch",
+            "payload": {
+                "id": "branch-4",
+                "from_node_id": "node-6",
+                "to_node_id": "node-1",
+                "branch_kind": "LINE",
+                "in_service": True,
+            },
+            "created_at": "2024-01-04T00:01:00+00:00",
+        },
+    ]
+
+    response_first = client.post(
+        f"/snapshots/{snapshot.meta.snapshot_id}/actions:batch",
+        json={"actions": actions},
+    )
+    response_second = client.post(
+        f"/snapshots/{snapshot.meta.snapshot_id}/actions:batch",
+        json={"actions": actions},
+    )
+
+    assert response_first.status_code == 200
+    assert response_second.status_code == 200
+
+    snapshot_first = client.get(
+        f"/snapshots/{response_first.json()['new_snapshot_id']}"
+    ).json()
+    snapshot_second = client.get(
+        f"/snapshots/{response_second.json()['new_snapshot_id']}"
+    ).json()
+
+    assert snapshot_first["graph"] == snapshot_second["graph"]
+
+
+def test_submit_batch_actions_rejected_is_atomic(api_client):
+    client, snapshot, session_factory = api_client
+    actions = [
+        {
+            "action_id": "batch-action-9",
+            "parent_snapshot_id": snapshot.meta.snapshot_id,
+            "action_type": "create_node",
+            "payload": {
+                "id": "node-7",
+                "name": "Node 7",
+                "node_type": "PQ",
+                "voltage_level": 15.0,
+                "active_power": 1.0,
+                "reactive_power": 0.5,
+            },
+            "created_at": "2024-01-05T00:00:00+00:00",
+        },
+        {
+            "action_id": "batch-action-10",
+            "parent_snapshot_id": snapshot.meta.snapshot_id,
+            "action_type": "create_branch",
+            "payload": {
+                "id": "branch-5",
+                "from_node_id": "node-7",
+                "to_node_id": "missing-node",
+                "branch_kind": "LINE",
+                "in_service": True,
+            },
+            "created_at": "2024-01-05T00:01:00+00:00",
+        },
+    ]
+
+    response = client.post(
+        f"/snapshots/{snapshot.meta.snapshot_id}/actions:batch",
+        json={"actions": actions},
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["status"] == "rejected"
+    assert payload["new_snapshot_id"] is None
+
+    parent_snapshot = client.get(f"/snapshots/{snapshot.meta.snapshot_id}").json()
+    assert "node-7" not in {node["id"] for node in parent_snapshot["graph"]["nodes"]}
+
+    session = session_factory()
+    count = session.query(NetworkSnapshotORM).count()
+    session.close()
+    assert count == 1
