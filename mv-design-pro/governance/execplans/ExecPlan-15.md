@@ -12,6 +12,7 @@ Establish a single, minimal “run envelope” contract that wraps analysis exec
 - [x] Add ADR documenting v0 contract and versioning rules.
 - [x] Add adapter tests for determinism.
 - [x] Add protection device-mapping analysis skeleton with run envelope adapter (PR-1).
+- [x] Add vendor adapter v0 for protection device catalog mapping with vendor-specific keys (PR-2).
 
 ## Surprises & Discoveries
 (None.)
