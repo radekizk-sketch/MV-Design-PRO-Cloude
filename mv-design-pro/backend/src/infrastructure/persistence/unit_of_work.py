@@ -5,16 +5,23 @@ from typing import Callable
 
 from sqlalchemy.orm import Session, sessionmaker
 
-from infrastructure.persistence.repositories import (
-    AnalysisRunRepository,
-    CaseRepository,
-    NetworkRepository,
-    NetworkWizardRepository,
-    ProjectRepository,
-    ResultRepository,
-    SnapshotRepository,
-    SldRepository,
+from infrastructure.persistence.repositories.analysis_run_repository import AnalysisRunRepository
+from infrastructure.persistence.repositories.case_repository import CaseRepository
+from infrastructure.persistence.repositories.design_evidence_repository import (
+    DesignEvidenceRepository,
 )
+from infrastructure.persistence.repositories.design_proposal_repository import (
+    DesignProposalRepository,
+)
+from infrastructure.persistence.repositories.design_spec_repository import DesignSpecRepository
+from infrastructure.persistence.repositories.network_repository import NetworkRepository
+from infrastructure.persistence.repositories.network_wizard_repository import (
+    NetworkWizardRepository,
+)
+from infrastructure.persistence.repositories.project_repository import ProjectRepository
+from infrastructure.persistence.repositories.result_repository import ResultRepository
+from infrastructure.persistence.repositories.snapshot_repository import SnapshotRepository
+from infrastructure.persistence.repositories.sld_repository import SldRepository
 
 
 class UnitOfWork(AbstractContextManager["UnitOfWork"]):
@@ -29,6 +36,9 @@ class UnitOfWork(AbstractContextManager["UnitOfWork"]):
         self.results: ResultRepository | None = None
         self.analysis_runs: AnalysisRunRepository | None = None
         self.snapshots: SnapshotRepository | None = None
+        self.design_specs: DesignSpecRepository | None = None
+        self.design_proposals: DesignProposalRepository | None = None
+        self.design_evidence: DesignEvidenceRepository | None = None
 
     def __enter__(self) -> "UnitOfWork":
         self.session = self._session_factory()
@@ -40,6 +50,9 @@ class UnitOfWork(AbstractContextManager["UnitOfWork"]):
         self.results = ResultRepository(self.session)
         self.analysis_runs = AnalysisRunRepository(self.session)
         self.snapshots = SnapshotRepository(self.session)
+        self.design_specs = DesignSpecRepository(self.session)
+        self.design_proposals = DesignProposalRepository(self.session)
+        self.design_evidence = DesignEvidenceRepository(self.session)
         return self
 
     def __exit__(self, exc_type, exc, tb) -> bool:

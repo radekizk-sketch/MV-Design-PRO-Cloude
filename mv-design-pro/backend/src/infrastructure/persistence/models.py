@@ -353,3 +353,49 @@ class SldAnnotationORM(Base):
     text: Mapped[str] = mapped_column(Text, nullable=False)
     x: Mapped[float] = mapped_column(Float, nullable=False)
     y: Mapped[float] = mapped_column(Float, nullable=False)
+
+
+class DesignSpecORM(Base):
+    __tablename__ = "design_specs"
+    __table_args__ = (Index("ix_design_specs_case_id", "case_id"),)
+
+    id: Mapped[UUID] = mapped_column(GUID(), primary_key=True)
+    case_id: Mapped[UUID] = mapped_column(
+        GUID(), ForeignKey("operating_cases.id"), nullable=False
+    )
+    base_snapshot_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    spec_json: Mapped[dict[str, Any]] = mapped_column(DeterministicJSON(), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+
+class DesignProposalORM(Base):
+    __tablename__ = "design_proposals"
+    __table_args__ = (Index("ix_design_proposals_case_id", "case_id"),)
+
+    id: Mapped[UUID] = mapped_column(GUID(), primary_key=True)
+    case_id: Mapped[UUID] = mapped_column(
+        GUID(), ForeignKey("operating_cases.id"), nullable=False
+    )
+    input_snapshot_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    proposal_json: Mapped[dict[str, Any]] = mapped_column(
+        DeterministicJSON(), nullable=False
+    )
+    status: Mapped[str] = mapped_column(String(20), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+
+class DesignEvidenceORM(Base):
+    __tablename__ = "design_evidence"
+    __table_args__ = (Index("ix_design_evidence_case_id", "case_id"),)
+
+    id: Mapped[UUID] = mapped_column(GUID(), primary_key=True)
+    case_id: Mapped[UUID] = mapped_column(
+        GUID(), ForeignKey("operating_cases.id"), nullable=False
+    )
+    snapshot_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    evidence_json: Mapped[dict[str, Any]] = mapped_column(
+        DeterministicJSON(), nullable=False
+    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)

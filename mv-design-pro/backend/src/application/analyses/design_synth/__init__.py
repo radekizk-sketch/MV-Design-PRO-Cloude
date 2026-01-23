@@ -1,0 +1,1 @@
+"""DesignSynth application package."""

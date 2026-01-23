@@ -140,6 +140,10 @@ Odpowiedź zawiera wynik batcha i listę wyników dla każdej akcji:
 W przypadku błędu cały batch jest odrzucony, a akcje oznaczane są jako `rejected`
 z kodem `batch_aborted`, natomiast akcja błędna zawiera własne kody i ścieżki błędów.
 
+### 2.6 DesignSynth (Project Designer) — case-level artifacts
+
+DesignSynth przechowuje artefakty case-level (bez mutacji domeny Core): **DesignSpec**, **DesignProposal** oraz **DesignEvidence**. Są one zapisywane w tabelach `design_specs`, `design_proposals`, `design_evidence` i służą jako audytowalne, deterministycznie serializowane (JSON-safe) wejścia/wyjścia dla procesu projektowania na poziomie OperatingCase (case_id + snapshot_id). W Core nie ma logiki solverów ani fizyki powiązanej z tymi artefaktami.
+
 ## 3. Komponenty
 
 ### 3.1 Node (`node.py`)
