@@ -9,6 +9,9 @@ backend/src/network_model/core/
 ├── branch.py        # Branch, LineBranch, TransformerBranch, BranchType
 ├── graph.py         # NetworkGraph
 ├── inverter.py      # InverterSource
+├── snapshot.py      # NetworkSnapshot, SnapshotMeta
+├── action_envelope.py # ActionEnvelope, ActionResult
+├── action_apply.py  # apply_action_to_snapshot
 └── ybus.py          # AdmittanceMatrixBuilder
 ```
 
@@ -231,6 +234,20 @@ Walidator zwraca `ActionResult`:
 
 Przykładowe kody błędów: `missing_field`, `invalid_type`, `unknown_action_type`,
 `missing_payload_key`, `unknown_node`, `unknown_entity`.
+
+### 5.4 Action → Snapshot Application Flow
+
+Przepływ aplikacji akcji do nowego snapshotu:
+
+1. **Wizard** generuje `ActionEnvelope` (intencja zmiany).
+2. **Validation** wykonuje deterministyczną walidację strukturalną i zwraca `ActionResult`.
+3. Dla `ActionResult.status == "accepted"` następuje **Apply Action** w backend core.
+4. **Apply Action** tworzy **NOWY** `NetworkSnapshot` z:
+   - nowym `snapshot_id` (deterministycznym, powiązanym z akcją),
+   - `parent_snapshot_id` wskazującym snapshot wejściowy,
+   - stabilną, deterministyczną serializacją (sortowanie encji po `id`).
+
+Flow summary: **Wizard → ActionEnvelope → Validation → Apply Action → New Snapshot**.
 
 ### 4.2 Snapshot Pattern
 

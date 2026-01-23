@@ -121,11 +121,13 @@ def _graph_to_dict(graph: NetworkGraph) -> dict[str, Any]:
         "nodes": [node.to_dict() for node in nodes],
         "branches": [branch.to_dict() for branch in branches],
         "inverter_sources": [source.to_dict() for source in inverters],
+        "pcc_node_id": graph.pcc_node_id,
     }
 
 
 def _graph_from_dict(data: dict[str, Any]) -> NetworkGraph:
     graph = NetworkGraph()
+    graph.pcc_node_id = data.get("pcc_node_id")
     for node_data in data.get("nodes", []):
         graph.add_node(Node.from_dict(node_data))
     for branch_data in data.get("branches", []):

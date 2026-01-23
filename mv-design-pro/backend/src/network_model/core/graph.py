@@ -46,6 +46,7 @@ class NetworkGraph:
         self.nodes: Dict[str, Node] = {}
         self.branches: Dict[str, Branch] = {}
         self.inverter_sources: Dict[str, InverterSource] = {}
+        self.pcc_node_id: str | None = None
         self._graph: nx.MultiGraph = nx.MultiGraph()
 
     def add_node(self, node: Node) -> None:
