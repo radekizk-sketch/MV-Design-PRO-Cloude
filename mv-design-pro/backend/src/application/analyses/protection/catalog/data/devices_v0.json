@@ -1,0 +1,43 @@
+{
+  "schema_version": "v0",
+  "devices": [
+    {
+      "device_id": "ACME_REX500_v1",
+      "vendor": "ACME",
+      "model": "REX-500",
+      "functions_supported": ["50", "51", "50N", "51N"],
+      "curves_supported": ["IEC_NI"],
+      "i_pickup_51_a_min": 0.5,
+      "i_pickup_51_a_max": 2000.0,
+      "tms_51_min": 0.05,
+      "tms_51_max": 1.2,
+      "i_inst_50_a_min": 50.0,
+      "i_inst_50_a_max": 10000.0,
+      "i_pickup_51n_a_min": 0.2,
+      "i_pickup_51n_a_max": 800.0,
+      "tms_51n_min": 0.05,
+      "tms_51n_max": 1.2,
+      "i_inst_50n_a_min": 20.0,
+      "i_inst_50n_a_max": 5000.0
+    },
+    {
+      "device_id": "ACME_REX200_v1",
+      "vendor": "ACME",
+      "model": "REX-200",
+      "functions_supported": ["50", "51"],
+      "curves_supported": ["IEC_NI"],
+      "i_pickup_51_a_min": 0.5,
+      "i_pickup_51_a_max": 1200.0,
+      "tms_51_min": 0.05,
+      "tms_51_max": 1.0,
+      "i_inst_50_a_min": 50.0,
+      "i_inst_50_a_max": 6000.0,
+      "i_pickup_51n_a_min": 0.0,
+      "i_pickup_51n_a_max": 0.0,
+      "tms_51n_min": 0.0,
+      "tms_51n_max": 0.0,
+      "i_inst_50n_a_min": 0.0,
+      "i_inst_50n_a_max": 0.0
+    }
+  ]
+}

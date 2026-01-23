@@ -1,0 +1,203 @@
+from __future__ import annotations
+
+from datetime import datetime, timezone
+from typing import Any, Callable
+
+from application.analyses.design_synth.canonical import canonicalize_json
+from application.analyses.design_synth.fingerprint import fingerprint_json
+from application.analyses.protection.catalog.catalog_store import load_device_capability
+from application.analyses.protection.catalog.envelope_adapter import to_run_envelope
+from application.analyses.protection.catalog.mapper import map_requirement_to_device
+from application.analyses.protection.catalog.models import (
+    DeviceMappingResult,
+    ProtectionRequirementV0,
+)
+from application.analyses.run_envelope import AnalysisRunEnvelope
+from application.analyses.run_index import index_run
+from infrastructure.persistence.unit_of_work import UnitOfWork
+
+
+def run_device_mapping_v0(
+    *,
+    protection_run_id: str,
+    device_id: str,
+    uow_factory: Callable[[], UnitOfWork],
+) -> AnalysisRunEnvelope:
+    protection_entry = _read_protection_index_entry(
+        protection_run_id, uow_factory=uow_factory
+    )
+    requirement = _extract_requirement(protection_entry.meta_json)
+
+    capability = load_device_capability(device_id)
+    if capability is None:
+        mapping_result = DeviceMappingResult(
+            compatible=False,
+            violations=("DEVICE_NOT_FOUND",),
+            mapped_settings={},
+            assumptions=("MAPPING_SKIPPED_NO_DEVICE",),
+        )
+        status = "FAILED"
+    else:
+        mapping_result = map_requirement_to_device(requirement, capability)
+        status = "SUCCEEDED" if mapping_result.compatible else "DEGRADED"
+
+    requirement_payload = requirement.to_dict()
+    requirement_hash = fingerprint_json(requirement_payload)
+
+    report = _build_mapping_report(
+        protection_run_id=protection_run_id,
+        device_id=device_id,
+        requirement=requirement_payload,
+        capability=capability.to_dict() if capability else None,
+        mapping=mapping_result.to_dict(),
+        status=status,
+    )
+    report_fingerprint = report["fingerprint"]
+
+    trace_inline = _build_trace_inline(
+        protection_entry=protection_entry,
+        requirement=requirement_payload,
+        capability=capability.to_dict() if capability else None,
+        mapping=mapping_result.to_dict(),
+        report_fingerprint=report_fingerprint,
+        status=status,
+    )
+
+    created_at_utc = datetime.now(timezone.utc).isoformat()
+    envelope = to_run_envelope(
+        protection_run_id=protection_run_id,
+        device_id=device_id,
+        requirement_hash=requirement_hash,
+        capability_id=capability.device_id if capability else None,
+        mapping_report_fingerprint=report_fingerprint,
+        case_id=protection_entry.case_id,
+        base_snapshot_id=protection_entry.base_snapshot_id,
+        trace_inline=trace_inline,
+        created_at_utc=created_at_utc,
+    )
+
+    entry = index_run(
+        envelope,
+        primary_artifact_type="device_mapping_report_v0",
+        primary_artifact_id=f"device_mapping_report_v0:{report_fingerprint}",
+        base_snapshot_id=protection_entry.base_snapshot_id,
+        case_id=protection_entry.case_id,
+        status=status,
+        meta={
+            "protection_run_id": protection_run_id,
+            "device_id": device_id,
+            "requirement_hash": requirement_hash,
+            "device_mapping_report_v0": report,
+        },
+    )
+    with uow_factory() as uow:
+        if uow.analysis_runs_index.get(entry.run_id) is None:
+            uow.analysis_runs_index.add(entry)
+    return envelope
+
+
+def _read_protection_index_entry(
+    run_id: str, *, uow_factory: Callable[[], UnitOfWork]
+) -> Any:
+    with uow_factory() as uow:
+        entry = uow.analysis_runs_index.get(run_id)
+    if entry is None:
+        raise ValueError("Protection run not found")
+    if entry.analysis_type != "protection.overcurrent.v0":
+        raise ValueError("Unsupported protection run type")
+    return entry
+
+
+def _extract_requirement(meta_json: dict[str, Any] | None) -> ProtectionRequirementV0:
+    if isinstance(meta_json, dict):
+        report = meta_json.get("protection_report_v0")
+        if isinstance(report, dict):
+            settings = report.get("settings")
+            if isinstance(settings, dict):
+                return _settings_to_requirement(settings)
+        settings = meta_json.get("protection_settings_v0")
+        if isinstance(settings, dict):
+            return _settings_to_requirement(settings)
+    raise ValueError("Protection requirements not available")
+
+
+def _settings_to_requirement(settings: dict[str, Any]) -> ProtectionRequirementV0:
+    return ProtectionRequirementV0(
+        curve=str(settings.get("curve", "")),
+        i_pickup_51_a=float(settings.get("i_pickup_51_a", 0.0)),
+        tms_51=float(settings.get("tms_51", 0.0)),
+        i_inst_50_a=float(settings.get("i_inst_50_a", 0.0)),
+        i_pickup_51n_a=float(settings.get("i_pickup_51n_a", 0.0)),
+        tms_51n=float(settings.get("tms_51n", 0.0)),
+        i_inst_50n_a=float(settings.get("i_inst_50n_a", 0.0)),
+    )
+
+
+def _build_mapping_report(
+    *,
+    protection_run_id: str,
+    device_id: str,
+    requirement: dict[str, Any],
+    capability: dict[str, Any] | None,
+    mapping: dict[str, Any],
+    status: str,
+) -> dict[str, Any]:
+    report_body = {
+        "analysis_type": "protection.device_mapping.v0",
+        "inputs": {
+            "protection_run_id": protection_run_id,
+            "device_id": device_id,
+            "requirement": requirement,
+        },
+        "capability": capability,
+        "mapping": mapping,
+        "status": status,
+    }
+    report_body = canonicalize_json(report_body)
+    report_fingerprint = fingerprint_json(report_body)
+    return canonicalize_json({**report_body, "fingerprint": report_fingerprint})
+
+
+def _build_trace_inline(
+    *,
+    protection_entry: Any,
+    requirement: dict[str, Any],
+    capability: dict[str, Any] | None,
+    mapping: dict[str, Any],
+    report_fingerprint: str,
+    status: str,
+) -> dict[str, Any]:
+    steps = [
+        {
+            "step": "read_protection_run",
+            "run_id": protection_entry.run_id,
+            "analysis_type": protection_entry.analysis_type,
+            "case_id": protection_entry.case_id,
+            "base_snapshot_id": protection_entry.base_snapshot_id,
+        },
+        {
+            "step": "extract_requirement",
+            "requirement": requirement,
+        },
+        {
+            "step": "load_device_capability",
+            "device_id": capability.get("device_id") if capability else None,
+            "found": capability is not None,
+        },
+        {
+            "step": "validate_and_map",
+            "compatible": mapping.get("compatible"),
+            "violations": mapping.get("violations"),
+            "mapped_settings": mapping.get("mapped_settings"),
+        },
+        {
+            "step": "build_report",
+            "report_fingerprint": report_fingerprint,
+        },
+        {
+            "step": "index_run",
+            "status": status,
+        },
+    ]
+    return {"steps": canonicalize_json(steps)}
+

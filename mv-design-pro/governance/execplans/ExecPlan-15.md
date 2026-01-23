@@ -11,6 +11,7 @@ Establish a single, minimal “run envelope” contract that wraps analysis exec
 - [x] Add DesignSynth adapter mapping to v0 envelope.
 - [x] Add ADR documenting v0 contract and versioning rules.
 - [x] Add adapter tests for determinism.
+- [x] Add protection device-mapping analysis skeleton with run envelope adapter (PR-1).
 
 ## Surprises & Discoveries
 (None.)
@@ -40,6 +41,7 @@ IS NOT:
 2) Add application DTO for AnalysisRunEnvelope + helpers.
 3) Add DesignSynth adapter and deterministic tests.
 4) Keep solver result APIs unchanged.
+5) Add protection device-mapping analysis skeleton using RunIndex + v0 envelope.
 
 ## Acceptance
 - Envelope DTO is JSON-serializable and deterministic.
