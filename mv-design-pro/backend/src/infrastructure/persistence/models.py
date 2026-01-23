@@ -285,6 +285,30 @@ class AnalysisRunORM(Base):
     error_message: Mapped[str | None] = mapped_column(Text)
 
 
+class AnalysisRunIndexORM(Base):
+    __tablename__ = "analysis_runs_index"
+    __table_args__ = (
+        Index("ix_analysis_runs_index_analysis_type", "analysis_type"),
+        Index("ix_analysis_runs_index_case_id", "case_id"),
+        Index("ix_analysis_runs_index_base_snapshot_id", "base_snapshot_id"),
+        Index("ix_analysis_runs_index_fingerprint", "fingerprint"),
+        Index("ix_analysis_runs_index_created_at_utc", "created_at_utc"),
+    )
+
+    run_id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    analysis_type: Mapped[str] = mapped_column(String(100), nullable=False)
+    case_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    base_snapshot_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    primary_artifact_type: Mapped[str] = mapped_column(String(100), nullable=False)
+    primary_artifact_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    fingerprint: Mapped[str] = mapped_column(String(128), nullable=False)
+    created_at_utc: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    status: Mapped[str] = mapped_column(String(20), nullable=False)
+    meta_json: Mapped[dict[str, Any] | None] = mapped_column(
+        DeterministicJSON(), nullable=True
+    )
+
+
 class StudyRunORM(Base):
     __tablename__ = "study_runs"
 

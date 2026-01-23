@@ -6,6 +6,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 
 from api.dependencies import get_uow_factory
+from application.analyses.run_reader import read_run_envelope
 from application.analysis_run import (
     AnalysisRunDetailDTO,
     AnalysisRunExportService,
@@ -78,12 +79,28 @@ def list_analysis_runs(
 
 @router.get("/analysis-runs/{run_id}")
 def get_analysis_run(
-    run_id: UUID,
+    run_id: str,
     uow_factory=Depends(get_uow_factory),
 ) -> dict[str, Any]:
+    index_entry = _get_run_index_entry(run_id, uow_factory=uow_factory)
+    if index_entry is not None:
+        try:
+            envelope = read_run_envelope(
+                index_entry.analysis_type, run_id, uow_factory=uow_factory
+            )
+        except ValueError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)
+            ) from exc
+        return envelope.to_dict()
+
+    try:
+        parsed_run_id = UUID(run_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
     service = _build_service(uow_factory)
     try:
-        run = service.get_run(run_id)
+        run = service.get_run(parsed_run_id)
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
     trace_payload = get_run_trace(run)
@@ -101,6 +118,11 @@ def get_analysis_run(
         input_metadata=build_input_metadata(run.input_snapshot),
     )
     return canonicalize_json(dto.to_dict())
+
+
+def _get_run_index_entry(run_id: str, *, uow_factory) -> Any | None:
+    with uow_factory() as uow:
+        return uow.analysis_runs_index.get(run_id)
 
 
 @router.get("/analysis-runs/{run_id}/results")

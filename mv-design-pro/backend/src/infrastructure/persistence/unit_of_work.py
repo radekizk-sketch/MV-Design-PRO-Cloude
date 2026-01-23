@@ -5,6 +5,9 @@ from typing import Callable
 
 from sqlalchemy.orm import Session, sessionmaker
 
+from infrastructure.persistence.repositories.analysis_run_index_repository import (
+    AnalysisRunIndexRepository,
+)
 from infrastructure.persistence.repositories.analysis_run_repository import AnalysisRunRepository
 from infrastructure.persistence.repositories.case_repository import CaseRepository
 from infrastructure.persistence.repositories.design_evidence_repository import (
@@ -35,6 +38,7 @@ class UnitOfWork(AbstractContextManager["UnitOfWork"]):
         self.sld: SldRepository | None = None
         self.results: ResultRepository | None = None
         self.analysis_runs: AnalysisRunRepository | None = None
+        self.analysis_runs_index: AnalysisRunIndexRepository | None = None
         self.snapshots: SnapshotRepository | None = None
         self.design_specs: DesignSpecRepository | None = None
         self.design_proposals: DesignProposalRepository | None = None
@@ -49,6 +53,7 @@ class UnitOfWork(AbstractContextManager["UnitOfWork"]):
         self.sld = SldRepository(self.session)
         self.results = ResultRepository(self.session)
         self.analysis_runs = AnalysisRunRepository(self.session)
+        self.analysis_runs_index = AnalysisRunIndexRepository(self.session)
         self.snapshots = SnapshotRepository(self.session)
         self.design_specs = DesignSpecRepository(self.session)
         self.design_proposals = DesignProposalRepository(self.session)
