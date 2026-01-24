@@ -13,7 +13,14 @@ from application.analyses.protection.catalog.models import (
     DeviceMappingResult,
     ProtectionRequirementV0,
 )
-from application.analyses.protection.catalog.vendors.abb_v0 import VENDOR, build_adapter
+from application.analyses.protection.catalog.vendors.abb_v0 import (
+    VENDOR as ABB_VENDOR,
+    build_adapter as build_abb_adapter,
+)
+from application.analyses.protection.catalog.vendors.elektrometal_etango_v0 import (
+    VENDOR as ELEKTROMETAL_VENDOR,
+    build_adapter as build_elektrometal_adapter,
+)
 from application.analyses.protection.catalog.vendors.base import VendorAdapter
 from application.analyses.run_envelope import AnalysisRunEnvelope
 from application.analyses.run_index import index_run
@@ -206,6 +213,7 @@ def _build_trace_inline(
             "compatible": mapping.get("compatible"),
             "violations": mapping.get("violations"),
             "mapped_settings": mapping.get("mapped_settings"),
+            "assumptions": mapping.get("assumptions"),
         },
         {
             "step": "vendor_validate_and_map",
@@ -230,8 +238,10 @@ def _build_trace_inline(
 
 
 def _resolve_vendor_adapter(vendor: str) -> VendorAdapter | None:
-    if vendor == VENDOR:
-        return build_adapter()
+    if vendor == ABB_VENDOR:
+        return build_abb_adapter()
+    if vendor == ELEKTROMETAL_VENDOR:
+        return build_elektrometal_adapter()
     return None
 
 

@@ -25,6 +25,7 @@ class DeviceCapability:
     tms_51n_max: float
     i_inst_50n_a_min: float
     i_inst_50n_a_max: float
+    meta: dict[str, Any]
 
     def to_dict(self) -> dict[str, Any]:
         payload = {
@@ -45,6 +46,7 @@ class DeviceCapability:
             "tms_51n_max": self.tms_51n_max,
             "i_inst_50n_a_min": self.i_inst_50n_a_min,
             "i_inst_50n_a_max": self.i_inst_50n_a_max,
+            "meta": self.meta,
         }
         return canonicalize_json(payload)
 

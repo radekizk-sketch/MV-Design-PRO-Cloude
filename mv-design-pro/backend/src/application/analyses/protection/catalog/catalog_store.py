@@ -30,6 +30,9 @@ def _load_catalog() -> list[DeviceCapability]:
 
 
 def _parse_device(payload: dict) -> DeviceCapability:
+    meta = payload.get("meta", {})
+    if not isinstance(meta, dict):
+        meta = {}
     return DeviceCapability(
         device_id=str(payload.get("device_id", "")),
         vendor=str(payload.get("vendor", "")),
@@ -48,4 +51,5 @@ def _parse_device(payload: dict) -> DeviceCapability:
         tms_51n_max=float(payload.get("tms_51n_max", 0.0)),
         i_inst_50n_a_min=float(payload.get("i_inst_50n_a_min", 0.0)),
         i_inst_50n_a_max=float(payload.get("i_inst_50n_a_max", 0.0)),
+        meta=meta,
     )
