@@ -7,7 +7,9 @@
  * Minimal orchestration: fetch data, pass to views.
  * No business logic. No interpretation.
  *
- * REQUIRES: snapshotId prop - actions are ONLY available when snapshot is active.
+ * snapshotId is OPTIONAL:
+ * - If not provided: show neutral message, no API calls
+ * - If provided: load snapshot and actions per canonical flow
  */
 
 import { useCallback, useEffect, useState } from 'react';
@@ -19,7 +21,7 @@ import { ActionsList } from './ActionsList';
 import { ActionResult } from './ActionResult';
 
 interface Props {
-  snapshotId: string;
+  snapshotId?: string;
 }
 
 /**
@@ -46,6 +48,10 @@ export function DesignerPage({ snapshotId }: Props) {
   const [actionResult, setActionResult] = useState<ActionRunResult | null>(null);
 
   const loadSnapshot = useCallback(async () => {
+    if (!snapshotId) {
+      setSnapshot(null);
+      return;
+    }
     setSnapshotLoading(true);
     setSnapshotError(null);
     try {
@@ -79,6 +85,7 @@ export function DesignerPage({ snapshotId }: Props) {
   }, [snapshotId]);
 
   const handleRunAction = useCallback(async (actionId: string) => {
+    if (!snapshotId) return;
     setRunningAction(actionId);
     setActionResult(null);
     try {
@@ -103,21 +110,36 @@ export function DesignerPage({ snapshotId }: Props) {
   }, [snapshotId, loadSnapshot, loadActions]);
 
   const handleRefresh = useCallback(() => {
+    if (!snapshotId) return;
     loadSnapshot();
     loadActions();
-  }, [loadSnapshot, loadActions]);
+  }, [snapshotId, loadSnapshot, loadActions]);
 
-  // Load snapshot first, then load actions only after snapshot is available
+  // Load snapshot when snapshotId changes
   useEffect(() => {
     loadSnapshot();
   }, [loadSnapshot]);
 
+  // Load actions only after snapshot is available
   useEffect(() => {
-    // Actions are ONLY visible when snapshot is loaded
     if (snapshot) {
       loadActions();
     }
   }, [snapshot, loadActions]);
+
+  // No snapshot selected: show neutral message
+  if (!snapshotId) {
+    return (
+      <div className="min-h-screen bg-gray-100 p-4">
+        <div className="max-w-4xl mx-auto">
+          <h1 className="text-2xl font-bold text-gray-800 mb-4">Designer</h1>
+          <div className="p-4 border rounded bg-white text-gray-500">
+            No active snapshot selected.
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-100 p-4">
