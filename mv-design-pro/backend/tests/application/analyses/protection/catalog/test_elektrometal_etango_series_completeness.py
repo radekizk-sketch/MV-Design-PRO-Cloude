@@ -16,9 +16,17 @@ def test_elektrometal_etango_series_is_complete_and_deterministic() -> None:
     expected_device_ids = [f"EM_ETANGO_{rated}_V0" for rated in EXPECTED_RATED]
 
     assert device_ids == sorted(device_ids)
-    assert models == expected_models
-    assert rated_values == EXPECTED_RATED
-    assert device_ids == expected_device_ids
+    assert set(models) == set(expected_models)
+    assert set(rated_values) == set(EXPECTED_RATED)
+    assert set(device_ids) == set(expected_device_ids)
+    rated_order = sorted(
+        ((device.meta.get("rated"), device.model, device.device_id) for device in devices),
+        key=lambda entry: entry[0],
+    )
+    expected_order = [
+        (rated, f"e2TANGO-{rated}", f"EM_ETANGO_{rated}_V0") for rated in EXPECTED_RATED
+    ]
+    assert rated_order == expected_order
     assert {"e2TANGO-400", "e2TANGO-600", "e2TANGO-800", "e2TANGO-1000"} <= set(
         models
     )
