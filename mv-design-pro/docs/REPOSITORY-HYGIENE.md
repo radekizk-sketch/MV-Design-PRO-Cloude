@@ -6,8 +6,9 @@ Define the structural hygiene for MV-DESIGN-PRO to preserve determinism, auditab
 ## KEEP
 - `backend/` as the authoritative home for core solvers and Result APIs.
 - `frontend/` as the deterministic engineering interface (no physics).
-- `docs/` as the authoritative architecture and governance record.
-- `docs/execplans/` as the canonical storage for ExecPlans.
+- `SYSTEM_SPEC.md` as the single source of architectural truth.
+- `docs/` for operational guides and checklists (non-architectural).
+- `docs/execplans/` as the canonical storage for ExecPlans (historical catalog).
 
 ## REMOVE
 - Ad-hoc or duplicated solver logic in non-solver layers.

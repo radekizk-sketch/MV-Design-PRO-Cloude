@@ -9,6 +9,17 @@
 - Brak nowych zależności, brak re-eksportów w __init__.py, brak side-effect importów.
 - Brak pełnej persystencji dla IEC 60909 (tylko jeśli już istnieje).
 
+## Architectural Alignment / Remediation
+- Rozstrzygnięcie: **Power Flow = solver** (fizyka, brak interpretacji).
+- Rozstrzygnięcie: **Protection = analysis (NOT IMPLEMENTED)**.
+- Zakres naprawy: **dokumentacja + semantyka** (bez zmian w kodzie).
+- Poza zakresem: refaktoryzacje solverów, zmiany API, implementacja Protection.
+
+### Definition of Done (DoD)
+- Jedna specyfikacja kanoniczna (SYSTEM_SPEC.md).
+- Brak sprzeczności w dokumentacji.
+- Jednoznaczny podział solver / case / analysis.
+
 ## NOW (scope)
 1) Dodać migrację i ORM dla tabeli analysis_runs.
 2) Dodać repozytorium AnalysisRunRepository i dostęp w UnitOfWork.
