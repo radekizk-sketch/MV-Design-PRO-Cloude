@@ -85,20 +85,37 @@ export function DesignerPage() {
   }, [loadState, loadActions]);
 
   return (
-    <div className="min-h-screen bg-gray-100 p-4">
-      <div className="max-w-4xl mx-auto">
-        <div className="flex justify-between items-center mb-4">
-          <h1 className="text-2xl font-bold text-gray-800">Designer</h1>
-          <button
-            onClick={handleRefresh}
-            className="px-3 py-1 bg-gray-200 rounded hover:bg-gray-300 text-sm"
-          >
-            Refresh
-          </button>
+    <div className="min-h-screen bg-gray-100">
+      {/* Header */}
+      <header className="bg-white border-b border-gray-200 sticky top-0 z-10">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex justify-between items-center h-16">
+            <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Designer</h1>
+            <button
+              onClick={handleRefresh}
+              disabled={stateLoading || actionsLoading}
+              className="inline-flex items-center gap-2 px-4 py-2 bg-gray-100 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-200 active:bg-gray-300 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              <svg
+                className={`w-4 h-4 ${stateLoading || actionsLoading ? 'animate-spin' : ''}`}
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth="2"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              </svg>
+              Refresh
+            </button>
+          </div>
         </div>
+      </header>
 
+      {/* Main content */}
+      <main className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        {/* Action Result - displayed above the grid when present */}
         {actionResult && (
-          <div className="mb-4">
+          <div className="mb-6">
             <ActionResult
               result={actionResult}
               onDismiss={() => setActionResult(null)}
@@ -106,7 +123,8 @@ export function DesignerPage() {
           </div>
         )}
 
-        <div className="grid gap-4 md:grid-cols-2">
+        {/* Two-column layout on larger screens */}
+        <div className="grid gap-6 lg:grid-cols-2">
           <ProjectStateView
             state={state}
             loading={stateLoading}
@@ -120,7 +138,7 @@ export function DesignerPage() {
             runningAction={runningAction}
           />
         </div>
-      </div>
+      </main>
     </div>
   );
 }
