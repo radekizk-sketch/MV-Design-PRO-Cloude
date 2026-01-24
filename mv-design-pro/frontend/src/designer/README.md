@@ -1,6 +1,6 @@
 # Designer UI
 
-Thin client for snapshot-based API. No interpretation. No wizards. No suggestions.
+Thin client for snapshot-based API. No interpretation. Read-only wizard. No suggestions.
 
 ## Canonical Flow
 

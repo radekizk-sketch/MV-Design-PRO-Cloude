@@ -19,6 +19,7 @@ import { ApiError, fetchActions, fetchSnapshot, runAction } from './api';
 import { SnapshotView } from './SnapshotView';
 import { ActionsList } from './ActionsList';
 import { ActionResult } from './ActionResult';
+import { DesignerWizard, type WizardStep, type WizardStatus } from './DesignerWizard';
 
 interface Props {
   snapshotId?: string;
@@ -33,6 +34,108 @@ function formatError(e: unknown): string {
     return `HTTP ${e.status} ${e.statusText} [${e.endpoint}]: ${e.detail ?? 'No detail'}`;
   }
   return e instanceof Error ? e.message : String(e);
+}
+
+const wizardStepDefinitions = [
+  { stepNumber: 1, title: 'INICJALIZACJA PROJEKTU', actionTypes: [] },
+  { stepNumber: 2, title: 'DEFINICJA ŹRÓDŁA ZASILANIA (GPZ)', actionTypes: ['add_source'] },
+  {
+    stepNumber: 3,
+    title: 'BUDOWA TOPOLOGII SIECI',
+    actionTypes: ['add_line', 'add_station', 'add_transformer'],
+  },
+  {
+    stepNumber: 4,
+    title: 'WERYFIKACJA KOMPLETNOŚCI DANYCH',
+    actionTypes: [],
+  },
+  { stepNumber: 5, title: 'OBLICZENIA ZWARCIOWE', actionTypes: ['run_short_circuit'] },
+  { stepNumber: 6, title: 'OBLICZENIA ROZPŁYWU MOCY', actionTypes: ['run_power_flow'] },
+  { stepNumber: 7, title: 'ODBIORY I ŹRÓDŁA OZE', actionTypes: ['add_load', 'add_generator'] },
+  {
+    stepNumber: 8,
+    title: 'PCC – PUNKT WSPÓLNEGO PRZYŁĄCZENIA',
+    actionTypes: ['set_pcc'],
+  },
+  {
+    stepNumber: 9,
+    title: 'ZABEZPIECZENIA I SELEKTYWNOŚĆ',
+    actionTypes: ['run_analysis'],
+  },
+  { stepNumber: 10, title: 'WALIDACJA KOŃCOWA', actionTypes: [] },
+  {
+    stepNumber: 11,
+    title: 'DOKUMENTACJA',
+    actionTypes: ['export_docx', 'export_pdf', 'export_json'],
+  },
+];
+
+const rejectedStatuses = new Set(['REJECTED', 'rejected']);
+
+function formatBlockedReason(reason: { code: string; description: string } | null): string | null {
+  if (!reason) return null;
+  return `code: ${reason.code}\ndescription: ${reason.description}`;
+}
+
+function formatActionResultReason(result: ActionRunResult): string | null {
+  if (!rejectedStatuses.has(result.status)) return null;
+  if ('reason' in result && result.reason) {
+    return formatBlockedReason(result.reason);
+  }
+  if ('errors' in result && result.errors && result.errors.length > 0) {
+    return result.errors
+      .map((err) => `code: ${err.code}\nmessage: ${err.message}${err.path ? `\npath: ${err.path}` : ''}`)
+      .join('\n\n');
+  }
+  return null;
+}
+
+function mapActionStatus(status: 'ALLOWED' | 'BLOCKED'): WizardStatus {
+  return status === 'ALLOWED' ? 'ALLOW' : 'BLOCK';
+}
+
+function buildWizardSteps(
+  snapshot: Snapshot | null,
+  actions: ActionItem[] | null,
+  actionResult: ActionRunResult | null,
+  snapshotError: string | null,
+): WizardStep[] {
+  return wizardStepDefinitions.map((definition) => {
+    if (definition.stepNumber === 1) {
+      const status: WizardStatus = snapshot ? 'ALLOW' : snapshotError ? 'BLOCK' : 'WARNING';
+      const reason = snapshotError ? snapshotError : null;
+      return {
+        stepNumber: definition.stepNumber,
+        title: definition.title,
+        status,
+        reason,
+      };
+    }
+
+    const matchingAction = actions?.find((action) =>
+      definition.actionTypes.includes(action.action_type.toLowerCase()),
+    );
+
+    if (!matchingAction) {
+      return {
+        stepNumber: definition.stepNumber,
+        title: definition.title,
+        status: 'WARNING',
+        reason: null,
+      };
+    }
+
+    const resultReason = actionResult && actionResult.action_id === matchingAction.action_id
+      ? formatActionResultReason(actionResult)
+      : null;
+
+    return {
+      stepNumber: definition.stepNumber,
+      title: definition.title,
+      status: mapActionStatus(matchingAction.status),
+      reason: resultReason ?? formatBlockedReason(matchingAction.blocked_reason),
+    };
+  });
 }
 
 export function DesignerPage({ snapshotId }: Props) {
@@ -141,6 +244,8 @@ export function DesignerPage({ snapshotId }: Props) {
     );
   }
 
+  const wizardSteps = buildWizardSteps(snapshot, actions, actionResult, snapshotError);
+
   return (
     <div className="min-h-screen bg-gray-100 p-4">
       <div className="max-w-4xl mx-auto">
@@ -157,6 +262,10 @@ export function DesignerPage({ snapshotId }: Props) {
               Refresh
             </button>
           </div>
+        </div>
+
+        <div className="mb-4">
+          <DesignerWizard steps={wizardSteps} />
         </div>
 
         {actionResult && (
