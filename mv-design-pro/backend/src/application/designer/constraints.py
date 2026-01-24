@@ -6,6 +6,7 @@ from dataclasses import dataclass
 
 from application.designer.actions import ActionType
 from application.designer.context import ProjectContext
+from application.designer.messages import BlockedCode, BlockedReason, blocked_reason
 
 
 @dataclass(frozen=True)
@@ -15,30 +16,23 @@ class Allowed:
 
 @dataclass(frozen=True)
 class Blocked:
-    reason: str
+    reason: BlockedReason
 
 
 Decision = Allowed | Blocked
 
 
 def can_run(action_type: ActionType, project_context: ProjectContext) -> Decision:
+    state = project_context.state
+
     if action_type in {ActionType.SHORT_CIRCUIT, ActionType.POWER_FLOW}:
-        if project_context.network_complete:
+        if state.is_complete("network_complete"):
             return Allowed()
-        return Blocked(reason="Network data is incomplete; action requires a complete network.")
+        return Blocked(reason=blocked_reason(BlockedCode.NETWORK_INCOMPLETE))
 
     if action_type == ActionType.ANALYSIS:
-        if _has_solver_results(project_context):
+        if state.has_solver_results():
             return Allowed()
-        return Blocked(
-            reason="No solver results available; analysis requires short-circuit or power-flow results."
-        )
+        return Blocked(reason=blocked_reason(BlockedCode.NO_SOLVER_RESULTS))
 
-    return Blocked(reason="Unknown action type.")
-
-
-def _has_solver_results(project_context: ProjectContext) -> bool:
-    return bool(
-        project_context.available_solver_results
-        & {ActionType.SHORT_CIRCUIT, ActionType.POWER_FLOW}
-    )
+    return Blocked(reason=blocked_reason(BlockedCode.UNSUPPORTED_ACTION))
