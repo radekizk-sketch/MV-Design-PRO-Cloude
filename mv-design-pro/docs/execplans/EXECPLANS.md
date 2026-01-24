@@ -1,3 +1,7 @@
+# NOTE
+Canonical architecture is defined in [`SYSTEM_SPEC.md`](../../SYSTEM_SPEC.md).
+This document is a historical catalog of ExecPlans and must not be treated as an architectural source of truth.
+
 ```md
 # MV-DESIGN-PRO — Ezechiel Plan (Industrial-Grade System)
 
