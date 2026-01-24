@@ -2,11 +2,18 @@
 Moduł rdzeniowy modelu sieci.
 
 Zawiera podstawowe klasy reprezentujące elementy sieci elektroenergetycznej:
-węzły, gałęzie, transformatory (jako typ gałęzi) oraz graf sieci.
+węzły (Bus), gałęzie, transformatory oraz graf sieci.
+
+PowerFactory Alignment:
+- Bus (Node) = węzeł elektryczny (pojedynczy potencjał)
+- Branch = gałąź fizyczna z impedancją
+- Switch = aparatura łączeniowa (bez impedancji, tylko OPEN/CLOSE)
+- NetworkGraph = topologia sieci
 """
 
 from .node import Node, NodeType
 from .branch import BranchType, Branch, LineBranch, TransformerBranch
+from .switch import Switch, SwitchType, SwitchState
 from .graph import NetworkGraph
 from .inverter import InverterSource
 from .snapshot import NetworkSnapshot, SnapshotMeta, create_network_snapshot
@@ -23,18 +30,32 @@ from .action_envelope import (
 )
 from .ybus import AdmittanceMatrixBuilder
 
+# PowerFactory terminology alias
+Bus = Node  # Bus = Node = electrical node with single potential
+
 __all__ = [
+    # PowerFactory-aligned names
+    "Bus",  # Alias for Node
     "Node",
     "NodeType",
+    # Branches
     "BranchType",
     "Branch",
     "LineBranch",
     "TransformerBranch",
+    # Switching apparatus (no impedance)
+    "Switch",
+    "SwitchType",
+    "SwitchState",
+    # Network topology
     "NetworkGraph",
+    # Sources
     "InverterSource",
+    # Snapshots (immutable state)
     "NetworkSnapshot",
     "SnapshotMeta",
     "create_network_snapshot",
+    # Action handling
     "ActionEnvelope",
     "ActionId",
     "ActionIssue",
@@ -44,5 +65,6 @@ __all__ = [
     "EntityId",
     "validate_action_envelope",
     "apply_action_to_snapshot",
+    # Admittance matrix
     "AdmittanceMatrixBuilder",
 ]
