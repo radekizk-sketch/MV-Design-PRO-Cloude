@@ -1,8 +1,12 @@
 /**
  * ActionResult
  *
- * Renders POST /designer/actions/{action_type}/run response 1:1.
- * Shows REQUESTED or REJECTED with reason.
+ * Renders POST /snapshots/{id}/actions/{action_id}/run response 1:1.
+ * Shows success (REQUESTED/accepted) or rejection with reason/errors.
+ *
+ * CANONICAL RULES:
+ * - Display HTTP status and detail for API errors
+ * - Show all data from API response without interpretation
  */
 
 import type { ActionRunResult } from './types';
@@ -17,7 +21,7 @@ export function ActionResult({ result, onDismiss }: Props) {
     return null;
   }
 
-  const isSuccess = result.status === 'REQUESTED';
+  const isSuccess = result.status === 'REQUESTED' || result.status === 'accepted';
 
   return (
     <div
@@ -29,7 +33,8 @@ export function ActionResult({ result, onDismiss }: Props) {
         <h2 className="text-lg font-semibold">Action Result</h2>
         <button
           onClick={onDismiss}
-          className="text-gray-500 hover:text-gray-700"
+          className="text-gray-500 hover:text-gray-700 text-xl"
+          aria-label="Dismiss"
         >
           &times;
         </button>
@@ -37,28 +42,48 @@ export function ActionResult({ result, onDismiss }: Props) {
 
       <div className="space-y-2 text-sm">
         <div>
-          <span className="font-medium">action_type:</span> {result.action_type}
+          <span className="font-medium">action_id:</span> {result.action_id}
         </div>
         <div>
           <span className="font-medium">status:</span>{' '}
-          <span
-            className={isSuccess ? 'text-green-700' : 'text-red-700'}
-          >
+          <span className={isSuccess ? 'text-green-700' : 'text-red-700'}>
             {result.status}
           </span>
         </div>
 
-        {result.status === 'REQUESTED' && (
+        {/* Success response */}
+        {isSuccess && 'message' in result && result.message && (
           <div>
             <span className="font-medium">message:</span> {result.message}
           </div>
         )}
+        {isSuccess && 'new_snapshot_id' in result && result.new_snapshot_id && (
+          <div>
+            <span className="font-medium">new_snapshot_id:</span>{' '}
+            <span className="font-mono text-xs">{result.new_snapshot_id}</span>
+          </div>
+        )}
 
-        {result.status === 'REJECTED' && result.reason && (
+        {/* Rejection with reason */}
+        {!isSuccess && 'reason' in result && result.reason && (
           <div className="mt-2 p-2 bg-red-100 rounded">
             <div className="font-medium">reason:</div>
             <div>code: {result.reason.code}</div>
-            <div>description: {result.reason.description}</div>
+            <div className="break-words">description: {result.reason.description}</div>
+          </div>
+        )}
+
+        {/* Rejection with errors array */}
+        {!isSuccess && 'errors' in result && result.errors && result.errors.length > 0 && (
+          <div className="mt-2 p-2 bg-red-100 rounded">
+            <div className="font-medium">errors:</div>
+            {result.errors.map((err, idx) => (
+              <div key={idx} className="ml-2 mt-1">
+                <div>code: {err.code}</div>
+                <div className="break-words">message: {err.message}</div>
+                {err.path && <div>path: {err.path}</div>}
+              </div>
+            ))}
           </div>
         )}
       </div>
