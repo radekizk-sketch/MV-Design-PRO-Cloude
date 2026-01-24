@@ -1,42 +1,78 @@
 /**
  * Designer API Types
  *
- * These types mirror the backend Designer module contract.
+ * These types mirror the backend snapshot API contract.
  * UI renders these 1:1 - no interpretation.
+ *
+ * CANONICAL FLOW:
+ * project → case → snapshot → actions → run
  */
 
-export type ActionType = 'run_short_circuit' | 'run_power_flow' | 'run_analysis';
-
+/**
+ * Action status from API.
+ * BLOCKED actions are shown with disabled RUN button.
+ */
 export type ActionStatus = 'ALLOWED' | 'BLOCKED';
 
+/**
+ * Reason why an action is blocked.
+ * UI displays this 1:1 from API response.
+ */
 export interface BlockedReason {
   code: string;
   description: string;
 }
 
+/**
+ * Action item from POST /snapshots/{id}/actions.
+ * UI renders all actions - never hides BLOCKED.
+ */
 export interface ActionItem {
-  action_type: ActionType;
+  action_id: string;
+  action_type: string;
   label: string;
   status: ActionStatus;
   blocked_reason: BlockedReason | null;
 }
 
-export interface ProjectState {
-  available_results: ActionType[];
-  last_run_timestamps: Record<ActionType, string>;
-  completeness_flags: Record<string, boolean>;
+/**
+ * Snapshot metadata from GET /snapshots/{id}.
+ * UI renders this 1:1 - entire response as received.
+ */
+export interface SnapshotMeta {
+  snapshot_id: string;
+  parent_snapshot_id: string | null;
+  schema_version: string;
+  created_at: string;
 }
 
+/**
+ * Full snapshot from GET /snapshots/{id}.
+ * UI renders meta and shows graph as JSON.
+ */
+export interface Snapshot {
+  meta: SnapshotMeta;
+  graph: Record<string, unknown>;
+}
+
+/**
+ * Successful action run result.
+ */
 export interface ActionRunResultSuccess {
-  action_type: ActionType;
-  status: 'REQUESTED';
-  message: string;
+  action_id: string;
+  status: 'REQUESTED' | 'accepted';
+  message?: string;
+  new_snapshot_id?: string;
 }
 
+/**
+ * Rejected action run result.
+ */
 export interface ActionRunResultRejected {
-  action_type: ActionType;
-  status: 'REJECTED';
-  reason: BlockedReason;
+  action_id: string;
+  status: 'REJECTED' | 'rejected';
+  reason?: BlockedReason;
+  errors?: Array<{ code: string; message: string; path?: string }>;
 }
 
 export type ActionRunResult = ActionRunResultSuccess | ActionRunResultRejected;

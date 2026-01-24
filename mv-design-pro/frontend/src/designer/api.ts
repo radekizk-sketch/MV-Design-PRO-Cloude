@@ -1,33 +1,89 @@
 /**
  * Designer API Client
  *
- * Raw fetch calls to Designer endpoints.
+ * Raw fetch calls to snapshot-based endpoints.
  * No caching, no state management, no interpretation.
+ *
+ * CANONICAL FLOW:
+ * project → case → snapshot → actions → run
+ *
+ * ENDPOINTS:
+ * - GET  /snapshots/{snapshot_id}                    → fetch snapshot
+ * - POST /snapshots/{snapshot_id}/actions (body: {}) → fetch available actions
+ * - POST /snapshots/{snapshot_id}/actions/{action_id}/run → run action
  */
 
-import type { ActionItem, ActionRunResult, ActionType, ProjectState } from './types';
+import type { ActionItem, ActionRunResult, Snapshot } from './types';
 
-const API_BASE = '/api/designer';
+/**
+ * API Error with HTTP status and detail from response.
+ * UI must display this information to the user.
+ */
+export class ApiError extends Error {
+  constructor(
+    public readonly status: number,
+    public readonly statusText: string,
+    public readonly detail: string | null,
+    public readonly endpoint: string
+  ) {
+    super(`${status} ${statusText}: ${detail ?? 'No detail'}`);
+    this.name = 'ApiError';
+  }
+}
 
-export async function fetchProjectState(): Promise<ProjectState> {
-  const response = await fetch(`${API_BASE}/state`);
+async function handleResponse<T>(response: Response, endpoint: string): Promise<T> {
   if (!response.ok) {
-    throw new Error(`GET /designer/state failed: ${response.status}`);
+    let detail: string | null = null;
+    try {
+      const body = await response.json();
+      detail = body.detail ?? JSON.stringify(body);
+    } catch {
+      // Response body not JSON or empty
+    }
+    throw new ApiError(response.status, response.statusText, detail, endpoint);
   }
   return response.json();
 }
 
-export async function fetchActions(): Promise<ActionItem[]> {
-  const response = await fetch(`${API_BASE}/actions`);
-  if (!response.ok) {
-    throw new Error(`GET /designer/actions failed: ${response.status}`);
-  }
-  return response.json();
+/**
+ * GET /snapshots/{snapshot_id}
+ * Fetches the current snapshot. UI renders this 1:1.
+ */
+export async function fetchSnapshot(snapshotId: string): Promise<Snapshot> {
+  const endpoint = `/snapshots/${snapshotId}`;
+  const response = await fetch(endpoint);
+  return handleResponse<Snapshot>(response, endpoint);
 }
 
-export async function runAction(actionType: ActionType): Promise<ActionRunResult> {
-  const response = await fetch(`${API_BASE}/actions/${actionType}/run`, {
+/**
+ * POST /snapshots/{snapshot_id}/actions
+ * With empty body {} to fetch available actions.
+ *
+ * Actions are ONLY available when snapshot is active.
+ * BLOCKED actions must be shown with disabled RUN and reason from API.
+ */
+export async function fetchActions(snapshotId: string): Promise<ActionItem[]> {
+  const endpoint = `/snapshots/${snapshotId}/actions`;
+  const response = await fetch(endpoint, {
     method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({}),
   });
-  return response.json();
+  return handleResponse<ActionItem[]>(response, endpoint);
+}
+
+/**
+ * POST /snapshots/{snapshot_id}/actions/{action_id}/run
+ * Executes the specified action. UI shows result 1:1.
+ */
+export async function runAction(
+  snapshotId: string,
+  actionId: string
+): Promise<ActionRunResult> {
+  const endpoint = `/snapshots/${snapshotId}/actions/${actionId}/run`;
+  const response = await fetch(endpoint, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+  });
+  return handleResponse<ActionRunResult>(response, endpoint);
 }
