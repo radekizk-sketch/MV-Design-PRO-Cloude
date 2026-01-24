@@ -19,6 +19,7 @@ Define the structural hygiene for MV-DESIGN-PRO to preserve determinism, auditab
 - Governance artifacts: `AGENTS.md` and `.agent/PLANS.md`.
 - Explicit ExecPlans in `docs/execplans/`.
 - Traceability documentation tied to Result APIs.
+- CI architectural guard (`scripts/arch_guard.py`) enforcing solver/analysis boundaries.
 
 ## Architectural Rationale
 - Enforces clear solver boundaries and prevents physics leakage.
