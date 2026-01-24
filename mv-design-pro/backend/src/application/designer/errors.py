@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from application.designer.actions import ActionType
+from application.designer.messages import BlockedReason
 
 
 class DesignerError(RuntimeError):
@@ -14,10 +15,13 @@ class DesignerError(RuntimeError):
 @dataclass(frozen=True)
 class BlockedActionError(DesignerError):
     action_type: ActionType
-    reason: str
+    reason: BlockedReason
 
     def __str__(self) -> str:
-        return f"Action '{self.action_type.value}' is blocked: {self.reason}"
+        return (
+            f"Action '{self.action_type.value}' is blocked "
+            f"[{self.reason.code.value}]: {self.reason.description}"
+        )
 
 
 class NotImplementedActionError(DesignerError):
