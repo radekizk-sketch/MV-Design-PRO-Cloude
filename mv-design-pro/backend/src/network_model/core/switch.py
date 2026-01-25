@@ -12,7 +12,7 @@ PowerFactory Alignment:
 
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 import uuid
 
 
@@ -63,6 +63,7 @@ class Switch:
         in_service: Whether the switch is in service (default True).
         rated_current_a: Rated current capacity [A] (for thermal checks only).
         rated_voltage_kv: Rated voltage [kV] (for compatibility checks only).
+        equipment_type_ref: Optional reference to catalog switch equipment type.
 
     Notes:
         - When CLOSED, switch acts as zero-impedance connection
@@ -79,6 +80,7 @@ class Switch:
     in_service: bool = True
     rated_current_a: float = 0.0
     rated_voltage_kv: float = 0.0
+    equipment_type_ref: Optional[str] = None
 
     def __post_init__(self) -> None:
         """Validate and convert enum values if needed."""
@@ -114,6 +116,7 @@ class Switch:
             in_service=self.in_service,
             rated_current_a=self.rated_current_a,
             rated_voltage_kv=self.rated_voltage_kv,
+            equipment_type_ref=self.equipment_type_ref,
         )
 
     def close(self) -> "Switch":
@@ -133,6 +136,7 @@ class Switch:
             in_service=self.in_service,
             rated_current_a=self.rated_current_a,
             rated_voltage_kv=self.rated_voltage_kv,
+            equipment_type_ref=self.equipment_type_ref,
         )
 
     def toggle(self) -> "Switch":
@@ -194,6 +198,7 @@ class Switch:
             "in_service": self.in_service,
             "rated_current_a": self.rated_current_a,
             "rated_voltage_kv": self.rated_voltage_kv,
+            "equipment_type_ref": self.equipment_type_ref,
         }
 
     @classmethod
@@ -228,6 +233,11 @@ class Switch:
             in_service=bool(data.get("in_service", True)),
             rated_current_a=float(data.get("rated_current_a", 0.0)),
             rated_voltage_kv=float(data.get("rated_voltage_kv", 0.0)),
+            equipment_type_ref=(
+                str(data.get("equipment_type_ref"))
+                if data.get("equipment_type_ref") is not None
+                else None
+            ),
         )
 
     def __repr__(self) -> str:

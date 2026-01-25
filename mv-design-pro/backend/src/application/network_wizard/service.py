@@ -28,7 +28,9 @@ from domain.project_design_mode import ProjectDesignMode
 from domain.sld import SldBranchSymbol, SldDiagram, SldNodeSymbol
 from domain.validation import ValidationIssue, ValidationReport
 from infrastructure.persistence.unit_of_work import UnitOfWork
+from network_model.catalog import CatalogRepository
 from network_model.core import NetworkGraph
+from network_model.core.branch import Branch, LineBranch, TransformerBranch
 
 from .dtos import (
     BranchPayload,
@@ -386,6 +388,79 @@ class NetworkWizardService:
         with self._uow_factory() as uow:
             return uow.wizard.list_transformer_types()
 
+    def list_switch_equipment_types(self) -> list[dict]:
+        with self._uow_factory() as uow:
+            return uow.wizard.list_switch_equipment_types()
+
+    def get_line_type(self, type_id: UUID) -> dict:
+        with self._uow_factory() as uow:
+            record = uow.wizard.get_line_type(type_id)
+        if record is None:
+            raise NotFound(f"LineType {type_id} not found")
+        return record
+
+    def get_cable_type(self, type_id: UUID) -> dict:
+        with self._uow_factory() as uow:
+            record = uow.wizard.get_cable_type(type_id)
+        if record is None:
+            raise NotFound(f"CableType {type_id} not found")
+        return record
+
+    def get_transformer_type(self, type_id: UUID) -> dict:
+        with self._uow_factory() as uow:
+            record = uow.wizard.get_transformer_type(type_id)
+        if record is None:
+            raise NotFound(f"TransformerType {type_id} not found")
+        return record
+
+    def get_switch_equipment_type(self, type_id: UUID) -> dict:
+        with self._uow_factory() as uow:
+            record = uow.wizard.get_switch_equipment_type(type_id)
+        if record is None:
+            raise NotFound(f"SwitchEquipmentType {type_id} not found")
+        return record
+
+    def assign_type_ref_to_branch(self, project_id: UUID, branch_id: UUID, type_id: UUID) -> dict:
+        with self._uow_factory() as uow:
+            self._ensure_project(uow, project_id)
+            branch = uow.network.get_branch(branch_id)
+            if branch is None or branch["project_id"] != project_id:
+                raise NotFound(f"Branch {branch_id} not found")
+            params = dict(branch.get("params") or {})
+            params["type_ref"] = str(type_id)
+            params.pop("type_id", None)
+            updated = uow.network.update_branch(branch_id, {"params": params}, commit=False)
+            self._invalidate_results(uow, project_id)
+        if updated is None:
+            raise NotFound(f"Branch {branch_id} not found")
+        return updated
+
+    def assign_type_ref_to_transformer(
+        self, project_id: UUID, transformer_id: UUID, type_id: UUID
+    ) -> dict:
+        with self._uow_factory() as uow:
+            self._ensure_project(uow, project_id)
+            branch = uow.network.get_branch(transformer_id)
+            if branch is None or branch["project_id"] != project_id:
+                raise NotFound(f"Transformer {transformer_id} not found")
+            params = dict(branch.get("params") or {})
+            params["type_ref"] = str(type_id)
+            params.pop("type_id", None)
+            updated = uow.network.update_branch(transformer_id, {"params": params}, commit=False)
+            self._invalidate_results(uow, project_id)
+        if updated is None:
+            raise NotFound(f"Transformer {transformer_id} not found")
+        return updated
+
+    def assign_equipment_type_to_switch(
+        self, project_id: UUID, switch_id: UUID, type_id: UUID
+    ) -> None:
+        with self._uow_factory() as uow:
+            self._ensure_project(uow, project_id)
+            uow.wizard.assign_switch_equipment_type(
+                project_id, switch_id, type_id, commit=False
+            )
+
     def set_case_switching(
         self,
         case_id: UUID,
@@ -655,6 +730,7 @@ class NetworkWizardService:
         with self._uow_factory() as uow:
             nodes = uow.network.list_nodes(project_id)
             branches = uow.network.list_branches(project_id)
+            catalog = self._build_catalog_repository(uow)
             switching_states = {}
             if case_id is not None:
                 switching_states = {
@@ -667,7 +743,7 @@ class NetworkWizardService:
             branches=branches,
             switching_states=switching_states,
             node_payload_builder=self._node_to_graph_payload,
-            branch_payload_builder=self._branch_to_graph_payload,
+            branch_payload_builder=lambda branch: self._branch_to_graph_payload(branch, catalog),
             network_model_id=network_model_id_for_project(project_id),
         )
 
@@ -1445,18 +1521,32 @@ class NetworkWizardService:
         branch_type = branch["branch_type"].upper()
         params = branch.get("params") or {}
         if branch_type in {"LINE", "CABLE"}:
-            type_id = params.get("type_id")
-            if type_id:
+            type_ref = params.get("type_ref") or params.get("type_id")
+            override = params.get("impedance_override")
+            if override:
+                report = self._validate_branch_params(
+                    report,
+                    branch_id,
+                    params,
+                    required=["length_km"],
+                )
+                report = self._validate_branch_params(
+                    report,
+                    branch_id,
+                    override,
+                    required=["r_total_ohm", "x_total_ohm"],
+                )
+            elif type_ref:
                 type_library = line_types if branch_type == "LINE" else cable_types
                 try:
-                    type_uuid = UUID(str(type_id))
+                    type_uuid = UUID(str(type_ref))
                 except ValueError:
                     report = report.with_error(
                         ValidationIssue(
                             code="branch.type_invalid",
-                            message="Branch type_id is not a valid UUID",
+                            message="Branch type_ref is not a valid UUID",
                             element_id=branch_id,
-                            field="type_id",
+                            field="type_ref",
                         )
                     )
                 else:
@@ -1464,9 +1554,9 @@ class NetworkWizardService:
                         report = report.with_error(
                             ValidationIssue(
                                 code="branch.type_missing",
-                                message="Branch type_id not found in type library",
+                                message="Branch type_ref not found in type library",
                                 element_id=branch_id,
-                                field="type_id",
+                                field="type_ref",
                             )
                         )
             else:
@@ -1478,17 +1568,17 @@ class NetworkWizardService:
                 )
             report = self._validate_line_voltage_levels(branch, nodes, report, branch_id)
         elif branch_type == "TRANSFORMER":
-            type_id = params.get("type_id")
-            if type_id:
+            type_ref = params.get("type_ref") or params.get("type_id")
+            if type_ref:
                 try:
-                    type_uuid = UUID(str(type_id))
+                    type_uuid = UUID(str(type_ref))
                 except ValueError:
                     report = report.with_error(
                         ValidationIssue(
                             code="branch.type_invalid",
-                            message="Transformer type_id is not a valid UUID",
+                            message="Transformer type_ref is not a valid UUID",
                             element_id=branch_id,
-                            field="type_id",
+                            field="type_ref",
                         )
                     )
                 else:
@@ -1496,9 +1586,9 @@ class NetworkWizardService:
                         report = report.with_error(
                             ValidationIssue(
                                 code="branch.type_missing",
-                                message="Transformer type_id not found in type library",
+                                message="Transformer type_ref not found in type library",
                                 element_id=branch_id,
-                                field="type_id",
+                                field="type_ref",
                             )
                         )
             else:
@@ -1574,7 +1664,9 @@ class NetworkWizardService:
             "reactive_power": attrs.get("reactive_power"),
         }
 
-    def _branch_to_graph_payload(self, branch: dict) -> dict[str, Any]:
+    def _branch_to_graph_payload(
+        self, branch: dict, catalog: CatalogRepository | None = None
+    ) -> dict[str, Any]:
         params = branch.get("params") or {}
         payload = {
             "id": str(branch["id"]),
@@ -1585,7 +1677,20 @@ class NetworkWizardService:
             "in_service": branch.get("in_service", True),
         }
         payload.update(params)
-        return payload
+        branch_model = Branch.from_dict(payload)
+        if isinstance(branch_model, LineBranch):
+            branch_model = branch_model.with_resolved_params(catalog)
+        elif isinstance(branch_model, TransformerBranch):
+            branch_model = branch_model.with_resolved_nameplate(catalog)
+        return branch_model.to_dict()
+
+    def _build_catalog_repository(self, uow: UnitOfWork) -> CatalogRepository:
+        return CatalogRepository.from_records(
+            line_types=uow.wizard.list_line_types(),
+            cable_types=uow.wizard.list_cable_types(),
+            transformer_types=uow.wizard.list_transformer_types(),
+            switch_equipment_types=uow.wizard.list_switch_equipment_types(),
+        )
 
     def _serialize_node(self, node: dict) -> dict[str, Any]:
         return {

@@ -210,6 +210,23 @@ class TransformerTypeORM(Base):
     params_jsonb: Mapped[dict[str, Any]] = mapped_column(DeterministicJSON(), nullable=False)
 
 
+class SwitchEquipmentTypeORM(Base):
+    __tablename__ = "switch_equipment_types"
+
+    id: Mapped[UUID] = mapped_column(GUID(), primary_key=True)
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    params_jsonb: Mapped[dict[str, Any]] = mapped_column(DeterministicJSON(), nullable=False)
+
+
+class SwitchEquipmentAssignmentORM(Base):
+    __tablename__ = "switch_equipment_assignments"
+
+    id: Mapped[UUID] = mapped_column(GUID(), primary_key=True)
+    project_id: Mapped[UUID] = mapped_column(GUID(), ForeignKey("projects.id"), nullable=False)
+    switch_id: Mapped[UUID] = mapped_column(GUID(), nullable=False)
+    equipment_type_id: Mapped[UUID] = mapped_column(GUID(), nullable=False)
+
+
 class SwitchingStateORM(Base):
     __tablename__ = "network_switching_states"
 

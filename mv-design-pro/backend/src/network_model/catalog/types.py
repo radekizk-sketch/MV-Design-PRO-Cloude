@@ -25,7 +25,7 @@ Usage:
 
 from dataclasses import dataclass
 from typing import Any, Dict, Optional
-from uuid import UUID, uuid4
+from uuid import uuid4
 
 
 @dataclass(frozen=True)
@@ -40,6 +40,7 @@ class LineType:
         id: Unique identifier.
         name: Type name (e.g., "ACSR 240/40").
         manufacturer: Manufacturer name (optional).
+        standard: Standard designation (optional).
         r_ohm_per_km: Resistance per unit length [Ω/km].
         x_ohm_per_km: Reactance per unit length [Ω/km].
         b_us_per_km: Susceptance per unit length [μS/km].
@@ -56,6 +57,7 @@ class LineType:
     b_us_per_km: float = 0.0
     rated_current_a: float = 0.0
     manufacturer: Optional[str] = None
+    standard: Optional[str] = None
     max_temperature_c: float = 70.0
     voltage_rating_kv: float = 0.0
     conductor_material: Optional[str] = None
@@ -71,6 +73,7 @@ class LineType:
             "b_us_per_km": self.b_us_per_km,
             "rated_current_a": self.rated_current_a,
             "manufacturer": self.manufacturer,
+            "standard": self.standard,
             "max_temperature_c": self.max_temperature_c,
             "voltage_rating_kv": self.voltage_rating_kv,
             "conductor_material": self.conductor_material,
@@ -88,6 +91,7 @@ class LineType:
             b_us_per_km=float(data.get("b_us_per_km", 0.0)),
             rated_current_a=float(data.get("rated_current_a", 0.0)),
             manufacturer=data.get("manufacturer"),
+            standard=data.get("standard"),
             max_temperature_c=float(data.get("max_temperature_c", 70.0)),
             voltage_rating_kv=float(data.get("voltage_rating_kv", 0.0)),
             conductor_material=data.get("conductor_material"),
@@ -112,6 +116,7 @@ class CableType:
         rated_current_a: Continuous current rating [A].
         voltage_rating_kv: Rated voltage [kV].
         insulation_type: Insulation type (e.g., "XLPE", "EPR").
+        standard: Standard designation (optional).
         conductor_material: Conductor material (e.g., "Al", "Cu").
         cross_section_mm2: Conductor cross-section [mm²].
         max_temperature_c: Maximum operating temperature [°C].
@@ -125,6 +130,7 @@ class CableType:
     manufacturer: Optional[str] = None
     voltage_rating_kv: float = 0.0
     insulation_type: Optional[str] = None
+    standard: Optional[str] = None
     conductor_material: Optional[str] = None
     cross_section_mm2: float = 0.0
     max_temperature_c: float = 90.0
@@ -152,6 +158,7 @@ class CableType:
             "manufacturer": self.manufacturer,
             "voltage_rating_kv": self.voltage_rating_kv,
             "insulation_type": self.insulation_type,
+            "standard": self.standard,
             "conductor_material": self.conductor_material,
             "cross_section_mm2": self.cross_section_mm2,
             "max_temperature_c": self.max_temperature_c,
@@ -170,6 +177,7 @@ class CableType:
             manufacturer=data.get("manufacturer"),
             voltage_rating_kv=float(data.get("voltage_rating_kv", 0.0)),
             insulation_type=data.get("insulation_type"),
+            standard=data.get("standard"),
             conductor_material=data.get("conductor_material"),
             cross_section_mm2=float(data.get("cross_section_mm2", 0.0)),
             max_temperature_c=float(data.get("max_temperature_c", 90.0)),
@@ -195,6 +203,7 @@ class TransformerType:
         i0_percent: No-load current [%].
         p0_kw: No-load losses [kW].
         vector_group: Vector group (e.g., "Dyn11").
+        cooling_class: Cooling class (e.g., "ONAN", "ONAF").
         tap_min: Minimum tap position.
         tap_max: Maximum tap position.
         tap_step_percent: Tap step size [%].
@@ -210,6 +219,7 @@ class TransformerType:
     i0_percent: float = 0.0
     p0_kw: float = 0.0
     vector_group: str = "Dyn11"
+    cooling_class: Optional[str] = None
     tap_min: int = -5
     tap_max: int = 5
     tap_step_percent: float = 2.5
@@ -228,6 +238,7 @@ class TransformerType:
             "i0_percent": self.i0_percent,
             "p0_kw": self.p0_kw,
             "vector_group": self.vector_group,
+            "cooling_class": self.cooling_class,
             "tap_min": self.tap_min,
             "tap_max": self.tap_max,
             "tap_step_percent": self.tap_step_percent,
@@ -248,6 +259,7 @@ class TransformerType:
             i0_percent=float(data.get("i0_percent", 0.0)),
             p0_kw=float(data.get("p0_kw", 0.0)),
             vector_group=str(data.get("vector_group", "Dyn11")),
+            cooling_class=data.get("cooling_class"),
             tap_min=int(data.get("tap_min", -5)),
             tap_max=int(data.get("tap_max", 5)),
             tap_step_percent=float(data.get("tap_step_percent", 2.5)),
@@ -255,7 +267,7 @@ class TransformerType:
 
 
 @dataclass(frozen=True)
-class SwitchType:
+class SwitchEquipmentType:
     """
     Immutable switch type definition.
 
@@ -266,40 +278,48 @@ class SwitchType:
         id: Unique identifier.
         name: Type name (e.g., "ABB VD4 12kV").
         manufacturer: Manufacturer name (optional).
-        rated_current_a: Rated continuous current [A].
-        rated_voltage_kv: Rated voltage [kV].
-        breaking_current_ka: Breaking capacity [kA] (for breakers).
-        switch_category: Category (BREAKER, DISCONNECTOR, LOAD_SWITCH, FUSE).
+        equipment_kind: Equipment kind (CIRCUIT_BREAKER, DISCONNECTOR, EARTH_SWITCH).
+        un_kv: Rated voltage [kV].
+        in_a: Rated current [A].
+        ik_ka: Short-circuit breaking current [kA] (for breakers).
+        icw_ka: Short-time withstand current [kA] (for disconnectors).
+        medium: Quenching medium (e.g., "SF6", "VACUUM").
     """
     id: str
     name: str
-    rated_current_a: float = 0.0
-    rated_voltage_kv: float = 0.0
     manufacturer: Optional[str] = None
-    breaking_current_ka: float = 0.0
-    switch_category: str = "BREAKER"
+    equipment_kind: str = "CIRCUIT_BREAKER"
+    un_kv: float = 0.0
+    in_a: float = 0.0
+    ik_ka: float = 0.0
+    icw_ka: float = 0.0
+    medium: Optional[str] = None
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary."""
         return {
             "id": self.id,
             "name": self.name,
-            "rated_current_a": self.rated_current_a,
-            "rated_voltage_kv": self.rated_voltage_kv,
             "manufacturer": self.manufacturer,
-            "breaking_current_ka": self.breaking_current_ka,
-            "switch_category": self.switch_category,
+            "equipment_kind": self.equipment_kind,
+            "un_kv": self.un_kv,
+            "in_a": self.in_a,
+            "ik_ka": self.ik_ka,
+            "icw_ka": self.icw_ka,
+            "medium": self.medium,
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "SwitchType":
+    def from_dict(cls, data: Dict[str, Any]) -> "SwitchEquipmentType":
         """Create from dictionary."""
         return cls(
             id=str(data.get("id", str(uuid4()))),
             name=str(data.get("name", "")),
-            rated_current_a=float(data.get("rated_current_a", 0.0)),
-            rated_voltage_kv=float(data.get("rated_voltage_kv", 0.0)),
             manufacturer=data.get("manufacturer"),
-            breaking_current_ka=float(data.get("breaking_current_ka", 0.0)),
-            switch_category=str(data.get("switch_category", "BREAKER")),
+            equipment_kind=str(data.get("equipment_kind", "CIRCUIT_BREAKER")),
+            un_kv=float(data.get("un_kv", 0.0)),
+            in_a=float(data.get("in_a", 0.0)),
+            ik_ka=float(data.get("ik_ka", 0.0)),
+            icw_ka=float(data.get("icw_ka", 0.0)),
+            medium=data.get("medium"),
         )

@@ -12,6 +12,8 @@ from infrastructure.persistence.models import (
     NetworkSourceORM,
     OperatingCaseORM,
     ProjectSettingsORM,
+    SwitchEquipmentAssignmentORM,
+    SwitchEquipmentTypeORM,
     SwitchingStateORM,
     TransformerTypeORM,
 )
@@ -223,16 +225,56 @@ class NetworkWizardRepository:
             self._session.commit()
 
     def list_line_types(self) -> list[dict]:
-        rows = self._session.execute(select(LineTypeORM)).scalars().all()
+        stmt = select(LineTypeORM).order_by(LineTypeORM.name, LineTypeORM.id)
+        rows = self._session.execute(stmt).scalars().all()
         return [{"id": row.id, "name": row.name, "params": row.params_jsonb} for row in rows]
 
     def list_cable_types(self) -> list[dict]:
-        rows = self._session.execute(select(CableTypeORM)).scalars().all()
+        stmt = select(CableTypeORM).order_by(CableTypeORM.name, CableTypeORM.id)
+        rows = self._session.execute(stmt).scalars().all()
         return [{"id": row.id, "name": row.name, "params": row.params_jsonb} for row in rows]
 
     def list_transformer_types(self) -> list[dict]:
-        rows = self._session.execute(select(TransformerTypeORM)).scalars().all()
+        stmt = select(TransformerTypeORM).order_by(
+            TransformerTypeORM.name, TransformerTypeORM.id
+        )
+        rows = self._session.execute(stmt).scalars().all()
         return [{"id": row.id, "name": row.name, "params": row.params_jsonb} for row in rows]
+
+    def list_switch_equipment_types(self) -> list[dict]:
+        stmt = select(SwitchEquipmentTypeORM).order_by(
+            SwitchEquipmentTypeORM.name, SwitchEquipmentTypeORM.id
+        )
+        rows = self._session.execute(stmt).scalars().all()
+        return [{"id": row.id, "name": row.name, "params": row.params_jsonb} for row in rows]
+
+    def get_line_type(self, type_id: UUID) -> dict | None:
+        stmt = select(LineTypeORM).where(LineTypeORM.id == type_id)
+        row = self._session.execute(stmt).scalar_one_or_none()
+        if row is None:
+            return None
+        return {"id": row.id, "name": row.name, "params": row.params_jsonb}
+
+    def get_cable_type(self, type_id: UUID) -> dict | None:
+        stmt = select(CableTypeORM).where(CableTypeORM.id == type_id)
+        row = self._session.execute(stmt).scalar_one_or_none()
+        if row is None:
+            return None
+        return {"id": row.id, "name": row.name, "params": row.params_jsonb}
+
+    def get_transformer_type(self, type_id: UUID) -> dict | None:
+        stmt = select(TransformerTypeORM).where(TransformerTypeORM.id == type_id)
+        row = self._session.execute(stmt).scalar_one_or_none()
+        if row is None:
+            return None
+        return {"id": row.id, "name": row.name, "params": row.params_jsonb}
+
+    def get_switch_equipment_type(self, type_id: UUID) -> dict | None:
+        stmt = select(SwitchEquipmentTypeORM).where(SwitchEquipmentTypeORM.id == type_id)
+        row = self._session.execute(stmt).scalar_one_or_none()
+        if row is None:
+            return None
+        return {"id": row.id, "name": row.name, "params": row.params_jsonb}
 
     def upsert_line_type(self, payload: dict, *, commit: bool = True) -> None:
         stmt = select(LineTypeORM).where(LineTypeORM.id == payload["id"])
@@ -272,6 +314,50 @@ class NetworkWizardRepository:
         else:
             row.name = payload["name"]
             row.params_jsonb = payload["params"]
+        if commit:
+            self._session.commit()
+
+    def upsert_switch_equipment_type(self, payload: dict, *, commit: bool = True) -> None:
+        stmt = select(SwitchEquipmentTypeORM).where(
+            SwitchEquipmentTypeORM.id == payload["id"]
+        )
+        row = self._session.execute(stmt).scalar_one_or_none()
+        if row is None:
+            self._session.add(
+                SwitchEquipmentTypeORM(
+                    id=payload["id"], name=payload["name"], params_jsonb=payload["params"]
+                )
+            )
+        else:
+            row.name = payload["name"]
+            row.params_jsonb = payload["params"]
+        if commit:
+            self._session.commit()
+
+    def assign_switch_equipment_type(
+        self,
+        project_id: UUID,
+        switch_id: UUID,
+        equipment_type_id: UUID,
+        *,
+        commit: bool = True,
+    ) -> None:
+        stmt = select(SwitchEquipmentAssignmentORM).where(
+            SwitchEquipmentAssignmentORM.project_id == project_id,
+            SwitchEquipmentAssignmentORM.switch_id == switch_id,
+        )
+        row = self._session.execute(stmt).scalar_one_or_none()
+        if row is None:
+            self._session.add(
+                SwitchEquipmentAssignmentORM(
+                    id=uuid4(),
+                    project_id=project_id,
+                    switch_id=switch_id,
+                    equipment_type_id=equipment_type_id,
+                )
+            )
+        else:
+            row.equipment_type_id = equipment_type_id
         if commit:
             self._session.commit()
 

@@ -26,7 +26,9 @@ from domain.analysis_run import AnalysisRun, new_analysis_run
 from domain.project_design_mode import ProjectDesignMode
 from domain.validation import ValidationIssue, ValidationReport
 from infrastructure.persistence.unit_of_work import UnitOfWork
+from network_model.catalog import CatalogRepository
 from network_model.core import InverterSource, NetworkGraph, create_network_snapshot
+from network_model.core.branch import Branch, LineBranch, TransformerBranch
 from network_model.validation import NetworkValidator as ModelNetworkValidator, Severity as ModelSeverity
 from network_model.solvers import ShortCircuitIEC60909Solver, ShortCircuitType
 
@@ -477,6 +479,7 @@ class AnalysisRunService:
                 raise ValueError(f"OperatingCase {operating_case_id} not found")
             nodes = uow.network.list_nodes(project_id)
             branches = uow.network.list_branches(project_id)
+            catalog = self._build_catalog_repository(uow)
             switching_states = {
                 state["element_id"]: state
                 for state in uow.wizard.list_switching_states(operating_case_id)
@@ -488,7 +491,7 @@ class AnalysisRunService:
         normalized_nodes = [self._node_to_graph_payload(node) for node in nodes]
         normalized_branches: list[dict[str, Any]] = []
         for branch in branches:
-            branch_payload = self._branch_to_graph_payload(branch)
+            branch_payload = self._branch_to_graph_payload(branch, catalog)
             branch_state = switching_states.get(branch["id"])
             if branch_state is not None:
                 branch_payload["in_service"] = branch_state["in_service"]
@@ -1025,6 +1028,7 @@ class AnalysisRunService:
         with self._uow_factory() as uow:
             nodes = uow.network.list_nodes(project_id)
             branches = uow.network.list_branches(project_id)
+            catalog = self._build_catalog_repository(uow)
             switching_states = {}
             if case_id is not None:
                 switching_states = {
@@ -1037,7 +1041,7 @@ class AnalysisRunService:
             branches=branches,
             switching_states=switching_states,
             node_payload_builder=self._node_to_graph_payload,
-            branch_payload_builder=self._branch_to_graph_payload,
+            branch_payload_builder=lambda branch: self._branch_to_graph_payload(branch, catalog),
             network_model_id=network_model_id_for_project(project_id),
         )
 
@@ -1070,7 +1074,9 @@ class AnalysisRunService:
             "reactive_power": attrs.get("reactive_power"),
         }
 
-    def _branch_to_graph_payload(self, branch: dict) -> dict[str, Any]:
+    def _branch_to_graph_payload(
+        self, branch: dict, catalog: CatalogRepository | None = None
+    ) -> dict[str, Any]:
         params = branch.get("params") or {}
         payload = {
             "id": str(branch["id"]),
@@ -1081,7 +1087,20 @@ class AnalysisRunService:
             "in_service": branch.get("in_service", True),
         }
         payload.update(params)
-        return payload
+        branch_model = Branch.from_dict(payload)
+        if isinstance(branch_model, LineBranch):
+            branch_model = branch_model.with_resolved_params(catalog)
+        elif isinstance(branch_model, TransformerBranch):
+            branch_model = branch_model.with_resolved_nameplate(catalog)
+        return branch_model.to_dict()
+
+    def _build_catalog_repository(self, uow: UnitOfWork) -> CatalogRepository:
+        return CatalogRepository.from_records(
+            line_types=uow.wizard.list_line_types(),
+            cable_types=uow.wizard.list_cable_types(),
+            transformer_types=uow.wizard.list_transformer_types(),
+            switch_equipment_types=uow.wizard.list_switch_equipment_types(),
+        )
 
     def _normalize_sources(self, sources: list[dict]) -> list[dict[str, Any]]:
         normalized = [
