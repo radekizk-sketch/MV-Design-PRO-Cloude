@@ -19,14 +19,12 @@ ACTION_TYPES = (
     "create_node",
     "create_branch",
     "set_in_service",
-    "set_pcc",
 )
 
 ACTION_REQUIRED_PAYLOAD_KEYS = {
     "create_node": ["node_type"],
     "create_branch": ["from_node_id", "to_node_id", "branch_kind"],
     "set_in_service": ["entity_id", "in_service"],
-    "set_pcc": ["node_id"],
 }
 
 NODE_TYPE_REQUIRED_PAYLOAD_KEYS = {
@@ -327,17 +325,6 @@ def _validate_referential_integrity(
     errors: list[ActionIssue],
 ) -> None:
     graph = snapshot.graph
-
-    if action_type == "set_pcc":
-        node_id = payload.get("node_id")
-        if isinstance(node_id, str) and node_id not in graph.nodes:
-            errors.append(
-                ActionIssue(
-                    code="unknown_node",
-                    message=f"Node '{node_id}' does not exist in snapshot.",
-                    path="payload.node_id",
-                )
-            )
 
     if action_type == "set_in_service":
         entity_id = payload.get("entity_id")

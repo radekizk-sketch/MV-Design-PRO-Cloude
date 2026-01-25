@@ -11,7 +11,6 @@ class SldNodeSymbol:
     x: float
     y: float
     label: str | None = None
-    is_pcc: bool = False
 
     def to_payload(self) -> dict:
         return {
@@ -20,7 +19,6 @@ class SldNodeSymbol:
             "x": self.x,
             "y": self.y,
             "label": self.label,
-            "is_pcc": self.is_pcc,
         }
 
 
@@ -66,14 +64,12 @@ class SldDiagram:
     nodes: tuple[SldNodeSymbol, ...] = field(default_factory=tuple)
     branches: tuple[SldBranchSymbol, ...] = field(default_factory=tuple)
     annotations: tuple[SldAnnotation, ...] = field(default_factory=tuple)
-    pcc_node_id: UUID | None = None
     dirty_flag: bool = False
 
     def to_payload(self) -> dict:
         return {
             "version": 1,
             "name": self.name,
-            "pcc_node_id": str(self.pcc_node_id) if self.pcc_node_id else None,
             "nodes": [node.to_payload() for node in self.nodes],
             "branches": [branch.to_payload() for branch in self.branches],
             "annotations": [annotation.to_payload() for annotation in self.annotations],

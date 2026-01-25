@@ -1202,6 +1202,10 @@ class NetworkWizardService:
         branches: list[dict],
         pcc_node_id: UUID | None,
     ) -> SldDiagram:
+        # NOTE: pcc_node_id is kept as parameter for layout purposes only
+        # but is NOT stored in SldNodeSymbol or SldDiagram.
+        # PCC – punkt wspólnego przyłączenia is interpretation, not model data.
+        _ = pcc_node_id  # Unused, kept for API compatibility
         node_symbols = [
             SldNodeSymbol(
                 id=uuid4(),
@@ -1209,7 +1213,6 @@ class NetworkWizardService:
                 x=0.0,
                 y=0.0,
                 label=node.get("name"),
-                is_pcc=node["id"] == pcc_node_id,
             )
             for node in sorted(nodes, key=lambda item: str(item["id"]))
         ]
@@ -1230,7 +1233,6 @@ class NetworkWizardService:
             nodes=tuple(node_symbols),
             branches=tuple(branch_symbols),
             annotations=tuple(),
-            pcc_node_id=pcc_node_id,
             dirty_flag=False,
         )
 
