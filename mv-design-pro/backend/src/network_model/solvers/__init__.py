@@ -13,6 +13,7 @@ from .short_circuit_contributions import (
     ShortCircuitSourceContribution,
     SourceType,
 )
+from .power_flow_newton import PowerFlowNewtonSolver, PowerFlowNewtonSolution
 
 __all__ = [
     "C_MAX",
@@ -24,4 +25,6 @@ __all__ = [
     "ShortCircuitSourceContribution",
     "ShortCircuitBranchContribution",
     "SourceType",
+    "PowerFlowNewtonSolver",
+    "PowerFlowNewtonSolution",
 ]
