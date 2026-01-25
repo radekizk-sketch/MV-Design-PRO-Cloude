@@ -15,8 +15,8 @@ mv-design-pro/
 ├── backend/          # Backend API + moduły obliczeniowe
 ├── frontend/         # UI
 ├── docs/             # How-to / guide / checklisty
-├── governance/       # ExecPlany i governance
-├── ExecPlan.md       # Aktualny ExecPlan (do aktualizacji, nie tworzyć nowego)
+├── docs/audit/       # Audyty i notatki historyczne
+├── PLANS.md          # Aktywny ExecPlan (aktualizować, nie tworzyć nowego)
 └── SYSTEM_SPEC.md    # Specyfikacja kanoniczna
 ```
 
@@ -33,3 +33,5 @@ mv-design-pro/
 - [GO-LIVE-CHECKLIST.md](./GO-LIVE-CHECKLIST.md)
 - [REPOSITORY-HYGIENE.md](./REPOSITORY-HYGIENE.md)
 - [ROADMAP.md](./ROADMAP.md)
+- [INDEX.md](./INDEX.md) — spis treści dokumentacji
+- [docs/audit/](./audit/) — raporty audytowe i archiwalne ExecPlany (non-canonical)
