@@ -22,6 +22,10 @@ from application.network_wizard.dtos import (
 from domain.project_design_mode import ProjectDesignMode
 from infrastructure.persistence.db import create_engine_from_url, create_session_factory, init_db
 from infrastructure.persistence.unit_of_work import build_uow_factory
+from network_model.validation import (
+    ValidationIssue as ModelValidationIssue,
+    ValidationReport as ModelValidationReport,
+)
 
 
 def _build_services() -> tuple[NetworkWizardService, AnalysisRunService]:
@@ -154,6 +158,86 @@ def test_analysis_run_lifecycle_sc() -> None:
     assert run.input_snapshot["snapshot_id"] == case.case_payload["active_snapshot_id"]
     assert "white_box_trace" in payload
     assert payload["white_box_trace"]
+
+
+def test_network_validator_blocks_invalid_model() -> None:
+    wizard, service = _build_services()
+    project = wizard.create_project("Invalid Network")
+    wizard.add_node(
+        project.id,
+        NodePayload(
+            name="PQ",
+            node_type="PQ",
+            base_kv=15.0,
+            attrs={"active_power_mw": 1.0, "reactive_power_mvar": 0.5},
+        ),
+    )
+    case = wizard.create_operating_case(
+        project.id,
+        "Normal",
+        {
+            "base_mva": 100.0,
+            "active_snapshot_id": str(uuid4()),
+            "project_design_mode": ProjectDesignMode.SN_NETWORK.value,
+        },
+    )
+
+    run = service.create_power_flow_run(project.id, case.id)
+    executed = service.execute_run(run.id)
+
+    assert executed.status == "FAILED"
+    payload = json.loads(executed.error_message or "{}")
+    error_codes = {item["code"] for item in payload.get("errors", [])}
+    assert "network.no_slack" in error_codes
+    assert "network.validation_blocked" in error_codes
+
+
+def test_network_validator_warning_allows_solver(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    wizard, service = _build_services()
+    project = wizard.create_project("Warning Network")
+    slack_node, pq_node = _create_basic_network(wizard, project.id)
+    wizard.set_pcc(project.id, slack_node["id"])
+    _add_grid_source(wizard, project.id, slack_node["id"])
+    wizard.add_load(
+        project.id,
+        LoadPayload(
+            name="Load",
+            node_id=pq_node["id"],
+            payload={"name": "Load", "p_mw": 1.0, "q_mvar": 0.5},
+        ),
+    )
+    case = wizard.create_operating_case(
+        project.id,
+        "Normal",
+        {
+            "base_mva": 100.0,
+            "active_snapshot_id": str(uuid4()),
+            "project_design_mode": ProjectDesignMode.SN_NETWORK.value,
+        },
+    )
+
+    warning_report = ModelValidationReport().with_warning(
+        ModelValidationIssue(
+            code="network.warning",
+            message="Test warning",
+        )
+    )
+
+    def _warning_only(self, graph):
+        return warning_report
+
+    monkeypatch.setattr(
+        "network_model.validation.validator.NetworkValidator.validate",
+        _warning_only,
+        raising=True,
+    )
+
+    run = service.create_power_flow_run(project.id, case.id)
+    executed = service.execute_run(run.id)
+
+    assert executed.status == "FINISHED"
 
 
 def test_validation_missing_slack() -> None:
