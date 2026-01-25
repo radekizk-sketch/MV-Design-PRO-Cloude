@@ -1,503 +1,214 @@
-# Wizard Screens Specification (PowerFactory Data Manager Style)
+# Wizard Screens Specification
 
-**Version:** 1.0
-**Status:** REFERENCE
-**Reference:** SYSTEM_SPEC.md, ARCHITECTURE.md
-
----
-
-## 1. Purpose
-
-This document specifies the canonical workflow and screen structure for the MV-DESIGN-PRO Wizard, aligned with DIgSILENT PowerFactory Data Manager patterns.
-
-**Scope:** Documentation and design guidelines ONLY. No implementation requirements.
+**Reference:** SYSTEM_SPEC.md Section 8, Section 18
+**Status:** CANONICAL
 
 ---
 
-## 2. Wizard Definition
+## A. Workflow kreatora (Wizard Workflow)
 
-### 2.1 What Wizard Is
+### A.1 Step-by-Step Navigation (PF-style)
 
-| Aspect | Description |
-|--------|-------------|
-| Role | Sequential controller for NetworkModel creation |
-| Equivalent | PowerFactory Data Manager |
-| Data store | NetworkModel (shared with SLD) |
-| Output | Valid NetworkModel ready for calculations |
-
-### 2.2 What Wizard Is NOT
-
-| Avoid | Rationale |
-|-------|-----------|
-| Separate model | Single NetworkModel principle |
-| Physics engine | Solvers handle physics |
-| Auto-correction system | User must understand all changes |
-| Intelligent shortcut provider | Explicit steps required |
-
----
-
-## 3. Canonical Step Sequence
-
-### 3.1 Step Overview
-
-| Step | Name | Model Object | Mandatory |
-|------|------|--------------|-----------|
-| 1 | Project Setup | Project | YES |
-| 2 | Type Library | Catalog | YES (selection) |
-| 3 | Buses (Nodes) | Bus | YES (min 1) |
-| 4 | Lines / Cables | LineBranch | NO |
-| 5 | Transformers | TransformerBranch | NO |
-| 6 | Sources | Source | YES (min 1) |
-| 7 | Loads | Load | NO |
-| 8 | Switching Apparatus | Switch | NO |
-| 9 | Model Validation | NetworkValidator | YES |
-| 10 | Study Cases | Case | NO |
-
-### 3.2 Step Flow Diagram
-
-```
-┌─────────────┐
-│ Step 1:     │
-│ Project     │
-└──────┬──────┘
-       │
-       ▼
-┌─────────────┐
-│ Step 2:     │
-│ Type Library│
-└──────┬──────┘
-       │
-       ▼
-┌─────────────┐
-│ Step 3:     │
-│ Buses       │
-└──────┬──────┘
-       │
-       ▼
-┌─────────────┐
-│ Step 4:     │
-│ Lines/Cables│
-└──────┬──────┘
-       │
-       ▼
-┌─────────────┐
-│ Step 5:     │
-│ Transformers│
-└──────┬──────┘
-       │
-       ▼
-┌─────────────┐
-│ Step 6:     │
-│ Sources     │
-└──────┬──────┘
-       │
-       ▼
-┌─────────────┐
-│ Step 7:     │
-│ Loads       │
-└──────┬──────┘
-       │
-       ▼
-┌─────────────┐
-│ Step 8:     │
-│ Switches    │
-└──────┬──────┘
-       │
-       ▼
-┌─────────────┐
-│ Step 9:     │
-│ Validation  │
-└──────┬──────┘
-       │
-       ▼
-┌─────────────┐
-│ Step 10:    │
-│ Study Cases │
-└─────────────┘
-```
-
----
-
-## 4. Screen Specifications
-
-### 4.1 General Screen Structure
-
-Every Wizard screen MUST follow this layout:
+The Wizard follows PowerFactory Data Manager paradigm:
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│ HEADER: Step Title + Progress Indicator                      │
+│ Network Wizard                                    [X]       │
 ├─────────────────────────────────────────────────────────────┤
 │                                                             │
-│  CONTENT AREA:                                              │
-│  - List of existing items (left panel)                      │
-│  - Property Grid / Form (right panel)                       │
+│  Step 3 of 10: Buses (Nodes)                               │
 │                                                             │
-├─────────────────────────────────────────────────────────────┤
-│ FOOTER: Navigation (Back | Next) + Validation Status        │
+│  ┌─────────────────────────────────────────────────────┐   │
+│  │                                                     │   │
+│  │  [Property Grid / Form Content]                     │   │
+│  │                                                     │   │
+│  │                                                     │   │
+│  └─────────────────────────────────────────────────────┘   │
+│                                                             │
+│  ┌────────┐  ┌────────┐           ┌────────┐  ┌────────┐   │
+│  │  Back  │  │  Next  │           │   OK   │  │ Cancel │   │
+│  └────────┘  └────────┘           └────────┘  └────────┘   │
+│                                                             │
 └─────────────────────────────────────────────────────────────┘
 ```
 
-### 4.2 Step 1: Project Setup
+### A.2 Button Behaviors
 
-**Purpose:** Create or select project
+| Button | Action | Validation |
+|--------|--------|------------|
+| **Back** | Return to previous step | None (preserves data) |
+| **Next** | Proceed to next step | Step-level validation |
+| **OK** | Complete wizard, apply changes | Full model validation |
+| **Cancel** | Abort wizard, discard changes | Confirmation if changes exist |
 
-**Screen elements:**
-- Project name input
-- Project description (optional)
-- Voltage system selection (MV/HV)
-- Frequency (50 Hz / 60 Hz)
+### A.3 Canonical Step Sequence
 
-**Validation before Next:**
-- Project name is not empty
-- Voltage system selected
+| Step | Name | Purpose | Model Object |
+|------|------|---------|--------------|
+| 1 | Project | Create/select project | Project |
+| 2 | Type Library | Select equipment types | Catalog |
+| 3 | Buses | Define electrical nodes | Bus |
+| 4 | Lines/Cables | Define branch connections | LineBranch |
+| 5 | Transformers | Define power transformers | TransformerBranch |
+| 6 | Sources | Define power sources | Source |
+| 7 | Loads | Define electrical loads | Load |
+| 8 | Switches | Define switching apparatus | Switch |
+| 9 | Validation | Pre-solver network check | NetworkValidator |
+| 10 | Study Cases | Configure calculation scenarios | Case |
 
-**Model impact:**
-- Creates Project object
-- Sets global parameters
+### A.4 Validation Before Solver
 
-### 4.3 Step 2: Type Library (Catalog)
-
-**Purpose:** Select types for network elements
-
-**Screen elements:**
-- Line types list (filterable)
-- Cable types list (filterable)
-- Transformer types list (filterable)
-- "Add to Project" selection
-
-**Validation before Next:**
-- At least one type selected (warning only)
-
-**Model impact:**
-- Marks selected types as available for project
-- No NetworkModel changes
-
-### 4.4 Step 3: Buses
-
-**Purpose:** Define electrical nodes
-
-**Screen elements:**
-- Bus list (left panel)
-- Add / Edit / Delete buttons
-- Property Grid (right panel):
-  - Name
-  - Voltage level (kV)
-  - Node type (PQ, PV, SLACK)
-
-**Validation before Next:**
-- At least one Bus defined (blocking)
-- All buses have valid voltage > 0
-
-**Model impact:**
-- Adds Bus objects to NetworkModel
-
-### 4.5 Step 4: Lines / Cables
-
-**Purpose:** Define physical connections (branches)
-
-**Screen elements:**
-- Branch list (left panel)
-- Add Line / Add Cable buttons
-- Property Grid (right panel):
-  - Name
-  - Type (dropdown from Catalog)
-  - From Bus (dropdown)
-  - To Bus (dropdown)
-  - Length (km)
-
-**Validation before Next:**
-- All branches have valid endpoints
-- No duplicate branches between same buses (warning)
-
-**Model impact:**
-- Adds LineBranch objects to NetworkModel
-
-### 4.6 Step 5: Transformers
-
-**Purpose:** Define transformer branches
-
-**Screen elements:**
-- Transformer list (left panel)
-- Add 2W Transformer button
-- Property Grid (right panel):
-  - Name
-  - Type (dropdown from Catalog)
-  - HV Bus (dropdown)
-  - LV Bus (dropdown)
-  - Tap position
-
-**Validation before Next:**
-- HV and LV buses are different
-- HV voltage > LV voltage
-
-**Model impact:**
-- Adds TransformerBranch objects to NetworkModel
-
-### 4.7 Step 6: Sources
-
-**Purpose:** Define power injections
-
-**Screen elements:**
-- Source list (left panel)
-- Add External Grid / Add Generator buttons
-- Property Grid (right panel):
-  - Name
-  - Source type
-  - Connected Bus (dropdown)
-  - Sk'' (MVA) - for external grid
-  - R/X ratio
-
-**Validation before Next:**
-- At least one Source defined (blocking)
-- Source connected to existing Bus
-
-**Model impact:**
-- Adds Source objects to NetworkModel
-
-### 4.8 Step 7: Loads
-
-**Purpose:** Define power consumption
-
-**Screen elements:**
-- Load list (left panel)
-- Add Load button
-- Property Grid (right panel):
-  - Name
-  - Connected Bus (dropdown)
-  - P (MW)
-  - Q (Mvar)
-
-**Validation before Next:**
-- Loads connected to existing Buses
-
-**Model impact:**
-- Adds Load objects to NetworkModel
-
-### 4.9 Step 8: Switching Apparatus
-
-**Purpose:** Define topology switches
-
-**Screen elements:**
-- Switch list (left panel)
-- Add Switch button
-- Property Grid (right panel):
-  - Name
-  - Switch type (Breaker, Disconnector, Load Switch, Fuse)
-  - From Bus (dropdown)
-  - To Bus (dropdown)
-  - Initial state (Open / Closed)
-
-**Validation before Next:**
-- Switches connected to existing Buses
-
-**Model impact:**
-- Adds Switch objects to NetworkModel
-- NO impedance data (switches have zero impedance)
-
-### 4.10 Step 9: Model Validation
-
-**Purpose:** Verify NetworkModel before calculations
-
-**Screen elements:**
-- Validation results list
-- Error details panel
-- "Re-validate" button
-- Network summary statistics
-
-**Validation rules:**
-| Rule | Severity | Description |
-|------|----------|-------------|
-| Connectivity | ERROR | Network must be connected |
-| Source present | ERROR | At least one source required |
-| No dangling | ERROR | All elements must be connected |
-| Voltage valid | ERROR | All buses must have V > 0 |
-| Endpoints exist | ERROR | All branch endpoints must exist |
-
-**Blocking behavior:**
-- Cannot proceed to Study Cases if ERROR exists
-- Warnings allow proceed
-
-**Model impact:**
-- No changes (read-only validation)
-
-### 4.11 Step 10: Study Cases
-
-**Purpose:** Create calculation scenarios
-
-**Screen elements:**
-- Case list (left panel)
-- Add Short Circuit Case / Add Power Flow Case buttons
-- Property Grid (right panel):
-  - Case name
-  - Case type
-  - Case-specific parameters
-
-**For Short Circuit Case:**
-- Fault location (Bus or Branch + position)
-- Fault type (3-phase, L-G, etc.)
-- Voltage factor c_max / c_min
-- Calculation method (IEC 60909)
-
-**For Power Flow Case:**
-- Max iterations
-- Tolerance
-- Slack bus override (optional)
-
-**Validation before Finish:**
-- Cases have valid parameters
-
-**Model impact:**
-- Creates Case objects (reference NetworkSnapshot)
-
----
-
-## 5. Property Grid Standard
-
-### 5.1 Field Types
-
-| Field Type | Control | Example |
-|------------|---------|---------|
-| Text | Text input | Name |
-| Number | Number input with unit | Voltage (kV) |
-| Dropdown | Select list | Node type |
-| Checkbox | Toggle | In service |
-| Reference | Dropdown with search | From Bus |
-
-### 5.2 Property Grid Layout
+**MANDATORY:** Step 9 (Validation) MUST complete before any solver execution:
 
 ```
-┌─────────────────────────────────────────┐
-│ Properties: [Object Type] "[Name]"       │
-├─────────────────────────────────────────┤
-│ ▼ General                               │
-│   Name:           [_______________]     │
-│   In Service:     [✓]                   │
-├─────────────────────────────────────────┤
-│ ▼ Electrical                            │
-│   Voltage (kV):   [15.0          ]      │
-│   Node Type:      [PQ            ▼]     │
-├─────────────────────────────────────────┤
-│ ▼ Short Circuit                         │
-│   (derived values shown read-only)      │
-├─────────────────────────────────────────┤
-│        [Apply]         [Cancel]         │
-└─────────────────────────────────────────┘
-```
-
-### 5.3 Validation Feedback
-
-| State | Visual | Action |
-|-------|--------|--------|
-| Valid | Normal border | Allow Apply |
-| Warning | Yellow border + icon | Allow Apply (with notice) |
-| Error | Red border + icon | Block Apply |
-
----
-
-## 6. Modal Dialogs
-
-### 6.1 Add Element Modal
-
-```
-┌─────────────────────────────────────────┐
-│ Add New [Element Type]                   │
-├─────────────────────────────────────────┤
-│                                         │
-│  [Property Grid for new element]        │
-│                                         │
-├─────────────────────────────────────────┤
-│        [Add]           [Cancel]         │
-└─────────────────────────────────────────┘
-```
-
-### 6.2 Delete Confirmation Modal
-
-```
-┌─────────────────────────────────────────┐
-│ Confirm Delete                           │
-├─────────────────────────────────────────┤
-│                                         │
-│  Are you sure you want to delete        │
-│  [Element Type] "[Name]"?               │
-│                                         │
-│  This will also remove:                 │
-│  - [dependent items list]               │
-│                                         │
-├─────────────────────────────────────────┤
-│        [Delete]        [Cancel]         │
-└─────────────────────────────────────────┘
+Step 9: Validation
+        │
+        ▼
+NetworkValidator.validate()
+        │
+        ├── ERRORS present → Display errors, BLOCK "OK"
+        │
+        └── No ERRORS (warnings OK) → Allow "OK"
 ```
 
 ---
 
-## 7. Wizard Rules (Non-Negotiable)
+## B. Zasady UX (UX Rules)
 
-### 7.1 Data Rules
+### B.1 Property Grid First Principle
 
-| Rule | Description |
-|------|-------------|
-| Single source | Wizard edits NetworkModel directly |
-| No caching | All data from NetworkModel |
-| No special objects | Only standard model objects |
-| No hidden fields | All parameters visible |
+Every element edit MUST use Property Grid as primary interface:
 
-### 7.2 Behavior Rules
+| User Intent | UI Pattern |
+|-------------|------------|
+| Add element | Empty Property Grid → Fill → Add |
+| Edit element | Populated Property Grid → Modify → Apply |
+| View element | Read-only Property Grid |
 
-| Rule | Description |
-|------|-------------|
-| Deterministic lists | Same order, same content every time |
-| No intelligent shortcuts | User must explicitly create each element |
-| Validation before solver | Cannot skip validation step |
-| Explicit confirmation | Destructive actions require confirmation |
+### B.2 No Intelligent Shortcuts
 
-### 7.3 Forbidden Behaviors
+**FORBIDDEN:**
+- Auto-completing connections based on "likely" topology
+- Suggesting element values based on heuristics
+- Auto-creating elements based on partial input
+- "Smart defaults" that hide user choices
 
-| Forbidden | Rationale |
-|-----------|-----------|
-| Auto-create missing elements | User must understand model |
-| Auto-correct topology | No hidden modifications |
-| Skip validation | Safety requirement |
-| Create virtual elements | 1:1 model mapping |
-| Hide parameters | Transparency requirement |
+**REQUIRED:**
+- User explicitly specifies every value
+- Defaults are visible and documented
+- All auto-filled values are clearly marked
 
----
+### B.3 Deterministic Lists
 
-## 8. Navigation Rules
+All dropdown lists and selection controls MUST be deterministic:
 
-### 8.1 Forward Navigation
+| List Type | Sort Order |
+|-----------|------------|
+| Buses | Alphabetical by name |
+| Types (Catalog) | Alphabetical by name |
+| Elements | Creation order (oldest first) |
+| Enum values | Definition order (fixed) |
 
-- "Next" validates current step
-- Blocking errors prevent navigation
-- Warnings show notice but allow navigation
+### B.4 Explicit Parameters
 
-### 8.2 Backward Navigation
+**MANDATORY:** All solver-relevant parameters MUST be explicitly shown:
 
-- "Back" preserves all entered data
-- No confirmation required
-- Changes persist in NetworkModel
+```
+┌─────────────────────────────────────────────────┐
+│ Short Circuit Case Parameters                   │
+├─────────────────────────────────────────────────┤
+│ Fault Location:    [Bus_003           ▼]        │
+│ Fault Type:        [Three-Phase       ▼]        │
+│ c_max:             [1.10              ]         │
+│ c_min:             [1.00              ]         │
+│ Calculation:       [IEC 60909 Method B▼]        │
+└─────────────────────────────────────────────────┘
+```
 
-### 8.3 Direct Step Access
-
-- Step indicators clickable for completed steps
-- Cannot skip ahead past validation errors
-- Current step always highlighted
-
----
-
-## 9. Compliance Checklist (Wizard)
-
-| ID | Requirement | Verification |
-|----|-------------|--------------|
-| WZ-001 | Step sequence as specified | All 10 steps in order |
-| WZ-002 | Property Grid for all edits | No inline editing |
-| WZ-003 | Validation before Step 9 | Errors block navigation |
-| WZ-004 | Deterministic lists | Consistent ordering |
-| WZ-005 | No intelligent shortcuts | Explicit element creation |
-| WZ-006 | No virtual objects | 1:1 model mapping |
-| WZ-007 | NetworkModel as data source | No separate store |
-| WZ-008 | Confirmation for delete | Modal required |
+**FORBIDDEN:**
+- Hidden default values
+- Implicit parameter selection
+- "Advanced" sections that hide critical parameters
 
 ---
 
-**END OF DOCUMENT**
+## C. Zakazy (Prohibitions)
+
+### C.1 No Physics in Wizard
+
+The Wizard MUST NOT perform any physics calculations:
+
+| Forbidden | Correct Approach |
+|-----------|------------------|
+| Calculate impedance from geometry | User enters impedance OR selects Type |
+| Calculate voltage drop | Solver calculates, Analysis interprets |
+| Estimate load from building type | User enters load value directly |
+| Calculate short circuit current | Solver calculates on explicit request |
+
+### C.2 No Result Interpretation in Wizard
+
+The Wizard MUST NOT interpret or display solver results:
+
+| Forbidden | Correct Approach |
+|-----------|------------------|
+| Show "OVERLOAD" warning in Wizard | Analysis layer shows violations |
+| Display calculated currents | Result Mode shows solver output |
+| Show PCC marker | Analysis layer identifies PCC |
+| Color-code by loading | Result overlay in SLD |
+
+### C.3 No PCC in Wizard
+
+**BINDING:** PCC MUST NOT appear in Wizard data entry:
+
+| Forbidden | Correct Approach |
+|-----------|------------------|
+| "Select PCC Bus" step | BoundaryIdentifier in Analysis layer |
+| PCC checkbox on Bus | Analysis identifies PCC from Source connection |
+| PCC as required field | PCC is interpretation, not model data |
+
+**Exception:** PCC hint MAY be stored in application settings (not NetworkModel) for user preference, but MUST NOT affect model structure.
+
+### C.4 No Aggregation
+
+**FORBIDDEN:**
+- "Add Feeder" (aggregates multiple elements)
+- "Add Substation" (creates complex structure)
+- "Import from template" (creates multiple elements at once without explicit confirmation)
+
+**REQUIRED:**
+- Each element added individually
+- User explicitly confirms each addition
+- No batch creation without element-by-element review
+
+---
+
+## D. Form Validation Patterns
+
+### D.1 Field-Level Validation
+
+| Field Type | Validation | Error Display |
+|------------|------------|---------------|
+| Numeric | Range check, >0 where required | Red border + tooltip |
+| Selection | Required selection | Red border + "Required" |
+| Reference (UUID) | Target must exist | Red border + "Invalid reference" |
+| Text | Non-empty where required | Red border + "Required" |
+
+### D.2 Step-Level Validation
+
+Before "Next" button proceeds:
+
+1. All required fields filled
+2. All field-level validations pass
+3. Referential integrity (e.g., from_bus exists)
+
+### D.3 Model-Level Validation
+
+Before "OK" button completes wizard:
+
+1. NetworkValidator.validate() called
+2. No ERROR-level issues
+3. User acknowledged WARNING-level issues (if any)
+
+---
+
+**END OF WIZARD SCREENS SPECIFICATION**

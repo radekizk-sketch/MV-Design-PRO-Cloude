@@ -1,287 +1,233 @@
-# PowerFactory UI/UX Parity Guidelines
+# PowerFactory UI Parity Guidelines
 
-**Version:** 1.0
-**Status:** REFERENCE
-**Reference:** SYSTEM_SPEC.md, ARCHITECTURE.md
-
----
-
-## 1. Purpose
-
-This document defines UI/UX principles for MV-DESIGN-PRO that align with DIgSILENT PowerFactory user experience patterns. The goal is to provide users familiar with PowerFactory a consistent mental model when using MV-DESIGN-PRO.
-
-**Scope:** Documentation and design guidelines ONLY. No implementation requirements.
+**Reference:** SYSTEM_SPEC.md Section 18, ARCHITECTURE.md Section 14
+**Status:** CANONICAL
 
 ---
 
-## 2. UX Principles (PowerFactory-aligned)
+## A. Lifecycle obliczeń (Calculation Lifecycle)
 
-### 2.1 Consistency Over Innovation
+### A.1 Explicit Calculate Step
 
-| Principle | Description |
-|-----------|-------------|
-| **Familiar patterns** | Use UI patterns that PowerFactory users already know |
-| **Standard terminology** | Use PowerFactory/IEC terminology (Bus, Branch, Case) |
-| **Predictable behavior** | Same action → same result, always |
-| **No hidden magic** | All operations visible and auditable |
-
-### 2.2 Explicit Over Implicit
-
-| Avoid | Prefer | Rationale |
-|-------|--------|-----------|
-| Auto-correction of topology | Explicit user action | User must understand changes |
-| Smart defaults that hide complexity | Visible defaults with explanation | Audit trail requirement |
-| Implicit mode transitions | Explicit mode switching | User always knows context |
-| Background calculations | User-triggered calculations | Results must be intentional |
-
-### 2.3 Separation of Concerns (UI Level)
-
-| Concern | UI Location | Editable |
-|---------|-------------|----------|
-| Network structure | Wizard / SLD (Edit Mode) | YES |
-| Case parameters | Case Editor (Study Case Mode) | YES |
-| Calculation results | Result Viewer (Result Mode) | NO |
-| Analysis overlays | Result Viewer (Result Mode) | NO |
-
----
-
-## 3. Terminology Consistency
-
-### 3.1 Binding Terms (PowerFactory ↔ MV-DESIGN-PRO)
-
-| PowerFactory | MV-DESIGN-PRO | IEC Standard |
-|--------------|---------------|--------------|
-| Terminal | Bus | Node / Terminal |
-| Line | LineBranch (LINE) | Overhead line |
-| Cable | LineBranch (CABLE) | Underground cable |
-| 2-Winding Transformer | TransformerBranch | Two-winding transformer |
-| Switch / Breaker | Switch | Switching device |
-| External Grid | Source (EXTERNAL_GRID) | External network |
-| Generator | Source (GENERATOR) | Synchronous machine |
-| General Load | Load | Load |
-| Study Case | Case | Study case |
-| Type Library | Catalog | Type library |
-| Substation | Station (logical) | Substation |
-
-### 3.2 Forbidden UI Labels
-
-Do NOT use these labels in user-facing UI:
-
-| Forbidden | Use Instead | Reason |
-|-----------|-------------|--------|
-| Node | Bus | PowerFactory alignment |
-| Connection Point | Bus | Clearer terminology |
-| Scenario | Case / Study Case | Standard term |
-| Virtual element | (none - don't create) | No virtual elements allowed |
-| PCC object | PCC indicator (overlay) | PCC is interpretation |
-
----
-
-## 4. Operational Modes (UI Implementation)
-
-### 4.1 Edit Mode
-
-**Purpose:** Modify NetworkModel structure
-
-**Visual indicators:**
-- Status bar: "EDIT MODE" or green indicator
-- Toolbar: Edit tools active
-- SLD: Full editing enabled
-
-**Allowed actions:**
-- Add / remove / modify Bus, Branch, Switch, Source, Load
-- Modify element parameters via Property Grid
-- Modify SLD layout
-
-**Blocked actions:**
-- Modify Case parameters
-- View calculation results (must switch mode)
-
-### 4.2 Study Case Mode
-
-**Purpose:** Configure calculation scenarios
-
-**Visual indicators:**
-- Status bar: "STUDY CASE MODE" or blue indicator
-- Toolbar: Case configuration tools active
-- SLD: Read-only (network structure)
-
-**Allowed actions:**
-- Create / modify / delete Cases
-- Set Case parameters (fault location, method, etc.)
-- Select calculation options
-
-**Blocked actions:**
-- Modify NetworkModel structure
-- View calculation results (must run calculation first)
-
-### 4.3 Result Mode
-
-**Purpose:** Inspect calculation results and analyses
-
-**Visual indicators:**
-- Status bar: "RESULT MODE" or gray indicator
-- Toolbar: View/export tools only
-- SLD: Read-only with result overlays
-
-**Allowed actions:**
-- View result details
-- View analysis overlays (thermal, voltage)
-- Export results
-
-**Blocked actions:**
-- Modify NetworkModel
-- Modify Case parameters
-- Re-run calculations (must switch to Case Mode)
-
----
-
-## 5. Interaction Patterns
-
-### 5.1 Property Grid Pattern
-
-All object editing MUST use Property Grid:
+Calculations MUST be explicitly triggered by the user:
 
 ```
-User Action                     System Response
-─────────────────────────────────────────────────
-Double-click object      →      Open Property Grid
-Edit field               →      Validate input
-Click Apply/OK           →      Update NetworkModel
-Click Cancel             →      Discard changes
+User clicks "Calculate"
+        │
+        ▼
+NetworkValidator.validate()
+        │
+        ├── INVALID → Display errors, BLOCK solver
+        │
+        └── VALID
+              │
+              ▼
+        Solver.solve()
+              │
+              ▼
+        Results stored, state = FRESH
 ```
 
-**Property Grid structure:**
-1. Header: Object type + name
-2. Sections: Grouped by category (General, Electrical, etc.)
-3. Fields: Label + input control
-4. Footer: Apply / Cancel buttons
+**Rules:**
+- Solver MUST NOT run automatically on model change
+- User MUST explicitly initiate calculation
+- Invalid model MUST block solver execution (no override)
 
-### 5.2 Context Menu Pattern
+### A.2 Result Freshness States
 
-Right-click provides context-sensitive actions:
+| State | Description | User Action Required |
+|-------|-------------|---------------------|
+| **NONE** | Never computed | Run calculation |
+| **FRESH** | Results current with model | None |
+| **OUTDATED** | Model changed since computation | Re-run calculation |
 
-| Element Type | Menu Actions |
-|--------------|--------------|
-| Bus | Edit, Delete, Show Connected, Zoom To |
-| Branch | Edit, Delete, Show Endpoints, View Parameters |
-| Switch | Edit, Toggle State, Delete |
-| Source | Edit, Delete |
-| Load | Edit, Delete |
-| Case | Edit, Run, Delete, Duplicate |
-| Result | View, Export, Delete |
+**State Transitions:**
 
-### 5.3 Drag-and-Drop (SLD Only)
+```
+NONE ────────────► FRESH (after successful calculation)
+                      │
+                      │ (model change)
+                      ▼
+                  OUTDATED ────────► FRESH (after re-calculation)
+                      │
+                      │ (model change)
+                      └──────────────► OUTDATED (stays outdated)
+```
 
-| Action | Result |
-|--------|--------|
-| Drag Bus | Move Bus position (layout only) |
-| Drag Branch endpoint | Reconnect to different Bus |
-| Drag from palette | Create new element |
+### A.3 Invalid Model Blocking
 
-**Constraints:**
-- Topology changes require confirmation
-- No "smart" auto-connection
-- Invalid drops rejected with explanation
+When NetworkValidator reports errors:
 
----
-
-## 6. SLD Conventions
-
-### 6.1 Symbol Standards
-
-| Element | Symbol | Notes |
-|---------|--------|-------|
-| Bus | Horizontal bar | Width indicates voltage level |
-| Line | Solid line | With impedance indicator |
-| Cable | Dashed line or marked | Distinguishable from Line |
-| Transformer | Two circles | Standard IEC symbol |
-| Switch (closed) | Connected bar | Solid connection |
-| Switch (open) | Broken bar | Gap visible |
-| Source | Circle with ~ | Or grid symbol |
-| Load | Downward arrow | Or triangle |
-
-### 6.2 Color Coding (Result Mode)
-
-| Condition | Color | Meaning |
-|-----------|-------|---------|
-| Normal | Black/Default | Within limits |
-| Warning | Yellow/Orange | Approaching limits |
-| Violation | Red | Exceeds limits |
-| Out of service | Gray | Disabled element |
-
-### 6.3 Overlay Rules
-
-| Overlay Type | Display Rule |
-|--------------|--------------|
-| PCC indicator | Shown at identified Bus (interpretation) |
-| Thermal loading | % value on branches |
-| Voltage | V value at buses |
-| Fault current | Ik value at fault location |
-
-**PCC overlay rule:** PCC is NOT a model object. It is displayed as an annotation/overlay based on BoundaryIdentifier heuristics.
+| Condition | Solver State | User Message |
+|-----------|--------------|--------------|
+| Validation ERROR | BLOCKED | "Model invalid. Fix errors before calculation." |
+| Validation WARNING only | ALLOWED | "Warnings present. Proceed with calculation?" |
+| Valid (no issues) | ALLOWED | (no message) |
 
 ---
 
-## 7. Validation Feedback
+## B. Semantyka `in_service` (In Service Semantics)
 
-### 7.1 Pre-Solver Validation
+### B.1 Definition
 
-Before calculation, system displays validation status:
+The `in_service` flag determines element participation in calculations:
 
-| Status | Visual | Action |
-|--------|--------|--------|
-| Valid | Green checkmark | Calculation enabled |
-| Warning | Yellow triangle | Calculation enabled (with notice) |
-| Error | Red X | Calculation blocked |
+| `in_service` Value | Solver Behavior | SLD Appearance |
+|--------------------|-----------------|----------------|
+| `True` | Element INCLUDED in calculation | Normal display |
+| `False` | Element EXCLUDED from calculation | Grayed out, dashed |
 
-### 7.2 Validation Messages
+### B.2 Out-of-Service Element Display
 
-| Category | Example Message |
-|----------|-----------------|
-| Connectivity | "Network is not connected. Island detected." |
-| Source | "No source defined. Add External Grid or Generator." |
-| Voltage | "Bus 'Bus_01' has invalid voltage (0 kV)." |
-| Endpoints | "Line 'Line_01' has missing endpoint." |
+Elements with `in_service = False`:
 
----
+```
+┌─────────────────────────────────────────┐
+│ In Service (normal):                    │
+│                                         │
+│   ════════════════════  (solid line)    │
+│                                         │
+│ Out of Service:                         │
+│                                         │
+│   ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄  (dashed, gray)  │
+│                                         │
+└─────────────────────────────────────────┘
+```
 
-## 8. UI Layer Constraints
+**Rules:**
+- Out-of-service elements MUST remain visible in SLD
+- Out-of-service elements MUST be visually distinguished (grayed)
+- Out-of-service elements MUST be excluded from solver input
 
-### 8.1 What UI MUST NOT Do
+### B.3 Distinction: `in_service` vs Switch State
 
-| Constraint | Rationale |
-|------------|-----------|
-| NO physics calculations | Physics = Solver layer only |
-| NO topology corrections | User must explicitly fix |
-| NO hidden data stores | Single NetworkModel |
-| NO implicit assumptions | All parameters visible |
-| NO PCC creation in model | PCC = interpretation |
+| Property | Meaning | Affects Topology |
+|----------|---------|------------------|
+| `in_service = False` | Element does not exist for solver | Yes (removed) |
+| `Switch.state = OPEN` | Connection interrupted | Yes (disconnected) |
+| `Switch.state = CLOSED` | Connection active | No |
 
-### 8.2 What UI MUST Do
-
-| Requirement | Rationale |
-|-------------|-----------|
-| Display complete object state | Transparency |
-| Provide Property Grid for all edits | Consistency |
-| Show validation status | User awareness |
-| Indicate current mode | Context clarity |
-| Reflect NetworkModel changes immediately | Synchronization |
-
----
-
-## 9. Compliance Checklist (UI)
-
-| ID | Requirement | Verification |
-|----|-------------|--------------|
-| UI-001 | Property Grid for all edits | All edit paths use Property Grid |
-| UI-002 | Context menu on right-click | Standard actions available |
-| UI-003 | Mode indicator visible | Status bar shows current mode |
-| UI-004 | Validation feedback before solver | Errors/warnings displayed |
-| UI-005 | PowerFactory terminology | Bus, Branch, Case, Catalog |
-| UI-006 | No PCC in model (UI level) | PCC shown as overlay only |
-| UI-007 | SLD = NetworkModel view | 1:1 mapping, no virtual elements |
+**Critical Distinction:**
+- `in_service` removes the element entirely from solver consideration
+- `Switch.OPEN` only interrupts the topological path (switch still exists)
 
 ---
 
-**END OF DOCUMENT**
+## C. Property Grid
+
+### C.1 Canonical Field Set
+
+Each element type has a canonical, fixed set of fields:
+
+| Field Category | Examples | Source |
+|----------------|----------|--------|
+| Identity | id, name | User input |
+| Topology | from_bus_id, to_bus_id | User input |
+| Electrical (direct) | length_km | User input |
+| Electrical (from Type) | r_ohm_per_km, x_ohm_per_km | Catalog (read-only) |
+| Status | in_service | User input |
+
+### C.2 Unit Display
+
+**MANDATORY:** Every numeric field MUST display its unit:
+
+| Field | Display Format |
+|-------|----------------|
+| Length | `0.350 km` |
+| Resistance | `0.206 Ω/km` |
+| Reactance | `0.080 Ω/km` |
+| Current | `270 A` |
+| Voltage | `15.0 kV` |
+| Power | `10.0 MVA` |
+
+### C.3 Field Order Determinism
+
+**MANDATORY:** Field display order MUST be deterministic:
+
+1. Identity fields (name, id)
+2. Topology fields (from_bus, to_bus)
+3. Type reference
+4. Electrical parameters (from type, read-only)
+5. Local parameters (user-editable)
+6. Status fields (in_service)
+
+---
+
+## D. Validation Philosophy
+
+### D.1 Severity Levels
+
+| Severity | Meaning | Solver Impact |
+|----------|---------|---------------|
+| **ERROR** | Critical issue | BLOCKS solver |
+| **WARNING** | Non-critical issue | Solver allowed (with confirmation) |
+
+### D.2 No Auto-Repair
+
+**FORBIDDEN:**
+- Automatic correction of invalid values
+- Silent defaulting of missing parameters
+- "Smart" fixes without user consent
+
+**REQUIRED:**
+- Display error message with specific issue
+- User must manually correct the problem
+- Re-validate after correction
+
+### D.3 Validation Message Format
+
+```
+[ERROR] bus.voltage_valid: Bus "Bus_001" voltage must be > 0 (current: 0.0 kV)
+[ERROR] network.source_present: Network requires at least one Source
+[WARNING] branch.high_loading: Line "Line_005" may exceed thermal rating
+```
+
+---
+
+## E. Determinizm i audyt (Determinism and Audit)
+
+### E.1 Deterministic Computation
+
+**INVARIANT:** Same input MUST produce same output, always.
+
+```
+NetworkSnapshot_A + CaseParameters_A → Result_A
+
+If NetworkSnapshot_A == NetworkSnapshot_B
+   AND CaseParameters_A == CaseParameters_B
+THEN Result_A == Result_B (identical)
+```
+
+### E.2 No Randomness
+
+**FORBIDDEN:**
+- Random number generation in solvers
+- Non-deterministic algorithm selection
+- Time-dependent calculation variations
+- Platform-dependent floating-point behavior (where avoidable)
+
+### E.3 Audit Trail Requirements
+
+Every calculation MUST produce:
+
+| Artifact | Content |
+|----------|---------|
+| Input Snapshot | Frozen NetworkModel state |
+| Parameters | All solver configuration |
+| Intermediate Values | Y-bus matrix, impedances, iterations |
+| Output Results | Final calculated values |
+| Trace | Step-by-step calculation log |
+
+### E.4 Manual Verification
+
+**REQUIRED:** Any calculation step MUST be manually reproducible:
+
+```
+Given: WhiteBoxTrace with intermediate values
+User can: Verify any step with calculator/spreadsheet
+Result: Exact match between manual and solver computation
+```
+
+---
+
+**END OF POWERFACTORY UI PARITY GUIDELINES**

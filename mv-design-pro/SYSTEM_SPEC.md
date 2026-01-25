@@ -569,145 +569,160 @@ backend/src/
 
 ## 18. User Interaction Model (PowerFactory-aligned)
 
-### 18.1 Project Tree Structure (PF-style)
+This section defines the canonical user interaction model, fully aligned with DIgSILENT PowerFactory philosophy.
 
-The user interaction model MUST mirror DIgSILENT PowerFactory's hierarchical project structure:
+### 18.1 Model pracy użytkownika (User Workflow Model)
+
+#### 18.1.1 Project Tree (PF-style)
+
+The user MUST interact with the system through a hierarchical project tree structure:
 
 ```
 Project
-├── NetworkModel (single, editable)
-│   ├── Buses
-│   ├── Lines / Cables
-│   ├── Transformers
-│   ├── Switches
-│   ├── Sources
-│   └── Loads
-├── Study Cases
-│   ├── ShortCircuitCase #1
-│   ├── ShortCircuitCase #2
-│   ├── PowerFlowCase #1
-│   └── ...
-├── Calculations (solver runs)
-│   ├── ShortCircuitResult #1 → Case #1
-│   └── PowerFlowResult #1 → Case #1
-└── Results (analysis overlays)
-    ├── ThermalAnalysis
-    ├── VoltageAnalysis
-    └── ProtectionAnalysis (prospective)
+  └── NetworkModel (singleton)
+        ├── Study Cases
+        │     ├── ShortCircuitCase
+        │     ├── PowerFlowCase
+        │     └── ProtectionCase (prospective)
+        ├── Calculations (solver runs)
+        └── Results (per Case)
 ```
 
-### 18.2 Operational Modes (MANDATORY)
+**Invariant:** There is exactly ONE NetworkModel per Project. All Study Cases reference this single model.
 
-The system MUST distinguish three operational modes, clearly visible to the user:
+#### 18.1.2 Explicit Work Modes
 
-| Mode | Description | Editable | View |
-|------|-------------|----------|------|
-| **Edit Mode** | Direct modification of NetworkModel | YES | Network structure |
-| **Study Case Mode** | Configuration of Case parameters | Case parameters ONLY | Case settings |
-| **Result Mode** | Read-only inspection of results | NO | Results + overlays |
+The system MUST expose three distinct work modes:
+
+| Mode | Purpose | Model State | Results State |
+|------|---------|-------------|---------------|
+| **Edit Mode** | Modify NetworkModel | MUTABLE | N/A (results invalidated) |
+| **Study Case Mode** | Configure Case parameters | READ-ONLY (model) | CONFIGURABLE |
+| **Result Mode** | View calculation results | READ-ONLY | READ-ONLY + Overlays |
 
 **Rules:**
-- User MUST NOT be able to modify NetworkModel in Result Mode
-- User MUST NOT be able to modify Case parameters in Edit Mode (separation of concerns)
-- Mode switching MUST be explicit and visible (no implicit transitions)
+- The user MUST NOT modify NetworkModel while in Result Mode
+- Switching from Edit Mode MUST invalidate all existing results
+- Study Case Mode MUST NOT allow model mutations
 
-### 18.3 Wizard Definition (PowerFactory Data Manager Equivalent)
+### 18.2 Role komponentów (Component Roles)
 
-**Wizard = PowerFactory Data Manager**
+#### 18.2.1 Wizard = PowerFactory Data Manager
 
-The Wizard is the sequential controller for NetworkModel creation and modification:
+The Wizard serves as the equivalent of PowerFactory's Data Manager:
 
-| PowerFactory Concept | MV-DESIGN-PRO Equivalent |
-|---------------------|-------------------------|
-| Data Manager | Wizard |
-| Study Case | Case |
-| Calculation | Solver Run |
-| Results | Result + Analysis overlays |
-
-**Wizard MUST:**
-- Guide user through model creation in deterministic steps
-- Operate ONLY on NetworkModel objects (no special entities)
-- Enforce validation before solver execution
-- Provide Property Grid interface for object editing
-
-**Wizard MUST NOT:**
-- Create virtual or helper objects
-- Aggregate physics or calculations
-- Hide elements from user view
-- Provide "intelligent" shortcuts that bypass explicit steps
-
-### 18.4 SLD Definition (Single Line Diagram)
-
-**SLD = graphical view of NetworkModel ONLY**
-
-| Rule | Description |
-|------|-------------|
-| 1:1 mapping | Each SLD symbol corresponds to exactly ONE NetworkModel object |
-| No virtual elements | No helper lines, no logical symbols without model backing |
-| No PCC symbol in model | PCC is displayed as overlay (interpretation layer) |
-| Bidirectional sync | Edit via SLD → modifies NetworkModel → Wizard reflects change |
-
-**SLD MUST:**
-- Reflect NetworkModel state at all times
-- Support double-click → Properties (Property Grid)
-- Support context menu with PowerFactory-style actions
-- Display element states (in_service, switch state)
-
-**SLD MUST NOT:**
-- Store topology or physics data
-- Contain "smart" routing or auto-connection logic in model layer
-- Display elements not present in NetworkModel
-
-### 18.5 PCC (Point of Common Coupling) Rules
-
-**PCC MUST NOT belong to NetworkModel.**
-
-| Layer | PCC Handling |
-|-------|--------------|
-| NetworkModel | NO PCC field, no PCC object |
-| Solver | NO PCC concept (pure physics) |
-| Analysis (interpretation) | PCC identified via BoundaryIdentifier heuristics |
-| SLD (display) | PCC shown as overlay/annotation ONLY |
-
-**Rationale:** PCC is a contractual/interpretation concept, not a physical network element.
-
-### 18.6 Property Grid (PowerFactory-style)
-
-All object editing MUST use Property Grid pattern:
-
-```
-┌─────────────────────────────────────┐
-│ Properties: Bus "Bus_001"           │
-├─────────────────────────────────────┤
-│ General                             │
-│   Name:         [Bus_001        ]   │
-│   Voltage (kV): [15.0           ]   │
-│   Node Type:    [PQ       ▼     ]   │
-├─────────────────────────────────────┤
-│ Power Flow                          │
-│   V magnitude:  [1.0   ] pu         │
-│   V angle:      [0.0   ] rad        │
-├─────────────────────────────────────┤
-│ Short Circuit                       │
-│   (derived from topology)           │
-└─────────────────────────────────────┘
-```
+| Wizard Function | PowerFactory Equivalent |
+|-----------------|------------------------|
+| Sequential element entry | Data Manager forms |
+| Property editing | Element Properties dialog |
+| Type selection | Type Library browser |
+| Validation feedback | Check Network function |
 
 **Rules:**
-- Double-click on Wizard list item → Property Grid
-- Double-click on SLD symbol → Property Grid (same)
-- All parameters visible, no hidden fields
-- Read-only fields clearly marked
+- Wizard MUST operate directly on NetworkModel
+- Wizard MUST NOT maintain separate data store
+- Wizard MUST NOT interpret physics or results
+- Wizard MUST NOT contain PCC logic
 
-### 18.7 Invariants (Non-Negotiable)
+#### 18.2.2 SLD = Graphical View of NetworkModel
 
-1. **ONE NetworkModel** per project — no parallel data stores
-2. **Wizard and SLD operate on the SAME NetworkModel** — no synchronization issues
-3. **Case CANNOT mutate NetworkModel** — read-only view only
-4. **PCC NOT in NetworkModel** — interpretation layer only
-5. **No virtual elements** — every SLD symbol = model object
-6. **Explicit mode transitions** — user always knows current mode
-7. **Property Grid for all edits** — no hidden modification paths
+The SLD (Single Line Diagram) is EXCLUSIVELY a visualization layer:
+
+| SLD Function | PowerFactory Equivalent |
+|--------------|------------------------|
+| Symbol display | Graphic element |
+| Position/layout | Graphic coordinates |
+| Result overlay | Result display layer |
+| Element selection | Object selection |
+
+**Rules:**
+- SLD MUST have 1:1 mapping: one symbol per one model object
+- SLD MUST NOT contain virtual elements
+- SLD MUST NOT store physics or calculation data
+- SLD MUST NOT interpret results (interpretation belongs to Analysis layer)
+
+#### 18.2.3 Calculation = Explicit Solver Invocation
+
+Calculations MUST be explicitly triggered by the user:
+
+**Rules:**
+- Calculation MUST NOT run automatically on model change
+- User MUST explicitly click "Calculate" to invoke solver
+- Solver MUST reject invalid models (blocked by NetworkValidator)
+
+#### 18.2.4 Analysis = Result Interpretation Layer
+
+Analysis provides interpretation of solver results:
+
+| Analysis Function | Output |
+|-------------------|--------|
+| Limit checking | Violations (thermal, voltage) |
+| PCC identification | Boundary markers (overlays) |
+| Protection coordination | Coordination curves |
+| Compliance assessment | Normative status |
+
+**Rules:**
+- Analysis MUST NOT contain physics calculations
+- Analysis MUST NOT modify NetworkModel
+- PCC MUST be identified in Analysis layer ONLY (never in NetworkModel)
+
+### 18.3 Reguły twarde (Hard Rules)
+
+#### 18.3.1 Bijection: SLD ↔ NetworkModel
+
+**MUST:** Each SLD symbol corresponds to exactly one NetworkModel object.
+
+```
+SLD Symbol          NetworkModel Object
+───────────         ───────────────────
+BusSymbol      ↔    Bus
+LineSymbol     ↔    LineBranch
+TrafoSymbol    ↔    TransformerBranch
+SwitchSymbol   ↔    Switch
+SourceSymbol   ↔    Source
+LoadSymbol     ↔    Load
+```
+
+**MUST NOT:**
+- Create SLD symbols without model object
+- Create model objects invisible in SLD
+- Create "helper" or "auxiliary" symbols
+- Create "virtual nodes" or "aggregated symbols"
+
+#### 18.3.2 No Virtual Elements
+
+**MUST NOT** exist in NetworkModel:
+- Virtual nodes
+- Aggregated elements
+- Helper objects
+- Boundary markers (use Analysis layer)
+- PCC markers (use Analysis layer)
+
+#### 18.3.3 No Logic/Physics in UI
+
+**MUST NOT** be performed by UI (Wizard/SLD):
+- Impedance calculations
+- Power flow calculations
+- Short circuit calculations
+- Result interpretation
+- Limit checking
+- PCC identification
+
+**MUST** be delegated to:
+- Solver layer (physics)
+- Analysis layer (interpretation)
+
+#### 18.3.4 PCC Exclusively in Analysis Layer
+
+**BINDING:** PCC (Point of Common Coupling / punkt wspólnego przyłączenia) MUST NOT appear in NetworkModel.
+
+| Layer | PCC Status |
+|-------|------------|
+| NetworkModel | FORBIDDEN |
+| Wizard | FORBIDDEN (hint only in settings) |
+| SLD | FORBIDDEN (overlay only from Analysis) |
+| Analysis | ALLOWED (BoundaryIdentifier) |
+| Export/Import | ALLOWED (as hint, not model data) |
 
 ---
 
