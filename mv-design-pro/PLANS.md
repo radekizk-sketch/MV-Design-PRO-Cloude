@@ -291,6 +291,12 @@ class NetworkGraph:
 - [ ] Move/organize case classes
 - [ ] Ensure separation from analyses
 
+### 6.4 Task 4.4: Active Case Pointer (DONE)
+
+**Actions (DONE - 2025-02):**
+- [x] Add project-scoped Active Case pointer
+- [x] Gate calculations on Active Case context (PF-style)
+
 ---
 
 ## 7. Phase 5: Interpretation Layer (PARTIAL)
@@ -414,6 +420,7 @@ class NetworkGraph:
 | 2025-01 | 2.2 | Phase 1.x DONE: PowerFactory UI/UX Parity documentation |
 | 2025-02 | 2.3 | Docs consolidation & spec vs code audit report completed |
 | 2025-02 | 2.4 | P0: NetworkValidator wired as pre-solver gate (PF-compliant) |
+| 2025-02 | 2.5 | P2: Active Case pointer added (PF-style calculation context) |
 
 ---
 

@@ -11,6 +11,11 @@ from uuid import UUID
 from analysis.power_flow import PowerFlowSolver
 from analysis.power_flow._internal import build_slack_island, validate_input
 from analysis.power_flow.types import PowerFlowInput, PowerFlowOptions, PQSpec, PVSpec, SlackSpec
+from application.active_case import (
+    ActiveCaseMismatchError,
+    ActiveCaseNotSetError,
+    ActiveCaseService,
+)
 from application.sld.overlay import ResultSldOverlayBuilder
 from domain.analysis_run import AnalysisRun, new_analysis_run
 from domain.project_design_mode import ProjectDesignMode
@@ -67,9 +72,10 @@ class AnalysisRunService:
     def create_power_flow_run(
         self,
         project_id: UUID,
-        operating_case_id: UUID,
+        operating_case_id: UUID | None = None,
         options: dict | None = None,
     ) -> AnalysisRun:
+        operating_case_id = self._resolve_operating_case_id(project_id, operating_case_id)
         snapshot = self._build_power_flow_snapshot(project_id, operating_case_id, options)
         input_hash = compute_input_hash(snapshot)
         with self._uow_factory() as uow:
@@ -91,10 +97,13 @@ class AnalysisRunService:
     def create_short_circuit_run(
         self,
         project_id: UUID,
-        operating_case_id: UUID,
-        fault_spec: dict,
+        operating_case_id: UUID | None = None,
+        fault_spec: dict | None = None,
         options: dict | None = None,
     ) -> AnalysisRun:
+        if fault_spec is None:
+            raise ValueError("fault_spec is required to create short-circuit runs")
+        operating_case_id = self._resolve_operating_case_id(project_id, operating_case_id)
         snapshot = self._build_short_circuit_snapshot(
             project_id, operating_case_id, fault_spec, options
         )
@@ -118,9 +127,10 @@ class AnalysisRunService:
     def create_fault_loop_run(
         self,
         project_id: UUID,
-        operating_case_id: UUID,
+        operating_case_id: UUID | None = None,
         options: dict | None = None,
     ) -> AnalysisRun:
+        operating_case_id = self._resolve_operating_case_id(project_id, operating_case_id)
         snapshot = self._build_fault_loop_snapshot(project_id, operating_case_id, options)
         input_hash = compute_input_hash(snapshot)
         with self._uow_factory() as uow:
@@ -193,6 +203,20 @@ class AnalysisRunService:
         return self._overlay_builder.build_short_circuit_overlay(
             diagram.get("payload"), result_payload
         )
+
+    def _resolve_operating_case_id(
+        self, project_id: UUID, operating_case_id: UUID | None
+    ) -> UUID:
+        active_case_id = ActiveCaseService(self._uow_factory).get_active_case_id(project_id)
+        if active_case_id is None:
+            raise ActiveCaseNotSetError(
+                f"ActiveCase is not set for project {project_id}"
+            )
+        if operating_case_id is not None and operating_case_id != active_case_id:
+            raise ActiveCaseMismatchError(
+                f"OperatingCase {operating_case_id} is not the Active Case for project {project_id}"
+            )
+        return active_case_id
 
     def _execute_power_flow(self, uow: UnitOfWork, run: AnalysisRun) -> AnalysisRun:
         pf_input = self._build_power_flow_input(run)

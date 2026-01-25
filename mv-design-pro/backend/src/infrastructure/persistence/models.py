@@ -127,6 +127,11 @@ class ProjectSettingsORM(Base):
     pcc_node_id: Mapped[UUID | None] = mapped_column(
         GUID(), ForeignKey("network_nodes.id", use_alter=True, name="fk_settings_pcc_node")
     )
+    active_case_id: Mapped[UUID | None] = mapped_column(
+        GUID(),
+        ForeignKey("operating_cases.id", use_alter=True, name="fk_settings_active_case"),
+        nullable=True,
+    )
     grounding_jsonb: Mapped[dict[str, Any]] = mapped_column(
         DeterministicJSON(), nullable=False, default=dict
     )

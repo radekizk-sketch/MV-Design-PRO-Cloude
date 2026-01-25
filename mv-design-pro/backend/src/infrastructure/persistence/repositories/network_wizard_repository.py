@@ -28,12 +28,14 @@ class NetworkWizardRepository:
             return {
                 "project_id": project_id,
                 "pcc_node_id": None,
+                "active_case_id": None,
                 "grounding": {},
                 "limits": {},
             }
         return {
             "project_id": row.project_id,
             "pcc_node_id": row.pcc_node_id,
+            "active_case_id": row.active_case_id,
             "grounding": row.grounding_jsonb,
             "limits": row.limits_jsonb,
         }
@@ -43,6 +45,7 @@ class NetworkWizardRepository:
         project_id: UUID,
         *,
         pcc_node_id: UUID | None,
+        active_case_id: UUID | None,
         grounding: dict,
         limits: dict,
         commit: bool = True,
@@ -54,12 +57,14 @@ class NetworkWizardRepository:
                 ProjectSettingsORM(
                     project_id=project_id,
                     pcc_node_id=pcc_node_id,
+                    active_case_id=active_case_id,
                     grounding_jsonb=grounding,
                     limits_jsonb=limits,
                 )
             )
         else:
             row.pcc_node_id = pcc_node_id
+            row.active_case_id = active_case_id
             row.grounding_jsonb = grounding
             row.limits_jsonb = limits
         if commit:
@@ -70,6 +75,7 @@ class NetworkWizardRepository:
         self.upsert_settings(
             project_id,
             pcc_node_id=node_id,
+            active_case_id=settings["active_case_id"],
             grounding=settings["grounding"],
             limits=settings["limits"],
             commit=commit,
@@ -80,6 +86,7 @@ class NetworkWizardRepository:
         self.upsert_settings(
             project_id,
             pcc_node_id=settings["pcc_node_id"],
+            active_case_id=settings["active_case_id"],
             grounding=grounding,
             limits=settings["limits"],
             commit=commit,
@@ -90,8 +97,25 @@ class NetworkWizardRepository:
         self.upsert_settings(
             project_id,
             pcc_node_id=settings["pcc_node_id"],
+            active_case_id=settings["active_case_id"],
             grounding=settings["grounding"],
             limits=limits,
+            commit=commit,
+        )
+
+    def get_active_case_id(self, project_id: UUID) -> UUID | None:
+        return self.get_settings(project_id)["active_case_id"]
+
+    def set_active_case_id(
+        self, project_id: UUID, case_id: UUID | None, *, commit: bool = True
+    ) -> None:
+        settings = self.get_settings(project_id)
+        self.upsert_settings(
+            project_id,
+            pcc_node_id=settings["pcc_node_id"],
+            active_case_id=case_id,
+            grounding=settings["grounding"],
+            limits=settings["limits"],
             commit=commit,
         )
 
