@@ -340,6 +340,15 @@ class NetworkGraph:
 - [x] Document analysis vs solver boundary
 - [x] Add analysis layer tests
 
+### 7.4 Task 5.4: Power Flow solver boundary alignment (DONE)
+
+**Location:** `backend/src/network_model/solvers/power_flow_newton.py`
+
+**Actions (DONE):**
+- [x] Relocate Newton-Raphson Power Flow physics into solver layer
+- [x] Keep analysis layer orchestration-only with compatibility adapter
+- [x] Add regression test for solver layer parity
+
 ---
 
 ## 8. Phase 6: Wizard/SLD Unity (PENDING)
@@ -438,6 +447,7 @@ class NetworkGraph:
 | 2025-02 | 2.5 | P2: Active Case pointer added (PF-style calculation context) |
 | 2025-03 | 2.6 | P3: Single NetworkModel invariant enforced (no shadow graphs) |
 | 2025-03 | 2.7 | P5: BoundaryIdentifier (PCC heuristics) implemented as analysis-only |
+| 2025-03 | 2.8 | P6: Power Flow solver relocated to solver layer (PowerFactory boundary compliance) |
 
 ---
 
