@@ -4,13 +4,17 @@ from typing import Any
 
 
 def parse_network_payload(payload: dict[str, Any]) -> dict[str, Any]:
+    raw_nodes = payload.get("nodes")
+    if raw_nodes is None:
+        raw_nodes = payload.get("buses", [])
     nodes = []
-    for node in payload.get("nodes", []):
+    for node in raw_nodes:
+        node_type = node.get("node_type", node.get("bus_type"))
         nodes.append(
             {
                 "id": node.get("id"),
                 "name": node.get("name"),
-                "node_type": node.get("node_type"),
+                "node_type": node_type,
                 "base_kv": node.get("base_kv"),
                 "attrs": node.get("attrs", {}),
             }

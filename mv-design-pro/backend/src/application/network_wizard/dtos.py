@@ -17,6 +17,19 @@ class NodePayload:
 
 
 @dataclass(frozen=True)
+class BusPayload:
+    name: str
+    bus_type: str
+    base_kv: float
+    attrs: dict[str, Any] = field(default_factory=dict)
+    id: UUID | None = None
+
+    @property
+    def node_type(self) -> str:
+        return self.bus_type
+
+
+@dataclass(frozen=True)
 class BranchPayload:
     name: str
     branch_type: str

@@ -11,6 +11,7 @@ PowerFactory Alignment:
 - NetworkGraph = topologia sieci
 """
 
+from .bus import Bus
 from .node import Node, NodeType
 from .branch import BranchType, Branch, LineBranch, TransformerBranch
 from .switch import Switch, SwitchType, SwitchState
@@ -29,9 +30,6 @@ from .action_envelope import (
     validate_action_envelope,
 )
 from .ybus import AdmittanceMatrixBuilder
-
-# PowerFactory terminology alias
-Bus = Node  # Bus = Node = electrical node with single potential
 
 __all__ = [
     # PowerFactory-aligned names

@@ -16,7 +16,7 @@ The Wizard follows PowerFactory Data Manager paradigm:
 │ Network Wizard                                    [X]       │
 ├─────────────────────────────────────────────────────────────┤
 │                                                             │
-│  Step 3 of 10: Buses (Nodes)                               │
+│  Step 3 of 10: Buses                                       │
 │                                                             │
 │  ┌─────────────────────────────────────────────────────┐   │
 │  │                                                     │   │

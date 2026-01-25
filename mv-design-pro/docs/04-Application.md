@@ -212,9 +212,9 @@ get_sld_overlay_for_run(project_id, diagram_id, run_id) -> dict
 
 ```python
 @dataclass
-class NodePayload:
+class BusPayload:
     name: str
-    node_type: str
+    bus_type: str  # alias of node_type (legacy)
     base_kv: float
     attrs: dict = field(default_factory=dict)
     id: UUID | None = None
@@ -263,6 +263,10 @@ class ShortCircuitInput:
 > (user hint from project settings), NOT a field from NetworkGraph.
 > NetworkGraph does NOT contain PCC - see SYSTEM_SPEC.md Section 18.3.4.
 
+> **Terminology:** Bus to kanoniczny termin PowerFactory. `NodePayload` pozostaje
+> kompatybilnym aliasem wewnętrznym, a API akceptuje zarówno `bus_type`, jak i `node_type`.
+> Pola `node_id` / `from_node_id` / `to_node_id` pozostają bez zmian dla kompatybilności.
+
 ## 6. Błędy
 
 ### 6.1 Lokalizacja
@@ -294,10 +298,10 @@ class ValidationFailed(Exception):
 # 1. Utwórz projekt
 project = service.create_project("Sieć SN Centrum")
 
-# 2. Dodaj węzły
-slack = service.add_node(project.id, NodePayload(
+# 2. Dodaj busy (legacy: nodes)
+slack = service.add_node(project.id, BusPayload(
     name="GPZ",
-    node_type="SLACK",
+    bus_type="SLACK",
     base_kv=110.0,
     attrs={"voltage_magnitude_pu": 1.0, "voltage_angle_rad": 0.0}
 ))

@@ -2,6 +2,7 @@
 
 from .dtos import (
     BranchPayload,
+    BusPayload,
     CasePayload,
     FaultSpecPayload,
     GroundingPayload,
@@ -19,6 +20,7 @@ from .service import NetworkWizardService
 
 __all__ = [
     "BranchPayload",
+    "BusPayload",
     "CasePayload",
     "FaultSpecPayload",
     "GroundingPayload",
