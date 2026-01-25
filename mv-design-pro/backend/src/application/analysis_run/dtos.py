@@ -20,6 +20,7 @@ class AnalysisRunSummaryDTO:
     deterministic_id: str
     analysis_type: str
     status: str
+    result_status: str
     created_at: datetime
     finished_at: datetime | None
     input_hash: str
@@ -32,6 +33,7 @@ class AnalysisRunSummaryDTO:
             "deterministic_id": self.deterministic_id,
             "analysis_type": self.analysis_type,
             "status": self.status,
+            "result_status": self.result_status,
             "created_at": _format_datetime(self.created_at),
             "finished_at": _format_datetime(self.finished_at),
             "input_hash": self.input_hash,
@@ -46,6 +48,7 @@ class AnalysisRunDetailDTO:
     deterministic_id: str
     analysis_type: str
     status: str
+    result_status: str
     created_at: datetime
     finished_at: datetime | None
     input_hash: str
@@ -59,6 +62,7 @@ class AnalysisRunDetailDTO:
             "deterministic_id": self.deterministic_id,
             "analysis_type": self.analysis_type,
             "status": self.status,
+            "result_status": self.result_status,
             "created_at": _format_datetime(self.created_at),
             "finished_at": _format_datetime(self.finished_at),
             "input_hash": self.input_hash,

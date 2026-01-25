@@ -9,6 +9,7 @@ from application.network_model import (
     ensure_snapshot_matches_project,
     network_model_id_for_project,
 )
+from application.analysis_run.result_invalidator import ResultInvalidator
 from domain.models import OperatingCase
 from infrastructure.persistence.unit_of_work import UnitOfWork
 from network_model.core import (
@@ -26,6 +27,7 @@ from network_model.core import (
 class WizardActionService:
     def __init__(self, uow_factory: Callable[[], UnitOfWork]) -> None:
         self._uow_factory = uow_factory
+        self._result_invalidator = ResultInvalidator()
 
     def build_action(self, case_id: UUID, payload: dict[str, Any]) -> ActionEnvelope:
         parent_snapshot_id = self._get_case_snapshot_id(case_id)
@@ -127,6 +129,7 @@ class WizardActionService:
             uow.snapshots.add_snapshot(new_snapshot, commit=False)
             updated_case = _update_case_snapshot(case, new_snapshot.meta.snapshot_id)
             uow.cases.update_operating_case(updated_case, commit=False)
+            self._result_invalidator.invalidate_project_results(uow, case.project_id)
             return BatchActionResult(
                 status="accepted",
                 parent_snapshot_id=parent_snapshot_id,

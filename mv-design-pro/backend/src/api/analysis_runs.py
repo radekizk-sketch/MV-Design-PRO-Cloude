@@ -62,16 +62,17 @@ def list_analysis_runs(
             build_trace_summary(trace_payload) if trace_payload is not None else None
         )
         items.append(
-            AnalysisRunSummaryDTO(
-                id=run.id,
-                deterministic_id=build_deterministic_id(run),
-                analysis_type=run.analysis_type,
-                status=run.status,
-                created_at=run.created_at,
-                finished_at=run.finished_at,
-                input_hash=run.input_hash,
-                summary_json=minimize_summary(run.result_summary),
-                trace_summary=trace_summary,
+                AnalysisRunSummaryDTO(
+                    id=run.id,
+                    deterministic_id=build_deterministic_id(run),
+                    analysis_type=run.analysis_type,
+                    status=run.status,
+                    result_status=run.result_status,
+                    created_at=run.created_at,
+                    finished_at=run.finished_at,
+                    input_hash=run.input_hash,
+                    summary_json=minimize_summary(run.result_summary),
+                    trace_summary=trace_summary,
             ).to_dict()
         )
     return canonicalize_json({"items": items, "count": len(runs)})
@@ -110,6 +111,7 @@ def get_analysis_run(
         deterministic_id=build_deterministic_id(run),
         analysis_type=run.analysis_type,
         status=run.status,
+        result_status=run.result_status,
         created_at=run.created_at,
         finished_at=run.finished_at,
         input_hash=run.input_hash,
