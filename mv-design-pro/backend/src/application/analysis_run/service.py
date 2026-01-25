@@ -770,9 +770,9 @@ class AnalysisRunService:
 
         graph = self._build_network_graph(project_id, case.id)
         settings = uow.wizard.get_settings(project_id)
-        pcc_node_id = settings.get("pcc_node_id")
-        if pcc_node_id:
-            graph.pcc_node_id = str(pcc_node_id)
+        # NOTE: PCC – punkt wspólnego przyłączenia is no longer stored in NetworkGraph.
+        # PCC is an interpretation, not a model property. The pcc_node_id hint
+        # remains in wizard settings for use by analysis/interpretation layer.
         sources = uow.wizard.list_sources(project_id)
         for source in sources:
             if source.get("source_type") == "GRID":

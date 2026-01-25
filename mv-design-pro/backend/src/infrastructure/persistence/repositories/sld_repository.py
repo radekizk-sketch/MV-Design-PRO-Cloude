@@ -179,7 +179,9 @@ class SldRepository:
                     x=float(node.get("x", 0.0)),
                     y=float(node.get("y", 0.0)),
                     label=node.get("label"),
-                    is_pcc=bool(node.get("is_pcc", False)),
+                    # NOTE: is_pcc is deprecated and always False.
+                    # PCC – punkt wspólnego przyłączenia is interpretation, not stored data.
+                    is_pcc=False,
                 )
             )
         for branch in payload.get("branches", []):

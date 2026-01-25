@@ -69,7 +69,8 @@ def test_sld_binding_nodes_and_branches() -> None:
 
     assert payload_node_ids == node_ids
     assert payload_branch_ids == branch_ids
-    assert any(item.get("is_pcc") for item in payload.get("nodes", []))
+    # NOTE: is_pcc was removed from SldNodeSymbol.
+    # PCC – punkt wspólnego przyłączenia is interpretation, not stored data.
 
 
 def test_sld_export_import_roundtrip() -> None:
