@@ -1021,4 +1021,130 @@ Response: {
 
 ---
 
+## 14. PowerFactory UI/UX Parity
+
+This section documents the alignment between MV-DESIGN-PRO user interface concepts and DIgSILENT PowerFactory paradigms.
+
+### 14.1 UI Component Mapping
+
+| PowerFactory Component | MV-DESIGN-PRO Equivalent | Description |
+|------------------------|--------------------------|-------------|
+| Data Manager | Wizard | Sequential element entry and property editing |
+| Study Case | Case | Calculation scenario with parameters |
+| Calculation Command | Solver Run | Explicit invocation of solver |
+| Result Browser | Results + Analysis overlays | View of solver output with interpretation |
+| Type Library | Catalog | Immutable type definitions |
+| Graphic (Single Line) | SLD | Topological diagram visualization |
+| Element Properties | Property Grid | Canonical field editor |
+| Check Network | NetworkValidator | Pre-solver validation |
+
+### 14.2 PowerFactory-style Behaviors
+
+#### 14.2.1 Property Grid as Central Interface
+
+The Property Grid is the canonical interface for element editing:
+
+```
+┌─────────────────────────────────────────────────┐
+│ Properties: Line_001                            │
+├─────────────────────────────────────────────────┤
+│ General                                         │
+│   Name:           [Line_001        ]            │
+│   Type:           [NAYY 4x150    ▼]            │
+│   Length (km):    [0.350          ]            │
+│   In Service:     [✓]                          │
+├─────────────────────────────────────────────────┤
+│ Electrical                                      │
+│   R (Ω/km):       0.206          (from Type)   │
+│   X (Ω/km):       0.080          (from Type)   │
+│   B (µS/km):      260.0          (from Type)   │
+├─────────────────────────────────────────────────┤
+│ Rating                                          │
+│   I_rated (A):    270            (from Type)   │
+└─────────────────────────────────────────────────┘
+```
+
+**Rules:**
+- Units MUST be displayed explicitly with every numeric field
+- Read-only fields (from Type) MUST be visually distinguished
+- Field order MUST be deterministic (same order every time)
+
+#### 14.2.2 Interaction Patterns
+
+| User Action | System Response |
+|-------------|-----------------|
+| Double-click element (SLD/Tree) | Open Properties dialog |
+| Right-click element | Context menu (Add / Properties / Delete / In service) |
+| Ctrl+Click | Multi-select |
+| Delete key | Delete selected (with confirmation) |
+
+#### 14.2.3 In Service Toggle
+
+The `in_service` flag follows PowerFactory semantics:
+
+| UI Action | Effect |
+|-----------|--------|
+| Toggle "In Service" OFF | Element excluded from solver, grayed in SLD |
+| Toggle "In Service" ON | Element included in solver, normal display |
+
+**Visual States:**
+```
+In Service = True:   [Normal color, solid lines]
+In Service = False:  [Grayed out, dashed lines]
+```
+
+#### 14.2.4 Read-only vs Editable Fields
+
+| Field State | Visual Indicator | User Can Edit |
+|-------------|------------------|---------------|
+| Editable | White background | Yes |
+| Read-only (from Type) | Gray background | No |
+| Read-only (Result Mode) | All fields gray | No |
+| Calculated | Blue text | No |
+
+### 14.3 Wizard/SLD Unity Principle
+
+#### 14.3.1 Single Model Guarantee
+
+Both Wizard and SLD operate on THE SAME NetworkModel instance:
+
+```
+┌─────────────────────────────────────────────────────────┐
+│                    NetworkModel                          │
+│                    (single instance)                     │
+└─────────────────────────────────────────────────────────┘
+          ▲                              ▲
+          │                              │
+     ┌────┴────┐                    ┌────┴────┐
+     │ Wizard  │                    │   SLD   │
+     │ (edit)  │                    │ (edit)  │
+     └─────────┘                    └─────────┘
+
+Edit via Wizard → NetworkModel updated → SLD reflects immediately
+Edit via SLD    → NetworkModel updated → Wizard reflects immediately
+```
+
+#### 14.3.2 No State Duplication
+
+**FORBIDDEN:**
+- Wizard maintaining separate element list
+- SLD maintaining separate topology
+- Cached copies of model data
+- "Pending changes" buffers
+
+**REQUIRED:**
+- All reads directly from NetworkModel
+- All writes directly to NetworkModel
+- Immediate consistency between views
+
+#### 14.3.3 No Auxiliary Models
+
+**FORBIDDEN:**
+- "SLD Model" separate from NetworkModel
+- "Wizard Data Model" separate from NetworkModel
+- "Display Model" with virtual elements
+- "Working Copy" for editing
+
+---
+
 **END OF ARCHITECTURE DOCUMENT**
