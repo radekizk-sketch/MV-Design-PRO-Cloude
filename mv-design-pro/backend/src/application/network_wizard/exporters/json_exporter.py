@@ -22,11 +22,18 @@ def export_network_payload(
     schema_version: str,
     export_version: str = "1.0",
 ) -> dict[str, Any]:
+    buses = []
+    for node in nodes:
+        bus = dict(node)
+        if "node_type" in bus:
+            bus["bus_type"] = bus.pop("node_type")
+        buses.append(bus)
     return {
         "export_version": export_version,
         "schema_version": schema_version,
         "project": project,
         "nodes": nodes,
+        "buses": buses,
         "branches": branches,
         "operating_cases": operating_cases,
         "study_cases": study_cases,

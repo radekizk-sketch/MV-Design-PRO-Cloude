@@ -32,7 +32,7 @@ This document provides a comprehensive checklist for verifying compliance with D
 
 | ID | Requirement | Verification | Status |
 |----|-------------|--------------|--------|
-| NM-010 | Bus = electrical node (single potential) | Check: Node class exists | VERIFY |
+| NM-010 | Bus = electrical node (single potential) | Check: Bus alias maps to Node | PASS |
 | NM-011 | Line = overhead line with R/X | Check: LineBranch has impedance | PASS |
 | NM-012 | Cable = underground with R/X/C | Check: LineBranch supports CABLE | PASS |
 | NM-013 | Transformer = 2W/3W with impedance | Check: TransformerBranch exists | PASS |

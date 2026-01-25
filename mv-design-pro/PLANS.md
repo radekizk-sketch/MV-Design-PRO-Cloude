@@ -231,9 +231,9 @@ class NetworkGraph:
 ### 4.4 Task 2.4: Bus Terminology
 
 **Actions:**
-- [ ] Add alias/documentation for Bus = Node
-- [ ] Update docstrings
-- [ ] Consider rename in next major version
+- [x] Add alias/documentation for Bus = Node
+- [x] Update docstrings
+- [x] Consider rename in next major version
 
 ### 4.5 Task 2.5: NetworkValidator gate (DONE)
 
@@ -383,7 +383,7 @@ class NetworkGraph:
 | Requirement | Phase | Status |
 |-------------|-------|--------|
 | Single NetworkModel | Phase 2 | DONE |
-| Bus terminology | Phase 2 | PENDING |
+| Bus terminology | Phase 2 | DONE |
 | Switch without impedance | Phase 2 | DONE |
 | Station = logical only | N/A | DONE |
 | Case immutability | Phase 4 | PENDING |

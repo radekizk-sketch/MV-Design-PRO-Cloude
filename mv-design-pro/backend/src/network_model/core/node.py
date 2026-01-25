@@ -230,7 +230,7 @@ class Node:
             'GPZ-1'
         """
         # Konwersja typu węzła z stringa na enum
-        node_type_value = data.get("node_type", "PQ")
+        node_type_value = data.get("node_type", data.get("bus_type", "PQ"))
         if isinstance(node_type_value, str):
             node_type = NodeType(node_type_value)
         else:
