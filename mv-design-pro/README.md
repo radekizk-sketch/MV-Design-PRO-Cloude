@@ -136,7 +136,7 @@ mv-design-pro/
 │   └── src/
 │       └── designer/            # UI kreatora i SLD
 ├── docs/                        # Dokumentacja operacyjna
-└── governance/                  # Plany wykonawcze
+└── docs/audit/                  # Raporty audytowe i archiwalne ExecPlany
 ```
 
 ---
@@ -177,7 +177,9 @@ mv-design-pro/
 | [ARCHITECTURE.md](./ARCHITECTURE.md) | Architektura szczegółowa |
 | [AGENTS.md](./AGENTS.md) | Zasady governance |
 | [PLANS.md](./PLANS.md) | Plan wykonawczy refaktoryzacji |
+| [docs/audit/](./docs/audit/) | Raporty audytowe i materiały historyczne (non-canonical) |
 | [docs/](./docs/) | Dokumentacja operacyjna |
+| [docs/INDEX.md](./docs/INDEX.md) | Spis treści dokumentacji |
 
 ---
 

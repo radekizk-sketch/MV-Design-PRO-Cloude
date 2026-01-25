@@ -8,7 +8,7 @@ Define the structural hygiene for MV-DESIGN-PRO to preserve determinism, auditab
 - `frontend/` as the deterministic engineering interface (no physics).
 - `SYSTEM_SPEC.md` as the single source of architectural truth.
 - `docs/` for operational guides and checklists (non-architectural).
-- `docs/execplans/` as the canonical storage for ExecPlans (historical catalog).
+- `docs/audit/historical_execplans/` as the historical storage for legacy ExecPlans (non-canonical).
 
 ## REMOVE
 - Ad-hoc or duplicated solver logic in non-solver layers.
@@ -17,7 +17,7 @@ Define the structural hygiene for MV-DESIGN-PRO to preserve determinism, auditab
 
 ## CREATE
 - Governance artifacts: `AGENTS.md` and `.agent/PLANS.md`.
-- Explicit ExecPlans in `docs/execplans/`.
+- Audit reports in `docs/audit/` (including historical ExecPlans where needed).
 - Traceability documentation tied to Result APIs.
 - CI architectural guard (`scripts/arch_guard.py`) enforcing solver/analysis boundaries.
 

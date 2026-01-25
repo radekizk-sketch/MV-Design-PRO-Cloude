@@ -122,6 +122,7 @@ This plan describes the complete refactoring of MV-DESIGN-PRO to align with DIgS
 - [x] Update AGENTS.md with governance rules
 - [x] Create PLANS.md with execution roadmap
 - [x] Update README.md with architecture overview
+- [x] Docs consolidation & audit report (`docs/audit/spec_vs_code_gap_report.md`)
 
 ---
 
@@ -403,6 +404,7 @@ class NetworkGraph:
 | 2025-01 | 2.0 | Initial PowerFactory alignment plan |
 | 2025-01 | 2.1 | Phase 2 Task 2.1 DONE: PCC removed from NetworkGraph |
 | 2025-01 | 2.2 | Phase 1.x DONE: PowerFactory UI/UX Parity documentation |
+| 2025-02 | 2.3 | Docs consolidation & spec vs code audit report completed |
 
 ---
 
