@@ -13,6 +13,7 @@ import networkx as nx
 from .node import Node, NodeType
 from .branch import Branch
 from .inverter import InverterSource
+from .switch import Switch
 
 
 class NetworkGraph:
@@ -25,6 +26,7 @@ class NetworkGraph:
     Attributes:
         nodes: Słownik węzłów (node_id -> Node).
         branches: Słownik gałęzi (branch_id -> Branch).
+        switches: Słownik łączników (switch_id -> Switch).
         _graph: Prywatny multigraf NetworkX (nieskierowany) do analiz topologicznych.
 
     Notes:
@@ -36,8 +38,10 @@ class NetworkGraph:
         węzłów (np. dwie linie lub kable między stacjami). Każda krawędź
         jest identyfikowana przez key=branch.id.
 
-        Krawędzie w _graph odpowiadają tylko gałęziom z in_service=True.
-        Gałęzie nieaktywne są przechowywane w słowniku branches, ale nie
+        Krawędzie w _graph odpowiadają tylko aktywnym elementom:
+        - gałęziom z in_service=True
+        - łącznikom z in_service=True i stanem CLOSED
+        Elementy nieaktywne są przechowywane w słownikach, ale nie
         tworzą krawędzi w grafie topologicznym.
     """
 
@@ -46,6 +50,7 @@ class NetworkGraph:
         self.nodes: Dict[str, Node] = {}
         self.branches: Dict[str, Branch] = {}
         self.inverter_sources: Dict[str, InverterSource] = {}
+        self.switches: Dict[str, Switch] = {}
         self._graph: nx.MultiGraph = nx.MultiGraph()
 
     def add_node(self, node: Node) -> None:
@@ -131,8 +136,63 @@ class NetworkGraph:
                 branch.to_node_id,
                 key=branch.id,
                 branch_id=branch.id,
+                edge_kind="branch",
                 branch_type=branch.branch_type.value,
                 name=branch.name,
+            )
+
+    def add_switch(self, switch: Switch) -> None:
+        """
+        Dodaje łącznik (switch) do grafu sieci.
+
+        Walidacje:
+        - switch.id nie może istnieć już w switches
+        - from_node_id i to_node_id muszą istnieć w nodes
+        - Switch nie może łączyć węzła samego ze sobą
+
+        Jeśli switch ma in_service=False lub stan OPEN, obiekt jest
+        przechowywany w switches, ale krawędź nie jest dodawana do _graph.
+
+        Args:
+            switch: Łącznik do dodania.
+
+        Raises:
+            ValueError: Gdy łącznik o podanym ID już istnieje.
+            ValueError: Gdy węzeł początkowy lub końcowy nie istnieje.
+            ValueError: Gdy łącznik łączy węzeł sam ze sobą.
+        """
+        if switch.id in self.switches:
+            raise ValueError(
+                f"Łącznik o ID '{switch.id}' już istnieje w grafie."
+            )
+
+        if switch.from_node_id not in self.nodes:
+            raise ValueError(
+                f"Węzeł początkowy '{switch.from_node_id}' nie istnieje w grafie."
+            )
+
+        if switch.to_node_id not in self.nodes:
+            raise ValueError(
+                f"Węzeł końcowy '{switch.to_node_id}' nie istnieje w grafie."
+            )
+
+        if switch.from_node_id == switch.to_node_id:
+            raise ValueError(
+                f"Łącznik nie może łączyć węzła '{switch.from_node_id}' samego ze sobą."
+            )
+
+        self.switches[switch.id] = switch
+
+        if self._is_switch_active(switch):
+            self._graph.add_edge(
+                switch.from_node_id,
+                switch.to_node_id,
+                key=switch.id,
+                switch_id=switch.id,
+                edge_kind="switch",
+                switch_type=switch.switch_type.value,
+                state=switch.state.value,
+                name=switch.name,
             )
 
     def add_inverter_source(self, source: InverterSource) -> None:
@@ -235,9 +295,16 @@ class NetworkGraph:
             for branch_id, branch in self.branches.items()
             if branch.from_node_id == node_id or branch.to_node_id == node_id
         ]
+        switches_to_remove = [
+            switch_id
+            for switch_id, switch in self.switches.items()
+            if switch.from_node_id == node_id or switch.to_node_id == node_id
+        ]
 
         for branch_id in branches_to_remove:
             del self.branches[branch_id]
+        for switch_id in switches_to_remove:
+            del self.switches[switch_id]
 
         # Usuń węzeł z grafu NetworkX i ze słownika
         if node_id in self._graph:
@@ -273,6 +340,29 @@ class NetworkGraph:
 
         # Usuń gałąź ze słownika
         del self.branches[branch_id]
+
+    def remove_switch(self, switch_id: str) -> None:
+        """
+        Usuwa łącznik (switch) z grafu sieci.
+
+        Args:
+            switch_id: ID łącznika do usunięcia.
+
+        Raises:
+            ValueError: Gdy łącznik o podanym ID nie istnieje.
+        """
+        if switch_id not in self.switches:
+            raise ValueError(
+                f"Łącznik o ID '{switch_id}' nie istnieje w grafie."
+            )
+
+        switch = self.switches[switch_id]
+
+        if self._is_switch_active(switch):
+            if self._graph.has_edge(switch.from_node_id, switch.to_node_id, key=switch_id):
+                self._graph.remove_edge(switch.from_node_id, switch.to_node_id, key=switch_id)
+
+        del self.switches[switch_id]
 
     def get_node(self, node_id: str) -> Node:
         """
@@ -311,6 +401,36 @@ class NetworkGraph:
                 f"Gałąź o ID '{branch_id}' nie istnieje w grafie."
             )
         return self.branches[branch_id]
+
+    def get_switch(self, switch_id: str) -> Switch:
+        """
+        Zwraca łącznik o podanym ID.
+
+        Args:
+            switch_id: ID łącznika.
+
+        Returns:
+            Obiekt Switch.
+
+        Raises:
+            ValueError: Gdy łącznik o podanym ID nie istnieje.
+        """
+        if switch_id not in self.switches:
+            raise ValueError(
+                f"Łącznik o ID '{switch_id}' nie istnieje w grafie."
+            )
+        return self.switches[switch_id]
+
+    def list_switches(self) -> List[Switch]:
+        """
+        Zwraca listę łączników w sieci.
+
+        Returns:
+            Lista łączników posortowana deterministycznie po ID.
+        """
+        switches = list(self.switches.values())
+        switches.sort(key=lambda item: item.id)
+        return switches
 
     def get_slack_node(self) -> Node:
         """
@@ -461,8 +581,21 @@ class NetworkGraph:
                     branch.to_node_id,
                     key=branch.id,
                     branch_id=branch.id,
+                    edge_kind="branch",
                     branch_type=branch.branch_type.value,
                     name=branch.name,
+                )
+        for switch in self.switches.values():
+            if self._is_switch_active(switch):
+                self._graph.add_edge(
+                    switch.from_node_id,
+                    switch.to_node_id,
+                    key=switch.id,
+                    switch_id=switch.id,
+                    edge_kind="switch",
+                    switch_type=switch.switch_type.value,
+                    state=switch.state.value,
+                    name=switch.name,
                 )
 
     def _is_branch_in_service(self, branch: Branch) -> bool:
@@ -489,11 +622,34 @@ class NetworkGraph:
         """
         return getattr(source, "in_service", True)
 
+    def _is_switch_in_service(self, switch: Switch) -> bool:
+        """
+        Sprawdza czy łącznik jest aktywny (in_service).
+
+        Args:
+            switch: Łącznik do sprawdzenia.
+
+        Returns:
+            True jeśli łącznik jest aktywny, False w przeciwnym razie.
+        """
+        return getattr(switch, "in_service", True)
+
+    def _is_switch_active(self, switch: Switch) -> bool:
+        """
+        Sprawdza czy łącznik tworzy połączenie topologiczne.
+
+        Łącznik jest aktywny gdy:
+        - in_service=True
+        - state=CLOSED
+        """
+        return self._is_switch_in_service(switch) and switch.is_closed
+
     def __repr__(self) -> str:
         """Zwraca czytelną reprezentację tekstową grafu."""
         connected = self.is_connected() if self.nodes else False
         return (
             f"NetworkGraph(nodes={len(self.nodes)}, "
             f"branches={len(self.branches)}, "
+            f"switches={len(self.switches)}, "
             f"connected={connected})"
         )
