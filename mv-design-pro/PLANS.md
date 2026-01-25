@@ -51,6 +51,16 @@ This plan describes the complete refactoring of MV-DESIGN-PRO to align with DIgS
                               │
                               ▼
 ┌─────────────────────────────────────────────────────────────────┐
+│ PHASE 1.x: PowerFactory UI/UX Parity (DOC ONLY) (COMPLETE)      │
+│ - SYSTEM_SPEC.md Section 18: User Interaction Model             │
+│ - ARCHITECTURE.md Section 14: PowerFactory UI/UX Parity         │
+│ - docs/ui/powerfactory_ui_parity.md                             │
+│ - docs/ui/wizard_screens.md                                     │
+│ - docs/ui/sld_rules.md                                          │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
 │ PHASE 2: NetworkModel Core (IN PROGRESS)                         │
 │ - Remove PCC from NetworkGraph                                  │
 │ - Add Switch class (apparatus without impedance)                │
@@ -112,6 +122,53 @@ This plan describes the complete refactoring of MV-DESIGN-PRO to align with DIgS
 - [x] Update AGENTS.md with governance rules
 - [x] Create PLANS.md with execution roadmap
 - [x] Update README.md with architecture overview
+
+---
+
+## 3.5 Phase 1.x: PowerFactory UI/UX Parity (DOC ONLY) - COMPLETE
+
+### 3.5.1 Goal
+
+Align documentation with DIgSILENT PowerFactory mental model for user interaction, UI patterns, and workflow philosophy.
+
+### 3.5.2 Scope
+
+**IN SCOPE:**
+- User Interaction Model documentation
+- UI/UX parity guidelines
+- Wizard workflow specification
+- SLD rules specification
+- Calculation lifecycle documentation
+- `in_service` semantics documentation
+- Validation philosophy documentation
+- Determinism and audit requirements
+
+**OUT OF SCOPE:**
+- Code changes
+- UI implementation
+- Solver modifications
+- API changes
+- Schema changes
+
+### 3.5.3 Deliverables
+
+| File | Status | Description |
+|------|--------|-------------|
+| SYSTEM_SPEC.md Section 18 | DONE | User Interaction Model (PowerFactory-aligned) |
+| ARCHITECTURE.md Section 14 | DONE | PowerFactory UI/UX Parity |
+| docs/ui/powerfactory_ui_parity.md | DONE | Calculation lifecycle, in_service, validation |
+| docs/ui/wizard_screens.md | DONE | Wizard workflow, UX rules, prohibitions |
+| docs/ui/sld_rules.md | DONE | SLD principles, result overlays, modes |
+
+### 3.5.4 Completed Tasks
+
+- [x] Add User Interaction Model chapter to SYSTEM_SPEC.md (Section 18)
+- [x] Add PowerFactory UI/UX Parity chapter to ARCHITECTURE.md (Section 14)
+- [x] Create docs/ui/ directory
+- [x] Create docs/ui/powerfactory_ui_parity.md (lifecycle, in_service, validation, determinism)
+- [x] Create docs/ui/wizard_screens.md (workflow, UX rules, prohibitions)
+- [x] Create docs/ui/sld_rules.md (SLD principles, results, modes)
+- [x] Update PLANS.md with Phase 1.x
 
 ---
 
@@ -345,6 +402,7 @@ class NetworkGraph:
 |------|---------|---------|
 | 2025-01 | 2.0 | Initial PowerFactory alignment plan |
 | 2025-01 | 2.1 | Phase 2 Task 2.1 DONE: PCC removed from NetworkGraph |
+| 2025-01 | 2.2 | Phase 1.x DONE: PowerFactory UI/UX Parity documentation |
 
 ---
 
