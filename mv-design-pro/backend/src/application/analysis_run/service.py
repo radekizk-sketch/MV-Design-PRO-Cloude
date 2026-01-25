@@ -16,18 +16,17 @@ from application.active_case import (
     ActiveCaseNotSetError,
     ActiveCaseService,
 )
+from application.network_model import (
+    build_network_graph,
+    ensure_snapshot_matches_project,
+    network_model_id_for_project,
+)
 from application.sld.overlay import ResultSldOverlayBuilder
 from domain.analysis_run import AnalysisRun, new_analysis_run
 from domain.project_design_mode import ProjectDesignMode
 from domain.validation import ValidationIssue, ValidationReport
 from infrastructure.persistence.unit_of_work import UnitOfWork
-from network_model.core import (
-    Branch,
-    InverterSource,
-    NetworkGraph,
-    Node,
-    create_network_snapshot,
-)
+from network_model.core import InverterSource, NetworkGraph, create_network_snapshot
 from network_model.validation import NetworkValidator as ModelNetworkValidator, Severity as ModelSeverity
 from network_model.solvers import ShortCircuitIEC60909Solver, ShortCircuitType
 
@@ -382,9 +381,12 @@ class AnalysisRunService:
             loads = uow.wizard.list_loads(project_id)
             sources = uow.wizard.list_sources(project_id)
             nodes = uow.network.list_nodes(project_id)
+            snapshot_id = self._get_snapshot_id(case)
+            existing_snapshot = uow.snapshots.get_snapshot(snapshot_id)
+            if existing_snapshot is not None:
+                ensure_snapshot_matches_project(existing_snapshot, project_id)
 
         base_mva = float(case.case_payload.get("base_mva", 100.0))
-        snapshot_id = self._get_snapshot_id(case)
         slack_node_id = settings.get("pcc_node_id") or self._select_slack_node_id(nodes)
         slack_attrs = self._lookup_node_attrs(nodes, slack_node_id) if slack_node_id else {}
         slack_spec = {
@@ -494,7 +496,10 @@ class AnalysisRunService:
                 state["element_id"]: state
                 for state in uow.wizard.list_switching_states(operating_case_id)
             }
-        snapshot_id = self._get_snapshot_id(case)
+            snapshot_id = self._get_snapshot_id(case)
+            existing_snapshot = uow.snapshots.get_snapshot(snapshot_id)
+            if existing_snapshot is not None:
+                ensure_snapshot_matches_project(existing_snapshot, project_id)
         normalized_nodes = [self._node_to_graph_payload(node) for node in nodes]
         normalized_branches: list[dict[str, Any]] = []
         for branch in branches:
@@ -823,6 +828,7 @@ class AnalysisRunService:
         if snapshot_id_str:
             existing_snapshot = uow.snapshots.get_snapshot(snapshot_id_str)
             if existing_snapshot is not None:
+                ensure_snapshot_matches_project(existing_snapshot, project_id)
                 return snapshot_id_str
 
         graph = self._build_network_graph(project_id, case.id)
@@ -857,6 +863,7 @@ class AnalysisRunService:
         snapshot = create_network_snapshot(
             graph,
             snapshot_id=snapshot_id_str,
+            network_model_id=network_model_id_for_project(project_id),
         )
         uow.snapshots.add_snapshot(snapshot, commit=False)
         return snapshot.meta.snapshot_id
@@ -1040,17 +1047,14 @@ class AnalysisRunService:
                     for state in uow.wizard.list_switching_states(case_id)
                 }
 
-        graph = NetworkGraph()
-        for node in nodes:
-            node_data = self._node_to_graph_payload(node)
-            graph.add_node(Node.from_dict(node_data))
-        for branch in branches:
-            branch_data = self._branch_to_graph_payload(branch)
-            branch_state = switching_states.get(branch["id"])
-            if branch_state is not None:
-                branch_data["in_service"] = branch_state["in_service"]
-            graph.add_branch(Branch.from_dict(branch_data))
-        return graph
+        return build_network_graph(
+            nodes=nodes,
+            branches=branches,
+            switching_states=switching_states,
+            node_payload_builder=self._node_to_graph_payload,
+            branch_payload_builder=self._branch_to_graph_payload,
+            network_model_id=network_model_id_for_project(project_id),
+        )
 
     def _validate_network_graph(self, graph: NetworkGraph) -> ValidationReport:
         model_report = ModelNetworkValidator().validate(graph)

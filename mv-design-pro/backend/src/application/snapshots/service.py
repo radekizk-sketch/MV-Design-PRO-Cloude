@@ -109,6 +109,7 @@ class SnapshotService:
                 parent_snapshot_id=parent_snapshot_id,
                 created_at=str(envelopes[-1].created_at),
                 schema_version=snapshot.meta.schema_version,
+                network_model_id=snapshot.meta.network_model_id,
             )
             uow.snapshots.add_snapshot(new_snapshot, commit=False)
             return BatchActionResult(

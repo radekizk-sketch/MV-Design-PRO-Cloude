@@ -5,6 +5,10 @@ from datetime import datetime, timezone
 from typing import Any, Callable
 from uuid import UUID
 
+from application.network_model import (
+    ensure_snapshot_matches_project,
+    network_model_id_for_project,
+)
 from domain.models import OperatingCase
 from infrastructure.persistence.unit_of_work import UnitOfWork
 from network_model.core import (
@@ -44,9 +48,13 @@ class WizardActionService:
     def get_case_snapshot(self, case_id: UUID) -> NetworkSnapshot:
         parent_snapshot_id = self._get_case_snapshot_id(case_id)
         with self._uow_factory() as uow:
+            case = uow.cases.get_operating_case(case_id)
             snapshot = uow.snapshots.get_snapshot(parent_snapshot_id)
+        if case is None:
+            raise ValueError(f"OperatingCase {case_id} not found")
         if snapshot is None:
             raise ValueError(f"Snapshot {parent_snapshot_id} not found")
+        ensure_snapshot_matches_project(snapshot, case.project_id)
         return snapshot
 
     def submit_batch(
@@ -60,6 +68,7 @@ class WizardActionService:
             snapshot = uow.snapshots.get_snapshot(parent_snapshot_id)
             if snapshot is None:
                 raise ValueError(f"Snapshot {parent_snapshot_id} not found")
+            ensure_snapshot_matches_project(snapshot, case.project_id)
             if not actions:
                 return BatchActionResult(
                     status="rejected",
@@ -113,6 +122,7 @@ class WizardActionService:
                 parent_snapshot_id=parent_snapshot_id,
                 created_at=str(envelopes[-1].created_at),
                 schema_version=snapshot.meta.schema_version,
+                network_model_id=network_model_id_for_project(case.project_id),
             )
             uow.snapshots.add_snapshot(new_snapshot, commit=False)
             updated_case = _update_case_snapshot(case, new_snapshot.meta.snapshot_id)

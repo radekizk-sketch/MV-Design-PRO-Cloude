@@ -7,9 +7,11 @@ from network_model.core import (
     create_network_snapshot,
 )
 
+NETWORK_MODEL_ID = "model-1"
+
 
 def test_create_node_creates_new_snapshot_and_preserves_parent() -> None:
-    graph = NetworkGraph()
+    graph = NetworkGraph(network_model_id=NETWORK_MODEL_ID)
     graph.add_node(
         Node(
             id="node-1",
@@ -21,7 +23,10 @@ def test_create_node_creates_new_snapshot_and_preserves_parent() -> None:
         )
     )
     snapshot = create_network_snapshot(
-        graph, snapshot_id="snap-1", created_at="2024-01-01T00:00:00+00:00"
+        graph,
+        snapshot_id="snap-1",
+        created_at="2024-01-01T00:00:00+00:00",
+        network_model_id=NETWORK_MODEL_ID,
     )
     parent_payload = snapshot.to_dict()
 
@@ -50,7 +55,7 @@ def test_create_node_creates_new_snapshot_and_preserves_parent() -> None:
 
 
 def test_snapshot_serialization_is_deterministic() -> None:
-    graph = NetworkGraph()
+    graph = NetworkGraph(network_model_id=NETWORK_MODEL_ID)
     graph.add_node(
         Node(
             id="node-1",
@@ -62,7 +67,10 @@ def test_snapshot_serialization_is_deterministic() -> None:
         )
     )
     snapshot = create_network_snapshot(
-        graph, snapshot_id="snap-1", created_at="2024-01-01T00:00:00+00:00"
+        graph,
+        snapshot_id="snap-1",
+        created_at="2024-01-01T00:00:00+00:00",
+        network_model_id=NETWORK_MODEL_ID,
     )
     action = ActionEnvelope(
         action_id="action-1",
@@ -92,7 +100,7 @@ def test_snapshot_serialization_is_deterministic() -> None:
 
 
 def test_two_actions_create_snapshot_chain() -> None:
-    graph = NetworkGraph()
+    graph = NetworkGraph(network_model_id=NETWORK_MODEL_ID)
     graph.add_node(
         Node(
             id="node-1",
@@ -104,7 +112,10 @@ def test_two_actions_create_snapshot_chain() -> None:
         )
     )
     snapshot = create_network_snapshot(
-        graph, snapshot_id="snap-1", created_at="2024-01-01T00:00:00+00:00"
+        graph,
+        snapshot_id="snap-1",
+        created_at="2024-01-01T00:00:00+00:00",
+        network_model_id=NETWORK_MODEL_ID,
     )
     action_node = ActionEnvelope(
         action_id="action-1",
@@ -142,3 +153,40 @@ def test_two_actions_create_snapshot_chain() -> None:
     assert snapshot_one.meta.parent_snapshot_id == snapshot.meta.snapshot_id
     assert snapshot_two.meta.parent_snapshot_id == snapshot_one.meta.snapshot_id
     assert "branch-1" in snapshot_two.graph.branches
+
+
+def test_snapshot_actions_preserve_network_model_id() -> None:
+    graph = NetworkGraph(network_model_id=NETWORK_MODEL_ID)
+    graph.add_node(
+        Node(
+            id="node-1",
+            name="Node 1",
+            node_type=NodeType.SLACK,
+            voltage_level=15.0,
+            voltage_magnitude=1.0,
+            voltage_angle=0.0,
+        )
+    )
+    snapshot = create_network_snapshot(
+        graph,
+        snapshot_id="snap-1",
+        created_at="2024-01-01T00:00:00+00:00",
+        network_model_id=NETWORK_MODEL_ID,
+    )
+    action = ActionEnvelope(
+        action_id="action-1",
+        parent_snapshot_id=snapshot.meta.snapshot_id,
+        action_type="create_node",
+        payload={
+            "id": "node-2",
+            "name": "Node 2",
+            "node_type": "PQ",
+            "voltage_level": 15.0,
+        },
+        created_at="2024-01-02T00:00:00+00:00",
+        status="accepted",
+    )
+
+    new_snapshot = apply_action_to_snapshot(snapshot, action)
+
+    assert new_snapshot.meta.network_model_id == NETWORK_MODEL_ID

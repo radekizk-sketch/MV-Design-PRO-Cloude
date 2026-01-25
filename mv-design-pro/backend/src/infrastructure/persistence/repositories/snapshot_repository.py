@@ -23,6 +23,7 @@ class SnapshotRepository:
                 parent_snapshot_id=meta.parent_snapshot_id,
                 created_at=created_at,
                 schema_version=meta.schema_version,
+                network_model_id=meta.network_model_id,
                 snapshot_json=payload,
             )
         )
@@ -39,6 +40,19 @@ class SnapshotRepository:
 
     def get_latest_snapshot(self) -> NetworkSnapshot | None:
         stmt = select(NetworkSnapshotORM).order_by(desc(NetworkSnapshotORM.created_at)).limit(1)
+        row = self._session.execute(stmt).scalar_one_or_none()
+        if row is None:
+            return None
+        payload = _hydrate_payload(row)
+        return NetworkSnapshot.from_dict(payload)
+
+    def get_latest_snapshot_for_model(self, network_model_id: str) -> NetworkSnapshot | None:
+        stmt = (
+            select(NetworkSnapshotORM)
+            .where(NetworkSnapshotORM.network_model_id == network_model_id)
+            .order_by(desc(NetworkSnapshotORM.created_at))
+            .limit(1)
+        )
         row = self._session.execute(stmt).scalar_one_or_none()
         if row is None:
             return None
@@ -76,6 +90,7 @@ def _meta_from_row(row: NetworkSnapshotORM) -> SnapshotMeta:
         parent_snapshot_id=row.parent_snapshot_id,
         created_at=row.created_at.isoformat(),
         schema_version=row.schema_version,
+        network_model_id=row.network_model_id,
     )
 
 
@@ -93,5 +108,6 @@ def _hydrate_payload(row: NetworkSnapshotORM) -> dict:
     meta.setdefault("parent_snapshot_id", row.parent_snapshot_id)
     meta.setdefault("created_at", row.created_at.isoformat())
     meta.setdefault("schema_version", row.schema_version)
+    meta.setdefault("network_model_id", row.network_model_id)
     payload["meta"] = meta
     return payload
