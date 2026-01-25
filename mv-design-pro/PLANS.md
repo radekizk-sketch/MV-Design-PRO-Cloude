@@ -280,23 +280,23 @@ class NetworkGraph:
 
 ---
 
-## 6. Phase 4: Case Layer (PENDING)
+## 6. Phase 4: Case Layer (DONE)
 
-### 6.1 Task 4.1: Case Immutability
+### 6.1 Task 4.1: Case Immutability (DEFERRED)
 
 **Actions:**
 - [ ] Verify Case uses NetworkSnapshot
 - [ ] Add immutability enforcement
 - [ ] Document case-model relationship
 
-### 6.2 Task 4.2: Result Invalidation
+### 6.2 Task 4.2: Result Invalidation (DONE - 2025-02)
 
 **Actions:**
-- [ ] Implement ResultInvalidator
-- [ ] Add model change detection
-- [ ] Mark results as OUTDATED on change
+- [x] Implement ResultInvalidator
+- [x] Add model change detection
+- [x] Mark results as OUTDATED on change
 
-### 6.3 Task 4.3: Case Directory Structure
+### 6.3 Task 4.3: Case Directory Structure (DEFERRED)
 
 **Actions:**
 - [ ] Create `backend/src/cases/` if not exists
@@ -308,6 +308,9 @@ class NetworkGraph:
 **Actions (DONE - 2025-02):**
 - [x] Add project-scoped Active Case pointer
 - [x] Gate calculations on Active Case context (PF-style)
+
+**Changelog:**
+- P4: Result invalidation on NetworkModel change (PF-style)
 
 ---
 

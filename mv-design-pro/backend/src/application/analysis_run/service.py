@@ -78,11 +78,6 @@ class AnalysisRunService:
         snapshot = self._build_power_flow_snapshot(project_id, operating_case_id, options)
         input_hash = compute_input_hash(snapshot)
         with self._uow_factory() as uow:
-            existing = uow.analysis_runs.get_by_deterministic_key(
-                project_id, operating_case_id, "PF", input_hash
-            )
-            if existing:
-                return existing
             run = new_analysis_run(
                 project_id=project_id,
                 operating_case_id=operating_case_id,
@@ -108,11 +103,6 @@ class AnalysisRunService:
         )
         input_hash = compute_input_hash(snapshot)
         with self._uow_factory() as uow:
-            existing = uow.analysis_runs.get_by_deterministic_key(
-                project_id, operating_case_id, "short_circuit_sn", input_hash
-            )
-            if existing:
-                return existing
             run = new_analysis_run(
                 project_id=project_id,
                 operating_case_id=operating_case_id,
@@ -133,11 +123,6 @@ class AnalysisRunService:
         snapshot = self._build_fault_loop_snapshot(project_id, operating_case_id, options)
         input_hash = compute_input_hash(snapshot)
         with self._uow_factory() as uow:
-            existing = uow.analysis_runs.get_by_deterministic_key(
-                project_id, operating_case_id, "fault_loop_nn", input_hash
-            )
-            if existing:
-                return existing
             run = new_analysis_run(
                 project_id=project_id,
                 operating_case_id=operating_case_id,

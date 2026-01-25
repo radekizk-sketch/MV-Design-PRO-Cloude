@@ -4,7 +4,7 @@ from datetime import datetime
 from typing import Any
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.orm import Session
 
 from domain.analysis_run import AnalysisRun
@@ -24,6 +24,7 @@ class AnalysisRunRepository:
                 operating_case_id=run.operating_case_id,
                 analysis_type=run.analysis_type,
                 status=run.status,
+                result_status=run.result_status,
                 created_at=ensure_utc(run.created_at),
                 started_at=ensure_utc(run.started_at),
                 finished_at=ensure_utc(run.finished_at),
@@ -107,6 +108,17 @@ class AnalysisRunRepository:
         self._session.commit()
         return self._to_domain(row)
 
+    def mark_results_outdated(self, project_id: UUID, *, commit: bool = True) -> int:
+        stmt = (
+            update(AnalysisRunORM)
+            .where(AnalysisRunORM.project_id == project_id)
+            .values(result_status="OUTDATED")
+        )
+        result = self._session.execute(stmt)
+        if commit:
+            self._session.commit()
+        return int(result.rowcount or 0)
+
     def _to_domain(self, row: AnalysisRunORM) -> AnalysisRun:
         return AnalysisRun(
             id=row.id,
@@ -114,6 +126,7 @@ class AnalysisRunRepository:
             operating_case_id=row.operating_case_id,
             analysis_type=row.analysis_type,
             status=row.status,
+            result_status=row.result_status,
             created_at=ensure_utc(row.created_at),
             started_at=ensure_utc(row.started_at),
             finished_at=ensure_utc(row.finished_at),

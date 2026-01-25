@@ -55,6 +55,7 @@ class AnalysisRunExportService:
                 "deterministic_id": build_deterministic_id(run),
                 "analysis_type": run.analysis_type,
                 "status": run.status,
+                "result_status": run.result_status,
                 "created_at": _format_datetime(run.created_at),
                 "started_at": _format_datetime(run.started_at),
                 "finished_at": _format_datetime(run.finished_at),

@@ -257,13 +257,6 @@ class ScenarioORM(Base):
 class AnalysisRunORM(Base):
     __tablename__ = "analysis_runs"
     __table_args__ = (
-        UniqueConstraint(
-            "project_id",
-            "operating_case_id",
-            "analysis_type",
-            "input_hash",
-            name="uq_analysis_runs_deterministic",
-        ),
         Index("ix_analysis_runs_input_hash", "input_hash"),
     )
 
@@ -274,6 +267,7 @@ class AnalysisRunORM(Base):
     )
     analysis_type: Mapped[str] = mapped_column(String(20), nullable=False)
     status: Mapped[str] = mapped_column(String(20), nullable=False)
+    result_status: Mapped[str] = mapped_column(String(20), nullable=False, default="VALID")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

@@ -122,11 +122,12 @@ def test_analysis_run_lifecycle_pf() -> None:
     executed = service.execute_run(run.id)
 
     assert executed.status == "FINISHED"
+    assert executed.result_status == "VALID"
     assert executed.started_at is not None
     assert executed.finished_at is not None
 
     repeat = service.create_power_flow_run(project.id, case.id)
-    assert repeat.id == run.id
+    assert repeat.id != run.id
 
 
 def test_analysis_run_lifecycle_sc() -> None:
@@ -153,11 +154,102 @@ def test_analysis_run_lifecycle_sc() -> None:
     payload = results[0]["payload"]
 
     assert executed.status == "FINISHED"
+    assert executed.result_status == "VALID"
     assert executed.result_summary
     assert results
     assert run.input_snapshot["snapshot_id"] == case.case_payload["active_snapshot_id"]
     assert "white_box_trace" in payload
     assert payload["white_box_trace"]
+
+
+def test_result_invalidation_on_network_change() -> None:
+    wizard, service = _build_services()
+    project = wizard.create_project("Invalidate")
+    slack_node, pq_node = _create_basic_network(wizard, project.id)
+    wizard.set_pcc(project.id, slack_node["id"])
+    wizard.add_load(
+        project.id,
+        LoadPayload(
+            name="Load",
+            node_id=pq_node["id"],
+            payload={"name": "Load", "p_mw": 1.0, "q_mvar": 0.5},
+        ),
+    )
+    case = wizard.create_operating_case(
+        project.id,
+        "Normal",
+        {
+            "base_mva": 100.0,
+            "active_snapshot_id": str(uuid4()),
+            "project_design_mode": ProjectDesignMode.SN_NETWORK.value,
+        },
+    )
+
+    run = service.create_power_flow_run(project.id, case.id)
+    executed = service.execute_run(run.id)
+    assert executed.result_status == "VALID"
+
+    wizard.add_node(
+        project.id,
+        NodePayload(
+            name="New",
+            node_type="PQ",
+            base_kv=15.0,
+            attrs={"active_power_mw": 0.5, "reactive_power_mvar": 0.2},
+        ),
+    )
+
+    updated = service.get_run(run.id)
+    assert updated.result_status == "OUTDATED"
+
+
+def test_result_status_after_recalculate_and_case_change() -> None:
+    wizard, service = _build_services()
+    project = wizard.create_project("Recalculate")
+    slack_node, pq_node = _create_basic_network(wizard, project.id)
+    wizard.set_pcc(project.id, slack_node["id"])
+    wizard.add_load(
+        project.id,
+        LoadPayload(
+            name="Load",
+            node_id=pq_node["id"],
+            payload={"name": "Load", "p_mw": 1.0, "q_mvar": 0.5},
+        ),
+    )
+    case = wizard.create_operating_case(
+        project.id,
+        "Normal",
+        {
+            "base_mva": 100.0,
+            "active_snapshot_id": str(uuid4()),
+            "project_design_mode": ProjectDesignMode.SN_NETWORK.value,
+        },
+    )
+
+    run = service.create_power_flow_run(project.id, case.id)
+    executed = service.execute_run(run.id)
+    assert executed.result_status == "VALID"
+
+    wizard.update_operating_case(
+        project.id,
+        case.id,
+        {
+            "case_payload": {
+                "base_mva": 110.0,
+                "active_snapshot_id": case.case_payload["active_snapshot_id"],
+            }
+        },
+    )
+    unchanged = service.get_run(run.id)
+    assert unchanged.result_status == "VALID"
+
+    wizard.set_in_service(project.id, pq_node["id"], False)
+    outdated = service.get_run(run.id)
+    assert outdated.result_status == "OUTDATED"
+
+    follow_up = service.create_power_flow_run(project.id, case.id)
+    follow_executed = service.execute_run(follow_up.id)
+    assert follow_executed.result_status == "VALID"
 
 
 def test_network_validator_blocks_invalid_model() -> None:

@@ -8,6 +8,7 @@ from uuid import UUID, uuid4
 
 AnalysisType = Literal["PF", "short_circuit_sn", "fault_loop_nn"]
 AnalysisRunStatus = Literal["CREATED", "VALIDATED", "RUNNING", "FINISHED", "FAILED"]
+ResultStatus = Literal["VALID", "OUTDATED"]
 
 
 @dataclass(frozen=True)
@@ -17,6 +18,7 @@ class AnalysisRun:
     operating_case_id: UUID
     analysis_type: AnalysisType
     status: AnalysisRunStatus
+    result_status: ResultStatus = "VALID"
     created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
     started_at: datetime | None = None
     finished_at: datetime | None = None
@@ -42,6 +44,7 @@ def new_analysis_run(
         operating_case_id=operating_case_id,
         analysis_type=analysis_type,
         status="CREATED",
+        result_status="VALID",
         input_snapshot=input_snapshot,
         input_hash=input_hash,
     )
