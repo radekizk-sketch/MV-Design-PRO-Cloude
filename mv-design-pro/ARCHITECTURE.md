@@ -1021,4 +1021,136 @@ Response: {
 
 ---
 
+## 14. PowerFactory UI/UX Parity
+
+### 14.1 Concept Mapping (PowerFactory → MV-DESIGN-PRO)
+
+| PowerFactory Concept | MV-DESIGN-PRO Equivalent | Notes |
+|---------------------|-------------------------|-------|
+| **Data Manager** | Wizard | Sequential network editor |
+| **Study Case** | Case | Calculation scenario (immutable view) |
+| **Calculation** | Solver Run | Physics computation (WHITE BOX) |
+| **Results** | Result + Analysis overlays | Solver output + interpretation |
+| **Terminal** | Bus | Electrical node (single potential) |
+| **Line / Cable** | LineBranch | Physical connection with impedance |
+| **2-Winding Transformer** | TransformerBranch | Impedance transformation |
+| **Switch / Breaker** | Switch | Topology only (no impedance) |
+| **External Grid** | Source (EXTERNAL_GRID) | Power injection |
+| **General Load** | Load | Power consumption |
+| **Type Library** | Catalog | Immutable type definitions |
+| **Substation** | Station (logical) | Folder / grouping only |
+| **Graphic** | SLD | Single Line Diagram visualization |
+
+### 14.2 UI Behavior Patterns (PowerFactory-style)
+
+#### 14.2.1 Property Grid
+
+All object editing follows PowerFactory Property Grid pattern:
+
+```python
+# User interaction flow
+1. User double-clicks element (in Wizard list OR SLD symbol)
+2. System opens Property Grid modal/panel
+3. Property Grid displays ALL object fields (read/write)
+4. User modifies values
+5. On Apply/OK: NetworkModel is updated
+6. SLD and Wizard reflect change immediately
+```
+
+**Implementation notes:**
+- Property Grid is a presentation concern (frontend)
+- Backend provides complete object DTOs
+- No hidden or computed-only fields
+
+#### 14.2.2 Double-click Behavior
+
+| Context | Action | Result |
+|---------|--------|--------|
+| Wizard list item | Double-click | Property Grid for object |
+| SLD symbol | Double-click | Property Grid for object |
+| Case list item | Double-click | Case parameter editor |
+| Result item | Double-click | Result detail view (read-only) |
+
+#### 14.2.3 Context Menu
+
+PowerFactory-style context menus:
+
+| Element | Context Menu Actions |
+|---------|---------------------|
+| Bus | Edit Properties, Delete, Show Connected |
+| Branch | Edit Properties, Delete, Show Endpoints |
+| Switch | Edit Properties, Toggle State (Open/Close), Delete |
+| Source | Edit Properties, Delete |
+| Case | Edit Parameters, Run Calculation, Delete |
+| Result | View Details, Export, Delete |
+
+### 14.3 Wizard & SLD Operate on the SAME NetworkModel
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                      SINGLE NetworkModel                     │
+│                                                             │
+│  ┌─────────────────┐           ┌─────────────────┐         │
+│  │     WIZARD      │           │       SLD       │         │
+│  │  (list view)    │◄─────────►│  (graphic view) │         │
+│  └────────┬────────┘           └────────┬────────┘         │
+│           │                              │                  │
+│           └──────────┬───────────────────┘                  │
+│                      │                                      │
+│                      ▼                                      │
+│           ┌─────────────────────┐                          │
+│           │   NetworkGraph      │                          │
+│           │   (single source    │                          │
+│           │    of truth)        │                          │
+│           └─────────────────────┘                          │
+└─────────────────────────────────────────────────────────────┘
+
+Edit via Wizard → updates NetworkGraph → SLD refreshes
+Edit via SLD    → updates NetworkGraph → Wizard refreshes
+```
+
+**Critical invariant:** There is NO separate data store for Wizard or SLD. Both are views of the same NetworkGraph instance.
+
+### 14.4 Mode Visibility (UI Feedback)
+
+The user interface MUST clearly indicate current operational mode:
+
+| Mode | Visual Indicator | Allowed Actions |
+|------|------------------|-----------------|
+| Edit Mode | Green status bar / "EDIT" badge | Modify NetworkModel |
+| Study Case Mode | Blue status bar / "CASE" badge | Modify Case parameters |
+| Result Mode | Gray status bar / "RESULTS" badge | View only (no edits) |
+
+**Mode transitions:**
+- Edit Mode → Study Case Mode: User selects/creates Case
+- Study Case Mode → Result Mode: User runs Calculation
+- Result Mode → Edit Mode: User clicks "Edit Network" or similar
+
+### 14.5 Terminology Alignment
+
+To maintain mental model consistency with PowerFactory users:
+
+| Avoid | Use Instead | Rationale |
+|-------|-------------|-----------|
+| Node | Bus | PowerFactory terminology |
+| Connection | Branch | Clearer physical meaning |
+| Scenario | Case / Study Case | PowerFactory standard |
+| Analysis Run | Calculation | PowerFactory terminology |
+| Breaker (as type) | Switch (with SwitchType.BREAKER) | Apparatus classification |
+
+### 14.6 SLD Conventions (PowerFactory-aligned)
+
+| Convention | Rule |
+|------------|------|
+| Bus symbol | Horizontal bar (busbar) |
+| Line symbol | Solid line with impedance indicator |
+| Cable symbol | Solid line with cable marker (or dashed) |
+| Transformer symbol | Standard 2-winding symbol (circles) |
+| Switch symbol | Breaker symbol (open/closed state visible) |
+| Source symbol | Generator or grid symbol (depends on type) |
+| Load symbol | Arrow pointing down |
+| PCC indicator | Overlay / annotation (NOT model object) |
+
+---
+
 **END OF ARCHITECTURE DOCUMENT**

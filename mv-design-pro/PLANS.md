@@ -115,6 +115,88 @@ This plan describes the complete refactoring of MV-DESIGN-PRO to align with DIgS
 
 ---
 
+## 3.5 Phase 1.x: PowerFactory UI/UX Parity (DOC ONLY)
+
+### 3.5.1 Purpose
+
+Unify the mental model of MV-DESIGN-PRO users with DIgSILENT PowerFactory UI/UX conventions through documentation updates.
+
+### 3.5.2 Scope
+
+| In Scope | Out of Scope |
+|----------|--------------|
+| Documentation updates | Code changes |
+| SYSTEM_SPEC.md additions | UI implementation |
+| ARCHITECTURE.md additions | Solver modifications |
+| New docs/ui/ folder | Model changes |
+| PLANS.md update | API changes |
+
+### 3.5.3 Deliverables
+
+| File | Status | Description |
+|------|--------|-------------|
+| SYSTEM_SPEC.md (Section 18) | DONE | User Interaction Model (PowerFactory-aligned) |
+| ARCHITECTURE.md (Section 14) | DONE | PowerFactory UI/UX Parity |
+| docs/ui/powerfactory_ui_parity.md | DONE | UX guidelines document |
+| docs/ui/wizard_screens.md | DONE | Wizard workflow specification |
+| PLANS.md (this section) | DONE | Phase 1.x documentation |
+
+### 3.5.4 Key Additions
+
+1. **User Interaction Model (SYSTEM_SPEC.md)**
+   - PF-style Project Tree structure
+   - Operational modes (Edit / Case / Results)
+   - Wizard = Data Manager equivalence
+   - SLD rules (1:1 mapping)
+   - PCC NOT in NetworkModel rule
+   - Property Grid pattern
+
+2. **PowerFactory UI/UX Parity (ARCHITECTURE.md)**
+   - Concept mapping table (PF → MV-DESIGN-PRO)
+   - UI behavior patterns
+   - Wizard & SLD single model diagram
+   - Mode visibility requirements
+   - Terminology alignment
+
+3. **docs/ui/powerfactory_ui_parity.md**
+   - UX principles
+   - Terminology consistency rules
+   - Operational mode specifications
+   - Interaction patterns
+   - SLD conventions
+   - Validation feedback
+
+4. **docs/ui/wizard_screens.md**
+   - Canonical step sequence
+   - Screen specifications (Steps 1-10)
+   - Property Grid standard
+   - Modal dialog patterns
+   - Wizard rules (non-negotiable)
+   - Navigation rules
+
+### 3.5.5 Explicitly Out of Scope
+
+The following are NOT part of this phase:
+
+- Implementation of UI components
+- Frontend code changes
+- Backend API changes
+- Solver modifications
+- NetworkModel schema changes
+- Test code changes
+- CI/CD changes
+
+### 3.5.6 Compliance
+
+This phase updates documentation only and does not alter:
+- Existing architectural invariants
+- Solver contracts (WHITE BOX)
+- Case immutability rules
+- PCC interpretation layer principle
+- NetworkModel singleton principle
+
+---
+
 ## 4. Phase 2: NetworkModel Core (PENDING)
 
 ### 4.1 Task 2.1: Remove PCC from NetworkGraph
