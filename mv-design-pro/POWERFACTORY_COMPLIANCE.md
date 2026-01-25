@@ -1,8 +1,8 @@
 # MV-DESIGN-PRO PowerFactory Compliance Checklist
 
-**Version:** 2.0
-**Status:** AUDIT DOCUMENT
-**Reference:** SYSTEM_SPEC.md
+**Version:** 2.2
+**Status:** AUDIT DOCUMENT (Updated 2025-01)
+**Reference:** SYSTEM_SPEC.md, PLANS.md
 
 ---
 
@@ -48,12 +48,12 @@ This document provides a comprehensive checklist for verifying compliance with D
 
 | ID | Requirement | Verification | Status |
 |----|-------------|--------------|--------|
-| NM-020 | NO PCC in NetworkModel | Check: pcc_node_id removed from NetworkGraph | FAIL |
-| NM-021 | NO boundary markers in model | Check: no boundary fields | VERIFY |
+| NM-020 | NO PCC in NetworkModel | Check: pcc_node_id removed from NetworkGraph | PASS |
+| NM-021 | NO boundary markers in model | Check: no boundary fields | PASS |
 | NM-022 | NO legal/contractual concepts | Check: no legal fields | PASS |
 | NM-023 | Station = logical only | Check: Station has no impedance | N/A |
 
-**Current issue:** `pcc_node_id` exists in NetworkGraph (line 49 in graph.py)
+**Remediated (2025-01):** `pcc_node_id` removed from NetworkGraph. PCC is now identified exclusively in the interpretation layer via BoundaryIdentifier. See PLANS.md Phase 2 Task 2.1.
 
 ---
 
@@ -218,14 +218,14 @@ This document provides a comprehensive checklist for verifying compliance with D
 | SD-012 | No visual shortcuts without model | Check: all visible in model | VERIFY |
 | SD-013 | Edit via SLD = edit model | Check: same NetworkGraph | VERIFY |
 
-### 7.3 PCC in SLD (Current Issue)
+### 7.3 PCC in SLD
 
 | ID | Requirement | Verification | Status |
 |----|-------------|--------------|--------|
-| SD-020 | NO is_pcc in SldNodeSymbol | Check: is_pcc field removed | FAIL |
-| SD-021 | PCC identified from interpretation | Check: BoundaryIdentifier | PENDING |
+| SD-020 | NO is_pcc in SldNodeSymbol | Check: is_pcc field removed | PASS |
+| SD-021 | PCC identified from interpretation | Check: BoundaryIdentifier | PASS |
 
-**Current issue:** `is_pcc` field exists in SldNodeSymbol
+**Remediated (2025-01):** `is_pcc` removed from SldNodeSymbol. PCC marker is now generated as overlay from BoundaryIdentifier in the analysis layer. See PLANS.md Phase 2 Task 2.1.
 
 ---
 
@@ -244,9 +244,11 @@ This document provides a comprehensive checklist for verifying compliance with D
 
 | ID | Requirement | Verification | Status |
 |----|-------------|--------------|--------|
-| IN-010 | PCC identified in interpretation | Check: BoundaryIdentifier | PENDING |
-| IN-011 | PCC not in NetworkModel | Check: pcc_node_id removed | FAIL |
-| IN-012 | PCC uses heuristics | Check: not physics | PENDING |
+| IN-010 | PCC identified in interpretation | Check: BoundaryIdentifier | PASS |
+| IN-011 | PCC not in NetworkModel | Check: pcc_node_id removed | PASS |
+| IN-012 | PCC uses heuristics | Check: not physics | PASS |
+
+**Remediated (2025-01):** BoundaryIdentifier implemented in `application/analyses/boundary.py`. Uses heuristic identification (external grid connection) without physics calculations.
 
 ---
 
@@ -256,48 +258,54 @@ This document provides a comprehensive checklist for verifying compliance with D
 
 | Category | Total | Pass | Fail | Pending |
 |----------|-------|------|------|---------|
-| Network Model | 15 | 5 | 1 | 9 |
+| Network Model | 15 | 7 | 0 | 8 |
 | Study Case | 8 | 1 | 0 | 7 |
 | Catalog | 7 | 1 | 0 | 6 |
 | Solver WHITE BOX | 12 | 3 | 0 | 9 |
 | Validation | 7 | 4 | 0 | 3 |
 | Wizard | 15 | 8 | 0 | 7 |
-| SLD | 9 | 3 | 1 | 5 |
-| Interpretation | 7 | 0 | 1 | 6 |
-| **TOTAL** | **80** | **25** | **3** | **52** |
+| SLD | 9 | 5 | 0 | 4 |
+| Interpretation | 7 | 3 | 0 | 4 |
+| **TOTAL** | **80** | **32** | **0** | **48** |
 
 ### 9.2 Critical Failures
 
-| ID | Description | Priority |
-|----|-------------|----------|
-| NM-020 | pcc_node_id in NetworkGraph | HIGH |
-| SD-020 | is_pcc in SldNodeSymbol | HIGH |
-| IN-011 | PCC not moved to interpretation | HIGH |
+**All critical failures have been remediated (2025-01):**
+
+| ID | Description | Resolution |
+|----|-------------|------------|
+| NM-020 | pcc_node_id in NetworkGraph | REMEDIATED - removed from NetworkGraph |
+| SD-020 | is_pcc in SldNodeSymbol | REMEDIATED - removed from SldNodeSymbol |
+| IN-011 | PCC not moved to interpretation | REMEDIATED - BoundaryIdentifier implemented |
 
 ---
 
-## 10. Remediation Plan
+## 10. Remediation Status
 
-### 10.1 Immediate Actions (Phase 2)
+### 10.1 Completed Actions (Phase 2 - 2025-01)
 
-1. **Remove pcc_node_id from NetworkGraph**
+1. **Remove pcc_node_id from NetworkGraph** — DONE
    - File: `backend/src/network_model/core/graph.py`
-   - Action: Delete field, update references
+   - Action: Field removed, snapshot serialization updated
 
-2. **Remove is_pcc from SLD**
+2. **Remove is_pcc from SLD** — DONE
    - File: `backend/src/domain/sld.py`
-   - Action: Delete field, update layout.py
+   - Action: Field removed from SldNodeSymbol, sld_projection.py updated
 
-3. **Create BoundaryIdentifier**
-   - File: `backend/src/analyses/boundary.py` (NEW)
-   - Action: Implement PCC identification logic
+3. **BoundaryIdentifier implementation** — DONE
+   - File: `backend/src/application/analyses/boundary.py`
+   - Action: PCC identification via heuristics (external grid connection)
 
-### 10.2 Verification Tests
+4. **Action Envelope updated** — DONE
+   - Removed `set_pcc` action from core action types
+   - PCC hint preserved in application/wizard settings layer
 
-For each remediation:
-1. Unit test confirming removal
-2. Integration test confirming functionality preserved
-3. Regression test confirming no breaking changes
+### 10.2 Verification
+
+All remediations verified via:
+- Unit tests confirming PCC removal from core layer
+- Integration tests confirming PCC overlay from analysis layer
+- PLANS.md Phase 2 Task 2.1 marked DONE
 
 ---
 
@@ -305,7 +313,9 @@ For each remediation:
 
 | Date | Auditor | Version | Findings |
 |------|---------|---------|----------|
-| 2025-01 | System | 2.0 | Initial audit - 3 failures |
+| 2025-01 | System | 2.0 | Initial audit - 3 failures identified |
+| 2025-01 | System | 2.1 | Phase 2 Task 2.1 completed - all 3 failures remediated |
+| 2025-01 | System | 2.2 | Compliance document updated - 0 failures, 48 pending verification |
 
 ---
 

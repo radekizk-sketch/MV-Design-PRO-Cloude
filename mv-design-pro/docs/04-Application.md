@@ -93,7 +93,7 @@ create_study_case(project_id, name, payload) -> StudyCase
 list_study_cases(project_id) -> list[StudyCase]
 ```
 
-#### Konfiguracja
+#### Konfiguracja (Application-Layer Settings)
 ```python
 set_pcc(project_id, node_id) -> None
 get_pcc(project_id) -> UUID | None
@@ -103,6 +103,12 @@ set_limits(project_id, payload) -> None
 get_limits(project_id) -> LimitsPayload
 ```
 
+> **IMPORTANT (PowerFactory Alignment):** `set_pcc()` and `get_pcc()` manage a user **hint**
+> stored in application/project settings. PCC (punkt wspólnego przyłączenia) is **NOT**
+> stored in NetworkModel/NetworkGraph. The actual PCC identification is performed by
+> BoundaryIdentifier in the analysis layer, which may use this hint as input.
+> See SYSTEM_SPEC.md Section 18.3.4.
+
 ### 3.3 Walidacja
 
 ```python
@@ -111,7 +117,7 @@ validate_network(project_id, case_id=None) -> ValidationReport
 
 Sprawdza:
 - Istnienie węzłów i gałęzi
-- Poprawność PCC
+- Poprawność PCC hint (czy wskazany węzeł istnieje w projekcie)
 - Kompletność sources
 - Kompletność loads
 - Poprawność parametrów gałęzi
@@ -244,7 +250,7 @@ class LoadPayload:
 class ShortCircuitInput:
     graph: NetworkGraph
     base_mva: float
-    pcc_node_id: str
+    pcc_node_id: str  # Application-layer hint, NOT from NetworkGraph
     sources: list[dict]
     loads: list[dict]
     grounding: dict
@@ -252,6 +258,10 @@ class ShortCircuitInput:
     fault_spec: dict
     options: dict
 ```
+
+> **Note:** `pcc_node_id` in ShortCircuitInput is an application-layer parameter
+> (user hint from project settings), NOT a field from NetworkGraph.
+> NetworkGraph does NOT contain PCC - see SYSTEM_SPEC.md Section 18.3.4.
 
 ## 6. Błędy
 
@@ -301,8 +311,8 @@ line = service.add_branch(project.id, BranchPayload(
     params={"r_ohm_per_km": 0.05, "x_ohm_per_km": 0.4, "length_km": 50}
 ))
 
-# 4. Ustaw PCC
-service.set_pcc(project.id, slack["id"])
+# 4. Ustaw PCC hint (application-layer, NOT in NetworkModel)
+service.set_pcc(project.id, slack["id"])  # Stores hint in project settings
 
 # 5. Dodaj source
 service.add_source(project.id, SourcePayload(
