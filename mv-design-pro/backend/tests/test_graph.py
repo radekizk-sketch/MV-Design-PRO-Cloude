@@ -21,6 +21,7 @@ sys.path.insert(0, str(backend_src))
 from network_model.core.node import Node, NodeType
 from network_model.core.branch import BranchType, LineBranch
 from network_model.core.graph import NetworkGraph
+from network_model.core.switch import Switch, SwitchState
 
 
 # =============================================================================
@@ -83,6 +84,25 @@ def create_line_branch(
         b_us_per_km=5.0,
         length_km=10.0,
         rated_current_a=200.0,
+    )
+
+
+def create_switch(
+    switch_id: str,
+    from_node_id: str,
+    to_node_id: str,
+    state: SwitchState = SwitchState.CLOSED,
+    in_service: bool = True,
+    name: str = "Switch",
+) -> Switch:
+    """Tworzy poprawny łącznik do testów."""
+    return Switch(
+        id=switch_id,
+        name=name,
+        from_node_id=from_node_id,
+        to_node_id=to_node_id,
+        state=state,
+        in_service=in_service,
     )
 
 
@@ -843,3 +863,56 @@ class TestParallelBranches:
         assert len(edges_ab) == 2
         assert "AB1" in edges_ab
         assert "AB2" in edges_ab
+
+
+# =============================================================================
+# Test: switch topology (OPEN/CLOSED/in_service)
+# =============================================================================
+
+
+class TestSwitchTopology:
+    """Testy topologii dla łączników (Switch)."""
+
+    def test_closed_switch_connects_nodes(self):
+        """
+        CLOSED + in_service=True powinien łączyć węzły.
+        """
+        graph = NetworkGraph()
+        graph.add_node(create_pq_node("A"))
+        graph.add_node(create_pq_node("B"))
+
+        graph.add_switch(create_switch("SW1", "A", "B", state=SwitchState.CLOSED))
+
+        assert graph.is_connected() is True
+
+    def test_open_switch_disconnects_nodes(self):
+        """
+        OPEN powinien rozłączać węzły.
+        """
+        graph = NetworkGraph()
+        graph.add_node(create_pq_node("A"))
+        graph.add_node(create_pq_node("B"))
+
+        graph.add_switch(create_switch("SW1", "A", "B", state=SwitchState.OPEN))
+
+        assert graph.is_connected() is False
+
+    def test_out_of_service_switch_disconnects_nodes(self):
+        """
+        in_service=False powinien rozłączać węzły nawet jeśli CLOSED.
+        """
+        graph = NetworkGraph()
+        graph.add_node(create_pq_node("A"))
+        graph.add_node(create_pq_node("B"))
+
+        graph.add_switch(
+            create_switch(
+                "SW1",
+                "A",
+                "B",
+                state=SwitchState.CLOSED,
+                in_service=False,
+            )
+        )
+
+        assert graph.is_connected() is False

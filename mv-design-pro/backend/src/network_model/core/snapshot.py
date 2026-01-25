@@ -13,6 +13,7 @@ from .branch import Branch
 from .graph import NetworkGraph
 from .inverter import InverterSource
 from .node import Node
+from .switch import Switch
 
 
 @dataclass(frozen=True)
@@ -117,10 +118,12 @@ def _graph_to_dict(graph: NetworkGraph) -> dict[str, Any]:
     nodes = _sorted_by_id(graph.nodes.values())
     branches = _sorted_by_id(graph.branches.values())
     inverters = _sorted_by_id(graph.inverter_sources.values())
+    switches = _sorted_by_id(graph.switches.values())
     return {
         "nodes": [node.to_dict() for node in nodes],
         "branches": [branch.to_dict() for branch in branches],
         "inverter_sources": [source.to_dict() for source in inverters],
+        "switches": [switch.to_dict() for switch in switches],
     }
 
 
@@ -132,6 +135,8 @@ def _graph_from_dict(data: dict[str, Any]) -> NetworkGraph:
         graph.add_branch(Branch.from_dict(branch_data))
     for source_data in data.get("inverter_sources", []):
         graph.add_inverter_source(InverterSource.from_dict(source_data))
+    for switch_data in data.get("switches", []):
+        graph.add_switch(Switch.from_dict(switch_data))
     return graph
 
 

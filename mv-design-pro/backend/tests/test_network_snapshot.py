@@ -3,6 +3,8 @@ from network_model.core import (
     NetworkGraph,
     Node,
     NodeType,
+    Switch,
+    SwitchState,
     create_network_snapshot,
 )
 from network_model.core.branch import Branch
@@ -69,6 +71,15 @@ def _build_graph() -> NetworkGraph:
             in_rated_a=5.0,
         )
     )
+    graph.add_switch(
+        Switch(
+            id="sw-1",
+            name="Switch 1",
+            from_node_id="node-a",
+            to_node_id="node-b",
+            state=SwitchState.CLOSED,
+        )
+    )
     return graph
 
 
@@ -88,12 +99,14 @@ def test_snapshot_roundtrip_preserves_identity_and_ordering() -> None:
         "inv-1",
         "inv-2",
     ]
+    assert [switch["id"] for switch in payload["graph"]["switches"]] == ["sw-1"]
 
     restored = NetworkSnapshot.from_dict(payload)
     assert restored.meta.snapshot_id == snapshot.meta.snapshot_id
     assert list(restored.graph.nodes.keys()) == ["node-a", "node-b"]
     assert list(restored.graph.branches.keys()) == ["branch-1", "branch-2"]
     assert list(restored.graph.inverter_sources.keys()) == ["inv-1", "inv-2"]
+    assert list(restored.graph.switches.keys()) == ["sw-1"]
     assert restored.to_dict() == payload
 
 

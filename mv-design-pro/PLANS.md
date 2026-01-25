@@ -207,11 +207,14 @@ class NetworkGraph:
 **Location:** `backend/src/network_model/core/switch.py` (NEW)
 
 **Actions:**
-- [ ] Create Switch dataclass
-- [ ] Define SwitchType enum (BREAKER, DISCONNECTOR, LOAD_SWITCH, FUSE)
-- [ ] Define SwitchState enum (OPEN, CLOSED)
-- [ ] NO impedance fields
-- [ ] Add to NetworkGraph
+- [x] Create Switch dataclass
+- [x] Define SwitchType enum (BREAKER, DISCONNECTOR, LOAD_SWITCH, FUSE)
+- [x] Define SwitchState enum (OPEN, CLOSED)
+- [x] NO impedance fields
+- [x] Add to NetworkGraph
+
+**Changelog:**
+- P1: Switch integrated into NetworkGraph effective topology (PF-compliant)
 
 ### 4.3 Task 2.3: Implement NetworkValidator
 
@@ -360,7 +363,7 @@ class NetworkGraph:
 |-------------|-------|--------|
 | Single NetworkModel | Phase 2 | PENDING |
 | Bus terminology | Phase 2 | PENDING |
-| Switch without impedance | Phase 2 | PENDING |
+| Switch without impedance | Phase 2 | DONE |
 | Station = logical only | N/A | DONE |
 | Case immutability | Phase 4 | PENDING |
 | Catalog layer | Phase 3 | PENDING |
