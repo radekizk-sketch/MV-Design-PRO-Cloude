@@ -24,12 +24,13 @@ backend/src/network_model/core/
 - **Analiza spójności** grafu (wyspy, komponenty)
 - **Budowa macierzy admitancji** (Y-bus) dla solverów
 
-### 2.2 Zakazy
+### 2.2 Zakazy (Prohibitions)
 
 - **Brak interpretacji** - Node nie wie czy napięcie jest "za wysokie"
 - **Brak regulacji** - NetworkGraph nie wie o OSD ani kodeksach
 - **Brak analiz** - Core nie wykonuje obliczeń rozpływu ani zwarć
 - **Brak persystencji** - Core nie zna bazy danych
+- **Brak PCC w modelu** - PCC (punkt wspólnego przyłączenia) NIE występuje w NetworkGraph; jest identyfikowane w warstwie analysis przez BoundaryIdentifier
 
 ### 2.3 Snapshot Store (Persistence)
 
@@ -55,11 +56,14 @@ Minimalne API backendu wspiera pełny przepływ:
   "graph": {
     "nodes": [],
     "branches": [],
-    "inverter_sources": [],
-    "pcc_node_id": null
+    "inverter_sources": []
   }
 }
 ```
+
+> **Note:** PCC (punkt wspólnego przyłączenia) is NOT stored in NetworkGraph.
+> PCC is identified in the interpretation/analysis layer via BoundaryIdentifier.
+> See SYSTEM_SPEC.md Section 18.3.4.
 
 **POST /snapshots/{snapshot_id}/actions** przyjmuje `ActionEnvelope`, waliduje go i zwraca
 `ActionResult` wraz z `new_snapshot_id` tylko dla akcji zaakceptowanych:
@@ -337,7 +341,9 @@ Brak tu fizyki i norm — tylko struktura oraz referencje do encji snapshotu.
 - `create_node` — minimalny payload: `node_type` + wymagane pola zależne od typu
 - `create_branch` — `from_node_id`, `to_node_id`, `branch_kind`
 - `set_in_service` — `entity_id`, `in_service` (bool)
-- `set_pcc` — `node_id`
+
+> **Note:** `set_pcc` action was removed from Core layer in Phase 2 Task 2.1.
+> PCC hint is managed in the application/wizard settings layer, NOT in NetworkGraph.
 
 ### 5.3 ActionResult (accept/reject)
 

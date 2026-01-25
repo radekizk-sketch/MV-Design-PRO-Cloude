@@ -1,5 +1,11 @@
 # ExecPlan: PR-96 (v1) — Designer Completion: Usability + Determinism
 
+> **Relationship to PLANS.md:** This is a feature-specific ExecPlan for PR-96 (Designer module).
+> The canonical, system-wide PowerFactory alignment plan is documented in [PLANS.md](./PLANS.md).
+> This ExecPlan follows the governance rules defined in [AGENTS.md](./AGENTS.md).
+
+---
+
 ## WHAT IT IS
 - Domknięcie modułu Projektanta (Designer) do stanu „v1 DONE”.
 - Jawny, deterministyczny model stanu projektu (ProjectState) bez danych fizycznych.
