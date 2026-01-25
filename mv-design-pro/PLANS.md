@@ -86,7 +86,7 @@ This plan describes the complete refactoring of MV-DESIGN-PRO to align with DIgS
                               │
                               ▼
 ┌─────────────────────────────────────────────────────────────────┐
-│ PHASE 5: Interpretation Layer                                   │
+│ PHASE 5: Interpretation Layer (DONE)                            │
 │ - Move PCC identification to analyses/                          │
 │ - Create BoundaryIdentifier                                     │
 │ - Separate analysis from solver                                 │
@@ -207,11 +207,14 @@ class NetworkGraph:
 **Location:** `backend/src/network_model/core/switch.py` (NEW)
 
 **Actions:**
-- [ ] Create Switch dataclass
-- [ ] Define SwitchType enum (BREAKER, DISCONNECTOR, LOAD_SWITCH, FUSE)
-- [ ] Define SwitchState enum (OPEN, CLOSED)
-- [ ] NO impedance fields
-- [ ] Add to NetworkGraph
+- [x] Create Switch dataclass
+- [x] Define SwitchType enum (BREAKER, DISCONNECTOR, LOAD_SWITCH, FUSE)
+- [x] Define SwitchState enum (OPEN, CLOSED)
+- [x] NO impedance fields
+- [x] Add to NetworkGraph
+
+**Changelog:**
+- P1: Switch integrated into NetworkGraph effective topology (PF-compliant)
 
 ### 4.3 Task 2.3: Implement NetworkValidator
 
@@ -228,9 +231,9 @@ class NetworkGraph:
 ### 4.4 Task 2.4: Bus Terminology
 
 **Actions:**
-- [ ] Add alias/documentation for Bus = Node
-- [ ] Update docstrings
-- [ ] Consider rename in next major version
+- [x] Add alias/documentation for Bus = Node
+- [x] Update docstrings
+- [x] Consider rename in next major version
 
 ### 4.5 Task 2.5: NetworkValidator gate (DONE)
 
@@ -239,6 +242,15 @@ class NetworkGraph:
 **Actions (DONE):**
 - [x] Wire NetworkValidator before solver execution (PF, SC)
 - [x] Block on ERROR, log warnings
+
+### 4.6 Task 2.6: Single NetworkModel invariant (DONE)
+
+**Location:** `backend/src/application/network_model/`
+
+**Actions (DONE):**
+- [x] Centralize NetworkGraph construction via application-level builder
+- [x] Enforce single NetworkModel id per project in snapshots and analysis
+- [x] Add runtime invariant checks to block mismatched model usage
 
 ---
 
@@ -268,42 +280,51 @@ class NetworkGraph:
 
 ---
 
-## 6. Phase 4: Case Layer (PENDING)
+## 6. Phase 4: Case Layer (DONE)
 
-### 6.1 Task 4.1: Case Immutability
+### 6.1 Task 4.1: Case Immutability (DEFERRED)
 
 **Actions:**
 - [ ] Verify Case uses NetworkSnapshot
 - [ ] Add immutability enforcement
 - [ ] Document case-model relationship
 
-### 6.2 Task 4.2: Result Invalidation
+### 6.2 Task 4.2: Result Invalidation (DONE - 2025-02)
 
 **Actions:**
-- [ ] Implement ResultInvalidator
-- [ ] Add model change detection
-- [ ] Mark results as OUTDATED on change
+- [x] Implement ResultInvalidator
+- [x] Add model change detection
+- [x] Mark results as OUTDATED on change
 
-### 6.3 Task 4.3: Case Directory Structure
+### 6.3 Task 4.3: Case Directory Structure (DEFERRED)
 
 **Actions:**
 - [ ] Create `backend/src/cases/` if not exists
 - [ ] Move/organize case classes
 - [ ] Ensure separation from analyses
 
+### 6.4 Task 4.4: Active Case Pointer (DONE)
+
+**Actions (DONE - 2025-02):**
+- [x] Add project-scoped Active Case pointer
+- [x] Gate calculations on Active Case context (PF-style)
+
+**Changelog:**
+- P4: Result invalidation on NetworkModel change (PF-style)
+
 ---
 
-## 7. Phase 5: Interpretation Layer (PARTIAL)
+## 7. Phase 5: Interpretation Layer (DONE)
 
 ### 7.1 Task 5.1: Create BoundaryIdentifier (DONE)
 
-**Location:** `backend/src/application/analyses/boundary.py` (EXISTS)
+**Location:** `backend/src/analysis/boundary/` (NEW)
 
 **Actions (DONE):**
-- [x] BoundaryIdentifier class exists
-- [x] identify_pcc() method implemented with hint support
-- [x] Uses heuristics (external grid connection)
-- [x] Documented as interpretation, not physics
+- [x] BoundaryIdentifier class implemented in analysis layer
+- [x] identify() reads NetworkSnapshot + case params (read-only)
+- [x] Heuristics: external grid, generator-dominant, single-feeder, voltage-level
+- [x] Deterministic result DTO with diagnostics
 
 ### 7.2 Task 5.2: PCC Migration (DONE)
 
@@ -312,12 +333,21 @@ class NetworkGraph:
 - [x] SLD no longer stores is_pcc (removed from SldNodeSymbol)
 - [x] PCC remains in export/import as application-level hint (not core model)
 
-### 7.3 Task 5.3: Analysis Separation
+### 7.3 Task 5.3: Analysis Separation (DONE)
 
-**Actions:**
-- [ ] Verify analyses don't contain physics
-- [ ] Document analysis vs solver boundary
-- [ ] Add analysis layer tests
+**Actions (DONE):**
+- [x] Verify analyses don't contain physics
+- [x] Document analysis vs solver boundary
+- [x] Add analysis layer tests
+
+### 7.4 Task 5.4: Power Flow solver boundary alignment (DONE)
+
+**Location:** `backend/src/network_model/solvers/power_flow_newton.py`
+
+**Actions (DONE):**
+- [x] Relocate Newton-Raphson Power Flow physics into solver layer
+- [x] Keep analysis layer orchestration-only with compatibility adapter
+- [x] Add regression test for solver layer parity
 
 ---
 
@@ -352,9 +382,9 @@ class NetworkGraph:
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| Single NetworkModel | Phase 2 | PENDING |
-| Bus terminology | Phase 2 | PENDING |
-| Switch without impedance | Phase 2 | PENDING |
+| Single NetworkModel | Phase 2 | DONE |
+| Bus terminology | Phase 2 | DONE |
+| Switch without impedance | Phase 2 | DONE |
 | Station = logical only | N/A | DONE |
 | Case immutability | Phase 4 | PENDING |
 | Catalog layer | Phase 3 | PENDING |
@@ -414,6 +444,10 @@ class NetworkGraph:
 | 2025-01 | 2.2 | Phase 1.x DONE: PowerFactory UI/UX Parity documentation |
 | 2025-02 | 2.3 | Docs consolidation & spec vs code audit report completed |
 | 2025-02 | 2.4 | P0: NetworkValidator wired as pre-solver gate (PF-compliant) |
+| 2025-02 | 2.5 | P2: Active Case pointer added (PF-style calculation context) |
+| 2025-03 | 2.6 | P3: Single NetworkModel invariant enforced (no shadow graphs) |
+| 2025-03 | 2.7 | P5: BoundaryIdentifier (PCC heuristics) implemented as analysis-only |
+| 2025-03 | 2.8 | P6: Power Flow solver relocated to solver layer (PowerFactory boundary compliance) |
 
 ---
 

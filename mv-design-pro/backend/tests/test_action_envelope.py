@@ -9,9 +9,11 @@ from network_model.core import (
 from network_model.core.branch import Branch
 from network_model.core.inverter import InverterSource
 
+NETWORK_MODEL_ID = "model-1"
+
 
 def _build_snapshot() -> tuple[NetworkGraph, str]:
-    graph = NetworkGraph()
+    graph = NetworkGraph(network_model_id=NETWORK_MODEL_ID)
     graph.add_node(
         Node(
             id="node-1",
@@ -52,7 +54,10 @@ def _build_snapshot() -> tuple[NetworkGraph, str]:
         )
     )
     snapshot = create_network_snapshot(
-        graph, snapshot_id="snap-1", created_at="2024-01-01T00:00:00+00:00"
+        graph,
+        snapshot_id="snap-1",
+        created_at="2024-01-01T00:00:00+00:00",
+        network_model_id=NETWORK_MODEL_ID,
     )
     return graph, snapshot.meta.snapshot_id
 
@@ -75,7 +80,10 @@ def _base_envelope(**overrides: object) -> ActionEnvelope:
 def test_valid_envelope_passes_validation() -> None:
     graph, snapshot_id = _build_snapshot()
     snapshot = create_network_snapshot(
-        graph, snapshot_id=snapshot_id, created_at="2024-01-01T00:00:00+00:00"
+        graph,
+        snapshot_id=snapshot_id,
+        created_at="2024-01-01T00:00:00+00:00",
+        network_model_id=NETWORK_MODEL_ID,
     )
     envelope = _base_envelope(parent_snapshot_id=snapshot_id)
 
@@ -89,7 +97,10 @@ def test_valid_envelope_passes_validation() -> None:
 def test_missing_required_fields_rejected() -> None:
     graph, snapshot_id = _build_snapshot()
     snapshot = create_network_snapshot(
-        graph, snapshot_id=snapshot_id, created_at="2024-01-01T00:00:00+00:00"
+        graph,
+        snapshot_id=snapshot_id,
+        created_at="2024-01-01T00:00:00+00:00",
+        network_model_id=NETWORK_MODEL_ID,
     )
     envelope = ActionEnvelope(
         action_id=None,  # type: ignore[arg-type]
@@ -108,7 +119,10 @@ def test_missing_required_fields_rejected() -> None:
 def test_unknown_action_type_rejected() -> None:
     graph, snapshot_id = _build_snapshot()
     snapshot = create_network_snapshot(
-        graph, snapshot_id=snapshot_id, created_at="2024-01-01T00:00:00+00:00"
+        graph,
+        snapshot_id=snapshot_id,
+        created_at="2024-01-01T00:00:00+00:00",
+        network_model_id=NETWORK_MODEL_ID,
     )
     envelope = _base_envelope(action_type="unknown_action")
 
@@ -121,7 +135,10 @@ def test_unknown_action_type_rejected() -> None:
 def test_missing_payload_keys_rejected() -> None:
     graph, snapshot_id = _build_snapshot()
     snapshot = create_network_snapshot(
-        graph, snapshot_id=snapshot_id, created_at="2024-01-01T00:00:00+00:00"
+        graph,
+        snapshot_id=snapshot_id,
+        created_at="2024-01-01T00:00:00+00:00",
+        network_model_id=NETWORK_MODEL_ID,
     )
     envelope = _base_envelope(payload={"node_type": "PQ"})
 
@@ -137,7 +154,10 @@ def test_missing_payload_keys_rejected() -> None:
 def test_referential_integrity_errors_rejected() -> None:
     graph, snapshot_id = _build_snapshot()
     snapshot = create_network_snapshot(
-        graph, snapshot_id=snapshot_id, created_at="2024-01-01T00:00:00+00:00"
+        graph,
+        snapshot_id=snapshot_id,
+        created_at="2024-01-01T00:00:00+00:00",
+        network_model_id=NETWORK_MODEL_ID,
     )
     envelope = _base_envelope(
         action_type="set_in_service",

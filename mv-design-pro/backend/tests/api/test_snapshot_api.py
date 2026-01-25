@@ -17,9 +17,11 @@ from infrastructure.persistence.unit_of_work import build_uow_factory
 from network_model.core import Branch, BranchType, NetworkGraph, Node, NodeType
 from network_model.core.snapshot import NetworkSnapshot, SnapshotMeta
 
+NETWORK_MODEL_ID = "model-1"
+
 
 def _build_snapshot(snapshot_id: str) -> NetworkSnapshot:
-    graph = NetworkGraph()
+    graph = NetworkGraph(network_model_id=NETWORK_MODEL_ID)
     graph.add_node(
         Node(
             id="node-1",
@@ -54,6 +56,7 @@ def _build_snapshot(snapshot_id: str) -> NetworkSnapshot:
         snapshot_id=snapshot_id,
         created_at="2024-01-01T00:00:00+00:00",
         schema_version="v1",
+        network_model_id=NETWORK_MODEL_ID,
     )
     return NetworkSnapshot(meta=meta, graph=graph)
 

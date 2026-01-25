@@ -3,14 +3,18 @@ from network_model.core import (
     NetworkGraph,
     Node,
     NodeType,
+    Switch,
+    SwitchState,
     create_network_snapshot,
 )
 from network_model.core.branch import Branch
 from network_model.core.snapshot import NetworkSnapshot
 
+NETWORK_MODEL_ID = "model-1"
+
 
 def _build_graph() -> NetworkGraph:
-    graph = NetworkGraph()
+    graph = NetworkGraph(network_model_id=NETWORK_MODEL_ID)
     graph.add_node(
         Node(
             id="node-b",
@@ -69,13 +73,25 @@ def _build_graph() -> NetworkGraph:
             in_rated_a=5.0,
         )
     )
+    graph.add_switch(
+        Switch(
+            id="sw-1",
+            name="Switch 1",
+            from_node_id="node-a",
+            to_node_id="node-b",
+            state=SwitchState.CLOSED,
+        )
+    )
     return graph
 
 
 def test_snapshot_roundtrip_preserves_identity_and_ordering() -> None:
     graph = _build_graph()
     snapshot = create_network_snapshot(
-        graph, snapshot_id="snap-1", created_at="2024-01-01T00:00:00+00:00"
+        graph,
+        snapshot_id="snap-1",
+        created_at="2024-01-01T00:00:00+00:00",
+        network_model_id=NETWORK_MODEL_ID,
     )
 
     payload = snapshot.to_dict()
@@ -88,21 +104,30 @@ def test_snapshot_roundtrip_preserves_identity_and_ordering() -> None:
         "inv-1",
         "inv-2",
     ]
+    assert [switch["id"] for switch in payload["graph"]["switches"]] == ["sw-1"]
 
     restored = NetworkSnapshot.from_dict(payload)
     assert restored.meta.snapshot_id == snapshot.meta.snapshot_id
     assert list(restored.graph.nodes.keys()) == ["node-a", "node-b"]
     assert list(restored.graph.branches.keys()) == ["branch-1", "branch-2"]
     assert list(restored.graph.inverter_sources.keys()) == ["inv-1", "inv-2"]
+    assert list(restored.graph.switches.keys()) == ["sw-1"]
     assert restored.to_dict() == payload
 
 
 def test_snapshot_lineage_creates_new_snapshot_id() -> None:
     graph = _build_graph()
     base_snapshot = create_network_snapshot(
-        graph, snapshot_id="base-snap", created_at="2024-01-01T00:00:00+00:00"
+        graph,
+        snapshot_id="base-snap",
+        created_at="2024-01-01T00:00:00+00:00",
+        network_model_id=NETWORK_MODEL_ID,
     )
-    derived_snapshot = create_network_snapshot(graph, parent_snapshot=base_snapshot)
+    derived_snapshot = create_network_snapshot(
+        graph,
+        parent_snapshot=base_snapshot,
+        network_model_id=NETWORK_MODEL_ID,
+    )
 
     assert derived_snapshot.meta.snapshot_id != base_snapshot.meta.snapshot_id
     assert derived_snapshot.meta.parent_snapshot_id == base_snapshot.meta.snapshot_id

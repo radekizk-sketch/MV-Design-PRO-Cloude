@@ -11,18 +11,22 @@ from uuid import UUID
 from analysis.power_flow import PowerFlowSolver
 from analysis.power_flow._internal import build_slack_island, validate_input
 from analysis.power_flow.types import PowerFlowInput, PowerFlowOptions, PQSpec, PVSpec, SlackSpec
+from application.active_case import (
+    ActiveCaseMismatchError,
+    ActiveCaseNotSetError,
+    ActiveCaseService,
+)
+from application.network_model import (
+    build_network_graph,
+    ensure_snapshot_matches_project,
+    network_model_id_for_project,
+)
 from application.sld.overlay import ResultSldOverlayBuilder
 from domain.analysis_run import AnalysisRun, new_analysis_run
 from domain.project_design_mode import ProjectDesignMode
 from domain.validation import ValidationIssue, ValidationReport
 from infrastructure.persistence.unit_of_work import UnitOfWork
-from network_model.core import (
-    Branch,
-    InverterSource,
-    NetworkGraph,
-    Node,
-    create_network_snapshot,
-)
+from network_model.core import InverterSource, NetworkGraph, create_network_snapshot
 from network_model.validation import NetworkValidator as ModelNetworkValidator, Severity as ModelSeverity
 from network_model.solvers import ShortCircuitIEC60909Solver, ShortCircuitType
 
@@ -67,17 +71,13 @@ class AnalysisRunService:
     def create_power_flow_run(
         self,
         project_id: UUID,
-        operating_case_id: UUID,
+        operating_case_id: UUID | None = None,
         options: dict | None = None,
     ) -> AnalysisRun:
+        operating_case_id = self._resolve_operating_case_id(project_id, operating_case_id)
         snapshot = self._build_power_flow_snapshot(project_id, operating_case_id, options)
         input_hash = compute_input_hash(snapshot)
         with self._uow_factory() as uow:
-            existing = uow.analysis_runs.get_by_deterministic_key(
-                project_id, operating_case_id, "PF", input_hash
-            )
-            if existing:
-                return existing
             run = new_analysis_run(
                 project_id=project_id,
                 operating_case_id=operating_case_id,
@@ -91,20 +91,18 @@ class AnalysisRunService:
     def create_short_circuit_run(
         self,
         project_id: UUID,
-        operating_case_id: UUID,
-        fault_spec: dict,
+        operating_case_id: UUID | None = None,
+        fault_spec: dict | None = None,
         options: dict | None = None,
     ) -> AnalysisRun:
+        if fault_spec is None:
+            raise ValueError("fault_spec is required to create short-circuit runs")
+        operating_case_id = self._resolve_operating_case_id(project_id, operating_case_id)
         snapshot = self._build_short_circuit_snapshot(
             project_id, operating_case_id, fault_spec, options
         )
         input_hash = compute_input_hash(snapshot)
         with self._uow_factory() as uow:
-            existing = uow.analysis_runs.get_by_deterministic_key(
-                project_id, operating_case_id, "short_circuit_sn", input_hash
-            )
-            if existing:
-                return existing
             run = new_analysis_run(
                 project_id=project_id,
                 operating_case_id=operating_case_id,
@@ -118,17 +116,13 @@ class AnalysisRunService:
     def create_fault_loop_run(
         self,
         project_id: UUID,
-        operating_case_id: UUID,
+        operating_case_id: UUID | None = None,
         options: dict | None = None,
     ) -> AnalysisRun:
+        operating_case_id = self._resolve_operating_case_id(project_id, operating_case_id)
         snapshot = self._build_fault_loop_snapshot(project_id, operating_case_id, options)
         input_hash = compute_input_hash(snapshot)
         with self._uow_factory() as uow:
-            existing = uow.analysis_runs.get_by_deterministic_key(
-                project_id, operating_case_id, "fault_loop_nn", input_hash
-            )
-            if existing:
-                return existing
             run = new_analysis_run(
                 project_id=project_id,
                 operating_case_id=operating_case_id,
@@ -193,6 +187,20 @@ class AnalysisRunService:
         return self._overlay_builder.build_short_circuit_overlay(
             diagram.get("payload"), result_payload
         )
+
+    def _resolve_operating_case_id(
+        self, project_id: UUID, operating_case_id: UUID | None
+    ) -> UUID:
+        active_case_id = ActiveCaseService(self._uow_factory).get_active_case_id(project_id)
+        if active_case_id is None:
+            raise ActiveCaseNotSetError(
+                f"ActiveCase is not set for project {project_id}"
+            )
+        if operating_case_id is not None and operating_case_id != active_case_id:
+            raise ActiveCaseMismatchError(
+                f"OperatingCase {operating_case_id} is not the Active Case for project {project_id}"
+            )
+        return active_case_id
 
     def _execute_power_flow(self, uow: UnitOfWork, run: AnalysisRun) -> AnalysisRun:
         pf_input = self._build_power_flow_input(run)
@@ -358,9 +366,12 @@ class AnalysisRunService:
             loads = uow.wizard.list_loads(project_id)
             sources = uow.wizard.list_sources(project_id)
             nodes = uow.network.list_nodes(project_id)
+            snapshot_id = self._get_snapshot_id(case)
+            existing_snapshot = uow.snapshots.get_snapshot(snapshot_id)
+            if existing_snapshot is not None:
+                ensure_snapshot_matches_project(existing_snapshot, project_id)
 
         base_mva = float(case.case_payload.get("base_mva", 100.0))
-        snapshot_id = self._get_snapshot_id(case)
         slack_node_id = settings.get("pcc_node_id") or self._select_slack_node_id(nodes)
         slack_attrs = self._lookup_node_attrs(nodes, slack_node_id) if slack_node_id else {}
         slack_spec = {
@@ -470,7 +481,10 @@ class AnalysisRunService:
                 state["element_id"]: state
                 for state in uow.wizard.list_switching_states(operating_case_id)
             }
-        snapshot_id = self._get_snapshot_id(case)
+            snapshot_id = self._get_snapshot_id(case)
+            existing_snapshot = uow.snapshots.get_snapshot(snapshot_id)
+            if existing_snapshot is not None:
+                ensure_snapshot_matches_project(existing_snapshot, project_id)
         normalized_nodes = [self._node_to_graph_payload(node) for node in nodes]
         normalized_branches: list[dict[str, Any]] = []
         for branch in branches:
@@ -799,6 +813,7 @@ class AnalysisRunService:
         if snapshot_id_str:
             existing_snapshot = uow.snapshots.get_snapshot(snapshot_id_str)
             if existing_snapshot is not None:
+                ensure_snapshot_matches_project(existing_snapshot, project_id)
                 return snapshot_id_str
 
         graph = self._build_network_graph(project_id, case.id)
@@ -833,6 +848,7 @@ class AnalysisRunService:
         snapshot = create_network_snapshot(
             graph,
             snapshot_id=snapshot_id_str,
+            network_model_id=network_model_id_for_project(project_id),
         )
         uow.snapshots.add_snapshot(snapshot, commit=False)
         return snapshot.meta.snapshot_id
@@ -1016,17 +1032,14 @@ class AnalysisRunService:
                     for state in uow.wizard.list_switching_states(case_id)
                 }
 
-        graph = NetworkGraph()
-        for node in nodes:
-            node_data = self._node_to_graph_payload(node)
-            graph.add_node(Node.from_dict(node_data))
-        for branch in branches:
-            branch_data = self._branch_to_graph_payload(branch)
-            branch_state = switching_states.get(branch["id"])
-            if branch_state is not None:
-                branch_data["in_service"] = branch_state["in_service"]
-            graph.add_branch(Branch.from_dict(branch_data))
-        return graph
+        return build_network_graph(
+            nodes=nodes,
+            branches=branches,
+            switching_states=switching_states,
+            node_payload_builder=self._node_to_graph_payload,
+            branch_payload_builder=self._branch_to_graph_payload,
+            network_model_id=network_model_id_for_project(project_id),
+        )
 
     def _validate_network_graph(self, graph: NetworkGraph) -> ValidationReport:
         model_report = ModelNetworkValidator().validate(graph)

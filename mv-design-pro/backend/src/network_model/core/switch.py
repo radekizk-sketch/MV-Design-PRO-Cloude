@@ -60,6 +60,7 @@ class Switch:
         to_node_id: ID of the second terminal node.
         switch_type: Type of switch (BREAKER, DISCONNECTOR, etc.).
         state: Current state (OPEN or CLOSED).
+        in_service: Whether the switch is in service (default True).
         rated_current_a: Rated current capacity [A] (for thermal checks only).
         rated_voltage_kv: Rated voltage [kV] (for compatibility checks only).
 
@@ -75,6 +76,7 @@ class Switch:
     to_node_id: str
     switch_type: SwitchType = SwitchType.BREAKER
     state: SwitchState = SwitchState.CLOSED
+    in_service: bool = True
     rated_current_a: float = 0.0
     rated_voltage_kv: float = 0.0
 
@@ -109,6 +111,7 @@ class Switch:
             to_node_id=self.to_node_id,
             switch_type=self.switch_type,
             state=SwitchState.OPEN,
+            in_service=self.in_service,
             rated_current_a=self.rated_current_a,
             rated_voltage_kv=self.rated_voltage_kv,
         )
@@ -127,6 +130,7 @@ class Switch:
             to_node_id=self.to_node_id,
             switch_type=self.switch_type,
             state=SwitchState.CLOSED,
+            in_service=self.in_service,
             rated_current_a=self.rated_current_a,
             rated_voltage_kv=self.rated_voltage_kv,
         )
@@ -169,6 +173,8 @@ class Switch:
             return False
         if not isinstance(self.state, SwitchState):
             return False
+        if not isinstance(self.in_service, bool):
+            return False
         return True
 
     def to_dict(self) -> Dict[str, Any]:
@@ -185,6 +191,7 @@ class Switch:
             "to_node_id": self.to_node_id,
             "switch_type": self.switch_type.value,
             "state": self.state.value,
+            "in_service": self.in_service,
             "rated_current_a": self.rated_current_a,
             "rated_voltage_kv": self.rated_voltage_kv,
         }
@@ -218,6 +225,7 @@ class Switch:
             to_node_id=str(data.get("to_node_id", "")),
             switch_type=switch_type,
             state=state,
+            in_service=bool(data.get("in_service", True)),
             rated_current_a=float(data.get("rated_current_a", 0.0)),
             rated_voltage_kv=float(data.get("rated_voltage_kv", 0.0)),
         )

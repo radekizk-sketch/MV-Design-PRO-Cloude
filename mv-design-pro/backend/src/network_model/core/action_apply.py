@@ -38,6 +38,7 @@ def apply_action_to_snapshot(
         parent_snapshot_id=snapshot.meta.snapshot_id,
         created_at=str(action.created_at),
         schema_version=snapshot.meta.schema_version,
+        network_model_id=snapshot.meta.network_model_id,
     )
     return NetworkSnapshot(meta=meta, graph=graph)
 

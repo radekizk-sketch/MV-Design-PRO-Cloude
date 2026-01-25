@@ -13,6 +13,8 @@ from analysis.power_flow.types import (
     PVSpec,
     SlackSpec,
 )
+from application.analysis_run.result_invalidator import ResultInvalidator
+from application.network_model import build_network_graph, network_model_id_for_project
 from application.sld.layout import build_auto_layout_diagram
 from domain.models import (
     OperatingCase,
@@ -26,7 +28,7 @@ from domain.project_design_mode import ProjectDesignMode
 from domain.sld import SldBranchSymbol, SldDiagram, SldNodeSymbol
 from domain.validation import ValidationIssue, ValidationReport
 from infrastructure.persistence.unit_of_work import UnitOfWork
-from network_model.core import Branch, NetworkGraph, Node
+from network_model.core import NetworkGraph
 
 from .dtos import (
     BranchPayload,
@@ -50,6 +52,7 @@ from .importers.json_importer import parse_network_payload
 class NetworkWizardService:
     def __init__(self, uow_factory: Callable[[], UnitOfWork]) -> None:
         self._uow_factory = uow_factory
+        self._result_invalidator = ResultInvalidator()
 
     def create_project(self, name: str, description: str | None = None) -> Project:
         project = new_project(name=name, description=description)
@@ -111,6 +114,7 @@ class NetworkWizardService:
             }
             uow.network.add_node(project_id, node, commit=False)
             self._mark_sld_dirty(uow, project_id)
+            self._invalidate_results(uow, project_id)
         return node
 
     def update_node(self, project_id: UUID, node_id: UUID, patch: dict) -> dict:
@@ -126,6 +130,7 @@ class NetworkWizardService:
                 patch["attrs"] = self._normalize_node_attrs(node_type, attrs)
             updated = uow.network.update_node(node_id, patch, commit=False)
             self._mark_sld_dirty(uow, project_id)
+            self._invalidate_results(uow, project_id)
         if updated is None:
             raise NotFound(f"Node {node_id} not found")
         return updated
@@ -141,6 +146,7 @@ class NetworkWizardService:
                 raise Conflict("Cannot delete node with connected branches")
             uow.network.delete_node(node_id, commit=False)
             self._mark_sld_dirty(uow, project_id)
+            self._invalidate_results(uow, project_id)
 
     def add_branch(self, project_id: UUID, payload: BranchPayload) -> dict:
         with self._uow_factory() as uow:
@@ -157,6 +163,7 @@ class NetworkWizardService:
             }
             uow.network.add_branch(project_id, branch, commit=False)
             self._mark_sld_dirty(uow, project_id)
+            self._invalidate_results(uow, project_id)
         return branch
 
     def update_branch(self, project_id: UUID, branch_id: UUID, patch: dict) -> dict:
@@ -167,6 +174,7 @@ class NetworkWizardService:
                 raise NotFound(f"Branch {branch_id} not found")
             updated = uow.network.update_branch(branch_id, patch, commit=False)
             self._mark_sld_dirty(uow, project_id)
+            self._invalidate_results(uow, project_id)
         if updated is None:
             raise NotFound(f"Branch {branch_id} not found")
         return updated
@@ -176,6 +184,7 @@ class NetworkWizardService:
             self._ensure_project(uow, project_id)
             uow.network.delete_branch(branch_id, commit=False)
             self._mark_sld_dirty(uow, project_id)
+            self._invalidate_results(uow, project_id)
 
     def set_in_service(self, project_id: UUID, element_id: UUID, in_service: bool) -> None:
         with self._uow_factory() as uow:
@@ -188,6 +197,7 @@ class NetworkWizardService:
                     element_id, {"in_service": in_service}, commit=False
                 )
                 self._mark_sld_dirty(uow, project_id)
+                self._invalidate_results(uow, project_id)
                 return
             node = uow.network.get_node(element_id)
             if node is None or node["project_id"] != project_id:
@@ -196,6 +206,7 @@ class NetworkWizardService:
             attrs["in_service"] = in_service
             uow.network.update_node(element_id, {"attrs": attrs}, commit=False)
             self._mark_sld_dirty(uow, project_id)
+            self._invalidate_results(uow, project_id)
 
     def set_pcc(self, project_id: UUID, node_id: UUID) -> None:
         with self._uow_factory() as uow:
@@ -218,6 +229,7 @@ class NetworkWizardService:
             for source in sources:
                 payload = self._source_payload_to_record(project_id, source)
                 uow.wizard.upsert_source(project_id, payload, commit=False)
+            self._invalidate_results(uow, project_id)
 
     def get_sources(self, project_id: UUID) -> list[SourcePayload]:
         with self._uow_factory() as uow:
@@ -237,6 +249,7 @@ class NetworkWizardService:
             self._ensure_project(uow, project_id)
             self._ensure_node(uow, project_id, payload.node_id)
             uow.wizard.upsert_load(project_id, record, commit=False)
+            self._invalidate_results(uow, project_id)
         return record
 
     def update_load(self, project_id: UUID, load_id: UUID, patch: dict) -> dict:
@@ -255,12 +268,14 @@ class NetworkWizardService:
                 "in_service": patch.get("in_service", existing["in_service"]),
             }
             uow.wizard.upsert_load(project_id, record, commit=False)
+            self._invalidate_results(uow, project_id)
         return record
 
     def remove_load(self, project_id: UUID, load_id: UUID) -> None:
         with self._uow_factory() as uow:
             self._ensure_project(uow, project_id)
             uow.wizard.delete_load(load_id, commit=False)
+            self._invalidate_results(uow, project_id)
 
     def list_loads(self, project_id: UUID) -> list[LoadPayload]:
         with self._uow_factory() as uow:
@@ -274,6 +289,7 @@ class NetworkWizardService:
             self._ensure_project(uow, project_id)
             self._ensure_node(uow, project_id, payload.node_id)
             uow.wizard.upsert_source(project_id, record, commit=False)
+            self._invalidate_results(uow, project_id)
         return record
 
     def update_source(self, project_id: UUID, source_id: UUID, patch: dict) -> dict:
@@ -293,12 +309,14 @@ class NetworkWizardService:
                 "in_service": patch.get("in_service", existing["in_service"]),
             }
             uow.wizard.upsert_source(project_id, record, commit=False)
+            self._invalidate_results(uow, project_id)
         return record
 
     def remove_source(self, project_id: UUID, source_id: UUID) -> None:
         with self._uow_factory() as uow:
             self._ensure_project(uow, project_id)
             uow.wizard.delete_source(source_id, commit=False)
+            self._invalidate_results(uow, project_id)
 
     def set_grounding(self, project_id: UUID, payload: GroundingPayload) -> None:
         with self._uow_factory() as uow:
@@ -382,6 +400,7 @@ class NetworkWizardService:
             uow.wizard.set_switching_state(
                 case_id, element_id, element_type, in_service, commit=False
             )
+            self._invalidate_results(uow, case.project_id)
 
     def get_effective_in_service(
         self, project_id: UUID, case_id: UUID, element_id: UUID
@@ -413,7 +432,10 @@ class NetworkWizardService:
         )
         with self._uow_factory() as uow:
             self._ensure_project(uow, project_id)
+            existing_cases = uow.cases.list_operating_cases(project_id)
             uow.cases.add_operating_case(case, commit=False)
+            if not existing_cases and uow.wizard.get_active_case_id(project_id) is None:
+                uow.wizard.set_active_case_id(project_id, case.id, commit=False)
         return case
 
     def update_operating_case(self, project_id: UUID, case_id: UUID, patch: dict) -> OperatingCase:
@@ -640,17 +662,14 @@ class NetworkWizardService:
                     for state in uow.wizard.list_switching_states(case_id)
                 }
 
-        graph = NetworkGraph()
-        for node in nodes:
-            node_data = self._node_to_graph_payload(node)
-            graph.add_node(Node.from_dict(node_data))
-        for branch in branches:
-            branch_data = self._branch_to_graph_payload(branch)
-            branch_state = switching_states.get(branch["id"])
-            if branch_state is not None:
-                branch_data["in_service"] = branch_state["in_service"]
-            graph.add_branch(Branch.from_dict(branch_data))
-        return graph
+        return build_network_graph(
+            nodes=nodes,
+            branches=branches,
+            switching_states=switching_states,
+            node_payload_builder=self._node_to_graph_payload,
+            branch_payload_builder=self._branch_to_graph_payload,
+            network_model_id=network_model_id_for_project(project_id),
+        )
 
     def build_power_flow_input(
         self, project_id: UUID, case_id: UUID, options: dict | None = None
@@ -1124,6 +1143,7 @@ class NetworkWizardService:
                 except ValueError as exc:
                     errors.append(str(exc))
             self._mark_sld_dirty(uow, project_id)
+            self._invalidate_results(uow, project_id)
 
         validation = self.validate_network(project_id)
         return ImportReport(
@@ -1175,6 +1195,7 @@ class NetworkWizardService:
                 else:
                     created, updated = self._bump_counts(result, created, updated, "branches")
             self._mark_sld_dirty(uow, project_id)
+            self._invalidate_results(uow, project_id)
 
         validation = self.validate_network(project_id)
         return ImportReport(
@@ -1193,6 +1214,9 @@ class NetworkWizardService:
         if uow.sld is None:
             return
         uow.sld.mark_dirty_by_project(project_id, commit=False)
+
+    def _invalidate_results(self, uow: UnitOfWork, project_id: UUID) -> None:
+        self._result_invalidator.invalidate_project_results(uow, project_id)
 
     def _build_manual_sld(
         self,
@@ -1680,6 +1704,7 @@ class NetworkWizardService:
             case_id = self._deterministic_uuid(project_id, {"name": name, "payload": payload})
         existing = uow.cases.get_operating_case(case_id)
         if existing is None:
+            existing_cases = uow.cases.list_operating_cases(project_id)
             case = OperatingCase(
                 id=case_id,
                 project_id=project_id,
@@ -1688,6 +1713,8 @@ class NetworkWizardService:
                 project_design_mode=project_design_mode,
             )
             uow.cases.add_operating_case(case, commit=False)
+            if not existing_cases and uow.wizard.get_active_case_id(project_id) is None:
+                uow.wizard.set_active_case_id(project_id, case.id, commit=False)
             return "created"
         if existing.project_id != project_id:
             raise ValueError("Operating case ID belongs to a different project")

@@ -5,6 +5,8 @@ from network_model.core.node import Node, NodeType
 from network_model.core.snapshot import create_network_snapshot
 from network_model.sld_projection import project_snapshot_to_sld
 
+NETWORK_MODEL_ID = "model-1"
+
 
 def _build_node(node_id: str) -> Node:
     return Node(
@@ -18,7 +20,7 @@ def _build_node(node_id: str) -> Node:
 
 
 def _build_snapshot() -> tuple[NetworkGraph, str]:
-    graph = NetworkGraph()
+    graph = NetworkGraph(network_model_id=NETWORK_MODEL_ID)
     graph.add_node(_build_node("n1"))
     graph.add_node(_build_node("n2"))
     return graph, "snap-1"
@@ -35,7 +37,11 @@ def test_project_two_buses_one_branch() -> None:
     )
     graph.add_branch(branch)
 
-    snapshot = create_network_snapshot(graph, snapshot_id=snapshot_id)
+    snapshot = create_network_snapshot(
+        graph,
+        snapshot_id=snapshot_id,
+        network_model_id=NETWORK_MODEL_ID,
+    )
     diagram = project_snapshot_to_sld(snapshot)
 
     assert diagram.diagram_id == snapshot_id
@@ -55,7 +61,11 @@ def test_pcc_marker_not_in_projection() -> None:
     graph, snapshot_id = _build_snapshot()
     # NOTE: graph.pcc_node_id was removed. PCC is interpretation, not model property.
 
-    snapshot = create_network_snapshot(graph, snapshot_id=snapshot_id)
+    snapshot = create_network_snapshot(
+        graph,
+        snapshot_id=snapshot_id,
+        network_model_id=NETWORK_MODEL_ID,
+    )
     diagram = project_snapshot_to_sld(snapshot)
 
     # Verify no pcc_marker elements are generated from graph
@@ -77,7 +87,11 @@ def test_in_service_false_excludes_entity() -> None:
     source = InverterSource(id="s1", node_id="n1", in_service=False)
     graph.add_inverter_source(source)
 
-    snapshot = create_network_snapshot(graph, snapshot_id=snapshot_id)
+    snapshot = create_network_snapshot(
+        graph,
+        snapshot_id=snapshot_id,
+        network_model_id=NETWORK_MODEL_ID,
+    )
     diagram = project_snapshot_to_sld(snapshot)
 
     identities = {(e.element_type, e.identity) for e in diagram.elements}
@@ -104,7 +118,11 @@ def test_parallel_branches_are_distinct_elements() -> None:
     graph.add_branch(branch_1)
     graph.add_branch(branch_2)
 
-    snapshot = create_network_snapshot(graph, snapshot_id=snapshot_id)
+    snapshot = create_network_snapshot(
+        graph,
+        snapshot_id=snapshot_id,
+        network_model_id=NETWORK_MODEL_ID,
+    )
     diagram = project_snapshot_to_sld(snapshot)
 
     branch_ids = [
@@ -128,7 +146,11 @@ def test_projection_is_deterministic() -> None:
     source = InverterSource(id="s1", node_id="n1")
     graph.add_inverter_source(source)
 
-    snapshot = create_network_snapshot(graph, snapshot_id=snapshot_id)
+    snapshot = create_network_snapshot(
+        graph,
+        snapshot_id=snapshot_id,
+        network_model_id=NETWORK_MODEL_ID,
+    )
 
     first = project_snapshot_to_sld(snapshot).to_dict()
     second = project_snapshot_to_sld(snapshot).to_dict()

@@ -5,7 +5,8 @@
 ```
 backend/src/network_model/core/
 ├── __init__.py
-├── node.py          # Node, NodeType
+├── bus.py           # Bus (alias for Node)
+├── node.py          # Node, NodeType (legacy implementation)
 ├── branch.py        # Branch, LineBranch, TransformerBranch, BranchType
 ├── graph.py         # NetworkGraph
 ├── inverter.py      # InverterSource
@@ -26,7 +27,7 @@ backend/src/network_model/core/
 
 ### 2.2 Zakazy (Prohibitions)
 
-- **Brak interpretacji** - Node nie wie czy napięcie jest "za wysokie"
+- **Brak interpretacji** - Bus (Node) nie wie czy napięcie jest "za wysokie"
 - **Brak regulacji** - NetworkGraph nie wie o OSD ani kodeksach
 - **Brak analiz** - Core nie wykonuje obliczeń rozpływu ani zwarć
 - **Brak persystencji** - Core nie zna bazy danych
@@ -152,9 +153,10 @@ DesignSynth M2 rozszerza to o deterministyczny pipeline „connection study” (
 
 ## 3. Komponenty
 
-### 3.1 Node (`node.py`)
+### 3.1 Bus (`bus.py`, alias for Node)
 
-Reprezentacja węzła sieci elektroenergetycznej.
+Reprezentacja węzła sieci elektroenergetycznej (PowerFactory: Bus).
+`Node` pozostaje implementacją legacy, a `Bus` jest aliasem zgodnym z PF.
 
 ```python
 class NodeType(Enum):
@@ -180,7 +182,7 @@ class Node:
 - PV wymaga `active_power` i `voltage_magnitude`
 
 **Serializacja:**
-- `to_dict()` / `from_dict()` - JSON-ready
+- `to_dict()` / `from_dict()` - JSON-ready (Node/Bus kompatybilne)
 
 ### 3.2 Branch (`branch.py`)
 

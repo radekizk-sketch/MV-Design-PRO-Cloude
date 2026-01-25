@@ -115,6 +115,7 @@ class NetworkSnapshotORM(Base):
     parent_snapshot_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     schema_version: Mapped[str | None] = mapped_column(String(50))
+    network_model_id: Mapped[str | None] = mapped_column(String(64))
     snapshot_json: Mapped[dict[str, Any]] = mapped_column(DeterministicJSON(), nullable=False)
 
 
@@ -126,6 +127,11 @@ class ProjectSettingsORM(Base):
     )
     pcc_node_id: Mapped[UUID | None] = mapped_column(
         GUID(), ForeignKey("network_nodes.id", use_alter=True, name="fk_settings_pcc_node")
+    )
+    active_case_id: Mapped[UUID | None] = mapped_column(
+        GUID(),
+        ForeignKey("operating_cases.id", use_alter=True, name="fk_settings_active_case"),
+        nullable=True,
     )
     grounding_jsonb: Mapped[dict[str, Any]] = mapped_column(
         DeterministicJSON(), nullable=False, default=dict
@@ -251,13 +257,6 @@ class ScenarioORM(Base):
 class AnalysisRunORM(Base):
     __tablename__ = "analysis_runs"
     __table_args__ = (
-        UniqueConstraint(
-            "project_id",
-            "operating_case_id",
-            "analysis_type",
-            "input_hash",
-            name="uq_analysis_runs_deterministic",
-        ),
         Index("ix_analysis_runs_input_hash", "input_hash"),
     )
 
@@ -268,6 +267,7 @@ class AnalysisRunORM(Base):
     )
     analysis_type: Mapped[str] = mapped_column(String(20), nullable=False)
     status: Mapped[str] = mapped_column(String(20), nullable=False)
+    result_status: Mapped[str] = mapped_column(String(20), nullable=False, default="VALID")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
