@@ -9,16 +9,13 @@ PowerFactory Alignment:
 The Catalog is the single source of physical parameters for network elements.
 """
 
-from .types import (
-    LineType,
-    CableType,
-    TransformerType,
-    SwitchType as SwitchTypeSpec,  # Avoid conflict with SwitchType enum
-)
+from .repository import CatalogRepository
+from .types import CableType, LineType, SwitchEquipmentType, TransformerType
 
 __all__ = [
     "LineType",
     "CableType",
     "TransformerType",
-    "SwitchTypeSpec",
+    "SwitchEquipmentType",
+    "CatalogRepository",
 ]

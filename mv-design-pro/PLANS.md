@@ -254,29 +254,32 @@ class NetworkGraph:
 
 ---
 
-## 5. Phase 3: Catalog Layer (PENDING)
+## 5. Phase 3: Catalog Layer (DONE)
 
 ### 5.1 Task 3.1: Create Catalog Directory
 
 **Actions:**
-- [ ] Create `backend/src/network_model/catalog/`
-- [ ] Create `types.py` with immutable type classes
-- [ ] Create `repository.py` with CatalogRepository
+- [x] Create `backend/src/network_model/catalog/`
+- [x] Create `types.py` with immutable type classes
+- [x] Create `repository.py` with CatalogRepository
 
 ### 5.2 Task 3.2: Formalize Type Classes
 
 **Actions:**
-- [ ] Make LineType frozen dataclass
-- [ ] Make CableType frozen dataclass
-- [ ] Make TransformerType frozen dataclass
-- [ ] Add manufacturer, rating fields
+- [x] Make LineType frozen dataclass
+- [x] Make CableType frozen dataclass
+- [x] Make TransformerType frozen dataclass
+- [x] Add manufacturer, rating fields
 
 ### 5.3 Task 3.3: Migrate Type References
 
 **Actions:**
-- [ ] Update branch classes to use type_ref
-- [ ] Migrate existing type data
-- [ ] Update wizard service
+- [x] Update branch classes to use type_ref
+- [x] Migrate existing type data
+- [x] Update wizard service
+
+**Changelog:**
+- P8: Type Library implemented (immutable types + type_ref + impedance override compat)
 
 ---
 

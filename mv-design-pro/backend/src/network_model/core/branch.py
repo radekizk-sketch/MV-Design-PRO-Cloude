@@ -15,9 +15,12 @@ Units:
 """
 
 import math
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from enum import Enum
-from typing import Any, Dict
+from typing import Any, Dict, Optional
+
+from network_model.catalog import CatalogRepository
+from network_model.catalog.types import CableType, LineType, TransformerType
 
 
 class BranchType(Enum):
@@ -172,6 +175,42 @@ class Branch:
         }
 
 
+@dataclass(frozen=True)
+class LineImpedanceOverride:
+    """
+    Optional impedance override for line/cable branches.
+
+    Values represent total impedance over the full length.
+    """
+
+    r_total_ohm: float
+    x_total_ohm: float
+    b_total_us: float = 0.0
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "r_total_ohm": self.r_total_ohm,
+            "x_total_ohm": self.x_total_ohm,
+            "b_total_us": self.b_total_us,
+        }
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "LineImpedanceOverride":
+        return cls(
+            r_total_ohm=float(data.get("r_total_ohm", 0.0)),
+            x_total_ohm=float(data.get("x_total_ohm", 0.0)),
+            b_total_us=float(data.get("b_total_us", 0.0)),
+        )
+
+
+@dataclass(frozen=True)
+class ResolvedLineParams:
+    r_ohm_per_km: float
+    x_ohm_per_km: float
+    b_us_per_km: float
+    rated_current_a: float
+
+
 @dataclass
 class LineBranch(Branch):
     """
@@ -198,6 +237,8 @@ class LineBranch(Branch):
     b_us_per_km: float = 0.0
     length_km: float = 0.0
     rated_current_a: float = 0.0
+    type_ref: Optional[str] = None
+    impedance_override: Optional[LineImpedanceOverride] = None
 
     @classmethod
     def _from_dict(cls, data: Dict[str, Any], branch_type: BranchType) -> "LineBranch":
@@ -231,6 +272,8 @@ class LineBranch(Branch):
             b_us_per_km=float(data.get("b_us_per_km", 0.0)),
             length_km=float(data.get("length_km", 0.0)),
             rated_current_a=float(data.get("rated_current_a", 0.0)),
+            type_ref=_parse_type_ref(data),
+            impedance_override=_parse_impedance_override(data),
         )
 
     def validate(self) -> bool:
@@ -266,8 +309,6 @@ class LineBranch(Branch):
         # Validate positive/non-negative constraints
         if self.length_km <= 0:
             return False
-        if self.rated_current_a <= 0:
-            return False
         if self.r_ohm_per_km < 0:
             return False
         if self.x_ohm_per_km < 0:
@@ -275,9 +316,31 @@ class LineBranch(Branch):
         if self.b_us_per_km < 0:
             return False
 
-        # Impedance must be non-zero (cannot have both R=0 and X=0)
-        if self.r_ohm_per_km == 0 and self.x_ohm_per_km == 0:
-            return False
+        if self.impedance_override is not None:
+            override_fields = [
+                self.impedance_override.r_total_ohm,
+                self.impedance_override.x_total_ohm,
+                self.impedance_override.b_total_us,
+            ]
+            if not all(math.isfinite(value) for value in override_fields):
+                return False
+            if (
+                self.impedance_override.r_total_ohm < 0
+                or self.impedance_override.x_total_ohm < 0
+                or self.impedance_override.b_total_us < 0
+            ):
+                return False
+            if (
+                self.impedance_override.r_total_ohm == 0
+                and self.impedance_override.x_total_ohm == 0
+            ):
+                return False
+        elif self.type_ref is None:
+            if self.rated_current_a <= 0:
+                return False
+            # Impedance must be non-zero (cannot have both R=0 and X=0)
+            if self.r_ohm_per_km == 0 and self.x_ohm_per_km == 0:
+                return False
 
         return True
 
@@ -297,7 +360,10 @@ class LineBranch(Branch):
             "b_us_per_km": self.b_us_per_km,
             "length_km": self.length_km,
             "rated_current_a": self.rated_current_a,
+            "type_ref": self.type_ref,
         })
+        if self.impedance_override is not None:
+            result["impedance_override"] = self.impedance_override.to_dict()
         return result
 
     def get_total_impedance(self) -> complex:
@@ -309,6 +375,11 @@ class LineBranch(Branch):
         Returns:
             Complex impedance Z = R_total + jX_total [Ω].
         """
+        if self.impedance_override is not None:
+            return complex(
+                self.impedance_override.r_total_ohm,
+                self.impedance_override.x_total_ohm,
+            )
         r_total = self.r_ohm_per_km * self.length_km
         x_total = self.x_ohm_per_km * self.length_km
         return complex(r_total, x_total)
@@ -342,6 +413,9 @@ class LineBranch(Branch):
         Returns:
             Complex shunt admittance Y_sh = jB_total [S].
         """
+        if self.impedance_override is not None:
+            b_total = self.impedance_override.b_total_us * 1e-6
+            return complex(0, b_total)
         # Convert from μS/km to S/km, then multiply by length
         b_s_per_km = self.b_us_per_km * 1e-6
         b_total = b_s_per_km * self.length_km
@@ -357,6 +431,48 @@ class LineBranch(Branch):
             Complex shunt admittance per end [S].
         """
         return self.get_shunt_admittance() / 2
+
+    def resolve_electrical_params(
+        self, catalog: CatalogRepository | None = None
+    ) -> ResolvedLineParams:
+        if self.impedance_override is not None:
+            if self.length_km <= 0:
+                return ResolvedLineParams(0.0, 0.0, 0.0, self.rated_current_a)
+            return ResolvedLineParams(
+                r_ohm_per_km=self.impedance_override.r_total_ohm / self.length_km,
+                x_ohm_per_km=self.impedance_override.x_total_ohm / self.length_km,
+                b_us_per_km=self.impedance_override.b_total_us / self.length_km,
+                rated_current_a=self.rated_current_a,
+            )
+        if self.type_ref and catalog is not None:
+            type_data = None
+            if self.branch_type == BranchType.LINE:
+                type_data = catalog.get_line_type(self.type_ref)
+            elif self.branch_type == BranchType.CABLE:
+                type_data = catalog.get_cable_type(self.type_ref)
+            if type_data is not None:
+                return ResolvedLineParams(
+                    r_ohm_per_km=type_data.r_ohm_per_km,
+                    x_ohm_per_km=type_data.x_ohm_per_km,
+                    b_us_per_km=_get_b_us_per_km(type_data),
+                    rated_current_a=type_data.rated_current_a,
+                )
+        return ResolvedLineParams(
+            r_ohm_per_km=self.r_ohm_per_km,
+            x_ohm_per_km=self.x_ohm_per_km,
+            b_us_per_km=self.b_us_per_km,
+            rated_current_a=self.rated_current_a,
+        )
+
+    def with_resolved_params(self, catalog: CatalogRepository | None = None) -> "LineBranch":
+        resolved = self.resolve_electrical_params(catalog)
+        return replace(
+            self,
+            r_ohm_per_km=resolved.r_ohm_per_km,
+            x_ohm_per_km=resolved.x_ohm_per_km,
+            b_us_per_km=resolved.b_us_per_km,
+            rated_current_a=resolved.rated_current_a,
+        )
 
 
 @dataclass
@@ -401,6 +517,7 @@ class TransformerBranch(Branch):
     vector_group: str = "Dyn11"
     tap_position: int = 0
     tap_step_percent: float = 2.5
+    type_ref: Optional[str] = None
 
     @classmethod
     def _from_dict(cls, data: Dict[str, Any]) -> "TransformerBranch":
@@ -438,6 +555,7 @@ class TransformerBranch(Branch):
             vector_group=str(data.get("vector_group", "Dyn11")),
             tap_position=int(data.get("tap_position", 0)),
             tap_step_percent=float(data.get("tap_step_percent", 2.5)),
+            type_ref=_parse_type_ref(data),
         )
 
     def validate(self) -> bool:
@@ -655,6 +773,7 @@ class TransformerBranch(Branch):
             "vector_group": self.vector_group,
             "tap_position": self.tap_position,
             "tap_step_percent": self.tap_step_percent,
+            "type_ref": self.type_ref,
         })
         return result
 
@@ -724,3 +843,85 @@ class TransformerBranch(Branch):
             Tap ratio (dimensionless).
         """
         return 1.0 + self.tap_position * self.tap_step_percent / 100.0
+
+    def resolve_nameplate(self, catalog: CatalogRepository | None = None) -> TransformerType:
+        if self.type_ref and catalog is not None:
+            type_data = catalog.get_transformer_type(self.type_ref)
+            if type_data is not None:
+                return type_data
+        return TransformerType(
+            id=self.type_ref or self.id,
+            name=self.name,
+            rated_power_mva=self.rated_power_mva,
+            voltage_hv_kv=self.voltage_hv_kv,
+            voltage_lv_kv=self.voltage_lv_kv,
+            uk_percent=self.uk_percent,
+            pk_kw=self.pk_kw,
+            manufacturer=None,
+            i0_percent=self.i0_percent,
+            p0_kw=self.p0_kw,
+            vector_group=self.vector_group,
+        )
+
+    def computed_equivalent_pu(
+        self, catalog: CatalogRepository | None = None
+    ) -> complex:
+        nameplate = self.resolve_nameplate(catalog)
+        return _compute_transformer_impedance_pu(
+            rated_power_mva=nameplate.rated_power_mva,
+            uk_percent=nameplate.uk_percent,
+            pk_kw=nameplate.pk_kw,
+        )
+
+    def with_resolved_nameplate(
+        self, catalog: CatalogRepository | None = None
+    ) -> "TransformerBranch":
+        if not self.type_ref or catalog is None:
+            return self
+        type_data = catalog.get_transformer_type(self.type_ref)
+        if type_data is None:
+            return self
+        return replace(
+            self,
+            rated_power_mva=type_data.rated_power_mva,
+            voltage_hv_kv=type_data.voltage_hv_kv,
+            voltage_lv_kv=type_data.voltage_lv_kv,
+            uk_percent=type_data.uk_percent,
+            pk_kw=type_data.pk_kw,
+            i0_percent=type_data.i0_percent,
+            p0_kw=type_data.p0_kw,
+            vector_group=type_data.vector_group,
+        )
+
+
+def _parse_type_ref(data: Dict[str, Any]) -> Optional[str]:
+    type_ref = data.get("type_ref") or data.get("type_id")
+    if type_ref is None:
+        return None
+    return str(type_ref)
+
+
+def _parse_impedance_override(data: Dict[str, Any]) -> Optional[LineImpedanceOverride]:
+    override = data.get("impedance_override")
+    if override is None:
+        return None
+    if isinstance(override, LineImpedanceOverride):
+        return override
+    if isinstance(override, dict):
+        return LineImpedanceOverride.from_dict(override)
+    return None
+
+
+def _get_b_us_per_km(type_data: LineType | CableType) -> float:
+    if isinstance(type_data, CableType):
+        return type_data.b_us_per_km
+    return type_data.b_us_per_km
+
+
+def _compute_transformer_impedance_pu(
+    *, rated_power_mva: float, uk_percent: float, pk_kw: float
+) -> complex:
+    z_pu = uk_percent / 100.0
+    r_pu = (pk_kw / 1000.0) / rated_power_mva
+    x_pu = math.sqrt(max(z_pu * z_pu - r_pu * r_pu, 0.0))
+    return complex(r_pu, x_pu)
