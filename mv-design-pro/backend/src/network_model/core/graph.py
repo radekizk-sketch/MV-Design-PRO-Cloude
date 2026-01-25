@@ -45,8 +45,9 @@ class NetworkGraph:
         tworzą krawędzi w grafie topologicznym.
     """
 
-    def __init__(self) -> None:
+    def __init__(self, network_model_id: str | None = None) -> None:
         """Inicjalizuje pusty graf sieci."""
+        self.network_model_id = network_model_id
         self.nodes: Dict[str, Node] = {}
         self.branches: Dict[str, Branch] = {}
         self.inverter_sources: Dict[str, InverterSource] = {}

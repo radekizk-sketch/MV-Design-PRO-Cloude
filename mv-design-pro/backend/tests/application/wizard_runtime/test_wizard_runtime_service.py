@@ -19,8 +19,8 @@ from network_model.core.action_envelope import ActionEnvelope
 from network_model.core.snapshot import NetworkSnapshot, SnapshotMeta
 
 
-def _build_snapshot(snapshot_id: str, created_at: str) -> NetworkSnapshot:
-    graph = NetworkGraph()
+def _build_snapshot(snapshot_id: str, created_at: str, network_model_id: str) -> NetworkSnapshot:
+    graph = NetworkGraph(network_model_id=network_model_id)
     graph.add_node(
         Node(
             id="node-1",
@@ -35,6 +35,7 @@ def _build_snapshot(snapshot_id: str, created_at: str) -> NetworkSnapshot:
         snapshot_id=snapshot_id,
         created_at=created_at,
         schema_version="1.0",
+        network_model_id=network_model_id,
     )
     return NetworkSnapshot(meta=meta, graph=graph)
 
@@ -47,8 +48,13 @@ def _build_service(tmp_path):
     uow_factory = build_uow_factory(session_factory)
 
     project = new_project(name="Wizard Project")
-    snapshot_one = _build_snapshot("snap-1", "2024-01-01T00:00:00+00:00")
-    snapshot_two = _build_snapshot("snap-2", "2024-01-02T00:00:00+00:00")
+    network_model_id = str(project.id)
+    snapshot_one = _build_snapshot(
+        "snap-1", "2024-01-01T00:00:00+00:00", network_model_id
+    )
+    snapshot_two = _build_snapshot(
+        "snap-2", "2024-01-02T00:00:00+00:00", network_model_id
+    )
 
     with uow_factory() as uow:
         uow.projects.add(project, commit=False)

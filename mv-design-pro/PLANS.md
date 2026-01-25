@@ -243,6 +243,15 @@ class NetworkGraph:
 - [x] Wire NetworkValidator before solver execution (PF, SC)
 - [x] Block on ERROR, log warnings
 
+### 4.6 Task 2.6: Single NetworkModel invariant (DONE)
+
+**Location:** `backend/src/application/network_model/`
+
+**Actions (DONE):**
+- [x] Centralize NetworkGraph construction via application-level builder
+- [x] Enforce single NetworkModel id per project in snapshots and analysis
+- [x] Add runtime invariant checks to block mismatched model usage
+
 ---
 
 ## 5. Phase 3: Catalog Layer (PENDING)
@@ -361,7 +370,7 @@ class NetworkGraph:
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| Single NetworkModel | Phase 2 | PENDING |
+| Single NetworkModel | Phase 2 | DONE |
 | Bus terminology | Phase 2 | PENDING |
 | Switch without impedance | Phase 2 | DONE |
 | Station = logical only | N/A | DONE |
@@ -424,6 +433,7 @@ class NetworkGraph:
 | 2025-02 | 2.3 | Docs consolidation & spec vs code audit report completed |
 | 2025-02 | 2.4 | P0: NetworkValidator wired as pre-solver gate (PF-compliant) |
 | 2025-02 | 2.5 | P2: Active Case pointer added (PF-style calculation context) |
+| 2025-03 | 2.6 | P3: Single NetworkModel invariant enforced (no shadow graphs) |
 
 ---
 

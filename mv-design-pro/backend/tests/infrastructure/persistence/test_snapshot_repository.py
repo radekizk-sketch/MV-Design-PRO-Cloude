@@ -15,6 +15,8 @@ from infrastructure.persistence.repositories import SnapshotRepository
 from network_model.core import Branch, BranchType, NetworkGraph, Node, NodeType
 from network_model.core.snapshot import NetworkSnapshot, SnapshotMeta, create_network_snapshot
 
+NETWORK_MODEL_ID = "model-1"
+
 
 def _setup_session() -> Session:
     engine = create_engine_from_url("sqlite+pysqlite:///:memory:")
@@ -24,7 +26,7 @@ def _setup_session() -> Session:
 
 
 def _build_snapshot(*, snapshot_id: str, parent_snapshot_id: str | None = None) -> NetworkSnapshot:
-    graph = NetworkGraph()
+    graph = NetworkGraph(network_model_id=NETWORK_MODEL_ID)
     node_a = Node(
         id="node-a",
         name="Bus A",
@@ -59,6 +61,7 @@ def _build_snapshot(*, snapshot_id: str, parent_snapshot_id: str | None = None) 
         snapshot_id=snapshot_id,
         parent_snapshot_id=parent_snapshot_id,
         schema_version="1.0",
+        network_model_id=NETWORK_MODEL_ID,
     )
     return NetworkSnapshot(meta=meta, graph=graph)
 
@@ -95,7 +98,11 @@ def test_snapshot_lineage_lists_parent_chain() -> None:
     repo = SnapshotRepository(session)
     root = _build_snapshot(snapshot_id="root")
     child = create_network_snapshot(
-        root.graph, parent_snapshot=root, snapshot_id="child", schema_version="1.0"
+        root.graph,
+        parent_snapshot=root,
+        snapshot_id="child",
+        schema_version="1.0",
+        network_model_id=NETWORK_MODEL_ID,
     )
 
     repo.add_snapshot(root)

@@ -115,6 +115,7 @@ class NetworkSnapshotORM(Base):
     parent_snapshot_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     schema_version: Mapped[str | None] = mapped_column(String(50))
+    network_model_id: Mapped[str | None] = mapped_column(String(64))
     snapshot_json: Mapped[dict[str, Any]] = mapped_column(DeterministicJSON(), nullable=False)
 
 

@@ -6,6 +6,10 @@ from datetime import datetime, timezone
 from typing import Any, Callable
 from uuid import UUID, uuid4, uuid5
 
+from application.network_model import (
+    ensure_snapshot_matches_project,
+    network_model_id_for_project,
+)
 from infrastructure.persistence.unit_of_work import UnitOfWork
 from network_model.core import (
     ActionEnvelope,
@@ -34,9 +38,12 @@ class WizardService:
             project = uow.projects.get(project_id)
             if project is None:
                 raise NotFound(f"Project {project_id} not found")
-            base_snapshot = uow.snapshots.get_latest_snapshot()
+            base_snapshot = uow.snapshots.get_latest_snapshot_for_model(
+                network_model_id_for_project(project_id)
+            )
             if base_snapshot is None:
                 raise NotFound("No snapshots available to start wizard session")
+            ensure_snapshot_matches_project(base_snapshot, project_id)
         session = WizardSession(
             wizard_session_id=uuid4(),
             project_id=project_id,
@@ -141,6 +148,7 @@ class WizardService:
             snapshot_id=snapshot_id,
             created_at=created_at,
             schema_version=base_snapshot.meta.schema_version,
+            network_model_id=network_model_id_for_project(session.project_id),
         )
         with self._uow_factory() as uow:
             uow.snapshots.add_snapshot(new_snapshot, commit=False)

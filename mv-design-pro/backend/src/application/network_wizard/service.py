@@ -13,6 +13,7 @@ from analysis.power_flow.types import (
     PVSpec,
     SlackSpec,
 )
+from application.network_model import build_network_graph, network_model_id_for_project
 from application.sld.layout import build_auto_layout_diagram
 from domain.models import (
     OperatingCase,
@@ -26,7 +27,7 @@ from domain.project_design_mode import ProjectDesignMode
 from domain.sld import SldBranchSymbol, SldDiagram, SldNodeSymbol
 from domain.validation import ValidationIssue, ValidationReport
 from infrastructure.persistence.unit_of_work import UnitOfWork
-from network_model.core import Branch, NetworkGraph, Node
+from network_model.core import NetworkGraph
 
 from .dtos import (
     BranchPayload,
@@ -643,17 +644,14 @@ class NetworkWizardService:
                     for state in uow.wizard.list_switching_states(case_id)
                 }
 
-        graph = NetworkGraph()
-        for node in nodes:
-            node_data = self._node_to_graph_payload(node)
-            graph.add_node(Node.from_dict(node_data))
-        for branch in branches:
-            branch_data = self._branch_to_graph_payload(branch)
-            branch_state = switching_states.get(branch["id"])
-            if branch_state is not None:
-                branch_data["in_service"] = branch_state["in_service"]
-            graph.add_branch(Branch.from_dict(branch_data))
-        return graph
+        return build_network_graph(
+            nodes=nodes,
+            branches=branches,
+            switching_states=switching_states,
+            node_payload_builder=self._node_to_graph_payload,
+            branch_payload_builder=self._branch_to_graph_payload,
+            network_model_id=network_model_id_for_project(project_id),
+        )
 
     def build_power_flow_input(
         self, project_id: UUID, case_id: UUID, options: dict | None = None
