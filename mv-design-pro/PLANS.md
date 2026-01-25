@@ -86,7 +86,7 @@ This plan describes the complete refactoring of MV-DESIGN-PRO to align with DIgS
                               │
                               ▼
 ┌─────────────────────────────────────────────────────────────────┐
-│ PHASE 5: Interpretation Layer                                   │
+│ PHASE 5: Interpretation Layer (DONE)                            │
 │ - Move PCC identification to analyses/                          │
 │ - Create BoundaryIdentifier                                     │
 │ - Separate analysis from solver                                 │
@@ -314,17 +314,17 @@ class NetworkGraph:
 
 ---
 
-## 7. Phase 5: Interpretation Layer (PARTIAL)
+## 7. Phase 5: Interpretation Layer (DONE)
 
 ### 7.1 Task 5.1: Create BoundaryIdentifier (DONE)
 
-**Location:** `backend/src/application/analyses/boundary.py` (EXISTS)
+**Location:** `backend/src/analysis/boundary/` (NEW)
 
 **Actions (DONE):**
-- [x] BoundaryIdentifier class exists
-- [x] identify_pcc() method implemented with hint support
-- [x] Uses heuristics (external grid connection)
-- [x] Documented as interpretation, not physics
+- [x] BoundaryIdentifier class implemented in analysis layer
+- [x] identify() reads NetworkSnapshot + case params (read-only)
+- [x] Heuristics: external grid, generator-dominant, single-feeder, voltage-level
+- [x] Deterministic result DTO with diagnostics
 
 ### 7.2 Task 5.2: PCC Migration (DONE)
 
@@ -333,12 +333,12 @@ class NetworkGraph:
 - [x] SLD no longer stores is_pcc (removed from SldNodeSymbol)
 - [x] PCC remains in export/import as application-level hint (not core model)
 
-### 7.3 Task 5.3: Analysis Separation
+### 7.3 Task 5.3: Analysis Separation (DONE)
 
-**Actions:**
-- [ ] Verify analyses don't contain physics
-- [ ] Document analysis vs solver boundary
-- [ ] Add analysis layer tests
+**Actions (DONE):**
+- [x] Verify analyses don't contain physics
+- [x] Document analysis vs solver boundary
+- [x] Add analysis layer tests
 
 ---
 
@@ -437,6 +437,7 @@ class NetworkGraph:
 | 2025-02 | 2.4 | P0: NetworkValidator wired as pre-solver gate (PF-compliant) |
 | 2025-02 | 2.5 | P2: Active Case pointer added (PF-style calculation context) |
 | 2025-03 | 2.6 | P3: Single NetworkModel invariant enforced (no shadow graphs) |
+| 2025-03 | 2.7 | P5: BoundaryIdentifier (PCC heuristics) implemented as analysis-only |
 
 ---
 
