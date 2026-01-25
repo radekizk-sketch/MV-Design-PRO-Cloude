@@ -232,6 +232,14 @@ class NetworkGraph:
 - [ ] Update docstrings
 - [ ] Consider rename in next major version
 
+### 4.5 Task 2.5: NetworkValidator gate (DONE)
+
+**Location:** `backend/src/application/analysis_run/service.py`
+
+**Actions (DONE):**
+- [x] Wire NetworkValidator before solver execution (PF, SC)
+- [x] Block on ERROR, log warnings
+
 ---
 
 ## 5. Phase 3: Catalog Layer (PENDING)
@@ -405,6 +413,7 @@ class NetworkGraph:
 | 2025-01 | 2.1 | Phase 2 Task 2.1 DONE: PCC removed from NetworkGraph |
 | 2025-01 | 2.2 | Phase 1.x DONE: PowerFactory UI/UX Parity documentation |
 | 2025-02 | 2.3 | Docs consolidation & spec vs code audit report completed |
+| 2025-02 | 2.4 | P0: NetworkValidator wired as pre-solver gate (PF-compliant) |
 
 ---
 

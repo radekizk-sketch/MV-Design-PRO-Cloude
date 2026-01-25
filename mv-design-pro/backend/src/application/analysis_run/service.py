@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import logging
 import math
 from datetime import datetime, timezone
 from typing import Any, Callable
@@ -22,10 +23,12 @@ from network_model.core import (
     Node,
     create_network_snapshot,
 )
+from network_model.validation import NetworkValidator as ModelNetworkValidator, Severity as ModelSeverity
 from network_model.solvers import ShortCircuitIEC60909Solver, ShortCircuitType
 
 
 DETERMINISTIC_LIST_KEYS = {"nodes", "branches", "sources", "loads"}
+logger = logging.getLogger(__name__)
 
 
 def canonicalize(value: Any, *, current_key: str | None = None) -> Any:
@@ -193,6 +196,21 @@ class AnalysisRunService:
 
     def _execute_power_flow(self, uow: UnitOfWork, run: AnalysisRun) -> AnalysisRun:
         pf_input = self._build_power_flow_input(run)
+        network_report = self._validate_network_graph(pf_input.graph)
+        if not network_report.is_valid:
+            network_report = network_report.with_error(
+                ValidationIssue(
+                    code="network.validation_blocked",
+                    message="Network validation failed; solver execution blocked",
+                )
+            )
+            return self._fail_run(uow, run, network_report)
+        if network_report.warnings:
+            logger.warning(
+                "Network validation warnings for run %s: %s",
+                run.id,
+                network_report.to_dict(),
+            )
         report = self._validate_power_flow_input(pf_input)
         if not report.is_valid:
             return self._fail_run(uow, run, report)
@@ -246,6 +264,21 @@ class AnalysisRunService:
             uow=uow,
         )
         sc_input = self._build_short_circuit_input(run)
+        network_report = self._validate_network_graph(sc_input["graph"])
+        if not network_report.is_valid:
+            network_report = network_report.with_error(
+                ValidationIssue(
+                    code="network.validation_blocked",
+                    message="Network validation failed; solver execution blocked",
+                )
+            )
+            return self._fail_run(uow, run, network_report)
+        if network_report.warnings:
+            logger.warning(
+                "Network validation warnings for run %s: %s",
+                run.id,
+                network_report.to_dict(),
+            )
         report = self._validate_short_circuit_input(sc_input)
         if not report.is_valid:
             return self._fail_run(uow, run, report)
@@ -994,6 +1027,22 @@ class AnalysisRunService:
                 branch_data["in_service"] = branch_state["in_service"]
             graph.add_branch(Branch.from_dict(branch_data))
         return graph
+
+    def _validate_network_graph(self, graph: NetworkGraph) -> ValidationReport:
+        model_report = ModelNetworkValidator().validate(graph)
+        report = ValidationReport()
+        for issue in model_report.issues:
+            mapped = ValidationIssue(
+                code=issue.code,
+                message=issue.message,
+                element_id=issue.element_id,
+                field=issue.field,
+            )
+            if issue.severity == ModelSeverity.WARNING:
+                report = report.with_warning(mapped)
+            else:
+                report = report.with_error(mapped)
+        return report
 
     def _node_to_graph_payload(self, node: dict) -> dict[str, Any]:
         attrs = self._node_attrs_from_node(node)
