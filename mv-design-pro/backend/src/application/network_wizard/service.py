@@ -413,7 +413,10 @@ class NetworkWizardService:
         )
         with self._uow_factory() as uow:
             self._ensure_project(uow, project_id)
+            existing_cases = uow.cases.list_operating_cases(project_id)
             uow.cases.add_operating_case(case, commit=False)
+            if not existing_cases and uow.wizard.get_active_case_id(project_id) is None:
+                uow.wizard.set_active_case_id(project_id, case.id, commit=False)
         return case
 
     def update_operating_case(self, project_id: UUID, case_id: UUID, patch: dict) -> OperatingCase:
@@ -1680,6 +1683,7 @@ class NetworkWizardService:
             case_id = self._deterministic_uuid(project_id, {"name": name, "payload": payload})
         existing = uow.cases.get_operating_case(case_id)
         if existing is None:
+            existing_cases = uow.cases.list_operating_cases(project_id)
             case = OperatingCase(
                 id=case_id,
                 project_id=project_id,
@@ -1688,6 +1692,8 @@ class NetworkWizardService:
                 project_design_mode=project_design_mode,
             )
             uow.cases.add_operating_case(case, commit=False)
+            if not existing_cases and uow.wizard.get_active_case_id(project_id) is None:
+                uow.wizard.set_active_case_id(project_id, case.id, commit=False)
             return "created"
         if existing.project_id != project_id:
             raise ValueError("Operating case ID belongs to a different project")
