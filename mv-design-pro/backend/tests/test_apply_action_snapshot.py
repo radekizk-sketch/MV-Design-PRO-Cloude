@@ -182,6 +182,8 @@ def test_snapshot_actions_preserve_network_model_id() -> None:
             "name": "Node 2",
             "node_type": "PQ",
             "voltage_level": 15.0,
+            "active_power": 0.0,
+            "reactive_power": 0.0,
         },
         created_at="2024-01-02T00:00:00+00:00",
         status="accepted",

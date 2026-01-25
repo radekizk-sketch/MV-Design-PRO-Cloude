@@ -12,7 +12,7 @@ sys.path.insert(0, str(backend_src))
 from application.analysis_run import AnalysisRunService
 from application.network_model import MultipleNetworkModelsError
 from application.network_wizard import NetworkWizardService
-from application.network_wizard.dtos import BranchPayload, NodePayload
+from application.network_wizard.dtos import BranchPayload, NodePayload, SourcePayload
 from infrastructure.persistence.db import create_engine_from_url, create_session_factory, init_db
 from infrastructure.persistence.unit_of_work import build_uow_factory
 from network_model.core import NetworkGraph, Node, NodeType, create_network_snapshot
@@ -58,6 +58,16 @@ def _create_basic_network(wizard: NetworkWizardService, project_id) -> None:
                 "b_us_per_km": 1.0,
                 "length_km": 1.0,
             },
+        ),
+    )
+    wizard.set_pcc(project_id, slack_node["id"])
+    wizard.add_source(
+        project_id,
+        SourcePayload(
+            name="Grid",
+            node_id=slack_node["id"],
+            source_type="GRID",
+            payload={"grid_supply": True, "u_pu": 1.0},
         ),
     )
 
