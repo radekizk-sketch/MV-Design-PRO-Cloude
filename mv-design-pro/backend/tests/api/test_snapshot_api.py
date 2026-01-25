@@ -185,6 +185,8 @@ def test_submit_action_is_deterministic_on_same_parent(api_client):
 
 def test_submit_batch_actions_accepts_and_creates_snapshot(api_client):
     client, snapshot, _session_factory = api_client
+    # NOTE: set_pcc action was removed. PCC – punkt wspólnego przyłączenia
+    # is interpretation, not a model property stored in NetworkGraph.
     action_payload = [
         {
             "action_id": "batch-action-1",
@@ -227,13 +229,6 @@ def test_submit_batch_actions_accepts_and_creates_snapshot(api_client):
             },
             "created_at": "2024-01-02T00:02:00+00:00",
         },
-        {
-            "action_id": "batch-action-4",
-            "parent_snapshot_id": snapshot.meta.snapshot_id,
-            "action_type": "set_pcc",
-            "payload": {"node_id": "node-3"},
-            "created_at": "2024-01-02T00:03:00+00:00",
-        },
     ]
 
     response = client.post(
@@ -245,7 +240,7 @@ def test_submit_batch_actions_accepts_and_creates_snapshot(api_client):
     payload = response.json()
     assert payload["status"] == "accepted"
     assert payload["new_snapshot_id"]
-    assert len(payload["action_results"]) == 4
+    assert len(payload["action_results"]) == 3
     assert all(result["status"] == "accepted" for result in payload["action_results"])
 
     new_snapshot_id = payload["new_snapshot_id"]
@@ -254,13 +249,12 @@ def test_submit_batch_actions_accepts_and_creates_snapshot(api_client):
     graph = snapshot_response.json()["graph"]
     assert {"node-3", "node-4"}.issubset({node["id"] for node in graph["nodes"]})
     assert "branch-2" in {branch["id"] for branch in graph["branches"]}
-    assert graph["pcc_node_id"] == "node-3"
+    # pcc_node_id is no longer stored in graph
 
     parent_response = client.get(f"/snapshots/{snapshot.meta.snapshot_id}")
     assert parent_response.status_code == 200
     parent_graph = parent_response.json()["graph"]
     assert "node-3" not in {node["id"] for node in parent_graph["nodes"]}
-    assert parent_graph["pcc_node_id"] is None
 
 
 def test_submit_batch_actions_rejects_invalid_reference(api_client):

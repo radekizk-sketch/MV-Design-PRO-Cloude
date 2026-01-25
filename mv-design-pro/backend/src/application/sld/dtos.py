@@ -12,7 +12,6 @@ class SldNodeSymbolDTO:
     x: float
     y: float
     label: str | None = None
-    is_pcc: bool = False
     overlay: dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -22,7 +21,6 @@ class SldNodeSymbolDTO:
             "x": self.x,
             "y": self.y,
             "label": self.label,
-            "is_pcc": self.is_pcc,
             "overlay": self.overlay,
         }
 
@@ -67,7 +65,6 @@ class SldAnnotationDTO:
 class SldDiagramDTO:
     id: UUID
     name: str
-    pcc_node_id: UUID | None
     nodes: tuple[SldNodeSymbolDTO, ...] = ()
     branches: tuple[SldBranchSymbolDTO, ...] = ()
     annotations: tuple[SldAnnotationDTO, ...] = ()
@@ -77,7 +74,6 @@ class SldDiagramDTO:
         return {
             "id": str(self.id),
             "name": self.name,
-            "pcc_node_id": str(self.pcc_node_id) if self.pcc_node_id else None,
             "nodes": [node.to_dict() for node in self.nodes],
             "branches": [branch.to_dict() for branch in self.branches],
             "annotations": [annotation.to_dict() for annotation in self.annotations],

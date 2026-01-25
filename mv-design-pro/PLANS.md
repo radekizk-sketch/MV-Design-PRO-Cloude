@@ -51,7 +51,7 @@ This plan describes the complete refactoring of MV-DESIGN-PRO to align with DIgS
                               │
                               ▼
 ┌─────────────────────────────────────────────────────────────────┐
-│ PHASE 2: NetworkModel Core (NEXT)                               │
+│ PHASE 2: NetworkModel Core (IN PROGRESS)                         │
 │ - Remove PCC from NetworkGraph                                  │
 │ - Add Switch class (apparatus without impedance)                │
 │ - Formalize Bus terminology                                     │
@@ -115,29 +115,34 @@ This plan describes the complete refactoring of MV-DESIGN-PRO to align with DIgS
 
 ---
 
-## 4. Phase 2: NetworkModel Core (PENDING)
+## 4. Phase 2: NetworkModel Core (IN PROGRESS)
 
-### 4.1 Task 2.1: Remove PCC from NetworkGraph
+### 4.1 Task 2.1: Remove PCC from NetworkGraph (DONE)
 
 **Location:** `backend/src/network_model/core/graph.py`
 
-**Current state:**
-```python
-class NetworkGraph:
-    ...
-    pcc_node_id: str | None = None  # TO BE REMOVED
-```
-
-**Target state:**
+**Completed state:**
 ```python
 class NetworkGraph:
     # No PCC - PCC is identified in interpretation layer
 ```
 
-**Actions:**
-- [ ] Remove `pcc_node_id` from NetworkGraph
-- [ ] Update all references
-- [ ] Move PCC logic to `analyses/boundary.py`
+**Actions (DONE - 2025-01):**
+- [x] Remove `pcc_node_id` from NetworkGraph
+- [x] Remove `is_pcc` from SldNodeSymbol and SldDiagram
+- [x] Update snapshot.py serialization
+- [x] Remove `set_pcc` action from action_envelope and action_apply
+- [x] Update sld_projection.py (pcc_marker no longer generated from graph)
+- [x] Update wizard service (pcc_node_id hint preserved in settings/application layer)
+- [x] Update analysis_run service
+- [x] Update SLD repository
+- [x] Update tests to reflect new architecture
+- [x] BoundaryIdentifier already exists in `application/analyses/boundary.py`
+
+**Notes:**
+- PCC – punkt wspólnego przyłączenia is now INTERPRETATION only
+- PCC hint remains in wizard settings (application layer) for user selection
+- BoundaryIdentifier provides heuristic PCC identification
 
 ### 4.2 Task 2.2: Add Switch Class
 
@@ -222,24 +227,24 @@ class NetworkGraph:
 
 ---
 
-## 7. Phase 5: Interpretation Layer (PENDING)
+## 7. Phase 5: Interpretation Layer (PARTIAL)
 
-### 7.1 Task 5.1: Create BoundaryIdentifier
+### 7.1 Task 5.1: Create BoundaryIdentifier (DONE)
 
-**Location:** `backend/src/analyses/boundary.py` (NEW)
+**Location:** `backend/src/application/analyses/boundary.py` (EXISTS)
 
-**Actions:**
-- [ ] Create BoundaryIdentifier class
-- [ ] Implement identify_pcc() method
-- [ ] Use heuristics (external grid connection)
-- [ ] Document as interpretation, not physics
+**Actions (DONE):**
+- [x] BoundaryIdentifier class exists
+- [x] identify_pcc() method implemented with hint support
+- [x] Uses heuristics (external grid connection)
+- [x] Documented as interpretation, not physics
 
-### 7.2 Task 5.2: PCC Migration
+### 7.2 Task 5.2: PCC Migration (DONE)
 
-**Actions:**
-- [ ] Update SLD to get PCC from BoundaryIdentifier
-- [ ] Update wizard to not store PCC in model
-- [ ] Remove PCC from export/import core
+**Actions (DONE - moved to Phase 2 Task 2.1):**
+- [x] Wizard no longer stores PCC in NetworkGraph (pcc_node_id hint in settings)
+- [x] SLD no longer stores is_pcc (removed from SldNodeSymbol)
+- [x] PCC remains in export/import as application-level hint (not core model)
 
 ### 7.3 Task 5.3: Analysis Separation
 
@@ -287,7 +292,7 @@ class NetworkGraph:
 | Station = logical only | N/A | DONE |
 | Case immutability | Phase 4 | PENDING |
 | Catalog layer | Phase 3 | PENDING |
-| PCC not in model | Phase 5 | PENDING |
+| PCC not in model | Phase 2 | DONE |
 
 ### 9.2 WHITE BOX Compliance
 
@@ -339,6 +344,7 @@ class NetworkGraph:
 | Date | Version | Changes |
 |------|---------|---------|
 | 2025-01 | 2.0 | Initial PowerFactory alignment plan |
+| 2025-01 | 2.1 | Phase 2 Task 2.1 DONE: PCC removed from NetworkGraph |
 
 ---
 

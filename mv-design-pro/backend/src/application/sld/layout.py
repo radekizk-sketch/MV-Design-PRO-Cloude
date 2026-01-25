@@ -55,7 +55,6 @@ def build_auto_layout_diagram(
                 x=x,
                 y=y,
                 label=_label_for_node(node_id, nodes),
-                is_pcc=node_id == pcc_node_id,
             )
         )
 
@@ -98,7 +97,6 @@ def build_auto_layout_diagram(
         nodes=tuple(node_symbols),
         branches=tuple(branch_symbols),
         annotations=tuple(annotation_symbols),
-        pcc_node_id=pcc_node_id,
         dirty_flag=False,
     )
 

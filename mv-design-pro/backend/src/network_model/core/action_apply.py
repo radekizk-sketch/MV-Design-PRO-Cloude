@@ -30,9 +30,6 @@ def apply_action_to_snapshot(
         graph.add_branch(branch)
     elif action.action_type == "set_in_service":
         _apply_in_service(graph, action)
-    elif action.action_type == "set_pcc":
-        node_id = action.payload.get("node_id")
-        graph.pcc_node_id = str(node_id) if node_id is not None else None
     else:
         raise RuntimeError(f"Unsupported action_type: {action.action_type}")
 
