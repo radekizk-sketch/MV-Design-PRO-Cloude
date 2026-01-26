@@ -11,6 +11,7 @@
  */
 
 import { create } from 'zustand';
+import { persist } from 'zustand/middleware';
 import type { ElementType, OperatingMode, ResultStatus, SelectedElement } from '../types';
 
 /**
@@ -52,69 +53,107 @@ interface SelectionState {
  * const { selectedElement, selectElement, mode } = useSelectionStore();
  * ```
  */
-export const useSelectionStore = create<SelectionState>((set) => ({
-  // Initial state
-  selectedElement: null,
-  mode: 'MODEL_EDIT',
-  resultStatus: 'NONE',
-  propertyGridOpen: false,
-  treeExpandedNodes: new Set<string>(),
-  sldCenterOnElement: null,
-
-  // Select an element (from SLD, Tree, or List)
-  selectElement: (element) =>
-    set((state) => ({
-      selectedElement: element,
-      // Auto-open property grid on selection
-      propertyGridOpen: element !== null || state.propertyGridOpen,
-    })),
-
-  // Change operating mode
-  setMode: (mode) =>
-    set(() => ({
-      mode,
-      // Clear result status when entering MODEL_EDIT (results become OUTDATED)
-      resultStatus: mode === 'MODEL_EDIT' ? 'OUTDATED' : 'NONE',
-    })),
-
-  // Update result freshness status
-  setResultStatus: (resultStatus) => set(() => ({ resultStatus })),
-
-  // Toggle property grid visibility
-  togglePropertyGrid: (open) =>
-    set((state) => ({
-      propertyGridOpen: open !== undefined ? open : !state.propertyGridOpen,
-    })),
-
-  // Expand a tree node
-  expandTreeNode: (nodeId) =>
-    set((state) => {
-      const newExpanded = new Set(state.treeExpandedNodes);
-      newExpanded.add(nodeId);
-      return { treeExpandedNodes: newExpanded };
-    }),
-
-  // Collapse a tree node
-  collapseTreeNode: (nodeId) =>
-    set((state) => {
-      const newExpanded = new Set(state.treeExpandedNodes);
-      newExpanded.delete(nodeId);
-      return { treeExpandedNodes: newExpanded };
-    }),
-
-  // Center SLD view on element
-  centerSldOnElement: (elementId) =>
-    set(() => ({
-      sldCenterOnElement: elementId,
-    })),
-
-  // Clear selection
-  clearSelection: () =>
-    set(() => ({
+export const useSelectionStore = create<SelectionState>()(
+  persist(
+    (set) => ({
+      // Initial state
       selectedElement: null,
+      mode: 'MODEL_EDIT',
+      resultStatus: 'NONE',
+      propertyGridOpen: false,
+      treeExpandedNodes: new Set<string>(),
       sldCenterOnElement: null,
-    })),
-}));
+
+      // Select an element (from SLD, Tree, or List)
+      selectElement: (element) =>
+        set((state) => ({
+          selectedElement: element,
+          // Auto-open property grid on selection
+          propertyGridOpen: element !== null || state.propertyGridOpen,
+        })),
+
+      // Change operating mode
+      setMode: (mode) =>
+        set(() => ({
+          mode,
+          // Clear result status when entering MODEL_EDIT (results become OUTDATED)
+          resultStatus: mode === 'MODEL_EDIT' ? 'OUTDATED' : 'NONE',
+        })),
+
+      // Update result freshness status
+      setResultStatus: (resultStatus) => set(() => ({ resultStatus })),
+
+      // Toggle property grid visibility
+      togglePropertyGrid: (open) =>
+        set((state) => ({
+          propertyGridOpen: open !== undefined ? open : !state.propertyGridOpen,
+        })),
+
+      // Expand a tree node
+      expandTreeNode: (nodeId) =>
+        set((state) => {
+          const newExpanded = new Set(state.treeExpandedNodes);
+          newExpanded.add(nodeId);
+          return { treeExpandedNodes: newExpanded };
+        }),
+
+      // Collapse a tree node
+      collapseTreeNode: (nodeId) =>
+        set((state) => {
+          const newExpanded = new Set(state.treeExpandedNodes);
+          newExpanded.delete(nodeId);
+          return { treeExpandedNodes: newExpanded };
+        }),
+
+      // Center SLD view on element
+      centerSldOnElement: (elementId) =>
+        set(() => ({
+          sldCenterOnElement: elementId,
+        })),
+
+      // Clear selection
+      clearSelection: () =>
+        set(() => ({
+          selectedElement: null,
+          sldCenterOnElement: null,
+        })),
+    }),
+    {
+      name: 'mv-design-selection-store',
+      partialState: true,
+      // Only persist UI state, not runtime state
+      partialize: (state) => ({
+        treeExpandedNodes: state.treeExpandedNodes,
+        propertyGridOpen: state.propertyGridOpen,
+      }),
+      // Custom serializer for Set
+      storage: {
+        getItem: (name) => {
+          const str = localStorage.getItem(name);
+          if (!str) return null;
+          const parsed = JSON.parse(str);
+          if (parsed.state?.treeExpandedNodes) {
+            parsed.state.treeExpandedNodes = new Set(parsed.state.treeExpandedNodes);
+          }
+          return parsed;
+        },
+        setItem: (name, value) => {
+          const toStore = {
+            ...value,
+            state: {
+              ...value.state,
+              treeExpandedNodes: value.state?.treeExpandedNodes
+                ? Array.from(value.state.treeExpandedNodes)
+                : [],
+            },
+          };
+          localStorage.setItem(name, JSON.stringify(toStore));
+        },
+        removeItem: (name) => localStorage.removeItem(name),
+      },
+    }
+  )
+);
 
 /**
  * Hook to check if editing is allowed based on current mode.
