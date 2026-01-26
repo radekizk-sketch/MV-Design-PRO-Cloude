@@ -1,10 +1,26 @@
+"""
+SLD Auto-Layout Algorithm.
+
+PowerFactory Alignment (per sld_rules.md § F.6, POWERFACTORY_COMPLIANCE.md):
+- Deterministic: Same input → identical layout
+- BFS-based hierarchical positioning from PCC/root
+- Switches affect topology when CLOSED and in_service
+- All elements visible (in_service=False → gray/dashed but still positioned)
+"""
+
 from __future__ import annotations
 
 from collections import deque
 from typing import Iterable
 from uuid import UUID, uuid4, uuid5
 
-from domain.sld import SldAnnotation, SldBranchSymbol, SldDiagram, SldNodeSymbol
+from domain.sld import (
+    SldAnnotation,
+    SldBranchSymbol,
+    SldDiagram,
+    SldNodeSymbol,
+    SldSwitchSymbol,
+)
 
 
 def build_auto_layout_diagram(
@@ -18,9 +34,26 @@ def build_auto_layout_diagram(
     x_spacing: float = 200.0,
     y_spacing: float = 120.0,
     annotations: Iterable[dict] | None = None,
+    switches: Iterable[dict] | None = None,
 ) -> SldDiagram:
+    """
+    Build deterministic auto-layout SLD diagram.
+
+    Per sld_rules.md § F.6 (Deterministic Display):
+    - Same input → identical output
+    - Elements sorted by ID before processing
+    - in_service=False elements are positioned but visually grayed
+
+    Per sld_rules.md § D.2 (Switch States):
+    - CLOSED switches contribute to topology (adjacency)
+    - OPEN switches do not connect nodes in layout
+    - Both are visible in SLD with appropriate symbols
+    """
     nodes = list(nodes)
     branches = list(branches)
+    switches_list = list(switches) if switches else []
+
+    # Deterministic sorting by ID (per sld_rules.md § F.6)
     nodes.sort(key=lambda item: str(item["id"]))
     branches.sort(
         key=lambda item: (
@@ -29,9 +62,20 @@ def build_auto_layout_diagram(
             str(item.get("id")),
         )
     )
+    switches_list.sort(
+        key=lambda item: (
+            str(item.get("from_node_id")),
+            str(item.get("to_node_id")),
+            str(item.get("id")),
+        )
+    )
+
     diagram_uuid = diagram_id or uuid5(project_id, f"sld:{name}")
     node_ids = [node["id"] for node in nodes]
+    node_in_service = {node["id"]: node.get("in_service", True) for node in nodes}
     adjacency = {node_id: set() for node_id in node_ids}
+
+    # Build adjacency from branches (in_service only for layout)
     for branch in branches:
         if not branch.get("in_service", True):
             continue
@@ -41,10 +85,24 @@ def build_auto_layout_diagram(
             adjacency[from_node_id].add(to_node_id)
             adjacency[to_node_id].add(from_node_id)
 
+    # Build adjacency from switches (CLOSED + in_service only for layout)
+    # Per powerfactory_ui_parity.md § C.3: Switch.OPEN interrupts topology
+    for switch in switches_list:
+        if not switch.get("in_service", True):
+            continue
+        if switch.get("state", "CLOSED") != "CLOSED":
+            continue
+        from_node_id = switch["from_node_id"]
+        to_node_id = switch["to_node_id"]
+        if from_node_id in adjacency and to_node_id in adjacency:
+            adjacency[from_node_id].add(to_node_id)
+            adjacency[to_node_id].add(from_node_id)
+
     positions = _layout_positions(
         adjacency, node_ids, pcc_node_id, x_spacing=x_spacing, y_spacing=y_spacing
     )
 
+    # Create node symbols with in_service state
     node_symbols = []
     for node_id in _sorted_ids(node_ids):
         x, y = positions.get(node_id, (0.0, 0.0))
@@ -55,9 +113,11 @@ def build_auto_layout_diagram(
                 x=x,
                 y=y,
                 label=_label_for_node(node_id, nodes),
+                in_service=node_in_service.get(node_id, True),
             )
         )
 
+    # Create branch symbols with in_service state
     branch_symbols = []
     for branch in branches:
         from_node_id = branch["from_node_id"]
@@ -71,6 +131,32 @@ def build_auto_layout_diagram(
                 from_node_id=from_node_id,
                 to_node_id=to_node_id,
                 points=(from_pos, to_pos),
+                in_service=branch.get("in_service", True),
+            )
+        )
+
+    # Create switch symbols with type and state (per sld_rules.md § A.2, § D.2)
+    # Position at midpoint between connected nodes
+    switch_symbols = []
+    for switch in switches_list:
+        from_node_id = switch["from_node_id"]
+        to_node_id = switch["to_node_id"]
+        from_pos = positions.get(from_node_id, (0.0, 0.0))
+        to_pos = positions.get(to_node_id, (0.0, 0.0))
+        mid_x = (from_pos[0] + to_pos[0]) / 2
+        mid_y = (from_pos[1] + to_pos[1]) / 2
+        switch_symbols.append(
+            SldSwitchSymbol(
+                id=_symbol_uuid(diagram_uuid, "switch", switch["id"]),
+                switch_id=switch["id"],
+                from_node_id=from_node_id,
+                to_node_id=to_node_id,
+                switch_type=switch.get("switch_type", "BREAKER"),
+                state=switch.get("state", "CLOSED"),
+                x=mid_x,
+                y=mid_y,
+                label=switch.get("name"),
+                in_service=switch.get("in_service", True),
             )
         )
 
@@ -96,6 +182,7 @@ def build_auto_layout_diagram(
         name=name,
         nodes=tuple(node_symbols),
         branches=tuple(branch_symbols),
+        switches=tuple(switch_symbols),
         annotations=tuple(annotation_symbols),
         dirty_flag=False,
     )
