@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import math
 from dataclasses import replace
 from datetime import datetime, timezone
 from typing import Any, Callable
@@ -44,6 +45,7 @@ from .dtos import (
     SourcePayload,
     SwitchingStatePayload,
     TypePayload,
+    InverterSetpoint,
 )
 from .errors import Conflict, NotFound, ValidationFailed
 from .exporters.json_exporter import export_network_payload
@@ -294,6 +296,20 @@ class NetworkWizardService:
             self._invalidate_results(uow, project_id)
         return record
 
+    def create_inverter_source(
+        self, project_id: UUID, bus_id: UUID, name: str, type_id: UUID
+    ) -> dict:
+        return self.add_source(
+            project_id,
+            SourcePayload(
+                name=name,
+                node_id=bus_id,
+                source_type="INVERTER",
+                payload={"name": name},
+                type_ref=type_id,
+            ),
+        )
+
     def update_source(self, project_id: UUID, source_id: UUID, patch: dict) -> dict:
         with self._uow_factory() as uow:
             self._ensure_project(uow, project_id)
@@ -391,6 +407,10 @@ class NetworkWizardService:
     def list_switch_equipment_types(self) -> list[dict]:
         with self._uow_factory() as uow:
             return uow.wizard.list_switch_equipment_types()
+
+    def list_inverter_types(self) -> list[dict]:
+        with self._uow_factory() as uow:
+            return uow.wizard.list_inverter_types()
 
     def get_line_type(self, type_id: UUID) -> dict:
         with self._uow_factory() as uow:
@@ -532,6 +552,45 @@ class NetworkWizardService:
             )
             uow.cases.update_operating_case(updated, commit=False)
         return updated
+
+    def set_inverter_setpoints(
+        self,
+        case_id: UUID,
+        source_id: UUID,
+        p_mw: float,
+        q_mvar: float | None = None,
+        cosphi: float | None = None,
+    ) -> OperatingCase:
+        setpoint = self._build_inverter_setpoint(
+            p_mw=p_mw,
+            q_mvar=q_mvar,
+            cosphi=cosphi,
+        )
+        with self._uow_factory() as uow:
+            case = uow.cases.get_operating_case(case_id)
+            if case is None:
+                raise NotFound(f"OperatingCase {case_id} not found")
+            sources = uow.wizard.list_sources(case.project_id)
+            source = next((item for item in sources if item.get("id") == source_id), None)
+            if source is None:
+                raise NotFound(f"Source {source_id} not found")
+            if source.get("source_type") != "INVERTER":
+                raise Conflict(f"Source {source_id} is not an inverter")
+            payload = dict(case.case_payload or {})
+            inverter_setpoints = dict(payload.get("inverter_setpoints", {}))
+            inverter_setpoints[str(source_id)] = setpoint
+            payload["inverter_setpoints"] = inverter_setpoints
+            updated = OperatingCase(
+                id=case.id,
+                project_id=case.project_id,
+                name=case.name,
+                case_payload=payload,
+                project_design_mode=case.project_design_mode,
+                created_at=case.created_at,
+                updated_at=datetime.now(timezone.utc),
+            )
+            uow.cases.update_operating_case(updated, commit=False)
+            return updated
 
     def list_operating_cases(self, project_id: UUID) -> list[OperatingCase]:
         with self._uow_factory() as uow:
@@ -761,6 +820,9 @@ class NetworkWizardService:
 
         case_payload = case.case_payload
         base_mva = float(case_payload.get("base_mva", 100.0))
+        inverter_setpoints = self._normalize_inverter_setpoints(
+            case_payload.get("inverter_setpoints", {})
+        )
 
         slack_node_id = settings.get("pcc_node_id") or self._select_slack_node_id(project_id)
         slack_data = self._lookup_node_attrs(project_id, slack_node_id)
@@ -789,6 +851,18 @@ class NetworkWizardService:
                 continue
             payload = source.get("payload", {})
             if source.get("source_type") == "GRID":
+                continue
+            if source.get("source_type") == "INVERTER":
+                setpoint = inverter_setpoints.get(str(source.get("id")))
+                if setpoint is None:
+                    continue
+                pq_specs.append(
+                    PQSpec(
+                        node_id=str(source["node_id"]),
+                        p_mw=setpoint.p_mw,
+                        q_mvar=self._resolve_inverter_q_mvar(setpoint),
+                    )
+                )
                 continue
             pv_specs.append(
                 PVSpec(
@@ -888,6 +962,7 @@ class NetworkWizardService:
             line_types = uow.wizard.list_line_types()
             cable_types = uow.wizard.list_cable_types()
             transformer_types = uow.wizard.list_transformer_types()
+            inverter_types = uow.wizard.list_inverter_types()
             switching_states = []
             for case in operating_cases:
                 switching_states.extend(uow.wizard.list_switching_states(case.id))
@@ -906,6 +981,7 @@ class NetworkWizardService:
         line_types.sort(key=lambda item: str(item["id"]))
         cable_types.sort(key=lambda item: str(item["id"]))
         transformer_types.sort(key=lambda item: str(item["id"]))
+        inverter_types.sort(key=lambda item: str(item["id"]))
         switching_states.sort(key=lambda item: (str(item["case_id"]), str(item["element_id"])))
 
         return export_network_payload(
@@ -926,6 +1002,7 @@ class NetworkWizardService:
             line_types=line_types,
             cable_types=cable_types,
             transformer_types=transformer_types,
+            inverter_types=inverter_types,
             switching_states=switching_states,
             schema_version=project.schema_version,
         )
@@ -1036,6 +1113,7 @@ class NetworkWizardService:
             existing_transformer_type_ids = {
                 item["id"] for item in uow.wizard.list_transformer_types()
             }
+            existing_inverter_type_ids = {item["id"] for item in uow.wizard.list_inverter_types()}
 
             node_id_map: dict[str, str] = {}
             for node_data in parsed["nodes"]:
@@ -1200,6 +1278,19 @@ class NetworkWizardService:
                     )
                     created, updated = self._bump_counts(
                         result, created, updated, "transformer_types"
+                    )
+                except ValueError as exc:
+                    errors.append(str(exc))
+
+            for item in parsed.get("inverter_types", []):
+                try:
+                    record = self._type_record_from_dict(item)
+                    uow.wizard.upsert_inverter_type(record, commit=False)
+                    result = (
+                        "updated" if record["id"] in existing_inverter_type_ids else "created"
+                    )
+                    created, updated = self._bump_counts(
+                        result, created, updated, "inverter_types"
                     )
                 except ValueError as exc:
                     errors.append(str(exc))
@@ -1690,6 +1781,7 @@ class NetworkWizardService:
             cable_types=uow.wizard.list_cable_types(),
             transformer_types=uow.wizard.list_transformer_types(),
             switch_equipment_types=uow.wizard.list_switch_equipment_types(),
+            inverter_types=uow.wizard.list_inverter_types(),
         )
 
     def _serialize_node(self, node: dict) -> dict[str, Any]:
@@ -1880,6 +1972,8 @@ class NetworkWizardService:
     def _source_payload_to_record(self, project_id: UUID, source: SourcePayload) -> dict:
         payload = dict(source.payload)
         payload.setdefault("name", source.name)
+        if source.type_ref is not None:
+            payload["type_ref"] = str(source.type_ref)
         source_payload = {
             "name": source.name,
             "node_id": str(source.node_id),
@@ -1915,6 +2009,7 @@ class NetworkWizardService:
     def _source_payload_from_dict(self, source: dict) -> SourcePayload:
         payload = source.get("payload") or {}
         name = source.get("name") or payload.get("name", "")
+        type_ref = payload.get("type_ref")
         return SourcePayload(
             id=UUID(str(source["id"])) if source.get("id") else None,
             node_id=UUID(str(source["node_id"])),
@@ -1922,16 +2017,20 @@ class NetworkWizardService:
             name=name,
             payload=payload,
             in_service=bool(source.get("in_service", True)),
+            type_ref=UUID(str(type_ref)) if type_ref else None,
         )
 
     def _source_payload_from_record(self, source: dict) -> SourcePayload:
+        payload = source.get("payload") or {}
+        type_ref = payload.get("type_ref")
         return SourcePayload(
             id=UUID(str(source["id"])) if source.get("id") else None,
-            name=source.get("payload", {}).get("name", source.get("payload", {}).get("label", "")),
+            name=payload.get("name", payload.get("label", "")),
             node_id=UUID(str(source["node_id"])),
             source_type=source.get("source_type", ""),
-            payload=source.get("payload") or {},
+            payload=payload,
             in_service=bool(source.get("in_service", True)),
+            type_ref=UUID(str(type_ref)) if type_ref else None,
         )
 
     def _normalize_load_dicts(self, loads: list[dict]) -> list[dict[str, Any]]:
@@ -1978,6 +2077,82 @@ class NetworkWizardService:
         else:
             type_id = self._deterministic_uuid(UUID(int=0), item)
         return {"id": type_id, "name": item.get("name", ""), "params": item.get("params") or {}}
+
+    def _build_inverter_setpoint(
+        self,
+        *,
+        p_mw: float,
+        q_mvar: float | None,
+        cosphi: float | None,
+    ) -> dict[str, Any]:
+        if p_mw is None or not math.isfinite(float(p_mw)):
+            raise ValueError("Inverter setpoint requires finite p_mw")
+        if (q_mvar is None and cosphi is None) or (q_mvar is not None and cosphi is not None):
+            raise ValueError("Exactly one of q_mvar or cosphi must be set for inverter setpoint")
+        if q_mvar is not None and not math.isfinite(float(q_mvar)):
+            raise ValueError("Inverter setpoint q_mvar must be finite")
+        if cosphi is not None and not math.isfinite(float(cosphi)):
+            raise ValueError("Inverter setpoint cosphi must be finite")
+        mode = "PQ" if q_mvar is not None else "Cosphi"
+        setpoint = InverterSetpoint(
+            p_mw=float(p_mw),
+            q_mvar=float(q_mvar) if q_mvar is not None else None,
+            cosphi=float(cosphi) if cosphi is not None else None,
+            mode=mode,
+        )
+        self._validate_inverter_setpoint(setpoint)
+        return {
+            "p_mw": setpoint.p_mw,
+            "q_mvar": setpoint.q_mvar,
+            "cosphi": setpoint.cosphi,
+            "mode": setpoint.mode,
+        }
+
+    def _validate_inverter_setpoint(self, setpoint: InverterSetpoint) -> None:
+        if setpoint.p_mw is None or not math.isfinite(setpoint.p_mw):
+            raise ValueError("Inverter setpoint requires finite p_mw")
+        has_q = setpoint.q_mvar is not None
+        has_cosphi = setpoint.cosphi is not None
+        if has_q == has_cosphi:
+            raise ValueError("Inverter setpoint requires exactly one of q_mvar or cosphi")
+        if setpoint.mode not in {"PQ", "Cosphi"}:
+            raise ValueError("Inverter setpoint mode must be PQ or Cosphi")
+        if setpoint.mode == "PQ" and not has_q:
+            raise ValueError("Inverter PQ mode requires q_mvar")
+        if setpoint.mode == "Cosphi" and not has_cosphi:
+            raise ValueError("Inverter Cosphi mode requires cosphi")
+
+    def _normalize_inverter_setpoints(
+        self, payload: dict[str, Any] | None
+    ) -> dict[str, InverterSetpoint]:
+        normalized: dict[str, InverterSetpoint] = {}
+        for source_id, data in (payload or {}).items():
+            if "p_mw" not in data:
+                raise ValueError("Inverter setpoint requires p_mw")
+            setpoint = InverterSetpoint(
+                p_mw=float(data.get("p_mw", 0.0)),
+                q_mvar=(
+                    float(data.get("q_mvar"))
+                    if data.get("q_mvar") is not None
+                    else None
+                ),
+                cosphi=(
+                    float(data.get("cosphi"))
+                    if data.get("cosphi") is not None
+                    else None
+                ),
+                mode=str(data.get("mode", "PQ")),
+            )
+            self._validate_inverter_setpoint(setpoint)
+            normalized[str(source_id)] = setpoint
+        return normalized
+
+    def _resolve_inverter_q_mvar(self, setpoint: InverterSetpoint) -> float:
+        if setpoint.q_mvar is not None:
+            return setpoint.q_mvar
+        cosphi = setpoint.cosphi if setpoint.cosphi is not None else 1.0
+        cosphi = min(1.0, max(-1.0, cosphi))
+        return setpoint.p_mw * math.tan(math.acos(cosphi))
 
     def _validate_line_voltage_levels(
         self, branch: dict, nodes: list[dict], report: ValidationReport, branch_id: str

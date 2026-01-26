@@ -10,12 +10,13 @@ The Catalog is the single source of physical parameters for network elements.
 """
 
 from .repository import CatalogRepository
-from .types import CableType, LineType, SwitchEquipmentType, TransformerType
+from .types import CableType, InverterType, LineType, SwitchEquipmentType, TransformerType
 
 __all__ = [
     "LineType",
     "CableType",
     "TransformerType",
     "SwitchEquipmentType",
+    "InverterType",
     "CatalogRepository",
 ]

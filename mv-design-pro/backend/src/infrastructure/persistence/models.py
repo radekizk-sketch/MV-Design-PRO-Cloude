@@ -218,6 +218,14 @@ class SwitchEquipmentTypeORM(Base):
     params_jsonb: Mapped[dict[str, Any]] = mapped_column(DeterministicJSON(), nullable=False)
 
 
+class InverterTypeORM(Base):
+    __tablename__ = "inverter_types"
+
+    id: Mapped[UUID] = mapped_column(GUID(), primary_key=True)
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    params_jsonb: Mapped[dict[str, Any]] = mapped_column(DeterministicJSON(), nullable=False)
+
+
 class SwitchEquipmentAssignmentORM(Base):
     __tablename__ = "switch_equipment_assignments"
 

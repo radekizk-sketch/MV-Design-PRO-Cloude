@@ -323,3 +323,84 @@ class SwitchEquipmentType:
             icw_ka=float(data.get("icw_ka", 0.0)),
             medium=data.get("medium"),
         )
+
+
+@dataclass(frozen=True)
+class InverterType:
+    """
+    Immutable inverter type definition.
+
+    Attributes:
+        id: Unique identifier.
+        name: Type name.
+        un_kv: Rated voltage [kV].
+        sn_mva: Rated apparent power [MVA].
+        pmax_mw: Maximum active power [MW].
+        qmin_mvar: Minimum reactive power [MVAr] (optional).
+        qmax_mvar: Maximum reactive power [MVAr] (optional).
+        cosphi_min: Minimum cos(phi) (optional).
+        cosphi_max: Maximum cos(phi) (optional).
+        manufacturer: Manufacturer name (optional).
+        model: Model designation (optional).
+    """
+
+    id: str
+    name: str
+    un_kv: float
+    sn_mva: float
+    pmax_mw: float
+    qmin_mvar: Optional[float] = None
+    qmax_mvar: Optional[float] = None
+    cosphi_min: Optional[float] = None
+    cosphi_max: Optional[float] = None
+    manufacturer: Optional[str] = None
+    model: Optional[str] = None
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert to dictionary."""
+        return {
+            "id": self.id,
+            "name": self.name,
+            "un_kv": self.un_kv,
+            "sn_mva": self.sn_mva,
+            "pmax_mw": self.pmax_mw,
+            "qmin_mvar": self.qmin_mvar,
+            "qmax_mvar": self.qmax_mvar,
+            "cosphi_min": self.cosphi_min,
+            "cosphi_max": self.cosphi_max,
+            "manufacturer": self.manufacturer,
+            "model": self.model,
+        }
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "InverterType":
+        """Create from dictionary."""
+        return cls(
+            id=str(data.get("id", str(uuid4()))),
+            name=str(data.get("name", "")),
+            un_kv=float(data.get("un_kv", 0.0)),
+            sn_mva=float(data.get("sn_mva", 0.0)),
+            pmax_mw=float(data.get("pmax_mw", 0.0)),
+            qmin_mvar=(
+                float(data.get("qmin_mvar"))
+                if data.get("qmin_mvar") is not None
+                else None
+            ),
+            qmax_mvar=(
+                float(data.get("qmax_mvar"))
+                if data.get("qmax_mvar") is not None
+                else None
+            ),
+            cosphi_min=(
+                float(data.get("cosphi_min"))
+                if data.get("cosphi_min") is not None
+                else None
+            ),
+            cosphi_max=(
+                float(data.get("cosphi_max"))
+                if data.get("cosphi_max") is not None
+                else None
+            ),
+            manufacturer=data.get("manufacturer"),
+            model=data.get("model"),
+        )
