@@ -37,7 +37,7 @@ This document provides a comprehensive checklist for verifying compliance with D
 | NM-012 | Cable = underground with R/X/C | Check: LineBranch supports CABLE | PASS |
 | NM-013 | Transformer = 2W/3W with impedance | Check: TransformerBranch exists | PASS |
 | NM-014 | Switch = OPEN/CLOSE only, NO impedance | Check: Switch class or in_service | VERIFY |
-| NM-015 | Source = power injection | Check: Source class exists | VERIFY |
+| NM-015 | Source = power injection | Check: Source class exists | PASS |
 | NM-016 | Load = power consumption | Check: Load class exists | VERIFY |
 
 **Code locations:**

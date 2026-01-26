@@ -3,7 +3,15 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Iterable
 
-from .types import CableType, InverterType, LineType, SwitchEquipmentType, TransformerType
+from .types import (
+    CableType,
+    ConverterKind,
+    ConverterType,
+    InverterType,
+    LineType,
+    SwitchEquipmentType,
+    TransformerType,
+)
 
 
 @dataclass(frozen=True)
@@ -18,6 +26,7 @@ class CatalogRepository:
     cable_types: dict[str, CableType]
     transformer_types: dict[str, TransformerType]
     switch_equipment_types: dict[str, SwitchEquipmentType]
+    converter_types: dict[str, ConverterType]
     inverter_types: dict[str, InverterType]
 
     @classmethod
@@ -28,6 +37,7 @@ class CatalogRepository:
         cable_types: Iterable[dict],
         transformer_types: Iterable[dict],
         switch_equipment_types: Iterable[dict] | None = None,
+        converter_types: Iterable[dict] | None = None,
         inverter_types: Iterable[dict] | None = None,
     ) -> "CatalogRepository":
         def _build_line_type(record: dict) -> LineType:
@@ -55,8 +65,16 @@ class CatalogRepository:
             data.update(record.get("params") or {})
             return InverterType.from_dict(data)
 
+        def _build_converter_type(record: dict) -> ConverterType:
+            data = {"id": record.get("id"), "name": record.get("name")}
+            data.update(record.get("params") or {})
+            return ConverterType.from_dict(data)
+
         switch_records = list(switch_equipment_types or [])
+        converter_records = list(converter_types or [])
         inverter_records = list(inverter_types or [])
+        if not converter_records and inverter_records:
+            converter_records = inverter_records
         return cls(
             line_types={str(item.id): item for item in map(_build_line_type, line_types)},
             cable_types={str(item.id): item for item in map(_build_cable_type, cable_types)},
@@ -65,6 +83,9 @@ class CatalogRepository:
             },
             switch_equipment_types={
                 str(item.id): item for item in map(_build_switch_equipment_type, switch_records)
+            },
+            converter_types={
+                str(item.id): item for item in map(_build_converter_type, converter_records)
             },
             inverter_types={
                 str(item.id): item for item in map(_build_inverter_type, inverter_records)
@@ -83,6 +104,12 @@ class CatalogRepository:
     def list_switch_equipment_types(self) -> list[SwitchEquipmentType]:
         return self._sorted(self.switch_equipment_types.values())
 
+    def list_converter_types(self, kind: ConverterKind | None = None) -> list[ConverterType]:
+        values = self.converter_types.values()
+        if kind is not None:
+            values = [item for item in values if item.kind == kind]
+        return sorted(values, key=lambda item: str(item.id))
+
     def list_inverter_types(self) -> list[InverterType]:
         return self._sorted(self.inverter_types.values())
 
@@ -97,6 +124,9 @@ class CatalogRepository:
 
     def get_switch_equipment_type(self, type_id: str) -> SwitchEquipmentType | None:
         return self.switch_equipment_types.get(str(type_id))
+
+    def get_converter_type(self, type_id: str) -> ConverterType | None:
+        return self.converter_types.get(str(type_id))
 
     def get_inverter_type(self, type_id: str) -> InverterType | None:
         return self.inverter_types.get(str(type_id))
