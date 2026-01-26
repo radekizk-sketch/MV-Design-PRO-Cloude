@@ -163,6 +163,7 @@ export type TreeNodeType =
   | 'TRANSFORMER_TYPES'
   | 'SWITCH_EQUIPMENT_TYPES'
   | 'CASES'
+  | 'STUDY_CASE'  // P10: Individual study case node
   | 'RESULTS'
   | 'ELEMENT'; // Individual element node
 
@@ -179,6 +180,10 @@ export interface TreeNode {
   count?: number; // Number of items in category
   expanded?: boolean;
   icon?: string;
+  // P10: Study case properties
+  studyCaseId?: string; // For STUDY_CASE nodes
+  isActive?: boolean; // For STUDY_CASE nodes - active case indicator
+  resultStatus?: ResultStatus; // For STUDY_CASE nodes - result status
 }
 
 // ============================================================================

@@ -439,30 +439,75 @@ class ValidationReport:
 
 ## 5. Case Layer
 
-### 5.1 Case Definition
+### 5.1 Case Definition (P10 FULL MAX)
 
 ```python
-@dataclass
+@dataclass(frozen=True)
 class StudyCase:
     """
-    Base class for all study cases.
+    Study case for calculation variants (P10 FULL MAX).
     CANNOT mutate the network model.
+    Configuration-only entity.
     """
     id: UUID
-    name: str
     project_id: UUID
+    name: str
+    description: str
 
-    # Reference to network snapshot (immutable)
-    network_snapshot_id: UUID
+    # Configuration (calculation parameters)
+    config: StudyCaseConfig
 
-    # Case-specific parameters
-    parameters: Dict[str, Any]
+    # Result status lifecycle
+    result_status: StudyCaseResultStatus  # NONE, FRESH, OUTDATED
 
-    # Result state
-    result_state: ResultState  # NONE, FRESH, OUTDATED
+    # Active case management
+    is_active: bool
 
-    def get_network_snapshot(self) -> NetworkSnapshot:
-        """Get the immutable network state for this case."""
+    # Result references (for FRESH status)
+    result_refs: Tuple[StudyCaseResult, ...]
+
+    # Versioning
+    revision: int
+    created_at: datetime
+    updated_at: datetime
+
+    def clone(self, new_name: str | None = None) -> StudyCase:
+        """
+        Clone this case (PowerFactory-style).
+        - Config is COPIED
+        - Results are NOT copied
+        - Status = NONE
+        - is_active = False
+        """
+
+    def mark_as_fresh(self, result: StudyCaseResult) -> StudyCase:
+        """Mark case as FRESH after successful calculation."""
+
+    def mark_as_outdated(self) -> StudyCase:
+        """Mark case as OUTDATED (model/config changed)."""
+
+    def with_updated_config(self, new_config: StudyCaseConfig) -> StudyCase:
+        """Update config and mark as OUTDATED."""
+
+
+@dataclass(frozen=True)
+class StudyCaseConfig:
+    """
+    Calculation configuration for a study case.
+    Immutable — changes create new config.
+    """
+    voltage_factor_cmax: float = 1.1
+    voltage_factor_cmin: float = 1.0
+    calculation_method: str = "IEC_60909"
+    fault_type: str = "THREE_PHASE"
+    additional_params: Dict[str, Any] = field(default_factory=dict)
+
+
+class StudyCaseResultStatus(str, Enum):
+    """Result freshness status."""
+    NONE = "NONE"        # Never computed
+    FRESH = "FRESH"      # Results current
+    OUTDATED = "OUTDATED"  # Model/config changed
 ```
 
 ### 5.2 Short Circuit Case (IEC 60909)
@@ -502,6 +547,55 @@ class PowerFlowCase(StudyCase):
 
     # Result (when computed)
     result: PowerFlowResult | None = None
+```
+
+### 5.4 Study Case Service (P10 FULL MAX)
+
+```python
+class StudyCaseService:
+    """
+    Application service for study case management.
+    Implements full lifecycle with PowerFactory-grade semantics.
+    """
+
+    # CRUD Operations
+    def create_case(self, project_id, name, description, config) -> StudyCase: ...
+    def get_case(self, case_id) -> StudyCase: ...
+    def list_cases(self, project_id) -> List[StudyCaseListItem]: ...
+    def update_case(self, case_id, name, description, config) -> StudyCase: ...
+    def delete_case(self, case_id) -> bool: ...
+
+    # Clone Operation (PowerFactory-style)
+    def clone_case(self, case_id, new_name) -> StudyCase:
+        """
+        Clone rules:
+        - Configuration is COPIED
+        - Results are NOT copied (status = NONE)
+        - is_active = False
+        """
+
+    # Active Case Management
+    def get_active_case(self, project_id) -> StudyCase | None: ...
+    def set_active_case(self, project_id, case_id) -> StudyCase:
+        """
+        Active case invariant:
+        - Deactivates all other cases first
+        - Exactly one active case per project
+        """
+
+    # Compare Operation (read-only)
+    def compare_cases(self, case_a_id, case_b_id) -> StudyCaseComparison:
+        """100% read-only — no mutations."""
+
+    # Result Status Management
+    def mark_all_outdated(self, project_id) -> int:
+        """Called when NetworkModel changes."""
+
+    def mark_case_outdated(self, case_id) -> bool:
+        """Called when case config changes."""
+
+    def mark_case_fresh(self, case_id, result_ref) -> bool:
+        """Called after successful calculation."""
 ```
 
 ---

@@ -258,12 +258,28 @@ class OperatingCaseORM(Base):
 
 
 class StudyCaseORM(Base):
+    """
+    Study Case ORM model — P10 FULL MAX.
+
+    Extended with:
+    - is_active: Active case indicator (exactly one per project)
+    - result_status: NONE / FRESH / OUTDATED lifecycle
+    - description: Case description
+    - result_refs_jsonb: References to calculation results
+    """
     __tablename__ = "study_cases"
 
     id: Mapped[UUID] = mapped_column(GUID(), primary_key=True)
     project_id: Mapped[UUID] = mapped_column(GUID(), ForeignKey("projects.id"), nullable=False)
     name: Mapped[str] = mapped_column(String(255), nullable=False)
+    description: Mapped[str] = mapped_column(Text, nullable=False, default="")
     study_jsonb: Mapped[dict[str, Any]] = mapped_column(DeterministicJSON(), nullable=False)
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    result_status: Mapped[str] = mapped_column(String(20), nullable=False, default="NONE")
+    result_refs_jsonb: Mapped[list[dict[str, Any]]] = mapped_column(
+        DeterministicJSON(), nullable=False, default=list
+    )
+    revision: Mapped[int] = mapped_column(nullable=False, default=1)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
 

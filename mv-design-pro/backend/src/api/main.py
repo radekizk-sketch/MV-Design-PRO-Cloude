@@ -10,6 +10,7 @@ from api.cases import router as cases_router
 from api.catalog import router as catalog_router
 from api.design_synth import router as design_synth_router
 from api.snapshots import router as snapshots_router
+from api.study_cases import router as study_cases_router
 
 app = FastAPI(
     title="MV-DESIGN PRO API",
@@ -35,6 +36,7 @@ app.include_router(cases_router)
 app.include_router(catalog_router)
 app.include_router(design_synth_router)
 app.include_router(snapshots_router)
+app.include_router(study_cases_router)
 
 
 @app.get("/")

@@ -123,13 +123,14 @@ Station:
 
 A Case is a calculation scenario that:
 - **CANNOT mutate** the Network Model
-- Stores **ONLY** calculation parameters
+- Stores **ONLY** calculation parameters (configuration)
 - References the Network Model (read-only)
 
 ### 3.2 Case Types
 
 | Case Type | Purpose | Standard |
 |-----------|---------|----------|
+| **StudyCase** | Generic calculation scenario | P10 FULL MAX |
 | **ShortCircuitCase** | Fault current calculations | IEC 60909 |
 | **PowerFlowCase** | Load flow analysis | Newton-Raphson |
 | **ProtectionCase** | Protection coordination | IEC 60255 (prospective) |
@@ -139,12 +140,84 @@ A Case is a calculation scenario that:
 ```
 NetworkModel (MUTABLE by Wizard/SLD)
     │
+    ├── StudyCase (config-only, P10 FULL MAX)
     ├── ShortCircuitCase (READ-ONLY view of model)
     ├── PowerFlowCase (READ-ONLY view of model)
     └── ProtectionCase (READ-ONLY view of model)
 ```
 
 **Invariant:** Multiple Cases can reference the same NetworkModel. No Case can modify the model.
+
+### 3.4 Study Case Lifecycle (P10 FULL MAX)
+
+#### 3.4.1 Active Case Invariant
+
+**BINDING:** Exactly ONE StudyCase can be active per project at any time.
+
+| Operation | Effect |
+|-----------|--------|
+| Activate case A | All other cases deactivated, A becomes active |
+| Create new case | New case is NOT active (unless explicitly set) |
+| Clone case | Cloned case is NOT active |
+| Delete active case | No active case until user selects another |
+
+#### 3.4.2 Result Status Lifecycle
+
+```
+StudyCase.result_status:
+
+NONE ─────────────► FRESH (after successful calculation)
+  │                    │
+  │                    │
+  │                    ▼
+  │               OUTDATED (after model or config change)
+  │                    │
+  └────────────────────┘ (re-calculation)
+```
+
+| Status | Description |
+|--------|-------------|
+| **NONE** | Never computed, no results |
+| **FRESH** | Results computed on current model snapshot |
+| **OUTDATED** | Model or config changed since last computation |
+
+#### 3.4.3 Invalidation Rules (PowerFactory-grade)
+
+| Event | Effect |
+|-------|--------|
+| NetworkModel change | ALL cases marked OUTDATED |
+| Case config change | ONLY that case marked OUTDATED |
+| Successful calculation | Case marked FRESH |
+| Case clone | New case has NONE status (no results copied) |
+
+#### 3.4.4 Clone vs Copy
+
+**Clone** (PowerFactory-style):
+- Configuration is COPIED
+- Results are NOT copied
+- Status = NONE
+- is_active = False
+
+```python
+cloned = source_case.clone(new_name="Case (kopia)")
+# cloned.config == source_case.config (copy)
+# cloned.result_status == NONE
+# cloned.result_refs == () (empty)
+# cloned.is_active == False
+```
+
+#### 3.4.5 Compare Operation
+
+Compare is a **100% read-only** operation:
+- No mutations allowed
+- Shows configuration differences between two cases
+- Available in ALL operating modes
+
+```python
+comparison = compare_study_cases(case_a, case_b)
+# comparison.case_a_name, comparison.case_b_name
+# comparison.config_differences: List[ConfigDifference]
+```
 
 ---
 
