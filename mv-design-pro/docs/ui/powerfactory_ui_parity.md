@@ -1,13 +1,50 @@
 # PowerFactory UI Parity Guidelines
 
-**Reference:** SYSTEM_SPEC.md Section 18, ARCHITECTURE.md Section 14
+**Reference:** SYSTEM_SPEC.md Section 18, ARCHITECTURE.md Section 14, **wizard_screens.md (KANONICZNY)**
 **Status:** CANONICAL
+
+> **UWAGA:** Niniejszy dokument jest spójny z `wizard_screens.md` (wersja 2.0) i nie duplikuje jego treści.
+> Szczegółowe specyfikacje ekranów, formularzy i pól znajdują się w dokumencie kanoncznym Wizard.
 
 ---
 
-## A. Lifecycle obliczeń (Calculation Lifecycle)
+## A. Tryby Pracy (Operating Modes)
 
-### A.1 Explicit Calculate Step
+**Referencja:** wizard_screens.md § 1.2
+
+System operuje w trzech rozłącznych trybach pracy. Przełączanie między trybami jest jawne.
+
+| Tryb | Identyfikator | Stan modelu | Stan przypadku | Stan wyników | Dozwolone akcje |
+|------|---------------|-------------|----------------|--------------|-----------------|
+| **Edycja Modelu** | MODEL_EDIT | MUTOWALNY | N/A | NIEAKTYWNE (UKRYTE) | Dodawanie, edycja, usuwanie elementów |
+| **Konfiguracja Przypadku** | CASE_CONFIG | TYLKO DO ODCZYTU | MUTOWALNY | UKRYTE | Parametryzacja przypadku, obliczenia |
+| **Wyniki** | RESULT_VIEW | TYLKO DO ODCZYTU | TYLKO DO ODCZYTU | WIDOCZNE | Przeglądanie, eksport, porównanie |
+
+### A.1 Blokady i przejścia
+
+| Przejście | Warunek | Efekt uboczny |
+|-----------|---------|---------------|
+| MODEL_EDIT → CASE_CONFIG | Model zwalidowany (brak ERROR) | — |
+| CASE_CONFIG → MODEL_EDIT | Jawna akcja użytkownika | Ostrzeżenie: wyniki mogą stać się OUTDATED |
+| CASE_CONFIG → RESULT_VIEW | Obliczenia zakończone sukcesem | — |
+| RESULT_VIEW → MODEL_EDIT | Jawna akcja użytkownika | Wyniki zachowują stan OUTDATED |
+
+### A.2 Pasek stanu aktywnego przypadku
+
+**Referencja:** wizard_screens.md § 1.3
+
+Pasek stanu przypadku jest ZAWSZE widoczny i pokazuje:
+- Nazwę i typ aktywnego przypadku
+- Stan wyników (NONE / FRESH / OUTDATED)
+- Przyciski: [Zmień przypadek ▼] [Oblicz] [Wyniki]
+
+**REGUŁA BLOKADY:** Brak aktywnego przypadku → przycisk [Oblicz] NIEAKTYWNY.
+
+---
+
+## B. Lifecycle obliczeń (Calculation Lifecycle)
+
+### B.1 Jawny krok obliczeniowy (Explicit Calculate Step)
 
 Calculations MUST be explicitly triggered by the user:
 
@@ -33,7 +70,7 @@ NetworkValidator.validate()
 - User MUST explicitly initiate calculation
 - Invalid model MUST block solver execution (no override)
 
-### A.2 Result Freshness States
+### B.2 Stany świeżości wyników (Result Freshness States)
 
 | State | Description | User Action Required |
 |-------|-------------|---------------------|
@@ -54,7 +91,7 @@ NONE ────────────► FRESH (after successful calculation
                       └──────────────► OUTDATED (stays outdated)
 ```
 
-### A.3 Invalid Model Blocking
+### B.3 Blokada obliczeń przy błędach walidacji
 
 When NetworkValidator reports errors:
 
@@ -66,9 +103,9 @@ When NetworkValidator reports errors:
 
 ---
 
-## B. Semantyka `in_service` (In Service Semantics)
+## C. Semantyka `in_service` (In Service Semantics)
 
-### B.1 Definition
+### C.1 Definicja
 
 The `in_service` flag determines element participation in calculations:
 
@@ -77,7 +114,7 @@ The `in_service` flag determines element participation in calculations:
 | `True` | Element INCLUDED in calculation | Normal display |
 | `False` | Element EXCLUDED from calculation | Grayed out, dashed |
 
-### B.2 Out-of-Service Element Display
+### C.2 Wyświetlanie elementów wyłączonych
 
 Elements with `in_service = False`:
 
@@ -99,7 +136,7 @@ Elements with `in_service = False`:
 - Out-of-service elements MUST be visually distinguished (grayed)
 - Out-of-service elements MUST be excluded from solver input
 
-### B.3 Distinction: `in_service` vs Switch State
+### C.3 Rozróżnienie: `in_service` vs stan łącznika (Switch.state)
 
 | Property | Meaning | Affects Topology |
 |----------|---------|------------------|
@@ -113,9 +150,11 @@ Elements with `in_service = False`:
 
 ---
 
-## C. Property Grid
+## D. Siatka Właściwości (Property Grid)
 
-### C.1 Canonical Field Set
+**Referencja:** wizard_screens.md § 2.4, § 3
+
+### D.1 Kanoniczna struktura pól
 
 Each element type has a canonical, fixed set of fields:
 
@@ -127,9 +166,9 @@ Each element type has a canonical, fixed set of fields:
 | Electrical (from Type) | r_ohm_per_km, x_ohm_per_km | Catalog (read-only) |
 | Status | in_service | User input |
 
-### C.2 Unit Display
+### D.2 Wyświetlanie jednostek
 
-**MANDATORY:** Every numeric field MUST display its unit:
+**OBOWIĄZKOWE:** Każde pole numeryczne MUSI wyświetlać jednostkę:
 
 | Field | Display Format |
 |-------|----------------|
@@ -140,41 +179,59 @@ Each element type has a canonical, fixed set of fields:
 | Voltage | `15.0 kV` |
 | Power | `10.0 MVA` |
 
-### C.3 Field Order Determinism
+### D.3 Deterministyczna kolejność pól
 
-**MANDATORY:** Field display order MUST be deterministic:
+**OBOWIĄZKOWE:** Kolejność wyświetlania pól MUSI być deterministyczna:
 
-1. Identity fields (name, id)
-2. Topology fields (from_bus, to_bus)
-3. Type reference
-4. Electrical parameters (from type, read-only)
-5. Local parameters (user-editable)
-6. Status fields (in_service)
+1. **Identyfikacja** (nazwa, id, UUID)
+2. **Stan** (w eksploatacji, cykl życia)
+3. **Topologia** (szyna początkowa, szyna końcowa)
+4. **Referencja typu** (`type_ref` → Katalog) — **TYLKO DO ODCZYTU**
+5. **Parametry elektryczne z typu** (R', X', Sn, Un z katalogu) — **TYLKO DO ODCZYTU**
+6. **Parametry lokalne** (długość, pozycja zaczepu) — edytowalne
+7. **Wartości obliczeniowe** — **TYLKO DO ODCZYTU**, źródło: wyniki analizy
+8. **Stan walidacji** — komunikaty błędów/ostrzeżeń
+9. **Metadane audytowe** — **TYLKO DO ODCZYTU**
+
+### D.4 Atrybut `type_ref` i parametry typu
+
+**Referencja:** wizard_screens.md § 6.8.6
+
+| Źródło parametru | Edytowalność w Property Grid | Przykład |
+|------------------|------------------------------|----------|
+| `type_ref` → Katalog | TYLKO DO ODCZYTU | Sn, Un, R', X' z typu przewodu |
+| Lokalne (instancja) | Edytowalne | długość, pozycja zaczepu, setpointy P/Q |
+
+**INVARIANT:** Parametry pochodzące z `type_ref` NIE MOGĄ być edytowane w Property Grid pojedynczego elementu — zmiana wymaga edycji typu w Katalogu.
 
 ---
 
-## D. Validation Philosophy
+## E. Filozofia walidacji (Validation Philosophy)
 
-### D.1 Severity Levels
+**Referencja:** wizard_screens.md § 6.10, § 11
+
+### E.1 Poziomy ważności komunikatów
 
 | Severity | Meaning | Solver Impact |
 |----------|---------|---------------|
 | **ERROR** | Critical issue | BLOCKS solver |
 | **WARNING** | Non-critical issue | Solver allowed (with confirmation) |
 
-### D.2 No Auto-Repair
+### E.2 Zakaz automatycznej naprawy (No Auto-Repair)
 
-**FORBIDDEN:**
-- Automatic correction of invalid values
-- Silent defaulting of missing parameters
-- "Smart" fixes without user consent
+**ZABRONIONE:**
+- Automatyczna korekta nieprawidłowych wartości
+- Ciche ustawianie wartości domyślnych dla brakujących parametrów
+- „Inteligentne" poprawki bez zgody użytkownika
 
-**REQUIRED:**
-- Display error message with specific issue
-- User must manually correct the problem
-- Re-validate after correction
+**WYMAGANE:**
+- Wyświetlenie komunikatu błędu z opisem problemu
+- Użytkownik MUSI ręcznie poprawić problem
+- Ponowna walidacja po korekcie
 
-### D.3 Validation Message Format
+**INVARIANT:** System NIGDY nie modyfikuje danych wejściowych użytkownika bez jawnej akcji.
+
+### E.3 Format komunikatów walidacji
 
 ```
 [ERROR] bus.voltage_valid: Bus "Bus_001" voltage must be > 0 (current: 0.0 kV)
@@ -184,9 +241,11 @@ Each element type has a canonical, fixed set of fields:
 
 ---
 
-## E. Determinizm i audyt (Determinism and Audit)
+## F. Determinizm i audyt (Determinism and Audit)
 
-### E.1 Deterministic Computation
+**Referencja:** wizard_screens.md § 1.4
+
+### F.1 Deterministyczne obliczenia
 
 **INVARIANT:** Same input MUST produce same output, always.
 
@@ -198,17 +257,17 @@ If NetworkSnapshot_A == NetworkSnapshot_B
 THEN Result_A == Result_B (identical)
 ```
 
-### E.2 No Randomness
+### F.2 Zakaz losowości
 
-**FORBIDDEN:**
-- Random number generation in solvers
-- Non-deterministic algorithm selection
-- Time-dependent calculation variations
-- Platform-dependent floating-point behavior (where avoidable)
+**ZABRONIONE:**
+- Generowanie liczb losowych w solverach
+- Niedeterministyczny wybór algorytmów
+- Zmienność obliczeń zależna od czasu
+- Zachowanie zmiennoprzecinkowe zależne od platformy (gdzie możliwe do uniknięcia)
 
-### E.3 Audit Trail Requirements
+### F.3 Wymagania śladu audytowego
 
-Every calculation MUST produce:
+Każde obliczenie MUSI wytworzyć:
 
 | Artifact | Content |
 |----------|---------|
@@ -218,9 +277,9 @@ Every calculation MUST produce:
 | Output Results | Final calculated values |
 | Trace | Step-by-step calculation log |
 
-### E.4 Manual Verification
+### F.4 Ręczna weryfikacja
 
-**REQUIRED:** Any calculation step MUST be manually reproducible:
+**WYMAGANE:** Każdy krok obliczeniowy MUSI być możliwy do ręcznego odtworzenia:
 
 ```
 Given: WhiteBoxTrace with intermediate values
@@ -230,4 +289,20 @@ Result: Exact match between manual and solver computation
 
 ---
 
-**END OF POWERFACTORY UI PARITY GUIDELINES**
+## G. Integracja z SLD
+
+**Referencja:** sld_rules.md, wizard_screens.md § 2.3
+
+Schemat jednokreskowy (SLD) jest zintegrowany z systemem trybów pracy:
+
+| Tryb systemowy | Tryb SLD | Dozwolone akcje na SLD |
+|----------------|----------|------------------------|
+| MODEL_EDIT | Tryb edycji | Dodawanie, usuwanie, przeciąganie symboli |
+| CASE_CONFIG | Tryb edycji (read-only model) | Brak edycji topologii |
+| RESULT_VIEW | Tryb wyników | Tylko przeglądanie, nakładki wyników WIDOCZNE |
+
+**BINDING:** Wyniki są wyświetlane jako **overlay** z warstwy Analysis — NIE modyfikują symboli SLD ani NetworkModel.
+
+---
+
+**KONIEC WYTYCZNYCH POWERFACTORY UI PARITY**
