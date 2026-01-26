@@ -155,7 +155,14 @@ export function getLineBranchFieldDefinitions(): PropertySection[] {
       id: 'type_reference',
       label: SECTION_LABELS.type_reference,
       fields: [
-        { key: 'type_ref', label: 'Typ przewodu (katalog)', value: null, type: 'ref', editable: false, source: 'type' },
+        {
+          key: 'type_ref',
+          label: 'Typ przewodu (katalog)',
+          value: null,
+          type: 'type_ref_with_actions',
+          editable: true, // Buttons available in MODEL_EDIT
+          source: 'type',
+        },
       ],
     },
     {
@@ -236,7 +243,14 @@ export function getTransformerBranchFieldDefinitions(): PropertySection[] {
       id: 'type_reference',
       label: SECTION_LABELS.type_reference,
       fields: [
-        { key: 'type_ref', label: 'Typ transformatora (katalog)', value: null, type: 'ref', editable: false, source: 'type' },
+        {
+          key: 'type_ref',
+          label: 'Typ transformatora (katalog)',
+          value: null,
+          type: 'type_ref_with_actions',
+          editable: true, // Buttons available in MODEL_EDIT
+          source: 'type',
+        },
       ],
     },
     {
@@ -314,6 +328,20 @@ export function getSwitchFieldDefinitions(): PropertySection[] {
       fields: [
         { key: 'from_node_id', label: 'Szyna', value: '', type: 'ref', refType: 'Bus', editable: true, source: 'instance' },
         { key: 'to_node_id', label: 'Szyna końcowa', value: '', type: 'ref', refType: 'Bus', editable: true, source: 'instance' },
+      ],
+    },
+    {
+      id: 'type_reference',
+      label: SECTION_LABELS.type_reference,
+      fields: [
+        {
+          key: 'equipment_type_ref',
+          label: 'Typ aparatu (katalog)',
+          value: null,
+          type: 'type_ref_with_actions',
+          editable: true, // Buttons available in MODEL_EDIT
+          source: 'type',
+        },
       ],
     },
     {

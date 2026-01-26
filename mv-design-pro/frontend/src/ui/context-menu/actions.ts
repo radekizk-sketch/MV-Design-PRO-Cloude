@@ -15,9 +15,10 @@ import type { ContextMenuAction, ElementType, OperatingMode, SwitchState } from 
  * Build context menu actions for an element.
  *
  * Rules:
- * - MODEL_EDIT: Full menu (add, edit, delete, toggle state)
+ * - MODEL_EDIT: Full menu (add, edit, delete, toggle state, type assignment)
  * - CASE_CONFIG: Properties only (read-only), no topology changes
  * - RESULT_VIEW: View-only menu (properties RO, results detail, export)
+ * - P8.2: Type Library actions (Assign/Clear Type) only in MODEL_EDIT
  */
 export function buildContextMenuActions(
   elementType: ElementType,
@@ -27,9 +28,12 @@ export function buildContextMenuActions(
   options: {
     inService?: boolean;
     switchState?: SwitchState;
+    hasTypeRef?: boolean;
     onOpenProperties?: () => void;
     onToggleInService?: () => void;
     onToggleSwitchState?: () => void;
+    onAssignType?: () => void;
+    onClearType?: () => void;
     onDelete?: () => void;
     onShowInTree?: () => void;
     onShowOnDiagram?: () => void;
@@ -40,9 +44,12 @@ export function buildContextMenuActions(
   const {
     inService = true,
     switchState,
+    hasTypeRef = false,
     onOpenProperties,
     onToggleInService,
     onToggleSwitchState,
+    onAssignType,
+    onClearType,
     onDelete,
     onShowInTree,
     onShowOnDiagram,
@@ -55,6 +62,12 @@ export function buildContextMenuActions(
   const isCaseConfig = mode === 'CASE_CONFIG';
 
   const actions: ContextMenuAction[] = [];
+
+  // Check if element supports type_ref (P8.2)
+  const supportsTypeRef =
+    elementType === 'LineBranch' ||
+    elementType === 'TransformerBranch' ||
+    elementType === 'Switch';
 
   // Properties action (always available)
   actions.push({
@@ -88,6 +101,32 @@ export function buildContextMenuActions(
     visible: true,
     handler: onToggleInService,
   });
+
+  // Type Library actions (P8.2) - MODEL_EDIT only
+  if (supportsTypeRef && isModelEdit) {
+    actions.push({ id: 'sep_type', label: '', enabled: false, visible: true, separator: true });
+
+    // Assign or change type
+    const assignLabel = hasTypeRef ? 'Zmień typ...' : 'Przypisz typ...';
+    actions.push({
+      id: 'assign_type',
+      label: assignLabel,
+      enabled: true,
+      visible: true,
+      handler: onAssignType,
+    });
+
+    // Clear type (only if type_ref exists)
+    if (hasTypeRef) {
+      actions.push({
+        id: 'clear_type',
+        label: 'Wyczyść typ',
+        enabled: true,
+        visible: true,
+        handler: onClearType,
+      });
+    }
+  }
 
   // Separator
   actions.push({ id: 'sep2', label: '', enabled: false, visible: true, separator: true });

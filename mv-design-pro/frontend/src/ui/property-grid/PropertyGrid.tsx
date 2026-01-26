@@ -26,6 +26,9 @@ interface PropertyGridProps {
   elementData?: Record<string, unknown>;
   validationMessages?: ValidationMessage[];
   onFieldChange?: (fieldKey: string, value: unknown) => void;
+  // P8.2 HOTFIX: Type Library callbacks
+  onAssignType?: () => void;
+  onClearType?: () => void;
 }
 
 /**
@@ -41,6 +44,8 @@ export function PropertyGrid({
   elementData = {},
   validationMessages = [],
   onFieldChange,
+  onAssignType,
+  onClearType,
 }: PropertyGridProps) {
   const mode = useSelectionStore((state) => state.mode);
   const canEdit = useCanEdit();
@@ -50,13 +55,28 @@ export function PropertyGrid({
   const sections = getFieldDefinitions(elementType);
 
   // Merge element data into field definitions
+  // P8.2 HOTFIX: Wire type_ref_with_actions callbacks
   const populatedSections = sections.map((section) => ({
     ...section,
-    fields: section.fields.map((field) => ({
-      ...field,
-      value: elementData[field.key] ?? field.value,
-      validation: validationMessages.find((v) => v.field === field.key),
-    })),
+    fields: section.fields.map((field) => {
+      const baseField = {
+        ...field,
+        value: elementData[field.key] ?? field.value,
+        validation: validationMessages.find((v) => v.field === field.key),
+      };
+
+      // Wire type library callbacks for type_ref_with_actions fields
+      if (field.type === 'type_ref_with_actions') {
+        return {
+          ...baseField,
+          onAssignType,
+          onClearType,
+          typeRefName: elementData[`${field.key}_name`] as string | null | undefined,
+        };
+      }
+
+      return baseField;
+    }),
   }));
 
   // Toggle section collapse
@@ -274,6 +294,76 @@ function PropertyFieldRow({
     return String(value);
   };
 
+  // Special rendering for type_ref_with_actions (P8.2)
+  if (field.type === 'type_ref_with_actions') {
+    const hasTypeRef = field.value !== null && field.value !== undefined && field.value !== '';
+    const canModifyType = canEdit && mode === 'MODEL_EDIT';
+
+    return (
+      <div
+        className={clsx(
+          'py-2',
+          field.validation?.severity === 'ERROR' && 'bg-red-50 -mx-2 px-2 rounded',
+          field.validation?.severity === 'WARNING' && 'bg-yellow-50 -mx-2 px-2 rounded'
+        )}
+      >
+        {/* Label */}
+        <div className="mb-1">
+          <span className="text-xs text-gray-600">{field.label}</span>
+        </div>
+
+        {/* Type Display */}
+        <div className="text-xs mb-2">
+          {hasTypeRef ? (
+            <>
+              <div className="font-medium text-gray-900">
+                {field.typeRefName ?? String(field.value)}
+              </div>
+              <div className="text-xs text-gray-500 font-mono mt-0.5">
+                ID: {String(field.value)}
+              </div>
+            </>
+          ) : (
+            <span className="text-gray-400 italic">Nie przypisano typu z katalogu</span>
+          )}
+        </div>
+
+        {/* Action Buttons */}
+        {canModifyType && (
+          <div className="flex gap-2">
+            <button
+              onClick={field.onAssignType}
+              className="px-3 py-1 text-xs bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors"
+            >
+              {hasTypeRef ? 'Zmień typ...' : 'Przypisz typ...'}
+            </button>
+            {hasTypeRef && (
+              <button
+                onClick={field.onClearType}
+                className="px-3 py-1 text-xs bg-gray-200 text-gray-700 rounded hover:bg-gray-300 transition-colors"
+              >
+                Wyczyść
+              </button>
+            )}
+          </div>
+        )}
+
+        {/* Validation Message */}
+        {field.validation && (
+          <div
+            className={clsx(
+              'text-xs mt-1',
+              field.validation.severity === 'ERROR' ? 'text-red-600' : 'text-yellow-600'
+            )}
+          >
+            {field.validation.message}
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // Standard field rendering
   return (
     <div
       className={clsx(

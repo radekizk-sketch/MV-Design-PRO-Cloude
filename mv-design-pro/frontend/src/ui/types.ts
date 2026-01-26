@@ -81,11 +81,16 @@ export interface PropertyField {
   value: unknown;
   unit?: string;
   editable: boolean;
-  type: 'string' | 'number' | 'boolean' | 'enum' | 'ref';
+  type: 'string' | 'number' | 'boolean' | 'enum' | 'ref' | 'type_ref_with_actions';
   enumOptions?: string[];
   refType?: ElementType;
   validation?: ValidationMessage;
   source?: 'instance' | 'type' | 'calculated' | 'audit';
+
+  // P8.2: Type reference actions (for type_ref_with_actions type)
+  onAssignType?: () => void;
+  onClearType?: () => void;
+  typeRefName?: string | null; // Resolved type name for display
 }
 
 /**

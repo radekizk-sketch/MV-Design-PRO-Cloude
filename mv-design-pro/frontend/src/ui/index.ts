@@ -40,3 +40,27 @@ export {
   buildNetworkModelContextMenu,
   getContextMenuHeader,
 } from './context-menu';
+
+// Type Catalog (P8.2)
+export {
+  TypePicker,
+  fetchLineTypes,
+  fetchCableTypes,
+  fetchTransformerTypes,
+  fetchSwitchEquipmentTypes,
+  fetchTypesByCategory,
+  assignTypeToBranch,
+  assignTypeToTransformer,
+  assignEquipmentTypeToSwitch,
+  clearTypeFromBranch,
+  clearTypeFromTransformer,
+  clearEquipmentTypeFromSwitch,
+} from './catalog';
+export type {
+  LineType,
+  CableType,
+  TransformerType,
+  SwitchEquipmentType,
+  TypeCategory,
+  TypeReference,
+} from './catalog';

@@ -548,6 +548,44 @@ class NetworkWizardService:
                 project_id, switch_id, type_id, commit=False
             )
 
+    def clear_type_ref_from_branch(self, project_id: UUID, branch_id: UUID) -> dict:
+        """Clear type_ref from branch (set to None) - P8.2 HOTFIX"""
+        with self._uow_factory() as uow:
+            self._ensure_project(uow, project_id)
+            branch = uow.network.get_branch(branch_id)
+            if branch is None or branch["project_id"] != project_id:
+                raise NotFound(f"Branch {branch_id} not found")
+            params = dict(branch.get("params") or {})
+            params["type_ref"] = None
+            params.pop("type_id", None)
+            updated = uow.network.update_branch(branch_id, {"params": params}, commit=False)
+            self._invalidate_results(uow, project_id)
+        if updated is None:
+            raise NotFound(f"Branch {branch_id} not found")
+        return updated
+
+    def clear_type_ref_from_transformer(self, project_id: UUID, transformer_id: UUID) -> dict:
+        """Clear type_ref from transformer (set to None) - P8.2 HOTFIX"""
+        with self._uow_factory() as uow:
+            self._ensure_project(uow, project_id)
+            branch = uow.network.get_branch(transformer_id)
+            if branch is None or branch["project_id"] != project_id:
+                raise NotFound(f"Transformer {transformer_id} not found")
+            params = dict(branch.get("params") or {})
+            params["type_ref"] = None
+            params.pop("type_id", None)
+            updated = uow.network.update_branch(transformer_id, {"params": params}, commit=False)
+            self._invalidate_results(uow, project_id)
+        if updated is None:
+            raise NotFound(f"Transformer {transformer_id} not found")
+        return updated
+
+    def clear_equipment_type_from_switch(self, project_id: UUID, switch_id: UUID) -> None:
+        """Clear equipment_type from switch - P8.2 HOTFIX"""
+        with self._uow_factory() as uow:
+            self._ensure_project(uow, project_id)
+            uow.wizard.clear_switch_equipment_type(project_id, switch_id, commit=False)
+
     def set_case_switching(
         self,
         case_id: UUID,

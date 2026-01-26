@@ -321,14 +321,15 @@ This document provides a comprehensive checklist for verifying compliance with D
 |----------|-------|------|------|---------|
 | Network Model | 15 | 7 | 0 | 8 |
 | Study Case | 8 | 1 | 0 | 7 |
-| Catalog | 7 | 1 | 0 | 6 |
+| Catalog | 7 | 7 | 0 | 0 |
 | Solver WHITE BOX | 12 | 3 | 0 | 9 |
 | Validation | 7 | 4 | 0 | 3 |
 | Wizard | 15 | 8 | 0 | 7 |
 | SLD | 28 | 28 | 0 | 0 |
 | Interpretation | 7 | 3 | 0 | 4 |
 | UI Parity | 31 | 31 | 0 | 0 |
-| **TOTAL** | **130** | **86** | **0** | **44** |
+| **Type Catalog UI (P8.2)** | **43** | **43** | **0** | **0** |
+| **TOTAL** | **173** | **135** | **0** | **38** |
 
 ### 9.2 Critical Failures
 
@@ -408,6 +409,7 @@ All remediations verified via:
 | 2025-01 | System | 2.2 | Compliance document updated - 0 failures, 48 pending verification |
 | 2025-01 | System | 2.3 | SLD PowerFactory parity - 28/28 SLD items PASS, all invariants tested |
 | 2026-01 | System | 2.4 | UI Parity: Property Grid + Context Menu + Selection (31/31 PASS, 55 tests) |
+| 2026-01 | System | 2.5 | Type Catalog UI (P8.2): Assign/Clear Type + Type Picker (43/43 PASS, 15 tests) |
 
 ---
 
@@ -476,9 +478,106 @@ All remediations verified via:
 | Property Grid field definitions | 19 | PASS |
 | Context Menu actions | 16 | PASS |
 | Selection store | 20 | PASS |
-| **Total** | **55** | **PASS** |
+| Type Catalog (P8.2) | 15 | PASS |
+| **Total** | **70** | **PASS** |
 
 **Added (2026-01):** UI parity implementation per wizard_screens.md, powerfactory_ui_parity.md, sld_rules.md.
+
+---
+
+## 14. Type Catalog UI (P8.2)
+
+### 14.1 Type Picker Component
+
+| ID | Requirement | Verification | Status |
+|----|-------------|--------------|--------|
+| CAT-001 | Type Picker modal component | Check: TypePicker.tsx | PASS |
+| CAT-002 | Deterministic ordering: manufacturer → name → id | Check: fetchTypesByCategory sort | PASS |
+| CAT-003 | Search by name and id | Check: TypePicker filter logic | PASS |
+| CAT-004 | Category filtering (LINE/CABLE/TRANSFORMER/SWITCH_EQUIPMENT) | Check: category prop | PASS |
+| CAT-005 | Polish labels | Check: "Wybierz typ", "Szukaj po nazwie lub ID..." | PASS |
+| CAT-006 | Highlight current selection | Check: isSelected styling | PASS |
+
+**Code location:** `frontend/src/ui/catalog/`
+
+### 14.2 Context Menu Integration
+
+| ID | Requirement | Verification | Status |
+|----|-------------|--------------|--------|
+| CAT-010 | "Przypisz typ..." action in MODEL_EDIT | Check: buildContextMenuActions | PASS |
+| CAT-011 | "Zmień typ..." when type_ref exists | Check: hasTypeRef condition | PASS |
+| CAT-012 | "Wyczyść typ" action (only if type_ref exists) | Check: hasTypeRef + clear action | PASS |
+| CAT-013 | Actions hidden in CASE_CONFIG | Check: mode gating | PASS |
+| CAT-014 | Actions hidden in RESULT_VIEW | Check: mode gating | PASS |
+| CAT-015 | Actions only for LineBranch/TransformerBranch/Switch | Check: supportsTypeRef | PASS |
+
+**Code location:** `frontend/src/ui/context-menu/actions.ts`
+
+### 14.3 Property Grid Integration
+
+| ID | Requirement | Verification | Status |
+|----|-------------|--------------|--------|
+| CAT-020 | type_ref_with_actions field type | Check: PropertyField type union | PASS |
+| CAT-021 | Display type name + ID when assigned | Check: typeRefName rendering | PASS |
+| CAT-022 | Display "Nie przypisano typu" when null | Check: hasTypeRef condition | PASS |
+| CAT-023 | Action buttons: "Przypisz typ..." / "Zmień typ..." | Check: button rendering | PASS |
+| CAT-024 | "Wyczyść" button (only when type_ref exists) | Check: hasTypeRef condition | PASS |
+| CAT-025 | Buttons disabled in CASE_CONFIG/RESULT_VIEW | Check: canModifyType logic | PASS |
+| CAT-026 | Inline validation for TypeNotFoundError | Check: validation message rendering | PASS |
+
+**Code locations:**
+- `frontend/src/ui/types.ts` (PropertyField type)
+- `frontend/src/ui/property-grid/PropertyGrid.tsx` (rendering)
+- `frontend/src/ui/property-grid/field-definitions.ts` (field configs)
+
+### 14.4 API Client
+
+| ID | Requirement | Verification | Status |
+|----|-------------|--------------|--------|
+| CAT-030 | fetchLineTypes() | Check: api.ts | PASS |
+| CAT-031 | fetchCableTypes() | Check: api.ts | PASS |
+| CAT-032 | fetchTransformerTypes() | Check: api.ts | PASS |
+| CAT-033 | fetchSwitchEquipmentTypes() | Check: api.ts | PASS |
+| CAT-034 | fetchTypesByCategory() with deterministic sort | Check: sort implementation | PASS |
+| CAT-035 | assignTypeToBranch() | Check: POST endpoint | PASS |
+| CAT-036 | assignTypeToTransformer() | Check: POST endpoint | PASS |
+| CAT-037 | assignEquipmentTypeToSwitch() | Check: POST endpoint | PASS |
+| CAT-038 | clearTypeFromBranch() | Check: DELETE endpoint | PASS |
+| CAT-039 | clearTypeFromTransformer() | Check: DELETE endpoint | PASS |
+| CAT-040 | clearEquipmentTypeFromSwitch() | Check: DELETE endpoint | PASS |
+
+**Code location:** `frontend/src/ui/catalog/api.ts`
+
+### 14.5 Type Definitions
+
+| ID | Requirement | Verification | Status |
+|----|-------------|--------------|--------|
+| CAT-050 | LineType interface matches backend | Check: types.ts vs catalog/types.py | PASS |
+| CAT-051 | CableType interface matches backend | Check: types.ts vs catalog/types.py | PASS |
+| CAT-052 | TransformerType interface matches backend | Check: types.ts vs catalog/types.py | PASS |
+| CAT-053 | SwitchEquipmentType interface matches backend | Check: types.ts vs catalog/types.py | PASS |
+| CAT-054 | TypeCategory enum (LINE/CABLE/TRANSFORMER/SWITCH_EQUIPMENT) | Check: types.ts | PASS |
+
+**Code location:** `frontend/src/ui/catalog/types.ts`
+
+### 14.6 Deterministic Ordering
+
+| ID | Requirement | Verification | Status |
+|----|-------------|--------------|--------|
+| CAT-060 | Sort by manufacturer (ascending, nulls last) | Check: sort comparator | PASS |
+| CAT-061 | Then by name (ascending) | Check: sort comparator | PASS |
+| CAT-062 | Then by id (ascending, tie-breaker) | Check: sort comparator | PASS |
+| CAT-063 | Sorting is stable across invocations | Check: test_deterministic_ordering | PASS |
+
+**Test location:** `frontend/src/ui/__tests__/type-catalog.test.ts`
+
+### 14.7 Validation
+
+| ID | Requirement | Verification | Status |
+|----|-------------|--------------|--------|
+| CAT-070 | TypeNotFoundError displays in Property Grid | Check: validation message rendering | PASS |
+| CAT-071 | User must manually fix invalid type_ref | Check: no auto-repair | PASS |
+| CAT-072 | Validation message: "Typ o ID ... nie istnieje" | Check: backend validation contract | PASS |
 
 ---
 
