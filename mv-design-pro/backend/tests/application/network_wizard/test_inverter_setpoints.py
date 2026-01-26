@@ -40,7 +40,7 @@ def _build_inverter_network(
             name="INV",
             node_type="PQ",
             base_kv=15.0,
-            attrs={},
+            attrs={"active_power_mw": 0.0, "reactive_power_mvar": 0.0},
         ),
     )
     service.add_branch(
@@ -54,6 +54,15 @@ def _build_inverter_network(
         ),
     )
     service.set_pcc(project_id, slack["id"])
+    service.add_source(
+        project_id,
+        SourcePayload(
+            name="Grid",
+            node_id=slack["id"],
+            source_type="GRID",
+            payload={"name": "Grid", "grid_supply": True, "u_pu": 1.0},
+        ),
+    )
     return slack, inverter_node
 
 
