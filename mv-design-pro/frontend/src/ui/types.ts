@@ -187,6 +187,7 @@ export interface TreeNode {
 
 /**
  * Data Manager column definition.
+ * P9.2: Extended with editability metadata for inline editing.
  */
 export interface DataManagerColumn {
   key: string;
@@ -195,6 +196,11 @@ export interface DataManagerColumn {
   unit?: string;
   sortable: boolean;
   width?: number;
+  // P9.2: Inline editing metadata
+  editable?: boolean; // Can be edited inline (only in MODEL_EDIT, only instance fields)
+  source?: 'instance' | 'type' | 'calculated'; // Source of the value
+  enumOptions?: string[]; // For enum type fields
+  validation?: (value: unknown) => string | null; // Inline validation function
 }
 
 /**
@@ -253,12 +259,14 @@ export interface DataManagerRow {
 
 /**
  * Batch edit operation type.
+ * P9.2: Extended with SET_PARAMETER for generic parameter editing.
  */
 export type BatchEditOperation =
   | { type: 'SET_IN_SERVICE'; value: boolean }
   | { type: 'ASSIGN_TYPE'; typeId: string }
   | { type: 'CLEAR_TYPE' }
-  | { type: 'SET_SWITCH_STATE'; state: SwitchState };
+  | { type: 'SET_SWITCH_STATE'; state: SwitchState }
+  | { type: 'SET_PARAMETER'; field: string; value: unknown }; // P9.2: Generic parameter edit
 
 /**
  * Batch edit result.
@@ -267,4 +275,51 @@ export interface BatchEditResult {
   success: boolean;
   affectedCount: number;
   errors: Array<{ elementId: string; message: string }>;
+}
+
+// ============================================================================
+// P9.2: Inline Editing Types
+// ============================================================================
+
+/**
+ * Inline edit state (tracks currently edited cell).
+ */
+export interface InlineEditState {
+  rowId: string;
+  columnKey: string;
+  value: unknown;
+}
+
+/**
+ * Inline edit validation result.
+ */
+export interface InlineEditValidation {
+  valid: boolean;
+  error?: string;
+}
+
+// ============================================================================
+// P9.2: Batch Edit Diff Preview Types
+// ============================================================================
+
+/**
+ * Single change in batch edit preview.
+ */
+export interface BatchEditChange {
+  elementId: string;
+  elementName: string;
+  field: string;
+  fieldLabel: string;
+  oldValue: unknown;
+  newValue: unknown;
+  validation: InlineEditValidation;
+}
+
+/**
+ * Batch edit preview (shown before applying changes).
+ */
+export interface BatchEditPreview {
+  operation: BatchEditOperation;
+  changes: BatchEditChange[];
+  hasErrors: boolean;
 }

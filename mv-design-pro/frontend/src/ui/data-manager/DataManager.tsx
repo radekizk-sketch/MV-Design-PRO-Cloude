@@ -27,6 +27,8 @@ import type {
   BatchEditOperation,
   SwitchState,
   ColumnViewPreset,
+  InlineEditState,
+  BatchEditPreview,
 } from '../types';
 import { COLUMN_VIEW_PRESET_LABELS } from '../types';
 import { useSelectionStore } from '../selection/store';
@@ -37,6 +39,7 @@ import {
   useDataManagerFilter,
   useDataManagerSearchQuery,
 } from './store';
+import { BatchEditPreviewDialog } from './BatchEditPreviewDialog';
 
 // ============================================================================
 // Column Definitions (Deterministic Ordering)
@@ -44,60 +47,61 @@ import {
 
 /**
  * P9.1: Column definitions per preset and element type.
+ * P9.2: Extended with editability metadata for inline editing.
  * Full column definitions (can be filtered per preset).
  */
 const COLUMNS_BY_TYPE: Record<string, DataManagerColumn[]> = {
   Bus: [
-    { key: 'id', label: 'ID', type: 'string', sortable: true, width: 120 },
-    { key: 'name', label: 'Nazwa', type: 'string', sortable: true, width: 180 },
-    { key: 'inService', label: 'W eksploatacji', type: 'boolean', sortable: true, width: 100 },
-    { key: 'voltage_kv', label: 'Napięcie', type: 'number', unit: 'kV', sortable: true, width: 100 },
-    { key: 'bus_type', label: 'Typ szyny', type: 'enum', sortable: true, width: 100 },
+    { key: 'id', label: 'ID', type: 'string', sortable: true, width: 120, editable: false, source: 'instance' },
+    { key: 'name', label: 'Nazwa', type: 'string', sortable: true, width: 180, editable: true, source: 'instance' },
+    { key: 'inService', label: 'W eksploatacji', type: 'boolean', sortable: true, width: 100, editable: false, source: 'instance' }, // Editable via quick action
+    { key: 'voltage_kv', label: 'Napięcie', type: 'number', unit: 'kV', sortable: true, width: 100, editable: true, source: 'instance', validation: (v) => (typeof v === 'number' && v > 0 && v <= 500 ? null : 'Napięcie musi być > 0 i ≤ 500 kV') },
+    { key: 'bus_type', label: 'Typ szyny', type: 'enum', sortable: true, width: 100, editable: true, source: 'instance', enumOptions: ['ZBIORCZA', 'SEKCYJNA', 'ODCZEPOWA'] },
   ],
   LineBranch: [
-    { key: 'id', label: 'ID', type: 'string', sortable: true, width: 120 },
-    { key: 'name', label: 'Nazwa', type: 'string', sortable: true, width: 180 },
-    { key: 'inService', label: 'W eksploatacji', type: 'boolean', sortable: true, width: 100 },
-    { key: 'typeRefName', label: 'Typ', type: 'ref', sortable: true, width: 150 },
-    { key: 'length_km', label: 'Długość', type: 'number', unit: 'km', sortable: true, width: 100 },
-    { key: 'from_bus', label: 'Z szyny', type: 'ref', sortable: true, width: 120 },
-    { key: 'to_bus', label: 'Do szyny', type: 'ref', sortable: true, width: 120 },
+    { key: 'id', label: 'ID', type: 'string', sortable: true, width: 120, editable: false, source: 'instance' },
+    { key: 'name', label: 'Nazwa', type: 'string', sortable: true, width: 180, editable: true, source: 'instance' },
+    { key: 'inService', label: 'W eksploatacji', type: 'boolean', sortable: true, width: 100, editable: false, source: 'instance' }, // Editable via quick action
+    { key: 'typeRefName', label: 'Typ', type: 'ref', sortable: true, width: 150, editable: false, source: 'type' }, // Read-only (type reference)
+    { key: 'length_km', label: 'Długość', type: 'number', unit: 'km', sortable: true, width: 100, editable: true, source: 'instance', validation: (v) => (typeof v === 'number' && v > 0 && v <= 100 ? null : 'Długość musi być > 0 i ≤ 100 km') },
+    { key: 'from_bus', label: 'Z szyny', type: 'ref', sortable: true, width: 120, editable: false, source: 'instance' }, // Topology - not inline editable
+    { key: 'to_bus', label: 'Do szyny', type: 'ref', sortable: true, width: 120, editable: false, source: 'instance' }, // Topology - not inline editable
   ],
   TransformerBranch: [
-    { key: 'id', label: 'ID', type: 'string', sortable: true, width: 120 },
-    { key: 'name', label: 'Nazwa', type: 'string', sortable: true, width: 180 },
-    { key: 'inService', label: 'W eksploatacji', type: 'boolean', sortable: true, width: 100 },
-    { key: 'typeRefName', label: 'Typ', type: 'ref', sortable: true, width: 150 },
-    { key: 'rated_power_mva', label: 'Moc znam.', type: 'number', unit: 'MVA', sortable: true, width: 100 },
-    { key: 'tap_position', label: 'Poz. zaczep.', type: 'number', sortable: true, width: 80 },
-    { key: 'from_bus', label: 'SG', type: 'ref', sortable: true, width: 120 },
-    { key: 'to_bus', label: 'DN', type: 'ref', sortable: true, width: 120 },
+    { key: 'id', label: 'ID', type: 'string', sortable: true, width: 120, editable: false, source: 'instance' },
+    { key: 'name', label: 'Nazwa', type: 'string', sortable: true, width: 180, editable: true, source: 'instance' },
+    { key: 'inService', label: 'W eksploatacji', type: 'boolean', sortable: true, width: 100, editable: false, source: 'instance' }, // Editable via quick action
+    { key: 'typeRefName', label: 'Typ', type: 'ref', sortable: true, width: 150, editable: false, source: 'type' }, // Read-only (type reference)
+    { key: 'rated_power_mva', label: 'Moc znam.', type: 'number', unit: 'MVA', sortable: true, width: 100, editable: false, source: 'type' }, // From type catalog
+    { key: 'tap_position', label: 'Poz. zaczep.', type: 'number', sortable: true, width: 80, editable: true, source: 'instance', validation: (v) => (typeof v === 'number' && v >= -10 && v <= 10 ? null : 'Pozycja zaczepu musi być w zakresie -10..10') },
+    { key: 'from_bus', label: 'SG', type: 'ref', sortable: true, width: 120, editable: false, source: 'instance' }, // Topology - not inline editable
+    { key: 'to_bus', label: 'DN', type: 'ref', sortable: true, width: 120, editable: false, source: 'instance' }, // Topology - not inline editable
   ],
   Switch: [
-    { key: 'id', label: 'ID', type: 'string', sortable: true, width: 120 },
-    { key: 'name', label: 'Nazwa', type: 'string', sortable: true, width: 180 },
-    { key: 'inService', label: 'W eksploatacji', type: 'boolean', sortable: true, width: 100 },
-    { key: 'switchState', label: 'Stan', type: 'enum', sortable: true, width: 80 },
-    { key: 'switch_type', label: 'Rodzaj', type: 'enum', sortable: true, width: 120 },
-    { key: 'typeRefName', label: 'Typ urządzenia', type: 'ref', sortable: true, width: 150 },
-    { key: 'from_bus', label: 'Z szyny', type: 'ref', sortable: true, width: 120 },
-    { key: 'to_bus', label: 'Do szyny', type: 'ref', sortable: true, width: 120 },
+    { key: 'id', label: 'ID', type: 'string', sortable: true, width: 120, editable: false, source: 'instance' },
+    { key: 'name', label: 'Nazwa', type: 'string', sortable: true, width: 180, editable: true, source: 'instance' },
+    { key: 'inService', label: 'W eksploatacji', type: 'boolean', sortable: true, width: 100, editable: false, source: 'instance' }, // Editable via quick action
+    { key: 'switchState', label: 'Stan', type: 'enum', sortable: true, width: 80, editable: false, source: 'instance' }, // Editable via quick action
+    { key: 'switch_type', label: 'Rodzaj', type: 'enum', sortable: true, width: 120, editable: false, source: 'instance' }, // Fixed for switch type
+    { key: 'typeRefName', label: 'Typ urządzenia', type: 'ref', sortable: true, width: 150, editable: false, source: 'type' }, // Read-only (type reference)
+    { key: 'from_bus', label: 'Z szyny', type: 'ref', sortable: true, width: 120, editable: false, source: 'instance' }, // Topology - not inline editable
+    { key: 'to_bus', label: 'Do szyny', type: 'ref', sortable: true, width: 120, editable: false, source: 'instance' }, // Topology - not inline editable
   ],
   Source: [
-    { key: 'id', label: 'ID', type: 'string', sortable: true, width: 120 },
-    { key: 'name', label: 'Nazwa', type: 'string', sortable: true, width: 180 },
-    { key: 'inService', label: 'W eksploatacji', type: 'boolean', sortable: true, width: 100 },
-    { key: 'source_type', label: 'Rodzaj źródła', type: 'enum', sortable: true, width: 120 },
-    { key: 'sk_mva', label: 'Sk"', type: 'number', unit: 'MVA', sortable: true, width: 100 },
-    { key: 'bus_id', label: 'Szyna', type: 'ref', sortable: true, width: 120 },
+    { key: 'id', label: 'ID', type: 'string', sortable: true, width: 120, editable: false, source: 'instance' },
+    { key: 'name', label: 'Nazwa', type: 'string', sortable: true, width: 180, editable: true, source: 'instance' },
+    { key: 'inService', label: 'W eksploatacji', type: 'boolean', sortable: true, width: 100, editable: false, source: 'instance' }, // Editable via quick action
+    { key: 'source_type', label: 'Rodzaj źródła', type: 'enum', sortable: true, width: 120, editable: false, source: 'instance' }, // Fixed for source
+    { key: 'sk_mva', label: 'Sk"', type: 'number', unit: 'MVA', sortable: true, width: 100, editable: true, source: 'instance', validation: (v) => (typeof v === 'number' && v > 0 && v <= 50000 ? null : 'Sk" musi być > 0 i ≤ 50000 MVA') },
+    { key: 'bus_id', label: 'Szyna', type: 'ref', sortable: true, width: 120, editable: false, source: 'instance' }, // Topology - not inline editable
   ],
   Load: [
-    { key: 'id', label: 'ID', type: 'string', sortable: true, width: 120 },
-    { key: 'name', label: 'Nazwa', type: 'string', sortable: true, width: 180 },
-    { key: 'inService', label: 'W eksploatacji', type: 'boolean', sortable: true, width: 100 },
-    { key: 'p_mw', label: 'P', type: 'number', unit: 'MW', sortable: true, width: 80 },
-    { key: 'q_mvar', label: 'Q', type: 'number', unit: 'Mvar', sortable: true, width: 80 },
-    { key: 'bus_id', label: 'Szyna', type: 'ref', sortable: true, width: 120 },
+    { key: 'id', label: 'ID', type: 'string', sortable: true, width: 120, editable: false, source: 'instance' },
+    { key: 'name', label: 'Nazwa', type: 'string', sortable: true, width: 180, editable: true, source: 'instance' },
+    { key: 'inService', label: 'W eksploatacji', type: 'boolean', sortable: true, width: 100, editable: false, source: 'instance' }, // Editable via quick action
+    { key: 'p_mw', label: 'P', type: 'number', unit: 'MW', sortable: true, width: 80, editable: true, source: 'instance', validation: (v) => (typeof v === 'number' && v >= 0 && v <= 1000 ? null : 'P musi być ≥ 0 i ≤ 1000 MW') },
+    { key: 'q_mvar', label: 'Q', type: 'number', unit: 'Mvar', sortable: true, width: 80, editable: true, source: 'instance', validation: (v) => (typeof v === 'number' && v >= -1000 && v <= 1000 ? null : 'Q musi być w zakresie -1000..1000 Mvar') },
+    { key: 'bus_id', label: 'Szyna', type: 'ref', sortable: true, width: 120, editable: false, source: 'instance' }, // Topology - not inline editable
   ],
 };
 
@@ -152,6 +156,8 @@ interface DataManagerProps {
   onRowSelect?: (row: DataManagerRow) => void;
   onBatchEdit?: (selectedIds: string[], operation: BatchEditOperation) => Promise<void>;
   onOpenTypePicker?: (elementIds: string[], category: string) => void;
+  // P9.2: Inline editing callback
+  onCellEdit?: (rowId: string, field: string, value: unknown) => Promise<void>;
 }
 
 // ============================================================================
@@ -165,6 +171,7 @@ export function DataManager({
   onRowSelect,
   onBatchEdit,
   onOpenTypePicker,
+  onCellEdit,
 }: DataManagerProps) {
   // Selection state
   const { selectedElement, centerSldOnElement } = useSelectionStore();
@@ -190,6 +197,14 @@ export function DataManager({
   const [filter, setFilter] = useState<DataManagerFilter>(persistedFilter);
   const [searchQuery, setSearchQuery] = useState(persistedSearchQuery);
   const [batchEditPending, setBatchEditPending] = useState(false);
+
+  // P9.2: Inline editing state
+  const [editingCell, setEditingCell] = useState<InlineEditState | null>(null);
+  const [editValue, setEditValue] = useState<unknown>(null);
+  const [inlineEditPending, setInlineEditPending] = useState(false);
+
+  // P9.2: Batch edit preview state
+  const [batchPreview, setBatchPreview] = useState<BatchEditPreview | null>(null);
 
   // P9.1: Search input ref for Ctrl+F
   const searchInputRef = useRef<HTMLInputElement>(null);
@@ -314,6 +329,65 @@ export function DataManager({
     return sorted;
   }, [filteredRows, sort]);
 
+  // P9.2: Inline editing handlers
+  const canInlineEdit = mode === 'MODEL_EDIT';
+
+  const handleCellDoubleClick = useCallback(
+    (row: DataManagerRow, col: DataManagerColumn) => {
+      if (!canInlineEdit) return;
+      if (!col.editable) return;
+      if (col.source !== 'instance') return;
+
+      const currentValue = getRowValue(row, col.key);
+      setEditingCell({ rowId: row.id, columnKey: col.key, value: currentValue });
+      setEditValue(currentValue);
+    },
+    [canInlineEdit]
+  );
+
+  const handleCellEditChange = useCallback((value: unknown) => {
+    setEditValue(value);
+  }, []);
+
+  const handleCellEditConfirm = useCallback(async () => {
+    if (!editingCell || !onCellEdit) {
+      setEditingCell(null);
+      return;
+    }
+
+    // Find column for validation
+    const col = columns.find((c) => c.key === editingCell.columnKey);
+    if (!col) {
+      setEditingCell(null);
+      return;
+    }
+
+    // Validate
+    if (col.validation) {
+      const error = col.validation(editValue);
+      if (error) {
+        alert(`Błąd walidacji: ${error}`);
+        return;
+      }
+    }
+
+    // Apply edit
+    setInlineEditPending(true);
+    try {
+      await onCellEdit(editingCell.rowId, editingCell.columnKey, editValue);
+      setEditingCell(null);
+    } catch (err) {
+      alert(`Błąd zapisu: ${err instanceof Error ? err.message : String(err)}`);
+    } finally {
+      setInlineEditPending(false);
+    }
+  }, [editingCell, editValue, onCellEdit, columns]);
+
+  const handleCellEditCancel = useCallback(() => {
+    setEditingCell(null);
+    setEditValue(null);
+  }, []);
+
   // Handle column header click
   const handleColumnClick = useCallback((columnKey: string) => {
     setSort((prev) => ({
@@ -357,31 +431,123 @@ export function DataManager({
     [sortedRows]
   );
 
-  // Batch edit handlers
-  const handleBatchSetInService = useCallback(
-    async (value: boolean) => {
-      if (!canBatchEdit || selectedIds.size === 0) return;
+  // P9.2: Generate batch edit preview
+  const generateBatchPreview = useCallback(
+    (operation: BatchEditOperation): BatchEditPreview | null => {
+      if (selectedIds.size === 0) return null;
+
+      const selectedRows = sortedRows.filter((row) => selectedIds.has(row.id));
+      const changes = selectedRows.map((row) => {
+        let field: string;
+        let fieldLabel: string;
+        let oldValue: unknown;
+        let newValue: unknown;
+
+        switch (operation.type) {
+          case 'SET_IN_SERVICE':
+            field = 'in_service';
+            fieldLabel = 'W eksploatacji';
+            oldValue = row.inService;
+            newValue = operation.value;
+            break;
+          case 'ASSIGN_TYPE':
+            field = 'type_ref';
+            fieldLabel = 'Typ';
+            oldValue = row.typeRef;
+            newValue = operation.typeId;
+            break;
+          case 'CLEAR_TYPE':
+            field = 'type_ref';
+            fieldLabel = 'Typ';
+            oldValue = row.typeRef;
+            newValue = null;
+            break;
+          case 'SET_SWITCH_STATE':
+            field = 'state';
+            fieldLabel = 'Stan łącznika';
+            oldValue = row.switchState;
+            newValue = operation.state;
+            break;
+          case 'SET_PARAMETER':
+            field = operation.field;
+            fieldLabel = columns.find((c) => c.key === operation.field)?.label ?? operation.field;
+            oldValue = getRowValue(row, operation.field);
+            newValue = operation.value;
+            break;
+          default:
+            return null;
+        }
+
+        // Validate change
+        const col = columns.find((c) => c.key === field);
+        let validation = { valid: true };
+        if (col?.validation) {
+          const error = col.validation(newValue);
+          if (error) {
+            validation = { valid: false, error };
+          }
+        }
+
+        return {
+          elementId: row.id,
+          elementName: row.name,
+          field,
+          fieldLabel,
+          oldValue,
+          newValue,
+          validation,
+        };
+      }).filter((change) => change !== null);
+
+      const hasErrors = changes.some((change) => !change.validation.valid);
+
+      return {
+        operation,
+        changes,
+        hasErrors,
+      };
+    },
+    [selectedIds, sortedRows, columns]
+  );
+
+  // P9.2: Apply batch edit (after preview confirmation)
+  const applyBatchEdit = useCallback(
+    async (preview: BatchEditPreview) => {
+      if (!onBatchEdit || preview.hasErrors) return;
+
       setBatchEditPending(true);
       try {
-        await onBatchEdit?.(Array.from(selectedIds), { type: 'SET_IN_SERVICE', value });
+        await onBatchEdit(Array.from(selectedIds), preview.operation);
         setSelectedIds(new Set());
+        setBatchPreview(null);
+      } catch (err) {
+        alert(`Błąd podczas operacji zbiorczej: ${err instanceof Error ? err.message : String(err)}`);
       } finally {
         setBatchEditPending(false);
       }
     },
-    [canBatchEdit, selectedIds, onBatchEdit]
+    [onBatchEdit, selectedIds]
   );
 
-  const handleBatchClearType = useCallback(async () => {
+  // Batch edit handlers (P9.2: now generate preview instead of direct execution)
+  const handleBatchSetInService = useCallback(
+    (value: boolean) => {
+      if (!canBatchEdit || selectedIds.size === 0) return;
+      const preview = generateBatchPreview({ type: 'SET_IN_SERVICE', value });
+      if (preview) {
+        setBatchPreview(preview);
+      }
+    },
+    [canBatchEdit, selectedIds, generateBatchPreview]
+  );
+
+  const handleBatchClearType = useCallback(() => {
     if (!canBatchEdit || selectedIds.size === 0) return;
-    setBatchEditPending(true);
-    try {
-      await onBatchEdit?.(Array.from(selectedIds), { type: 'CLEAR_TYPE' });
-      setSelectedIds(new Set());
-    } finally {
-      setBatchEditPending(false);
+    const preview = generateBatchPreview({ type: 'CLEAR_TYPE' });
+    if (preview) {
+      setBatchPreview(preview);
     }
-  }, [canBatchEdit, selectedIds, onBatchEdit]);
+  }, [canBatchEdit, selectedIds, generateBatchPreview]);
 
   const handleBatchAssignType = useCallback(() => {
     if (!canBatchEdit || selectedIds.size === 0) return;
@@ -399,17 +565,14 @@ export function DataManager({
   }, [canBatchEdit, selectedIds, elementType, onOpenTypePicker]);
 
   const handleBatchSetSwitchState = useCallback(
-    async (state: SwitchState) => {
+    (state: SwitchState) => {
       if (!canBatchEdit || selectedIds.size === 0 || elementType !== 'Switch') return;
-      setBatchEditPending(true);
-      try {
-        await onBatchEdit?.(Array.from(selectedIds), { type: 'SET_SWITCH_STATE', state });
-        setSelectedIds(new Set());
-      } finally {
-        setBatchEditPending(false);
+      const preview = generateBatchPreview({ type: 'SET_SWITCH_STATE', state });
+      if (preview) {
+        setBatchPreview(preview);
       }
     },
-    [canBatchEdit, selectedIds, elementType, onBatchEdit]
+    [canBatchEdit, selectedIds, elementType, generateBatchPreview]
   );
 
   // P9.1: Quick action handlers (single row)
@@ -719,38 +882,53 @@ export function DataManager({
                       />
                     </td>
                   )}
-                  {columns.map((col, colIdx) => (
-                    <td
-                      key={col.key}
-                      className={clsx(
-                        'px-3 py-2',
-                        row.validationMessages.some((m) => m.field === col.key) &&
-                          'bg-red-50 text-red-700'
-                      )}
-                    >
-                      <div className="flex items-center gap-2">
-                        {/* P9.1: Error/Warning badge (first column only) */}
-                        {colIdx === 0 && (hasErrors || hasWarnings) && (
-                          <span
-                            className={clsx(
-                              'px-1.5 py-0.5 text-xs font-semibold rounded',
-                              hasErrors
-                                ? 'bg-red-100 text-red-700'
-                                : 'bg-yellow-100 text-yellow-700'
-                            )}
-                            title={
-                              hasErrors
-                                ? 'Błąd: ' + row.validationMessages.find((m) => m.severity === 'ERROR')?.message
-                                : 'Ostrzeżenie: ' + row.validationMessages.find((m) => m.severity === 'WARNING')?.message
-                            }
-                          >
-                            {hasErrors ? 'ERR' : 'WARN'}
-                          </span>
+                  {columns.map((col, colIdx) => {
+                    const isEditing = editingCell?.rowId === row.id && editingCell?.columnKey === col.key;
+                    const isEditable = canInlineEdit && col.editable && col.source === 'instance';
+                    const isFromType = col.source === 'type';
+
+                    return (
+                      <td
+                        key={col.key}
+                        className={clsx(
+                          'px-3 py-2',
+                          row.validationMessages.some((m) => m.field === col.key) &&
+                            'bg-red-50 text-red-700',
+                          isEditable && 'cursor-pointer hover:bg-blue-50',
+                          isFromType && 'bg-gray-50'
                         )}
-                        {renderCellValue(row, col)}
-                      </div>
-                    </td>
-                  ))}
+                        onDoubleClick={() => !isEditing && handleCellDoubleClick(row, col)}
+                        title={isFromType ? 'Parametr z typu katalogowego (tylko odczyt)' : undefined}
+                      >
+                        <div className="flex items-center gap-2">
+                          {/* P9.1: Error/Warning badge (first column only) */}
+                          {colIdx === 0 && (hasErrors || hasWarnings) && (
+                            <span
+                              className={clsx(
+                                'px-1.5 py-0.5 text-xs font-semibold rounded',
+                                hasErrors
+                                  ? 'bg-red-100 text-red-700'
+                                  : 'bg-yellow-100 text-yellow-700'
+                              )}
+                              title={
+                                hasErrors
+                                  ? 'Błąd: ' + row.validationMessages.find((m) => m.severity === 'ERROR')?.message
+                                  : 'Ostrzeżenie: ' + row.validationMessages.find((m) => m.severity === 'WARNING')?.message
+                              }
+                            >
+                              {hasErrors ? 'ERR' : 'WARN'}
+                            </span>
+                          )}
+                          {/* P9.2: Inline editing cell */}
+                          {isEditing ? (
+                            renderEditableCell(col, editValue, handleCellEditChange, handleCellEditConfirm, handleCellEditCancel, inlineEditPending)
+                          ) : (
+                            renderCellValue(row, col)
+                          )}
+                        </div>
+                      </td>
+                    );
+                  })}
                 {/* P9.1: Quick actions cell (MODEL_EDIT only) */}
                 {canBatchEdit && (
                   <td className="px-3 py-2" onClick={(e) => e.stopPropagation()}>
@@ -810,6 +988,18 @@ export function DataManager({
         Razem: {rows.length} | Wyświetlono: {sortedRows.length}
         {selectedIds.size > 0 && ` | Zaznaczono: ${selectedIds.size}`}
       </div>
+
+      {/* P9.2: Batch Edit Preview Dialog */}
+      <BatchEditPreviewDialog
+        preview={batchPreview}
+        pending={batchEditPending}
+        onConfirm={() => {
+          if (batchPreview) {
+            applyBatchEdit(batchPreview);
+          }
+        }}
+        onCancel={() => setBatchPreview(null)}
+      />
     </div>
   );
 }
@@ -817,6 +1007,83 @@ export function DataManager({
 // ============================================================================
 // Helper Functions
 // ============================================================================
+
+/**
+ * P9.2: Render editable cell (input/select based on column type).
+ */
+function renderEditableCell(
+  col: DataManagerColumn,
+  value: unknown,
+  onChange: (value: unknown) => void,
+  onConfirm: () => void,
+  onCancel: () => void,
+  pending: boolean
+): React.ReactNode {
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      onConfirm();
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      onCancel();
+    }
+  };
+
+  // Enum type - render select
+  if (col.type === 'enum' && col.enumOptions) {
+    return (
+      <select
+        value={String(value ?? '')}
+        onChange={(e) => onChange(e.target.value)}
+        onKeyDown={handleKeyDown}
+        onBlur={onConfirm}
+        autoFocus
+        disabled={pending}
+        className="w-full px-2 py-1 text-xs border border-blue-500 rounded focus:outline-none focus:ring-1 focus:ring-blue-600"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {col.enumOptions.map((option) => (
+          <option key={option} value={option}>
+            {option}
+          </option>
+        ))}
+      </select>
+    );
+  }
+
+  // Number type - render number input
+  if (col.type === 'number') {
+    return (
+      <input
+        type="number"
+        step="any"
+        value={typeof value === 'number' ? value : ''}
+        onChange={(e) => onChange(e.target.value ? parseFloat(e.target.value) : null)}
+        onKeyDown={handleKeyDown}
+        onBlur={onConfirm}
+        autoFocus
+        disabled={pending}
+        className="w-full px-2 py-1 text-xs border border-blue-500 rounded focus:outline-none focus:ring-1 focus:ring-blue-600"
+        onClick={(e) => e.stopPropagation()}
+      />
+    );
+  }
+
+  // String type - render text input
+  return (
+    <input
+      type="text"
+      value={String(value ?? '')}
+      onChange={(e) => onChange(e.target.value)}
+      onKeyDown={handleKeyDown}
+      onBlur={onConfirm}
+      autoFocus
+      disabled={pending}
+      className="w-full px-2 py-1 text-xs border border-blue-500 rounded focus:outline-none focus:ring-1 focus:ring-blue-600"
+      onClick={(e) => e.stopPropagation()}
+    />
+  );
+}
 
 function getRowValue(row: DataManagerRow, key: string): unknown {
   if (key === 'inService') return row.inService;
