@@ -19,6 +19,21 @@ describe('Type Catalog API', () => {
     vi.clearAllMocks();
   });
 
+  describe('handleResponse with 204 No Content (HOTFIX)', () => {
+    it('handles 204 No Content without calling response.json()', async () => {
+      // Mock 204 response
+      (global.fetch as any).mockResolvedValueOnce({
+        ok: true,
+        status: 204,
+      });
+
+      const { clearTypeFromBranch } = await import('../catalog/api');
+
+      // Should not throw - 204 is handled correctly
+      await expect(clearTypeFromBranch('proj-123', 'branch-456')).resolves.toBeUndefined();
+    });
+  });
+
   describe('fetchTypesByCategory', () => {
     it('fetches line types and sorts deterministically', async () => {
       const mockTypes: LineType[] = [

@@ -26,6 +26,9 @@ interface PropertyGridProps {
   elementData?: Record<string, unknown>;
   validationMessages?: ValidationMessage[];
   onFieldChange?: (fieldKey: string, value: unknown) => void;
+  // P8.2 HOTFIX: Type Library callbacks
+  onAssignType?: () => void;
+  onClearType?: () => void;
 }
 
 /**
@@ -41,6 +44,8 @@ export function PropertyGrid({
   elementData = {},
   validationMessages = [],
   onFieldChange,
+  onAssignType,
+  onClearType,
 }: PropertyGridProps) {
   const mode = useSelectionStore((state) => state.mode);
   const canEdit = useCanEdit();
@@ -50,13 +55,28 @@ export function PropertyGrid({
   const sections = getFieldDefinitions(elementType);
 
   // Merge element data into field definitions
+  // P8.2 HOTFIX: Wire type_ref_with_actions callbacks
   const populatedSections = sections.map((section) => ({
     ...section,
-    fields: section.fields.map((field) => ({
-      ...field,
-      value: elementData[field.key] ?? field.value,
-      validation: validationMessages.find((v) => v.field === field.key),
-    })),
+    fields: section.fields.map((field) => {
+      const baseField = {
+        ...field,
+        value: elementData[field.key] ?? field.value,
+        validation: validationMessages.find((v) => v.field === field.key),
+      };
+
+      // Wire type library callbacks for type_ref_with_actions fields
+      if (field.type === 'type_ref_with_actions') {
+        return {
+          ...baseField,
+          onAssignType,
+          onClearType,
+          typeRefName: elementData[`${field.key}_name`] as string | null | undefined,
+        };
+      }
+
+      return baseField;
+    }),
   }));
 
   // Toggle section collapse

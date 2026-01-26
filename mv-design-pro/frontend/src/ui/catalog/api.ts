@@ -43,6 +43,12 @@ async function handleResponse<T>(response: Response, endpoint: string): Promise<
     }
     throw new CatalogApiError(response.status, response.statusText, detail, endpoint);
   }
+
+  // Handle 204 No Content (assign/clear operations return no body)
+  if (response.status === 204) {
+    return undefined as T;
+  }
+
   return response.json();
 }
 
@@ -116,13 +122,22 @@ export async function fetchTypesByCategory(
       throw new Error(`Unknown category: ${category}`);
   }
 
-  // Deterministic sort: manufacturer → name → id
+  // Deterministic sort: manufacturer → name → id (nulls last)
   return types.sort((a, b) => {
     // manufacturer (nulls last)
-    const mfrA = a.manufacturer ?? '';
-    const mfrB = b.manufacturer ?? '';
-    if (mfrA < mfrB) return -1;
-    if (mfrA > mfrB) return 1;
+    const hasA = a.manufacturer != null;
+    const hasB = b.manufacturer != null;
+    if (!hasA && !hasB) {
+      // Both null - skip to name comparison
+    } else if (!hasA) {
+      return 1; // a (null) goes after b
+    } else if (!hasB) {
+      return -1; // a goes before b (null)
+    } else {
+      // Both have manufacturer - compare
+      if (a.manufacturer < b.manufacturer) return -1;
+      if (a.manufacturer > b.manufacturer) return 1;
+    }
 
     // name
     if (a.name < b.name) return -1;

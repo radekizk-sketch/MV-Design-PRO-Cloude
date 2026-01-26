@@ -389,6 +389,22 @@ class NetworkWizardRepository:
         if commit:
             self._session.commit()
 
+    def clear_switch_equipment_type(
+        self,
+        project_id: UUID,
+        switch_id: UUID,
+        *,
+        commit: bool = True,
+    ) -> None:
+        """Clear equipment type assignment from switch (P8.2 HOTFIX)"""
+        stmt = delete(SwitchEquipmentAssignmentORM).where(
+            SwitchEquipmentAssignmentORM.project_id == project_id,
+            SwitchEquipmentAssignmentORM.switch_id == switch_id,
+        )
+        self._session.execute(stmt)
+        if commit:
+            self._session.commit()
+
     def set_switching_state(
         self,
         case_id: UUID,
