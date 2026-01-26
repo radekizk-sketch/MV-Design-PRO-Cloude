@@ -238,4 +238,116 @@ Edit Mode ◄────────────────────► Res
 
 ---
 
+## F. Converter-Based Sources (PV/WIND/BESS) — SLD Rules
+
+### F.1 Symbolika i mapowanie (Symbol Mapping)
+
+Źródła konwerterowe (PV, WIND, BESS) są reprezentowane jako warianty symbolu Source:
+
+| Typ źródła | Symbol SLD | Obiekt modelu | Opis |
+|------------|------------|---------------|------|
+| **PV** | SourceSymbol (wariant PV) | Source (converter_kind=PV) | Fotowoltaika |
+| **WIND** | SourceSymbol (wariant WIND) | Source (converter_kind=WIND) | Elektrownia wiatrowa |
+| **BESS** | SourceSymbol (wariant BESS) | Source (converter_kind=BESS) | Magazyn energii |
+
+**INVARIANT (1:1 Mapping):** Każdy symbol źródła konwerterowego odpowiada dokładnie jednemu obiektowi Source w NetworkModel. Brak helper objects.
+
+### F.2 Etykieta symbolu (Symbol Label)
+
+Etykieta źródła konwerterowego MUSI zawierać:
+
+```
+┌─────────────────────────────┐
+│ [Nazwa] ([Typ])             │
+│ Sn = [wartość] MVA          │
+│ Un = [wartość] kV           │
+└─────────────────────────────┘
+```
+
+| Element etykiety | Źródło danych | Przykład |
+|------------------|---------------|----------|
+| Nazwa | Source.name | "PV-DACH-01" |
+| Typ | Source.converter_kind | "PV" / "WIND" / "BESS" |
+| Sn | Catalog (type_ref) | "2.5 MVA" |
+| Un | Catalog (type_ref) | "0.4 kV" |
+
+**Determinizm:** Kolejność elementów etykiety jest stała. Kolejność legend i list źródeł MUSI być deterministyczna (np. alfabetycznie po nazwie).
+
+### F.3 Stany i widoczność (States and Visibility)
+
+#### F.3.1 Stan `in_service`
+
+| `in_service` | Widoczność SLD | Solver | Opis |
+|--------------|----------------|--------|------|
+| `True` | Normalny wygląd | Uwzględniony | Element aktywny |
+| `False` | Wyszarzony, linia przerywana | Pominięty | Element wyłączony z obliczeń |
+
+**Reguła:** Element z `in_service = False` pozostaje widoczny na SLD, ale solver go nie widzi.
+
+#### F.3.2 Brak impedancji w symbolu
+
+Symbol źródła konwerterowego NIE zawiera impedancji. Parametry pracy (P, Q, cosφ) nie zmieniają topologii sieci — wpływają wyłącznie na bilans mocy.
+
+### F.4 Result Overlays (RESULT_VIEW)
+
+W trybie RESULT_VIEW overlay dla źródła konwerterowego pokazuje:
+
+| Parametr | Jednostka | Opis |
+|----------|-----------|------|
+| P | MW | Moc czynna (wynik obliczeń) |
+| Q | Mvar | Moc bierna (wynik obliczeń) |
+| I | A | Prąd wypływający |
+| Kierunek | → / ← | Kierunek przepływu mocy |
+
+#### F.4.1 BESS — interpretacja znaku P w overlay
+
+| Wynik P | Oznaczenie overlay | Interpretacja |
+|---------|-------------------|---------------|
+| P > 0 | → (strzałka od BESS) | Rozładowanie — eksport do sieci |
+| P < 0 | ← (strzałka do BESS) | Ładowanie — pobór z sieci |
+
+#### F.4.2 Status wyników (Result Freshness)
+
+Overlay MUSI wskazywać status wyników:
+
+| Status | Oznaczenie UX | Opis |
+|--------|---------------|------|
+| **VALID** | Normalny kolor | Wyniki aktualne względem modelu |
+| **OUTDATED** | Wyszarzenie / ostrzeżenie | Model zmieniony od ostatniego obliczenia |
+
+### F.5 Zakazy (Prohibitions)
+
+#### F.5.1 PCC – punkt wspólnego przyłączenia
+
+**BINDING:** PCC NIE istnieje w NetworkModel ani jako obiekt SLD.
+
+| Warstwa | Status PCC |
+|---------|------------|
+| NetworkModel | ZABRONIONY |
+| SLD (symbol) | ZABRONIONY |
+| Analysis (overlay) | DOZWOLONY — wyłącznie jako wynik analizy |
+
+PCC może być wyświetlony wyłącznie jako overlay pochodzący z warstwy Analysis (BoundaryIdentifier), nigdy jako obiekt modelu.
+
+#### F.5.2 Regulatorów i trybów dynamicznych
+
+**ZABRONIONE w SLD (tryb statyczny):**
+- Volt-VAR, Volt-Watt, droop
+- Modele dynamiczne (RMS/EMT)
+- Regulatory napięcia/mocy biernej
+- Parametry inercji i stałych czasowych
+
+### F.6 Deterministyczna prezentacja (Deterministic Display)
+
+| Element | Reguła sortowania |
+|---------|-------------------|
+| Lista źródeł w panelu | Alfabetycznie po nazwie |
+| Legenda typów | Kolejność: PV → WIND → BESS |
+| Etykiety na diagramie | Stała pozycja względem symbolu |
+| Overlay wyników | Stała kolejność: P, Q, I |
+
+**INVARIANT:** Identyczny model MUSI generować identyczny widok SLD przy każdym renderowaniu.
+
+---
+
 **END OF SLD RULES SPECIFICATION**
