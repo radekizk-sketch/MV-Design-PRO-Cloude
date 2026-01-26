@@ -30,6 +30,7 @@ from domain.sld import SldBranchSymbol, SldDiagram, SldNodeSymbol
 from domain.validation import ValidationIssue, ValidationReport
 from infrastructure.persistence.unit_of_work import UnitOfWork
 from network_model.catalog import CatalogRepository
+from network_model.catalog.types import ConverterKind
 from network_model.core import NetworkGraph
 from network_model.core.branch import Branch, LineBranch, TransformerBranch
 
@@ -45,6 +46,7 @@ from .dtos import (
     SourcePayload,
     SwitchingStatePayload,
     TypePayload,
+    ConverterSetpoint,
     InverterSetpoint,
 )
 from .errors import Conflict, NotFound, ValidationFailed
@@ -310,6 +312,51 @@ class NetworkWizardService:
             ),
         )
 
+    def create_converter_source(
+        self,
+        project_id: UUID,
+        bus_id: UUID,
+        name: str,
+        kind: ConverterKind | str,
+        type_id: UUID,
+    ) -> dict:
+        converter_kind = self._normalize_converter_kind(kind)
+        return self.add_source(
+            project_id,
+            SourcePayload(
+                name=name,
+                node_id=bus_id,
+                source_type="CONVERTER",
+                payload={"name": name, "converter_kind": converter_kind.value},
+                type_ref=type_id,
+            ),
+        )
+
+    def assign_converter_type(self, project_id: UUID, source_id: UUID, type_id: UUID) -> dict:
+        with self._uow_factory() as uow:
+            self._ensure_project(uow, project_id)
+            sources = uow.wizard.list_sources(project_id)
+            source = next((item for item in sources if item["id"] == source_id), None)
+            if source is None:
+                raise NotFound(f"Source {source_id} not found")
+            if source.get("source_type") != "CONVERTER":
+                raise Conflict(f"Source {source_id} is not a converter")
+            record = uow.wizard.get_inverter_type(type_id)
+            if record is None:
+                raise NotFound(f"ConverterType {type_id} not found")
+            payload = dict(source.get("payload") or {})
+            payload["type_ref"] = str(type_id)
+            updated = {
+                "id": source_id,
+                "node_id": source.get("node_id"),
+                "source_type": source.get("source_type"),
+                "payload": payload,
+                "in_service": source.get("in_service", True),
+            }
+            uow.wizard.upsert_source(project_id, updated, commit=False)
+            self._invalidate_results(uow, project_id)
+        return updated
+
     def update_source(self, project_id: UUID, source_id: UUID, patch: dict) -> dict:
         with self._uow_factory() as uow:
             self._ensure_project(uow, project_id)
@@ -412,6 +459,19 @@ class NetworkWizardService:
         with self._uow_factory() as uow:
             return uow.wizard.list_inverter_types()
 
+    def list_converter_types(self, kind: str | None = None) -> list[dict]:
+        with self._uow_factory() as uow:
+            records = uow.wizard.list_inverter_types()
+        if kind is None:
+            return records
+        normalized = []
+        for record in records:
+            params = record.get("params") or {}
+            record_kind = (params.get("kind") or params.get("converter_kind") or "PV")
+            if str(record_kind).upper() == str(kind).upper():
+                normalized.append(record)
+        return normalized
+
     def get_line_type(self, type_id: UUID) -> dict:
         with self._uow_factory() as uow:
             record = uow.wizard.get_line_type(type_id)
@@ -431,6 +491,13 @@ class NetworkWizardService:
             record = uow.wizard.get_transformer_type(type_id)
         if record is None:
             raise NotFound(f"TransformerType {type_id} not found")
+        return record
+
+    def get_converter_type(self, type_id: UUID) -> dict:
+        with self._uow_factory() as uow:
+            record = uow.wizard.get_inverter_type(type_id)
+        if record is None:
+            raise NotFound(f"ConverterType {type_id} not found")
         return record
 
     def get_switch_equipment_type(self, type_id: UUID) -> dict:
@@ -580,6 +647,45 @@ class NetworkWizardService:
             inverter_setpoints = dict(payload.get("inverter_setpoints", {}))
             inverter_setpoints[str(source_id)] = setpoint
             payload["inverter_setpoints"] = inverter_setpoints
+            updated = OperatingCase(
+                id=case.id,
+                project_id=case.project_id,
+                name=case.name,
+                case_payload=payload,
+                project_design_mode=case.project_design_mode,
+                created_at=case.created_at,
+                updated_at=datetime.now(timezone.utc),
+            )
+            uow.cases.update_operating_case(updated, commit=False)
+            return updated
+
+    def set_converter_setpoints(
+        self,
+        case_id: UUID,
+        source_id: UUID,
+        p_mw: float,
+        q_mvar: float | None = None,
+        cosphi: float | None = None,
+    ) -> OperatingCase:
+        setpoint = self._build_converter_setpoint(
+            p_mw=p_mw,
+            q_mvar=q_mvar,
+            cosphi=cosphi,
+        )
+        with self._uow_factory() as uow:
+            case = uow.cases.get_operating_case(case_id)
+            if case is None:
+                raise NotFound(f"OperatingCase {case_id} not found")
+            sources = uow.wizard.list_sources(case.project_id)
+            source = next((item for item in sources if item.get("id") == source_id), None)
+            if source is None:
+                raise NotFound(f"Source {source_id} not found")
+            if source.get("source_type") != "CONVERTER":
+                raise Conflict(f"Source {source_id} is not a converter")
+            payload = dict(case.case_payload or {})
+            converter_setpoints = dict(payload.get("converter_setpoints", {}))
+            converter_setpoints[str(source_id)] = setpoint
+            payload["converter_setpoints"] = converter_setpoints
             updated = OperatingCase(
                 id=case.id,
                 project_id=case.project_id,
@@ -823,6 +929,9 @@ class NetworkWizardService:
         inverter_setpoints = self._normalize_inverter_setpoints(
             case_payload.get("inverter_setpoints", {})
         )
+        converter_setpoints = self._normalize_converter_setpoints(
+            case_payload.get("converter_setpoints", {})
+        )
 
         slack_node_id = settings.get("pcc_node_id") or self._select_slack_node_id(project_id)
         slack_data = self._lookup_node_attrs(project_id, slack_node_id)
@@ -861,6 +970,18 @@ class NetworkWizardService:
                         node_id=str(source["node_id"]),
                         p_mw=setpoint.p_mw,
                         q_mvar=self._resolve_inverter_q_mvar(setpoint),
+                    )
+                )
+                continue
+            if source.get("source_type") == "CONVERTER":
+                setpoint = converter_setpoints.get(str(source.get("id")))
+                if setpoint is None:
+                    continue
+                pq_specs.append(
+                    PQSpec(
+                        node_id=str(source["node_id"]),
+                        p_mw=setpoint.p_mw,
+                        q_mvar=self._resolve_converter_q_mvar(setpoint),
                     )
                 )
                 continue
@@ -2153,6 +2274,87 @@ class NetworkWizardService:
         cosphi = setpoint.cosphi if setpoint.cosphi is not None else 1.0
         cosphi = min(1.0, max(-1.0, cosphi))
         return setpoint.p_mw * math.tan(math.acos(cosphi))
+
+    def _build_converter_setpoint(
+        self,
+        *,
+        p_mw: float,
+        q_mvar: float | None,
+        cosphi: float | None,
+    ) -> dict[str, Any]:
+        if p_mw is None or not math.isfinite(float(p_mw)):
+            raise ValueError("Converter setpoint requires finite p_mw")
+        if (q_mvar is None and cosphi is None) or (q_mvar is not None and cosphi is not None):
+            raise ValueError("Exactly one of q_mvar or cosphi must be set for converter setpoint")
+        if q_mvar is not None and not math.isfinite(float(q_mvar)):
+            raise ValueError("Converter setpoint q_mvar must be finite")
+        if cosphi is not None and not math.isfinite(float(cosphi)):
+            raise ValueError("Converter setpoint cosphi must be finite")
+        mode = "PQ" if q_mvar is not None else "Cosphi"
+        setpoint = ConverterSetpoint(
+            p_mw=float(p_mw),
+            q_mvar=float(q_mvar) if q_mvar is not None else None,
+            cosphi=float(cosphi) if cosphi is not None else None,
+            mode=mode,
+        )
+        self._validate_converter_setpoint(setpoint)
+        return {
+            "p_mw": setpoint.p_mw,
+            "q_mvar": setpoint.q_mvar,
+            "cosphi": setpoint.cosphi,
+            "mode": setpoint.mode,
+        }
+
+    def _validate_converter_setpoint(self, setpoint: ConverterSetpoint) -> None:
+        if setpoint.p_mw is None or not math.isfinite(setpoint.p_mw):
+            raise ValueError("Converter setpoint requires finite p_mw")
+        has_q = setpoint.q_mvar is not None
+        has_cosphi = setpoint.cosphi is not None
+        if has_q == has_cosphi:
+            raise ValueError("Converter setpoint requires exactly one of q_mvar or cosphi")
+        if setpoint.mode not in {"PQ", "Cosphi"}:
+            raise ValueError("Converter setpoint mode must be PQ or Cosphi")
+        if setpoint.mode == "PQ" and not has_q:
+            raise ValueError("Converter PQ mode requires q_mvar")
+        if setpoint.mode == "Cosphi" and not has_cosphi:
+            raise ValueError("Converter Cosphi mode requires cosphi")
+
+    def _normalize_converter_setpoints(
+        self, payload: dict[str, Any] | None
+    ) -> dict[str, ConverterSetpoint]:
+        normalized: dict[str, ConverterSetpoint] = {}
+        for source_id, data in (payload or {}).items():
+            if "p_mw" not in data:
+                raise ValueError("Converter setpoint requires p_mw")
+            setpoint = ConverterSetpoint(
+                p_mw=float(data.get("p_mw", 0.0)),
+                q_mvar=(
+                    float(data.get("q_mvar"))
+                    if data.get("q_mvar") is not None
+                    else None
+                ),
+                cosphi=(
+                    float(data.get("cosphi"))
+                    if data.get("cosphi") is not None
+                    else None
+                ),
+                mode=str(data.get("mode", "PQ")),
+            )
+            self._validate_converter_setpoint(setpoint)
+            normalized[str(source_id)] = setpoint
+        return normalized
+
+    def _resolve_converter_q_mvar(self, setpoint: ConverterSetpoint) -> float:
+        if setpoint.q_mvar is not None:
+            return setpoint.q_mvar
+        cosphi = setpoint.cosphi if setpoint.cosphi is not None else 1.0
+        cosphi = min(1.0, max(-1.0, cosphi))
+        return setpoint.p_mw * math.tan(math.acos(cosphi))
+
+    def _normalize_converter_kind(self, kind: ConverterKind | str) -> ConverterKind:
+        if isinstance(kind, ConverterKind):
+            return kind
+        return ConverterKind(str(kind).upper())
 
     def _validate_line_voltage_levels(
         self, branch: dict, nodes: list[dict], report: ValidationReport, branch_id: str

@@ -16,7 +16,7 @@ from application.active_case import (
     ActiveCaseNotSetError,
     ActiveCaseService,
 )
-from application.network_wizard.dtos import InverterSetpoint
+from application.network_wizard.dtos import ConverterSetpoint, InverterSetpoint
 from application.network_model import (
     build_network_graph,
     ensure_snapshot_matches_project,
@@ -28,6 +28,7 @@ from domain.project_design_mode import ProjectDesignMode
 from domain.validation import ValidationIssue, ValidationReport
 from infrastructure.persistence.unit_of_work import UnitOfWork
 from network_model.catalog import CatalogRepository
+from network_model.catalog.types import ConverterKind
 from network_model.core import InverterSource, NetworkGraph, create_network_snapshot
 from network_model.core.branch import Branch, LineBranch, TransformerBranch
 from network_model.validation import NetworkValidator as ModelNetworkValidator, Severity as ModelSeverity
@@ -378,6 +379,9 @@ class AnalysisRunService:
         inverter_setpoints = self._normalize_inverter_setpoints(
             case.case_payload.get("inverter_setpoints", {})
         )
+        converter_setpoints = self._normalize_converter_setpoints(
+            case.case_payload.get("converter_setpoints", {})
+        )
         slack_node_id = settings.get("pcc_node_id") or self._select_slack_node_id(nodes)
         slack_attrs = self._lookup_node_attrs(nodes, slack_node_id) if slack_node_id else {}
         slack_spec = {
@@ -413,6 +417,18 @@ class AnalysisRunService:
                         "node_id": str(source["node_id"]),
                         "p_mw": setpoint.p_mw,
                         "q_mvar": self._resolve_inverter_q_mvar(setpoint),
+                    }
+                )
+                continue
+            if source.get("source_type") == "CONVERTER":
+                setpoint = converter_setpoints.get(str(source.get("id")))
+                if setpoint is None:
+                    continue
+                pq_specs.append(
+                    {
+                        "node_id": str(source["node_id"]),
+                        "p_mw": setpoint.p_mw,
+                        "q_mvar": self._resolve_converter_q_mvar(setpoint),
                     }
                 )
                 continue
@@ -571,6 +587,7 @@ class AnalysisRunService:
                 name=payload.get("name", source.get("name", "")),
                 node_id=str(source.get("node_id")),
                 type_ref=payload.get("type_ref"),
+                converter_kind=self._parse_converter_kind(payload.get("converter_kind")),
                 in_rated_a=float(payload.get("in_rated_a", 0.0)),
                 k_sc=float(payload.get("k_sc", 1.1)),
                 contributes_negative_sequence=bool(
@@ -1183,6 +1200,57 @@ class AnalysisRunService:
         cosphi = setpoint.cosphi if setpoint.cosphi is not None else 1.0
         cosphi = min(1.0, max(-1.0, cosphi))
         return setpoint.p_mw * math.tan(math.acos(cosphi))
+
+    def _parse_converter_kind(self, value: str | None) -> ConverterKind | None:
+        if value is None:
+            return None
+        return ConverterKind(str(value).upper())
+
+    def _normalize_converter_setpoints(
+        self, payload: dict[str, Any] | None
+    ) -> dict[str, ConverterSetpoint]:
+        normalized: dict[str, ConverterSetpoint] = {}
+        for source_id, data in (payload or {}).items():
+            if "p_mw" not in data:
+                raise ValueError("Converter setpoint requires p_mw")
+            setpoint = ConverterSetpoint(
+                p_mw=float(data.get("p_mw", 0.0)),
+                q_mvar=(
+                    float(data.get("q_mvar"))
+                    if data.get("q_mvar") is not None
+                    else None
+                ),
+                cosphi=(
+                    float(data.get("cosphi"))
+                    if data.get("cosphi") is not None
+                    else None
+                ),
+                mode=str(data.get("mode", "PQ")),
+            )
+            self._validate_converter_setpoint(setpoint)
+            normalized[str(source_id)] = setpoint
+        return normalized
+
+    def _resolve_converter_q_mvar(self, setpoint: ConverterSetpoint) -> float:
+        if setpoint.q_mvar is not None:
+            return setpoint.q_mvar
+        cosphi = setpoint.cosphi if setpoint.cosphi is not None else 1.0
+        cosphi = min(1.0, max(-1.0, cosphi))
+        return setpoint.p_mw * math.tan(math.acos(cosphi))
+
+    def _validate_converter_setpoint(self, setpoint: ConverterSetpoint) -> None:
+        if setpoint.p_mw is None or not math.isfinite(setpoint.p_mw):
+            raise ValueError("Converter setpoint requires finite p_mw")
+        has_q = setpoint.q_mvar is not None
+        has_cosphi = setpoint.cosphi is not None
+        if has_q == has_cosphi:
+            raise ValueError("Converter setpoint requires exactly one of q_mvar or cosphi")
+        if setpoint.mode not in {"PQ", "Cosphi"}:
+            raise ValueError("Converter setpoint mode must be PQ or Cosphi")
+        if setpoint.mode == "PQ" and not has_q:
+            raise ValueError("Converter PQ mode requires q_mvar")
+        if setpoint.mode == "Cosphi" and not has_cosphi:
+            raise ValueError("Converter Cosphi mode requires cosphi")
 
     def _validate_inverter_setpoint(self, setpoint: InverterSetpoint) -> None:
         if setpoint.p_mw is None or not math.isfinite(setpoint.p_mw):

@@ -8,7 +8,7 @@ backend_src = Path(__file__).parent.parent / "src"
 sys.path.insert(0, str(backend_src))
 
 from network_model.catalog import CatalogRepository
-from network_model.catalog.types import InverterType, LineType, TransformerType
+from network_model.catalog.types import ConverterKind, ConverterType, InverterType, LineType, TransformerType
 from network_model.core.branch import BranchType, LineBranch, LineImpedanceOverride, TransformerBranch
 from network_model.core.switch import Switch, SwitchState
 
@@ -44,6 +44,17 @@ def test_catalog_types_are_frozen() -> None:
     )
     with pytest.raises(FrozenInstanceError):
         inverter.name = "INV 2"
+
+    converter = ConverterType(
+        id="conv-1",
+        name="PV 1",
+        kind=ConverterKind.PV,
+        un_kv=15.0,
+        sn_mva=5.0,
+        pmax_mw=4.0,
+    )
+    with pytest.raises(FrozenInstanceError):
+        converter.name = "PV 2"
 
 
 def test_catalog_repository_lists_deterministically() -> None:
@@ -82,6 +93,18 @@ def test_catalog_repository_lists_deterministically() -> None:
             {"id": "s2", "name": "Switch B", "params": {"equipment_kind": "DISCONNECTOR"}},
             {"id": "s1", "name": "Switch A", "params": {"equipment_kind": "CIRCUIT_BREAKER"}},
         ],
+        converter_types=[
+            {
+                "id": "c2",
+                "name": "BESS B",
+                "params": {"kind": "BESS", "un_kv": 15.0, "sn_mva": 2.0, "pmax_mw": 1.5},
+            },
+            {
+                "id": "c1",
+                "name": "PV A",
+                "params": {"kind": "PV", "un_kv": 15.0, "sn_mva": 1.0, "pmax_mw": 0.8},
+            },
+        ],
         inverter_types=[
             {"id": "i2", "name": "INV B", "params": {"un_kv": 15.0, "sn_mva": 2.0, "pmax_mw": 1.5}},
             {"id": "i1", "name": "INV A", "params": {"un_kv": 15.0, "sn_mva": 1.0, "pmax_mw": 0.8}},
@@ -92,6 +115,8 @@ def test_catalog_repository_lists_deterministically() -> None:
     assert [item.id for item in repo.list_cable_types()] == ["1", "2"]
     assert [item.id for item in repo.list_transformer_types()] == ["t1", "t2"]
     assert [item.id for item in repo.list_switch_equipment_types()] == ["s1", "s2"]
+    assert [item.id for item in repo.list_converter_types()] == ["c1", "c2"]
+    assert [item.id for item in repo.list_converter_types(kind=ConverterKind.PV)] == ["c1"]
     assert [item.id for item in repo.list_inverter_types()] == ["i1", "i2"]
 
 

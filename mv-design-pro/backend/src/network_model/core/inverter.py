@@ -5,6 +5,8 @@ Definicje źródeł falownikowych (OZE) dla obliczeń zwarciowych IEC 60909.
 from dataclasses import dataclass, field
 import uuid
 
+from network_model.catalog.types import ConverterKind
+
 
 @dataclass
 class InverterSource:
@@ -19,6 +21,7 @@ class InverterSource:
     name: str = field(default="")
     node_id: str = field(default="")
     type_ref: str | None = field(default=None)
+    converter_kind: ConverterKind | None = field(default=None)
     in_rated_a: float = field(default=0.0)
     k_sc: float = field(default=1.1)
     contributes_negative_sequence: bool = field(default=False)
@@ -41,6 +44,7 @@ class InverterSource:
             "name": self.name,
             "node_id": self.node_id,
             "type_ref": self.type_ref,
+            "converter_kind": self.converter_kind.value if self.converter_kind else None,
             "in_rated_a": self.in_rated_a,
             "k_sc": self.k_sc,
             "contributes_negative_sequence": self.contributes_negative_sequence,
@@ -58,6 +62,11 @@ class InverterSource:
             name=str(data.get("name", "")),
             node_id=str(data.get("node_id", "")),
             type_ref=data.get("type_ref"),
+            converter_kind=(
+                ConverterKind(str(data.get("converter_kind")).upper())
+                if data.get("converter_kind") is not None
+                else None
+            ),
             in_rated_a=float(data.get("in_rated_a", 0.0)),
             k_sc=float(data.get("k_sc", 1.1)),
             contributes_negative_sequence=bool(

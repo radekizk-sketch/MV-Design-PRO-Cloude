@@ -75,6 +75,14 @@ class InverterSetpoint:
 
 
 @dataclass(frozen=True)
+class ConverterSetpoint:
+    p_mw: float
+    q_mvar: float | None = None
+    cosphi: float | None = None
+    mode: str = "PQ"
+
+
+@dataclass(frozen=True)
 class GroundingPayload:
     grounding_type: str
     params: dict[str, Any] = field(default_factory=dict)

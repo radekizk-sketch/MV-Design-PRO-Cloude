@@ -452,6 +452,7 @@ class NetworkGraph:
 | 2025-03 | 2.7 | P5: BoundaryIdentifier (PCC heuristics) implemented as analysis-only |
 | 2025-03 | 2.8 | P6: Power Flow solver relocated to solver layer (PowerFactory boundary compliance) |
 | 2025-03 | 2.9 | Static inverter support (catalog + case setpoints) |
+| 2025-03 | 2.10 | Static converter sources (PV/WIND/BESS) – catalog + case setpoints |
 
 ---
 
