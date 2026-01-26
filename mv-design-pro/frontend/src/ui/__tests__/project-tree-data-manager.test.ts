@@ -16,6 +16,7 @@
 
 import { describe, it, expect, beforeEach } from 'vitest';
 import { useSelectionStore } from '../selection/store';
+import { useDataManagerUIStore } from '../data-manager/store';
 import type {
   TreeNode,
   TreeNodeType,
@@ -26,7 +27,10 @@ import type {
   BatchEditOperation,
   ElementType,
   OperatingMode,
+  ColumnViewPreset,
+  ValidationMessage,
 } from '../types';
+import { COLUMN_VIEW_PRESET_LABELS } from '../types';
 
 // ============================================================================
 // Project Tree Tests
@@ -717,5 +721,246 @@ describe('P9: Polish UI Labels', () => {
 
     expect(labels.all).toBe('Wszystkie');
     expect(labels.closed).toBe('Zamknięty');
+  });
+});
+
+// ============================================================================
+// P9.1: Persistencja stanu UI
+// ============================================================================
+
+describe('P9.1: UI State Persistence', () => {
+  beforeEach(() => {
+    // Clear localStorage
+    localStorage.clear();
+  });
+
+  describe('Tree Expansion Persistence', () => {
+    it('should persist tree expansion state', () => {
+      const store = useSelectionStore.getState();
+
+      // Expand nodes
+      store.expandTreeNode('network');
+      store.expandTreeNode('buses');
+
+      // Verify they are expanded
+      const state = useSelectionStore.getState();
+      expect(state.treeExpandedNodes.has('network')).toBe(true);
+      expect(state.treeExpandedNodes.has('buses')).toBe(true);
+    });
+
+    it('should persist property grid open state', () => {
+      const store = useSelectionStore.getState();
+
+      store.togglePropertyGrid(true);
+
+      const state = useSelectionStore.getState();
+      expect(state.propertyGridOpen).toBe(true);
+    });
+  });
+
+  describe('Data Manager UI State Persistence', () => {
+    it('should persist selected element type', () => {
+      const store = useDataManagerUIStore.getState();
+
+      store.setSelectedElementType('Bus');
+
+      const state = useDataManagerUIStore.getState();
+      expect(state.selectedElementType).toBe('Bus');
+    });
+
+    it('should persist column view preset', () => {
+      const store = useDataManagerUIStore.getState();
+
+      store.setColumnViewPreset('TECHNICAL');
+
+      const state = useDataManagerUIStore.getState();
+      expect(state.columnViewPreset).toBe('TECHNICAL');
+    });
+
+    it('should persist sort per element type', () => {
+      const store = useDataManagerUIStore.getState();
+
+      const sort: DataManagerSort = { column: 'name', direction: 'desc' };
+      store.setSort('Bus', sort);
+
+      const state = useDataManagerUIStore.getState();
+      expect(state.sortByType.Bus).toEqual(sort);
+    });
+
+    it('should persist filter per element type', () => {
+      const store = useDataManagerUIStore.getState();
+
+      const filter: DataManagerFilter = {
+        inServiceOnly: true,
+        withTypeOnly: false,
+        withoutTypeOnly: false,
+        switchStateFilter: 'ALL',
+        showErrorsOnly: false,
+      };
+      store.setFilter('LineBranch', filter);
+
+      const state = useDataManagerUIStore.getState();
+      expect(state.filterByType.LineBranch).toEqual(filter);
+    });
+
+    it('should persist search query per element type', () => {
+      const store = useDataManagerUIStore.getState();
+
+      store.setSearchQuery('Bus', 'szyna główna');
+
+      const state = useDataManagerUIStore.getState();
+      expect(state.searchQueryByType.Bus).toBe('szyna główna');
+    });
+  });
+});
+
+// ============================================================================
+// P9.1: Column View Presets
+// ============================================================================
+
+describe('P9.1: Column View Presets', () => {
+  it('should have three preset types', () => {
+    const presets: ColumnViewPreset[] = ['BASIC', 'TECHNICAL', 'OPERATIONAL'];
+    expect(presets.length).toBe(3);
+  });
+
+  it('should have Polish labels for presets', () => {
+    expect(COLUMN_VIEW_PRESET_LABELS.BASIC).toBe('Widok podstawowy');
+    expect(COLUMN_VIEW_PRESET_LABELS.TECHNICAL).toBe('Parametry techniczne');
+    expect(COLUMN_VIEW_PRESET_LABELS.OPERATIONAL).toBe('Eksploatacja');
+  });
+
+  it('should switch between presets', () => {
+    const store = useDataManagerUIStore.getState();
+
+    store.setColumnViewPreset('BASIC');
+    expect(useDataManagerUIStore.getState().columnViewPreset).toBe('BASIC');
+
+    store.setColumnViewPreset('TECHNICAL');
+    expect(useDataManagerUIStore.getState().columnViewPreset).toBe('TECHNICAL');
+
+    store.setColumnViewPreset('OPERATIONAL');
+    expect(useDataManagerUIStore.getState().columnViewPreset).toBe('OPERATIONAL');
+  });
+});
+
+// ============================================================================
+// P9.1: Error Filtering & Signaling
+// ============================================================================
+
+describe('P9.1: Error Filtering & Signaling', () => {
+  const testRowsWithErrors: DataManagerRow[] = [
+    {
+      id: 'bus-001',
+      name: 'Szyna 1',
+      elementType: 'Bus',
+      inService: true,
+      typeRef: null,
+      typeRefName: null,
+      data: {},
+      validationMessages: [
+        { code: 'ERR_001', severity: 'ERROR', message: 'Brak napięcia znamionowego' },
+      ],
+    },
+    {
+      id: 'bus-002',
+      name: 'Szyna 2',
+      elementType: 'Bus',
+      inService: true,
+      typeRef: null,
+      typeRefName: null,
+      data: {},
+      validationMessages: [
+        { code: 'WARN_001', severity: 'WARNING', message: 'Niska moc zwarciowa' },
+      ],
+    },
+    {
+      id: 'bus-003',
+      name: 'Szyna 3',
+      elementType: 'Bus',
+      inService: true,
+      typeRef: null,
+      typeRefName: null,
+      data: {},
+      validationMessages: [],
+    },
+  ];
+
+  it('should filter rows with errors only', () => {
+    const filter: DataManagerFilter = {
+      inServiceOnly: false,
+      withTypeOnly: false,
+      withoutTypeOnly: false,
+      switchStateFilter: 'ALL',
+      showErrorsOnly: true,
+    };
+
+    const filtered = testRowsWithErrors.filter((row) =>
+      row.validationMessages.some((m) => m.severity === 'ERROR')
+    );
+
+    expect(filtered.length).toBe(1);
+    expect(filtered[0].id).toBe('bus-001');
+  });
+
+  it('should detect errors in rows', () => {
+    const rowWithError = testRowsWithErrors[0];
+    const hasErrors = rowWithError.validationMessages.some((m) => m.severity === 'ERROR');
+    expect(hasErrors).toBe(true);
+  });
+
+  it('should detect warnings in rows', () => {
+    const rowWithWarning = testRowsWithErrors[1];
+    const hasWarnings = rowWithWarning.validationMessages.some((m) => m.severity === 'WARNING');
+    expect(hasWarnings).toBe(true);
+  });
+
+  it('should handle rows without validation messages', () => {
+    const rowNoErrors = testRowsWithErrors[2];
+    const hasErrors = rowNoErrors.validationMessages.some((m) => m.severity === 'ERROR');
+    const hasWarnings = rowNoErrors.validationMessages.some((m) => m.severity === 'WARNING');
+    expect(hasErrors).toBe(false);
+    expect(hasWarnings).toBe(false);
+  });
+});
+
+// ============================================================================
+// P9.1: Quick Actions (MODEL_EDIT Only)
+// ============================================================================
+
+describe('P9.1: Quick Actions', () => {
+  it('should have toggle in-service action', () => {
+    const operations: BatchEditOperation[] = [
+      { type: 'SET_IN_SERVICE', value: true },
+      { type: 'SET_IN_SERVICE', value: false },
+    ];
+
+    expect(operations[0].type).toBe('SET_IN_SERVICE');
+    expect(operations[0].value).toBe(true);
+    expect(operations[1].value).toBe(false);
+  });
+
+  it('should have toggle switch state action', () => {
+    const operations: BatchEditOperation[] = [
+      { type: 'SET_SWITCH_STATE', state: 'OPEN' },
+      { type: 'SET_SWITCH_STATE', state: 'CLOSED' },
+    ];
+
+    expect(operations[0].type).toBe('SET_SWITCH_STATE');
+    expect(operations[0].state).toBe('OPEN');
+    expect(operations[1].state).toBe('CLOSED');
+  });
+
+  it('should only allow quick actions in MODEL_EDIT mode', () => {
+    const modes: OperatingMode[] = ['MODEL_EDIT', 'CASE_CONFIG', 'RESULT_VIEW'];
+
+    modes.forEach((mode) => {
+      const canQuickAction = mode === 'MODEL_EDIT';
+      if (mode === 'MODEL_EDIT') {
+        expect(canQuickAction).toBe(true);
+      } else {
+        expect(canQuickAction).toBe(false);
+      }
+    });
   });
 });

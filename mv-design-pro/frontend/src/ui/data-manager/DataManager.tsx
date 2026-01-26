@@ -15,7 +15,7 @@
  * - Mode gating
  */
 
-import { useState, useCallback, useMemo } from 'react';
+import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { clsx } from 'clsx';
 import type {
   DataManagerColumn,
@@ -26,14 +26,26 @@ import type {
   OperatingMode,
   BatchEditOperation,
   SwitchState,
+  ColumnViewPreset,
 } from '../types';
+import { COLUMN_VIEW_PRESET_LABELS } from '../types';
 import { useSelectionStore } from '../selection/store';
 import { useTreeSelection } from '../selection/hooks';
+import {
+  useDataManagerUIStore,
+  useDataManagerSort,
+  useDataManagerFilter,
+  useDataManagerSearchQuery,
+} from './store';
 
 // ============================================================================
 // Column Definitions (Deterministic Ordering)
 // ============================================================================
 
+/**
+ * P9.1: Column definitions per preset and element type.
+ * Full column definitions (can be filtered per preset).
+ */
 const COLUMNS_BY_TYPE: Record<string, DataManagerColumn[]> = {
   Bus: [
     { key: 'id', label: 'ID', type: 'string', sortable: true, width: 120 },
@@ -89,6 +101,26 @@ const COLUMNS_BY_TYPE: Record<string, DataManagerColumn[]> = {
   ],
 };
 
+/**
+ * P9.1: Get columns for element type and preset.
+ * Different presets show different subsets of columns.
+ */
+function getColumnsForPreset(
+  elementType: ElementType,
+  preset: ColumnViewPreset
+): DataManagerColumn[] {
+  const allColumns = COLUMNS_BY_TYPE[elementType] ?? COLUMNS_BY_TYPE.Bus;
+
+  // For now, all presets show all columns
+  // Future: filter columns based on preset
+  // BASIC: ID, Name, InService
+  // TECHNICAL: + type-specific technical params
+  // OPERATIONAL: + operational params (tap_position, switch_state, etc)
+
+  // Phase 1: Return all columns for all presets
+  return allColumns;
+}
+
 // ============================================================================
 // Polish Labels
 // ============================================================================
@@ -138,20 +170,70 @@ export function DataManager({
   const { selectedElement, centerSldOnElement } = useSelectionStore();
   const { handleTreeClick } = useTreeSelection();
 
+  // P9.1: Persistent UI state
+  const {
+    columnViewPreset,
+    setColumnViewPreset,
+    setSort: setPersistentSort,
+    setFilter: setPersistentFilter,
+    setSearchQuery: setPersistentSearchQuery,
+    setSelectedElementType,
+  } = useDataManagerUIStore();
+
+  const persistedSort = useDataManagerSort(elementType);
+  const persistedFilter = useDataManagerFilter(elementType);
+  const persistedSearchQuery = useDataManagerSearchQuery(elementType);
+
   // Local state
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  const [sort, setSort] = useState<DataManagerSort>({ column: 'name', direction: 'asc' });
-  const [filter, setFilter] = useState<DataManagerFilter>({
-    inServiceOnly: false,
-    withTypeOnly: false,
-    withoutTypeOnly: false,
-    switchStateFilter: 'ALL',
-  });
-  const [searchQuery, setSearchQuery] = useState('');
+  const [sort, setSort] = useState<DataManagerSort>(persistedSort);
+  const [filter, setFilter] = useState<DataManagerFilter>(persistedFilter);
+  const [searchQuery, setSearchQuery] = useState(persistedSearchQuery);
   const [batchEditPending, setBatchEditPending] = useState(false);
 
-  // Get columns for this element type
-  const columns = COLUMNS_BY_TYPE[elementType] ?? COLUMNS_BY_TYPE.Bus;
+  // P9.1: Search input ref for Ctrl+F
+  const searchInputRef = useRef<HTMLInputElement>(null);
+
+  // Persist elementType selection
+  useEffect(() => {
+    setSelectedElementType(elementType);
+  }, [elementType, setSelectedElementType]);
+
+  // Persist state changes
+  useEffect(() => {
+    setPersistentSort(elementType, sort);
+  }, [elementType, sort, setPersistentSort]);
+
+  useEffect(() => {
+    setPersistentFilter(elementType, filter);
+  }, [elementType, filter, setPersistentFilter]);
+
+  useEffect(() => {
+    setPersistentSearchQuery(elementType, searchQuery);
+  }, [elementType, searchQuery, setPersistentSearchQuery]);
+
+  // P9.1: Keyboard shortcuts (Ctrl+F, Esc)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Ctrl+F: Focus search input
+      if (e.ctrlKey && e.key === 'f') {
+        e.preventDefault();
+        searchInputRef.current?.focus();
+      }
+      // Esc: Clear search
+      if (e.key === 'Escape' && document.activeElement === searchInputRef.current) {
+        e.preventDefault();
+        setSearchQuery('');
+        searchInputRef.current?.blur();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
+  // Get columns for this element type and preset
+  const columns = getColumnsForPreset(elementType, columnViewPreset);
 
   // Check if batch edit is allowed
   const canBatchEdit = mode === 'MODEL_EDIT';
@@ -186,6 +268,13 @@ export function DataManager({
     // Switch state filter
     if (elementType === 'Switch' && filter.switchStateFilter !== 'ALL') {
       result = result.filter((row) => row.switchState === filter.switchStateFilter);
+    }
+
+    // P9.1: Errors only filter
+    if (filter.showErrorsOnly) {
+      result = result.filter(
+        (row) => row.validationMessages.some((m) => m.severity === 'ERROR')
+      );
     }
 
     return result;
@@ -323,6 +412,36 @@ export function DataManager({
     [canBatchEdit, selectedIds, elementType, onBatchEdit]
   );
 
+  // P9.1: Quick action handlers (single row)
+  const handleQuickToggleInService = useCallback(
+    async (rowId: string, currentValue: boolean, e: React.MouseEvent) => {
+      e.stopPropagation();
+      if (!canBatchEdit) return;
+      setBatchEditPending(true);
+      try {
+        await onBatchEdit?.([rowId], { type: 'SET_IN_SERVICE', value: !currentValue });
+      } finally {
+        setBatchEditPending(false);
+      }
+    },
+    [canBatchEdit, onBatchEdit]
+  );
+
+  const handleQuickToggleSwitchState = useCallback(
+    async (rowId: string, currentState: SwitchState | undefined, e: React.MouseEvent) => {
+      e.stopPropagation();
+      if (!canBatchEdit || !currentState) return;
+      const newState: SwitchState = currentState === 'CLOSED' ? 'OPEN' : 'CLOSED';
+      setBatchEditPending(true);
+      try {
+        await onBatchEdit?.([rowId], { type: 'SET_SWITCH_STATE', state: newState });
+      } finally {
+        setBatchEditPending(false);
+      }
+    },
+    [canBatchEdit, onBatchEdit]
+  );
+
   const allSelected = sortedRows.length > 0 && sortedRows.every((row) => selectedIds.has(row.id));
   const someSelected = selectedIds.size > 0 && !allSelected;
 
@@ -353,12 +472,29 @@ export function DataManager({
         {/* Search */}
         <div className="flex-1 min-w-48">
           <input
+            ref={searchInputRef}
             type="text"
-            placeholder="Szukaj po ID lub nazwie..."
+            placeholder="Szukaj... (Ctrl+F)"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="w-full px-3 py-1.5 text-xs border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
           />
+        </div>
+
+        {/* P9.1: Column View Preset Selector */}
+        <div className="flex items-center gap-1 text-xs">
+          <label className="text-gray-600">Widok:</label>
+          <select
+            value={columnViewPreset}
+            onChange={(e) => setColumnViewPreset(e.target.value as ColumnViewPreset)}
+            className="border border-gray-300 rounded px-2 py-1 text-xs"
+          >
+            {Object.entries(COLUMN_VIEW_PRESET_LABELS).map(([key, label]) => (
+              <option key={key} value={key}>
+                {label}
+              </option>
+            ))}
+          </select>
         </div>
 
         {/* Filters */}
@@ -426,6 +562,19 @@ export function DataManager({
               <option value="CLOSED">{SWITCH_STATE_LABELS.CLOSED}</option>
             </select>
           )}
+
+          {/* P9.1: Show errors only filter */}
+          <label className="flex items-center gap-1 text-xs text-gray-600">
+            <input
+              type="checkbox"
+              checked={filter.showErrorsOnly}
+              onChange={(e) =>
+                setFilter((prev) => ({ ...prev, showErrorsOnly: e.target.checked }))
+              }
+              className="rounded border-gray-300"
+            />
+            Tylko błędne
+          </label>
         </div>
       </div>
 
@@ -532,52 +681,120 @@ export function DataManager({
                   </div>
                 </th>
               ))}
+              {/* P9.1: Quick actions column (MODEL_EDIT only) */}
+              {canBatchEdit && (
+                <th className="px-3 py-2 text-left border-b border-gray-200 font-medium text-gray-700 w-32">
+                  Akcje
+                </th>
+              )}
             </tr>
           </thead>
           <tbody>
-            {sortedRows.map((row) => (
-              <tr
-                key={row.id}
-                className={clsx(
-                  'border-b border-gray-100 hover:bg-gray-50 cursor-pointer',
-                  selectedElement?.id === row.id && 'bg-blue-50',
-                  !row.inService && 'text-gray-400'
-                )}
-                onClick={() => handleRowClick(row)}
-              >
-                {/* Checkbox */}
+            {sortedRows.map((row) => {
+              const hasErrors = row.validationMessages.some((m) => m.severity === 'ERROR');
+              const hasWarnings = row.validationMessages.some((m) => m.severity === 'WARNING');
+              return (
+                <tr
+                  key={row.id}
+                  className={clsx(
+                    'border-b border-gray-100 hover:bg-gray-50 cursor-pointer',
+                    selectedElement?.id === row.id && 'bg-blue-50',
+                    !row.inService && 'text-gray-400',
+                    hasErrors && 'border-l-4 border-l-red-500'
+                  )}
+                  onClick={() => handleRowClick(row)}
+                >
+                  {/* Checkbox */}
+                  {canBatchEdit && (
+                    <td className="px-2 py-2">
+                      <input
+                        type="checkbox"
+                        checked={selectedIds.has(row.id)}
+                        onChange={(e) => {
+                          e.stopPropagation();
+                          handleCheckboxChange(row.id, e.target.checked);
+                        }}
+                        onClick={(e) => e.stopPropagation()}
+                        className="rounded border-gray-300"
+                      />
+                    </td>
+                  )}
+                  {columns.map((col, colIdx) => (
+                    <td
+                      key={col.key}
+                      className={clsx(
+                        'px-3 py-2',
+                        row.validationMessages.some((m) => m.field === col.key) &&
+                          'bg-red-50 text-red-700'
+                      )}
+                    >
+                      <div className="flex items-center gap-2">
+                        {/* P9.1: Error/Warning badge (first column only) */}
+                        {colIdx === 0 && (hasErrors || hasWarnings) && (
+                          <span
+                            className={clsx(
+                              'px-1.5 py-0.5 text-xs font-semibold rounded',
+                              hasErrors
+                                ? 'bg-red-100 text-red-700'
+                                : 'bg-yellow-100 text-yellow-700'
+                            )}
+                            title={
+                              hasErrors
+                                ? 'Błąd: ' + row.validationMessages.find((m) => m.severity === 'ERROR')?.message
+                                : 'Ostrzeżenie: ' + row.validationMessages.find((m) => m.severity === 'WARNING')?.message
+                            }
+                          >
+                            {hasErrors ? 'ERR' : 'WARN'}
+                          </span>
+                        )}
+                        {renderCellValue(row, col)}
+                      </div>
+                    </td>
+                  ))}
+                {/* P9.1: Quick actions cell (MODEL_EDIT only) */}
                 {canBatchEdit && (
-                  <td className="px-2 py-2">
-                    <input
-                      type="checkbox"
-                      checked={selectedIds.has(row.id)}
-                      onChange={(e) => {
-                        e.stopPropagation();
-                        handleCheckboxChange(row.id, e.target.checked);
-                      }}
-                      onClick={(e) => e.stopPropagation()}
-                      className="rounded border-gray-300"
-                    />
+                  <td className="px-3 py-2" onClick={(e) => e.stopPropagation()}>
+                    <div className="flex items-center gap-1">
+                      {/* Toggle In Service */}
+                      <button
+                        onClick={(e) => handleQuickToggleInService(row.id, row.inService, e)}
+                        disabled={batchEditPending}
+                        className={clsx(
+                          'px-1.5 py-0.5 text-xs rounded disabled:opacity-50 transition-colors',
+                          row.inService
+                            ? 'bg-green-100 text-green-700 hover:bg-green-200'
+                            : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                        )}
+                        title={row.inService ? 'Wyłącz' : 'Włącz'}
+                      >
+                        {row.inService ? '✓' : '✗'}
+                      </button>
+                      {/* Toggle Switch State (Switch only) */}
+                      {elementType === 'Switch' && row.switchState && (
+                        <button
+                          onClick={(e) => handleQuickToggleSwitchState(row.id, row.switchState, e)}
+                          disabled={batchEditPending}
+                          className={clsx(
+                            'px-1.5 py-0.5 text-xs rounded disabled:opacity-50 transition-colors',
+                            row.switchState === 'CLOSED'
+                              ? 'bg-green-100 text-green-700 hover:bg-green-200'
+                              : 'bg-red-100 text-red-700 hover:bg-red-200'
+                          )}
+                          title={row.switchState === 'CLOSED' ? 'Otwórz' : 'Zamknij'}
+                        >
+                          {row.switchState === 'CLOSED' ? 'Z' : 'O'}
+                        </button>
+                      )}
+                    </div>
                   </td>
                 )}
-                {columns.map((col) => (
-                  <td
-                    key={col.key}
-                    className={clsx(
-                      'px-3 py-2',
-                      row.validationMessages.some((m) => m.field === col.key) &&
-                        'bg-red-50 text-red-700'
-                    )}
-                  >
-                    {renderCellValue(row, col)}
-                  </td>
-                ))}
               </tr>
-            ))}
+              );
+            })}
             {sortedRows.length === 0 && (
               <tr>
                 <td
-                  colSpan={columns.length + (canBatchEdit ? 1 : 0)}
+                  colSpan={columns.length + (canBatchEdit ? 2 : 0)}
                   className="px-4 py-8 text-center text-gray-500"
                 >
                   Brak elementów do wyświetlenia

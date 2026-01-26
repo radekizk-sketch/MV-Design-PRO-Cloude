@@ -218,7 +218,23 @@ export interface DataManagerFilter {
   withTypeOnly: boolean;
   withoutTypeOnly: boolean;
   switchStateFilter: 'ALL' | 'OPEN' | 'CLOSED';
+  showErrorsOnly: boolean; // P9.1: Filter for elements with validation errors
 }
+
+/**
+ * Column view preset types.
+ * P9.1: PowerFactory-like column view presets.
+ */
+export type ColumnViewPreset = 'BASIC' | 'TECHNICAL' | 'OPERATIONAL';
+
+/**
+ * Column view preset labels (Polish).
+ */
+export const COLUMN_VIEW_PRESET_LABELS: Record<ColumnViewPreset, string> = {
+  BASIC: 'Widok podstawowy',
+  TECHNICAL: 'Parametry techniczne',
+  OPERATIONAL: 'Eksploatacja',
+};
 
 /**
  * Data Manager row (generic element representation).
