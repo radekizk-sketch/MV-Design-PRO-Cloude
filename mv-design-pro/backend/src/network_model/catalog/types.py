@@ -326,7 +326,6 @@ class SwitchEquipmentType:
         )
 
 
-@dataclass(frozen=True)
 class ConverterKind(Enum):
     PV = "PV"
     WIND = "WIND"
@@ -390,10 +389,14 @@ class ConverterType:
     def from_dict(cls, data: Dict[str, Any]) -> "ConverterType":
         """Create from dictionary."""
         kind = data.get("kind") or data.get("converter_kind") or ConverterKind.PV.value
+        if isinstance(kind, ConverterKind):
+            resolved_kind = kind
+        else:
+            resolved_kind = ConverterKind(str(kind).upper())
         return cls(
             id=str(data.get("id", str(uuid4()))),
             name=str(data.get("name", "")),
-            kind=ConverterKind(str(kind).upper()),
+            kind=resolved_kind,
             un_kv=float(data.get("un_kv", 0.0)),
             sn_mva=float(data.get("sn_mva", 0.0)),
             pmax_mw=float(data.get("pmax_mw", 0.0)),
