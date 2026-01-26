@@ -185,6 +185,29 @@ LineBranch (instance):
   # All other parameters from type
 ```
 
+### 4.4 Parameter Precedence Rules
+
+**Canonical precedence** for parameter resolution (PowerFactory-grade):
+
+| Equipment | Precedence Rule |
+|-----------|----------------|
+| **Line/Cable** | `impedance_override > type_ref > instance` |
+| **Transformer** | `type_ref > instance` |
+| **Switch** | `type_ref > instance` (metadata only) |
+
+**Backward Compatibility:**
+- Models without `type_ref` use instance parameters (no migration required)
+- Legacy behavior preserved: no numeric changes for existing models
+
+**Validation:**
+- `type_ref` specified but not found in catalog → `TypeNotFoundError`
+- Ensures data integrity without silent fallbacks
+
+**Implementation:**
+- Centralized resolver: `network_model.catalog.resolver`
+- Deterministic resolution across all equipment types
+- Transparent source tracking via `ParameterSource` enum
+
 ---
 
 ## 5. Solver Layer (WHITE BOX)
