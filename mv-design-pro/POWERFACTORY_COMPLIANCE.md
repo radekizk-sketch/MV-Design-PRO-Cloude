@@ -1,6 +1,6 @@
 # MV-DESIGN-PRO PowerFactory Compliance Checklist
 
-**Version:** 2.4
+**Version:** 2.6
 **Status:** AUDIT DOCUMENT (Updated 2026-01)
 **Reference:** SYSTEM_SPEC.md, PLANS.md, sld_rules.md
 
@@ -329,7 +329,8 @@ This document provides a comprehensive checklist for verifying compliance with D
 | Interpretation | 7 | 3 | 0 | 4 |
 | UI Parity | 31 | 31 | 0 | 0 |
 | **Type Catalog UI (P8.2)** | **43** | **43** | **0** | **0** |
-| **TOTAL** | **173** | **135** | **0** | **38** |
+| **Project Tree & Data Manager (P9)** | **52** | **52** | **0** | **0** |
+| **TOTAL** | **225** | **187** | **0** | **38** |
 
 ### 9.2 Critical Failures
 
@@ -410,6 +411,7 @@ All remediations verified via:
 | 2025-01 | System | 2.3 | SLD PowerFactory parity - 28/28 SLD items PASS, all invariants tested |
 | 2026-01 | System | 2.4 | UI Parity: Property Grid + Context Menu + Selection (31/31 PASS, 55 tests) |
 | 2026-01 | System | 2.5 | Type Catalog UI (P8.2): Assign/Clear Type + Type Picker (43/43 PASS, 15 tests) |
+| 2026-01 | System | 2.6 | P9 FULL: Project Tree + Data Manager (52/52 PASS, 52 tests) |
 
 ---
 
@@ -578,6 +580,107 @@ All remediations verified via:
 | CAT-070 | TypeNotFoundError displays in Property Grid | Check: validation message rendering | PASS |
 | CAT-071 | User must manually fix invalid type_ref | Check: no auto-repair | PASS |
 | CAT-072 | Validation message: "Typ o ID ... nie istnieje" | Check: backend validation contract | PASS |
+
+---
+
+## 15. Project Tree & Data Manager (P9 FULL)
+
+### 15.1 Project Tree (Drzewo Projektu)
+
+| ID | Requirement | Verification | Status |
+|----|-------------|--------------|--------|
+| PT-001 | PF-style tree structure | Check: ProjectTree.tsx | PASS |
+| PT-002 | Canonical hierarchy: Projekt → Sieć → elements | Check: tree node types | PASS |
+| PT-003 | Type Catalog (read-only) section | Check: TYPE_CATALOG nodes | PASS |
+| PT-004 | Cases and Results sections | Check: CASES, RESULTS nodes | PASS |
+| PT-005 | Count badges on categories (e.g. "Linie (12)") | Check: count prop | PASS |
+| PT-006 | Polish labels for all nodes | Check: TREE_NODE_LABELS | PASS |
+| PT-007 | Expand/collapse state in Selection Store | Check: treeExpandedNodes | PASS |
+| PT-008 | Click element → select (Selection Store) | Check: handleTreeClick | PASS |
+| PT-009 | Click category → open Data Manager | Check: onCategoryClick | PASS |
+| PT-010 | Elements sorted: name → id (deterministic) | Check: buildElementNodes sort | PASS |
+
+**Code location:** `frontend/src/ui/project-tree/ProjectTree.tsx`
+
+### 15.2 Data Manager (Menedżer Danych)
+
+| ID | Requirement | Verification | Status |
+|----|-------------|--------------|--------|
+| DM-001 | Table view for selected element type | Check: DataManager.tsx | PASS |
+| DM-002 | Deterministic column ordering per type | Check: COLUMNS_BY_TYPE | PASS |
+| DM-003 | Columns: ID, Name, In Service, Type, key params | Check: column definitions | PASS |
+| DM-004 | Multi-column sort with ID tie-breaker | Check: sortedRows useMemo | PASS |
+| DM-005 | Search by ID + Name | Check: searchQuery filter | PASS |
+| DM-006 | Filter: in_service (tak/nie) | Check: inServiceOnly filter | PASS |
+| DM-007 | Filter: with type / without type | Check: withTypeOnly, withoutTypeOnly | PASS |
+| DM-008 | Filter: switch state (OPEN/CLOSED) | Check: switchStateFilter | PASS |
+| DM-009 | Polish labels for all UI elements | Check: CATEGORY_LABELS, column labels | PASS |
+| DM-010 | Row click → select element (Selection Store) | Check: handleRowClick | PASS |
+| DM-011 | Row click → center SLD | Check: centerSldOnElement | PASS |
+| DM-012 | Validation messages inline | Check: validationMessages rendering | PASS |
+
+**Code location:** `frontend/src/ui/data-manager/DataManager.tsx`
+
+### 15.3 Batch Edit (Masowa Edycja)
+
+| ID | Requirement | Verification | Status |
+|----|-------------|--------------|--------|
+| BE-001 | Multi-select with checkboxes | Check: selectedIds state | PASS |
+| BE-002 | Select all / deselect all | Check: handleSelectAll | PASS |
+| BE-003 | Batch SET_IN_SERVICE (enable/disable) | Check: handleBatchSetInService | PASS |
+| BE-004 | Batch ASSIGN_TYPE | Check: handleBatchAssignType | PASS |
+| BE-005 | Batch CLEAR_TYPE | Check: handleBatchClearType | PASS |
+| BE-006 | Batch SET_SWITCH_STATE (Switch only) | Check: handleBatchSetSwitchState | PASS |
+| BE-007 | Polish labels: "Edytuj zbiorczo", "Włącz", "Wyłącz" | Check: batch toolbar labels | PASS |
+| BE-008 | Actions via existing change mechanism | Check: onBatchEdit callback | PASS |
+
+**Code location:** `frontend/src/ui/data-manager/DataManager.tsx`
+
+### 15.4 Mode Gating (Twarde)
+
+| ID | Requirement | Verification | Status |
+|----|-------------|--------------|--------|
+| MG-001 | MODEL_EDIT: full functionality | Check: canBatchEdit = MODEL_EDIT | PASS |
+| MG-002 | CASE_CONFIG: read-only model, no batch edit | Check: batch toolbar hidden | PASS |
+| MG-003 | RESULT_VIEW: 100% read-only | Check: batch toolbar hidden | PASS |
+| MG-004 | Batch edit toolbar visible only in MODEL_EDIT | Check: canBatchEdit && selectedIds.size > 0 | PASS |
+| MG-005 | No hidden mutation handlers in RO modes | Check: canBatchEdit guards | PASS |
+
+**Code locations:**
+- `frontend/src/ui/data-manager/DataManager.tsx` (canBatchEdit)
+- `frontend/src/ui/selection/store.ts` (mode state)
+
+### 15.5 4-Way Sync (Tree ↔ DM ↔ Grid ↔ SLD)
+
+| ID | Requirement | Verification | Status |
+|----|-------------|--------------|--------|
+| 4S-001 | Single source of truth: Selection Store | Check: useSelectionStore | PASS |
+| 4S-002 | Tree selection → updates DM + Grid + SLD | Check: handleTreeClick | PASS |
+| 4S-003 | DM selection → updates Tree + Grid + SLD | Check: handleRowClick | PASS |
+| 4S-004 | SLD selection → updates Tree + Grid + DM | Check: useSldSelection | PASS |
+| 4S-005 | Grid selection → updates Tree + DM + SLD | Check: usePropertyGridSelection | PASS |
+| 4S-006 | Center SLD on element from Tree/DM | Check: centerSldOnElement | PASS |
+| 4S-007 | Property Grid auto-open on selection | Check: propertyGridOpen logic | PASS |
+
+**Code locations:**
+- `frontend/src/ui/selection/store.ts`
+- `frontend/src/ui/selection/hooks.ts`
+
+### 15.6 Test Coverage (P9)
+
+| Test Suite | Tests | Status |
+|------------|-------|--------|
+| Project Tree structure | 8 | PASS |
+| Data Manager columns | 6 | PASS |
+| Sorting (deterministic) | 4 | PASS |
+| Filtering | 10 | PASS |
+| Mode Gating | 6 | PASS |
+| 4-Way Sync | 8 | PASS |
+| Batch Edit Operations | 6 | PASS |
+| Polish Labels | 4 | PASS |
+| **Total** | **52** | **PASS** |
+
+**Test location:** `frontend/src/ui/__tests__/project-tree-data-manager.test.ts`
 
 ---
 
