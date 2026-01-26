@@ -2231,6 +2231,40 @@ Otwiera modal wyboru przewodu z predefiniowanego katalogu:
 - Tworzy obiekty ExternalGrid i/lub SynchronousGenerator
 - Definiuje punkt zasilania sieci
 
+#### 6.8.6 Źródła konwerterowe (Converter-Based Sources) — tryb statyczny
+
+Ekran WZ-08 obejmuje również **źródła konwerterowe** (converter-based sources):
+
+| Typ źródła | Nazwa pełna | Symbol | Opis |
+|------------|-------------|--------|------|
+| **PV** | Fotowoltaika | ☼ | Źródło energii słonecznej |
+| **WIND** | Elektrownia wiatrowa | ⚡ | Turbina wiatrowa |
+| **BESS** | Magazyn energii | ⊞ | Battery Energy Storage System |
+
+**Tryb statyczny (Static Mode):**
+
+W trybie statycznym źródła konwerterowe działają wyłącznie jako źródła PQ lub z zadanym cosφ:
+
+| Parametr | Lokalizacja | Opis |
+|----------|-------------|------|
+| Typ, Sn, Un | NetworkModel (type_ref → Catalog) | Parametry znamionowe — niezmienne |
+| Przyłączenie (Bus) | NetworkModel | Szyna przyłączenia — topologia |
+| P, Q, cosφ (setpointy) | Case (Active Case) | Parametry pracy — zmienne per scenariusz |
+
+**INVARIANT:** Setpointy pracy (P, Q, cosφ) należą wyłącznie do Case — nie do NetworkModel. Model sieci zawiera tylko przyłączenie i referencję do typu.
+
+**BESS — interpretacja znaku mocy:**
+
+| Znak P | Interpretacja | Kierunek przepływu energii |
+|--------|---------------|---------------------------|
+| P > 0 | Eksport (rozładowanie) | BESS → sieć |
+| P < 0 | Import (ładowanie) | sieć → BESS |
+
+**Ograniczenia trybu statycznego:**
+- Brak regulatorów (Volt-VAR, Volt-Watt, droop)
+- Brak modeli dynamicznych (RMS/EMT)
+- PCC – punkt wspólnego przyłączenia nie istnieje w NetworkModel (analysis-only)
+
 ---
 
 ### 6.9 Ekran WZ-09: Odbiory
