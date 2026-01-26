@@ -1,7 +1,7 @@
 # MV-DESIGN-PRO PowerFactory Compliance Checklist
 
-**Version:** 2.3
-**Status:** AUDIT DOCUMENT (Updated 2025-01)
+**Version:** 2.4
+**Status:** AUDIT DOCUMENT (Updated 2026-01)
 **Reference:** SYSTEM_SPEC.md, PLANS.md, sld_rules.md
 
 ---
@@ -310,7 +310,8 @@ This document provides a comprehensive checklist for verifying compliance with D
 | Wizard | 15 | 8 | 0 | 7 |
 | SLD | 28 | 28 | 0 | 0 |
 | Interpretation | 7 | 3 | 0 | 4 |
-| **TOTAL** | **99** | **55** | **0** | **44** |
+| UI Parity | 31 | 31 | 0 | 0 |
+| **TOTAL** | **130** | **86** | **0** | **44** |
 
 ### 9.2 Critical Failures
 
@@ -389,10 +390,82 @@ All remediations verified via:
 | 2025-01 | System | 2.1 | Phase 2 Task 2.1 completed - all 3 failures remediated |
 | 2025-01 | System | 2.2 | Compliance document updated - 0 failures, 48 pending verification |
 | 2025-01 | System | 2.3 | SLD PowerFactory parity - 28/28 SLD items PASS, all invariants tested |
+| 2026-01 | System | 2.4 | UI Parity: Property Grid + Context Menu + Selection (31/31 PASS, 55 tests) |
 
 ---
 
-## 12. Verification Commands
+## 12. UI Parity Compliance (NEW)
+
+### 12.1 Property Grid (Siatka Właściwości)
+
+| ID | Requirement | Verification | Status |
+|----|-------------|--------------|--------|
+| UI-001 | Deterministic section ordering | Check: field-definitions.ts | PASS |
+| UI-002 | Deterministic field ordering | Check: field-definitions.ts | PASS |
+| UI-003 | type_ref is READ-ONLY | Check: source='type' | PASS |
+| UI-004 | Type params from catalog READ-ONLY | Check: source='type' | PASS |
+| UI-005 | Instance params editable | Check: source='instance' | PASS |
+| UI-006 | Calculated values READ-ONLY | Check: source='calculated' | PASS |
+| UI-007 | Audit metadata READ-ONLY | Check: source='audit' | PASS |
+| UI-008 | Units displayed with values | Check: unit property | PASS |
+| UI-009 | Polish labels | Check: SECTION_LABELS | PASS |
+| UI-010 | Mode gating (RESULT_VIEW = all RO) | Check: useCanEdit() | PASS |
+| UI-011 | Inline validation messages | Check: validation property | PASS |
+
+**Code location:** `frontend/src/ui/property-grid/`
+
+### 12.2 Context Menu (Menu Kontekstowe)
+
+| ID | Requirement | Verification | Status |
+|----|-------------|--------------|--------|
+| UI-020 | Polish labels | Check: actions.ts | PASS |
+| UI-021 | MODEL_EDIT: full menu | Check: buildContextMenuActions | PASS |
+| UI-022 | CASE_CONFIG: properties only | Check: mutation actions disabled | PASS |
+| UI-023 | RESULT_VIEW: read-only menu | Check: only view/export enabled | PASS |
+| UI-024 | in_service toggle (MODEL_EDIT only) | Check: enabled: isModelEdit | PASS |
+| UI-025 | Switch state toggle (MODEL_EDIT only) | Check: enabled: isModelEdit | PASS |
+| UI-026 | Navigation always allowed | Check: show_in_tree always enabled | PASS |
+| UI-027 | Submenu support | Check: buildBusContextMenu | PASS |
+
+**Code location:** `frontend/src/ui/context-menu/`
+
+### 12.3 Selection & Navigation
+
+| ID | Requirement | Verification | Status |
+|----|-------------|--------------|--------|
+| UI-030 | SLD click → select element | Check: useSldSelection() | PASS |
+| UI-031 | SLD click → Property Grid update | Check: auto-open on selection | PASS |
+| UI-032 | Tree click → highlight in SLD | Check: centerSldOnElement() | PASS |
+| UI-033 | Tree click → Property Grid update | Check: useTreeSelection() | PASS |
+| UI-034 | Bidirectional sync | Check: useSelectionSync() | PASS |
+| UI-035 | Single source of truth | Check: Zustand store | PASS |
+| UI-036 | No side effects | Check: deterministic state | PASS |
+
+**Code location:** `frontend/src/ui/selection/`
+
+### 12.4 Operating Modes (Frontend)
+
+| ID | Requirement | Verification | Status |
+|----|-------------|--------------|--------|
+| UI-040 | MODEL_EDIT mode | Check: full editing | PASS |
+| UI-041 | CASE_CONFIG mode | Check: model read-only | PASS |
+| UI-042 | RESULT_VIEW mode | Check: all read-only | PASS |
+| UI-043 | Result freshness (NONE/FRESH/OUTDATED) | Check: resultStatus | PASS |
+
+### 12.5 UI Test Coverage
+
+| Test Suite | Tests | Status |
+|------------|-------|--------|
+| Property Grid field definitions | 19 | PASS |
+| Context Menu actions | 16 | PASS |
+| Selection store | 20 | PASS |
+| **Total** | **55** | **PASS** |
+
+**Added (2026-01):** UI parity implementation per wizard_screens.md, powerfactory_ui_parity.md, sld_rules.md.
+
+---
+
+## 13. Verification Commands
 
 ### 12.1 Check for PCC in Model
 
