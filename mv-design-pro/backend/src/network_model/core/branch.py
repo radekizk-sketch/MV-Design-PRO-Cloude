@@ -19,7 +19,12 @@ from dataclasses import dataclass, replace
 from enum import Enum
 from typing import Any, Dict, Optional
 
-from network_model.catalog import CatalogRepository
+from network_model.catalog import (
+    CatalogRepository,
+    ResolvedLineParams,
+    resolve_line_params,
+    resolve_transformer_params,
+)
 from network_model.catalog.types import CableType, LineType, TransformerType
 
 
@@ -201,14 +206,6 @@ class LineImpedanceOverride:
             x_total_ohm=float(data.get("x_total_ohm", 0.0)),
             b_total_us=float(data.get("b_total_us", 0.0)),
         )
-
-
-@dataclass(frozen=True)
-class ResolvedLineParams:
-    r_ohm_per_km: float
-    x_ohm_per_km: float
-    b_us_per_km: float
-    rated_current_a: float
 
 
 @dataclass
@@ -435,33 +432,31 @@ class LineBranch(Branch):
     def resolve_electrical_params(
         self, catalog: CatalogRepository | None = None
     ) -> ResolvedLineParams:
+        """
+        Resolve electrical parameters using canonical precedence rules.
+
+        Precedence: impedance_override > type_ref > instance
+
+        Returns:
+            ResolvedLineParams with resolved values and source indicator.
+
+        Raises:
+            TypeNotFoundError: If type_ref is specified but not found in catalog.
+        """
+        impedance_override_dict = None
         if self.impedance_override is not None:
-            if self.length_km <= 0:
-                return ResolvedLineParams(0.0, 0.0, 0.0, self.rated_current_a)
-            return ResolvedLineParams(
-                r_ohm_per_km=self.impedance_override.r_total_ohm / self.length_km,
-                x_ohm_per_km=self.impedance_override.x_total_ohm / self.length_km,
-                b_us_per_km=self.impedance_override.b_total_us / self.length_km,
-                rated_current_a=self.rated_current_a,
-            )
-        if self.type_ref and catalog is not None:
-            type_data = None
-            if self.branch_type == BranchType.LINE:
-                type_data = catalog.get_line_type(self.type_ref)
-            elif self.branch_type == BranchType.CABLE:
-                type_data = catalog.get_cable_type(self.type_ref)
-            if type_data is not None:
-                return ResolvedLineParams(
-                    r_ohm_per_km=type_data.r_ohm_per_km,
-                    x_ohm_per_km=type_data.x_ohm_per_km,
-                    b_us_per_km=_get_b_us_per_km(type_data),
-                    rated_current_a=type_data.rated_current_a,
-                )
-        return ResolvedLineParams(
-            r_ohm_per_km=self.r_ohm_per_km,
-            x_ohm_per_km=self.x_ohm_per_km,
-            b_us_per_km=self.b_us_per_km,
-            rated_current_a=self.rated_current_a,
+            impedance_override_dict = self.impedance_override.to_dict()
+
+        return resolve_line_params(
+            type_ref=self.type_ref,
+            is_cable=(self.branch_type == BranchType.CABLE),
+            impedance_override=impedance_override_dict,
+            length_km=self.length_km,
+            instance_r_ohm_per_km=self.r_ohm_per_km,
+            instance_x_ohm_per_km=self.x_ohm_per_km,
+            instance_b_us_per_km=self.b_us_per_km,
+            instance_rated_current_a=self.rated_current_a,
+            catalog=catalog,
         )
 
     def with_resolved_params(self, catalog: CatalogRepository | None = None) -> "LineBranch":
@@ -845,22 +840,41 @@ class TransformerBranch(Branch):
         return 1.0 + self.tap_position * self.tap_step_percent / 100.0
 
     def resolve_nameplate(self, catalog: CatalogRepository | None = None) -> TransformerType:
-        if self.type_ref and catalog is not None:
-            type_data = catalog.get_transformer_type(self.type_ref)
-            if type_data is not None:
-                return type_data
+        """
+        Resolve transformer nameplate parameters using canonical precedence rules.
+
+        Precedence: type_ref > instance
+
+        Returns:
+            TransformerType with resolved nameplate parameters.
+
+        Raises:
+            TypeNotFoundError: If type_ref is specified but not found in catalog.
+        """
+        resolved = resolve_transformer_params(
+            type_ref=self.type_ref,
+            instance_rated_power_mva=self.rated_power_mva,
+            instance_voltage_hv_kv=self.voltage_hv_kv,
+            instance_voltage_lv_kv=self.voltage_lv_kv,
+            instance_uk_percent=self.uk_percent,
+            instance_pk_kw=self.pk_kw,
+            instance_i0_percent=self.i0_percent,
+            instance_p0_kw=self.p0_kw,
+            instance_vector_group=self.vector_group,
+            catalog=catalog,
+        )
         return TransformerType(
             id=self.type_ref or self.id,
             name=self.name,
-            rated_power_mva=self.rated_power_mva,
-            voltage_hv_kv=self.voltage_hv_kv,
-            voltage_lv_kv=self.voltage_lv_kv,
-            uk_percent=self.uk_percent,
-            pk_kw=self.pk_kw,
+            rated_power_mva=resolved.rated_power_mva,
+            voltage_hv_kv=resolved.voltage_hv_kv,
+            voltage_lv_kv=resolved.voltage_lv_kv,
+            uk_percent=resolved.uk_percent,
+            pk_kw=resolved.pk_kw,
             manufacturer=None,
-            i0_percent=self.i0_percent,
-            p0_kw=self.p0_kw,
-            vector_group=self.vector_group,
+            i0_percent=resolved.i0_percent,
+            p0_kw=resolved.p0_kw,
+            vector_group=resolved.vector_group,
         )
 
     def computed_equivalent_pu(
@@ -876,21 +890,25 @@ class TransformerBranch(Branch):
     def with_resolved_nameplate(
         self, catalog: CatalogRepository | None = None
     ) -> "TransformerBranch":
-        if not self.type_ref or catalog is None:
-            return self
-        type_data = catalog.get_transformer_type(self.type_ref)
-        if type_data is None:
-            return self
+        """
+        Return a new TransformerBranch with resolved nameplate parameters.
+
+        Uses resolve_nameplate() to get canonical parameters.
+
+        Raises:
+            TypeNotFoundError: If type_ref is specified but not found in catalog.
+        """
+        nameplate = self.resolve_nameplate(catalog)
         return replace(
             self,
-            rated_power_mva=type_data.rated_power_mva,
-            voltage_hv_kv=type_data.voltage_hv_kv,
-            voltage_lv_kv=type_data.voltage_lv_kv,
-            uk_percent=type_data.uk_percent,
-            pk_kw=type_data.pk_kw,
-            i0_percent=type_data.i0_percent,
-            p0_kw=type_data.p0_kw,
-            vector_group=type_data.vector_group,
+            rated_power_mva=nameplate.rated_power_mva,
+            voltage_hv_kv=nameplate.voltage_hv_kv,
+            voltage_lv_kv=nameplate.voltage_lv_kv,
+            uk_percent=nameplate.uk_percent,
+            pk_kw=nameplate.pk_kw,
+            i0_percent=nameplate.i0_percent or 0.0,
+            p0_kw=nameplate.p0_kw or 0.0,
+            vector_group=nameplate.vector_group or "",
         )
 
 
@@ -910,12 +928,6 @@ def _parse_impedance_override(data: Dict[str, Any]) -> Optional[LineImpedanceOve
     if isinstance(override, dict):
         return LineImpedanceOverride.from_dict(override)
     return None
-
-
-def _get_b_us_per_km(type_data: LineType | CableType) -> float:
-    if isinstance(type_data, CableType):
-        return type_data.b_us_per_km
-    return type_data.b_us_per_km
 
 
 def _compute_transformer_impedance_pu(

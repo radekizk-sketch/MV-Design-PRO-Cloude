@@ -10,6 +10,14 @@ The Catalog is the single source of physical parameters for network elements.
 """
 
 from .repository import CatalogRepository
+from .resolver import (
+    ParameterSource,
+    ResolvedLineParams,
+    ResolvedTransformerParams,
+    TypeNotFoundError,
+    resolve_line_params,
+    resolve_transformer_params,
+)
 from .types import (
     CableType,
     ConverterKind,
@@ -29,4 +37,10 @@ __all__ = [
     "ConverterType",
     "InverterType",
     "CatalogRepository",
+    "ParameterSource",
+    "ResolvedLineParams",
+    "ResolvedTransformerParams",
+    "TypeNotFoundError",
+    "resolve_line_params",
+    "resolve_transformer_params",
 ]

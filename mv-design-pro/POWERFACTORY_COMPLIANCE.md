@@ -104,6 +104,23 @@ This document provides a comprehensive checklist for verifying compliance with D
 | CT-011 | CableType with R, X, C, I_rated | Check: type structure | VERIFY |
 | CT-012 | TransformerType with S, U_hv, U_lv, uk%, pk | Check: type structure | VERIFY |
 
+### 3.3 Parameter Precedence (P8.1)
+
+| ID | Requirement | Verification | Status |
+|----|-------------|--------------|--------|
+| CT-020 | Line/Cable: override > type_ref > instance | Check: resolve_line_params() | PASS |
+| CT-021 | Transformer: type_ref > instance | Check: resolve_transformer_params() | PASS |
+| CT-022 | Backward compat: no type_ref = instance | Check: test_no_type_ref_preserves_legacy_behavior | PASS |
+| CT-023 | Validation: type_ref not found → error | Check: TypeNotFoundError raised | PASS |
+| CT-024 | Centralized resolver (no duplication) | Check: single resolver module | PASS |
+| CT-025 | Deterministic resolution | Check: test_*_is_deterministic | PASS |
+| CT-026 | No numeric change for legacy models | Check: regression test | PASS |
+
+**Code locations:**
+- `backend/src/network_model/catalog/resolver.py` (central resolver)
+- `backend/src/network_model/core/branch.py` (LineBranch, TransformerBranch)
+- `backend/tests/network_model/catalog/test_resolver.py` (contract tests)
+
 ---
 
 ## 4. Solver Layer (WHITE BOX) Compliance
