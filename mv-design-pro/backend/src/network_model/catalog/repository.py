@@ -108,7 +108,7 @@ class CatalogRepository:
         values = self.converter_types.values()
         if kind is not None:
             values = [item for item in values if item.kind == kind]
-        return self._sorted(values)
+        return sorted(values, key=lambda item: str(item.id))
 
     def list_inverter_types(self) -> list[InverterType]:
         return self._sorted(self.inverter_types.values())
