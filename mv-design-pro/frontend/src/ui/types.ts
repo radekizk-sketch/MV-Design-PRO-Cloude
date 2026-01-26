@@ -139,3 +139,116 @@ export interface ContextMenuConfig {
   mode: OperatingMode;
   actions: ContextMenuAction[];
 }
+
+// ============================================================================
+// P9: Project Tree Types
+// ============================================================================
+
+/**
+ * Tree node type (categories in the project tree).
+ */
+export type TreeNodeType =
+  | 'PROJECT'
+  | 'NETWORK'
+  | 'BUSES'
+  | 'LINES'
+  | 'CABLES'
+  | 'TRANSFORMERS'
+  | 'SWITCHES'
+  | 'SOURCES'
+  | 'LOADS'
+  | 'TYPE_CATALOG'
+  | 'LINE_TYPES'
+  | 'CABLE_TYPES'
+  | 'TRANSFORMER_TYPES'
+  | 'SWITCH_EQUIPMENT_TYPES'
+  | 'CASES'
+  | 'RESULTS'
+  | 'ELEMENT'; // Individual element node
+
+/**
+ * Project tree node structure.
+ */
+export interface TreeNode {
+  id: string;
+  label: string;
+  nodeType: TreeNodeType;
+  elementType?: ElementType; // For ELEMENT nodes
+  elementId?: string; // For ELEMENT nodes
+  children?: TreeNode[];
+  count?: number; // Number of items in category
+  expanded?: boolean;
+  icon?: string;
+}
+
+// ============================================================================
+// P9: Data Manager Types
+// ============================================================================
+
+/**
+ * Data Manager column definition.
+ */
+export interface DataManagerColumn {
+  key: string;
+  label: string;
+  type: 'string' | 'number' | 'boolean' | 'enum' | 'ref';
+  unit?: string;
+  sortable: boolean;
+  width?: number;
+}
+
+/**
+ * Sort direction.
+ */
+export type SortDirection = 'asc' | 'desc';
+
+/**
+ * Data Manager sort configuration.
+ */
+export interface DataManagerSort {
+  column: string;
+  direction: SortDirection;
+}
+
+/**
+ * Data Manager filter configuration.
+ */
+export interface DataManagerFilter {
+  inServiceOnly: boolean;
+  withTypeOnly: boolean;
+  withoutTypeOnly: boolean;
+  switchStateFilter: 'ALL' | 'OPEN' | 'CLOSED';
+}
+
+/**
+ * Data Manager row (generic element representation).
+ */
+export interface DataManagerRow {
+  id: string;
+  name: string;
+  elementType: ElementType;
+  inService: boolean;
+  typeRef: string | null;
+  typeRefName: string | null;
+  switchState?: SwitchState;
+  data: Record<string, unknown>;
+  validationMessages: ValidationMessage[];
+}
+
+/**
+ * Batch edit operation type.
+ */
+export type BatchEditOperation =
+  | { type: 'SET_IN_SERVICE'; value: boolean }
+  | { type: 'ASSIGN_TYPE'; typeId: string }
+  | { type: 'CLEAR_TYPE' }
+  | { type: 'SET_SWITCH_STATE'; state: SwitchState };
+
+/**
+ * Batch edit result.
+ */
+export interface BatchEditResult {
+  success: boolean;
+  affectedCount: number;
+  errors: Array<{ elementId: string; message: string }>;
+}
