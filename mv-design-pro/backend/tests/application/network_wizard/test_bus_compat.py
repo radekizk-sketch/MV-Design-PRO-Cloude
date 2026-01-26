@@ -53,6 +53,7 @@ def test_export_network_payload_emits_buses_alias() -> None:
         line_types=[],
         cable_types=[],
         transformer_types=[],
+        inverter_types=[],
         switching_states=[],
         schema_version="1.0",
     )

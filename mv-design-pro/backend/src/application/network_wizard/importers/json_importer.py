@@ -68,6 +68,7 @@ def parse_network_payload(payload: dict[str, Any]) -> dict[str, Any]:
         "line_types": payload.get("line_types", []),
         "cable_types": payload.get("cable_types", []),
         "transformer_types": payload.get("transformer_types", []),
+        "inverter_types": payload.get("inverter_types", []),
         "switching_states": payload.get("switching_states", []),
         "schema_version": payload.get("schema_version", "1.0"),
         "export_version": payload.get("export_version", "1.0"),

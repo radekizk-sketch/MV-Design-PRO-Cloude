@@ -16,6 +16,7 @@ from application.active_case import (
     ActiveCaseNotSetError,
     ActiveCaseService,
 )
+from application.network_wizard.dtos import InverterSetpoint
 from application.network_model import (
     build_network_graph,
     ensure_snapshot_matches_project,
@@ -374,6 +375,9 @@ class AnalysisRunService:
                 ensure_snapshot_matches_project(existing_snapshot, project_id)
 
         base_mva = float(case.case_payload.get("base_mva", 100.0))
+        inverter_setpoints = self._normalize_inverter_setpoints(
+            case.case_payload.get("inverter_setpoints", {})
+        )
         slack_node_id = settings.get("pcc_node_id") or self._select_slack_node_id(nodes)
         slack_attrs = self._lookup_node_attrs(nodes, slack_node_id) if slack_node_id else {}
         slack_spec = {
@@ -400,6 +404,18 @@ class AnalysisRunService:
             if source.get("source_type") == "GRID":
                 continue
             payload = source.get("payload") or {}
+            if source.get("source_type") == "INVERTER":
+                setpoint = inverter_setpoints.get(str(source.get("id")))
+                if setpoint is None:
+                    continue
+                pq_specs.append(
+                    {
+                        "node_id": str(source["node_id"]),
+                        "p_mw": setpoint.p_mw,
+                        "q_mvar": self._resolve_inverter_q_mvar(setpoint),
+                    }
+                )
+                continue
             pv_specs.append(
                 {
                     "node_id": str(source["node_id"]),
@@ -554,6 +570,7 @@ class AnalysisRunService:
                 id=str(source.get("id")),
                 name=payload.get("name", source.get("name", "")),
                 node_id=str(source.get("node_id")),
+                type_ref=payload.get("type_ref"),
                 in_rated_a=float(payload.get("in_rated_a", 0.0)),
                 k_sc=float(payload.get("k_sc", 1.1)),
                 contributes_negative_sequence=bool(
@@ -835,6 +852,7 @@ class AnalysisRunService:
                 id=str(source.get("id")),
                 name=payload.get("name", source.get("name", "")),
                 node_id=str(source.get("node_id")),
+                type_ref=payload.get("type_ref"),
                 in_rated_a=float(payload.get("in_rated_a", 0.0)),
                 k_sc=float(payload.get("k_sc", 1.1)),
                 contributes_negative_sequence=bool(
@@ -1100,6 +1118,7 @@ class AnalysisRunService:
             cable_types=uow.wizard.list_cable_types(),
             transformer_types=uow.wizard.list_transformer_types(),
             switch_equipment_types=uow.wizard.list_switch_equipment_types(),
+            inverter_types=uow.wizard.list_inverter_types(),
         )
 
     def _normalize_sources(self, sources: list[dict]) -> list[dict[str, Any]]:
@@ -1132,6 +1151,52 @@ class AnalysisRunService:
         ]
         normalized.sort(key=lambda item: item["id"])
         return normalized
+
+    def _normalize_inverter_setpoints(
+        self, payload: dict[str, Any] | None
+    ) -> dict[str, InverterSetpoint]:
+        normalized: dict[str, InverterSetpoint] = {}
+        for source_id, data in (payload or {}).items():
+            if "p_mw" not in data:
+                raise ValueError("Inverter setpoint requires p_mw")
+            setpoint = InverterSetpoint(
+                p_mw=float(data.get("p_mw", 0.0)),
+                q_mvar=(
+                    float(data.get("q_mvar"))
+                    if data.get("q_mvar") is not None
+                    else None
+                ),
+                cosphi=(
+                    float(data.get("cosphi"))
+                    if data.get("cosphi") is not None
+                    else None
+                ),
+                mode=str(data.get("mode", "PQ")),
+            )
+            self._validate_inverter_setpoint(setpoint)
+            normalized[str(source_id)] = setpoint
+        return normalized
+
+    def _resolve_inverter_q_mvar(self, setpoint: InverterSetpoint) -> float:
+        if setpoint.q_mvar is not None:
+            return setpoint.q_mvar
+        cosphi = setpoint.cosphi if setpoint.cosphi is not None else 1.0
+        cosphi = min(1.0, max(-1.0, cosphi))
+        return setpoint.p_mw * math.tan(math.acos(cosphi))
+
+    def _validate_inverter_setpoint(self, setpoint: InverterSetpoint) -> None:
+        if setpoint.p_mw is None or not math.isfinite(setpoint.p_mw):
+            raise ValueError("Inverter setpoint requires finite p_mw")
+        has_q = setpoint.q_mvar is not None
+        has_cosphi = setpoint.cosphi is not None
+        if has_q == has_cosphi:
+            raise ValueError("Inverter setpoint requires exactly one of q_mvar or cosphi")
+        if setpoint.mode not in {"PQ", "Cosphi"}:
+            raise ValueError("Inverter setpoint mode must be PQ or Cosphi")
+        if setpoint.mode == "PQ" and not has_q:
+            raise ValueError("Inverter PQ mode requires q_mvar")
+        if setpoint.mode == "Cosphi" and not has_cosphi:
+            raise ValueError("Inverter Cosphi mode requires cosphi")
 
     def _iter_pf_numbers(self, pf_input: PowerFlowInput) -> list[float]:
         numbers = [pf_input.base_mva, pf_input.slack.u_pu, pf_input.slack.angle_rad]

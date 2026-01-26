@@ -18,6 +18,7 @@ class InverterSource:
     id: str = field(default_factory=lambda: str(uuid.uuid4()))
     name: str = field(default="")
     node_id: str = field(default="")
+    type_ref: str | None = field(default=None)
     in_rated_a: float = field(default=0.0)
     k_sc: float = field(default=1.1)
     contributes_negative_sequence: bool = field(default=False)
@@ -39,6 +40,7 @@ class InverterSource:
             "id": self.id,
             "name": self.name,
             "node_id": self.node_id,
+            "type_ref": self.type_ref,
             "in_rated_a": self.in_rated_a,
             "k_sc": self.k_sc,
             "contributes_negative_sequence": self.contributes_negative_sequence,
@@ -55,6 +57,7 @@ class InverterSource:
             id=str(data.get("id", str(uuid.uuid4()))),
             name=str(data.get("name", "")),
             node_id=str(data.get("node_id", "")),
+            type_ref=data.get("type_ref"),
             in_rated_a=float(data.get("in_rated_a", 0.0)),
             k_sc=float(data.get("k_sc", 1.1)),
             contributes_negative_sequence=bool(

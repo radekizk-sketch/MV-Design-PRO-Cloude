@@ -62,7 +62,16 @@ class SourcePayload:
     source_type: str
     payload: dict[str, Any] = field(default_factory=dict)
     in_service: bool = True
+    type_ref: UUID | None = None
     id: UUID | None = None
+
+
+@dataclass(frozen=True)
+class InverterSetpoint:
+    p_mw: float
+    q_mvar: float | None = None
+    cosphi: float | None = None
+    mode: str = "PQ"
 
 
 @dataclass(frozen=True)

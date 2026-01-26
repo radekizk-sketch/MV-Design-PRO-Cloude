@@ -18,6 +18,7 @@ def export_network_payload(
     line_types: list[dict[str, Any]],
     cable_types: list[dict[str, Any]],
     transformer_types: list[dict[str, Any]],
+    inverter_types: list[dict[str, Any]],
     switching_states: list[dict[str, Any]],
     schema_version: str,
     export_version: str = "1.0",
@@ -45,5 +46,6 @@ def export_network_payload(
         "line_types": line_types,
         "cable_types": cable_types,
         "transformer_types": transformer_types,
+        "inverter_types": inverter_types,
         "switching_states": switching_states,
     }

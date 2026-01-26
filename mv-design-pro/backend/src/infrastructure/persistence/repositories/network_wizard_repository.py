@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 
 from infrastructure.persistence.models import (
     CableTypeORM,
+    InverterTypeORM,
     LineTypeORM,
     NetworkLoadORM,
     NetworkSourceORM,
@@ -248,6 +249,11 @@ class NetworkWizardRepository:
         rows = self._session.execute(stmt).scalars().all()
         return [{"id": row.id, "name": row.name, "params": row.params_jsonb} for row in rows]
 
+    def list_inverter_types(self) -> list[dict]:
+        stmt = select(InverterTypeORM).order_by(InverterTypeORM.name, InverterTypeORM.id)
+        rows = self._session.execute(stmt).scalars().all()
+        return [{"id": row.id, "name": row.name, "params": row.params_jsonb} for row in rows]
+
     def get_line_type(self, type_id: UUID) -> dict | None:
         stmt = select(LineTypeORM).where(LineTypeORM.id == type_id)
         row = self._session.execute(stmt).scalar_one_or_none()
@@ -271,6 +277,13 @@ class NetworkWizardRepository:
 
     def get_switch_equipment_type(self, type_id: UUID) -> dict | None:
         stmt = select(SwitchEquipmentTypeORM).where(SwitchEquipmentTypeORM.id == type_id)
+        row = self._session.execute(stmt).scalar_one_or_none()
+        if row is None:
+            return None
+        return {"id": row.id, "name": row.name, "params": row.params_jsonb}
+
+    def get_inverter_type(self, type_id: UUID) -> dict | None:
+        stmt = select(InverterTypeORM).where(InverterTypeORM.id == type_id)
         row = self._session.execute(stmt).scalar_one_or_none()
         if row is None:
             return None
@@ -325,6 +338,21 @@ class NetworkWizardRepository:
         if row is None:
             self._session.add(
                 SwitchEquipmentTypeORM(
+                    id=payload["id"], name=payload["name"], params_jsonb=payload["params"]
+                )
+            )
+        else:
+            row.name = payload["name"]
+            row.params_jsonb = payload["params"]
+        if commit:
+            self._session.commit()
+
+    def upsert_inverter_type(self, payload: dict, *, commit: bool = True) -> None:
+        stmt = select(InverterTypeORM).where(InverterTypeORM.id == payload["id"])
+        row = self._session.execute(stmt).scalar_one_or_none()
+        if row is None:
+            self._session.add(
+                InverterTypeORM(
                     id=payload["id"], name=payload["name"], params_jsonb=payload["params"]
                 )
             )
