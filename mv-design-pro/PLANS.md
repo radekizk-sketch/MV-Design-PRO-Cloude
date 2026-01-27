@@ -533,13 +533,10 @@ Wprowadzenie warstwy **interpretacji dowodowej** (Proof Engine), która generuje
 ### 14.4 P11.1c — Zwarcia niesymetryczne (składowe symetryczne)
 
 **Definition of Done:**
-- [x] Transformacja Fortescue udokumentowana
-- [x] Impedancje Z1, Z2, Z0 zdefiniowane z mapping keys
-- [x] Równania 1F z krokami dowodu
-- [x] Równania 2F z krokami dowodu
-- [x] Równania 2FG z krokami dowodu
-- [x] Tabela połączeń transformatorów i ich wpływu na Z0
-- [x] Rejestr równań dla wszystkich typów zwarć
+- [x] P11.1c SKELETON (structure-only) udokumentowany
+- [x] Rejestr równań SC1 (placeholdery, bez matematyki)
+- [x] Generator dowodu SC1 (stub, bez obliczeń)
+- [x] Testy strukturalne SC1 (brak testów numerycznych)
 
 ### 14.5 P11.1d — Proof Inspector UI + Eksport
 

@@ -295,6 +295,7 @@ Pełna lista dokumentów kanonicznych:
 - `docs/proof_engine/EQUATIONS_IEC60909_SC3F.md` — Rejestr równań SC3F z mapping keys
 - `docs/proof_engine/EQUATIONS_VDROP.md` — Rejestr równań VDROP z mapping keys
 - `docs/proof_engine/P11_1a_MVP_SC3F_AND_VDROP.md` — Specyfikacja MVP, kroki dowodu
+- `docs/proof_engine/P11_1c_SC_ASYMMETRICAL.md` — P11.1c Proof Pack (structure-only, SKELETON)
 - `docs/proof_engine/P11_OVERVIEW.md` — TraceArtifact, hierarchia, UX
 
 ### 10.3 Reguły dla agentów AI

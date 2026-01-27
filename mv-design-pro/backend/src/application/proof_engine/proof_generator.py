@@ -161,6 +161,18 @@ class VDROPInput:
     u_source_kv: float
 
 
+@dataclass
+class SC1Input:
+    """Dane wejściowe dla generatora dowodu SC1 (P11.1c skeleton)."""
+
+    project_name: str
+    case_name: str
+    fault_node_id: str
+    fault_type: str
+    run_timestamp: datetime
+    solver_version: str
+
+
 class ProofGenerator:
     """
     Generator dowodów matematycznych P11.1a.
@@ -341,6 +353,89 @@ class ProofGenerator:
             artifact_id=artifact_id,
             proof_type=ProofType.SC3F_IEC60909,
             title_pl="Dowód obliczeń zwarciowych IEC 60909 — zwarcie trójfazowe",
+            header=header,
+            steps=steps,
+            summary=summary,
+        )
+
+    # =========================================================================
+    # SC1 Generator (P11.1c Skeleton)
+    # =========================================================================
+
+    @classmethod
+    def generate_sc1_proof(
+        cls,
+        data: SC1Input,
+        artifact_id: UUID | None = None,
+    ) -> ProofDocument:
+        """
+        Generuje szkic dowodu SC1 (zwarcia asymetryczne) — skeleton only.
+
+        Brak obliczeń liczbowych. Każda próba obliczeń -> NotImplementedError.
+        """
+        if artifact_id is None:
+            artifact_id = uuid4()
+
+        def _raise_calculation() -> None:
+            raise NotImplementedError("P11.1c — skeleton only")
+
+        _ = _raise_calculation
+
+        steps: list[ProofStep] = []
+        step_number = 0
+
+        for eq_id in EquationRegistry.get_sc1_step_order():
+            equation = EquationRegistry.get_equation(eq_id)
+            if equation is None:
+                raise ValueError(f"Missing equation definition for {eq_id}")
+            step_number += 1
+            steps.append(
+                ProofStep(
+                    step_id=ProofStep.generate_step_id("SC1", step_number),
+                    step_number=step_number,
+                    title_pl=equation.name_pl,
+                    equation=equation,
+                    input_values=(),
+                    substitution_latex="TODO",
+                    result=ProofValue(
+                        symbol="TODO",
+                        value="TODO",
+                        unit="—",
+                        formatted="TODO",
+                        source_key="TODO",
+                    ),
+                    unit_check=UnitCheckResult(
+                        passed=False,
+                        expected_unit="TODO",
+                        computed_unit="TODO",
+                        input_units={},
+                        derivation="P11.1c SKELETON",
+                    ),
+                    source_keys={},
+                )
+            )
+
+        header = ProofHeader(
+            project_name=data.project_name,
+            case_name=data.case_name,
+            run_timestamp=data.run_timestamp,
+            solver_version=data.solver_version,
+            fault_location=data.fault_node_id,
+            fault_type=data.fault_type,
+            voltage_factor=None,
+        )
+
+        summary = ProofSummary(
+            key_results={},
+            unit_check_passed=False,
+            total_steps=len(steps),
+            warnings=("P11.1c — skeleton only",),
+        )
+
+        return ProofDocument.create(
+            artifact_id=artifact_id,
+            proof_type=ProofType.SC1F_IEC60909,
+            title_pl="P11.1c — Zwarcia asymetryczne (SC1) — Skeleton",
             header=header,
             steps=steps,
             summary=summary,
