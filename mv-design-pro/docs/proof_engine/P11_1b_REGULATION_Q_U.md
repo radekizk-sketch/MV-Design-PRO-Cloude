@@ -1,8 +1,44 @@
 # P11.1b — Dowód algorytmu regulatora Q(U), cosφ(P)
 
 **STATUS: REFERENCE (prospektywny)**
-**Version:** 1.0
+**Version:** 1.1
 **Reference:** P11_OVERVIEW.md, PROOF_SCHEMAS.md
+
+---
+
+## 0. Relacja do Proof Pack P11
+
+### 0.1 Pozycja w hierarchii
+
+$$
+\boxed{
+\begin{aligned}
+&\textbf{P11 (OVERVIEW)} \to \textbf{P11.1b (REGULATION Q\_U)} \\[6pt]
+&\text{Dokument rozszerza zakres P11 o dowody regulacji napięcia:} \\
+&\quad \text{• Q(U) — regulacja mocy biernej w funkcji napięcia} \\
+&\quad \text{• cosφ(P) — regulacja współczynnika mocy w funkcji mocy czynnej} \\
+&\quad \text{• Counterfactual Proof — porównanie Case A vs Case B}
+\end{aligned}
+}
+$$
+
+### 0.2 Wejścia i wyjścia
+
+| Kierunek | Źródło / Cel | Opis |
+|----------|--------------|------|
+| **Wejście** | `WhiteBoxTrace` | Wyniki power flow (U, P, Q) |
+| **Wejście** | `SolverConfig` | Charakterystyki Q(U), cosφ(P) |
+| **Wejście** | `NetworkSnapshot` | Impedancje sieci (X, R) |
+| **Wyjście** | `ProofDocument` | Dowód regulacji z krokami |
+| **Wyjście** | `CounterfactualProof` | Dowód porównawczy Case A vs B |
+
+### 0.3 Relacja do solvera
+
+$$
+\boxed{
+\textbf{INTERPRETATION-ONLY:} \quad \text{Ten dokument NIE zmienia solvera. Definiuje format dowodu regulacji.}
+}
+$$
 
 ---
 
@@ -57,7 +93,9 @@ class QUCharacteristic:
 
 ### 2.2 Równanie Q(U) (BINDING)
 
-```latex
+**ID równania:** `EQ_QU_001`
+
+$$
 Q(U) = \begin{cases}
 Q_{max,ind} & \text{dla } U \leq U_{min} \\
 Q_{max,ind} \cdot \frac{U_1 - U}{U_1 - U_{min}} & \text{dla } U_{min} < U < U_1 \\
@@ -65,7 +103,7 @@ Q_{max,ind} \cdot \frac{U_1 - U}{U_1 - U_{min}} & \text{dla } U_{min} < U < U_1 
 Q_{max,cap} \cdot \frac{U - U_2}{U_{max} - U_2} & \text{dla } U_2 < U < U_{max} \\
 Q_{max,cap} & \text{dla } U \geq U_{max}
 \end{cases}
-```
+$$
 
 ### 2.3 Mapping keys dla Q(U)
 
@@ -106,12 +144,14 @@ class CosPhi_PCharacteristic:
 
 ### 3.2 Równanie cosφ(P) (BINDING)
 
-```latex
+**ID równania:** `EQ_COSPHI_001`
+
+$$
 \cos\varphi(P) = \begin{cases}
-1.0 & \text{dla } P \leq P_{start} \\
-1.0 - (1.0 - \cos\varphi_{min}) \cdot \frac{P - P_{start}}{P_{rated} - P_{start}} & \text{dla } P > P_{start}
+1{,}0 & \text{dla } P \leq P_{start} \\
+1{,}0 - (1{,}0 - \cos\varphi_{min}) \cdot \frac{P - P_{start}}{P_{rated} - P_{start}} & \text{dla } P > P_{start}
 \end{cases}
-```
+$$
 
 ### 3.3 Mapping keys dla cosφ(P)
 
@@ -129,14 +169,21 @@ class CosPhi_PCharacteristic:
 
 ### 4.1 Równanie wpływu Q na ΔU (BINDING)
 
-```latex
+**ID równania:** `EQ_QU_003`
+
+$$
 \Delta U_Q = \frac{X \cdot Q}{U_n^2} \cdot 100\%
-```
+$$
 
 Gdzie:
-- $X$ — reaktancja linii/transformatora [Ω]
-- $Q$ — moc bierna (dodatnia = indukcyjna, ujemna = pojemnościowa) [Mvar]
-- $U_n$ — napięcie znamionowe [kV]
+
+$$
+\begin{aligned}
+&X \text{ — reaktancja linii/transformatora } [\Omega] \\
+&Q \text{ — moc bierna (dodatnia = indukcyjna, ujemna = pojemnościowa) } [\text{Mvar}] \\
+&U_n \text{ — napięcie znamionowe } [\text{kV}]
+\end{aligned}
+$$
 
 ### 4.2 Mapping keys dla wpływu na ΔU
 

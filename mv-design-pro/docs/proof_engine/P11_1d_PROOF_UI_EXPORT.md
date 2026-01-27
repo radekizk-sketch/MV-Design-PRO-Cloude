@@ -1,8 +1,46 @@
 # P11.1d — Proof Inspector UI + Eksport
 
 **STATUS: REFERENCE (prospektywny)**
-**Version:** 1.0
-**Reference:** P11_OVERVIEW.md, P11_1a_MVP_SC3F_AND_VDROP.md
+**Version:** 1.1
+**Reference:** P11_OVERVIEW.md, P11_1a_MVP_SC3F_AND_VDROP.md, PROOF_SCHEMAS.md
+
+---
+
+## 0. Relacja do Proof Pack P11
+
+### 0.1 Pozycja w hierarchii
+
+$$
+\boxed{
+\begin{aligned}
+&\textbf{P11 (OVERVIEW)} \to \textbf{P11.1d (PROOF UI EXPORT)} \\[6pt]
+&\text{Dokument definiuje warstwę prezentacji Proof Engine:} \\
+&\quad \text{• Proof Inspector UI — interfejs przeglądania dowodów} \\
+&\quad \text{• Eksport — formaty LaTeX, PDF, DOCX, Markdown} \\
+&\quad \text{• Tryb READ-ONLY — bez edycji dowodu}
+\end{aligned}
+}
+$$
+
+### 0.2 Wejścia i wyjścia
+
+| Kierunek | Źródło / Cel | Opis |
+|----------|--------------|------|
+| **Wejście** | `ProofDocument` (JSON) | Dokument dowodowy z generatora |
+| **Wejście** | `TraceArtifact` | Kontekst uruchomienia (run_id, case_id) |
+| **Wyjście** | Wyświetlenie UI | Proof Inspector w przeglądarce |
+| **Wyjście** | `proof.tex` | Eksport do LaTeX |
+| **Wyjście** | `proof.pdf` | Eksport do PDF |
+| **Wyjście** | `proof.docx` | Eksport do DOCX |
+| **Wyjście** | `proof.md` | Eksport do Markdown |
+
+### 0.3 Relacja do solvera
+
+$$
+\boxed{
+\textbf{PRESENTATION-ONLY:} \quad \text{Ten dokument NIE zmienia solvera ani ProofDocument. Definiuje UX/UI.}
+}
+$$
 
 ---
 
