@@ -12,7 +12,7 @@ from __future__ import annotations
 from typing import Any
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Response, status
 from pydantic import BaseModel, Field
 
 from api.dependencies import get_uow_factory
@@ -225,11 +225,11 @@ def update_study_case(
         ) from exc
 
 
-@router.delete("/{case_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/{case_id}", status_code=status.HTTP_204_NO_CONTENT, response_class=Response)
 def delete_study_case(
     case_id: str,
     uow_factory=Depends(get_uow_factory),
-) -> None:
+) -> Response:
     """
     Usuń przypadek obliczeniowy.
 
@@ -243,6 +243,7 @@ def delete_study_case(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Przypadek obliczeniowy nie istnieje: {case_id}",
         )
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 # =============================================================================

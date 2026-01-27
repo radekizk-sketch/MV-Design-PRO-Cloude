@@ -125,8 +125,20 @@ class CaseRepository:
 
     def add_study_case(self, case: StudyCase, *, commit: bool = True) -> None:
         """Add a new StudyCase to the database."""
+        # Support both old (study_payload) and new (P10: config, is_active, etc.) models
+        is_active = getattr(case, "is_active", False)
+        description = getattr(case, "description", "")
+        result_status = getattr(case, "result_status", None)
+        result_refs = getattr(case, "result_refs", ())
+
+        # Determine study_jsonb from config (P10) or study_payload (legacy)
+        if hasattr(case, "config") and case.config is not None:
+            study_jsonb = case.config.to_dict()
+        else:
+            study_jsonb = getattr(case, "study_payload", {})
+
         # If this case is active, deactivate all other cases in the project
-        if case.is_active:
+        if is_active:
             self._deactivate_all_cases(case.project_id)
 
         self._session.add(
@@ -134,11 +146,11 @@ class CaseRepository:
                 id=case.id,
                 project_id=case.project_id,
                 name=case.name,
-                description=case.description,
-                study_jsonb=case.config.to_dict(),
-                is_active=case.is_active,
-                result_status=case.result_status.value,
-                result_refs_jsonb=[ref.to_dict() for ref in case.result_refs],
+                description=description,
+                study_jsonb=study_jsonb,
+                is_active=is_active,
+                result_status=result_status.value if result_status else "NONE",
+                result_refs_jsonb=[ref.to_dict() for ref in result_refs] if result_refs else [],
                 revision=case.revision,
                 created_at=case.created_at,
                 updated_at=case.updated_at,
@@ -152,16 +164,27 @@ class CaseRepository:
         stmt = select(StudyCaseORM).where(StudyCaseORM.id == case.id)
         row = self._session.execute(stmt).scalar_one()
 
+        # Support both old (study_payload) and new (P10) models
+        is_active = getattr(case, "is_active", False)
+        description = getattr(case, "description", "")
+        result_status = getattr(case, "result_status", None)
+        result_refs = getattr(case, "result_refs", ())
+
+        if hasattr(case, "config") and case.config is not None:
+            study_jsonb = case.config.to_dict()
+        else:
+            study_jsonb = getattr(case, "study_payload", {})
+
         # If this case is becoming active, deactivate all other cases
-        if case.is_active and not row.is_active:
+        if is_active and not row.is_active:
             self._deactivate_all_cases(case.project_id)
 
         row.name = case.name
-        row.description = case.description
-        row.study_jsonb = case.config.to_dict()
-        row.is_active = case.is_active
-        row.result_status = case.result_status.value
-        row.result_refs_jsonb = [ref.to_dict() for ref in case.result_refs]
+        row.description = description
+        row.study_jsonb = study_jsonb
+        row.is_active = is_active
+        row.result_status = result_status.value if result_status else "NONE"
+        row.result_refs_jsonb = [ref.to_dict() for ref in result_refs] if result_refs else []
         row.revision = case.revision
         row.updated_at = case.updated_at
 
