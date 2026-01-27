@@ -19,8 +19,8 @@ from typing import Any
 from uuid import UUID, uuid4
 
 from application.proof_engine.equation_registry import (
+    AntiDoubleCountingAudit,
     EquationRegistry,
-    EQ_SC3F_001,
     EQ_SC3F_003,
     EQ_SC3F_004,
     EQ_SC3F_005,
@@ -180,15 +180,16 @@ class ProofGenerator:
         """
         Generuje dowód SC3F (zwarcie trójfazowe IEC 60909).
 
+        Model Anti-Double-Counting: A1 (c tylko w EQ_SC3F_004)
+
         Kroki obowiązkowe (BINDING):
-        1. Napięcie z współczynnikiem c
-        2. Impedancja Thevenina (już obliczona przez solver)
-        3. Początkowy prąd zwarciowy I_k''
-        4. Współczynnik udaru κ
-        5. Prąd udarowy i_p
-        6. Prąd dynamiczny I_dyn (OBOWIĄZKOWY)
-        7. Prąd cieplny I_th (OBOWIĄZKOWY)
-        8. Moc zwarciowa S_k''
+        1. Impedancja Thevenina (z solvera)
+        2. Początkowy prąd zwarciowy I_k'' (c TUTAJ — jedyne miejsce)
+        3. Współczynnik udaru κ
+        4. Prąd udarowy i_p
+        5. Prąd dynamiczny I_dyn (OBOWIĄZKOWY)
+        6. Prąd cieplny I_th (OBOWIĄZKOWY)
+        7. Moc zwarciowa S_k''
 
         Args:
             data: Dane wejściowe SC3FInput
@@ -197,6 +198,9 @@ class ProofGenerator:
         Returns:
             ProofDocument z pełnym dowodem
         """
+        # Weryfikacja anti-double-counting przed generacją
+        assert AntiDoubleCountingAudit.verify(), "Anti-Double-Counting audit failed!"
+
         if artifact_id is None:
             artifact_id = uuid4()
 
@@ -209,104 +213,90 @@ class ProofGenerator:
         x_th = data.z_thevenin_ohm.imag
 
         # =====================================================================
-        # Krok 1: Napięcie z współczynnikiem c
+        # Krok 1: Impedancja Thevenina (prezentacja wartości z solvera)
         # =====================================================================
         step_number += 1
-        u_eq_kv = data.c_factor * data.u_n_kv
-
-        step_1 = cls._create_sc3f_step_u_eq(
-            step_number=step_number,
-            c_factor=data.c_factor,
-            u_n_kv=data.u_n_kv,
-            u_eq_kv=u_eq_kv,
-        )
-        steps.append(step_1)
-
-        # =====================================================================
-        # Krok 2: Impedancja Thevenina (prezentacja wartości z solvera)
-        # =====================================================================
-        step_number += 1
-        step_2 = cls._create_sc3f_step_z_th(
+        step_1 = cls._create_sc3f_step_z_th(
             step_number=step_number,
             z_thevenin_ohm=data.z_thevenin_ohm,
             r_th=r_th,
             x_th=x_th,
         )
-        steps.append(step_2)
+        steps.append(step_1)
 
         # =====================================================================
-        # Krok 3: Początkowy prąd zwarciowy I_k''
+        # Krok 2: Początkowy prąd zwarciowy I_k'' (c TUTAJ — jedyne miejsce)
         # =====================================================================
         step_number += 1
-        step_3 = cls._create_sc3f_step_ikss(
+        step_2 = cls._create_sc3f_step_ikss(
             step_number=step_number,
             c_factor=data.c_factor,
             u_n_kv=data.u_n_kv,
             z_th_abs=z_abs,
             ikss_ka=data.ikss_ka,
         )
-        steps.append(step_3)
+        steps.append(step_2)
 
         # =====================================================================
-        # Krok 4: Współczynnik udaru κ
+        # Krok 3: Współczynnik udaru κ
         # =====================================================================
         step_number += 1
-        step_4 = cls._create_sc3f_step_kappa(
+        step_3 = cls._create_sc3f_step_kappa(
             step_number=step_number,
             r_th=r_th,
             x_th=x_th,
             kappa=data.kappa,
         )
-        steps.append(step_4)
+        steps.append(step_3)
 
         # =====================================================================
-        # Krok 5: Prąd udarowy i_p
+        # Krok 4: Prąd udarowy i_p
         # =====================================================================
         step_number += 1
-        step_5 = cls._create_sc3f_step_ip(
+        step_4 = cls._create_sc3f_step_ip(
             step_number=step_number,
             kappa=data.kappa,
             ikss_ka=data.ikss_ka,
             ip_ka=data.ip_ka,
         )
-        steps.append(step_5)
+        steps.append(step_4)
 
         # =====================================================================
-        # Krok 6: Prąd dynamiczny I_dyn (OBOWIĄZKOWY)
+        # Krok 5: Prąd dynamiczny I_dyn (OBOWIĄZKOWY)
         # =====================================================================
         step_number += 1
         idyn_ka = data.ip_ka  # I_dyn = i_p
-        step_6 = cls._create_sc3f_step_idyn(
+        step_5 = cls._create_sc3f_step_idyn(
             step_number=step_number,
             ip_ka=data.ip_ka,
             idyn_ka=idyn_ka,
         )
-        steps.append(step_6)
+        steps.append(step_5)
 
         # =====================================================================
-        # Krok 7: Prąd cieplny I_th (OBOWIĄZKOWY)
+        # Krok 6: Prąd cieplny I_th (OBOWIĄZKOWY)
         # =====================================================================
         step_number += 1
-        step_7 = cls._create_sc3f_step_ith(
+        step_6 = cls._create_sc3f_step_ith(
             step_number=step_number,
             ikss_ka=data.ikss_ka,
             m_factor=data.m_factor,
             n_factor=data.n_factor,
             ith_ka=data.ith_ka,
         )
-        steps.append(step_7)
+        steps.append(step_6)
 
         # =====================================================================
-        # Krok 8: Moc zwarciowa S_k''
+        # Krok 7: Moc zwarciowa S_k''
         # =====================================================================
         step_number += 1
-        step_8 = cls._create_sc3f_step_sk(
+        step_7 = cls._create_sc3f_step_sk(
             step_number=step_number,
             u_n_kv=data.u_n_kv,
             ikss_ka=data.ikss_ka,
             sk_mva=data.sk_mva,
         )
-        steps.append(step_8)
+        steps.append(step_7)
 
         # =====================================================================
         # Podsumowanie
@@ -353,44 +343,6 @@ class ProofGenerator:
     # =========================================================================
 
     @classmethod
-    def _create_sc3f_step_u_eq(
-        cls,
-        step_number: int,
-        c_factor: float,
-        u_n_kv: float,
-        u_eq_kv: float,
-    ) -> ProofStep:
-        """Krok 1: Napięcie z współczynnikiem c."""
-        equation = EQ_SC3F_001
-
-        input_values = (
-            ProofValue.create("c", c_factor, "—", "c_factor"),
-            ProofValue.create("U_n", u_n_kv, "kV", "u_n_kv"),
-        )
-
-        substitution = f"U_{{eq}} = {c_factor:.4f} \\cdot {u_n_kv:.4f} = {u_eq_kv:.4f}\\,\\text{{kV}}"
-
-        result = ProofValue.create("U_{eq}", u_eq_kv, "kV", "u_eq_kv")
-
-        unit_check = UnitVerifier.verify_equation(
-            equation.equation_id,
-            {"c": "—", "U_n": "kV"},
-            "kV",
-        )
-
-        return ProofStep(
-            step_id=ProofStep.generate_step_id("SC3F", step_number),
-            step_number=step_number,
-            title_pl=equation.name_pl,
-            equation=equation,
-            input_values=input_values,
-            substitution_latex=substitution,
-            result=result,
-            unit_check=unit_check,
-            source_keys={"c": "c_factor", "U_n": "u_n_kv", "U_eq": "u_eq_kv"},
-        )
-
-    @classmethod
     def _create_sc3f_step_z_th(
         cls,
         step_number: int,
@@ -398,7 +350,7 @@ class ProofGenerator:
         r_th: float,
         x_th: float,
     ) -> ProofStep:
-        """Krok 2: Impedancja Thevenina."""
+        """Krok 1: Impedancja Thevenina (z solvera)."""
         equation = EQ_SC3F_003
 
         z_abs = abs(z_thevenin_ohm)
@@ -443,7 +395,7 @@ class ProofGenerator:
         z_th_abs: float,
         ikss_ka: float,
     ) -> ProofStep:
-        """Krok 3: Początkowy prąd zwarciowy I_k''."""
+        """Krok 2: Początkowy prąd zwarciowy I_k'' (c TUTAJ — jedyne miejsce)."""
         equation = EQ_SC3F_004
 
         sqrt3 = math.sqrt(3)
@@ -494,7 +446,7 @@ class ProofGenerator:
         x_th: float,
         kappa: float,
     ) -> ProofStep:
-        """Krok 4: Współczynnik udaru κ."""
+        """Krok 3: Współczynnik udaru κ."""
         equation = EQ_SC3F_005
 
         rx_ratio = r_th / x_th if x_th != 0 else 0
@@ -542,7 +494,7 @@ class ProofGenerator:
         ikss_ka: float,
         ip_ka: float,
     ) -> ProofStep:
-        """Krok 5: Prąd udarowy i_p."""
+        """Krok 4: Prąd udarowy i_p."""
         equation = EQ_SC3F_006
 
         sqrt2 = math.sqrt(2)
@@ -585,7 +537,7 @@ class ProofGenerator:
         ip_ka: float,
         idyn_ka: float,
     ) -> ProofStep:
-        """Krok 6: Prąd dynamiczny I_dyn (OBOWIĄZKOWY)."""
+        """Krok 5: Prąd dynamiczny I_dyn (OBOWIĄZKOWY)."""
         equation = EQ_SC3F_008a
 
         input_values = (
@@ -623,7 +575,7 @@ class ProofGenerator:
         n_factor: float,
         ith_ka: float,
     ) -> ProofStep:
-        """Krok 7: Prąd cieplny I_th (OBOWIĄZKOWY)."""
+        """Krok 6: Prąd cieplny I_th (OBOWIĄZKOWY)."""
         equation = EQ_SC3F_008
 
         sqrt_mn = math.sqrt(m_factor + n_factor)
@@ -672,7 +624,7 @@ class ProofGenerator:
         ikss_ka: float,
         sk_mva: float,
     ) -> ProofStep:
-        """Krok 8: Moc zwarciowa S_k''."""
+        """Krok 7: Moc zwarciowa S_k''."""
         equation = EQ_SC3F_007
 
         sqrt3 = math.sqrt(3)

@@ -88,7 +88,7 @@ def test_sc3f_generation():
 
     assert proof is not None, "Proof should not be None"
     assert proof.proof_type == ProofType.SC3F_IEC60909, "Wrong proof type"
-    assert len(proof.steps) == 8, f"Expected 8 steps, got {len(proof.steps)}"
+    assert len(proof.steps) == 7, f"Expected 7 steps, got {len(proof.steps)}"
 
     print(f"✓ Generated proof with {len(proof.steps)} steps")
     print(f"✓ Proof type: {proof.proof_type.value}")

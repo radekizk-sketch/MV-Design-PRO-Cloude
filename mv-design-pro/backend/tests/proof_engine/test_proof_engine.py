@@ -131,19 +131,20 @@ class TestSC3FProofGenerator:
         """
         Dowód SC3F zawiera wszystkie wymagane kroki (BINDING).
 
+        Model Anti-Double-Counting: A1 (c tylko w EQ_SC3F_004)
+
         Kroki obowiązkowe:
-        1. Napięcie z c
-        2. Impedancja Thevenina
-        3. Prąd I_k''
-        4. Współczynnik κ
-        5. Prąd udarowy i_p
-        6. Prąd dynamiczny I_dyn (OBOWIĄZKOWY)
-        7. Prąd cieplny I_th (OBOWIĄZKOWY)
-        8. Moc S_k''
+        1. Impedancja Thevenina
+        2. Prąd I_k'' (c TUTAJ — jedyne miejsce)
+        3. Współczynnik κ
+        4. Prąd udarowy i_p
+        5. Prąd dynamiczny I_dyn (OBOWIĄZKOWY)
+        6. Prąd cieplny I_th (OBOWIĄZKOWY)
+        7. Moc S_k''
         """
         proof = ProofGenerator.generate_sc3f_proof(sc3f_test_input)
 
-        assert len(proof.steps) == 8
+        assert len(proof.steps) == 7
 
         step_titles = [s.title_pl for s in proof.steps]
 
