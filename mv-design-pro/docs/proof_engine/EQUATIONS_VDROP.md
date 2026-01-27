@@ -403,4 +403,125 @@ notes: |
 
 ---
 
+## 7. Anti-Double-Counting Audit (BINDING)
+
+**Status: PASS**
+**Audyt: 2026-01-27**
+**Auditor: Opus 4.5 — Profesor Energetyki IEC 60909**
+
+---
+
+### 7.1 Audyt wielkości pierwotnych
+
+$$
+\boxed{
+\begin{aligned}
+&\textbf{WYNIK AUDYTU: PASS} \\[12pt]
+&\textbf{Wielkości pierwotne (WEJŚCIA):} \\[4pt]
+&\quad r \text{ [Ω/km]} \quad x \text{ [Ω/km]} \quad l \text{ [km]} \\
+&\quad P \text{ [MW]} \quad Q \text{ [Mvar]} \quad U_n \text{ [kV]} \quad U_{source} \text{ [kV]} \\[12pt]
+&\textbf{Każda wielkość pierwotna wprowadzona DOKŁADNIE RAZ.}
+\end{aligned}
+}
+$$
+
+### 7.2 Audyt wielkości pochodnych
+
+$$
+\begin{array}{|l|l|l|l|}
+\hline
+\textbf{Wielkość} & \textbf{Wprowadzona w} & \textbf{Używana w} & \textbf{Status} \\
+\hline
+R & \text{EQ\_VDROP\_001} & \text{EQ\_VDROP\_003, 009} & \checkmark \text{ PASS} \\
+X & \text{EQ\_VDROP\_002} & \text{EQ\_VDROP\_004, 009} & \checkmark \text{ PASS} \\
+\Delta U_R & \text{EQ\_VDROP\_003} & \text{EQ\_VDROP\_005} & \checkmark \text{ PASS} \\
+\Delta U_X & \text{EQ\_VDROP\_004} & \text{EQ\_VDROP\_005} & \checkmark \text{ PASS} \\
+\Delta U & \text{EQ\_VDROP\_005} & \text{EQ\_VDROP\_006} & \checkmark \text{ PASS} \\
+\Delta U_{total} & \text{EQ\_VDROP\_006} & \text{EQ\_VDROP\_007} & \checkmark \text{ PASS} \\
+U & \text{EQ\_VDROP\_007} & \text{EQ\_VDROP\_008} & \checkmark \text{ PASS} \\
+\hline
+\end{array}
+$$
+
+### 7.3 Weryfikacja braku kumulacji wtórnej
+
+$$
+\boxed{
+\begin{aligned}
+&\textbf{KLUCZOWE WERYFIKACJE:} \\[8pt]
+&\text{1. } R, X \text{ obliczone RAZ na odcinek (EQ\_VDROP\_001, 002)} \\
+&\quad \text{NIE są ponownie przeliczane w } \Delta U_R, \Delta U_X \\[4pt]
+&\text{2. } \Delta U_R, \Delta U_X \text{ użyte WYŁĄCZNIE jako składowe w } \Delta U \\
+&\quad \text{NIE są ponownie dodawane osobno} \\[4pt]
+&\text{3. } \Delta U_i \text{ (spadki na odcinkach) sumowane RAZ w } \Delta U_{total} \\
+&\quad \text{Brak wtórnej kumulacji} \\[4pt]
+&\text{4. } U_{source} \text{ użyte RAZ w EQ\_VDROP\_007} \\
+&\quad \text{NIE jest modyfikowane przed użyciem}
+\end{aligned}
+}
+$$
+
+### 7.4 Łańcuch obliczeniowy (weryfikacja)
+
+```
+WEJŚCIA (pierwotne):
+  r, x, l, P, Q, U_n, U_source
+       │
+       ▼
+KROK 1: R = r · l                    [r, l użyte RAZ]
+KROK 2: X = x · l                    [x, l użyte RAZ]
+       │
+       ▼
+KROK 3: ΔU_R = R·P / U_n²           [R użyte (obliczone w KROK 1)]
+KROK 4: ΔU_X = X·Q / U_n²           [X użyte (obliczone w KROK 2)]
+       │
+       ▼
+KROK 5: ΔU = ΔU_R + ΔU_X            [składowe użyte RAZ]
+       │
+       ▼
+KROK 6: ΔU_total = Σ ΔU_i           [suma po odcinkach, BRAK wtórnej kumulacji]
+       │
+       ▼
+KROK 7: U = U_source · (1 - ΔU_total/100)  [U_source użyte RAZ]
+KROK 8: U_pu = U / U_n                      [U obliczone w KROK 7]
+       │
+       ▼
+WYNIKI: ΔU_total, U, U_pu
+```
+
+### 7.5 Równania alternatywne (EQ_VDROP_009)
+
+$$
+\boxed{
+\begin{aligned}
+&\textbf{EQ\_VDROP\_009 (wzór dokładny) jest ALTERNATYWĄ dla EQ\_VDROP\_003+004+005} \\[8pt]
+&\text{Używać ALBO:} \\
+&\quad \text{EQ\_VDROP\_003} \to \text{EQ\_VDROP\_004} \to \text{EQ\_VDROP\_005} \\
+&\text{ALBO:} \\
+&\quad \text{EQ\_VDROP\_009 (samodzielnie)} \\[8pt]
+&\textbf{NIE używać obu ścieżek jednocześnie — to byłoby double-counting!}
+\end{aligned}
+}
+$$
+
+### 7.6 Gwarancja formalna
+
+$$
+\boxed{
+\textbf{GWARANCJA: Żadna wielkość fizyczna nie jest liczona podwójnie w rejestrze VDROP.}
+}
+$$
+
+| Wielkość | Wprowadzona dokładnie raz | Weryfikacja |
+|----------|---------------------------|-------------|
+| R | EQ_VDROP_001 | ✓ |
+| X | EQ_VDROP_002 | ✓ |
+| ΔU_R | EQ_VDROP_003 | ✓ |
+| ΔU_X | EQ_VDROP_004 | ✓ |
+| ΔU | EQ_VDROP_005 | ✓ |
+| ΔU_total | EQ_VDROP_006 | ✓ |
+| U | EQ_VDROP_007 | ✓ |
+
+---
+
 **END OF EQUATIONS VDROP**

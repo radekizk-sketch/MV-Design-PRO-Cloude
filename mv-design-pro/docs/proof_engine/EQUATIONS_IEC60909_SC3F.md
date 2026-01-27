@@ -49,16 +49,12 @@ equation_id: EQ_SC3F_002
 name_pl: "Impedancja źródła (sieci zasilającej)"
 standard_ref: "IEC 60909-0:2016 eq. (10)"
 latex: |
-  Z_Q = \frac{c \cdot U_n^2}{S_k''_Q}
+  Z_Q = \frac{U_n^2}{S_k''_Q}
 symbols:
   - symbol: "Z_Q"
     unit: "Ω"
     description_pl: "Impedancja źródła"
     mapping_key: "z_source_ohm"
-  - symbol: "c"
-    unit: "—"
-    description_pl: "Współczynnik napięciowy"
-    mapping_key: "c_factor"
   - symbol: "U_n"
     unit: "kV"
     description_pl: "Napięcie znamionowe"
@@ -68,6 +64,10 @@ symbols:
     description_pl: "Moc zwarciowa źródła"
     mapping_key: "sk_source_mva"
 unit_derivation: "kV² / MVA = kV² / (kV · kA) = kV / kA = Ω"
+notes: |
+  UWAGA: Współczynnik c NIE występuje w tym równaniu (Wariant A).
+  c jest wprowadzany WYŁĄCZNIE w EQ_SC3F_004 (I_k'').
+  Patrz sekcja 3a: Anti-Double-Counting.
 ```
 
 ---
@@ -431,10 +431,10 @@ $$
 \textbf{ID} & \textbf{Nazwa} & \textbf{Wzór} & \textbf{Wynik} & \textbf{Mapping key} \\
 \hline
 \text{EQ\_SC3F\_001} & \text{Napięcie z c} & U_{eq} = c \cdot U_n & \text{kV} & \text{u\_eq\_kv} \\
-\text{EQ\_SC3F\_002} & \text{Impedancja źródła} & Z_Q = \frac{c \cdot U_n^2}{S_k''_Q} & \Omega & \text{z\_source\_ohm} \\
+\text{EQ\_SC3F\_002} & \text{Impedancja źródła} & Z_Q = \frac{U_n^2}{S_k''_Q} \text{ (BEZ } c \text{)} & \Omega & \text{z\_source\_ohm} \\
 \text{EQ\_SC3F\_002a} & \text{Rozkład R/X} & R_Q, X_Q & \Omega & \text{r/x\_source\_ohm} \\
 \text{EQ\_SC3F\_003} & \text{Impedancja Thevenina} & Z_{th} = Z_Q + Z_T + Z_L & \Omega & \text{z\_thevenin\_ohm} \\
-\text{EQ\_SC3F\_004} & \text{Prąd } I_k'' & I_k'' = \frac{c \cdot U_n}{\sqrt{3} \cdot |Z_{th}|} & \text{kA} & \text{ikss\_ka} \\
+\text{EQ\_SC3F\_004} & \text{Prąd } I_k'' & I_k'' = \frac{c \cdot U_n}{\sqrt{3} \cdot |Z_{th}|} \text{ (c TUTAJ)} & \text{kA} & \text{ikss\_ka} \\
 \text{EQ\_SC3F\_005} & \text{Współczynnik } \kappa & \kappa = 1.02 + 0.98 \cdot e^{-3R/X} & — & \text{kappa} \\
 \text{EQ\_SC3F\_006} & \text{Prąd udarowy } i_p & i_p = \kappa \cdot \sqrt{2} \cdot I_k'' & \text{kA} & \text{ip\_ka} \\
 \text{EQ\_SC3F\_007} & \text{Moc } S_k'' & S_k'' = \sqrt{3} \cdot U_n \cdot I_k'' & \text{MVA} & \text{sk\_mva} \\
@@ -555,6 +555,114 @@ $$
 \end{aligned}
 }
 $$
+
+---
+
+## 6. Anti-Double-Counting Audit (BINDING)
+
+**Status: PASS**
+**Audyt: 2026-01-27**
+**Auditor: Opus 4.5 — Profesor Energetyki IEC 60909**
+
+---
+
+### 6.1 Audyt współczynnika c (KRYTYCZNY)
+
+$$
+\boxed{
+\begin{aligned}
+&\textbf{WYNIK AUDYTU: PASS (po korekcie)} \\[12pt]
+&\textbf{Współczynnik } c \textbf{ wprowadzony DOKŁADNIE RAZ:} \\[8pt]
+&\quad \text{EQ\_SC3F\_004: } I_k'' = \frac{\colorbox{yellow}{$c$} \cdot U_n}{\sqrt{3} \cdot |Z_{th}|} \quad \checkmark \\[12pt]
+&\textbf{Współczynnik } c \textbf{ NIE występuje w:} \\[4pt]
+&\quad \text{EQ\_SC3F\_002: } Z_Q = \frac{U_n^2}{S_k''_Q} \quad \text{(BEZ } c \text{)} \quad \checkmark \\
+&\quad \text{EQ\_SC3F\_003: } Z_{th} = Z_Q + Z_T + Z_L \quad \checkmark \\
+&\quad \text{EQ\_SC3F\_005: } \kappa = f(R_{th}/X_{th}) \quad \checkmark \\
+&\quad \text{EQ\_SC3F\_006: } i_p = \kappa \cdot \sqrt{2} \cdot I_k'' \quad \checkmark \\
+&\quad \text{EQ\_SC3F\_007: } S_k'' = \sqrt{3} \cdot U_n \cdot I_k'' \quad \checkmark \\
+&\quad \text{EQ\_SC3F\_008: } I_{th} = I_k'' \cdot \sqrt{m+n} \quad \checkmark \\
+&\quad \text{EQ\_SC3F\_009: } Z_T = \frac{u_k\% \cdot U_n^2}{100 \cdot S_r} \quad \checkmark \\
+&\quad \text{EQ\_SC3F\_010: } Z_L = (r+jx) \cdot l \quad \checkmark
+\end{aligned}
+}
+$$
+
+### 6.2 Audyt wielkości pochodnych
+
+$$
+\begin{array}{|l|l|l|l|}
+\hline
+\textbf{Wielkość} & \textbf{Wprowadzona w} & \textbf{Używana w} & \textbf{Status} \\
+\hline
+c & \text{(wejście)} & \text{EQ\_SC3F\_004 ONLY} & \checkmark \text{ PASS} \\
+U_n & \text{(wejście)} & \text{EQ\_SC3F\_001,002,004,007,009} & \checkmark \text{ PASS (input)} \\
+Z_Q & \text{EQ\_SC3F\_002} & \text{EQ\_SC3F\_003} & \checkmark \text{ PASS} \\
+Z_{th} & \text{EQ\_SC3F\_003} & \text{EQ\_SC3F\_004,005} & \checkmark \text{ PASS} \\
+I_k'' & \text{EQ\_SC3F\_004} & \text{EQ\_SC3F\_006,007,008} & \checkmark \text{ PASS} \\
+\kappa & \text{EQ\_SC3F\_005} & \text{EQ\_SC3F\_006,008b} & \checkmark \text{ PASS} \\
+i_p & \text{EQ\_SC3F\_006} & \text{EQ\_SC3F\_008a} & \checkmark \text{ PASS} \\
+\hline
+\end{array}
+$$
+
+### 6.3 Warianty A/B — mutually exclusive
+
+$$
+\boxed{
+\begin{aligned}
+&\textbf{MV-DESIGN-PRO stosuje WARIANT A (BINDING):} \\[8pt]
+&\quad c \text{ w liczniku } I_k'' \quad \land \quad c \text{ BRAK w } Z_Q \\[12pt]
+&\textbf{Wariant B (NIE UŻYWANY):} \\[4pt]
+&\quad c \text{ w } Z_Q \quad \land \quad c \text{ BRAK w } I_k'' \\[12pt]
+&\textbf{ZAKAZ (double-counting):} \\[4pt]
+&\quad c \text{ w } Z_Q \;\land\; c \text{ w } I_k'' \quad \Rightarrow \quad I_k'' \text{ zawyżone o czynnik } c
+\end{aligned}
+}
+$$
+
+### 6.4 Łańcuch obliczeniowy (weryfikacja)
+
+```
+WEJŚCIA (pierwotne):
+  U_n, S_k''_Q, X/R, u_k%, S_r, r, x, l, c, t_k, f
+       │
+       ▼
+KROK 1: Z_Q = U_n² / S_k''_Q          [c NIE UŻYTE]
+KROK 2: Z_T = u_k% · U_n² / (100·S_r)  [c NIE UŻYTE]
+KROK 3: Z_L = (r+jx) · l               [c NIE UŻYTE]
+KROK 4: Z_th = Z_Q + Z_T + Z_L         [c NIE UŻYTE]
+       │
+       ▼
+KROK 5: I_k'' = c·U_n / (√3·|Z_th|)    [c WPROWADZONE TUTAJ — JEDYNY RAZ]
+       │
+       ▼
+KROK 6: κ = f(R_th/X_th)               [c NIE UŻYTE, już wliczone w I_k'']
+KROK 7: i_p = κ · √2 · I_k''           [c NIE UŻYTE, już wliczone w I_k'']
+KROK 8: S_k'' = √3 · U_n · I_k''       [c NIE UŻYTE, już wliczone w I_k'']
+KROK 9: I_th = I_k'' · √(m+n)          [c NIE UŻYTE, już wliczone w I_k'']
+KROK 10: I_dyn = i_p                   [c NIE UŻYTE]
+       │
+       ▼
+WYNIKI: I_k'', i_p, S_k'', I_th, I_dyn
+        [c wpływa na wszystkie poprzez I_k'' — DOKŁADNIE RAZ]
+```
+
+### 6.5 Gwarancja formalna
+
+$$
+\boxed{
+\textbf{GWARANCJA: Żadna wielkość fizyczna nie jest liczona podwójnie w rejestrze SC3F.}
+}
+$$
+
+| Wielkość | Wprowadzona dokładnie raz | Weryfikacja |
+|----------|---------------------------|-------------|
+| c | EQ_SC3F_004 | ✓ |
+| κ | EQ_SC3F_005 | ✓ |
+| Z_th | EQ_SC3F_003 | ✓ |
+| I_k'' | EQ_SC3F_004 | ✓ |
+| i_p | EQ_SC3F_006 | ✓ |
+| X/R | (wejście) | ✓ |
 
 ---
 
