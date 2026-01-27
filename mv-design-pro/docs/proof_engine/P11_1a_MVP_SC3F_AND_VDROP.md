@@ -164,18 +164,25 @@ class UnitCheckResult:
 
 ## 4. Kroki dowodu SC3F (BINDING)
 
-### 4.1 Lista kroków
+### 4.1 Lista kroków (MANDATORY)
 
-| Nr | Krok | Równanie | Wynik |
-|----|------|----------|-------|
-| 1 | Napięcie znamionowe z współczynnikiem c | `EQ_SC3F_001` | $c \cdot U_n$ |
-| 2 | Impedancja źródła | `EQ_SC3F_002` | $Z_Q$ |
-| 3 | Impedancja Thevenina | `EQ_SC3F_003` | $Z_{th}$ |
-| 4 | Początkowy prąd zwarciowy | `EQ_SC3F_004` | $I_k''$ |
-| 5 | Współczynnik udaru κ | `EQ_SC3F_005` | $\kappa$ |
-| 6 | Prąd udarowy | `EQ_SC3F_006` | $i_p$ |
-| 7 | Moc zwarciowa | `EQ_SC3F_007` | $S_k''$ |
-| 8 | (Opcjonalnie) Prąd cieplny | `EQ_SC3F_008` | $I_{th}$ |
+$$
+\begin{array}{|c|l|l|l|}
+\hline
+\textbf{Nr} & \textbf{Krok} & \textbf{Równanie} & \textbf{Wynik} \\
+\hline
+1 & \text{Napięcie znamionowe z współczynnikiem } c & \text{EQ\_SC3F\_001} & c \cdot U_n \\
+2 & \text{Impedancja źródła} & \text{EQ\_SC3F\_002} & Z_Q \\
+3 & \text{Impedancja Thevenina} & \text{EQ\_SC3F\_003} & Z_{th} \\
+4 & \text{Początkowy prąd zwarciowy} & \text{EQ\_SC3F\_004} & I_k'' \\
+5 & \text{Współczynnik udaru} & \text{EQ\_SC3F\_005} & \kappa \\
+6 & \text{Prąd udarowy} & \text{EQ\_SC3F\_006} & i_p \\
+7 & \text{Prąd dynamiczny (OBOWIĄZKOWY)} & \text{EQ\_SC3F\_008a} & I_{dyn} \\
+8 & \text{Prąd cieplny (OBOWIĄZKOWY)} & \text{EQ\_SC3F\_008} & I_{th} \\
+9 & \text{Moc zwarciowa} & \text{EQ\_SC3F\_007} & S_k'' \\
+\hline
+\end{array}
+$$
 
 ### 4.2 Szczegóły kroków
 
@@ -606,6 +613,319 @@ def test_proof_step_order_stable():
 | Format JSON (proof.json) udokumentowany | SPEC |
 | Format LaTeX (proof.tex) udokumentowany | SPEC |
 | Testy determinism zdefiniowane | SPEC |
+
+---
+
+## 9. Wzorcowy dowód SC3F — standard habilitacyjny (BINDING EXAMPLE)
+
+Poniższy dowód stanowi **kanoniczny przykład referencyjny**. Agent MUSI generować dowody w identycznym formacie.
+
+### 9.0 Założenia normatywne
+
+$$
+\boxed{
+\begin{aligned}
+&\textbf{ZAŁOŻENIA NORMATYWNE IEC 60909-0:2016} \\[6pt]
+&\text{Metoda: źródło napięciowe zastępcze (equivalent voltage source)} \\
+&\text{Typ zwarcia: trójfazowe symetryczne (SC3F)} \\
+&\text{Rezystancja zwarcia: } R_f = 0\,\Omega \text{ (zwarcie metaliczne)} \\
+&\text{Częstotliwość: } f = 50\,\text{Hz} \\
+&\text{Obciążenia: pominięte w chwili zwarcia} \\
+&\text{Pojemności linii: pominięte (sieć SN/nN)} \\
+&\text{Transformatory: stan jałowy przed zwarciem} \\
+&\text{Współczynnik napięciowy: } c = c_{\max}
+\end{aligned}
+}
+$$
+
+### 9.1 Dane wejściowe
+
+$$
+\boxed{
+\begin{aligned}
+&\textbf{SIEĆ ZASILAJĄCA:} \\
+&\quad U_n = 15{,}0\,\text{kV} \quad &&\text{napięcie znamionowe} \\
+&\quad S_{kQ}'' = 250\,\text{MVA} \quad &&\text{moc zwarciowa źródła} \\
+&\quad (R/X)_Q = 0{,}1 \quad &&\text{stosunek R/X} \\[6pt]
+&\textbf{TRANSFORMATOR:} \\
+&\quad S_{rT} = 10\,\text{MVA} \quad &&\text{moc znamionowa} \\
+&\quad u_{kr} = 10\,\% \quad &&\text{napięcie zwarcia} \\
+&\quad P_{krT} = 60\,\text{kW} \quad &&\text{straty zwarciowe} \\[6pt]
+&\textbf{LINIA KABLOWA:} \\
+&\quad r_L = 0{,}206\,\Omega/\text{km} \quad &&\text{rezystancja jednostkowa} \\
+&\quad x_L = 0{,}075\,\Omega/\text{km} \quad &&\text{reaktancja jednostkowa} \\
+&\quad l = 2{,}5\,\text{km} \quad &&\text{długość} \\[6pt]
+&\textbf{WSPÓŁCZYNNIK NAPIĘCIOWY (Tab. 1, IEC 60909):} \\
+&\quad c = c_{\max} = 1{,}10 \quad &&\text{dla sieci SN (}6\text{ kV} < U_n \leq 35\text{ kV)}
+\end{aligned}
+}
+$$
+
+### 9.2 Krok 1: Impedancja sieci zasilającej
+
+**Wzór:**
+$$
+Z_Q = \frac{c \cdot U_n^2}{S_{kQ}''}
+$$
+
+**Podstawienie:**
+$$
+Z_Q = \frac{1{,}10 \cdot (15{,}0\,\text{kV})^2}{250\,\text{MVA}} = \frac{1{,}10 \cdot 225\,\text{kV}^2}{250\,\text{MVA}} = \frac{247{,}5\,\text{kV}^2}{250\,\text{MVA}} = 0{,}990\,\Omega
+$$
+
+**Weryfikacja jednostek:**
+$$
+\frac{[\text{kV}]^2}{[\text{MVA}]} = \frac{10^6\,\text{V}^2}{10^6\,\text{VA}} = \frac{[\text{V}]^2}{[\text{V}] \cdot [\text{A}]} = \frac{[\text{V}]}{[\text{A}]} = [\Omega] \quad \checkmark
+$$
+
+**Rozkład na składowe:**
+$$
+\begin{aligned}
+&(R/X)_Q = 0{,}1 \Rightarrow R_Q = 0{,}1 \cdot X_Q \\
+&|Z_Q| = \sqrt{R_Q^2 + X_Q^2} = \sqrt{1{,}01} \cdot X_Q \\
+&X_Q = \frac{0{,}990}{1{,}005}\,\Omega = 0{,}985\,\Omega \\
+&R_Q = 0{,}1 \cdot 0{,}985\,\Omega = 0{,}099\,\Omega \\[4pt]
+&\boxed{Z_Q = 0{,}099 + j\,0{,}985\,\Omega}
+\end{aligned}
+$$
+
+### 9.3 Krok 2: Impedancja transformatora
+
+**Wzór:**
+$$
+|Z_T| = \frac{u_{kr}}{100\%} \cdot \frac{U_n^2}{S_{rT}}
+$$
+
+**Podstawienie:**
+$$
+|Z_T| = \frac{10\%}{100\%} \cdot \frac{(15{,}0\,\text{kV})^2}{10\,\text{MVA}} = 0{,}10 \cdot 22{,}5\,\Omega = 2{,}25\,\Omega
+$$
+
+**Składowa rezystancyjna:**
+$$
+R_T = \frac{P_{krT} \cdot U_n^2}{S_{rT}^2} = \frac{60\,\text{kW} \cdot (15{,}0)^2\,\text{kV}^2}{(10\,\text{MVA})^2} = \frac{13{,}5 \cdot 10^{12}}{100 \cdot 10^{12}}\,\Omega = 0{,}135\,\Omega
+$$
+
+**Składowa reaktancyjna:**
+$$
+X_T = \sqrt{|Z_T|^2 - R_T^2} = \sqrt{5{,}0625 - 0{,}0182}\,\Omega = 2{,}246\,\Omega
+$$
+
+$$
+\boxed{Z_T = 0{,}135 + j\,2{,}246\,\Omega}
+$$
+
+### 9.4 Krok 3: Impedancja linii kablowej
+
+**Wzór:**
+$$
+Z_L = (r_L + j\,x_L) \cdot l
+$$
+
+**Podstawienie:**
+$$
+\begin{aligned}
+R_L &= 0{,}206\,\frac{\Omega}{\text{km}} \cdot 2{,}5\,\text{km} = 0{,}515\,\Omega \\
+X_L &= 0{,}075\,\frac{\Omega}{\text{km}} \cdot 2{,}5\,\text{km} = 0{,}188\,\Omega
+\end{aligned}
+$$
+
+$$
+\boxed{Z_L = 0{,}515 + j\,0{,}188\,\Omega}
+$$
+
+### 9.5 Krok 4: Impedancja zastępcza Thévenina
+
+**Wzór:**
+$$
+Z_{th} = Z_Q + Z_T + Z_L
+$$
+
+**Podstawienie:**
+$$
+\begin{aligned}
+R_{th} &= 0{,}099 + 0{,}135 + 0{,}515 = 0{,}749\,\Omega \\
+X_{th} &= 0{,}985 + 2{,}246 + 0{,}188 = 3{,}419\,\Omega
+\end{aligned}
+$$
+
+$$
+\boxed{Z_{th} = 0{,}749 + j\,3{,}419\,\Omega}
+$$
+
+**Moduł:**
+$$
+|Z_{th}| = \sqrt{(0{,}749)^2 + (3{,}419)^2}\,\Omega = \sqrt{12{,}251}\,\Omega = 3{,}500\,\Omega
+$$
+
+### 9.6 Krok 5: Początkowy prąd zwarciowy symetryczny
+
+**Wzór:**
+$$
+I_k'' = \frac{c \cdot U_n}{\sqrt{3} \cdot |Z_{th}|}
+$$
+
+**Podstawienie:**
+$$
+I_k'' = \frac{1{,}10 \cdot 15{,}0\,\text{kV}}{\sqrt{3} \cdot 3{,}500\,\Omega} = \frac{16{,}50\,\text{kV}}{6{,}062\,\Omega} = 2{,}722\,\text{kA}
+$$
+
+**Weryfikacja jednostek:**
+$$
+\frac{[\text{kV}]}{[\Omega]} = \frac{10^3\,[\text{V}]}{[\text{V}]/[\text{A}]} = 10^3\,[\text{A}] = [\text{kA}] \quad \checkmark
+$$
+
+$$
+\boxed{I_k'' = 2{,}722\,\text{kA}}
+$$
+
+### 9.7 Krok 6: Współczynnik udarowy
+
+**Wzór:**
+$$
+\kappa = 1{,}02 + 0{,}98 \cdot e^{-3 \cdot R_{th}/X_{th}}
+$$
+
+**Stosunek R/X:**
+$$
+\frac{R_{th}}{X_{th}} = \frac{0{,}749}{3{,}419} = 0{,}219
+$$
+
+**Podstawienie:**
+$$
+\kappa = 1{,}02 + 0{,}98 \cdot e^{-3 \cdot 0{,}219} = 1{,}02 + 0{,}98 \cdot e^{-0{,}657} = 1{,}02 + 0{,}508 = 1{,}528
+$$
+
+**Weryfikacja warunku stosowalności:**
+$$
+0{,}005 \leq 0{,}219 \leq 1{,}0 \quad \checkmark
+$$
+
+$$
+\boxed{\kappa = 1{,}528}
+$$
+
+### 9.8 Krok 7: Prąd udarowy (szczytowy)
+
+**Wzór:**
+$$
+i_p = \kappa \cdot \sqrt{2} \cdot I_k''
+$$
+
+**Podstawienie:**
+$$
+i_p = 1{,}528 \cdot 1{,}414 \cdot 2{,}722\,\text{kA} = 5{,}882\,\text{kA}
+$$
+
+$$
+\boxed{i_p = 5{,}882\,\text{kA}}
+$$
+
+### 9.9 Krok 8: Prąd dynamiczny (OBOWIĄZKOWY)
+
+**Wzór:**
+$$
+I_{dyn} = i_p
+$$
+
+**Podstawienie:**
+$$
+I_{dyn} = 5{,}882\,\text{kA}
+$$
+
+$$
+\boxed{I_{dyn} = 5{,}882\,\text{kA}}
+$$
+
+### 9.10 Krok 9: Prąd cieplny równoważny (OBOWIĄZKOWY)
+
+**Wzór:**
+$$
+I_{th} = I_k'' \cdot \sqrt{m + n}
+$$
+
+**Warunek uproszczenia:**
+$$
+\boxed{
+\begin{aligned}
+&\text{Dla sieci odległej od generatorów synchronicznych:} \\
+&m = 1, \quad n = 0 \quad \Rightarrow \quad \sqrt{m + n} = 1
+\end{aligned}
+}
+$$
+
+**Podstawienie:**
+$$
+I_{th} = 2{,}722\,\text{kA} \cdot 1 = 2{,}722\,\text{kA}
+$$
+
+$$
+\boxed{I_{th} = 2{,}722\,\text{kA}}
+$$
+
+### 9.11 Krok 10: Moc zwarciowa początkowa
+
+**Wzór:**
+$$
+S_k'' = \sqrt{3} \cdot U_n \cdot I_k''
+$$
+
+**Podstawienie:**
+$$
+S_k'' = 1{,}732 \cdot 15{,}0\,\text{kV} \cdot 2{,}722\,\text{kA} = 70{,}7\,\text{MVA}
+$$
+
+**Weryfikacja jednostek:**
+$$
+[\text{kV}] \cdot [\text{kA}] = 10^3\,[\text{V}] \cdot 10^3\,[\text{A}] = 10^6\,[\text{VA}] = [\text{MVA}] \quad \checkmark
+$$
+
+$$
+\boxed{S_k'' = 70{,}7\,\text{MVA}}
+$$
+
+### 9.12 Podsumowanie wyników
+
+$$
+\boxed{
+\begin{array}{|l|c|c|c|}
+\hline
+\textbf{Wielkość} & \textbf{Symbol} & \textbf{Wartość} & \textbf{Jednostka} \\
+\hline
+\text{Impedancja zastępcza} & |Z_{th}| & 3{,}500 & \Omega \\
+\text{Prąd początkowy} & I_k'' & 2{,}722 & \text{kA} \\
+\text{Współczynnik udaru} & \kappa & 1{,}528 & — \\
+\text{Prąd udarowy} & i_p & 5{,}882 & \text{kA} \\
+\text{Prąd dynamiczny} & I_{dyn} & 5{,}882 & \text{kA} \\
+\text{Prąd cieplny} & I_{th} & 2{,}722 & \text{kA} \\
+\text{Moc zwarciowa} & S_k'' & 70{,}7 & \text{MVA} \\
+\hline
+\end{array}
+}
+$$
+
+### 9.13 Wniosek inżynierski
+
+Na podstawie przeprowadzonych obliczeń zgodnych z normą IEC 60909-0:2016 stwierdzam, co następuje.
+
+**Wymagania dla aparatury łączeniowej:**
+
+$$
+\begin{array}{|l|l|}
+\hline
+\textbf{Parametr} & \textbf{Wymaganie minimalne} \\
+\hline
+\text{Znamionowy prąd zwarciowy łączeniowy} & I_{kn} \geq 3\,\text{kA} \\
+\text{Znamionowy prąd dynamiczny} & I_{dyn,n} \geq 6\,\text{kA} \\
+\text{Znamionowy prąd cieplny (1s)} & I_{th,n} \geq 3\,\text{kA} \\
+\hline
+\end{array}
+$$
+
+**Zalecenia:**
+- Dobór wyłączników z prądem znamionowym zwarciowym co najmniej jednego poziomu wyżej niż obliczony
+- Weryfikacja nastaw zabezpieczeń nadprądowych
+- Sprawdzenie koordynacji czasów działania zabezpieczeń
 
 ---
 
