@@ -804,6 +804,56 @@ OUTDATED → FRESH (after re-calculation)
 
 ---
 
+## 17. Proof Engine / Mathematical Proof Engine (P11/P11.1)
+
+### 17.1 Checklisty dowodu akademickiego (PF++)
+
+| ID | Requirement | Verification | Status |
+|----|-------------|--------------|--------|
+| PE-001 | Solver nietknięty (FROZEN) | Check: no changes to solvers | PASS |
+| PE-002 | Result API nietknięte (FROZEN) | Check: no changes to ShortCircuitResult | PASS |
+| PE-003 | TraceArtifact immutable | Check: frozen dataclass | VERIFY |
+| PE-004 | ProofDocument deterministic | Check: same input → same output | VERIFY |
+| PE-005 | Mapping keys literalne | Check: no interpretation of keys | VERIFY |
+| PE-006 | Rejestr równań SC3F kompletny | Check: EQUATIONS_IEC60909_SC3F.md | PASS |
+| PE-007 | Rejestr równań VDROP kompletny | Check: EQUATIONS_VDROP.md | PASS |
+| PE-008 | ProofStep format: Wzór→Dane→Podstawienie→Wynik→Jednostki | Check: PROOF_SCHEMAS.md | PASS |
+| PE-009 | Unit verification w każdym kroku | Check: UnitCheckResult schema | PASS |
+| PE-010 | Eksport JSON deterministyczny | Check: proof.json stable | VERIFY |
+| PE-011 | Eksport LaTeX deterministyczny | Check: proof.tex stable | VERIFY |
+
+### 17.2 Dokumentacja (DOC ONLY) — Status PASS
+
+| ID | Dokument | Zawartość | Status |
+|----|----------|-----------|--------|
+| PE-D01 | `docs/proof_engine/README.md` | Pakiet kanoniczny | PASS |
+| PE-D02 | `docs/proof_engine/P11_OVERVIEW.md` | TraceArtifact, inwarianty | PASS |
+| PE-D03 | `docs/proof_engine/P11_1a_MVP_SC3F_AND_VDROP.md` | MVP specyfikacja | PASS |
+| PE-D04 | `docs/proof_engine/P11_1b_REGULATION_Q_U.md` | Q(U), cosφ(P) | PASS |
+| PE-D05 | `docs/proof_engine/P11_1c_SC_ASYMMETRICAL.md` | Składowe symetryczne | PASS |
+| PE-D06 | `docs/proof_engine/P11_1d_PROOF_UI_EXPORT.md` | UI + eksport | PASS |
+| PE-D07 | `docs/proof_engine/PROOF_SCHEMAS.md` | Schematy JSON | PASS |
+| PE-D08 | `docs/proof_engine/EQUATIONS_IEC60909_SC3F.md` | Rejestr SC3F | PASS |
+| PE-D09 | `docs/proof_engine/EQUATIONS_VDROP.md` | Rejestr VDROP | PASS |
+
+### 17.3 Testy determinism (wymagane przy implementacji)
+
+| Test | Description | Status |
+|------|-------------|--------|
+| `test_trace_artifact_determinism` | Same run → identical artifact | SPEC |
+| `test_proof_json_determinism` | Same artifact → identical JSON | SPEC |
+| `test_proof_tex_determinism` | Same artifact → identical LaTeX | SPEC |
+| `test_proof_step_order_stable` | Step order is fixed | SPEC |
+| `test_mapping_keys_stable` | Keys don't change between versions | SPEC |
+
+### 17.4 Audit Trail (P11)
+
+| Date | Auditor | Version | Findings |
+|------|---------|---------|----------|
+| 2026-01 | System | 2.8 | P11/P11.1 DOC ONLY: 9/9 documents PASS, 11 items VERIFY (pending implementation) |
+
+---
+
 ## 13. Verification Commands
 
 ### 12.1 Check for PCC in Model

@@ -279,7 +279,43 @@ When making changes:
 
 ---
 
-## 10. Escalation
+## 10. Źródła kanoniczne — Proof Pack (BINDING)
+
+### 10.1 Przeznaczenie
+
+Ten pakiet zawiera **kanoniczne źródła wiedzy** dla Proof Engine (P11).
+**Wszystkie agenty (Claude, Codex, inne LLM) MUSZĄ traktować zawartość tych dokumentów jako BINDING REFERENCE.**
+
+### 10.2 Dokumenty BINDING
+
+| Dokument | Zawartość | Użycie |
+|----------|-----------|--------|
+| `docs/proof_engine/PROOF_SCHEMAS.md` | Schematy JSON (ProofDocument, ProofStep, ...) | Literalne struktury danych |
+| `docs/proof_engine/EQUATIONS_IEC60909_SC3F.md` | Rejestr równań SC3F z mapping keys | Literalne równania i klucze |
+| `docs/proof_engine/EQUATIONS_VDROP.md` | Rejestr równań VDROP z mapping keys | Literalne równania i klucze |
+| `docs/proof_engine/P11_1a_MVP_SC3F_AND_VDROP.md` | Specyfikacja MVP | Kroki dowodu, format wyjściowy |
+| `docs/proof_engine/P11_OVERVIEW.md` | TraceArtifact, inwarianty | Definicje, hierarchia, UX |
+
+### 10.3 Reguły dla agentów AI
+
+1. **NIE INTERPRETUJ** — bierz dosłownie definicje, schematy JSON, równania LaTeX
+2. **NIE MODYFIKUJ** solverów ani Result API IEC 60909
+3. **UŻYWAJ mapping keys** literalnie przy implementacji
+4. **ZACHOWAJ determinism** — identyczne wejścia → identyczne wyjścia
+5. **FORMAT KROKU**: Wzór → Dane → Podstawienie → Wynik → Weryfikacja jednostek
+
+### 10.4 Inwarianty Proof Engine
+
+| Inwariant | Opis |
+|-----------|------|
+| **Solver nietknięty** | Proof Engine NIE modyfikuje solverów ani Result API |
+| **Determinism** | Ten sam `run_id` → identyczny `proof.json` i `proof.tex` |
+| **Czysta interpretacja** | Dowód generowany z gotowych danych trace/result |
+| **Traceability** | Każda wartość ma mapping key do źródła |
+
+---
+
+## 11. Escalation
 
 If any rule conflict is detected:
 1. Stop implementation

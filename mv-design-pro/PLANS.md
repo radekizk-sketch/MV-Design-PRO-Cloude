@@ -456,4 +456,139 @@ class NetworkGraph:
 
 ---
 
+## 13. Phase P11: Proof Engine / Mathematical Proof Engine (DOC ONLY)
+
+### 13.1 Cel fazy
+
+Wprowadzenie warstwy **interpretacji dowodowej** (Proof Engine), która generuje formalne dowody matematyczne z wyników solverów (WhiteBoxTrace + SolverResult).
+
+**INVARIANT:** Solver i Result API IEC 60909 pozostają **NIETKNIĘTE**. Proof Engine jest warstwą interpretacji POST-HOC.
+
+### 13.2 Zakres fazy
+
+| W zakresie | Poza zakresem |
+|------------|---------------|
+| Dokumentacja Proof Engine (SPEC) | Implementacja kodu |
+| Schematy JSON ProofDocument | Modyfikacja solverów |
+| Rejestr równań SC3F, VDROP | Modyfikacja Result API |
+| Definicje mapping keys | Nowe typy zwarć (implementacja) |
+
+### 13.3 Deliverables (DOC ONLY)
+
+| Plik | Opis | Status |
+|------|------|--------|
+| `docs/proof_engine/README.md` | Kanoniczny pakiet wiedzy | SPEC |
+| `docs/proof_engine/P11_OVERVIEW.md` | TraceArtifact, inwarianty, UX | SPEC |
+| `docs/proof_engine/P11_1a_MVP_SC3F_AND_VDROP.md` | MVP: SC3F + VDROP | SPEC |
+| `docs/proof_engine/P11_1b_REGULATION_Q_U.md` | Dowód regulatora Q(U) | SPEC |
+| `docs/proof_engine/P11_1c_SC_ASYMMETRICAL.md` | Składowe symetryczne | SPEC |
+| `docs/proof_engine/P11_1d_PROOF_UI_EXPORT.md` | Proof Inspector UI | SPEC |
+| `docs/proof_engine/PROOF_SCHEMAS.md` | Kanoniczne schematy JSON | SPEC |
+| `docs/proof_engine/EQUATIONS_IEC60909_SC3F.md` | Rejestr równań SC3F | SPEC |
+| `docs/proof_engine/EQUATIONS_VDROP.md` | Rejestr równań VDROP | SPEC |
+
+---
+
+## 14. P11 Execution Plan (Detailed)
+
+### 14.1 P11 — White Box / Trace Inspector (dowodowy)
+
+**Definition of Done:**
+- [x] TraceArtifact zdefiniowany jako frozen dataclass
+- [x] Mapping keys dla SC3F i VDROP udokumentowane
+- [x] UI „Ślad obliczeń" opisany (read-only)
+- [x] Pipeline integracji z ProofEngine opisany
+- [x] Hierarchia Project → Case → Run → Artifact opisana
+
+**Tests (Determinism):**
+- TraceArtifact: ten sam run_id → identyczny artifact
+- Mapping keys: stabilne między wersjami
+
+### 14.2 P11.1a (MVP) — SC3F IEC60909 + VDROP
+
+**Definition of Done:**
+- [x] ProofDocument zdefiniowany z wszystkimi polami
+- [x] ProofStep z formatem Wzór→Dane→Podstawienie→Wynik→Jednostki
+- [x] SC3F: 7-8 kroków dowodu z mapping keys
+- [x] VDROP: 6 kroków dowodu z mapping keys
+- [x] Format JSON (proof.json) udokumentowany
+- [x] Format LaTeX (proof.tex) udokumentowany
+- [x] Testy determinism zdefiniowane
+
+**Tests (Determinism):**
+- proof.json: identyczny dla tego samego TraceArtifact
+- proof.tex: identyczny dla tego samego TraceArtifact
+- Kolejność kroków: stabilna
+
+### 14.3 P11.1b — Dowód regulatora Q(U), cosφ(P)
+
+**Definition of Done:**
+- [x] Charakterystyka Q(U) zdefiniowana z wszystkimi parametrami
+- [x] Charakterystyka cosφ(P) zdefiniowana z wszystkimi parametrami
+- [x] Równanie wpływu Q na ΔU udokumentowane
+- [x] Counterfactual Proof zdefiniowany
+- [x] Kroki dowodu Q(U) z mapping keys
+- [x] Przykład counterfactual udokumentowany
+
+### 14.4 P11.1c — Zwarcia niesymetryczne (składowe symetryczne)
+
+**Definition of Done:**
+- [x] Transformacja Fortescue udokumentowana
+- [x] Impedancje Z1, Z2, Z0 zdefiniowane z mapping keys
+- [x] Równania 1F z krokami dowodu
+- [x] Równania 2F z krokami dowodu
+- [x] Równania 2FG z krokami dowodu
+- [x] Tabela połączeń transformatorów i ich wpływu na Z0
+- [x] Rejestr równań dla wszystkich typów zwarć
+
+### 14.5 P11.1d — Proof Inspector UI + Eksport
+
+**Definition of Done:**
+- [x] Layout Proof Inspector zdefiniowany
+- [x] Sekcje kroku (Wzór/Dane/Podstawienie/Wynik/Weryfikacja) opisane
+- [x] Nawigacja (spis, przyciski, skróty) opisana
+- [x] Widok podsumowania opisany
+- [x] Kontrakty eksportu (LaTeX/PDF/DOCX/Markdown) zdefiniowane
+- [x] Tryb read-only udokumentowany
+- [x] Komponenty UI wyspecyfikowane
+- [x] Wymagania dostępności (a11y) opisane
+
+---
+
+## 15. P11 Compliance Checklist
+
+### 15.1 Proof Engine Alignment
+
+| Requirement | Phase | Status |
+|-------------|-------|--------|
+| Solver nietknięty | P11 | PASS (DOC ONLY) |
+| Result API nietknięte | P11 | PASS (DOC ONLY) |
+| TraceArtifact immutable | P11 | SPEC |
+| ProofDocument deterministic | P11.1a | SPEC |
+| Mapping keys literalne | P11.1a | SPEC |
+| Rejestr równań SC3F | P11.1a | SPEC |
+| Rejestr równań VDROP | P11.1a | SPEC |
+
+### 15.2 Determinism Tests (Required)
+
+| Test | Description | Status |
+|------|-------------|--------|
+| `test_trace_artifact_determinism` | Same run → identical artifact | SPEC |
+| `test_proof_json_determinism` | Same artifact → identical JSON | SPEC |
+| `test_proof_tex_determinism` | Same artifact → identical LaTeX | SPEC |
+| `test_proof_step_order_stable` | Step order is fixed | SPEC |
+| `test_mapping_keys_stable` | Keys don't change between versions | SPEC |
+
+---
+
+## 16. Change Log (continued)
+
+| Date | Version | Changes |
+|------|---------|---------|
+| 2026-01 | 2.11 | P11: Proof Engine / Mathematical Proof Engine documentation (DOC ONLY) |
+| 2026-01 | 2.12 | P11.1a MVP: SC3F IEC60909 + VDROP proof specifications |
+| 2026-01 | 2.13 | P11.1b-d: Regulation Q(U), asymmetrical SC, UI/export specs |
+
+---
+
 **END OF EXECUTION PLAN**
