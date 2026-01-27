@@ -95,41 +95,60 @@ output_results = {
 
 ### 3.1 Wymagane kategorie danych
 
-| Kategoria | Opis | Przykład |
-|-----------|------|----------|
-| **Wejścia** | Dane wejściowe solvera | `u_n_kv`, `s_rated_mva`, `r_ohm_per_km` |
-| **Wartości pośrednie** | Wyniki kroków pośrednich | `z_thevenin_ohm`, `y_bus_matrix` |
-| **Przepływy** | Moce i prądy w gałęziach | `p_mw`, `q_mvar`, `i_ka` |
-| **Ścieżki** | Topologia użyta w obliczeniach | `fault_path_buses`, `contributing_sources` |
-| **Limity** | Wartości odniesienia (jeśli dotyczy) | `i_rated_ka`, `u_min_pu`, `u_max_pu` |
+$$
+\begin{array}{|l|l|l|}
+\hline
+\textbf{Kategoria} & \textbf{Opis} & \textbf{Przykładowe mapping keys} \\
+\hline
+\textbf{Wejścia} & \text{Dane wejściowe solvera} & \texttt{u\_n\_kv}, \texttt{s\_rated\_mva} \\
+\textbf{Wartości pośrednie} & \text{Wyniki kroków pośrednich} & \texttt{z\_thevenin\_ohm}, \texttt{y\_bus\_matrix} \\
+\textbf{Przepływy} & \text{Moce i prądy w gałęziach} & \texttt{p\_mw}, \texttt{q\_mvar}, \texttt{i\_ka} \\
+\textbf{Ścieżki} & \text{Topologia użyta w obliczeniach} & \texttt{fault\_path\_buses} \\
+\textbf{Limity} & \text{Wartości odniesienia} & \texttt{i\_rated\_ka}, \texttt{u\_min\_pu} \\
+\hline
+\end{array}
+$$
 
 ### 3.2 Obowiązkowe pola dla SC3F
 
-| Pole | Typ | Jednostka | Opis |
-|------|-----|-----------|------|
-| `fault_bus_id` | UUID | — | Szyna miejsca zwarcia |
-| `u_n_kv` | float | kV | Napięcie znamionowe |
-| `c_factor` | float | — | Współczynnik napięciowy (c_max lub c_min) |
-| `z_source_ohm` | complex | Ω | Impedancja źródła |
-| `z_thevenin_ohm` | complex | Ω | Impedancja zastępcza Thevenina |
-| `ikss_ka` | float | kA | Początkowy prąd zwarciowy symetryczny |
-| `ip_ka` | float | kA | Prąd udarowy (szczytowy) |
-| `ith_ka` | float | kA | Prąd cieplny równoważny |
-| `sk_mva` | float | MVA | Moc zwarciowa |
-| `kappa` | float | — | Współczynnik udaru |
+$$
+\begin{array}{|l|l|l|l|}
+\hline
+\textbf{Pole (mapping key)} & \textbf{Typ} & \textbf{Jednostka} & \textbf{Opis} \\
+\hline
+\texttt{fault\_bus\_id} & \text{UUID} & — & \text{Szyna miejsca zwarcia} \\
+\texttt{u\_n\_kv} & \text{float} & \text{kV} & \text{Napięcie znamionowe} \\
+\texttt{c\_factor} & \text{float} & — & \text{Współczynnik napięciowy} \\
+\texttt{z\_source\_ohm} & \text{complex} & \Omega & \text{Impedancja źródła} \\
+\texttt{z\_thevenin\_ohm} & \text{complex} & \Omega & \text{Impedancja zastępcza Thevenina} \\
+\texttt{ikss\_ka} & \text{float} & \text{kA} & \text{Początkowy prąd zwarciowy symetryczny } I_k'' \\
+\texttt{ip\_ka} & \text{float} & \text{kA} & \text{Prąd udarowy (szczytowy) } i_p \\
+\texttt{ith\_ka} & \text{float} & \text{kA} & \text{Prąd cieplny równoważny } I_{th} \\
+\texttt{idyn\_ka} & \text{float} & \text{kA} & \text{Prąd dynamiczny } I_{dyn} \\
+\texttt{sk\_mva} & \text{float} & \text{MVA} & \text{Moc zwarciowa } S_k'' \\
+\texttt{kappa} & \text{float} & — & \text{Współczynnik udaru } \kappa \\
+\hline
+\end{array}
+$$
 
 ### 3.3 Obowiązkowe pola dla VDROP (spadki napięć)
 
-| Pole | Typ | Jednostka | Opis |
-|------|-----|-----------|------|
-| `from_bus_id` | UUID | — | Szyna początkowa odcinka |
-| `to_bus_id` | UUID | — | Szyna końcowa odcinka |
-| `r_ohm` | float | Ω | Rezystancja odcinka |
-| `x_ohm` | float | Ω | Reaktancja odcinka |
-| `p_mw` | float | MW | Moc czynna przepływająca |
-| `q_mvar` | float | Mvar | Moc bierna przepływająca |
-| `delta_u_percent` | float | % | Spadek napięcia na odcinku |
-| `delta_u_total_percent` | float | % | Sumaryczny spadek napięcia od źródła |
+$$
+\begin{array}{|l|l|l|l|}
+\hline
+\textbf{Pole (mapping key)} & \textbf{Typ} & \textbf{Jednostka} & \textbf{Opis} \\
+\hline
+\texttt{from\_bus\_id} & \text{UUID} & — & \text{Szyna początkowa odcinka} \\
+\texttt{to\_bus\_id} & \text{UUID} & — & \text{Szyna końcowa odcinka} \\
+\texttt{r\_ohm} & \text{float} & \Omega & \text{Rezystancja odcinka} \\
+\texttt{x\_ohm} & \text{float} & \Omega & \text{Reaktancja odcinka} \\
+\texttt{p\_mw} & \text{float} & \text{MW} & \text{Moc czynna przepływająca} \\
+\texttt{q\_mvar} & \text{float} & \text{Mvar} & \text{Moc bierna przepływająca} \\
+\texttt{delta\_u\_percent} & \text{float} & \% & \text{Spadek napięcia na odcinku} \\
+\texttt{delta\_u\_total\_percent} & \text{float} & \% & \text{Sumaryczny spadek napięcia od źródła} \\
+\hline
+\end{array}
+$$
 
 ---
 
@@ -144,17 +163,23 @@ Project
               ├── NetworkSnapshot (input)
               ├── SolverResult (output)
               └── TraceArtifact (audit)
-                    └── ProofDocument (optional)
+                    └── ProofDocument (OBOWIĄZKOWY)
 ```
 
 ### 4.2 Relacje (BINDING)
 
-| Relacja | Kardynalność | Opis |
-|---------|--------------|------|
-| Project → StudyCase | 1:N | Projekt ma wiele przypadków |
-| StudyCase → CalculationRun | 1:N | Przypadek ma wiele uruchomień |
-| CalculationRun → TraceArtifact | 1:1 | Uruchomienie ma dokładnie jeden artefakt |
-| TraceArtifact → ProofDocument | 1:0..1 | Artefakt może mieć wygenerowany dowód |
+$$
+\begin{array}{|l|l|l|}
+\hline
+\textbf{Relacja} & \textbf{Kardynalność} & \textbf{Opis} \\
+\hline
+\text{Project} \to \text{StudyCase} & 1:N & \text{Projekt ma wiele przypadków} \\
+\text{StudyCase} \to \text{CalculationRun} & 1:N & \text{Przypadek ma wiele uruchomień} \\
+\text{CalculationRun} \to \text{TraceArtifact} & 1:1 & \text{Uruchomienie ma dokładnie jeden artefakt} \\
+\text{TraceArtifact} \to \text{ProofDocument} & 1:1 & \text{Artefakt MA wygenerowany dowód} \\
+\hline
+\end{array}
+$$
 
 ---
 

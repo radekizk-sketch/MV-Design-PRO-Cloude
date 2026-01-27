@@ -93,9 +93,9 @@ Ten pakiet zawiera **kanoniczne źródła wiedzy** dla systemu dowodów matematy
 3. **Czysta interpretacja** — dowód jest generowany z gotowych danych trace/result
 4. **Kompletność** — każdy krok dowodu ma: wzór, dane, podstawienie, wynik, weryfikację jednostek
 5. **Traceability** — każdy wynik w dowodzie ma mapping key do źródła w trace/result
-6. **LaTeX-only math** — WSZYSTKIE symbole matematyczne, jednostki i liczby w blokach `$...$`
-7. **I_dyn MANDATORY** — prąd dynamiczny jest OBOWIĄZKOWYM wynikiem SC3F
-8. **I_th MANDATORY** — prąd cieplny jest OBOWIĄZKOWYM wynikiem SC3F (z pełnym obliczeniem m, n)
+6. **LaTeX-only math** — WSZYSTKIE symbole matematyczne, jednostki i liczby WYŁĄCZNIE w blokach `$$...$$`
+7. **Prąd dynamiczny OBOWIĄZKOWY** — obowiązkowy wynik obliczeń zwarciowych
+8. **Prąd cieplny OBOWIĄZKOWY** — obowiązkowy wynik z pełnym obliczeniem współczynników
 
 ---
 
@@ -104,14 +104,14 @@ Ten pakiet zawiera **kanoniczne źródła wiedzy** dla systemu dowodów matematy
 $$
 \boxed{
 \begin{aligned}
-&\textbf{REGUŁA: ZERO MATEMATYKI POZA BLOKAMI LaTeX} \\[8pt]
-&\text{DOZWOLONE: } \texttt{\$I\_k''\$}, \quad \texttt{\$15{,}0\,\textbackslash text\{kV\}\$} \\[4pt]
-&\text{ZABRONIONE: } \texttt{I\_k''}, \quad \texttt{15.0 kV} \text{ (poza blokiem)} \\[8pt]
-&\textbf{Jednostki SI TYLKO w LaTeX:} \\[4pt]
-&\quad \Omega, \text{kV}, \text{kA}, \text{MVA}, \text{MW}, \text{Mvar}, \% \\[4pt]
-&\textbf{Wyjątki (dozwolone poza LaTeX):} \\[4pt]
-&\quad \text{JSON examples: } \texttt{"unit": "kA"} \\
-&\quad \text{YAML definitions: } \texttt{unit: "Ω"}
+&\textbf{REGUŁA: ZERO MATEMATYKI POZA BLOKAMI } \texttt{\$\$...\$\$} \\[8pt]
+&\textbf{DOZWOLONE:} \\[4pt]
+&\quad \text{Blokowy LaTeX: } \texttt{\$\$...formuła...\$\$} \\[4pt]
+&\textbf{ZABRONIONE:} \\[4pt]
+&\quad \text{Inline LaTeX: } \texttt{\$...\$} \\
+&\quad \text{Symbole w tekście: } I_k'', \kappa, \Omega, \text{kV}, \text{kA} \\
+&\quad \text{Liczby z jednostkami w tekście: } 15{,}0\,\text{kV}, 20\,\text{kA} \\[8pt]
+&\textbf{BEZ WYJĄTKÓW — dotyczy również JSON/YAML w dokumentacji}
 \end{aligned}
 }
 $$

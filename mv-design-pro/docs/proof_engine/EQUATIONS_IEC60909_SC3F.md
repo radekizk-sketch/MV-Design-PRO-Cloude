@@ -288,50 +288,52 @@ m = \frac{1}{2 \cdot f \cdot t_k \cdot \ln(\kappa - 1)} \cdot \left( e^{4 \cdot 
 }
 $$
 
-**Uproszczenie** (dla sieci odległych od generatorów, $\kappa < 1{,}7$):
-
 $$
-m \approx \frac{1}{2 \cdot f \cdot t_k} \cdot \frac{\kappa^2 - 1}{2}
+\begin{array}{|l|l|l|l|}
+\hline
+\textbf{Symbol} & \textbf{Jednostka} & \textbf{Opis} & \textbf{Mapping key} \\
+\hline
+f & \text{Hz} & \text{Częstotliwość sieci} & \texttt{f\_hz} \\
+t_k & \text{s} & \text{Czas trwania zwarcia (OBOWIĄZKOWY)} & \texttt{t\_k\_s} \\
+\kappa & — & \text{Współczynnik udaru} & \texttt{kappa} \\
+\hline
+\end{array}
 $$
-
-| Symbol | Jednostka | Opis | Mapping key |
-|--------|-----------|------|-------------|
-| $f$ | Hz | Częstotliwość sieci (50 Hz) | `f_hz` |
-| $t_k$ | s | Czas trwania zwarcia | `t_k_s` |
-| $\kappa$ | — | Współczynnik udaru | `kappa` |
 
 #### EQ_SC3F_008c — Pełny wzór na współczynnik n (BINDING)
 
 $$
 \boxed{
-n = 1 \quad \text{dla sieci odległych od generatorów synchronicznych}
+n = \frac{1}{t_k} \cdot \int_0^{t_k} \left( \frac{I_k''(t)}{I_k''} \right)^2 dt
 }
 $$
 
-**Pełny wzór** (gdy wkład generatora synchronicznego jest znaczący):
-
 $$
-n = \frac{1}{t_k} \cdot \int_0^{t_k} \left( \frac{I_k''(t)}{I_k''} \right)^2 dt
+\begin{array}{|l|l|l|}
+\hline
+\textbf{Wymagane dane wejściowe} & \textbf{Mapping key} & \textbf{Opis} \\
+\hline
+I_k''(t) & \texttt{ikss\_decay\_curve} & \text{Przebieg czasowy prądu zwarciowego} \\
+t_k & \texttt{t\_k\_s} & \text{Czas trwania zwarcia} \\
+\hline
+\end{array}
 $$
 
-#### EQ_SC3F_008d — Warunki stosowalności uproszczenia $m + n = 1$
+#### EQ_SC3F_008d — Pełne obliczenie współczynników (OBOWIĄZKOWE)
 
 $$
 \boxed{
 \begin{aligned}
-&\textbf{Uproszczenie } m + n = 1 \textbf{ DOZWOLONE gdy:} \\[6pt]
-&\text{1. Sieć jest odległa od generatorów synchronicznych} \\
-&\text{2. } \kappa < 1{,}7 \\
-&\text{3. } t_k \leq 0{,}5\,\text{s} \\[8pt]
-&\textbf{PEŁNE OBLICZENIE WYMAGANE gdy:} \\[6pt]
-&\text{1. } \kappa \geq 1{,}7 \\
-&\text{2. } t_k > 0{,}5\,\text{s} \\
-&\text{3. Bliskość generatora synchronicznego}
+&\textbf{PEŁNE OBLICZENIE WSPÓŁCZYNNIKÓW } m \textbf{ ORAZ } n \textbf{ JEST OBOWIĄZKOWE} \\[8pt]
+&\textbf{Wymagane dane wejściowe:} \\[4pt]
+&\quad t_k \quad \text{— czas trwania zwarcia (parametr wejściowy)} \\
+&\quad f \quad \text{— częstotliwość sieci} \\
+&\quad \kappa \quad \text{— współczynnik udaru (obliczony)} \\
+&\quad I_k''(t) \quad \text{— przebieg czasowy prądu (jeśli dostępny)} \\[8pt]
+&\textbf{BEZ UPROSZCZEŃ — solver MUSI obliczyć } m \textbf{ i } n \textbf{ z pełnych wzorów}
 \end{aligned}
 }
 $$
-
-**UWAGA**: Parametr $t_k$ (czas trwania zwarcia) jest **OBOWIĄZKOWYM** parametrem wejściowym. Brak $t_k$ → błąd walidacji.
 
 ---
 
@@ -467,11 +469,9 @@ $$
 }
 $$
 
-**Zalecany wariant**: **Wariant A** (zgodny z IEC 60909-0:2016 eq. (29))
-
 $$
 \boxed{
-\textbf{MV-DESIGN-PRO stosuje Wariant A:} \quad I_k'' = \frac{c \cdot U_n}{\sqrt{3} \cdot |Z_{th}|}
+\textbf{MV-DESIGN-PRO stosuje Wariant A (zgodny z IEC 60909-0:2016 eq. (29)):} \quad I_k'' = \frac{c \cdot U_n}{\sqrt{3} \cdot |Z_{th}|}
 }
 $$
 
@@ -481,36 +481,48 @@ $$
 
 ### 4.1 Wejścia
 
-| Mapping key | Typ | Jednostka | Opis |
-|-------------|-----|-----------|------|
-| `u_n_kv` | float | kV | Napięcie znamionowe |
-| `c_factor` | float | — | Współczynnik napięciowy (c_max lub c_min) |
-| `sk_source_mva` | float | MVA | Moc zwarciowa źródła |
-| `rx_ratio` | float | — | Stosunek X/R źródła |
-| `uk_percent` | float | % | Napięcie zwarcia transformatora |
-| `s_rated_mva` | float | MVA | Moc znamionowa transformatora |
-| `r_ohm_per_km` | float | Ω/km | Rezystancja jednostkowa linii |
-| `x_ohm_per_km` | float | Ω/km | Reaktancja jednostkowa linii |
-| `length_km` | float | km | Długość linii/kabla |
-| `t_k_s` | float | s | Czas trwania zwarcia (OBOWIĄZKOWY dla $I_{th}$) |
-| `f_hz` | float | Hz | Częstotliwość sieci (domyślnie 50 Hz) |
+$$
+\begin{array}{|l|l|l|l|}
+\hline
+\textbf{Mapping key} & \textbf{Typ} & \textbf{Jednostka} & \textbf{Opis} \\
+\hline
+\texttt{u\_n\_kv} & \text{float} & \text{kV} & \text{Napięcie znamionowe} \\
+\texttt{c\_factor} & \text{float} & — & \text{Współczynnik napięciowy} \\
+\texttt{sk\_source\_mva} & \text{float} & \text{MVA} & \text{Moc zwarciowa źródła} \\
+\texttt{rx\_ratio} & \text{float} & — & \text{Stosunek X/R źródła} \\
+\texttt{uk\_percent} & \text{float} & \% & \text{Napięcie zwarcia transformatora} \\
+\texttt{s\_rated\_mva} & \text{float} & \text{MVA} & \text{Moc znamionowa transformatora} \\
+\texttt{r\_ohm\_per\_km} & \text{float} & \Omega/\text{km} & \text{Rezystancja jednostkowa linii} \\
+\texttt{x\_ohm\_per\_km} & \text{float} & \Omega/\text{km} & \text{Reaktancja jednostkowa linii} \\
+\texttt{length\_km} & \text{float} & \text{km} & \text{Długość linii/kabla} \\
+\texttt{t\_k\_s} & \text{float} & \text{s} & \text{Czas trwania zwarcia (OBOWIĄZKOWY)} \\
+\texttt{f\_hz} & \text{float} & \text{Hz} & \text{Częstotliwość sieci} \\
+\hline
+\end{array}
+$$
 
 ### 4.2 Wartości pośrednie
 
-| Mapping key | Typ | Jednostka | Opis |
-|-------------|-----|-----------|------|
-| `u_eq_kv` | float | kV | Napięcie równoważne źródła |
-| `z_source_ohm` | complex | Ω | Impedancja źródła |
-| `r_source_ohm` | float | Ω | Rezystancja źródła |
-| `x_source_ohm` | float | Ω | Reaktancja źródła |
-| `z_transformer_ohm` | complex | Ω | Impedancja transformatora |
-| `z_line_ohm` | complex | Ω | Impedancja linii |
-| `z_thevenin_ohm` | complex | Ω | Impedancja Thevenina |
-| `r_thevenin_ohm` | float | Ω | Rezystancja Thevenina |
-| `x_thevenin_ohm` | float | Ω | Reaktancja Thevenina |
-| `kappa` | float | — | Współczynnik udaru |
-| `m_factor` | float | — | Współczynnik m (cieplny) |
-| `n_factor` | float | — | Współczynnik n (cieplny) |
+$$
+\begin{array}{|l|l|l|l|}
+\hline
+\textbf{Mapping key} & \textbf{Typ} & \textbf{Jednostka} & \textbf{Opis} \\
+\hline
+\texttt{u\_eq\_kv} & \text{float} & \text{kV} & \text{Napięcie równoważne źródła} \\
+\texttt{z\_source\_ohm} & \text{complex} & \Omega & \text{Impedancja źródła} \\
+\texttt{r\_source\_ohm} & \text{float} & \Omega & \text{Rezystancja źródła} \\
+\texttt{x\_source\_ohm} & \text{float} & \Omega & \text{Reaktancja źródła} \\
+\texttt{z\_transformer\_ohm} & \text{complex} & \Omega & \text{Impedancja transformatora} \\
+\texttt{z\_line\_ohm} & \text{complex} & \Omega & \text{Impedancja linii} \\
+\texttt{z\_thevenin\_ohm} & \text{complex} & \Omega & \text{Impedancja Thevenina} \\
+\texttt{r\_thevenin\_ohm} & \text{float} & \Omega & \text{Rezystancja Thevenina} \\
+\texttt{x\_thevenin\_ohm} & \text{float} & \Omega & \text{Reaktancja Thevenina} \\
+\texttt{kappa} & \text{float} & — & \text{Współczynnik udaru } \kappa \\
+\texttt{m\_factor} & \text{float} & — & \text{Współczynnik } m \text{ (cieplny)} \\
+\texttt{n\_factor} & \text{float} & — & \text{Współczynnik } n \text{ (cieplny)} \\
+\hline
+\end{array}
+$$
 
 ### 4.3 Wyniki (MANDATORY)
 
