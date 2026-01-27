@@ -1403,6 +1403,85 @@ class ProofStep:
 4. **Completeness** — każdy ProofStep ma 5 sekcji: Wzór, Dane, Podstawienie, Wynik, Weryfikacja jednostek
 5. **Traceability** — każda wartość ma literalny `source_key` do trace/result
 
+### 15.6 Proof Inspector (P11.1d) — warstwa prezentacji
+
+#### 15.6.1 Pozycja w przepływie danych
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│ 1. SOLVER EXECUTION (FROZEN)                                             │
+│    ┌─────────────────┐    ┌─────────────────────────┐                   │
+│    │   IEC 60909     │    │    NEWTON-RAPHSON       │                   │
+│    │ Short Circuit   │    │     Power Flow          │                   │
+│    └────────┬────────┘    └────────────┬────────────┘                   │
+│             │                          │                                │
+│             └──────────┬───────────────┘                                │
+│                        │                                                │
+│                WhiteBoxTrace + SolverResult                             │
+└────────────────────────┼────────────────────────────────────────────────┘
+                         │ (READ-ONLY — Proof Inspector NIE modyfikuje)
+                         ▼
+┌─────────────────────────────────────────────────────────────────────────┐
+│ 2. PROOF ENGINE (P11)                                                    │
+│    ┌──────────────┐  ┌──────────────┐  ┌──────────────────┐             │
+│    │ TraceArtifact│  │ ProofDocument│  │ Equation Registry│             │
+│    │  (immutable) │  │  Generator   │  │  (SC3F, VDROP)   │             │
+│    └──────────────┘  └──────────────┘  └──────────────────┘             │
+│                              │                                          │
+│                     ProofDocument (JSON)                                │
+└──────────────────────────────┼──────────────────────────────────────────┘
+                               │ (READ-ONLY)
+                               ▼
+┌─────────────────────────────────────────────────────────────────────────┐
+│ 3. PROOF INSPECTOR (P11.1d) — PRESENTATION LAYER                         │
+│    ┌─────────────────────────────────────────────────────────────────┐  │
+│    │                       READ-ONLY VIEWER                          │  │
+│    │  ┌─────────────┐  ┌─────────────┐  ┌─────────────────────────┐ │  │
+│    │  │ Step View   │  │ Summary     │  │     Export Menu         │ │  │
+│    │  │ (5 sections)│  │ View        │  │ JSON/LaTeX/PDF/DOCX     │ │  │
+│    │  └─────────────┘  └─────────────┘  └─────────────────────────┘ │  │
+│    └─────────────────────────────────────────────────────────────────┘  │
+│                                                                         │
+│    ZAKAZY:                                                              │
+│    ❌ Brak obliczeń (to Solver Layer)                                   │
+│    ❌ Brak interpretacji normowej (to Analysis Layer)                   │
+│    ❌ Brak kolorowania pass/fail                                        │
+│    ❌ Brak modyfikacji ProofDocument                                    │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+#### 15.6.2 Struktura widoku kroku (BINDING)
+
+Każdy krok w Proof Inspector prezentowany jest w **5 obowiązkowych sekcjach**:
+
+| # | Sekcja | Zawartość |
+|---|--------|-----------|
+| 1 | **WZÓR** | Równanie LaTeX z rejestru (EQ_*) + ref do normy |
+| 2 | **DANE** | Wartości wejściowe z jednostkami + source_key |
+| 3 | **PODSTAWIENIE** | Wzór z podstawionymi liczbami |
+| 4 | **WYNIK** | Wartość końcowa w ramce |
+| 5 | **WERYFIKACJA JEDNOSTEK** | Status ✓/✗ + derywacja jednostek |
+
+#### 15.6.3 Eksport (deterministyczny)
+
+| Format | Opis | Gwarancja |
+|--------|------|-----------|
+| JSON | 1:1 z ProofDocument | SHA-256 fingerprint stabilny |
+| LaTeX | Blokowy `$$...$$` only | Kompilowalne bez modyfikacji |
+| PDF | Via LaTeX | A4, Times New Roman, numeracja |
+| DOCX | Microsoft Word | Wierna reprezentacja UI |
+
+#### 15.6.4 Lokalizacja w UI
+
+```
+Results (Wyniki)
+  └── [Case Name]
+        └── [Run Timestamp]
+              ├── Wyniki (tabela) ← Analysis Layer
+              ├── Ślad obliczeń (raw trace)
+              └── Dowód matematyczny ← PROOF INSPECTOR
+```
+
 ---
 
 **END OF ARCHITECTURE DOCUMENT**

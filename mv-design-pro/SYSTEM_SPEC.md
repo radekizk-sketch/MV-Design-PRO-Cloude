@@ -894,7 +894,53 @@ LoadSymbol     ↔    Load
 | Weryfikacja jednostek | Unit Check | Sekcja w każdym kroku dowodu |
 | Krok dowodu | Proof Step | Element listy w Proof Inspector |
 
-### 19.5 Kanoniczne źródła (docs/proof_engine/)
+### 19.5 Proof Inspector (P11.1d) — warstwa prezentacji
+
+#### 19.5.1 Definicja
+
+**Proof Inspector** to kanoniczny komponent warstwy prezentacji, odpowiedzialny za:
+- Wyświetlanie `ProofDocument` użytkownikowi (read-only)
+- Eksport do formatów: JSON, LaTeX, PDF, DOCX
+- Audyt dowodu (ślad obliczeń — White Box)
+
+#### 19.5.2 Pozycja w architekturze
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│ SOLVER LAYER (FROZEN)                                            │
+│   WhiteBoxTrace + SolverResult                                   │
+└──────────────────────────┬──────────────────────────────────────┘
+                           │ (READ-ONLY)
+                           ▼
+┌─────────────────────────────────────────────────────────────────┐
+│ INTERPRETATION LAYER                                             │
+│   Proof Engine: TraceArtifact → ProofDocument                   │
+└──────────────────────────┬──────────────────────────────────────┘
+                           │ (READ-ONLY)
+                           ▼
+┌─────────────────────────────────────────────────────────────────┐
+│ PRESENTATION LAYER                                               │
+│   ┌─────────────────────────────────────────────────────────┐   │
+│   │              PROOF INSPECTOR (P11.1d)                    │   │
+│   │  - Read-only viewer                                      │   │
+│   │  - Eksport: JSON / LaTeX / PDF / DOCX                   │   │
+│   │  - ZERO LOGIKI OBLICZENIOWEJ                            │   │
+│   │  - ZERO INTERPRETACJI NORMOWEJ                          │   │
+│   └─────────────────────────────────────────────────────────┘   │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+#### 19.5.3 Inwarianty Proof Inspector (BINDING)
+
+| Inwariant | Opis |
+|-----------|------|
+| **Read-only** | Proof Inspector NIE modyfikuje ProofDocument |
+| **No physics** | Brak obliczeń — tylko prezentacja |
+| **No interpretation** | Brak oceny normowej, brak kolorowania pass/fail |
+| **Deterministic export** | Ten sam ProofDocument → identyczny eksport |
+| **5-section step** | Każdy krok: Wzór → Dane → Podstawienie → Wynik → Weryfikacja |
+
+### 19.6 Kanoniczne źródła (docs/proof_engine/)
 
 | Dokument | Zawartość | Status |
 |----------|-----------|--------|
@@ -903,6 +949,7 @@ LoadSymbol     ↔    Load
 | `EQUATIONS_VDROP.md` | Rejestr równań VDROP z mapping keys | BINDING |
 | `P11_1a_MVP_SC3F_AND_VDROP.md` | Specyfikacja MVP | BINDING |
 | `P11_OVERVIEW.md` | Definicja TraceArtifact, inwarianty | BINDING |
+| `P11_1d_PROOF_UI_EXPORT.md` | **Proof Inspector UI + eksport** | **CANONICAL & BINDING** |
 
 ---
 
