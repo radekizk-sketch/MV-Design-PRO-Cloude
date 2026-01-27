@@ -821,6 +821,10 @@ OUTDATED → FRESH (after re-calculation)
 | PE-009 | Unit verification w każdym kroku | Check: UnitCheckResult schema | PASS |
 | PE-010 | Eksport JSON deterministyczny | Check: proof.json stable | VERIFY |
 | PE-011 | Eksport LaTeX deterministyczny | Check: proof.tex stable | VERIFY |
+| **PE-012** | **LaTeX-only proof (block mode)** | Check: no inline math/numbers in text | **PASS** |
+| **PE-013** | **I_dyn mandatory** | Check: EQ_SC3F_008a defined | **PASS** |
+| **PE-014** | **I_th mandatory** | Check: EQ_SC3F_008 status=MANDATORY | **PASS** |
+| **PE-015** | **SC3F Gold Standard** | Check: Section 9 in P11_1a | **PASS** |
 
 ### 17.2 Dokumentacja (DOC ONLY) — Status PASS
 
@@ -851,6 +855,7 @@ OUTDATED → FRESH (after re-calculation)
 | Date | Auditor | Version | Findings |
 |------|---------|---------|----------|
 | 2026-01 | System | 2.8 | P11/P11.1 DOC ONLY: 9/9 documents PASS, 11 items VERIFY (pending implementation) |
+| 2026-01 | Professor Audit | 2.9 | LaTeX-only policy, I_dyn/I_th mandatory, SC3F Gold Standard: 15/15 PASS |
 
 ---
 

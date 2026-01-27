@@ -247,12 +247,13 @@ unit_derivation: "kV · kA = MVA"
 
 ---
 
-### EQ_SC3F_008 — Prąd cieplny równoważny (opcjonalnie)
+### EQ_SC3F_008 — Prąd cieplny równoważny (OBOWIĄZKOWY)
 
 ```yaml
 equation_id: EQ_SC3F_008
 name_pl: "Prąd cieplny równoważny"
 standard_ref: "IEC 60909-0:2016 eq. (100)"
+status: MANDATORY
 latex: |
   I_{th} = I_k'' \cdot \sqrt{m + n}
 symbols:
@@ -273,9 +274,42 @@ symbols:
     description_pl: "Współczynnik dla składowej okresowej"
     mapping_key: "n_factor"
 unit_derivation: "kA · — = kA"
+conditions: |
+  $$
+  \text{Warunki stosowalności dla uproszczenia } m + n = 1:
+  $$
+  $$
+  \text{Sieć odległa od generatorów synchronicznych (brak wkładu DC decay)}
+  $$
+  $$
+  \text{Czas zwarcia } t_k \leq 5\,\text{s}
+  $$
+```
+
+---
+
+### EQ_SC3F_008a — Prąd dynamiczny (OBOWIĄZKOWY)
+
+```yaml
+equation_id: EQ_SC3F_008a
+name_pl: "Prąd dynamiczny"
+standard_ref: "IEC 60909-0:2016 § 4.3.1.2"
+status: MANDATORY
+latex: |
+  I_{dyn} = i_p
+symbols:
+  - symbol: "I_{dyn}"
+    unit: "kA"
+    description_pl: "Prąd dynamiczny (do wymiarowania wytrzymałości dynamicznej)"
+    mapping_key: "idyn_ka"
+  - symbol: "i_p"
+    unit: "kA"
+    description_pl: "Prąd udarowy (szczytowy)"
+    mapping_key: "ip_ka"
+unit_derivation: "kA = kA"
 notes: |
-  m i n zależą od czasu trwania zwarcia i typu źródła.
-  Dla uproszczenia często przyjmuje się m + n ≈ 1.
+  Prąd dynamiczny służy do wymiarowania aparatury na wytrzymałość elektrodynamiczną.
+  Jest numerycznie równy prądowi udarowemu.
 ```
 
 ---
@@ -342,19 +376,42 @@ unit_derivation: "Ω/km · km = Ω"
 
 ## 3. Tabela podsumowująca
 
-| ID | Nazwa | Wzór | Wynik | Mapping key |
-|----|-------|------|-------|-------------|
-| `EQ_SC3F_001` | Napięcie z c | $U_{eq} = c \cdot U_n$ | kV | `u_eq_kv` |
-| `EQ_SC3F_002` | Impedancja źródła | $Z_Q = \frac{c \cdot U_n^2}{S_k''_Q}$ | Ω | `z_source_ohm` |
-| `EQ_SC3F_002a` | Rozkład R/X źródła | $R_Q, X_Q$ | Ω | `r_source_ohm`, `x_source_ohm` |
-| `EQ_SC3F_003` | Impedancja Thevenina | $Z_{th} = Z_Q + Z_T + Z_L$ | Ω | `z_thevenin_ohm` |
-| `EQ_SC3F_004` | Prąd zwarciowy I_k'' | $I_k'' = \frac{c \cdot U_n}{\sqrt{3} \cdot \|Z_{th}\|}$ | kA | `ikss_ka` |
-| `EQ_SC3F_005` | Współczynnik κ | $\kappa = 1.02 + 0.98 \cdot e^{-3R/X}$ | — | `kappa` |
-| `EQ_SC3F_006` | Prąd udarowy i_p | $i_p = \kappa \cdot \sqrt{2} \cdot I_k''$ | kA | `ip_ka` |
-| `EQ_SC3F_007` | Moc zwarciowa S_k'' | $S_k'' = \sqrt{3} \cdot U_n \cdot I_k''$ | MVA | `sk_mva` |
-| `EQ_SC3F_008` | Prąd cieplny I_th | $I_{th} = I_k'' \cdot \sqrt{m+n}$ | kA | `ith_ka` |
-| `EQ_SC3F_009` | Impedancja transformatora | $Z_T = \frac{u_k\% \cdot U_n^2}{100 \cdot S_r}$ | Ω | `z_transformer_ohm` |
-| `EQ_SC3F_010` | Impedancja linii | $Z_L = (r + jx) \cdot l$ | Ω | `z_line_ohm` |
+$$
+\begin{array}{|l|l|l|l|l|}
+\hline
+\textbf{ID} & \textbf{Nazwa} & \textbf{Wzór} & \textbf{Wynik} & \textbf{Mapping key} \\
+\hline
+\text{EQ\_SC3F\_001} & \text{Napięcie z c} & U_{eq} = c \cdot U_n & \text{kV} & \text{u\_eq\_kv} \\
+\text{EQ\_SC3F\_002} & \text{Impedancja źródła} & Z_Q = \frac{c \cdot U_n^2}{S_k''_Q} & \Omega & \text{z\_source\_ohm} \\
+\text{EQ\_SC3F\_002a} & \text{Rozkład R/X} & R_Q, X_Q & \Omega & \text{r/x\_source\_ohm} \\
+\text{EQ\_SC3F\_003} & \text{Impedancja Thevenina} & Z_{th} = Z_Q + Z_T + Z_L & \Omega & \text{z\_thevenin\_ohm} \\
+\text{EQ\_SC3F\_004} & \text{Prąd } I_k'' & I_k'' = \frac{c \cdot U_n}{\sqrt{3} \cdot |Z_{th}|} & \text{kA} & \text{ikss\_ka} \\
+\text{EQ\_SC3F\_005} & \text{Współczynnik } \kappa & \kappa = 1.02 + 0.98 \cdot e^{-3R/X} & — & \text{kappa} \\
+\text{EQ\_SC3F\_006} & \text{Prąd udarowy } i_p & i_p = \kappa \cdot \sqrt{2} \cdot I_k'' & \text{kA} & \text{ip\_ka} \\
+\text{EQ\_SC3F\_007} & \text{Moc } S_k'' & S_k'' = \sqrt{3} \cdot U_n \cdot I_k'' & \text{MVA} & \text{sk\_mva} \\
+\text{EQ\_SC3F\_008} & \text{Prąd cieplny } I_{th} & I_{th} = I_k'' \cdot \sqrt{m+n} & \text{kA} & \text{ith\_ka} \\
+\text{EQ\_SC3F\_008a} & \text{Prąd dynamiczny } I_{dyn} & I_{dyn} = i_p & \text{kA} & \text{idyn\_ka} \\
+\text{EQ\_SC3F\_009} & \text{Impedancja transf.} & Z_T = \frac{u_k\% \cdot U_n^2}{100 \cdot S_r} & \Omega & \text{z\_transformer\_ohm} \\
+\text{EQ\_SC3F\_010} & \text{Impedancja linii} & Z_L = (r + jx) \cdot l & \Omega & \text{z\_line\_ohm} \\
+\hline
+\end{array}
+$$
+
+---
+
+## 3a. Reguła stosowania współczynnika c (BINDING)
+
+$$
+\boxed{
+\begin{aligned}
+&\textbf{Współczynnik } c \textbf{ występuje TYLKO w:} \\[4pt]
+&\text{1. } \text{EQ\_SC3F\_001: } U_{eq} = c \cdot U_n \quad \text{(napięcie równoważne źródła)} \\
+&\text{2. } \text{EQ\_SC3F\_002: } Z_Q = \frac{c \cdot U_n^2}{S_k''_Q} \quad \text{(impedancja sieci zasilającej)} \\
+&\text{3. } \text{EQ\_SC3F\_004: } I_k'' = \frac{c \cdot U_n}{\sqrt{3} \cdot |Z_{th}|} \quad \text{(prąd zwarciowy)} \\[8pt]
+&\textbf{ZAKAZ:} \text{ Nie stosować } c \text{ w innych równaniach.}
+\end{aligned}
+}
+$$
 
 ---
 
@@ -391,14 +448,37 @@ unit_derivation: "Ω/km · km = Ω"
 | `m_factor` | float | — | Współczynnik m (cieplny) |
 | `n_factor` | float | — | Współczynnik n (cieplny) |
 
-### 4.3 Wyniki
+### 4.3 Wyniki (MANDATORY)
 
-| Mapping key | Typ | Jednostka | Opis |
-|-------------|-----|-----------|------|
-| `ikss_ka` | float | kA | Początkowy prąd zwarciowy symetryczny |
-| `ip_ka` | float | kA | Prąd udarowy (szczytowy) |
-| `sk_mva` | float | MVA | Moc zwarciowa początkowa |
-| `ith_ka` | float | kA | Prąd cieplny równoważny |
+$$
+\begin{array}{|l|l|l|l|}
+\hline
+\textbf{Mapping key} & \textbf{Typ} & \textbf{Jednostka} & \textbf{Opis} \\
+\hline
+\text{ikss\_ka} & \text{float} & \text{kA} & \text{Początkowy prąd zwarciowy symetryczny} \\
+\text{ip\_ka} & \text{float} & \text{kA} & \text{Prąd udarowy (szczytowy)} \\
+\text{idyn\_ka} & \text{float} & \text{kA} & \text{Prąd dynamiczny (OBOWIĄZKOWY)} \\
+\text{ith\_ka} & \text{float} & \text{kA} & \text{Prąd cieplny równoważny (OBOWIĄZKOWY)} \\
+\text{sk\_mva} & \text{float} & \text{MVA} & \text{Moc zwarciowa początkowa} \\
+\hline
+\end{array}
+$$
+
+---
+
+## 5. Warunki stosowalności wzoru na κ (BINDING)
+
+$$
+\boxed{
+\begin{aligned}
+&\textbf{Warunki dla } \kappa = 1{,}02 + 0{,}98 \cdot e^{-3 R_{th}/X_{th}}: \\[6pt]
+&0{,}005 \leq \frac{R_{th}}{X_{th}} \leq 1{,}0 \\[4pt]
+&\text{Dla } \frac{R_{th}}{X_{th}} > 1{,}0 \Rightarrow \kappa = 1{,}02 + 0{,}98 \cdot e^{-3} \approx 1{,}07 \\[4pt]
+&\text{Dla } \frac{R_{th}}{X_{th}} \to 0 \Rightarrow \kappa \to 2{,}00 \\[6pt]
+&\textbf{Zakres wartości: } 1{,}02 \leq \kappa \leq 2{,}00
+\end{aligned}
+}
+$$
 
 ---
 

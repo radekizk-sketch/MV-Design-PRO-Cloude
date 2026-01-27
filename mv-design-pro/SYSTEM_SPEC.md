@@ -881,6 +881,9 @@ LoadSymbol     ↔    Load
 | **Czysta interpretacja** | Dowód generowany z gotowych danych trace/result |
 | **Kompletność kroku** | Każdy krok ma: Wzór → Dane → Podstawienie → Wynik → Weryfikacja jednostek |
 | **Traceability** | Każda wartość ma mapping key do źródła w trace/result |
+| **LaTeX-only proof** | Proof Pack odrzuca „pół-matematykę"; dowód TYLKO w blokowym LaTeX `$$...$$` |
+| **I_dyn mandatory** | Prąd dynamiczny jest OBOWIĄZKOWY w każdym dowodzie SC3F |
+| **I_th mandatory** | Prąd cieplny równoważny jest OBOWIĄZKOWY w każdym dowodzie SC3F |
 
 ### 19.4 Terminologia UI (BINDING)
 

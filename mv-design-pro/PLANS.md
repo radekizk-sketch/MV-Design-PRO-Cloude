@@ -568,6 +568,10 @@ Wprowadzenie warstwy **interpretacji dowodowej** (Proof Engine), która generuje
 | Mapping keys literalne | P11.1a | SPEC |
 | Rejestr równań SC3F | P11.1a | SPEC |
 | Rejestr równań VDROP | P11.1a | SPEC |
+| **LaTeX-only proof (block mode)** | P11.1a | **PASS** |
+| **I_dyn mandatory** | P11.1a | **PASS** |
+| **I_th mandatory** | P11.1a | **PASS** |
+| **SC3F Gold Standard** | P11.1a | **PASS** |
 
 ### 15.2 Determinism Tests (Required)
 
@@ -588,6 +592,7 @@ Wprowadzenie warstwy **interpretacji dowodowej** (Proof Engine), która generuje
 | 2026-01 | 2.11 | P11: Proof Engine / Mathematical Proof Engine documentation (DOC ONLY) |
 | 2026-01 | 2.12 | P11.1a MVP: SC3F IEC60909 + VDROP proof specifications |
 | 2026-01 | 2.13 | P11.1b-d: Regulation Q(U), asymmetrical SC, UI/export specs |
+| 2026-01 | 2.14 | P11 Professor Audit: LaTeX-only policy, I_dyn/I_th mandatory, SC3F Gold Standard |
 
 ---
 
