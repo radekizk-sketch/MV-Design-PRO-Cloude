@@ -779,6 +779,7 @@ class EquationRegistry:
         "EQ_VDROP_004",  # Składowa bierna ΔU_X
         "EQ_VDROP_005",  # Spadek na odcinku ΔU
         "EQ_VDROP_006",  # Suma spadków ΔU_total
+        "EQ_VDROP_007",  # Napięcie w punkcie U
     ]
 
     # Frozen IDs for stability tests (BINDING)

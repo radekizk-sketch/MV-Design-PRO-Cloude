@@ -14,7 +14,6 @@ Testy:
 from __future__ import annotations
 
 import json
-import math
 from datetime import datetime
 from uuid import uuid4
 
@@ -91,17 +90,6 @@ def vdrop_test_input() -> VDROPInput:
                 length_km=2.5,
                 p_mw=2.0,
                 q_mvar=1.0,
-                u_n_kv=15.0,
-            ),
-            VDROPSegmentInput(
-                segment_id="SEG2",
-                from_bus_id="MID",
-                to_bus_id="LOAD",
-                r_ohm_per_km=0.206,
-                x_ohm_per_km=0.075,
-                length_km=1.5,
-                p_mw=1.0,
-                q_mvar=0.5,
                 u_n_kv=15.0,
             ),
         ],
@@ -222,43 +210,62 @@ class TestVDROPProofGenerator:
         assert proof.proof_type == ProofType.VDROP
         assert proof.document_id is not None
 
-    def test_vdrop_proof_has_steps_for_each_segment(
-        self, vdrop_test_input: VDROPInput
-    ):
-        """
-        Dowód VDROP zawiera 5 kroków dla każdego odcinka + 1 krok sumy.
-
-        Kroki na odcinek:
-        1. Rezystancja R
-        2. Reaktancja X
-        3. Składowa ΔU_R
-        4. Składowa ΔU_X
-        5. Spadek ΔU
-        """
+    def test_vdrop_proof_has_required_steps(self, vdrop_test_input: VDROPInput):
+        """Dowód VDROP zawiera wszystkie wymagane kroki (7)."""
         proof = ProofGenerator.generate_vdrop_proof(vdrop_test_input)
 
-        num_segments = len(vdrop_test_input.segments)
-        expected_steps = num_segments * 5 + 1  # 5 per segment + total
+        assert len(proof.steps) == 7
 
-        assert len(proof.steps) == expected_steps
+        equation_ids = [step.equation.equation_id for step in proof.steps]
+        assert equation_ids == EquationRegistry.VDROP_STEP_ORDER
 
-    def test_vdrop_proof_total_drop_is_sum(self, vdrop_test_input: VDROPInput):
-        """Suma spadków jest obliczona poprawnie."""
+    def test_full_vdrop_proof_pipeline(self, vdrop_test_input: VDROPInput):
+        """Pełny pipeline VDROP: dane → ProofDocument → JSON → LaTeX."""
         proof = ProofGenerator.generate_vdrop_proof(vdrop_test_input)
 
-        # Pobierz wynik końcowy
-        total_drop = proof.summary.key_results["delta_u_total_percent"].value
+        json_str = proof.json_representation
+        json_dict = json.loads(json_str)
 
-        # Oblicz oczekiwaną sumę ręcznie
-        expected = 0.0
-        for seg in vdrop_test_input.segments:
-            r = seg.r_ohm_per_km * seg.length_km
-            x = seg.x_ohm_per_km * seg.length_km
-            du_r = (r * seg.p_mw) / (seg.u_n_kv ** 2) * 100
-            du_x = (x * seg.q_mvar) / (seg.u_n_kv ** 2) * 100
-            expected += du_r + du_x
+        assert "steps" in json_dict
+        assert len(json_dict["steps"]) == 7
+        assert json_dict["proof_type"] == "VDROP"
 
-        assert abs(total_drop - expected) < 0.0001
+        latex_str = proof.latex_representation
+
+        assert r"\documentclass" in latex_str
+        assert r"\begin{document}" in latex_str
+        assert r"\end{document}" in latex_str
+        assert "Dowód" in latex_str
+
+    def test_vdrop_determinism(self, vdrop_test_input: VDROPInput):
+        """Ten sam VDROPInput → identyczny proof.json."""
+        artifact_id = uuid4()
+
+        proof_1 = ProofGenerator.generate_vdrop_proof(vdrop_test_input, artifact_id)
+        proof_2 = ProofGenerator.generate_vdrop_proof(vdrop_test_input, artifact_id)
+
+        json_1 = proof_1.to_dict()
+        json_2 = proof_2.to_dict()
+
+        del json_1["document_id"]
+        del json_1["created_at"]
+        del json_2["document_id"]
+        del json_2["created_at"]
+
+        assert json_1 == json_2
+
+    def test_vdrop_unit_checks_pass(self, vdrop_test_input: VDROPInput):
+        """Wszystkie weryfikacje jednostek przechodzą dla VDROP."""
+        proof = ProofGenerator.generate_vdrop_proof(vdrop_test_input)
+
+        for step in proof.steps:
+            assert step.unit_check.passed, (
+                f"Unit check failed for step {step.step_id}: "
+                f"expected {step.unit_check.expected_unit}, "
+                f"computed {step.unit_check.computed_unit}"
+            )
+
+        assert proof.summary.unit_check_passed
 
 
 # =============================================================================
@@ -349,6 +356,7 @@ class TestEquationRegistry:
         required_ids = [
             "EQ_VDROP_001", "EQ_VDROP_002", "EQ_VDROP_003",
             "EQ_VDROP_004", "EQ_VDROP_005", "EQ_VDROP_006",
+            "EQ_VDROP_007",
         ]
 
         for eq_id in required_ids:

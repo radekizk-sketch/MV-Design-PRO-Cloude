@@ -123,6 +123,7 @@ def test_vdrop_generation():
 
     assert proof is not None, "Proof should not be None"
     assert proof.proof_type == ProofType.VDROP, "Wrong proof type"
+    assert len(proof.steps) == 7, f"Expected 7 steps, got {len(proof.steps)}"
 
     print(f"✓ Generated proof with {len(proof.steps)} steps")
     print(f"✓ Proof type: {proof.proof_type.value}")
