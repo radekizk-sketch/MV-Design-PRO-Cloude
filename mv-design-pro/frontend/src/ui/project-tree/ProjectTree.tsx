@@ -51,6 +51,7 @@ const TREE_NODE_ICONS: Record<TreeNodeType, string> = {
   TRANSFORMER_TYPES: '🔄',
   SWITCH_EQUIPMENT_TYPES: '⚙️',
   CASES: '📋',
+  STUDY_CASE: '◉',  // P10: Study case icon
   RESULTS: '📊',
   ELEMENT: '•',
 };
@@ -71,6 +72,7 @@ const TREE_NODE_LABELS: Record<TreeNodeType, string> = {
   TRANSFORMER_TYPES: 'Typy transformatorów',
   SWITCH_EQUIPMENT_TYPES: 'Typy aparatury',
   CASES: 'Przypadki obliczeniowe',
+  STUDY_CASE: '',  // P10: Label from case name
   RESULTS: 'Wyniki',
   ELEMENT: '',
 };
@@ -101,6 +103,14 @@ interface NetworkElement {
   branch_type?: 'LINE' | 'CABLE';
 }
 
+// P10: Study case item for tree
+interface StudyCaseItem {
+  id: string;
+  name: string;
+  result_status: 'NONE' | 'FRESH' | 'OUTDATED';
+  is_active: boolean;
+}
+
 interface ProjectTreeProps {
   projectName?: string;
   elements: {
@@ -118,10 +128,14 @@ interface ProjectTreeProps {
     transformerTypes: number;
     switchEquipmentTypes: number;
   };
-  casesCount?: number;
+  // P10: Study cases list
+  studyCases?: StudyCaseItem[];
   resultsCount?: number;
   onNodeClick?: (node: TreeNode) => void;
   onCategoryClick?: (nodeType: TreeNodeType, elementType?: ElementType) => void;
+  // P10: Study case callbacks
+  onStudyCaseClick?: (caseId: string) => void;
+  onStudyCaseActivate?: (caseId: string) => void;
 }
 
 // ============================================================================
@@ -132,10 +146,12 @@ export function ProjectTree({
   projectName = 'Nowy projekt',
   elements,
   typeCounts = { lineTypes: 0, cableTypes: 0, transformerTypes: 0, switchEquipmentTypes: 0 },
-  casesCount = 0,
+  studyCases = [],
   resultsCount = 0,
   onNodeClick,
   onCategoryClick,
+  onStudyCaseClick,
+  onStudyCaseActivate,
 }: ProjectTreeProps) {
   const { treeExpandedNodes, expandTreeNode, collapseTreeNode } = useSelectionStore();
   const { selectedElement, handleTreeClick } = useTreeSelection();
@@ -159,6 +175,26 @@ export function ProjectTree({
         nodeType: 'ELEMENT' as TreeNodeType,
         elementType,
         elementId: item.id,
+      }));
+    };
+
+    // P10: Build study case nodes
+    const buildStudyCaseNodes = (cases: StudyCaseItem[]): TreeNode[] => {
+      // Sort by name, active case first
+      const sorted = [...cases].sort((a, b) => {
+        if (a.is_active !== b.is_active) {
+          return a.is_active ? -1 : 1;
+        }
+        return a.name.localeCompare(b.name, 'pl');
+      });
+
+      return sorted.map((caseItem) => ({
+        id: `study-case-${caseItem.id}`,
+        label: caseItem.name,
+        nodeType: 'STUDY_CASE' as TreeNodeType,
+        studyCaseId: caseItem.id,
+        isActive: caseItem.is_active,
+        resultStatus: caseItem.result_status,
       }));
     };
 
@@ -259,7 +295,8 @@ export function ProjectTree({
           id: 'cases',
           label: TREE_NODE_LABELS.CASES,
           nodeType: 'CASES',
-          count: casesCount,
+          count: studyCases.length,
+          children: buildStudyCaseNodes(studyCases),
         },
         {
           id: 'results',
@@ -269,7 +306,7 @@ export function ProjectTree({
         },
       ],
     };
-  }, [projectName, elements, typeCounts, casesCount, resultsCount]);
+  }, [projectName, elements, typeCounts, studyCases, resultsCount]);
 
   // Handle node toggle
   const handleToggle = useCallback(
@@ -289,6 +326,9 @@ export function ProjectTree({
       if (node.nodeType === 'ELEMENT' && node.elementId && node.elementType) {
         // Select element
         handleTreeClick(node.elementId, node.elementType, node.label);
+      } else if (node.nodeType === 'STUDY_CASE' && node.studyCaseId) {
+        // P10: Study case click
+        onStudyCaseClick?.(node.studyCaseId);
       } else if (TREE_NODE_TO_ELEMENT_TYPE[node.nodeType]) {
         // Category click - open Data Manager
         onCategoryClick?.(node.nodeType, TREE_NODE_TO_ELEMENT_TYPE[node.nodeType]);
@@ -298,7 +338,17 @@ export function ProjectTree({
         onCategoryClick?.(node.nodeType);
       }
     },
-    [handleTreeClick, onNodeClick, onCategoryClick]
+    [handleTreeClick, onNodeClick, onCategoryClick, onStudyCaseClick]
+  );
+
+  // P10: Handle study case double-click (activate)
+  const handleNodeDoubleClick = useCallback(
+    (node: TreeNode) => {
+      if (node.nodeType === 'STUDY_CASE' && node.studyCaseId && !node.isActive) {
+        onStudyCaseActivate?.(node.studyCaseId);
+      }
+    },
+    [onStudyCaseActivate]
   );
 
   return (
@@ -320,6 +370,7 @@ export function ProjectTree({
           selectedElementId={selectedElement?.id ?? null}
           onToggle={handleToggle}
           onClick={handleNodeClick}
+          onDoubleClick={handleNodeDoubleClick}
         />
       </div>
     </div>
@@ -337,7 +388,21 @@ interface TreeNodeComponentProps {
   selectedElementId: string | null;
   onToggle: (nodeId: string) => void;
   onClick: (node: TreeNode) => void;
+  onDoubleClick: (node: TreeNode) => void;
 }
+
+// P10: Status icons and colors for study cases
+const RESULT_STATUS_ICONS: Record<string, string> = {
+  NONE: '○',
+  FRESH: '●',
+  OUTDATED: '◐',
+};
+
+const RESULT_STATUS_COLORS: Record<string, string> = {
+  NONE: 'text-gray-400',
+  FRESH: 'text-green-500',
+  OUTDATED: 'text-amber-500',
+};
 
 function TreeNodeComponent({
   node,
@@ -346,14 +411,24 @@ function TreeNodeComponent({
   selectedElementId,
   onToggle,
   onClick,
+  onDoubleClick,
 }: TreeNodeComponentProps) {
   const hasChildren = node.children && node.children.length > 0;
   const isExpanded = expandedNodes.has(node.id) || node.expanded;
   const isSelected = node.elementId === selectedElementId;
   const isElement = node.nodeType === 'ELEMENT';
+  const isStudyCase = node.nodeType === 'STUDY_CASE';
 
-  const icon = node.icon ?? TREE_NODE_ICONS[node.nodeType];
-  const label = node.nodeType === 'ELEMENT' ? node.label : TREE_NODE_LABELS[node.nodeType];
+  // P10: Get appropriate icon for study case (status-based)
+  const getIcon = () => {
+    if (isStudyCase && node.resultStatus) {
+      return RESULT_STATUS_ICONS[node.resultStatus] || TREE_NODE_ICONS.STUDY_CASE;
+    }
+    return node.icon ?? TREE_NODE_ICONS[node.nodeType];
+  };
+
+  const icon = getIcon();
+  const label = isElement || isStudyCase ? node.label : TREE_NODE_LABELS[node.nodeType];
 
   return (
     <div>
@@ -363,10 +438,13 @@ function TreeNodeComponent({
           'flex items-center py-1 px-2 rounded cursor-pointer',
           'hover:bg-gray-100 transition-colors',
           isSelected && 'bg-blue-100 hover:bg-blue-100',
-          !isElement && 'font-medium'
+          // P10: Active study case highlighting
+          isStudyCase && node.isActive && 'bg-blue-50 hover:bg-blue-100',
+          !isElement && !isStudyCase && 'font-medium'
         )}
         style={{ paddingLeft: `${level * 16 + 4}px` }}
         onClick={() => onClick(node)}
+        onDoubleClick={() => onDoubleClick(node)}
       >
         {/* Expand/collapse toggle */}
         {hasChildren ? (
@@ -383,18 +461,39 @@ function TreeNodeComponent({
           <span className="w-4 h-4 mr-1" />
         )}
 
-        {/* Icon */}
-        <span className="text-xs mr-2">{icon}</span>
+        {/* P10: Active case indicator */}
+        {isStudyCase && node.isActive && (
+          <span className="text-blue-600 mr-1" title="Aktywny przypadek">▸</span>
+        )}
+
+        {/* Icon with status color for study cases */}
+        <span
+          className={clsx(
+            'text-xs mr-2',
+            isStudyCase && node.resultStatus && RESULT_STATUS_COLORS[node.resultStatus]
+          )}
+          title={isStudyCase ? getStatusTooltip(node.resultStatus) : undefined}
+        >
+          {icon}
+        </span>
 
         {/* Label */}
         <span
           className={clsx(
             'text-xs flex-1 truncate',
-            isElement ? 'text-gray-700' : 'text-gray-900'
+            isElement ? 'text-gray-700' : 'text-gray-900',
+            isStudyCase && node.isActive && 'font-medium'
           )}
         >
           {label}
         </span>
+
+        {/* P10: Active badge for study case */}
+        {isStudyCase && node.isActive && (
+          <span className="ml-2 px-1.5 py-0.5 bg-blue-100 text-blue-700 text-[10px] rounded">
+            aktywny
+          </span>
+        )}
 
         {/* Count badge */}
         {node.count !== undefined && (
@@ -414,12 +513,26 @@ function TreeNodeComponent({
               selectedElementId={selectedElementId}
               onToggle={onToggle}
               onClick={onClick}
+              onDoubleClick={onDoubleClick}
             />
           ))}
         </div>
       )}
     </div>
   );
+}
+
+// P10: Get tooltip for result status
+function getStatusTooltip(status: string | undefined): string {
+  switch (status) {
+    case 'FRESH':
+      return 'Wyniki aktualne';
+    case 'OUTDATED':
+      return 'Wyniki nieaktualne — wymagane przeliczenie';
+    case 'NONE':
+    default:
+      return 'Brak wyników';
+  }
 }
 
 // ============================================================================

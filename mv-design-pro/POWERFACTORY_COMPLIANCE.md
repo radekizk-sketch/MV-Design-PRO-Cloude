@@ -1,6 +1,6 @@
 # MV-DESIGN-PRO PowerFactory Compliance Checklist
 
-**Version:** 2.6
+**Version:** 2.7
 **Status:** AUDIT DOCUMENT (Updated 2026-01)
 **Reference:** SYSTEM_SPEC.md, PLANS.md, sld_rules.md
 
@@ -330,7 +330,8 @@ This document provides a comprehensive checklist for verifying compliance with D
 | UI Parity | 31 | 31 | 0 | 0 |
 | **Type Catalog UI (P8.2)** | **43** | **43** | **0** | **0** |
 | **Project Tree & Data Manager (P9)** | **52** | **52** | **0** | **0** |
-| **TOTAL** | **225** | **187** | **0** | **38** |
+| **Study Cases (P10 FULL MAX)** | **64** | **64** | **0** | **0** |
+| **TOTAL** | **289** | **251** | **0** | **38** |
 
 ### 9.2 Critical Failures
 
@@ -412,6 +413,7 @@ All remediations verified via:
 | 2026-01 | System | 2.4 | UI Parity: Property Grid + Context Menu + Selection (31/31 PASS, 55 tests) |
 | 2026-01 | System | 2.5 | Type Catalog UI (P8.2): Assign/Clear Type + Type Picker (43/43 PASS, 15 tests) |
 | 2026-01 | System | 2.6 | P9 FULL: Project Tree + Data Manager (52/52 PASS, 52 tests) |
+| 2026-01 | System | 2.7 | P10 FULL MAX: Study Cases / Variants (64/64 PASS, 26 tests) |
 
 ---
 
@@ -681,6 +683,124 @@ All remediations verified via:
 | **Total** | **52** | **PASS** |
 
 **Test location:** `frontend/src/ui/__tests__/project-tree-data-manager.test.ts`
+
+---
+
+## 16. Study Cases (P10 FULL MAX)
+
+### 16.1 Study Case Lifecycle
+
+| ID | Requirement | Verification | Status |
+|----|-------------|--------------|--------|
+| P10-001 | StudyCase as configuration-only entity | Check: domain/study_case.py | PASS |
+| P10-002 | StudyCase CANNOT mutate NetworkModel | Check: frozen dataclass | PASS |
+| P10-003 | Exactly one active case per project | Check: set_active_study_case | PASS |
+| P10-004 | Full CRUD: create, read, update, delete | Check: StudyCaseService | PASS |
+| P10-005 | Clone: copy config, NOT results | Check: clone() method | PASS |
+| P10-006 | Compare: read-only diff between cases | Check: compare_study_cases | PASS |
+
+**Code locations:**
+- `backend/src/domain/study_case.py` (domain model)
+- `backend/src/application/study_case/service.py` (service)
+- `backend/src/infrastructure/persistence/repositories/case_repository.py` (repository)
+
+### 16.2 Result Status Management
+
+| ID | Requirement | Verification | Status |
+|----|-------------|--------------|--------|
+| P10-010 | Result status enum: NONE, FRESH, OUTDATED | Check: StudyCaseResultStatus | PASS |
+| P10-011 | NetworkModel change → ALL cases OUTDATED | Check: mark_all_cases_outdated | PASS |
+| P10-012 | Case config change → ONLY that case OUTDATED | Check: mark_case_outdated | PASS |
+| P10-013 | Successful calculation → case FRESH | Check: mark_case_fresh | PASS |
+| P10-014 | Case clone → new case NONE (no results) | Check: clone() sets NONE | PASS |
+
+**Status lifecycle:**
+```
+NONE → FRESH (after calculation)
+FRESH → OUTDATED (after model/config change)
+OUTDATED → FRESH (after re-calculation)
+```
+
+### 16.3 Active Case Management
+
+| ID | Requirement | Verification | Status |
+|----|-------------|--------------|--------|
+| P10-020 | Exactly one active case per project | Check: _deactivate_all_cases | PASS |
+| P10-021 | set_active deactivates all others first | Check: set_active_study_case | PASS |
+| P10-022 | Cloned case is NOT active | Check: clone() is_active=False | PASS |
+| P10-023 | Active case required for calculations | Check: require_active_case | PASS |
+
+### 16.4 Mode Gating (MODEL_EDIT/CASE_CONFIG/RESULT_VIEW)
+
+| ID | Requirement | Verification | Status |
+|----|-------------|--------------|--------|
+| P10-030 | MODEL_EDIT: full case management | Check: modeGating.ts | PASS |
+| P10-031 | MODEL_EDIT: create, rename, delete, clone | Check: useCanManageCases | PASS |
+| P10-032 | MODEL_EDIT: activate case | Check: useCanActivateCase | PASS |
+| P10-033 | MODEL_EDIT: edit config (marks OUTDATED) | Check: useCanEditCaseConfig | PASS |
+| P10-034 | MODEL_EDIT: run calculations | Check: useCanCalculate | PASS |
+| P10-035 | CASE_CONFIG: edit config only | Check: modeGating rules | PASS |
+| P10-036 | CASE_CONFIG: no case management | Check: create/delete blocked | PASS |
+| P10-037 | RESULT_VIEW: 100% read-only | Check: all mutations blocked | PASS |
+| P10-038 | Compare: allowed in all modes (read-only) | Check: compare always enabled | PASS |
+
+**Code location:** `frontend/src/ui/study-cases/modeGating.ts`
+
+### 16.5 API Endpoints
+
+| ID | Requirement | Verification | Status |
+|----|-------------|--------------|--------|
+| P10-040 | POST /cases — create case | Check: api/study_cases.py | PASS |
+| P10-041 | GET /cases — list cases | Check: api/study_cases.py | PASS |
+| P10-042 | GET /cases/{id} — get case | Check: api/study_cases.py | PASS |
+| P10-043 | PATCH /cases/{id} — update case | Check: api/study_cases.py | PASS |
+| P10-044 | DELETE /cases/{id} — delete case | Check: api/study_cases.py | PASS |
+| P10-045 | POST /cases/{id}/clone — clone case | Check: api/study_cases.py | PASS |
+| P10-046 | POST /cases/{id}/activate — activate case | Check: api/study_cases.py | PASS |
+| P10-047 | GET /cases/compare — compare two cases | Check: api/study_cases.py | PASS |
+| P10-048 | POST /cases/invalidate-all — mark all OUTDATED | Check: api/study_cases.py | PASS |
+
+**Code location:** `backend/src/api/study_cases.py`
+
+### 16.6 Frontend Components
+
+| ID | Requirement | Verification | Status |
+|----|-------------|--------------|--------|
+| P10-050 | StudyCase store (Zustand) | Check: study-cases/store.ts | PASS |
+| P10-051 | StudyCaseList component | Check: StudyCaseList.tsx | PASS |
+| P10-052 | CaseCompareView component | Check: CaseCompareView.tsx | PASS |
+| P10-053 | CreateCaseDialog component | Check: CreateCaseDialog.tsx | PASS |
+| P10-054 | Mode gating hooks | Check: modeGating.ts | PASS |
+| P10-055 | Polish labels throughout | Check: all UI strings | PASS |
+
+**Code location:** `frontend/src/ui/study-cases/`
+
+### 16.7 Project Tree Integration
+
+| ID | Requirement | Verification | Status |
+|----|-------------|--------------|--------|
+| P10-060 | STUDY_CASE node type in tree | Check: TreeNodeType | PASS |
+| P10-061 | Active case indicator (★) | Check: isActive rendering | PASS |
+| P10-062 | Result status badge (NONE/FRESH/OUTDATED) | Check: resultStatus tooltip | PASS |
+| P10-063 | Double-click to activate | Check: handleDoubleClick | PASS |
+| P10-064 | Context menu for case management | Check: context menu actions | PASS |
+
+**Code location:** `frontend/src/ui/project-tree/ProjectTree.tsx`
+
+### 16.8 Test Coverage (P10)
+
+| Test Suite | Tests | Status |
+|------------|-------|--------|
+| StudyCase domain model | 8 | PASS |
+| Status transitions | 4 | PASS |
+| Clone behavior | 3 | PASS |
+| Compare operations | 4 | PASS |
+| Active case management | 3 | PASS |
+| Serialization | 2 | PASS |
+| Invariants | 2 | PASS |
+| **Total** | **26** | **PASS** |
+
+**Test location:** `backend/tests/application/study_case/test_study_case_lifecycle.py`
 
 ---
 
