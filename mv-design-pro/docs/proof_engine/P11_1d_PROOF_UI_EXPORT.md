@@ -1,164 +1,333 @@
-# P11.1d — Proof Inspector UI + Eksport
+# P11.1d — Proof Inspector (Kanoniczny)
 
-**STATUS: REFERENCE (prospektywny)**
-**Version:** 1.1
-**Reference:** P11_OVERVIEW.md, P11_1a_MVP_SC3F_AND_VDROP.md, PROOF_SCHEMAS.md
+**STATUS: CANONICAL & BINDING**
+**Version:** 2.0
+**Reference:** P11_OVERVIEW.md, PROOF_SCHEMAS.md, SYSTEM_SPEC.md § 19
 
 ---
 
-## 0. Relacja do Proof Pack P11
+## 0. Dokument referencyjny
 
-### 0.1 Pozycja w hierarchii
+Ten dokument definiuje **Proof Inspector** — kanoniczną warstwę prezentacyjno-dowodową systemu MV-DESIGN-PRO.
+
+### 0.1 Pozycja w hierarchii systemu
 
 $$
 \boxed{
 \begin{aligned}
-&\textbf{P11 (OVERVIEW)} \to \textbf{P11.1d (PROOF UI EXPORT)} \\[6pt]
-&\text{Dokument definiuje warstwę prezentacji Proof Engine:} \\
-&\quad \text{• Proof Inspector UI — interfejs przeglądania dowodów} \\
-&\quad \text{• Eksport — formaty LaTeX, PDF, DOCX, Markdown} \\
-&\quad \text{• Tryb READ-ONLY — bez edycji dowodu}
+&\textbf{SOLVER LAYER (FROZEN)} \\
+&\quad \downarrow \quad \text{WhiteBoxTrace + SolverResult (READ-ONLY)} \\[6pt]
+&\textbf{INTERPRETATION LAYER} \\
+&\quad \downarrow \quad \text{TraceArtifact + ProofDocument} \\[6pt]
+&\textbf{PRESENTATION LAYER} \\
+&\quad \boxed{\textbf{PROOF INSPECTOR (P11.1d)}}
 \end{aligned}
 }
 $$
 
-### 0.2 Wejścia i wyjścia
-
-| Kierunek | Źródło / Cel | Opis |
-|----------|--------------|------|
-| **Wejście** | `ProofDocument` (JSON) | Dokument dowodowy z generatora |
-| **Wejście** | `TraceArtifact` | Kontekst uruchomienia (run_id, case_id) |
-| **Wyjście** | Wyświetlenie UI | Proof Inspector w przeglądarce |
-| **Wyjście** | `proof.tex` | Eksport do LaTeX |
-| **Wyjście** | `proof.pdf` | Eksport do PDF |
-| **Wyjście** | `proof.docx` | Eksport do DOCX |
-| **Wyjście** | `proof.md` | Eksport do Markdown |
-
-### 0.3 Relacja do solvera
+### 0.2 Definicja komponentu
 
 $$
 \boxed{
-\textbf{PRESENTATION-ONLY:} \quad \text{Ten dokument NIE zmienia solvera ani ProofDocument. Definiuje UX/UI.}
+\begin{aligned}
+&\textbf{Proof Inspector} = \text{warstwa prezentacji dowodu matematycznego} \\[8pt]
+&\text{JEST:} \\
+&\quad \bullet \text{ Read-only viewer nad } \texttt{ProofDocument} \\
+&\quad \bullet \text{ Eksporter do JSON / LaTeX / PDF / DOCX} \\
+&\quad \bullet \text{ Narzędzie audytu (ślad obliczeń — White Box)} \\[8pt]
+&\text{NIE JEST:} \\
+&\quad \bullet \text{ Solverem (brak fizyki)} \\
+&\quad \bullet \text{ Analysis (brak interpretacji normowej)} \\
+&\quad \bullet \text{ Edytorem (dowód jest IMMUTABLE)}
+\end{aligned}
 }
 $$
 
----
+### 0.3 Wejścia i wyjścia (BINDING)
 
-## 1. Cel i zakres
-
-### 1.1 Definicja
-
-Proof Inspector UI to interfejs użytkownika do:
-- Przeglądania dokumentów dowodowych (ProofDocument)
-- Nawigacji po krokach dowodu
-- Eksportu do formatów: LaTeX, PDF, DOCX, Markdown
-
-### 1.2 Czym NIE jest Proof Inspector
-
-| NIE jest | Uzasadnienie |
-|----------|--------------|
-| Edytorem | Dowód jest READ-ONLY |
-| Kalkulatorem | Nie wykonuje obliczeń (tylko prezentuje) |
-| Walidatorem | Nie sprawdza zgodności z normami |
+| Kierunek | Źródło / Cel | Opis |
+|----------|--------------|------|
+| **Wejście** | `ProofDocument` | Dokument dowodowy z generatora (JSON) |
+| **Wejście** | `TraceArtifact` | Kontekst uruchomienia (run_id, case_id, snapshot_id) |
+| **Wyjście** | Wyświetlenie UI | Proof Inspector w przeglądarce |
+| **Wyjście** | `proof.json` | Eksport 1:1 z ProofDocument |
+| **Wyjście** | `proof.tex` | Eksport LaTeX (blokowy, $$ only) |
+| **Wyjście** | `proof.pdf` | Dokument PDF (via LaTeX) |
+| **Wyjście** | `proof.docx` | Dokument Microsoft Word |
 
 ---
 
-## 2. Struktura UI — Proof Inspector
+## 1. Model mentalny (BINDING)
 
-### 2.1 Lokalizacja w aplikacji
+### 1.1 Relacja przepływu danych
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│ 1. SOLVER EXECUTION                                                      │
+│    Input: NetworkSnapshot + SolverConfig                                 │
+│    Output: SolverResult + WhiteBoxTrace                                  │
+│    (FROZEN — Proof Inspector NIE modyfikuje)                            │
+└────────────────────────────────┬────────────────────────────────────────┘
+                                 │ (READ-ONLY)
+                                 ▼
+┌─────────────────────────────────────────────────────────────────────────┐
+│ 2. PROOF ENGINE (P11)                                                    │
+│    - Tworzy TraceArtifact (immutable)                                   │
+│    - Generuje ProofDocument (kroki + weryfikacja jednostek)             │
+│    - Mapuje wartości z trace → symbole matematyczne                     │
+└────────────────────────────────┬────────────────────────────────────────┘
+                                 │ (READ-ONLY)
+                                 ▼
+┌─────────────────────────────────────────────────────────────────────────┐
+│ 3. PROOF INSPECTOR (P11.1d) — TEN DOKUMENT                              │
+│    - Prezentuje ProofDocument użytkownikowi                             │
+│    - Eksportuje do formatów (JSON/LaTeX/PDF/DOCX)                       │
+│    - ZERO LOGIKI OBLICZENIOWEJ                                          │
+│    - ZERO INTERPRETACJI NORMOWEJ                                        │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+### 1.2 Czym Proof Inspector NIE JEST (BINDING)
+
+| NIE jest | Uzasadnienie | Gdzie ta funkcja? |
+|----------|--------------|-------------------|
+| Solverem | Nie wykonuje obliczeń fizycznych | Solver Layer |
+| Analysis | Nie interpretuje wyników (brak limitów, brak oceny) | Analysis Layer |
+| Edytorem | Dowód jest IMMUTABLE po wygenerowaniu | — |
+| Walidatorem | Nie sprawdza zgodności z normami | Analysis Layer |
+| Kalkulatorem | Nie przelicza wartości | Solver Layer |
+| Formatowaczem danych | Nie modyfikuje struktury ProofDocument | — |
+
+### 1.3 Zasada „Zero Intelligence"
+
+$$
+\boxed{
+\textbf{Proof Inspector wyświetla dokładnie to, co otrzymał z ProofDocument.}
+}
+$$
+
+- Brak dodatkowych obliczeń
+- Brak decyzji logicznych (if/else na podstawie wartości)
+- Brak kolorowania „dobry/zły"
+- Brak interpretacji normowej
+- Brak modyfikacji wartości
+
+---
+
+## 2. Struktura widoku dowodu (BINDING)
+
+### 2.1 Nagłówek dowodu (ProofHeader)
+
+Każdy dowód MUSI zawierać nagłówek z pełnymi metadanymi:
+
+$$
+\begin{array}{|l|l|l|}
+\hline
+\textbf{Pole} & \textbf{Źródło} & \textbf{Przykład} \\
+\hline
+\text{Typ analizy} & \texttt{proof\_type} & \text{Zwarcie trójfazowe IEC 60909} \\
+\text{Norma} & \texttt{standard\_ref} & \text{IEC 60909-0:2016} \\
+\text{Projekt} & \texttt{project\_name} & \text{Projekt SN-01} \\
+\text{Przypadek} & \texttt{case\_name} & \text{Zwarcie na szynie B2} \\
+\text{Uruchomienie} & \texttt{run\_timestamp} & \text{2026-01-27T10:29:55Z} \\
+\text{snapshot\_id} & \texttt{TraceArtifact} & \texttt{6ba7b810-9dad-...} \\
+\text{run\_id} & \texttt{TraceArtifact} & \texttt{550e8400-e29b-...} \\
+\text{Wersja solvera} & \texttt{solver\_version} & \text{1.2.0} \\
+\text{Fingerprint} & \text{hash(ProofDocument)} & \texttt{sha256:abc123...} \\
+\hline
+\end{array}
+$$
+
+### 2.2 Lista kroków (ProofStep) — sekwencja
+
+Kolejność kroków jest **ustalona przez Equation Registry** i **nie może być zmieniana** przez UI.
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│ SPIS KROKÓW (read-only, navigation)                             │
+├─────────────────────────────────────────────────────────────────┤
+│ 1. Napięcie z współczynnikiem c                                 │
+│ 2. Impedancja źródła                                            │
+│ 3. Impedancja zastępcza Thevenina                               │
+│ ► 4. Początkowy prąd zwarciowy I_k''                           │
+│ 5. Współczynnik udaru κ                                         │
+│ 6. Prąd udarowy i_p                                             │
+│ 7. Moc zwarciowa S_k''                                          │
+│ 8. Prąd cieplny równoważny I_th                                 │
+│ 9. Prąd dynamiczny I_dyn                                        │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### 2.3 Struktura pojedynczego kroku (5 sekcji — MANDATORY)
+
+Każdy krok dowodu MUSI zawierać dokładnie **5 sekcji** w tej kolejności:
+
+$$
+\boxed{
+\textbf{KROK } n: \quad \underbrace{\text{WZÓR}}_{\text{1}} \to \underbrace{\text{DANE}}_{\text{2}} \to \underbrace{\text{PODSTAWIENIE}}_{\text{3}} \to \underbrace{\text{WYNIK}}_{\text{4}} \to \underbrace{\text{WERYFIKACJA JEDNOSTEK}}_{\text{5}}
+}
+$$
+
+#### 2.3.1 Sekcja WZÓR (formula)
+
+- Równanie matematyczne w notacji LaTeX
+- Wyłącznie bloki `$$ ... $$` (brak inline)
+- ID równania z rejestru (np. `EQ_SC3F_004`)
+- Odniesienie do normy (bez cytowania treści)
+
+```latex
+$$
+I_k'' = \frac{c \cdot U_n}{\sqrt{3} \cdot |Z_{th}|}
+$$
+```
+
+#### 2.3.2 Sekcja DANE (input_values)
+
+- Lista wartości wejściowych z jednostkami
+- Format: `symbol = wartość jednostka`
+- Źródło każdej wartości (`source_key`)
+
+| Symbol | Wartość | Jednostka | Źródło |
+|--------|---------|-----------|--------|
+| $c$ | 1.100 | — | `c_factor` |
+| $U_n$ | 15.00 | kV | `u_n_kv` |
+| $Z_{th}$ | 0.5000 + j2.000 | Ω | `z_thevenin_ohm` |
+| $\|Z_{th}\|$ | 2.062 | Ω | (obliczone) |
+
+#### 2.3.3 Sekcja PODSTAWIENIE (substitution)
+
+- Wzór z podstawionymi wartościami liczbowymi
+- LaTeX blokowy
+- Wynik końcowy
+
+```latex
+$$
+I_k'' = \frac{1.100 \cdot 15.00}{\sqrt{3} \cdot 2.062} = 4.620\,\text{kA}
+$$
+```
+
+#### 2.3.4 Sekcja WYNIK (result)
+
+- Wartość końcowa z jednostką
+- Wyróżniona wizualnie
+- Powiązanie z `mapping_key`
+
+$$
+\boxed{I_k'' = 4.620\,\text{kA}}
+$$
+
+#### 2.3.5 Sekcja WERYFIKACJA JEDNOSTEK (unit_check)
+
+- Status: ✓ PASS / ✗ FAIL
+- Ścieżka derywacji jednostek
+- Jednostka oczekiwana vs obliczona
+
+| Pole | Wartość |
+|------|---------|
+| Status | ✓ PASS |
+| Oczekiwana | kA |
+| Obliczona | kA |
+| Derywacja | kV / Ω = kA |
+
+### 2.4 Podsumowanie liczbowe (ProofSummary)
+
+Na końcu dowodu — tabela wyników **bez interpretacji normowej**:
+
+$$
+\begin{array}{|l|c|c|c|}
+\hline
+\textbf{Wielkość} & \textbf{Symbol} & \textbf{Wartość} & \textbf{Jednostka} \\
+\hline
+\text{Początkowy prąd zwarciowy} & I_k'' & 4.620 & \text{kA} \\
+\text{Prąd udarowy (szczytowy)} & i_p & 11.76 & \text{kA} \\
+\text{Moc zwarciowa} & S_k'' & 120.0 & \text{MVA} \\
+\text{Współczynnik udaru} & \kappa & 1.80 & — \\
+\text{Prąd cieplny równoważny} & I_{th} & 5.23 & \text{kA} \\
+\text{Prąd dynamiczny} & I_{dyn} & 11.76 & \text{kA} \\
+\hline
+\end{array}
+$$
+
+**UWAGA:** Brak granic normowych, brak oceny „spełnia/nie spełnia", brak kolorowania.
+
+---
+
+## 3. Layout UI — Proof Inspector (PowerFactory-style)
+
+### 3.1 Lokalizacja w aplikacji
 
 ```
 Results (Wyniki)
   └── [Wybrany Case]
         └── [Wybrany Run]
-              ├── Wyniki (tabela)
-              ├── Ślad obliczeń (TraceArtifact)
-              └── Dowód matematyczny ← TUTAJ (Proof Inspector)
+              ├── Wyniki (tabela) ← Analysis Layer
+              ├── Ślad obliczeń (TraceArtifact) ← raw trace
+              └── Dowód matematyczny ← PROOF INSPECTOR (TEN DOKUMENT)
 ```
 
-### 2.2 Layout główny
+### 3.2 Layout główny (two-panel)
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│ Dowód matematyczny: [Nazwa Case] / [Run timestamp]        [×]   │
-├─────────────────────────────────────────────────────────────────┤
-│ ┌───────────────┐ ┌───────────────────────────────────────────┐ │
-│ │ Spis kroków   │ │                                           │ │
-│ │               │ │  KROK 4: Początkowy prąd zwarciowy        │ │
-│ │ 1. Napięcie   │ │                                           │ │
-│ │ 2. Z źródła   │ │  ┌─────────────────────────────────────┐  │ │
-│ │ 3. Z Thevenin │ │  │ WZÓR                                │  │ │
-│ │►4. I_k''      │ │  │                                     │  │ │
-│ │ 5. κ          │ │  │       c · U_n                       │  │ │
-│ │ 6. i_p        │ │  │ I_k'' = ─────────────               │  │ │
-│ │ 7. S_k''      │ │  │        √3 · |Z_th|                  │  │ │
-│ │               │ │  │                                     │  │ │
-│ │               │ │  └─────────────────────────────────────┘  │ │
-│ │               │ │                                           │ │
-│ │               │ │  ┌─────────────────────────────────────┐  │ │
-│ │               │ │  │ DANE                                │  │ │
-│ │               │ │  │ c = 1.1                             │  │ │
-│ │               │ │  │ U_n = 15.0 kV                       │  │ │
-│ │               │ │  │ Z_th = 0.5 + j2.0 Ω                 │  │ │
-│ │               │ │  │ |Z_th| = 2.06 Ω                     │  │ │
-│ │               │ │  └─────────────────────────────────────┘  │ │
-│ │               │ │                                           │ │
-│ │               │ │  ┌─────────────────────────────────────┐  │ │
-│ │               │ │  │ PODSTAWIENIE                        │  │ │
-│ │               │ │  │         1.1 · 15.0                  │  │ │
-│ │               │ │  │ I_k'' = ───────────── = 4.62 kA     │  │ │
-│ │               │ │  │         √3 · 2.06                   │  │ │
-│ │               │ │  └─────────────────────────────────────┘  │ │
-│ │               │ │                                           │ │
-│ │               │ │  ┌─────────────────────────────────────┐  │ │
-│ │               │ │  │ WYNIK                               │  │ │
-│ │               │ │  │ I_k'' = 4.62 kA                     │  │ │
-│ │               │ │  └─────────────────────────────────────┘  │ │
-│ │               │ │                                           │ │
-│ │               │ │  ┌─────────────────────────────────────┐  │ │
-│ │               │ │  │ WERYFIKACJA JEDNOSTEK           ✓  │  │ │
-│ │               │ │  │ kV / Ω = kA                         │  │ │
-│ │               │ │  └─────────────────────────────────────┘  │ │
-│ └───────────────┘ └───────────────────────────────────────────┘ │
-├─────────────────────────────────────────────────────────────────┤
-│ [Eksportuj ▼]  [◄ Poprzedni]  [Następny ►]  [Podsumowanie]      │
-└─────────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────────────┐
+│ ŚLAD OBLICZEŃ (White Box) — [Case Name] / [Run Timestamp]          [×]  │
+├─────────────────────────────────────────────────────────────────────────┤
+│ ┌───────────────────┐ ┌─────────────────────────────────────────────┐   │
+│ │ SPIS KROKÓW       │ │                                             │   │
+│ │                   │ │  KROK 4: Początkowy prąd zwarciowy          │   │
+│ │ 1. Napięcie c·U_n │ │  ─────────────────────────────────────────  │   │
+│ │ 2. Z źródła       │ │                                             │   │
+│ │ 3. Z Thevenina    │ │  ┌─────────────────────────────────────┐    │   │
+│ │►4. I_k''          │ │  │ WZÓR                        [EQ_SC3F_004] │   │
+│ │ 5. κ              │ │  │                                     │    │   │
+│ │ 6. i_p            │ │  │       c · U_n                       │    │   │
+│ │ 7. S_k''          │ │  │ I_k'' = ─────────────               │    │   │
+│ │ 8. I_th           │ │  │        √3 · |Z_th|                  │    │   │
+│ │ 9. I_dyn          │ │  │                                     │    │   │
+│ │                   │ │  │ IEC 60909-0:2016 eq. (29)           │    │   │
+│ │                   │ │  └─────────────────────────────────────┘    │   │
+│ │                   │ │                                             │   │
+│ │                   │ │  ┌─────────────────────────────────────┐    │   │
+│ │                   │ │  │ DANE                                │    │   │
+│ │                   │ │  │ c = 1.100 (—)                       │    │   │
+│ │                   │ │  │ U_n = 15.00 kV                      │    │   │
+│ │                   │ │  │ Z_th = 0.5000 + j2.000 Ω           │    │   │
+│ │                   │ │  │ |Z_th| = 2.062 Ω                    │    │   │
+│ │                   │ │  └─────────────────────────────────────┘    │   │
+│ │                   │ │                                             │   │
+│ │                   │ │  ┌─────────────────────────────────────┐    │   │
+│ │                   │ │  │ PODSTAWIENIE                        │    │   │
+│ │                   │ │  │         1.100 · 15.00               │    │   │
+│ │                   │ │  │ I_k'' = ───────────────  = 4.620 kA │    │   │
+│ │                   │ │  │         √3 · 2.062                  │    │   │
+│ │                   │ │  └─────────────────────────────────────┘    │   │
+│ │                   │ │                                             │   │
+│ │                   │ │  ┌─────────────────────────────────────┐    │   │
+│ │                   │ │  │ WYNIK                               │    │   │
+│ │                   │ │  │ ┌───────────────────────────────┐   │    │   │
+│ │                   │ │  │ │   I_k'' = 4.620 kA            │   │    │   │
+│ │                   │ │  │ └───────────────────────────────┘   │    │   │
+│ │                   │ │  └─────────────────────────────────────┘    │   │
+│ │                   │ │                                             │   │
+│ │                   │ │  ┌─────────────────────────────────────┐    │   │
+│ │                   │ │  │ WERYFIKACJA JEDNOSTEK          ✓   │    │   │
+│ │                   │ │  │ kV / Ω = kA                         │    │   │
+│ │                   │ │  └─────────────────────────────────────┘    │   │
+│ └───────────────────┘ └─────────────────────────────────────────────┘   │
+├─────────────────────────────────────────────────────────────────────────┤
+│ [Eksportuj ▼]  [◄ Poprzedni]  [Następny ►]  [Podsumowanie]              │
+└─────────────────────────────────────────────────────────────────────────┘
 ```
 
-### 2.3 Sekcje kroku dowodu (BINDING)
+### 3.3 Reguły nawigacji (BINDING)
 
-| Sekcja | Zawartość | Styl |
-|--------|-----------|------|
-| **WZÓR** | Równanie w notacji matematycznej | LaTeX rendered |
-| **DANE** | Lista wartości wejściowych z jednostkami | Tabela |
-| **PODSTAWIENIE** | Wzór z podstawionymi wartościami | LaTeX rendered |
-| **WYNIK** | Wartość końcowa z jednostką | Wyróżniony |
-| **WERYFIKACJA JEDNOSTEK** | Status ✓/✗ + ścieżka derywacji | Mały tekst |
+| Element | Akcja | Blokady |
+|---------|-------|---------|
+| Spis kroków (lewy panel) | Kliknięcie → przejście do kroku | Brak sortowania |
+| ◄ Poprzedni | Poprzedni krok w sekwencji | Niedostępny na kroku 1 |
+| Następny ► | Następny krok w sekwencji | Niedostępny na ostatnim |
+| Podsumowanie | Widok zbiorczy wyników | Zawsze dostępny |
 
----
-
-## 3. Nawigacja
-
-### 3.1 Elementy nawigacji
-
-| Element | Akcja |
-|---------|-------|
-| Spis kroków (lewy panel) | Kliknięcie → przejście do kroku |
-| ◄ Poprzedni | Poprzedni krok |
-| Następny ► | Następny krok |
-| Podsumowanie | Widok zbiorczy wyników |
-
-### 3.2 Stan aktywnego kroku
-
-```typescript
-interface ProofInspectorState {
-  documentId: string;
-  currentStepIndex: number;  // 0-based
-  viewMode: "step" | "summary";
-}
-```
-
-### 3.3 Skróty klawiszowe
+### 3.4 Skróty klawiszowe
 
 | Skrót | Akcja |
 |-------|-------|
@@ -166,86 +335,152 @@ interface ProofInspectorState {
 | `Home` | Pierwszy krok |
 | `End` | Podsumowanie |
 | `Esc` | Zamknij Proof Inspector |
+| `Ctrl+E` | Otwórz menu eksportu |
 
 ---
 
-## 4. Widok podsumowania
+## 4. Tryb READ-ONLY (BINDING)
 
-### 4.1 Layout podsumowania
+### 4.1 Dozwolone akcje
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│ PODSUMOWANIE DOWODU                                             │
-├─────────────────────────────────────────────────────────────────┤
-│                                                                 │
-│  Typ obliczenia:    Zwarcie trójfazowe IEC 60909                │
-│  Miejsce zwarcia:   B2 (Szyna 15 kV)                            │
-│  Współczynnik c:    1.1 (c_max)                                 │
-│                                                                 │
-│  ┌───────────────────────────────────────────────────────────┐  │
-│  │ WYNIKI GŁÓWNE                                             │  │
-│  ├───────────────────────────────────────────────────────────┤  │
-│  │ Wielkość          │ Symbol    │ Wartość   │ Jednostka     │  │
-│  ├───────────────────┼───────────┼───────────┼───────────────┤  │
-│  │ Prąd początkowy   │ I_k''     │ 4.62      │ kA            │  │
-│  │ Prąd udarowy      │ i_p       │ 11.76     │ kA            │  │
-│  │ Moc zwarciowa     │ S_k''     │ 120.0     │ MVA           │  │
-│  │ Współczynnik κ    │ κ         │ 1.80      │ —             │  │
-│  └───────────────────────────────────────────────────────────┘  │
-│                                                                 │
-│  ┌───────────────────────────────────────────────────────────┐  │
-│  │ STATUS WERYFIKACJI                                        │  │
-│  │ Wszystkie jednostki poprawne: ✓                           │  │
-│  │ Liczba kroków: 7                                          │  │
-│  │ Ostrzeżenia: brak                                         │  │
-│  └───────────────────────────────────────────────────────────┘  │
-│                                                                 │
-└─────────────────────────────────────────────────────────────────┘
-```
+| Akcja | Dozwolona | Uzasadnienie |
+|-------|-----------|--------------|
+| Przeglądanie kroków | ✓ TAK | Prezentacja |
+| Nawigacja między krokami | ✓ TAK | Nawigacja |
+| Kopiowanie wartości | ✓ TAK | Audit |
+| Eksport do pliku | ✓ TAK | Archiwizacja |
+| Drukowanie | ✓ TAK | Dokumentacja |
+| Zmiana języka (pl/en) | ✓ TAK | Lokalizacja |
+
+### 4.2 Niedozwolone akcje (ABSOLUTNE)
+
+| Akcja | Dozwolona | Uzasadnienie |
+|-------|-----------|--------------|
+| Edycja wartości | ✗ NIE | Dowód jest IMMUTABLE |
+| Dodawanie kroków | ✗ NIE | Struktura z generatora |
+| Usuwanie kroków | ✗ NIE | Struktura z generatora |
+| Zmiana kolejności kroków | ✗ NIE | Sequence from Equation Registry |
+| Ponowne obliczenie | ✗ NIE | Wymaga nowego Run |
+| Sortowanie listy kroków | ✗ NIE | Fixed order |
+| Filtrowanie kroków | ✗ NIE | Complete proof required |
 
 ---
 
-## 5. Eksport — kontrakty
+## 5. Eksport dowodu — kontrakty (BINDING)
 
-### 5.1 Formaty eksportu (BINDING)
+### 5.1 Formaty eksportu
 
-| Format | Rozszerzenie | Opis |
-|--------|--------------|------|
-| **LaTeX** | `.tex` | Kod źródłowy LaTeX |
-| **PDF** | `.pdf` | Dokument PDF (via LaTeX) |
-| **DOCX** | `.docx` | Microsoft Word |
-| **Markdown** | `.md` | Markdown z MathJax |
+| Format | Rozszerzenie | Opis | Przeznaczenie |
+|--------|--------------|------|---------------|
+| **JSON** | `.json` | 1:1 z ProofDocument | Archiwizacja, API |
+| **LaTeX** | `.tex` | Kod źródłowy LaTeX | Kompilacja, edycja |
+| **PDF** | `.pdf` | Dokument PDF (via LaTeX) | Druk, audyt |
+| **DOCX** | `.docx` | Microsoft Word | Raportowanie |
 
-### 5.2 Kontrakt eksportu
+### 5.2 Gwarancja determinizmu (BINDING)
 
-```typescript
-interface ExportRequest {
-  documentId: string;
-  format: "latex" | "pdf" | "docx" | "markdown";
-  options: ExportOptions;
+$$
+\boxed{
+\textbf{Eksport jest deterministyczny:} \quad \text{identyczne wejście} \Rightarrow \text{identyczny dokument}
 }
+$$
 
-interface ExportOptions {
-  includeHeader: boolean;      // nagłówek z metadanymi
-  includeSteps: boolean;       // wszystkie kroki (domyślnie true)
-  includeSummary: boolean;     // podsumowanie (domyślnie true)
-  language: "pl" | "en";       // język (domyślnie "pl")
-  paperSize: "a4" | "letter";  // rozmiar strony (domyślnie "a4")
-}
+| Aspekt | Gwarancja |
+|--------|-----------|
+| Kolejność kroków | Identyczna (z Equation Registry) |
+| Kolejność pól JSON | Sortowana alfabetycznie |
+| Formatowanie liczb | 4 miejsca znaczące |
+| Timestamp w dokumencie | Z ProofDocument, nie z momentu eksportu |
+| Hash dokumentu | SHA-256 fingerprint |
 
-interface ExportResponse {
-  success: boolean;
-  fileUrl: string | null;      // URL do pobrania
-  error: string | null;
+### 5.3 Kontrakt JSON
+
+```json
+{
+  "$schema": "proof-document.json",
+  "document_id": "uuid",
+  "artifact_id": "uuid",
+  "created_at": "ISO8601",
+  "proof_type": "SC3F_IEC60909",
+  "title_pl": "Dowód obliczeń zwarciowych IEC 60909",
+  "header": { /* ProofHeader */ },
+  "steps": [ /* ProofStep[] */ ],
+  "summary": { /* ProofSummary */ },
+  "fingerprint": "sha256:..."
 }
 ```
 
-### 5.3 Endpoint API
+### 5.4 Kontrakt LaTeX
+
+```latex
+\documentclass[a4paper,11pt]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[polish]{babel}
+\usepackage{amsmath,amssymb}
+\usepackage{booktabs}
+
+\title{Dowód obliczeń zwarciowych IEC 60909}
+\author{MV-DESIGN-PRO v1.2.0}
+\date{2026-01-27}
+
+\begin{document}
+\maketitle
+
+\section*{Nagłówek dowodu}
+% ... header fields ...
+
+\section*{Kroki dowodu}
+
+\subsection*{Krok 1: Napięcie z współczynnikiem c}
+\textbf{Równanie:} (EQ\_SC3F\_001)
+$$
+U_{eq} = c \cdot U_n
+$$
+
+\textbf{Dane wejściowe:}
+\begin{itemize}
+  \item $c = 1.100$ (—)
+  \item $U_n = 15.00\,\text{kV}$
+\end{itemize}
+
+\textbf{Podstawienie:}
+$$
+U_{eq} = 1.100 \cdot 15.00 = 16.50\,\text{kV}
+$$
+
+\textbf{Wynik:}
+$$
+\boxed{U_{eq} = 16.50\,\text{kV}}
+$$
+
+\textbf{Weryfikacja jednostek:} $\checkmark$ kV
+
+% ... remaining steps ...
+
+\section*{Podsumowanie}
+% ... summary table ...
+
+\end{document}
+```
+
+### 5.5 Kontrakt PDF / DOCX
+
+| Element | Wymaganie |
+|---------|-----------|
+| Format strony | A4, marginesy 2.5 cm |
+| Czcionka | Times New Roman 11pt (tekst), LaTeX math |
+| Numeracja stron | Dolna, środkowa |
+| Spis treści | Automatyczny (dla PDF > 3 strony) |
+| Nagłówek strony | Tytuł dowodu + data |
+| Stopka | Fingerprint + wersja systemu |
+
+### 5.6 API eksportu
 
 ```
 POST /api/proofs/{document_id}/export
 Content-Type: application/json
 
+Request:
 {
   "format": "pdf",
   "options": {
@@ -260,38 +495,104 @@ Content-Type: application/json
 Response:
 {
   "success": true,
-  "fileUrl": "/api/exports/abc123.pdf"
+  "fileUrl": "/api/exports/abc123.pdf",
+  "fingerprint": "sha256:abc123...",
+  "generatedAt": "2026-01-27T10:35:00Z"
 }
 ```
 
 ---
 
-## 6. Tryb read-only (BINDING)
+## 6. UX — zgodność z PowerFactory (BINDING)
 
-### 6.1 Dozwolone akcje
+### 6.1 Zasady interfejsu
 
-| Akcja | Dozwolona |
-|-------|-----------|
-| Przeglądanie kroków | TAK |
-| Nawigacja między krokami | TAK |
-| Kopiowanie wartości | TAK |
-| Eksport do pliku | TAK |
-| Drukowanie | TAK |
+| Zasada | Opis |
+|--------|------|
+| **Brak trybu edycji** | Wszystkie pola read-only |
+| **Brak sortowania** | Kolejność kroków ustalona |
+| **Two-panel layout** | Lewa lista kroków → prawa treść |
+| **Polish normative** | Nazewnictwo zgodne z normami PN-EN |
+| **White Box label** | Jasne oznaczenie: „Ślad obliczeń (White Box)" |
+| **No interpretation** | Brak kolorowania, brak oceny |
 
-### 6.2 Niedozwolone akcje
+### 6.2 Terminologia polska (BINDING)
 
-| Akcja | Dozwolona | Uzasadnienie |
-|-------|-----------|--------------|
-| Edycja wartości | **NIE** | Dowód jest niemutowalny |
-| Dodawanie kroków | **NIE** | Struktura z generatora |
-| Usuwanie kroków | **NIE** | Struktura z generatora |
-| Ponowne obliczenie | **NIE** | Wymaga nowego Run |
+| Angielski | Polski (normowy) |
+|-----------|------------------|
+| Proof Inspector | Przeglądarka dowodu |
+| Trace | Ślad obliczeń |
+| Step | Krok |
+| Formula | Wzór |
+| Input | Dane wejściowe |
+| Substitution | Podstawienie |
+| Result | Wynik |
+| Unit Check | Weryfikacja jednostek |
+| Summary | Podsumowanie |
+| Export | Eksportuj |
+| Fingerprint | Odcisk (hash) |
+
+### 6.3 Zgodność z DIgSILENT PowerFactory
+
+| Aspekt PowerFactory | MV-DESIGN-PRO Equivalent |
+|---------------------|--------------------------|
+| Calculation Report | Proof Inspector |
+| Result Browser | Results → Proof Inspector |
+| Export to Word | Export DOCX |
+| Export to PDF | Export PDF |
+| White-box trace | TraceArtifact + ProofDocument |
 
 ---
 
-## 7. Komponenty UI (specyfikacja)
+## 7. Zakazy absolutne (BINDING)
 
-### 7.1 ProofInspector (główny komponent)
+### 7.1 Zakazy interpretacyjne
+
+$$
+\boxed{
+\begin{aligned}
+&\text{❌ Brak interpretacji norm (to NIE Analysis)} \\
+&\text{❌ Brak kolorowania „dobry/zły" (pass/fail)} \\
+&\text{❌ Brak granic normowych w prezentacji} \\
+&\text{❌ Brak oceny „spełnia/nie spełnia"} \\
+&\text{❌ Brak warningów/errorów na podstawie wartości}
+\end{aligned}
+}
+$$
+
+### 7.2 Zakazy matematyczne
+
+$$
+\boxed{
+\begin{aligned}
+&\text{❌ Brak skrótów matematycznych} \\
+&\text{❌ Brak inline LaTeX (tylko bloki } \$\$...\$\$ \text{)} \\
+&\text{❌ Brak uproszczonych wzorów} \\
+&\text{❌ Brak zaokrągleń pośrednich} \\
+&\text{❌ Brak pomijania kroków}
+\end{aligned}
+}
+$$
+
+### 7.3 Zakazy systemowe
+
+$$
+\boxed{
+\begin{aligned}
+&\text{❌ Brak modyfikacji solverów} \\
+&\text{❌ Brak modyfikacji Result API} \\
+&\text{❌ Brak modyfikacji TraceArtifact po utworzeniu} \\
+&\text{❌ Brak modyfikacji ProofDocument po wygenerowaniu} \\
+&\text{❌ Brak cache'owania z modyfikacją}
+\end{aligned}
+}
+$$
+
+---
+
+## 8. Komponenty UI (specyfikacja implementacyjna)
+
+### 8.1 ProofInspector (główny komponent)
 
 ```typescript
 interface ProofInspectorProps {
@@ -299,17 +600,26 @@ interface ProofInspectorProps {
   onClose: () => void;
 }
 
-// Stan wewnętrzny
 interface ProofInspectorState {
   document: ProofDocument | null;
   loading: boolean;
   error: string | null;
-  currentStepIndex: number;
+  currentStepIndex: number;  // 0-based
   viewMode: "step" | "summary";
 }
 ```
 
-### 7.2 StepView (widok kroku)
+### 8.2 ProofHeader (nagłówek)
+
+```typescript
+interface ProofHeaderViewProps {
+  header: ProofHeader;
+  proofType: string;
+  fingerprint: string;
+}
+```
+
+### 8.3 StepView (widok kroku)
 
 ```typescript
 interface StepViewProps {
@@ -317,69 +627,146 @@ interface StepViewProps {
   stepNumber: number;
   totalSteps: number;
 }
+
+// Renderuje 5 sekcji: WZÓR, DANE, PODSTAWIENIE, WYNIK, WERYFIKACJA
 ```
 
-### 7.3 SummaryView (widok podsumowania)
+### 8.4 SummaryView (podsumowanie)
 
 ```typescript
 interface SummaryViewProps {
-  document: ProofDocument;
+  summary: ProofSummary;
+  header: ProofHeader;
 }
 ```
 
-### 7.4 ExportMenu (menu eksportu)
+### 8.5 ExportMenu (menu eksportu)
 
 ```typescript
 interface ExportMenuProps {
   documentId: string;
   onExportStart: () => void;
   onExportComplete: (result: ExportResponse) => void;
+  onExportError: (error: string) => void;
 }
+
+type ExportFormat = "json" | "latex" | "pdf" | "docx";
 ```
 
 ---
 
-## 8. Dostępność (a11y)
+## 9. Dostępność (a11y)
 
-### 8.1 Wymagania
+### 9.1 Wymagania WCAG AA
 
-| Wymaganie | Opis |
-|-----------|------|
+| Wymaganie | Implementacja |
+|-----------|---------------|
 | Nawigacja klawiaturą | Pełna obsługa bez myszy |
-| Screen reader | Opisy dla wzorów matematycznych |
-| Kontrast | WCAG AA (min 4.5:1) |
-| Focus visible | Widoczny fokus na elementach |
+| Screen reader | ARIA labels dla wszystkich sekcji |
+| Kontrast | Min 4.5:1 (WCAG AA) |
+| Focus visible | Wyraźny fokus na elementach |
+| Skip links | Przejście do treści głównej |
 
-### 8.2 ARIA labels
+### 9.2 ARIA labels
 
 ```html
-<div role="region" aria-label="Krok dowodu 4 z 7">
-  <section aria-labelledby="formula-heading">
-    <h3 id="formula-heading">Wzór</h3>
-    <math aria-label="I k prim prim równa się c razy U n dzielone przez pierwiastek z 3 razy moduł Z th">
-      ...
-    </math>
-  </section>
-</div>
+<main role="main" aria-label="Przeglądarka dowodu matematycznego">
+  <nav role="navigation" aria-label="Spis kroków dowodu">
+    <ol>
+      <li aria-current="step">Krok 4: Początkowy prąd zwarciowy</li>
+    </ol>
+  </nav>
+
+  <article role="article" aria-label="Krok dowodu 4 z 9">
+    <section aria-labelledby="formula-heading">
+      <h2 id="formula-heading">Wzór</h2>
+      <math aria-label="I k prim prim równa się c razy U n dzielone przez pierwiastek z 3 razy moduł Z th">
+        <!-- MathML or LaTeX -->
+      </math>
+    </section>
+
+    <section aria-labelledby="data-heading">
+      <h2 id="data-heading">Dane wejściowe</h2>
+      <!-- ... -->
+    </section>
+
+    <!-- ... remaining sections ... -->
+  </article>
+</main>
 ```
 
 ---
 
-## 9. Definition of Done (DoD)
+## 10. Testy determinizmu (BINDING)
 
-### 9.1 P11.1d — DoD
+### 10.1 Test identyczności eksportu
+
+```python
+def test_export_determinism():
+    """
+    Ten sam ProofDocument → identyczny eksport.
+    """
+    document = create_test_proof_document()
+
+    export_1 = export_to_json(document)
+    export_2 = export_to_json(document)
+
+    assert export_1 == export_2
+    assert sha256(export_1) == sha256(export_2)
+```
+
+### 10.2 Test kolejności kroków
+
+```python
+def test_step_order_immutable():
+    """
+    Kolejność kroków jest ustalona i nie może być zmieniona.
+    """
+    document = create_test_proof_document()
+
+    step_ids_1 = [s.step_id for s in document.steps]
+    step_ids_2 = [s.step_id for s in document.steps]
+
+    assert step_ids_1 == step_ids_2
+    assert step_ids_1 == SC3F_CANONICAL_STEP_ORDER
+```
+
+### 10.3 Test fingerprint
+
+```python
+def test_fingerprint_stable():
+    """
+    Fingerprint jest stabilny dla tego samego dokumentu.
+    """
+    document = create_test_proof_document()
+
+    fp_1 = compute_fingerprint(document)
+    fp_2 = compute_fingerprint(document)
+
+    assert fp_1 == fp_2
+```
+
+---
+
+## 11. Definition of Done (DoD)
+
+### 11.1 P11.1d — DoD
 
 | Kryterium | Status |
 |-----------|--------|
-| Layout Proof Inspector zdefiniowany | SPEC |
-| Sekcje kroku (Wzór/Dane/Podstawienie/Wynik/Weryfikacja) opisane | SPEC |
-| Nawigacja (spis, przyciski, skróty) opisana | SPEC |
-| Widok podsumowania opisany | SPEC |
-| Kontrakty eksportu (LaTeX/PDF/DOCX/Markdown) zdefiniowane | SPEC |
-| Tryb read-only udokumentowany | SPEC |
-| Komponenty UI wyspecyfikowane | SPEC |
-| Wymagania dostępności (a11y) opisane | SPEC |
+| Model mentalny (read-only, presentation-only) | SPEC ✓ |
+| Relacja Solver → ProofDocument → Inspector | SPEC ✓ |
+| Struktura kroku (5 sekcji mandatory) | SPEC ✓ |
+| Layout UI (two-panel, PF-style) | SPEC ✓ |
+| Nawigacja (sekwencyjna, bez sortowania) | SPEC ✓ |
+| Tryb read-only (dozwolone/niedozwolone akcje) | SPEC ✓ |
+| Kontrakty eksportu (JSON/LaTeX/PDF/DOCX) | SPEC ✓ |
+| Gwarancja determinizmu | SPEC ✓ |
+| Zakazy absolutne (interpretacja, inline, modyfikacja) | SPEC ✓ |
+| Zgodność z PowerFactory | SPEC ✓ |
+| Dostępność (WCAG AA) | SPEC ✓ |
+| Testy determinizmu | SPEC ✓ |
 
 ---
 
-**END OF P11.1d**
+**END OF P11.1d CANONICAL**

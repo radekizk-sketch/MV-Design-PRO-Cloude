@@ -1,8 +1,8 @@
 # MV-DESIGN-PRO PowerFactory Compliance Checklist
 
-**Version:** 2.7
+**Version:** 3.0
 **Status:** AUDIT DOCUMENT (Updated 2026-01)
-**Reference:** SYSTEM_SPEC.md, PLANS.md, sld_rules.md
+**Reference:** SYSTEM_SPEC.md, PLANS.md, sld_rules.md, P11_1d_PROOF_UI_EXPORT.md
 
 ---
 
@@ -331,7 +331,8 @@ This document provides a comprehensive checklist for verifying compliance with D
 | **Type Catalog UI (P8.2)** | **43** | **43** | **0** | **0** |
 | **Project Tree & Data Manager (P9)** | **52** | **52** | **0** | **0** |
 | **Study Cases (P10 FULL MAX)** | **64** | **64** | **0** | **0** |
-| **TOTAL** | **289** | **251** | **0** | **38** |
+| **Proof Inspector (P11.1d)** | **33** | **1** | **0** | **32 (SPEC)** |
+| **TOTAL** | **322** | **252** | **0** | **70** |
 
 ### 9.2 Critical Failures
 
@@ -414,6 +415,7 @@ All remediations verified via:
 | 2026-01 | System | 2.5 | Type Catalog UI (P8.2): Assign/Clear Type + Type Picker (43/43 PASS, 15 tests) |
 | 2026-01 | System | 2.6 | P9 FULL: Project Tree + Data Manager (52/52 PASS, 52 tests) |
 | 2026-01 | System | 2.7 | P10 FULL MAX: Study Cases / Variants (64/64 PASS, 26 tests) |
+| 2026-01 | System | 3.0 | **P11.1d Proof Inspector: 33 checklisty (1 PASS, 32 SPEC), canonical presentation layer** |
 
 ---
 
@@ -850,12 +852,96 @@ OUTDATED → FRESH (after re-calculation)
 | `test_proof_step_order_stable` | Step order is fixed | SPEC |
 | `test_mapping_keys_stable` | Keys don't change between versions | SPEC |
 
-### 17.4 Audit Trail (P11)
+### 17.4 Proof Inspector (P11.1d) — Canonical Presentation Layer
+
+#### 17.4.1 Model mentalny
+
+| ID | Requirement | Verification | Status |
+|----|-------------|--------------|--------|
+| PI-001 | Proof Inspector = read-only viewer | Check: no edit actions | SPEC |
+| PI-002 | ZERO logiki obliczeniowej | Check: no physics in UI | SPEC |
+| PI-003 | ZERO interpretacji normowej | Check: no limits, no pass/fail | SPEC |
+| PI-004 | Prezentacja 1:1 z ProofDocument | Check: no data transformation | SPEC |
+
+#### 17.4.2 Struktura widoku
+
+| ID | Requirement | Verification | Status |
+|----|-------------|--------------|--------|
+| PI-010 | Nagłówek z metadanymi (proof_type, norma, case, run) | Check: ProofHeaderView | SPEC |
+| PI-011 | Lista kroków (sekwencyjna, read-only) | Check: StepList | SPEC |
+| PI-012 | Każdy krok ma 5 sekcji (WZÓR/DANE/PODSTAWIENIE/WYNIK/WERYFIKACJA) | Check: StepView | SPEC |
+| PI-013 | Podsumowanie liczbowe bez interpretacji | Check: SummaryView | SPEC |
+| PI-014 | Fingerprint (SHA-256) w nagłówku | Check: fingerprint field | SPEC |
+
+#### 17.4.3 Nawigacja i UX
+
+| ID | Requirement | Verification | Status |
+|----|-------------|--------------|--------|
+| PI-020 | Two-panel layout (lewa lista → prawa treść) | Check: UI mockup | SPEC |
+| PI-021 | Brak sortowania kroków (fixed order) | Check: no sort UI | SPEC |
+| PI-022 | Brak filtrowania kroków (complete proof) | Check: no filter UI | SPEC |
+| PI-023 | Skróty klawiszowe (←/→/Home/End/Esc) | Check: keyboard nav | SPEC |
+| PI-024 | Terminologia polska normowa | Check: SECTION_LABELS | SPEC |
+
+#### 17.4.4 Tryb Read-Only
+
+| ID | Requirement | Verification | Status |
+|----|-------------|--------------|--------|
+| PI-030 | Dozwolone: przeglądanie, kopiowanie, eksport | Check: allowed actions | SPEC |
+| PI-031 | Zabronione: edycja, dodawanie, usuwanie kroków | Check: no mutation UI | SPEC |
+| PI-032 | Zabronione: ponowne obliczenie | Check: no recalc action | SPEC |
+| PI-033 | Zabronione: zmiana kolejności kroków | Check: no drag-drop | SPEC |
+
+#### 17.4.5 Eksport
+
+| ID | Requirement | Verification | Status |
+|----|-------------|--------------|--------|
+| PI-040 | JSON: 1:1 z ProofDocument | Check: ExportJSON | SPEC |
+| PI-041 | LaTeX: blokowy `$$...$$` only | Check: ExportLaTeX | SPEC |
+| PI-042 | PDF: via LaTeX, A4, numeracja | Check: ExportPDF | SPEC |
+| PI-043 | DOCX: Microsoft Word | Check: ExportDOCX | SPEC |
+| PI-044 | Determinizm: identyczne wejście → identyczny eksport | Check: fingerprint test | SPEC |
+| PI-045 | Fingerprint SHA-256 w każdym eksporcie | Check: export response | SPEC |
+
+#### 17.4.6 Zakazy absolutne
+
+| ID | Requirement | Verification | Status |
+|----|-------------|--------------|--------|
+| PI-050 | ❌ Brak interpretacji norm | Check: no limits in UI | SPEC |
+| PI-051 | ❌ Brak kolorowania pass/fail | Check: no color logic | SPEC |
+| PI-052 | ❌ Brak inline LaTeX | Check: only `$$...$$` | SPEC |
+| PI-053 | ❌ Brak modyfikacji solverów | Check: solver untouched | PASS |
+| PI-054 | ❌ Brak modyfikacji ProofDocument | Check: immutable | SPEC |
+
+#### 17.4.7 Dostępność (a11y)
+
+| ID | Requirement | Verification | Status |
+|----|-------------|--------------|--------|
+| PI-060 | Nawigacja klawiaturą | Check: keyboard nav | SPEC |
+| PI-061 | Screen reader (ARIA labels) | Check: ARIA attributes | SPEC |
+| PI-062 | Kontrast WCAG AA (4.5:1) | Check: color contrast | SPEC |
+| PI-063 | Focus visible | Check: focus styling | SPEC |
+
+### 17.5 P11.1d Summary
+
+| Category | Items | SPEC | PASS | VERIFY |
+|----------|-------|------|------|--------|
+| Model mentalny | 4 | 4 | 0 | 0 |
+| Struktura widoku | 5 | 5 | 0 | 0 |
+| Nawigacja i UX | 5 | 5 | 0 | 0 |
+| Tryb Read-Only | 4 | 4 | 0 | 0 |
+| Eksport | 6 | 6 | 0 | 0 |
+| Zakazy absolutne | 5 | 4 | 1 | 0 |
+| Dostępność | 4 | 4 | 0 | 0 |
+| **TOTAL** | **33** | **32** | **1** | **0** |
+
+### 17.6 Audit Trail (P11)
 
 | Date | Auditor | Version | Findings |
 |------|---------|---------|----------|
 | 2026-01 | System | 2.8 | P11/P11.1 DOC ONLY: 9/9 documents PASS, 11 items VERIFY (pending implementation) |
 | 2026-01 | Professor Audit | 2.9 | LaTeX-only policy, I_dyn/I_th mandatory, SC3F Gold Standard: 15/15 PASS |
+| 2026-01 | System | 3.0 | **P11.1d Proof Inspector: 33 checklisty SPEC, canonical presentation layer** |
 
 ---
 
