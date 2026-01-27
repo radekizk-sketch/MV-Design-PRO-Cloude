@@ -108,7 +108,8 @@ class LaTeXRenderer:
         if h.fault_type:
             lines.append(rf"  \item Typ zwarcia: {cls._escape(h.fault_type)}")
         if h.voltage_factor is not None:
-            lines.append(rf"  \item Współczynnik napięciowy $c = {h.voltage_factor:.4f}$")
+            lines.append(r"  \item Współczynnik napięciowy:")
+            lines.append(cls._math_block(f"c = {h.voltage_factor:.4f}"))
         if h.source_bus:
             lines.append(rf"  \item Szyna źródłowa: {cls._escape(h.source_bus)}")
         if h.target_bus:
@@ -134,9 +135,7 @@ class LaTeXRenderer:
             rf"\subsection{{Krok {step.step_number}: {cls._escape(step.title_pl)}}}",
             "",
             r"\textbf{Wzór:}",
-            r"\begin{equation}",
-            step.equation.latex.strip(),
-            r"\end{equation}",
+            cls._math_block(step.equation.latex.strip()),
             "",
             r"\textbf{Dane:}",
             r"\begin{itemize}",
@@ -145,23 +144,26 @@ class LaTeXRenderer:
         # Sortowanie input_values alfabetycznie po symbol (determinizm)
         sorted_inputs = sorted(step.input_values, key=lambda v: v.symbol)
         for val in sorted_inputs:
-            parts.append(rf"  \item ${val.symbol} = {cls._format_value_latex(val)}$")
+            parts.append(r"  \item")
+            parts.append(cls._math_block(
+                f"{val.symbol} = {cls._format_value_latex(val)}"
+            ))
 
         parts.extend([
             r"\end{itemize}",
             "",
             r"\textbf{Podstawienie:}",
-            r"\begin{equation}",
-            step.substitution_latex,
-            r"\end{equation}",
+            cls._math_block(step.substitution_latex),
             "",
             r"\textbf{Wynik:}",
             r"\begin{center}",
-            rf"\resultbox{{${step.result.symbol} = {cls._format_value_latex(step.result)}$}}",
+            cls._math_block(
+                f"{step.result.symbol} = {cls._format_value_latex(step.result)}"
+            ),
             r"\end{center}",
             "",
             r"\textbf{Weryfikacja jednostek:}",
-            rf"${step.unit_check.derivation}$",
+            cls._math_block(step.unit_check.derivation),
         ])
 
         return "\n".join(parts)
@@ -172,23 +174,21 @@ class LaTeXRenderer:
         lines = [
             r"\section{Podsumowanie wyników}",
             "",
-            r"\begin{center}",
-            r"\begin{tabular}{lrr}",
-            r"\toprule",
-            r"\textbf{Wielkość} & \textbf{Wartość} & \textbf{Jednostka} \\",
-            r"\midrule",
+            r"\textbf{Wyniki końcowe:}",
+            r"\begin{itemize}",
         ]
 
         # Sortowanie key_results alfabetycznie (determinizm)
         for key in sorted(doc.summary.key_results.keys()):
             val = doc.summary.key_results[key]
             value_str = cls._format_numeric_value(val.value)
-            lines.append(rf"${val.symbol}$ & {value_str} & {val.unit} \\")
+            lines.append(r"  \item")
+            lines.append(
+                cls._math_block(f"{val.symbol} = {value_str}\\,\\text{{{val.unit}}}")
+            )
 
         lines.extend([
-            r"\bottomrule",
-            r"\end{tabular}",
-            r"\end{center}",
+            r"\end{itemize}",
             "",
             rf"Liczba kroków: {doc.summary.total_steps}",
             "",
@@ -207,6 +207,11 @@ class LaTeXRenderer:
             lines.append(r"\end{itemize}")
 
         return "\n".join(lines)
+
+    @staticmethod
+    def _math_block(latex: str) -> str:
+        """Opakowuje LaTeX w blok $$...$$."""
+        return f"$$\n{latex}\n$$"
 
     @classmethod
     def _escape(cls, text: str) -> str:

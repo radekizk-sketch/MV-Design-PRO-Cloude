@@ -34,6 +34,7 @@ from application.proof_engine.equation_registry import (
     EQ_VDROP_004,
     EQ_VDROP_005,
     EQ_VDROP_006,
+    EQ_VDROP_007,
 )
 from application.proof_engine.types import (
     EquationDefinition,
@@ -673,15 +674,14 @@ class ProofGenerator:
         """
         Generuje dowód VDROP (spadki napięć).
 
-        Kroki dla każdego odcinka:
+        Kroki obowiązkowe (BINDING):
         1. Rezystancja odcinka R
         2. Reaktancja odcinka X
         3. Składowa czynna ΔU_R
         4. Składowa bierna ΔU_X
         5. Spadek na odcinku ΔU
-
-        Plus krok końcowy:
         6. Suma spadków ΔU_total
+        7. Napięcie w punkcie U
 
         Args:
             data: Dane wejściowe VDROPInput
@@ -693,57 +693,76 @@ class ProofGenerator:
         if artifact_id is None:
             artifact_id = uuid4()
 
-        steps: list[ProofStep] = []
-        step_number = 0
+        if not data.segments:
+            raise ValueError("VDROP proof requires at least one segment.")
+        if len(data.segments) != 1:
+            raise ValueError("VDROP MVP requires exactly one segment.")
 
-        segment_drops: list[float] = []
+        segment = data.segments[0]
 
-        # Dla każdego odcinka generuj 5 kroków
-        for seg in data.segments:
-            # Obliczenia pośrednie
-            r_ohm = seg.r_ohm_per_km * seg.length_km
-            x_ohm = seg.x_ohm_per_km * seg.length_km
-            delta_u_r = (r_ohm * seg.p_mw) / (seg.u_n_kv ** 2) * 100
-            delta_u_x = (x_ohm * seg.q_mvar) / (seg.u_n_kv ** 2) * 100
-            delta_u = delta_u_r + delta_u_x
-            segment_drops.append(delta_u)
-
-            # Krok: Rezystancja
-            step_number += 1
-            steps.append(cls._create_vdrop_step_r(
-                step_number, seg.r_ohm_per_km, seg.length_km, r_ohm, seg.segment_id
-            ))
-
-            # Krok: Reaktancja
-            step_number += 1
-            steps.append(cls._create_vdrop_step_x(
-                step_number, seg.x_ohm_per_km, seg.length_km, x_ohm, seg.segment_id
-            ))
-
-            # Krok: Składowa czynna
-            step_number += 1
-            steps.append(cls._create_vdrop_step_du_r(
-                step_number, r_ohm, seg.p_mw, seg.u_n_kv, delta_u_r, seg.segment_id
-            ))
-
-            # Krok: Składowa bierna
-            step_number += 1
-            steps.append(cls._create_vdrop_step_du_x(
-                step_number, x_ohm, seg.q_mvar, seg.u_n_kv, delta_u_x, seg.segment_id
-            ))
-
-            # Krok: Spadek na odcinku
-            step_number += 1
-            steps.append(cls._create_vdrop_step_du(
-                step_number, delta_u_r, delta_u_x, delta_u, seg.segment_id
-            ))
-
-        # Krok końcowy: Suma spadków
-        step_number += 1
+        r_ohm = segment.r_ohm_per_km * segment.length_km
+        x_ohm = segment.x_ohm_per_km * segment.length_km
+        delta_u_r = (r_ohm * segment.p_mw) / (segment.u_n_kv ** 2) * 100
+        delta_u_x = (x_ohm * segment.q_mvar) / (segment.u_n_kv ** 2) * 100
+        delta_u = delta_u_r + delta_u_x
+        segment_drops = [delta_u]
         delta_u_total = sum(segment_drops)
-        steps.append(cls._create_vdrop_step_total(
-            step_number, segment_drops, delta_u_total
-        ))
+        u_kv = data.u_source_kv * (1 - delta_u_total / 100)
+
+        step_builders = {
+            "EQ_VDROP_001": lambda step_number: cls._create_vdrop_step_r(
+                step_number,
+                segment.r_ohm_per_km,
+                segment.length_km,
+                r_ohm,
+                segment.segment_id,
+            ),
+            "EQ_VDROP_002": lambda step_number: cls._create_vdrop_step_x(
+                step_number,
+                segment.x_ohm_per_km,
+                segment.length_km,
+                x_ohm,
+                segment.segment_id,
+            ),
+            "EQ_VDROP_003": lambda step_number: cls._create_vdrop_step_du_r(
+                step_number,
+                r_ohm,
+                segment.p_mw,
+                segment.u_n_kv,
+                delta_u_r,
+                segment.segment_id,
+            ),
+            "EQ_VDROP_004": lambda step_number: cls._create_vdrop_step_du_x(
+                step_number,
+                x_ohm,
+                segment.q_mvar,
+                segment.u_n_kv,
+                delta_u_x,
+                segment.segment_id,
+            ),
+            "EQ_VDROP_005": lambda step_number: cls._create_vdrop_step_du(
+                step_number,
+                delta_u_r,
+                delta_u_x,
+                delta_u,
+                segment.segment_id,
+            ),
+            "EQ_VDROP_006": lambda step_number: cls._create_vdrop_step_total(
+                step_number,
+                segment_drops,
+                delta_u_total,
+            ),
+            "EQ_VDROP_007": lambda step_number: cls._create_vdrop_step_u(
+                step_number,
+                data.u_source_kv,
+                delta_u_total,
+                u_kv,
+            ),
+        }
+
+        steps: list[ProofStep] = []
+        for step_number, equation_id in enumerate(EquationRegistry.VDROP_STEP_ORDER, start=1):
+            steps.append(step_builders[equation_id](step_number))
 
         # Podsumowanie
         unit_checks_passed = all(s.unit_check.passed for s in steps)
@@ -752,6 +771,7 @@ class ProofGenerator:
             "delta_u_total_percent": ProofValue.create(
                 "\\Delta U_{total}", delta_u_total, "%", "delta_u_total_percent"
             ),
+            "u_kv": ProofValue.create("U", u_kv, "kV", "u_kv"),
         }
 
         summary = ProofSummary(
@@ -1019,7 +1039,7 @@ class ProofGenerator:
         equation = EQ_VDROP_006
 
         input_values = tuple(
-            ProofValue.create(f"\\Delta U_{i+1}", drop, "%", f"delta_u_segment_{i}")
+            ProofValue.create("\\Delta U_i", drop, "%", "delta_u_segments")
             for i, drop in enumerate(segment_drops)
         )
 
@@ -1047,5 +1067,50 @@ class ProofGenerator:
             substitution_latex=substitution,
             result=result,
             unit_check=unit_check,
-            source_keys={"ΔU_total": "delta_u_total_percent"},
+            source_keys={"ΔU_i": "delta_u_segments", "ΔU_total": "delta_u_total_percent"},
+        )
+
+    @classmethod
+    def _create_vdrop_step_u(
+        cls,
+        step_number: int,
+        u_source_kv: float,
+        delta_u_total: float,
+        u_kv: float,
+    ) -> ProofStep:
+        """Napięcie w punkcie po uwzględnieniu spadku."""
+        equation = EQ_VDROP_007
+
+        input_values = (
+            ProofValue.create("U_{source}", u_source_kv, "kV", "u_source_kv"),
+            ProofValue.create("\\Delta U_{total}", delta_u_total, "%", "delta_u_total_percent"),
+        )
+
+        substitution = (
+            f"U = {u_source_kv:.4f} \\cdot \\left(1 - \\frac{{{delta_u_total:.4f}}}{{100}}\\right) = "
+            f"{u_kv:.4f}\\,\\text{{kV}}"
+        )
+
+        result = ProofValue.create("U", u_kv, "kV", "u_kv")
+
+        unit_check = UnitVerifier.verify_equation(
+            equation.equation_id,
+            {"U_{source}": "kV", "ΔU_{total}": "%"},
+            "kV",
+        )
+
+        return ProofStep(
+            step_id=ProofStep.generate_step_id("VDROP", step_number),
+            step_number=step_number,
+            title_pl=equation.name_pl,
+            equation=equation,
+            input_values=input_values,
+            substitution_latex=substitution,
+            result=result,
+            unit_check=unit_check,
+            source_keys={
+                "U_{source}": "u_source_kv",
+                "ΔU_{total}": "delta_u_total_percent",
+                "U": "u_kv",
+            },
         )

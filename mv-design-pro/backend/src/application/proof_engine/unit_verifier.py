@@ -198,6 +198,11 @@ class UnitVerifier:
             "inputs": {"ΔU_i": "%"},
             "output": "%",
         },
+        "EQ_VDROP_007": {
+            "rule": "kV · (1 - %) = kV",
+            "inputs": {"U_{source}": "kV", "ΔU_{total}": "%"},
+            "output": "kV",
+        },
     }
 
     @classmethod
