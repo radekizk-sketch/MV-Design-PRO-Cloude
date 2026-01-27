@@ -27,7 +27,7 @@
 - [docs/proof_engine/P11_OVERVIEW.md](./proof_engine/P11_OVERVIEW.md) — TraceArtifact, inwarianty, UX
 - [docs/proof_engine/P11_1a_MVP_SC3F_AND_VDROP.md](./proof_engine/P11_1a_MVP_SC3F_AND_VDROP.md) — MVP: SC3F + VDROP
 - [docs/proof_engine/P11_1b_REGULATION_Q_U.md](./proof_engine/P11_1b_REGULATION_Q_U.md) — Regulatory Q(U), cosφ(P)
-- [docs/proof_engine/P11_1c_SC_ASYMMETRICAL.md](./proof_engine/P11_1c_SC_ASYMMETRICAL.md) — Składowe symetryczne
+- [docs/proof_engine/P11_1c_SC_ASYMMETRICAL.md](./proof_engine/P11_1c_SC_ASYMMETRICAL.md) — Składowe symetryczne (SKELETON)
 - [docs/proof_engine/P11_1d_PROOF_UI_EXPORT.md](./proof_engine/P11_1d_PROOF_UI_EXPORT.md) — **Proof Inspector (CANONICAL): read-only viewer, eksport JSON/LaTeX/PDF/DOCX**
 - [docs/proof_engine/PROOF_SCHEMAS.md](./proof_engine/PROOF_SCHEMAS.md) — Schematy JSON (BINDING)
 - [docs/proof_engine/EQUATIONS_IEC60909_SC3F.md](./proof_engine/EQUATIONS_IEC60909_SC3F.md) — Rejestr równań SC3F (BINDING)

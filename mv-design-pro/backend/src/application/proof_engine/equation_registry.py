@@ -824,6 +824,61 @@ EQ_QU_005 = EquationDefinition(
 
 
 # =============================================================================
+# SC1 IEC 60909 — Zwarcia asymetryczne (P11.1c, SKELETON)
+# =============================================================================
+
+EQ_SC1_001 = EquationDefinition(
+    equation_id="EQ_SC1_001",
+    name_pl="Impedancje składowych Z₁, Z₂, Z₀",
+    standard_ref="TODO",
+    latex="TODO",
+    symbols=(),
+    unit_derivation="TODO",
+    notes="P11.1c SKELETON — bez implementacji",
+)
+
+EQ_SC1_002 = EquationDefinition(
+    equation_id="EQ_SC1_002",
+    name_pl="Transformacja składowych (Fortescue)",
+    standard_ref="TODO",
+    latex="TODO",
+    symbols=(),
+    unit_derivation="TODO",
+    notes="P11.1c SKELETON — bez implementacji",
+)
+
+EQ_SC1_003 = EquationDefinition(
+    equation_id="EQ_SC1_003",
+    name_pl="Sieci składowe dla typu zwarcia",
+    standard_ref="TODO",
+    latex="TODO",
+    symbols=(),
+    unit_derivation="TODO",
+    notes="P11.1c SKELETON — bez implementacji",
+)
+
+EQ_SC1_004 = EquationDefinition(
+    equation_id="EQ_SC1_004",
+    name_pl="Wyznaczenie I₁, I₂, I₀",
+    standard_ref="TODO",
+    latex="TODO",
+    symbols=(),
+    unit_derivation="TODO",
+    notes="P11.1c SKELETON — bez implementacji",
+)
+
+EQ_SC1_005 = EquationDefinition(
+    equation_id="EQ_SC1_005",
+    name_pl="Rekombinacja do prądów fazowych",
+    standard_ref="TODO",
+    latex="TODO",
+    symbols=(),
+    unit_derivation="TODO",
+    notes="P11.1c SKELETON — bez implementacji",
+)
+
+
+# =============================================================================
 # ANTI-DOUBLE-COUNTING AUDIT
 # =============================================================================
 
@@ -952,6 +1007,15 @@ class EquationRegistry:
         "EQ_QU_005": EQ_QU_005,  # P11.1c: VDROP link (no new physics)
     }
 
+    # SC1 equations registry (P11.1c, skeleton only)
+    SC1_EQUATIONS: dict[str, EquationDefinition] = {
+        "EQ_SC1_001": EQ_SC1_001,
+        "EQ_SC1_002": EQ_SC1_002,
+        "EQ_SC1_003": EQ_SC1_003,
+        "EQ_SC1_004": EQ_SC1_004,
+        "EQ_SC1_005": EQ_SC1_005,
+    }
+
     # Step order for SC3F proof (BINDING) — tylko równania dowodowe
     SC3F_PROOF_STEP_ORDER: list[str] = [
         "EQ_SC3F_003",  # Impedancja Thevenina
@@ -983,10 +1047,20 @@ class EquationRegistry:
         "EQ_QU_005",  # P11.1c: Q_cmd → U (VDROP link, no new physics)
     ]
 
+    # Step order for SC1 proof (BINDING) — P11.1c skeleton
+    SC1_STEP_ORDER: list[str] = [
+        "EQ_SC1_001",  # Z₁, Z₂, Z₀
+        "EQ_SC1_002",  # Transformacja Fortescue
+        "EQ_SC1_003",  # Sieci składowe
+        "EQ_SC1_004",  # I₁, I₂, I₀
+        "EQ_SC1_005",  # Rekombinacja fazowa
+    ]
+
     # Frozen IDs for stability tests (BINDING)
     FROZEN_IDS: dict[str, list[str]] = {
         "sc3f_equations": list(SC3F_EQUATIONS.keys()),
         "vdrop_equations": list(VDROP_EQUATIONS.keys()),
+        "sc1_equations": list(SC1_EQUATIONS.keys()),
         "mapping_keys": [
             # SC3F
             "ikss_ka", "ip_ka", "ith_ka", "idyn_ka", "sk_mva",
@@ -1008,6 +1082,8 @@ class EquationRegistry:
             return cls.VDROP_EQUATIONS[equation_id]
         if equation_id in cls.QU_EQUATIONS:
             return cls.QU_EQUATIONS[equation_id]
+        if equation_id in cls.SC1_EQUATIONS:
+            return cls.SC1_EQUATIONS[equation_id]
         return None
 
     @classmethod
@@ -1041,6 +1117,16 @@ class EquationRegistry:
         return cls.QU_STEP_ORDER.copy()
 
     @classmethod
+    def get_sc1_equations(cls) -> dict[str, EquationDefinition]:
+        """Zwraca wszystkie równania SC1 (P11.1c skeleton)."""
+        return cls.SC1_EQUATIONS.copy()
+
+    @classmethod
+    def get_sc1_step_order(cls) -> list[str]:
+        """Zwraca kolejność kroków dla dowodu SC1 (P11.1c skeleton)."""
+        return cls.SC1_STEP_ORDER.copy()
+
+    @classmethod
     def get_all_mapping_keys(cls) -> set[str]:
         """Zwraca wszystkie mapping_key używane w rejestrze."""
         keys: set[str] = set()
@@ -1051,6 +1137,9 @@ class EquationRegistry:
             for sym in eq.symbols:
                 keys.add(sym.mapping_key)
         for eq in cls.QU_EQUATIONS.values():
+            for sym in eq.symbols:
+                keys.add(sym.mapping_key)
+        for eq in cls.SC1_EQUATIONS.values():
             for sym in eq.symbols:
                 keys.add(sym.mapping_key)
         return keys
@@ -1068,6 +1157,10 @@ class EquationRegistry:
         for eq_id in cls.FROZEN_IDS["vdrop_equations"]:
             if eq_id not in cls.VDROP_EQUATIONS:
                 raise ValueError(f"Frozen equation ID {eq_id} usunięty z VDROP!")
+
+        for eq_id in cls.FROZEN_IDS["sc1_equations"]:
+            if eq_id not in cls.SC1_EQUATIONS:
+                raise ValueError(f"Frozen equation ID {eq_id} usunięty z SC1!")
 
         current_keys = cls.get_all_mapping_keys()
         for key in cls.FROZEN_IDS["mapping_keys"]:
