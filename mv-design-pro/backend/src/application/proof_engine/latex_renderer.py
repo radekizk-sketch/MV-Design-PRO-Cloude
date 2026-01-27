@@ -184,8 +184,28 @@ class LaTeXRenderer:
             and "delta_q_cmd" in doc.summary.key_results
         )
 
+        # P11.1c: Sprawdź czy ma dane VDROP (wpływ Q na U)
+        has_vdrop_link = "vdrop_u_kv" in doc.summary.key_results
+
         if is_counterfactual:
             lines.extend(cls._render_counterfactual_table(doc))
+        elif has_vdrop_link:
+            # P11.1c: Sekcja "Wpływ Q na U"
+            lines.extend(cls._render_vdrop_link_section(doc))
+            lines.append("")
+            lines.append(r"\textbf{Wyniki końcowe:}")
+            lines.append(r"\begin{itemize}")
+
+            # Sortowanie key_results alfabetycznie (determinizm)
+            for key in sorted(doc.summary.key_results.keys()):
+                val = doc.summary.key_results[key]
+                value_str = cls._format_numeric_value(val.value)
+                lines.append(r"  \item")
+                lines.append(
+                    cls._math_block(f"{val.symbol} = {value_str}\\,\\text{{{val.unit}}}")
+                )
+
+            lines.append(r"\end{itemize}")
         else:
             lines.append(r"\textbf{Wyniki końcowe:}")
             lines.append(r"\begin{itemize}")
@@ -247,6 +267,15 @@ class LaTeXRenderer:
             rf"$Q_{{cmd}}$ [Mvar] & {q_cmd_a:.4f} & {q_cmd_b:.4f} & {delta_q_cmd:.4f} \\"
         )
 
+        # P11.1c: Dodaj wiersz U jeśli dane VDROP są dostępne
+        if "u_a_kv" in kr and "u_b_kv" in kr and "delta_u_voltage_kv" in kr:
+            u_a = kr["u_a_kv"].value
+            u_b = kr["u_b_kv"].value
+            delta_u = kr["delta_u_voltage_kv"].value
+            lines.append(
+                rf"$U$ [kV] & {u_a:.4f} & {u_b:.4f} & {delta_u:.4f} \\"
+            )
+
         lines.extend([
             r"\bottomrule",
             r"\end{tabular}",
@@ -269,7 +298,57 @@ class LaTeXRenderer:
             f"\\Delta Q_{{cmd}} = {delta_q_cmd:.4f}\\,\\text{{Mvar}}"
         ))
 
+        # P11.1c: Dodaj delta U jeśli dostępne
+        if "delta_u_voltage_kv" in kr:
+            delta_u = kr["delta_u_voltage_kv"].value
+            lines.append(r"  \item")
+            lines.append(cls._math_block(
+                f"\\Delta U_{{(B-A)}} = {delta_u:.4f}\\,\\text{{kV}}"
+            ))
+
         lines.append(r"\end{itemize}")
+
+        return lines
+
+    @classmethod
+    def _render_vdrop_link_section(cls, doc: ProofDocument) -> list[str]:
+        """
+        P11.1c: Renderuje sekcję "Wpływ Q na U".
+
+        Pokazuje tabelę z Q_cmd i wynikami VDROP (ΔU_X, ΔU, U).
+        """
+        kr = doc.summary.key_results
+
+        q_cmd = kr["q_cmd_mvar"].value
+        delta_u_x = kr["vdrop_delta_u_x_percent"].value
+        delta_u = kr["vdrop_delta_u_percent"].value
+        u = kr["vdrop_u_kv"].value
+
+        lines = [
+            r"\subsection{Wpływ Q na U}",
+            "",
+            r"\textbf{Łańcuch zależności Q(U) → VDROP:}",
+            "",
+            cls._math_block(
+                r"Q_{cmd} \xrightarrow{\text{VDROP}} \Delta U_X \to \Delta U \to U"
+            ),
+            "",
+            r"\begin{center}",
+            r"\begin{tabular}{lcc}",
+            r"\toprule",
+            r"\textbf{Wielkość} & \textbf{Wartość} & \textbf{Jednostka} \\",
+            r"\midrule",
+            rf"$Q_{{cmd}}$ & {q_cmd:.4f} & Mvar \\",
+            rf"$\Delta U_X$ & {delta_u_x:.4f} & \% \\",
+            rf"$\Delta U$ & {delta_u:.4f} & \% \\",
+            rf"$U$ & {u:.4f} & kV \\",
+            r"\bottomrule",
+            r"\end{tabular}",
+            r"\end{center}",
+            "",
+            r"\textit{Uwaga: Wartości VDROP pochodzą z istniejących obliczeń "
+            r"(EQ\_VDROP\_004..007). Ten krok nie wykonuje nowych obliczeń.}",
+        ]
 
         return lines
 

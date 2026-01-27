@@ -454,6 +454,11 @@ class QUInput:
         k_q_mvar_per_kv: Współczynnik regulacji Q(U) [Mvar/kV]
         q_min_mvar: Minimalna moc bierna [Mvar]
         q_max_mvar: Maksymalna moc bierna [Mvar]
+
+        # P11.1c: Opcjonalne wyniki VDROP (LINK-ONLY, bez nowych obliczeń)
+        vdrop_delta_u_x_percent: Składowa bierna spadku napięcia [%] (z VDROP)
+        vdrop_delta_u_percent: Całkowity spadek napięcia [%] (z VDROP)
+        vdrop_u_kv: Napięcie w punkcie [kV] (z VDROP)
     """
 
     project_name: str
@@ -465,6 +470,11 @@ class QUInput:
     k_q_mvar_per_kv: float
     q_min_mvar: float
     q_max_mvar: float
+
+    # P11.1c: Opcjonalne wyniki VDROP dla linku Q_cmd → U
+    vdrop_delta_u_x_percent: float | None = None
+    vdrop_delta_u_percent: float | None = None
+    vdrop_u_kv: float | None = None
 
 
 @dataclass
