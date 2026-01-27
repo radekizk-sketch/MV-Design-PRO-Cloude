@@ -312,6 +312,10 @@ Ten pakiet zawiera **kanoniczne źródła wiedzy** dla Proof Engine (P11).
 | **Determinism** | Ten sam `run_id` → identyczny `proof.json` i `proof.tex` |
 | **Czysta interpretacja** | Dowód generowany z gotowych danych trace/result |
 | **Traceability** | Każda wartość ma mapping key do źródła |
+| **LaTeX-only math** | WSZYSTKIE symbole/jednostki w blokach `$...$` |
+| **I_dyn MANDATORY** | Prąd dynamiczny jest obowiązkowym wynikiem SC3F |
+| **I_th MANDATORY** | Prąd cieplny jest obowiązkowym wynikiem SC3F |
+| **Anti-double-counting** | Współczynnik c dokładnie raz w łańcuchu |
 
 ---
 

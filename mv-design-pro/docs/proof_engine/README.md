@@ -93,6 +93,28 @@ Ten pakiet zawiera **kanoniczne źródła wiedzy** dla systemu dowodów matematy
 3. **Czysta interpretacja** — dowód jest generowany z gotowych danych trace/result
 4. **Kompletność** — każdy krok dowodu ma: wzór, dane, podstawienie, wynik, weryfikację jednostek
 5. **Traceability** — każdy wynik w dowodzie ma mapping key do źródła w trace/result
+6. **LaTeX-only math** — WSZYSTKIE symbole matematyczne, jednostki i liczby w blokach `$...$`
+7. **I_dyn MANDATORY** — prąd dynamiczny jest OBOWIĄZKOWYM wynikiem SC3F
+8. **I_th MANDATORY** — prąd cieplny jest OBOWIĄZKOWYM wynikiem SC3F (z pełnym obliczeniem m, n)
+
+---
+
+## Polityka LaTeX-only (BINDING)
+
+$$
+\boxed{
+\begin{aligned}
+&\textbf{REGUŁA: ZERO MATEMATYKI POZA BLOKAMI LaTeX} \\[8pt]
+&\text{DOZWOLONE: } \texttt{\$I\_k''\$}, \quad \texttt{\$15{,}0\,\textbackslash text\{kV\}\$} \\[4pt]
+&\text{ZABRONIONE: } \texttt{I\_k''}, \quad \texttt{15.0 kV} \text{ (poza blokiem)} \\[8pt]
+&\textbf{Jednostki SI TYLKO w LaTeX:} \\[4pt]
+&\quad \Omega, \text{kV}, \text{kA}, \text{MVA}, \text{MW}, \text{Mvar}, \% \\[4pt]
+&\textbf{Wyjątki (dozwolone poza LaTeX):} \\[4pt]
+&\quad \text{JSON examples: } \texttt{"unit": "kA"} \\
+&\quad \text{YAML definitions: } \texttt{unit: "Ω"}
+\end{aligned}
+}
+$$
 
 ---
 

@@ -54,8 +54,8 @@ class TraceArtifact:
     intermediate_values: Dict[str, Any]  # wartości pośrednie z WhiteBoxTrace
     output_results: Dict[str, Any]     # wyniki końcowe
 
-    # Dowód (opcjonalny, generowany przez ProofEngine)
-    proof_document: ProofDocument | None
+    # Dowód (OBOWIĄZKOWY dla pełnego audytu, generowany przez ProofEngine)
+    proof_document: ProofDocument
 ```
 
 ### 2.2 Inwarianty TraceArtifact
@@ -218,7 +218,7 @@ ProofDocument (JSON + LaTeX)
 
 | Trigger | Opis |
 |---------|------|
-| **Automatyczny** | Po każdym pomyślnym CalculationRun (opcjonalnie) |
+| **Automatyczny** | Po każdym pomyślnym CalculationRun (ZALECANY) |
 | **Na żądanie** | Użytkownik klika „Wygeneruj dowód" |
 | **Batch** | Administrator generuje dowody dla wielu Run |
 

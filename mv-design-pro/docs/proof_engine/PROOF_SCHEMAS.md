@@ -491,7 +491,7 @@ VDROP_STEP_ORDER = [
 ]
 ```
 
-### 7.3 Stabilne ID
+### 7.3 Stabilne ID — polityka wersjonowania (BINDING)
 
 ```python
 def generate_step_id(proof_type: str, step_number: int) -> str:
@@ -503,6 +503,52 @@ def generate_step_id(proof_type: str, step_number: int) -> str:
 # Przykłady:
 # SC3F_STEP_001, SC3F_STEP_002, ...
 # VDROP_STEP_001, VDROP_STEP_002, ...
+```
+
+#### 7.3.1 Gwarancje stabilności ID (BINDING)
+
+$$
+\boxed{
+\begin{aligned}
+&\textbf{Polityka stabilności identyfikatorów:} \\[8pt]
+&\text{1. } \texttt{step\_id} \text{ NIE MOŻE się zmienić między wersjami} \\
+&\text{2. } \texttt{equation\_id} \text{ NIE MOŻE się zmienić dla istniejących równań} \\
+&\text{3. } \texttt{mapping\_key} \text{ NIE MOŻE się zmienić dla istniejących pól} \\[8pt]
+&\textbf{Przy dodawaniu nowych:} \\[4pt]
+&\text{• Nowe równania: użyj następnego wolnego ID (np. EQ\_SC3F\_011)} \\
+&\text{• Nowe kroki: użyj następnego wolnego numeru} \\
+&\text{• Nowe mapping keys: dodaj z nową nazwą, nie modyfikuj istniejących}
+\end{aligned}
+}
+$$
+
+#### 7.3.2 Reguły dla document_id i artifact_id
+
+| ID | Generowanie | Stabilność |
+|----|-------------|------------|
+| `document_id` | UUID v4 przy tworzeniu ProofDocument | Nowy przy każdym generowaniu |
+| `artifact_id` | UUID v4 przy tworzeniu TraceArtifact | Nowy przy każdym CalculationRun |
+| `step_id` | Deterministyczny: `{proof_type}_STEP_{nnn}` | STABILNY między wersjami |
+| `equation_id` | Deterministyczny: `EQ_{type}_{nnn}` | STABILNY, IMMUTABLE |
+
+#### 7.3.3 Test stabilności (BINDING)
+
+```python
+def test_id_stability():
+    """
+    Weryfikuje, że żaden istniejący ID nie został zmieniony.
+    """
+    FROZEN_IDS = {
+        "equations": ["EQ_SC3F_001", "EQ_SC3F_002", ..., "EQ_SC3F_010"],
+        "steps": ["SC3F_STEP_001", ..., "SC3F_STEP_010"],
+        "mapping_keys": ["ikss_ka", "ip_ka", "ith_ka", "idyn_ka", "sk_mva", ...]
+    }
+
+    for eq_id in FROZEN_IDS["equations"]:
+        assert eq_id in current_equation_registry, f"ID {eq_id} usunięty!"
+
+    for mapping_key in FROZEN_IDS["mapping_keys"]:
+        assert mapping_key in current_schema, f"Key {mapping_key} usunięty!"
 ```
 
 ### 7.4 Formatowanie liczb

@@ -252,7 +252,7 @@ unit_derivation: "kV · kA = MVA"
 ```yaml
 equation_id: EQ_SC3F_008
 name_pl: "Prąd cieplny równoważny"
-standard_ref: "IEC 60909-0:2016 eq. (100)"
+standard_ref: "IEC 60909-0:2016 eq. (100)–(105)"
 status: MANDATORY
 latex: |
   I_{th} = I_k'' \cdot \sqrt{m + n}
@@ -267,24 +267,71 @@ symbols:
     mapping_key: "ikss_ka"
   - symbol: "m"
     unit: "—"
-    description_pl: "Współczynnik dla składowej nieokresowej"
+    description_pl: "Współczynnik dla składowej nieokresowej (DC)"
     mapping_key: "m_factor"
   - symbol: "n"
     unit: "—"
-    description_pl: "Współczynnik dla składowej okresowej"
+    description_pl: "Współczynnik dla składowej okresowej (AC decay)"
     mapping_key: "n_factor"
+  - symbol: "t_k"
+    unit: "s"
+    description_pl: "Czas trwania zwarcia (parametr wejściowy OBOWIĄZKOWY)"
+    mapping_key: "t_k_s"
 unit_derivation: "kA · — = kA"
-conditions: |
-  $$
-  \text{Warunki stosowalności dla uproszczenia } m + n = 1:
-  $$
-  $$
-  \text{Sieć odległa od generatorów synchronicznych (brak wkładu DC decay)}
-  $$
-  $$
-  \text{Czas zwarcia } t_k \leq 5\,\text{s}
-  $$
 ```
+
+#### EQ_SC3F_008b — Pełny wzór na współczynnik m (BINDING)
+
+$$
+\boxed{
+m = \frac{1}{2 \cdot f \cdot t_k \cdot \ln(\kappa - 1)} \cdot \left( e^{4 \cdot f \cdot t_k \cdot \ln(\kappa - 1)} - 1 \right)
+}
+$$
+
+**Uproszczenie** (dla sieci odległych od generatorów, $\kappa < 1{,}7$):
+
+$$
+m \approx \frac{1}{2 \cdot f \cdot t_k} \cdot \frac{\kappa^2 - 1}{2}
+$$
+
+| Symbol | Jednostka | Opis | Mapping key |
+|--------|-----------|------|-------------|
+| $f$ | Hz | Częstotliwość sieci (50 Hz) | `f_hz` |
+| $t_k$ | s | Czas trwania zwarcia | `t_k_s` |
+| $\kappa$ | — | Współczynnik udaru | `kappa` |
+
+#### EQ_SC3F_008c — Pełny wzór na współczynnik n (BINDING)
+
+$$
+\boxed{
+n = 1 \quad \text{dla sieci odległych od generatorów synchronicznych}
+}
+$$
+
+**Pełny wzór** (gdy wkład generatora synchronicznego jest znaczący):
+
+$$
+n = \frac{1}{t_k} \cdot \int_0^{t_k} \left( \frac{I_k''(t)}{I_k''} \right)^2 dt
+$$
+
+#### EQ_SC3F_008d — Warunki stosowalności uproszczenia $m + n = 1$
+
+$$
+\boxed{
+\begin{aligned}
+&\textbf{Uproszczenie } m + n = 1 \textbf{ DOZWOLONE gdy:} \\[6pt]
+&\text{1. Sieć jest odległa od generatorów synchronicznych} \\
+&\text{2. } \kappa < 1{,}7 \\
+&\text{3. } t_k \leq 0{,}5\,\text{s} \\[8pt]
+&\textbf{PEŁNE OBLICZENIE WYMAGANE gdy:} \\[6pt]
+&\text{1. } \kappa \geq 1{,}7 \\
+&\text{2. } t_k > 0{,}5\,\text{s} \\
+&\text{3. Bliskość generatora synchronicznego}
+\end{aligned}
+}
+$$
+
+**UWAGA**: Parametr $t_k$ (czas trwania zwarcia) jest **OBOWIĄZKOWYM** parametrem wejściowym. Brak $t_k$ → błąd walidacji.
 
 ---
 
@@ -399,17 +446,32 @@ $$
 
 ---
 
-## 3a. Reguła stosowania współczynnika c (BINDING)
+## 3a. Reguła anti-double-counting dla współczynnika c (BINDING)
 
 $$
 \boxed{
 \begin{aligned}
-&\textbf{Współczynnik } c \textbf{ występuje TYLKO w:} \\[4pt]
-&\text{1. } \text{EQ\_SC3F\_001: } U_{eq} = c \cdot U_n \quad \text{(napięcie równoważne źródła)} \\
-&\text{2. } \text{EQ\_SC3F\_002: } Z_Q = \frac{c \cdot U_n^2}{S_k''_Q} \quad \text{(impedancja sieci zasilającej)} \\
-&\text{3. } \text{EQ\_SC3F\_004: } I_k'' = \frac{c \cdot U_n}{\sqrt{3} \cdot |Z_{th}|} \quad \text{(prąd zwarciowy)} \\[8pt]
-&\textbf{ZAKAZ:} \text{ Nie stosować } c \text{ w innych równaniach.}
+&\textbf{REGUŁA ANTI-DOUBLE-COUNTING} \\[8pt]
+&\text{Współczynnik napięciowy } c \text{ musi być zastosowany} \\
+&\textbf{dokładnie raz} \text{ w łańcuchu obliczeniowym.} \\[12pt]
+&\textbf{Wariant A — } c \textbf{ w napięciu:} \\[4pt]
+&\quad U_{eq} = c \cdot U_n \\
+&\quad I_k'' = \frac{U_{eq}}{\sqrt{3} \cdot |Z_{th}|} = \frac{c \cdot U_n}{\sqrt{3} \cdot |Z_{th}|} \\
+&\quad Z_Q = \frac{U_n^2}{S_k''_Q} \quad \text{(BEZ } c \text{)} \\[12pt]
+&\textbf{Wariant B — } c \textbf{ w impedancji źródła:} \\[4pt]
+&\quad Z_Q = \frac{c \cdot U_n^2}{S_k''_Q} \quad \text{(z } c \text{)} \\
+&\quad I_k'' = \frac{U_n}{\sqrt{3} \cdot |Z_{th}|} \quad \text{(BEZ } c \text{)} \\[12pt]
+&\textbf{ZAKAZ (double-counting):} \\[4pt]
+&\quad Z_Q = \frac{c \cdot U_n^2}{S_k''_Q} \;\land\; I_k'' = \frac{c \cdot U_n}{\sqrt{3} \cdot |Z_{th}|} \quad \text{❌ BŁĄD!}
 \end{aligned}
+}
+$$
+
+**Zalecany wariant**: **Wariant A** (zgodny z IEC 60909-0:2016 eq. (29))
+
+$$
+\boxed{
+\textbf{MV-DESIGN-PRO stosuje Wariant A:} \quad I_k'' = \frac{c \cdot U_n}{\sqrt{3} \cdot |Z_{th}|}
 }
 $$
 
@@ -430,6 +492,8 @@ $$
 | `r_ohm_per_km` | float | Ω/km | Rezystancja jednostkowa linii |
 | `x_ohm_per_km` | float | Ω/km | Reaktancja jednostkowa linii |
 | `length_km` | float | km | Długość linii/kabla |
+| `t_k_s` | float | s | Czas trwania zwarcia (OBOWIĄZKOWY dla $I_{th}$) |
+| `f_hz` | float | Hz | Częstotliwość sieci (domyślnie 50 Hz) |
 
 ### 4.2 Wartości pośrednie
 
