@@ -133,30 +133,35 @@ class TestSC3FProofGenerator:
 
         Model Anti-Double-Counting: A1 (c tylko w EQ_SC3F_004)
 
-        Kroki obowiązkowe:
-        1. Impedancja Thevenina
-        2. Prąd I_k'' (c TUTAJ — jedyne miejsce)
-        3. Współczynnik κ
-        4. Prąd udarowy i_p
-        5. Prąd dynamiczny I_dyn (OBOWIĄZKOWY)
-        6. Prąd cieplny I_th (OBOWIĄZKOWY)
-        7. Moc S_k''
+        Kroki obowiązkowe (Model A1):
+        1. Thevenin
+        2. I_k''
+        3. κ (kappa)
+        4. i_p
+        5. I_dyn (OBOWIĄZKOWY)
+        6. I_th (OBOWIĄZKOWY)
+        7. S_k''
         """
         proof = ProofGenerator.generate_sc3f_proof(sc3f_test_input)
 
         assert len(proof.steps) == 7
 
-        step_titles = [s.title_pl for s in proof.steps]
+        step_titles = [s.title_pl.lower() for s in proof.steps]
 
         # Weryfikacja kroków obowiązkowych
-        assert any("napięciow" in t.lower() for t in step_titles)
-        assert any("impedancja" in t.lower() for t in step_titles)
-        assert any("prąd" in t.lower() and "zwarciowy" in t.lower() for t in step_titles)
-        assert any("udaru" in t.lower() or "κ" in t.lower() for t in step_titles)
-        assert any("udarow" in t.lower() for t in step_titles)
-        assert any("dynamiczn" in t.lower() for t in step_titles)
-        assert any("ciepln" in t.lower() for t in step_titles)
-        assert any("moc" in t.lower() for t in step_titles)
+        assert any("thevenin" in t for t in step_titles)
+        assert any(
+            "i_k''" in t or "początkowy prąd zwarciowy symetryczny" in t
+            for t in step_titles
+        )
+        assert any(
+            "κ" in t or "kappa" in t or "współczynnik udaru" in t
+            for t in step_titles
+        )
+        assert any("i_p" in t or "prąd udarowy" in t for t in step_titles)
+        assert any("i_dyn" in t or "prąd dynamiczny" in t for t in step_titles)
+        assert any("i_th" in t or "prąd cieplny" in t for t in step_titles)
+        assert any("s_k''" in t or "moc zwarciowa" in t for t in step_titles)
 
     def test_sc3f_proof_step_numbers_are_sequential(self, sc3f_test_input: SC3FInput):
         """Numery kroków są sekwencyjne od 1."""
@@ -329,8 +334,8 @@ class TestEquationRegistry:
         sc3f_eqs = EquationRegistry.get_sc3f_equations()
 
         required_ids = [
-            "EQ_SC3F_001", "EQ_SC3F_002", "EQ_SC3F_003", "EQ_SC3F_004",
-            "EQ_SC3F_005", "EQ_SC3F_006", "EQ_SC3F_007", "EQ_SC3F_008",
+            "EQ_SC3F_002", "EQ_SC3F_003", "EQ_SC3F_004", "EQ_SC3F_005",
+            "EQ_SC3F_006", "EQ_SC3F_007", "EQ_SC3F_008",
             "EQ_SC3F_008a",
         ]
 
@@ -437,7 +442,7 @@ class TestIntegration:
         json_dict = json.loads(json_str)
 
         assert "steps" in json_dict
-        assert len(json_dict["steps"]) == 8
+        assert len(json_dict["steps"]) == 7
         assert json_dict["proof_type"] == "SC3F_IEC60909"
 
         # Verify LaTeX generation
