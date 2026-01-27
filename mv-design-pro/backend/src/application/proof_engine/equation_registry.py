@@ -641,6 +641,135 @@ EQ_VDROP_007 = EquationDefinition(
 
 
 # =============================================================================
+# Q(U) Regulation — Kanoniczne równania (BINDING) P11.1b
+# =============================================================================
+
+EQ_QU_001 = EquationDefinition(
+    equation_id="EQ_QU_001",
+    name_pl="Odchylenie napięcia od wartości referencyjnej",
+    standard_ref="Q(U) regulation",
+    latex=r"\Delta U = U_{meas} - U_{ref}",
+    symbols=(
+        SymbolDefinition(
+            symbol="\\Delta U",
+            unit="kV",
+            description_pl="Odchylenie napięcia",
+            mapping_key="delta_u_kv",
+        ),
+        SymbolDefinition(
+            symbol="U_{meas}",
+            unit="kV",
+            description_pl="Napięcie zmierzone",
+            mapping_key="u_meas_kv",
+        ),
+        SymbolDefinition(
+            symbol="U_{ref}",
+            unit="kV",
+            description_pl="Napięcie referencyjne",
+            mapping_key="u_ref_kv",
+        ),
+    ),
+    unit_derivation="kV - kV = kV",
+)
+
+EQ_QU_002 = EquationDefinition(
+    equation_id="EQ_QU_002",
+    name_pl="Funkcja martwej strefy (deadband)",
+    standard_ref="Q(U) regulation",
+    latex=(
+        r"s(U) = \begin{cases} "
+        r"\Delta U - U_{dead} & \text{if } \Delta U > U_{dead} \\ "
+        r"0 & \text{if } |\Delta U| \le U_{dead} \\ "
+        r"\Delta U + U_{dead} & \text{if } \Delta U < -U_{dead} "
+        r"\end{cases}"
+    ),
+    symbols=(
+        SymbolDefinition(
+            symbol="s(U)",
+            unit="kV",
+            description_pl="Sygnał po deadband",
+            mapping_key="s_u_kv",
+        ),
+        SymbolDefinition(
+            symbol="\\Delta U",
+            unit="kV",
+            description_pl="Odchylenie napięcia",
+            mapping_key="delta_u_kv",
+        ),
+        SymbolDefinition(
+            symbol="U_{dead}",
+            unit="kV",
+            description_pl="Szerokość martwej strefy",
+            mapping_key="u_dead_kv",
+        ),
+    ),
+    unit_derivation="kV ± kV = kV",
+)
+
+EQ_QU_003 = EquationDefinition(
+    equation_id="EQ_QU_003",
+    name_pl="Surowa wartość mocy biernej Q",
+    standard_ref="Q(U) regulation",
+    latex=r"Q_{raw} = k_Q \cdot s(U)",
+    symbols=(
+        SymbolDefinition(
+            symbol="Q_{raw}",
+            unit="Mvar",
+            description_pl="Surowa moc bierna",
+            mapping_key="q_raw_mvar",
+        ),
+        SymbolDefinition(
+            symbol="k_Q",
+            unit="Mvar/kV",
+            description_pl="Współczynnik regulacji Q(U)",
+            mapping_key="k_q_mvar_per_kv",
+        ),
+        SymbolDefinition(
+            symbol="s(U)",
+            unit="kV",
+            description_pl="Sygnał po deadband",
+            mapping_key="s_u_kv",
+        ),
+    ),
+    unit_derivation="Mvar/kV · kV = Mvar",
+)
+
+EQ_QU_004 = EquationDefinition(
+    equation_id="EQ_QU_004",
+    name_pl="Końcowa moc bierna z limitami",
+    standard_ref="Q(U) regulation",
+    latex=r"Q_{cmd} = \min(\max(Q_{raw}, Q_{min}), Q_{max})",
+    symbols=(
+        SymbolDefinition(
+            symbol="Q_{cmd}",
+            unit="Mvar",
+            description_pl="Komenda mocy biernej",
+            mapping_key="q_cmd_mvar",
+        ),
+        SymbolDefinition(
+            symbol="Q_{raw}",
+            unit="Mvar",
+            description_pl="Surowa moc bierna",
+            mapping_key="q_raw_mvar",
+        ),
+        SymbolDefinition(
+            symbol="Q_{min}",
+            unit="Mvar",
+            description_pl="Minimalna moc bierna",
+            mapping_key="q_min_mvar",
+        ),
+        SymbolDefinition(
+            symbol="Q_{max}",
+            unit="Mvar",
+            description_pl="Maksymalna moc bierna",
+            mapping_key="q_max_mvar",
+        ),
+    ),
+    unit_derivation="Mvar = Mvar",
+)
+
+
+# =============================================================================
 # ANTI-DOUBLE-COUNTING AUDIT
 # =============================================================================
 
@@ -760,6 +889,14 @@ class EquationRegistry:
         "EQ_VDROP_007": EQ_VDROP_007,
     }
 
+    # Q(U) equations registry (P11.1b)
+    QU_EQUATIONS: dict[str, EquationDefinition] = {
+        "EQ_QU_001": EQ_QU_001,
+        "EQ_QU_002": EQ_QU_002,
+        "EQ_QU_003": EQ_QU_003,
+        "EQ_QU_004": EQ_QU_004,
+    }
+
     # Step order for SC3F proof (BINDING) — tylko równania dowodowe
     SC3F_PROOF_STEP_ORDER: list[str] = [
         "EQ_SC3F_003",  # Impedancja Thevenina
@@ -780,6 +917,14 @@ class EquationRegistry:
         "EQ_VDROP_005",  # Spadek na odcinku ΔU
         "EQ_VDROP_006",  # Suma spadków ΔU_total
         "EQ_VDROP_007",  # Napięcie w punkcie U
+    ]
+
+    # Step order for Q(U) proof (BINDING) — P11.1b
+    QU_STEP_ORDER: list[str] = [
+        "EQ_QU_001",  # ΔU = U_meas - U_ref
+        "EQ_QU_002",  # s(U) deadband
+        "EQ_QU_003",  # Q_raw = k_Q · s(U)
+        "EQ_QU_004",  # Q_cmd with limits
     ]
 
     # Frozen IDs for stability tests (BINDING)
@@ -805,6 +950,8 @@ class EquationRegistry:
             return cls.SC3F_EQUATIONS[equation_id]
         if equation_id in cls.VDROP_EQUATIONS:
             return cls.VDROP_EQUATIONS[equation_id]
+        if equation_id in cls.QU_EQUATIONS:
+            return cls.QU_EQUATIONS[equation_id]
         return None
 
     @classmethod
@@ -828,6 +975,16 @@ class EquationRegistry:
         return cls.VDROP_STEP_ORDER.copy()
 
     @classmethod
+    def get_qu_equations(cls) -> dict[str, EquationDefinition]:
+        """Zwraca wszystkie równania Q(U)."""
+        return cls.QU_EQUATIONS.copy()
+
+    @classmethod
+    def get_qu_step_order(cls) -> list[str]:
+        """Zwraca kolejność kroków dla dowodu Q(U)."""
+        return cls.QU_STEP_ORDER.copy()
+
+    @classmethod
     def get_all_mapping_keys(cls) -> set[str]:
         """Zwraca wszystkie mapping_key używane w rejestrze."""
         keys: set[str] = set()
@@ -835,6 +992,9 @@ class EquationRegistry:
             for sym in eq.symbols:
                 keys.add(sym.mapping_key)
         for eq in cls.VDROP_EQUATIONS.values():
+            for sym in eq.symbols:
+                keys.add(sym.mapping_key)
+        for eq in cls.QU_EQUATIONS.values():
             for sym in eq.symbols:
                 keys.add(sym.mapping_key)
         return keys

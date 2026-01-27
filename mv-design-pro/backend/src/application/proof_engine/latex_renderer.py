@@ -1,5 +1,5 @@
 """
-LaTeX Renderer — Generator dokumentów LaTeX dla Proof Engine P11.1a
+LaTeX Renderer — Generator dokumentów LaTeX dla Proof Engine P11.1a/P11.1b
 
 STATUS: CANONICAL & BINDING
 Reference: P11_1a_MVP_SC3F_AND_VDROP.md
@@ -8,6 +8,7 @@ Generuje dokumenty LaTeX z ProofDocument:
 - Format blokowy ($$...$$) WYŁĄCZNIE
 - Bez inline LaTeX
 - Terminologia normowa PN-EN (PL)
+- Obsługa Q(U) (P11.1b) z tabelą counterfactual A/B/Δ
 """
 
 from __future__ import annotations
@@ -15,7 +16,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from application.proof_engine.types import ProofDocument, ProofStep
+    from application.proof_engine.types import ProofDocument, ProofStep, ProofType
 
 
 class LaTeXRenderer:
@@ -174,21 +175,33 @@ class LaTeXRenderer:
         lines = [
             r"\section{Podsumowanie wyników}",
             "",
-            r"\textbf{Wyniki końcowe:}",
-            r"\begin{itemize}",
         ]
 
-        # Sortowanie key_results alfabetycznie (determinizm)
-        for key in sorted(doc.summary.key_results.keys()):
-            val = doc.summary.key_results[key]
-            value_str = cls._format_numeric_value(val.value)
-            lines.append(r"  \item")
-            lines.append(
-                cls._math_block(f"{val.symbol} = {value_str}\\,\\text{{{val.unit}}}")
-            )
+        # Sprawdź czy to Q(U) counterfactual (ma klucze delta_*)
+        is_counterfactual = (
+            "delta_k_q" in doc.summary.key_results
+            and "delta_q_raw" in doc.summary.key_results
+            and "delta_q_cmd" in doc.summary.key_results
+        )
+
+        if is_counterfactual:
+            lines.extend(cls._render_counterfactual_table(doc))
+        else:
+            lines.append(r"\textbf{Wyniki końcowe:}")
+            lines.append(r"\begin{itemize}")
+
+            # Sortowanie key_results alfabetycznie (determinizm)
+            for key in sorted(doc.summary.key_results.keys()):
+                val = doc.summary.key_results[key]
+                value_str = cls._format_numeric_value(val.value)
+                lines.append(r"  \item")
+                lines.append(
+                    cls._math_block(f"{val.symbol} = {value_str}\\,\\text{{{val.unit}}}")
+                )
+
+            lines.append(r"\end{itemize}")
 
         lines.extend([
-            r"\end{itemize}",
             "",
             rf"Liczba kroków: {doc.summary.total_steps}",
             "",
@@ -207,6 +220,58 @@ class LaTeXRenderer:
             lines.append(r"\end{itemize}")
 
         return "\n".join(lines)
+
+    @classmethod
+    def _render_counterfactual_table(cls, doc: ProofDocument) -> list[str]:
+        """Renderuje tabelę A/B/Δ dla counterfactual Q(U)."""
+        kr = doc.summary.key_results
+
+        q_cmd_a = kr["q_cmd_a"].value
+        q_cmd_b = kr["q_cmd_b"].value
+        delta_k_q = kr["delta_k_q"].value
+        delta_q_raw = kr["delta_q_raw"].value
+        delta_q_cmd = kr["delta_q_cmd"].value
+
+        lines = [
+            r"\textbf{Porównanie scenariuszy A vs B:}",
+            "",
+            r"\begin{center}",
+            r"\begin{tabular}{lccc}",
+            r"\toprule",
+            r"\textbf{Wielkość} & \textbf{A} & \textbf{B} & \textbf{$\Delta$ (B-A)} \\",
+            r"\midrule",
+        ]
+
+        # Q_cmd row
+        lines.append(
+            rf"$Q_{{cmd}}$ [Mvar] & {q_cmd_a:.4f} & {q_cmd_b:.4f} & {delta_q_cmd:.4f} \\"
+        )
+
+        lines.extend([
+            r"\bottomrule",
+            r"\end{tabular}",
+            r"\end{center}",
+            "",
+            r"\textbf{Różnice (counterfactual diff):}",
+            r"\begin{itemize}",
+        ])
+
+        lines.append(r"  \item")
+        lines.append(cls._math_block(
+            f"\\Delta k_Q = {delta_k_q:.4f}\\,\\text{{Mvar/kV}}"
+        ))
+        lines.append(r"  \item")
+        lines.append(cls._math_block(
+            f"\\Delta Q_{{raw}} = {delta_q_raw:.4f}\\,\\text{{Mvar}}"
+        ))
+        lines.append(r"  \item")
+        lines.append(cls._math_block(
+            f"\\Delta Q_{{cmd}} = {delta_q_cmd:.4f}\\,\\text{{Mvar}}"
+        ))
+
+        lines.append(r"\end{itemize}")
+
+        return lines
 
     @staticmethod
     def _math_block(latex: str) -> str:
