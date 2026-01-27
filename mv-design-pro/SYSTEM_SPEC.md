@@ -822,4 +822,88 @@ LoadSymbol     ↔    Load
 
 ---
 
+## 19. Proof Pack / Mathematical Proof Engine (P11)
+
+### 19.1 Pozycja w architekturze
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                      SOLVER LAYER                            │
+│  - IEC 60909 Short Circuit (FROZEN)                          │
+│  - Newton-Raphson Power Flow (FROZEN)                        │
+│  - WhiteBoxTrace (intermediate values)                       │
+└─────────────────────────┬───────────────────────────────────┘
+                          │ trace + result (READ-ONLY)
+                          ▼
+┌─────────────────────────────────────────────────────────────┐
+│                 INTERPRETATION LAYER                         │
+│  ┌─────────────────────────────────────────────────────┐    │
+│  │           PROOF ENGINE (P11)                         │    │
+│  │  - TraceArtifact (immutable)                         │    │
+│  │  - ProofDocument generator                           │    │
+│  │  - Equation Registry (SC3F, VDROP)                   │    │
+│  │  - Unit verification                                 │    │
+│  │  - Export: JSON, LaTeX, PDF, DOCX                    │    │
+│  └─────────────────────────────────────────────────────┘    │
+│  - BoundaryIdentifier (PCC)                                  │
+│  - Thermal Analysis                                          │
+│  - Voltage Analysis                                          │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### 19.2 Kontrakty wejścia/wyjścia (BINDING)
+
+#### 19.2.1 Wejście
+
+| Źródło | Typ | Opis |
+|--------|-----|------|
+| `WhiteBoxTrace` | READ-ONLY | Wartości pośrednie z solvera |
+| `SolverResult` | READ-ONLY | Wyniki końcowe (ikss_ka, ip_ka, ...) |
+| `NetworkSnapshot` | READ-ONLY | Zamrożony stan sieci |
+| `SolverConfig` | READ-ONLY | Parametry uruchomienia (c_factor, fault_type, ...) |
+
+#### 19.2.2 Wyjście
+
+| Artefakt | Format | Opis |
+|----------|--------|------|
+| `TraceArtifact` | frozen dataclass | Pełny ślad obliczeń |
+| `ProofDocument` | JSON + LaTeX | Formalny dowód matematyczny |
+| `proof.json` | JSON | Serializacja dowodu |
+| `proof.tex` | LaTeX | Kod źródłowy dokumentu |
+| `proof.pdf` | PDF | Dokument do wydruku |
+
+### 19.3 Inwarianty (BINDING)
+
+| Inwariant | Opis |
+|-----------|------|
+| **Solver nietknięty** | Proof Engine NIE modyfikuje solverów ani Result API |
+| **Determinism** | Ten sam `run_id` → identyczny `proof.json` i `proof.tex` |
+| **Czysta interpretacja** | Dowód generowany z gotowych danych trace/result |
+| **Kompletność kroku** | Każdy krok ma: Wzór → Dane → Podstawienie → Wynik → Weryfikacja jednostek |
+| **Traceability** | Każda wartość ma mapping key do źródła w trace/result |
+| **LaTeX-only proof** | Proof Pack odrzuca „pół-matematykę"; dowód TYLKO w blokowym LaTeX `$$...$$` |
+| **I_dyn mandatory** | Prąd dynamiczny jest OBOWIĄZKOWY w każdym dowodzie SC3F |
+| **I_th mandatory** | Prąd cieplny równoważny jest OBOWIĄZKOWY w każdym dowodzie SC3F |
+
+### 19.4 Terminologia UI (BINDING)
+
+| Termin polski | Termin angielski | Lokalizacja UI |
+|---------------|------------------|----------------|
+| Ślad obliczeń | Trace | Results → [Case] → [Run] → Ślad obliczeń |
+| Dowód matematyczny | Mathematical Proof | Results → [Case] → [Run] → Dowód matematyczny |
+| Weryfikacja jednostek | Unit Check | Sekcja w każdym kroku dowodu |
+| Krok dowodu | Proof Step | Element listy w Proof Inspector |
+
+### 19.5 Kanoniczne źródła (docs/proof_engine/)
+
+| Dokument | Zawartość | Status |
+|----------|-----------|--------|
+| `PROOF_SCHEMAS.md` | Schematy JSON (ProofDocument, ProofStep) | BINDING |
+| `EQUATIONS_IEC60909_SC3F.md` | Rejestr równań SC3F z mapping keys | BINDING |
+| `EQUATIONS_VDROP.md` | Rejestr równań VDROP z mapping keys | BINDING |
+| `P11_1a_MVP_SC3F_AND_VDROP.md` | Specyfikacja MVP | BINDING |
+| `P11_OVERVIEW.md` | Definicja TraceArtifact, inwarianty | BINDING |
+
+---
+
 **END OF CANONICAL SPECIFICATION**

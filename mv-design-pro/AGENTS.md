@@ -279,7 +279,48 @@ When making changes:
 
 ---
 
-## 10. Escalation
+## 10. Źródła kanoniczne — Proof Pack (BINDING)
+
+### 10.1 Przeznaczenie
+
+Ten pakiet zawiera **kanoniczne źródła wiedzy** dla Proof Engine (P11).
+**Wszystkie agenty (Claude, Codex, inne LLM) MUSZĄ traktować zawartość tych dokumentów jako BINDING REFERENCE.**
+
+### 10.2 Dokumenty BINDING
+
+Pełna lista dokumentów kanonicznych:
+
+- `docs/proof_engine/README.md` — Polityka LaTeX-only, inwarianty pakietu
+- `docs/proof_engine/PROOF_SCHEMAS.md` — Schematy JSON (ProofDocument, ProofStep)
+- `docs/proof_engine/EQUATIONS_IEC60909_SC3F.md` — Rejestr równań SC3F z mapping keys
+- `docs/proof_engine/EQUATIONS_VDROP.md` — Rejestr równań VDROP z mapping keys
+- `docs/proof_engine/P11_1a_MVP_SC3F_AND_VDROP.md` — Specyfikacja MVP, kroki dowodu
+- `docs/proof_engine/P11_OVERVIEW.md` — TraceArtifact, hierarchia, UX
+
+### 10.3 Reguły dla agentów AI
+
+1. **NIE INTERPRETUJ** — bierz dosłownie definicje, schematy JSON, równania LaTeX
+2. **NIE MODYFIKUJ** solverów ani Result API IEC 60909
+3. **UŻYWAJ mapping keys** literalnie przy implementacji
+4. **ZACHOWAJ determinism** — identyczne wejścia → identyczne wyjścia
+5. **FORMAT KROKU**: Wzór → Dane → Podstawienie → Wynik → Weryfikacja jednostek
+6. **LaTeX BLOKOWY** — wyłącznie `$$...$$`, zakaz inline `$...$`
+
+### 10.4 Inwarianty Proof Engine
+
+- **Solver nietknięty** — Proof Engine NIE modyfikuje solverów ani Result API
+- **Determinism** — ten sam `run_id` → identyczny `proof.json` i `proof.tex`
+- **Czysta interpretacja** — dowód generowany z gotowych danych trace/result
+- **Traceability** — każda wartość ma mapping key do źródła
+- **LaTeX-only math** — WSZYSTKIE symbole/jednostki WYŁĄCZNIE w blokach `$$...$$`
+- **Prąd dynamiczny OBOWIĄZKOWY** — obowiązkowy wynik SC3F
+- **Prąd cieplny OBOWIĄZKOWY** — obowiązkowy wynik SC3F z pełnym obliczeniem
+- **Anti-double-counting** — współczynnik c dokładnie raz w łańcuchu
+- **BEZ UPROSZCZEŃ** — pełne wzory na m i n, brak przybliżeń
+
+---
+
+## 11. Escalation
 
 If any rule conflict is detected:
 1. Stop implementation

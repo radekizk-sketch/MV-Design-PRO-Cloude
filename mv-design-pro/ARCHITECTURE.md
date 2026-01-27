@@ -1241,4 +1241,168 @@ Edit via SLD    → NetworkModel updated → Wizard reflects immediately
 
 ---
 
+## 15. Interpretation Layer: Proof Engine (P11)
+
+### 15.1 Pozycja w warstwach
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                      SOLVER LAYER                                │
+│  ┌───────────────────────────────────────────────────────────┐  │
+│  │              WHITE BOX SOLVERS (FROZEN)                    │  │
+│  │  ┌─────────────────┐    ┌─────────────────────────┐       │  │
+│  │  │   IEC 60909     │    │    NEWTON-RAPHSON       │       │  │
+│  │  │ Short Circuit   │    │     Power Flow          │       │  │
+│  │  └────────┬────────┘    └────────────┬────────────┘       │  │
+│  │           │                          │                     │  │
+│  │           └──────────┬───────────────┘                     │  │
+│  │                      │                                     │  │
+│  │              WhiteBoxTrace + SolverResult                  │  │
+│  └──────────────────────┼────────────────────────────────────┘  │
+└─────────────────────────┼───────────────────────────────────────┘
+                          │ (READ-ONLY)
+                          ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                   INTERPRETATION LAYER                           │
+│                                                                  │
+│  ┌───────────────────────────────────────────────────────────┐  │
+│  │                    PROOF ENGINE (P11)                      │  │
+│  │                                                            │  │
+│  │  ┌──────────────┐  ┌──────────────┐  ┌──────────────────┐ │  │
+│  │  │ TraceArtifact│  │ ProofDocument│  │ Equation Registry│ │  │
+│  │  │  (immutable) │  │  Generator   │  │  (SC3F, VDROP)   │ │  │
+│  │  └──────────────┘  └──────────────┘  └──────────────────┘ │  │
+│  │                                                            │  │
+│  │  ┌──────────────┐  ┌──────────────┐  ┌──────────────────┐ │  │
+│  │  │ Unit Checker │  │ LaTeX Export │  │ Proof Inspector  │ │  │
+│  │  │              │  │              │  │      (UI)        │ │  │
+│  │  └──────────────┘  └──────────────┘  └──────────────────┘ │  │
+│  └───────────────────────────────────────────────────────────┘  │
+│                                                                  │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────────────────┐  │
+│  │ Boundary    │  │  Thermal    │  │      Voltage            │  │
+│  │ Identifier  │  │  Analysis   │  │      Analysis           │  │
+│  │   (PCC)     │  │             │  │                         │  │
+│  └─────────────┘  └─────────────┘  └─────────────────────────┘  │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### 15.2 Pipeline generowania dowodu
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│ 1. Solver Execution                                              │
+│    Input: NetworkSnapshot + SolverConfig                         │
+│    Output: SolverResult + WhiteBoxTrace                          │
+└────────────────────────────┬────────────────────────────────────┘
+                             │
+                             ▼
+┌─────────────────────────────────────────────────────────────────┐
+│ 2. TraceArtifact Creation                                        │
+│    - Capture: input, config, intermediate, output                │
+│    - Assign: artifact_id, run_id, snapshot_id                    │
+│    - Status: IMMUTABLE after creation                            │
+└────────────────────────────┬────────────────────────────────────┘
+                             │
+                             ▼
+┌─────────────────────────────────────────────────────────────────┐
+│ 3. ProofDocument Generation (on demand or automatic)             │
+│    - Load: Equation Registry (EQUATIONS_*.md)                    │
+│    - Map: trace values → equation symbols                        │
+│    - Generate: substitutions, results, unit checks               │
+│    - Build: ProofStep[] → ProofDocument                          │
+└────────────────────────────┬────────────────────────────────────┘
+                             │
+                             ▼
+┌─────────────────────────────────────────────────────────────────┐
+│ 4. Export                                                        │
+│    - proof.json (JSON serialization)                             │
+│    - proof.tex (LaTeX source)                                    │
+│    - proof.pdf (rendered PDF)                                    │
+│    - proof.docx (Word document)                                  │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### 15.3 Komponenty Proof Engine
+
+#### 15.3.1 TraceArtifact
+
+```python
+@dataclass(frozen=True)
+class TraceArtifact:
+    artifact_id: UUID
+    project_id: UUID
+    case_id: UUID
+    run_id: UUID
+    snapshot_id: UUID
+
+    solver_type: str
+    created_at: datetime
+    solver_version: str
+
+    input_snapshot: NetworkSnapshot
+    solver_config: Dict[str, Any]
+    intermediate_values: Dict[str, Any]
+    output_results: Dict[str, Any]
+
+    proof_document: ProofDocument | None
+```
+
+#### 15.3.2 ProofDocument
+
+```python
+@dataclass(frozen=True)
+class ProofDocument:
+    document_id: UUID
+    artifact_id: UUID
+    created_at: datetime
+
+    proof_type: str
+    title_pl: str
+
+    header: ProofHeader
+    steps: Tuple[ProofStep, ...]
+    summary: ProofSummary
+
+    json_representation: str
+    latex_representation: str
+```
+
+#### 15.3.3 ProofStep
+
+```python
+@dataclass(frozen=True)
+class ProofStep:
+    step_id: str
+    step_number: int
+    title_pl: str
+
+    equation: EquationDefinition
+    input_values: Tuple[ProofValue, ...]
+    substitution_latex: str
+    result: ProofValue
+    unit_check: UnitCheckResult
+
+    source_keys: Dict[str, str]
+```
+
+### 15.4 Equation Registry
+
+| Registry | Zawartość | Lokalizacja |
+|----------|-----------|-------------|
+| SC3F | EQ_SC3F_001..010 (zwarcia trójfazowe) | `docs/proof_engine/EQUATIONS_IEC60909_SC3F.md` |
+| VDROP | EQ_VDROP_001..009 (spadki napięć) | `docs/proof_engine/EQUATIONS_VDROP.md` |
+| SC1F | (prospektywne) zwarcia jednofazowe | `docs/proof_engine/P11_1c_SC_ASYMMETRICAL.md` |
+| Q_U | (prospektywne) regulatory Q(U) | `docs/proof_engine/P11_1b_REGULATION_Q_U.md` |
+
+### 15.5 Inwarianty (BINDING)
+
+1. **Solver FROZEN** — Proof Engine NIE modyfikuje solverów ani Result API
+2. **Determinism** — ten sam `run_id` → identyczny `proof.json` + `proof.tex`
+3. **Immutability** — TraceArtifact jest frozen po utworzeniu
+4. **Completeness** — każdy ProofStep ma 5 sekcji: Wzór, Dane, Podstawienie, Wynik, Weryfikacja jednostek
+5. **Traceability** — każda wartość ma literalny `source_key` do trace/result
+
+---
+
 **END OF ARCHITECTURE DOCUMENT**
