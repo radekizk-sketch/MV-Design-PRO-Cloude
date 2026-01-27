@@ -432,3 +432,50 @@ class ProofDocument:
             steps=tuple(sorted(steps, key=lambda x: x.step_number)),
             summary=summary,
         )
+
+
+# =============================================================================
+# Q(U) Regulation Input Types — P11.1b
+# =============================================================================
+
+
+@dataclass
+class QUInput:
+    """
+    Dane wejściowe dla generatora dowodu Q(U).
+
+    Attributes:
+        project_name: Nazwa projektu
+        case_name: Nazwa przypadku obliczeniowego
+        run_timestamp: Czas uruchomienia
+        u_meas_kv: Napięcie zmierzone [kV]
+        u_ref_kv: Napięcie referencyjne [kV]
+        u_dead_kv: Szerokość martwej strefy [kV]
+        k_q_mvar_per_kv: Współczynnik regulacji Q(U) [Mvar/kV]
+        q_min_mvar: Minimalna moc bierna [Mvar]
+        q_max_mvar: Maksymalna moc bierna [Mvar]
+    """
+
+    project_name: str
+    case_name: str
+    run_timestamp: datetime
+    u_meas_kv: float
+    u_ref_kv: float
+    u_dead_kv: float
+    k_q_mvar_per_kv: float
+    q_min_mvar: float
+    q_max_mvar: float
+
+
+@dataclass
+class QUCounterfactualInput:
+    """
+    Dane wejściowe dla porównania counterfactual A vs B.
+
+    Attributes:
+        a: Dane scenariusza A
+        b: Dane scenariusza B
+    """
+
+    a: QUInput
+    b: QUInput

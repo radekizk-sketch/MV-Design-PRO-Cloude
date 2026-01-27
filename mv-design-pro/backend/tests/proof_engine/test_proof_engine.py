@@ -26,7 +26,11 @@ from application.proof_engine.proof_generator import (
     VDROPInput,
     VDROPSegmentInput,
 )
-from application.proof_engine.types import ProofType
+from application.proof_engine.types import (
+    ProofType,
+    QUCounterfactualInput,
+    QUInput,
+)
 from application.proof_engine.unit_verifier import UnitVerifier
 
 
@@ -483,3 +487,101 @@ class TestIntegration:
         assert abs(ikss_proof - ikss_input) / ikss_input < 0.001
         assert abs(ip_proof - ip_input) / ip_input < 0.001
         assert abs(sk_proof - sk_input) / sk_input < 0.005
+
+
+# =============================================================================
+# Q(U) Tests — P11.1b
+# =============================================================================
+
+
+@pytest.fixture
+def qu_test_input() -> QUInput:
+    """
+    Fixture: minimalne dane Q(U) dla testów.
+
+    Scenariusz: napięcie powyżej deadband.
+    """
+    return QUInput(
+        project_name="Test Project QU",
+        case_name="Test Case QU",
+        run_timestamp=datetime(2026, 1, 27, 10, 30, 0),
+        u_meas_kv=15.5,
+        u_ref_kv=15.0,
+        u_dead_kv=0.2,
+        k_q_mvar_per_kv=5.0,
+        q_min_mvar=-10.0,
+        q_max_mvar=10.0,
+    )
+
+
+@pytest.fixture
+def qu_counterfactual_input(qu_test_input: QUInput) -> QUCounterfactualInput:
+    """
+    Fixture: dane counterfactual A vs B.
+
+    A = bazowy scenariusz
+    B = scenariusz ze zmienionym k_Q
+    """
+    input_b = QUInput(
+        project_name="Test Project QU B",
+        case_name="Test Case QU B",
+        run_timestamp=qu_test_input.run_timestamp,
+        u_meas_kv=qu_test_input.u_meas_kv,
+        u_ref_kv=qu_test_input.u_ref_kv,
+        u_dead_kv=qu_test_input.u_dead_kv,
+        k_q_mvar_per_kv=7.0,  # Zmieniony k_Q
+        q_min_mvar=qu_test_input.q_min_mvar,
+        q_max_mvar=qu_test_input.q_max_mvar,
+    )
+    return QUCounterfactualInput(a=qu_test_input, b=input_b)
+
+
+class TestQUProofGenerator:
+    """Testy generatora dowodów Q(U) — P11.1b."""
+
+    def test_qu_step_order_len_is_4(self):
+        """QU_STEP_ORDER ma dokładnie 4 elementy."""
+        step_order = EquationRegistry.get_qu_step_order()
+        assert len(step_order) == 4
+
+    def test_qu_proof_has_4_steps(self, qu_test_input: QUInput):
+        """Dowód Q(U) zawiera dokładnie 4 kroki."""
+        proof = ProofGenerator.generate_qu_proof(qu_test_input)
+
+        assert len(proof.steps) == 4
+        assert proof.proof_type == ProofType.Q_U_REGULATION
+
+    def test_qu_determinism_json(self, qu_test_input: QUInput):
+        """Ten sam QUInput → identyczny proof.json (2x generate)."""
+        artifact_id = uuid4()
+
+        proof_1 = ProofGenerator.generate_qu_proof(qu_test_input, artifact_id)
+        proof_2 = ProofGenerator.generate_qu_proof(qu_test_input, artifact_id)
+
+        # Porównanie JSON (pomijając document_id i created_at)
+        json_1 = proof_1.to_dict()
+        json_2 = proof_2.to_dict()
+
+        del json_1["document_id"]
+        del json_1["created_at"]
+        del json_2["document_id"]
+        del json_2["created_at"]
+
+        assert json_1 == json_2
+
+    def test_qu_counterfactual_has_diff_fields(
+        self, qu_counterfactual_input: QUCounterfactualInput
+    ):
+        """Counterfactual proof zawiera pola delta_k_q, delta_q_raw, delta_q_cmd."""
+        proof = ProofGenerator.generate_qu_counterfactual(qu_counterfactual_input)
+
+        key_results = proof.summary.key_results
+
+        assert "delta_k_q" in key_results
+        assert "delta_q_raw" in key_results
+        assert "delta_q_cmd" in key_results
+        assert "q_cmd_a" in key_results
+        assert "q_cmd_b" in key_results
+
+        # Sprawdź że delta_k_q = 7.0 - 5.0 = 2.0
+        assert key_results["delta_k_q"].value == 2.0

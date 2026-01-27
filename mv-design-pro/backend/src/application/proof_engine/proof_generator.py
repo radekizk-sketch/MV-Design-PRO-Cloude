@@ -35,6 +35,10 @@ from application.proof_engine.equation_registry import (
     EQ_VDROP_005,
     EQ_VDROP_006,
     EQ_VDROP_007,
+    EQ_QU_001,
+    EQ_QU_002,
+    EQ_QU_003,
+    EQ_QU_004,
 )
 from application.proof_engine.types import (
     EquationDefinition,
@@ -44,6 +48,8 @@ from application.proof_engine.types import (
     ProofSummary,
     ProofType,
     ProofValue,
+    QUCounterfactualInput,
+    QUInput,
     UnitCheckResult,
 )
 from application.proof_engine.unit_verifier import UnitVerifier
@@ -1112,5 +1118,427 @@ class ProofGenerator:
                 "U_{source}": "u_source_kv",
                 "ΔU_{total}": "delta_u_total_percent",
                 "U": "u_kv",
+            },
+        )
+
+    # =========================================================================
+    # Q(U) Generator — P11.1b
+    # =========================================================================
+
+    @classmethod
+    def generate_qu_proof(
+        cls,
+        data: QUInput,
+        artifact_id: UUID | None = None,
+    ) -> ProofDocument:
+        """
+        Generuje dowód Q(U) (regulacja mocy biernej).
+
+        Kroki obowiązkowe (BINDING):
+        1. Odchylenie napięcia ΔU = U_meas - U_ref
+        2. Funkcja martwej strefy s(U)
+        3. Surowa moc bierna Q_raw = k_Q · s(U)
+        4. Końcowa moc bierna Q_cmd z limitami
+
+        Args:
+            data: Dane wejściowe QUInput
+            artifact_id: Opcjonalny ID artefaktu
+
+        Returns:
+            ProofDocument z pełnym dowodem
+        """
+        if artifact_id is None:
+            artifact_id = uuid4()
+
+        # Obliczenia
+        delta_u_kv = data.u_meas_kv - data.u_ref_kv
+
+        # Deadband: określenie gałęzi
+        if delta_u_kv > data.u_dead_kv:
+            s_u_kv = delta_u_kv - data.u_dead_kv
+            deadband_branch = "above"
+        elif delta_u_kv < -data.u_dead_kv:
+            s_u_kv = delta_u_kv + data.u_dead_kv
+            deadband_branch = "below"
+        else:
+            s_u_kv = 0.0
+            deadband_branch = "inside"
+
+        q_raw_mvar = data.k_q_mvar_per_kv * s_u_kv
+        q_cmd_mvar = min(max(q_raw_mvar, data.q_min_mvar), data.q_max_mvar)
+
+        steps: list[ProofStep] = []
+
+        # Krok 1: ΔU
+        steps.append(cls._create_qu_step_delta_u(
+            step_number=1,
+            u_meas_kv=data.u_meas_kv,
+            u_ref_kv=data.u_ref_kv,
+            delta_u_kv=delta_u_kv,
+        ))
+
+        # Krok 2: s(U) deadband
+        steps.append(cls._create_qu_step_deadband(
+            step_number=2,
+            delta_u_kv=delta_u_kv,
+            u_dead_kv=data.u_dead_kv,
+            s_u_kv=s_u_kv,
+            deadband_branch=deadband_branch,
+        ))
+
+        # Krok 3: Q_raw
+        steps.append(cls._create_qu_step_q_raw(
+            step_number=3,
+            k_q_mvar_per_kv=data.k_q_mvar_per_kv,
+            s_u_kv=s_u_kv,
+            q_raw_mvar=q_raw_mvar,
+        ))
+
+        # Krok 4: Q_cmd z limitami
+        steps.append(cls._create_qu_step_q_cmd(
+            step_number=4,
+            q_raw_mvar=q_raw_mvar,
+            q_min_mvar=data.q_min_mvar,
+            q_max_mvar=data.q_max_mvar,
+            q_cmd_mvar=q_cmd_mvar,
+        ))
+
+        # Podsumowanie
+        unit_checks_passed = all(s.unit_check.passed for s in steps)
+
+        key_results = {
+            "delta_u_kv": ProofValue.create("\\Delta U", delta_u_kv, "kV", "delta_u_kv"),
+            "s_u_kv": ProofValue.create("s(U)", s_u_kv, "kV", "s_u_kv"),
+            "q_raw_mvar": ProofValue.create("Q_{raw}", q_raw_mvar, "Mvar", "q_raw_mvar"),
+            "q_cmd_mvar": ProofValue.create("Q_{cmd}", q_cmd_mvar, "Mvar", "q_cmd_mvar"),
+        }
+
+        summary = ProofSummary(
+            key_results=key_results,
+            unit_check_passed=unit_checks_passed,
+            total_steps=len(steps),
+            warnings=(),
+        )
+
+        header = ProofHeader(
+            project_name=data.project_name,
+            case_name=data.case_name,
+            run_timestamp=data.run_timestamp,
+            solver_version="Q(U) P11.1b",
+        )
+
+        return ProofDocument.create(
+            artifact_id=artifact_id,
+            proof_type=ProofType.Q_U_REGULATION,
+            title_pl="Dowód regulacji mocy biernej Q(U)",
+            header=header,
+            steps=steps,
+            summary=summary,
+        )
+
+    @classmethod
+    def generate_qu_counterfactual(
+        cls,
+        cf: QUCounterfactualInput,
+        artifact_id: UUID | None = None,
+    ) -> ProofDocument:
+        """
+        Generuje dowód porównawczy (counterfactual) A vs B dla Q(U).
+
+        Args:
+            cf: Dane wejściowe QUCounterfactualInput z dwoma scenariuszami
+            artifact_id: Opcjonalny ID artefaktu
+
+        Returns:
+            ProofDocument z porównaniem A vs B i różnicami w summary
+        """
+        if artifact_id is None:
+            artifact_id = uuid4()
+
+        # Generuj proof A i B wewnętrznie
+        proof_a = cls.generate_qu_proof(cf.a)
+        proof_b = cls.generate_qu_proof(cf.b)
+
+        # Wyciągnij wartości końcowe
+        k_q_a = cf.a.k_q_mvar_per_kv
+        k_q_b = cf.b.k_q_mvar_per_kv
+        q_raw_a = proof_a.summary.key_results["q_raw_mvar"].value
+        q_raw_b = proof_b.summary.key_results["q_raw_mvar"].value
+        q_cmd_a = proof_a.summary.key_results["q_cmd_mvar"].value
+        q_cmd_b = proof_b.summary.key_results["q_cmd_mvar"].value
+
+        # Oblicz delty
+        delta_k_q = k_q_b - k_q_a
+        delta_q_raw = q_raw_b - q_raw_a
+        delta_q_cmd = q_cmd_b - q_cmd_a
+
+        # Połącz kroki z obu dowodów (A jako kroki 1-4, B jako kroki 5-8)
+        steps: list[ProofStep] = []
+
+        # Kroki z proof A (renumerowane)
+        for i, step in enumerate(proof_a.steps, start=1):
+            new_step = ProofStep(
+                step_id=f"QU_CF_A_STEP_{i:03d}",
+                step_number=i,
+                title_pl=f"[A] {step.title_pl}",
+                equation=step.equation,
+                input_values=step.input_values,
+                substitution_latex=step.substitution_latex,
+                result=step.result,
+                unit_check=step.unit_check,
+                source_keys=step.source_keys,
+            )
+            steps.append(new_step)
+
+        # Kroki z proof B (renumerowane)
+        offset = len(proof_a.steps)
+        for i, step in enumerate(proof_b.steps, start=1):
+            new_step = ProofStep(
+                step_id=f"QU_CF_B_STEP_{i:03d}",
+                step_number=offset + i,
+                title_pl=f"[B] {step.title_pl}",
+                equation=step.equation,
+                input_values=step.input_values,
+                substitution_latex=step.substitution_latex,
+                result=step.result,
+                unit_check=step.unit_check,
+                source_keys=step.source_keys,
+            )
+            steps.append(new_step)
+
+        # Podsumowanie z counterfactual_diff
+        unit_checks_passed = all(s.unit_check.passed for s in steps)
+
+        key_results = {
+            "delta_k_q": ProofValue.create("\\Delta k_Q", delta_k_q, "Mvar/kV", "delta_k_q"),
+            "delta_q_raw": ProofValue.create("\\Delta Q_{raw}", delta_q_raw, "Mvar", "delta_q_raw"),
+            "delta_q_cmd": ProofValue.create("\\Delta Q_{cmd}", delta_q_cmd, "Mvar", "delta_q_cmd"),
+            "q_cmd_a": ProofValue.create("Q_{cmd,A}", q_cmd_a, "Mvar", "q_cmd_a"),
+            "q_cmd_b": ProofValue.create("Q_{cmd,B}", q_cmd_b, "Mvar", "q_cmd_b"),
+        }
+
+        summary = ProofSummary(
+            key_results=key_results,
+            unit_check_passed=unit_checks_passed,
+            total_steps=len(steps),
+            warnings=(),
+        )
+
+        header = ProofHeader(
+            project_name=f"{cf.a.project_name} vs {cf.b.project_name}",
+            case_name=f"{cf.a.case_name} vs {cf.b.case_name}",
+            run_timestamp=cf.a.run_timestamp,
+            solver_version="Q(U) Counterfactual P11.1b",
+        )
+
+        return ProofDocument.create(
+            artifact_id=artifact_id,
+            proof_type=ProofType.Q_U_REGULATION,
+            title_pl="Dowód porównawczy (counterfactual) Q(U): A vs B",
+            header=header,
+            steps=steps,
+            summary=summary,
+        )
+
+    # =========================================================================
+    # Q(U) Step Builders
+    # =========================================================================
+
+    @classmethod
+    def _create_qu_step_delta_u(
+        cls,
+        step_number: int,
+        u_meas_kv: float,
+        u_ref_kv: float,
+        delta_u_kv: float,
+    ) -> ProofStep:
+        """Krok 1: Odchylenie napięcia ΔU = U_meas - U_ref."""
+        equation = EQ_QU_001
+
+        input_values = (
+            ProofValue.create("U_{meas}", u_meas_kv, "kV", "u_meas_kv"),
+            ProofValue.create("U_{ref}", u_ref_kv, "kV", "u_ref_kv"),
+        )
+
+        substitution = (
+            f"\\Delta U = {u_meas_kv:.4f} - {u_ref_kv:.4f} = {delta_u_kv:.4f}\\,\\text{{kV}}"
+        )
+
+        result = ProofValue.create("\\Delta U", delta_u_kv, "kV", "delta_u_kv")
+
+        unit_check = UnitCheckResult(
+            passed=True,
+            expected_unit="kV",
+            computed_unit="kV",
+            input_units={"U_meas": "kV", "U_ref": "kV"},
+            derivation="kV - kV = kV ✓",
+        )
+
+        return ProofStep(
+            step_id=ProofStep.generate_step_id("QU", step_number),
+            step_number=step_number,
+            title_pl=equation.name_pl,
+            equation=equation,
+            input_values=input_values,
+            substitution_latex=substitution,
+            result=result,
+            unit_check=unit_check,
+            source_keys={
+                "U_meas": "u_meas_kv",
+                "U_ref": "u_ref_kv",
+                "ΔU": "delta_u_kv",
+            },
+        )
+
+    @classmethod
+    def _create_qu_step_deadband(
+        cls,
+        step_number: int,
+        delta_u_kv: float,
+        u_dead_kv: float,
+        s_u_kv: float,
+        deadband_branch: str,
+    ) -> ProofStep:
+        """Krok 2: Funkcja martwej strefy s(U)."""
+        equation = EQ_QU_002
+
+        input_values = (
+            ProofValue.create("\\Delta U", delta_u_kv, "kV", "delta_u_kv"),
+            ProofValue.create("U_{dead}", u_dead_kv, "kV", "u_dead_kv"),
+        )
+
+        # Jawne wskazanie gałęzi deadband
+        if deadband_branch == "above":
+            branch_text = f"\\Delta U = {delta_u_kv:.4f} > U_{{dead}} = {u_dead_kv:.4f}"
+            calc_text = f"s(U) = {delta_u_kv:.4f} - {u_dead_kv:.4f} = {s_u_kv:.4f}\\,\\text{{kV}}"
+        elif deadband_branch == "below":
+            branch_text = f"\\Delta U = {delta_u_kv:.4f} < -U_{{dead}} = -{u_dead_kv:.4f}"
+            calc_text = f"s(U) = {delta_u_kv:.4f} + {u_dead_kv:.4f} = {s_u_kv:.4f}\\,\\text{{kV}}"
+        else:  # inside
+            branch_text = f"|\\Delta U| = {abs(delta_u_kv):.4f} \\le U_{{dead}} = {u_dead_kv:.4f}"
+            calc_text = f"s(U) = 0\\,\\text{{kV}}"
+
+        substitution = f"\\text{{Branch: }} {branch_text}, \\quad {calc_text}"
+
+        result = ProofValue.create("s(U)", s_u_kv, "kV", "s_u_kv")
+
+        unit_check = UnitCheckResult(
+            passed=True,
+            expected_unit="kV",
+            computed_unit="kV",
+            input_units={"ΔU": "kV", "U_dead": "kV"},
+            derivation="kV ± kV = kV ✓",
+        )
+
+        return ProofStep(
+            step_id=ProofStep.generate_step_id("QU", step_number),
+            step_number=step_number,
+            title_pl=equation.name_pl,
+            equation=equation,
+            input_values=input_values,
+            substitution_latex=substitution,
+            result=result,
+            unit_check=unit_check,
+            source_keys={
+                "ΔU": "delta_u_kv",
+                "U_dead": "u_dead_kv",
+                "s(U)": "s_u_kv",
+            },
+        )
+
+    @classmethod
+    def _create_qu_step_q_raw(
+        cls,
+        step_number: int,
+        k_q_mvar_per_kv: float,
+        s_u_kv: float,
+        q_raw_mvar: float,
+    ) -> ProofStep:
+        """Krok 3: Surowa moc bierna Q_raw = k_Q · s(U)."""
+        equation = EQ_QU_003
+
+        input_values = (
+            ProofValue.create("k_Q", k_q_mvar_per_kv, "Mvar/kV", "k_q_mvar_per_kv"),
+            ProofValue.create("s(U)", s_u_kv, "kV", "s_u_kv"),
+        )
+
+        substitution = (
+            f"Q_{{raw}} = {k_q_mvar_per_kv:.4f} \\cdot {s_u_kv:.4f} = "
+            f"{q_raw_mvar:.4f}\\,\\text{{Mvar}}"
+        )
+
+        result = ProofValue.create("Q_{raw}", q_raw_mvar, "Mvar", "q_raw_mvar")
+
+        unit_check = UnitCheckResult(
+            passed=True,
+            expected_unit="Mvar",
+            computed_unit="Mvar",
+            input_units={"k_Q": "Mvar/kV", "s(U)": "kV"},
+            derivation="Mvar/kV · kV = Mvar ✓",
+        )
+
+        return ProofStep(
+            step_id=ProofStep.generate_step_id("QU", step_number),
+            step_number=step_number,
+            title_pl=equation.name_pl,
+            equation=equation,
+            input_values=input_values,
+            substitution_latex=substitution,
+            result=result,
+            unit_check=unit_check,
+            source_keys={
+                "k_Q": "k_q_mvar_per_kv",
+                "s(U)": "s_u_kv",
+                "Q_raw": "q_raw_mvar",
+            },
+        )
+
+    @classmethod
+    def _create_qu_step_q_cmd(
+        cls,
+        step_number: int,
+        q_raw_mvar: float,
+        q_min_mvar: float,
+        q_max_mvar: float,
+        q_cmd_mvar: float,
+    ) -> ProofStep:
+        """Krok 4: Końcowa moc bierna Q_cmd z limitami."""
+        equation = EQ_QU_004
+
+        input_values = (
+            ProofValue.create("Q_{raw}", q_raw_mvar, "Mvar", "q_raw_mvar"),
+            ProofValue.create("Q_{min}", q_min_mvar, "Mvar", "q_min_mvar"),
+            ProofValue.create("Q_{max}", q_max_mvar, "Mvar", "q_max_mvar"),
+        )
+
+        substitution = (
+            f"Q_{{cmd}} = \\min(\\max({q_raw_mvar:.4f}, {q_min_mvar:.4f}), {q_max_mvar:.4f}) = "
+            f"{q_cmd_mvar:.4f}\\,\\text{{Mvar}}"
+        )
+
+        result = ProofValue.create("Q_{cmd}", q_cmd_mvar, "Mvar", "q_cmd_mvar")
+
+        unit_check = UnitCheckResult(
+            passed=True,
+            expected_unit="Mvar",
+            computed_unit="Mvar",
+            input_units={"Q_raw": "Mvar", "Q_min": "Mvar", "Q_max": "Mvar"},
+            derivation="Mvar = Mvar ✓",
+        )
+
+        return ProofStep(
+            step_id=ProofStep.generate_step_id("QU", step_number),
+            step_number=step_number,
+            title_pl=equation.name_pl,
+            equation=equation,
+            input_values=input_values,
+            substitution_latex=substitution,
+            result=result,
+            unit_check=unit_check,
+            source_keys={
+                "Q_raw": "q_raw_mvar",
+                "Q_min": "q_min_mvar",
+                "Q_max": "q_max_mvar",
+                "Q_cmd": "q_cmd_mvar",
             },
         )
