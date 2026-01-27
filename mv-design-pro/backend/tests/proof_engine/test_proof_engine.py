@@ -537,12 +537,13 @@ def qu_counterfactual_input(qu_test_input: QUInput) -> QUCounterfactualInput:
 
 
 class TestQUProofGenerator:
-    """Testy generatora dowodów Q(U) — P11.1b."""
+    """Testy generatora dowodów Q(U) — P11.1b + P11.1c."""
 
-    def test_qu_step_order_len_is_4(self):
-        """QU_STEP_ORDER ma dokładnie 4 elementy."""
+    def test_qu_step_order_len_is_5(self):
+        """QU_STEP_ORDER ma dokładnie 5 elementów (4 z P11.1b + 1 z P11.1c)."""
         step_order = EquationRegistry.get_qu_step_order()
-        assert len(step_order) == 4
+        assert len(step_order) == 5
+        assert "EQ_QU_005" in step_order  # P11.1c VDROP link
 
     def test_qu_proof_has_4_steps(self, qu_test_input: QUInput):
         """Dowód Q(U) zawiera dokładnie 4 kroki."""
@@ -585,3 +586,208 @@ class TestQUProofGenerator:
 
         # Sprawdź że delta_k_q = 7.0 - 5.0 = 2.0
         assert key_results["delta_k_q"].value == 2.0
+
+
+# =============================================================================
+# P11.1c Tests — Q(U) × VDROP Link
+# =============================================================================
+
+
+@pytest.fixture
+def qu_test_input_with_vdrop() -> QUInput:
+    """
+    Fixture: dane Q(U) z wynikami VDROP dla testu P11.1c.
+
+    Scenariusz: napięcie powyżej deadband + wyniki VDROP.
+    """
+    return QUInput(
+        project_name="Test Project QU+VDROP",
+        case_name="Test Case QU P11.1c",
+        run_timestamp=datetime(2026, 1, 27, 10, 30, 0),
+        u_meas_kv=15.5,
+        u_ref_kv=15.0,
+        u_dead_kv=0.2,
+        k_q_mvar_per_kv=5.0,
+        q_min_mvar=-10.0,
+        q_max_mvar=10.0,
+        # P11.1c: Wyniki VDROP (read-only, bez obliczeń)
+        vdrop_delta_u_x_percent=0.42,
+        vdrop_delta_u_percent=0.67,
+        vdrop_u_kv=14.90,
+    )
+
+
+@pytest.fixture
+def qu_counterfactual_input_with_vdrop(
+    qu_test_input_with_vdrop: QUInput,
+) -> QUCounterfactualInput:
+    """
+    Fixture: dane counterfactual A vs B z wynikami VDROP.
+
+    A = bazowy scenariusz z VDROP
+    B = scenariusz ze zmienionym k_Q i innym U
+    """
+    input_b = QUInput(
+        project_name="Test Project QU B+VDROP",
+        case_name="Test Case QU B P11.1c",
+        run_timestamp=qu_test_input_with_vdrop.run_timestamp,
+        u_meas_kv=qu_test_input_with_vdrop.u_meas_kv,
+        u_ref_kv=qu_test_input_with_vdrop.u_ref_kv,
+        u_dead_kv=qu_test_input_with_vdrop.u_dead_kv,
+        k_q_mvar_per_kv=7.0,  # Zmieniony k_Q
+        q_min_mvar=qu_test_input_with_vdrop.q_min_mvar,
+        q_max_mvar=qu_test_input_with_vdrop.q_max_mvar,
+        # P11.1c: Inne wyniki VDROP dla scenariusza B
+        vdrop_delta_u_x_percent=0.58,
+        vdrop_delta_u_percent=0.83,
+        vdrop_u_kv=14.88,
+    )
+    return QUCounterfactualInput(a=qu_test_input_with_vdrop, b=input_b)
+
+
+class TestP11_1c_QU_VDROP_Link:
+    """Testy P11.1c — Q(U) × VDROP (LINK-ONLY)."""
+
+    def test_qu_vdrop_link_step_present(
+        self, qu_test_input_with_vdrop: QUInput
+    ):
+        """
+        P11.1c: Krok EQ_QU_005 (VDROP link) jest obecny gdy podano dane VDROP.
+
+        Dowód powinien mieć 5 kroków (4 z P11.1b + 1 z P11.1c).
+        """
+        proof = ProofGenerator.generate_qu_proof(qu_test_input_with_vdrop)
+
+        # Proof powinien mieć 5 kroków (z VDROP link)
+        assert len(proof.steps) == 5
+
+        # Ostatni krok powinien być EQ_QU_005
+        last_step = sorted(proof.steps, key=lambda s: s.step_number)[-1]
+        assert last_step.equation.equation_id == "EQ_QU_005"
+        assert "VDROP" in last_step.title_pl or "referencja" in last_step.title_pl.lower()
+
+        # Wyniki powinny zawierać dane VDROP
+        assert "vdrop_u_kv" in proof.summary.key_results
+        assert "vdrop_delta_u_x_percent" in proof.summary.key_results
+        assert "vdrop_delta_u_percent" in proof.summary.key_results
+
+    def test_qu_vdrop_no_new_equations(self):
+        """
+        P11.1c: Nie dodano nowych równań VDROP.
+
+        VDROP_EQUATIONS powinno mieć dokładnie 7 równań (bez zmian).
+        """
+        vdrop_eqs = EquationRegistry.get_vdrop_equations()
+
+        # Dokładnie 7 równań VDROP (bez nowych)
+        assert len(vdrop_eqs) == 7
+
+        # Sprawdź że wszystkie oryginalne są obecne
+        expected_ids = [
+            "EQ_VDROP_001", "EQ_VDROP_002", "EQ_VDROP_003",
+            "EQ_VDROP_004", "EQ_VDROP_005", "EQ_VDROP_006",
+            "EQ_VDROP_007",
+        ]
+        for eq_id in expected_ids:
+            assert eq_id in vdrop_eqs, f"Missing equation: {eq_id}"
+
+        # Upewnij się że NIE ma EQ_VDROP_008 ani wyższych
+        for eq_id in vdrop_eqs:
+            num = int(eq_id.split("_")[-1])
+            assert num <= 7, f"Unexpected VDROP equation: {eq_id}"
+
+    def test_qu_counterfactual_includes_u_delta(
+        self, qu_counterfactual_input_with_vdrop: QUCounterfactualInput
+    ):
+        """
+        P11.1c: Counterfactual zawiera U_A, U_B, ΔU gdy podano dane VDROP.
+        """
+        proof = ProofGenerator.generate_qu_counterfactual(
+            qu_counterfactual_input_with_vdrop
+        )
+
+        key_results = proof.summary.key_results
+
+        # Podstawowe pola counterfactual (P11.1b)
+        assert "delta_k_q" in key_results
+        assert "delta_q_raw" in key_results
+        assert "delta_q_cmd" in key_results
+
+        # P11.1c: Pola napięciowe
+        assert "u_a_kv" in key_results
+        assert "u_b_kv" in key_results
+        assert "delta_u_voltage_kv" in key_results
+
+        # Sprawdź wartości
+        u_a = key_results["u_a_kv"].value
+        u_b = key_results["u_b_kv"].value
+        delta_u = key_results["delta_u_voltage_kv"].value
+
+        assert u_a == 14.90
+        assert u_b == 14.88
+        assert abs(delta_u - (14.88 - 14.90)) < 0.0001  # -0.02
+
+    def test_qu_proof_without_vdrop_has_4_steps(self, qu_test_input: QUInput):
+        """
+        P11.1c: Dowód bez danych VDROP ma tylko 4 kroki (bez EQ_QU_005).
+        """
+        proof = ProofGenerator.generate_qu_proof(qu_test_input)
+
+        # Proof powinien mieć 4 kroki (bez VDROP link)
+        assert len(proof.steps) == 4
+
+        # Ostatni krok powinien być EQ_QU_004 (nie EQ_QU_005)
+        last_step = sorted(proof.steps, key=lambda s: s.step_number)[-1]
+        assert last_step.equation.equation_id == "EQ_QU_004"
+
+    def test_eq_qu_005_is_link_only(self):
+        """
+        P11.1c: EQ_QU_005 jest LINK-ONLY (referencja do VDROP, nie nowe obliczenia).
+        """
+        eq = EquationRegistry.get_equation("EQ_QU_005")
+
+        assert eq is not None
+        assert "VDROP" in eq.notes or "link" in eq.notes.lower()
+        assert "referencja" in eq.notes.lower() or "reference" in eq.notes.lower()
+
+        # Sprawdź że mapping_key odnosi się do istniejących kluczy VDROP
+        mapping_keys = [s.mapping_key for s in eq.symbols]
+        assert "delta_u_x_percent" in mapping_keys  # z EQ_VDROP_004
+        assert "delta_u_percent" in mapping_keys    # z EQ_VDROP_005
+        assert "u_kv" in mapping_keys               # z EQ_VDROP_007
+
+    def test_latex_renders_vdrop_link_section(
+        self, qu_test_input_with_vdrop: QUInput
+    ):
+        """
+        P11.1c: LaTeX zawiera sekcję "Wpływ Q na U" gdy podano dane VDROP.
+        """
+        proof = ProofGenerator.generate_qu_proof(qu_test_input_with_vdrop)
+        latex = proof.latex_representation
+
+        # Sekcja "Wpływ Q na U"
+        assert "Wpływ Q na U" in latex or "Wplyw Q na U" in latex
+
+        # Tabela z wartościami VDROP
+        assert "Q_{cmd}" in latex
+        assert "Delta U_X" in latex or "\\Delta U_X" in latex
+
+    def test_latex_renders_counterfactual_u_table(
+        self, qu_counterfactual_input_with_vdrop: QUCounterfactualInput
+    ):
+        """
+        P11.1c: LaTeX counterfactual zawiera wiersz U w tabeli A/B/Δ.
+        """
+        proof = ProofGenerator.generate_qu_counterfactual(
+            qu_counterfactual_input_with_vdrop
+        )
+        latex = proof.latex_representation
+
+        # Tabela A/B/Δ
+        assert "Porównanie scenariuszy A vs B" in latex
+
+        # Wiersz z napięciem U
+        assert "$U$ [kV]" in latex
+
+        # Delta U w różnicach
+        assert "Delta U_{(B-A)}" in latex or "\\Delta U_{(B-A)}" in latex

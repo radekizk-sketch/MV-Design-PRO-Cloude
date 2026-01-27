@@ -768,6 +768,60 @@ EQ_QU_004 = EquationDefinition(
     unit_derivation="Mvar = Mvar",
 )
 
+# =============================================================================
+# EQ_QU_005 — Wpływ Q_cmd na napięcie U (LINK-ONLY, P11.1c)
+# =============================================================================
+#
+# Ten krok jest REFERENCJĄ do istniejących równań VDROP (EQ_VDROP_004..007).
+# NIE DUPLIKUJE wzorów VDROP — tylko wskazuje na ich użycie.
+# NIE LICZY niczego nowego — tylko prezentuje wyniki VDROP.
+#
+# Łańcuch zależności:
+#   Q_cmd (z Q(U)) → ΔU_X (EQ_VDROP_004) → ΔU (EQ_VDROP_005)
+#                  → ΔU_total (EQ_VDROP_006) → U (EQ_VDROP_007)
+# =============================================================================
+
+EQ_QU_005 = EquationDefinition(
+    equation_id="EQ_QU_005",
+    name_pl="Wpływ Q_cmd na napięcie U (referencja VDROP)",
+    standard_ref="Q(U) regulation → VDROP link",
+    latex=(
+        r"Q_{cmd} \xrightarrow{\text{VDROP}} \Delta U_X \to \Delta U \to U"
+    ),
+    symbols=(
+        SymbolDefinition(
+            symbol="Q_{cmd}",
+            unit="Mvar",
+            description_pl="Komenda mocy biernej (z regulacji Q(U))",
+            mapping_key="q_cmd_mvar",
+        ),
+        SymbolDefinition(
+            symbol="\\Delta U_X",
+            unit="%",
+            description_pl="Składowa bierna spadku napięcia (EQ_VDROP_004)",
+            mapping_key="delta_u_x_percent",
+        ),
+        SymbolDefinition(
+            symbol="\\Delta U",
+            unit="%",
+            description_pl="Spadek napięcia na odcinku (EQ_VDROP_005)",
+            mapping_key="delta_u_percent",
+        ),
+        SymbolDefinition(
+            symbol="U",
+            unit="kV",
+            description_pl="Napięcie w punkcie (EQ_VDROP_007)",
+            mapping_key="u_kv",
+        ),
+    ),
+    unit_derivation="Mvar → % → kV (VDROP link)",
+    notes=(
+        "LINK-ONLY: Referencja do istniejących równań VDROP. "
+        "Q_cmd wpływa na ΔU_X przez EQ_VDROP_004: ΔU_X = (X·Q)/U_n²·100%. "
+        "NIE DUPLIKUJE wzorów — tylko pokazuje zależność."
+    ),
+)
+
 
 # =============================================================================
 # ANTI-DOUBLE-COUNTING AUDIT
@@ -889,12 +943,13 @@ class EquationRegistry:
         "EQ_VDROP_007": EQ_VDROP_007,
     }
 
-    # Q(U) equations registry (P11.1b)
+    # Q(U) equations registry (P11.1b + P11.1c)
     QU_EQUATIONS: dict[str, EquationDefinition] = {
         "EQ_QU_001": EQ_QU_001,
         "EQ_QU_002": EQ_QU_002,
         "EQ_QU_003": EQ_QU_003,
         "EQ_QU_004": EQ_QU_004,
+        "EQ_QU_005": EQ_QU_005,  # P11.1c: VDROP link (no new physics)
     }
 
     # Step order for SC3F proof (BINDING) — tylko równania dowodowe
@@ -919,12 +974,13 @@ class EquationRegistry:
         "EQ_VDROP_007",  # Napięcie w punkcie U
     ]
 
-    # Step order for Q(U) proof (BINDING) — P11.1b
+    # Step order for Q(U) proof (BINDING) — P11.1b + P11.1c
     QU_STEP_ORDER: list[str] = [
         "EQ_QU_001",  # ΔU = U_meas - U_ref
         "EQ_QU_002",  # s(U) deadband
         "EQ_QU_003",  # Q_raw = k_Q · s(U)
         "EQ_QU_004",  # Q_cmd with limits
+        "EQ_QU_005",  # P11.1c: Q_cmd → U (VDROP link, no new physics)
     ]
 
     # Frozen IDs for stability tests (BINDING)

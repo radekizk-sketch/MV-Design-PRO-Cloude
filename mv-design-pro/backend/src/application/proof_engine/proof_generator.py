@@ -39,6 +39,7 @@ from application.proof_engine.equation_registry import (
     EQ_QU_002,
     EQ_QU_003,
     EQ_QU_004,
+    EQ_QU_005,  # P11.1c: VDROP link
 )
 from application.proof_engine.types import (
     EquationDefinition,
@@ -1203,6 +1204,23 @@ class ProofGenerator:
             q_cmd_mvar=q_cmd_mvar,
         ))
 
+        # Krok 5: P11.1c — Wpływ Q_cmd na napięcie U (VDROP link)
+        # Tylko jeśli podano dane VDROP (opcjonalne)
+        has_vdrop_link = (
+            data.vdrop_delta_u_x_percent is not None
+            and data.vdrop_delta_u_percent is not None
+            and data.vdrop_u_kv is not None
+        )
+
+        if has_vdrop_link:
+            steps.append(cls._create_qu_step_vdrop_link(
+                step_number=5,
+                q_cmd_mvar=q_cmd_mvar,
+                delta_u_x_percent=data.vdrop_delta_u_x_percent,
+                delta_u_percent=data.vdrop_delta_u_percent,
+                u_kv=data.vdrop_u_kv,
+            ))
+
         # Podsumowanie
         unit_checks_passed = all(s.unit_check.passed for s in steps)
 
@@ -1212,6 +1230,18 @@ class ProofGenerator:
             "q_raw_mvar": ProofValue.create("Q_{raw}", q_raw_mvar, "Mvar", "q_raw_mvar"),
             "q_cmd_mvar": ProofValue.create("Q_{cmd}", q_cmd_mvar, "Mvar", "q_cmd_mvar"),
         }
+
+        # P11.1c: Dodaj wyniki VDROP do key_results jeśli dostępne
+        if has_vdrop_link:
+            key_results["vdrop_delta_u_x_percent"] = ProofValue.create(
+                "\\Delta U_X", data.vdrop_delta_u_x_percent, "%", "vdrop_delta_u_x_percent"
+            )
+            key_results["vdrop_delta_u_percent"] = ProofValue.create(
+                "\\Delta U", data.vdrop_delta_u_percent, "%", "vdrop_delta_u_percent"
+            )
+            key_results["vdrop_u_kv"] = ProofValue.create(
+                "U", data.vdrop_u_kv, "kV", "vdrop_u_kv"
+            )
 
         summary = ProofSummary(
             key_results=key_results,
@@ -1317,6 +1347,21 @@ class ProofGenerator:
             "q_cmd_b": ProofValue.create("Q_{cmd,B}", q_cmd_b, "Mvar", "q_cmd_b"),
         }
 
+        # P11.1c: Dodaj U_A, U_B, delta_u_kv jeśli dane VDROP są dostępne
+        has_vdrop_a = cf.a.vdrop_u_kv is not None
+        has_vdrop_b = cf.b.vdrop_u_kv is not None
+
+        if has_vdrop_a and has_vdrop_b:
+            u_a = cf.a.vdrop_u_kv
+            u_b = cf.b.vdrop_u_kv
+            delta_u_voltage = u_b - u_a
+
+            key_results["u_a_kv"] = ProofValue.create("U_A", u_a, "kV", "u_a_kv")
+            key_results["u_b_kv"] = ProofValue.create("U_B", u_b, "kV", "u_b_kv")
+            key_results["delta_u_voltage_kv"] = ProofValue.create(
+                "\\Delta U_{(B-A)}", delta_u_voltage, "kV", "delta_u_voltage_kv"
+            )
+
         summary = ProofSummary(
             key_results=key_results,
             unit_check_passed=unit_checks_passed,
@@ -1328,7 +1373,7 @@ class ProofGenerator:
             project_name=f"{cf.a.project_name} vs {cf.b.project_name}",
             case_name=f"{cf.a.case_name} vs {cf.b.case_name}",
             run_timestamp=cf.a.run_timestamp,
-            solver_version="Q(U) Counterfactual P11.1b",
+            solver_version="Q(U) Counterfactual P11.1b + P11.1c",
         )
 
         return ProofDocument.create(
@@ -1540,5 +1585,64 @@ class ProofGenerator:
                 "Q_min": "q_min_mvar",
                 "Q_max": "q_max_mvar",
                 "Q_cmd": "q_cmd_mvar",
+            },
+        )
+
+    @classmethod
+    def _create_qu_step_vdrop_link(
+        cls,
+        step_number: int,
+        q_cmd_mvar: float,
+        delta_u_x_percent: float,
+        delta_u_percent: float,
+        u_kv: float,
+    ) -> ProofStep:
+        """
+        Krok 5: P11.1c — Wpływ Q_cmd na napięcie U (VDROP link).
+
+        Ten krok NIE LICZY niczego nowego — tylko prezentuje wyniki VDROP
+        pokazując zależność: Q_cmd → ΔU_X → ΔU → U
+
+        LINK-ONLY: Referencja do EQ_VDROP_004..007, bez duplikowania wzorów.
+        """
+        equation = EQ_QU_005
+
+        input_values = (
+            ProofValue.create("Q_{cmd}", q_cmd_mvar, "Mvar", "q_cmd_mvar"),
+        )
+
+        # Prezentacja wyników VDROP (read-only, nie obliczamy)
+        substitution = (
+            f"Q_{{cmd}} = {q_cmd_mvar:.4f}\\,\\text{{Mvar}} "
+            f"\\xrightarrow{{\\text{{EQ\\_VDROP\\_004}}}} "
+            f"\\Delta U_X = {delta_u_x_percent:.4f}\\% "
+            f"\\xrightarrow{{\\text{{EQ\\_VDROP\\_005..007}}}} "
+            f"U = {u_kv:.4f}\\,\\text{{kV}}"
+        )
+
+        result = ProofValue.create("U", u_kv, "kV", "vdrop_u_kv")
+
+        unit_check = UnitCheckResult(
+            passed=True,
+            expected_unit="kV",
+            computed_unit="kV",
+            input_units={"Q_cmd": "Mvar", "ΔU_X": "%", "ΔU": "%"},
+            derivation="Mvar → % → kV (VDROP link) ✓",
+        )
+
+        return ProofStep(
+            step_id=ProofStep.generate_step_id("QU", step_number),
+            step_number=step_number,
+            title_pl=equation.name_pl,
+            equation=equation,
+            input_values=input_values,
+            substitution_latex=substitution,
+            result=result,
+            unit_check=unit_check,
+            source_keys={
+                "Q_cmd": "q_cmd_mvar",
+                "ΔU_X": "vdrop_delta_u_x_percent",
+                "ΔU": "vdrop_delta_u_percent",
+                "U": "vdrop_u_kv",
             },
         )
