@@ -718,7 +718,25 @@ Wprowadzenie warstwy **interpretacji dowodowej** (Proof Engine), która generuje
 
 ---
 
-## 16. Change Log (continued)
+## 16. Phase P12: Equipment Proof Pack (MVP) — DONE
+
+### 16.1 Cel fazy
+
+Wprowadzenie **P12 Equipment Proof Pack** jako niezależnego modułu analizy
+doboru aparatury na podstawie wyników P11 (bez nowych obliczeń fizycznych).
+
+### 16.2 Deliverables (MVP)
+
+| Element | Status | Opis |
+|---------|--------|------|
+| P12 moduł application/equipment_proof | DONE | Dataclassy wejścia/wyjścia + reguły U/Icu/Idyn/Ith |
+| ProofDocument P12 | DONE | Generator dowodu z krokami i podsumowaniem |
+| Proof Pack P12 | DONE | ZIP z manifest + proof.json + proof.tex |
+| Testy determinism | DONE | JSON + ZIP deterministyczne |
+
+---
+
+## 17. Change Log (continued)
 
 | Date | Version | Changes |
 |------|---------|---------|
@@ -727,6 +745,7 @@ Wprowadzenie warstwy **interpretacji dowodowej** (Proof Engine), która generuje
 | 2026-01 | 2.13 | P11.1b-d: Regulation Q(U), asymmetrical SC, UI/export specs |
 | 2026-01 | 2.14 | P11 Professor Audit: LaTeX-only policy, I_dyn/I_th mandatory, SC3F Gold Standard |
 | 2026-02 | 2.15 | P11.2 Proof Inspector UX/UI parity (PowerFactory-style, read-only) |
+| 2026-03 | 2.16 | P12 MVP: Equipment Proof Pack (U, Icu, Idyn, Ith) |
 
 ---
 

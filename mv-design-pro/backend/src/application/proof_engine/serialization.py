@@ -58,6 +58,8 @@ def _proof_summary_from_dict(payload: dict[str, Any]) -> ProofSummary:
         unit_check_passed=bool(payload.get("unit_check_passed", False)),
         total_steps=int(payload.get("total_steps", 0)),
         warnings=warnings,
+        overall_status=payload.get("overall_status"),
+        failed_checks=tuple(payload.get("failed_checks", []) or ()),
     )
 
 

@@ -51,6 +51,13 @@ COMPLETENESS_REQUIREMENTS: dict[str, tuple[str, ...]] = {
         "delta_u_total_percent",
         "u_kv",
     ),
+    ProofType.EQUIPMENT_PROOF.value: (
+        "u_m_ok",
+        "icu_ok",
+        "idyn_ok",
+        "ith_ok",
+        "overall_ok",
+    ),
 }
 
 
@@ -343,6 +350,8 @@ class ProofInspector:
             unit_check_passed=s.unit_check_passed,
             total_steps=s.total_steps,
             warnings=s.warnings,
+            overall_status=s.overall_status,
+            failed_checks=s.failed_checks,
         )
 
     def _build_counterfactual_view(
