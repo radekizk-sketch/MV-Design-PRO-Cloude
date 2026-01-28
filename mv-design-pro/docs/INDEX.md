@@ -32,6 +32,7 @@
 - [docs/ui/EXPERT_MODES_CONTRACT.md](./ui/EXPERT_MODES_CONTRACT.md) — **Expert Modes: Operator, Designer, Analyst, Auditor — NO SIMPLIFICATION RULE (CANONICAL)**
 - [docs/ui/GLOBAL_CONTEXT_BAR.md](./ui/GLOBAL_CONTEXT_BAR.md) — **Global Context Bar: sticky top bar, drukowany w nagłówku PDF (CANONICAL)**
 - [docs/ui/UI_ETAP_POWERFACTORY_PARITY.md](./ui/UI_ETAP_POWERFACTORY_PARITY.md) — **UI Parity Matrix: MV-DESIGN-PRO vs ETAP vs PowerFactory (47 FULL, 35 SUPERIOR) (CANONICAL)**
+- [docs/ui/SWITCHING_STATE_EXPLORER_CONTRACT.md](./ui/SWITCHING_STATE_EXPLORER_CONTRACT.md) — **Switching State Explorer: eksploracja stanów łączeniowych (OPEN/CLOSED), algorytmiczna identyfikacja Islands (graph traversal), Topology Checks (pre-solver validation), integracje SLD/Inspector/Results/Tree (CANONICAL)**
 
 ## Proof Engine (P11) — Canonical Knowledge Pack
 - [docs/proof_engine/README.md](./proof_engine/README.md) — Pakiet kanoniczny (BINDING)
