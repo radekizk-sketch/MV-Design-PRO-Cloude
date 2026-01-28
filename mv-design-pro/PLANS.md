@@ -173,6 +173,58 @@ Align documentation with DIgSILENT PowerFactory mental model for user interactio
 
 ---
 
+## 3.6 Phase 1.y: UI Contracts (SLD_UI_CONTRACT.md) - COMPLETE
+
+### 3.6.1 Goal
+
+Zdefiniowanie **wiążących kontraktów UI** dla warstwy prezentacji wyników i danych na diagramie SLD po zamrożeniu zasad SLD / IEC 60909.
+
+### 3.6.2 Scope
+
+**IN SCOPE:**
+- UI Priority Stack (BUS > LINIA > CAD)
+- Dense SLD Rules (INLINE → OFFSET → SIDE STACK)
+- Semantic Color Contract (kolor = znaczenie, nie element)
+- Print-First Contract (ekran = PDF = prawda)
+- Interaction Contract (hover, click, ESC)
+
+**OUT OF SCOPE:**
+- Kod implementacyjny (tylko dokumentacja)
+- UI mockupy (tylko specyfikacja tekstowa)
+- Backend changes
+
+### 3.6.3 Deliverables
+
+| File | Status | Description |
+|------|--------|-------------|
+| docs/ui/SLD_UI_CONTRACT.md | DONE | Kontrakty UI: 5 zasad fundamentalnych (BINDING) |
+| docs/ui/SLD_SCADA_CAD_CONTRACT.md (v1.1) | DONE | Uzupełnienie § 13 (integracja z kontraktami UI) |
+| docs/ui/SLD_SHORT_CIRCUIT_BUS_CENTRIC.md (v1.1) | DONE | Uzupełnienie § 13 (integracja z kontraktami UI) |
+| PLANS.md | DONE | Dodanie Phase 1.y |
+| ARCHITECTURE.md | DONE | Referencja do kontraktów UI |
+| docs/INDEX.md | DONE | Linki do SLD_UI_CONTRACT.md |
+
+### 3.6.4 Completed Tasks
+
+- [x] Utworzenie docs/ui/SLD_UI_CONTRACT.md z 5 kontraktami
+- [x] Uzupełnienie docs/ui/SLD_SCADA_CAD_CONTRACT.md (§ 13)
+- [x] Uzupełnienie docs/ui/SLD_SHORT_CIRCUIT_BUS_CENTRIC.md (§ 13)
+- [x] Aktualizacja PLANS.md (dodanie Phase 1.y)
+- [x] Aktualizacja ARCHITECTURE.md (referencja do kontraktów UI)
+- [x] Aktualizacja docs/INDEX.md (linki)
+
+### 3.6.5 Key Contracts (Summary)
+
+| # | Kontrakt | Zasada |
+|---|----------|--------|
+| 1 | **UI Priority Stack** | BUS (wyniki) > LINIA (prąd) > CAD (parametry) |
+| 2 | **Dense SLD Rules** | INLINE → OFFSET → SIDE STACK (auto, based on density) |
+| 3 | **Semantic Color Contract** | Kolor = znaczenie (alarm, stan), nie typ elementu |
+| 4 | **Print-First Contract** | Ekran = PDF = prawda projektu (żadne auto-hide) |
+| 5 | **Interaction Contract** | Hover = informacja, Click = fokus+panel, ESC = powrót |
+
+---
+
 ## 4. Phase 2: NetworkModel Core (IN PROGRESS)
 
 ### 4.1 Task 2.1: Remove PCC from NetworkGraph (DONE)
@@ -453,6 +505,7 @@ class NetworkGraph:
 | 2025-03 | 2.8 | P6: Power Flow solver relocated to solver layer (PowerFactory boundary compliance) |
 | 2025-03 | 2.9 | Static inverter support (catalog + case setpoints) |
 | 2025-03 | 2.10 | Static converter sources (PV/WIND/BESS) – catalog + case setpoints |
+| 2026-01 | 2.11 | Phase 1.y: UI Contracts (SLD_UI_CONTRACT.md) – DOC LOCKED |
 
 ---
 

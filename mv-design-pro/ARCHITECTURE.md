@@ -1484,4 +1484,70 @@ Results (Wyniki)
 
 ---
 
+## 16. UI Contracts (SLD_UI_CONTRACT.md)
+
+### 16.1 Pozycja w architekturze
+
+**Kontrakty UI** definiują zasady prezentacji i renderowania dla warstwy Application Layer (SLD, Wizard, Reporting).
+
+**Referencja:** `docs/ui/SLD_UI_CONTRACT.md` (CANONICAL, BINDING)
+
+### 16.2 Pięć kontraktów fundamentalnych
+
+| # | Kontrakt | Zasada |
+|---|----------|--------|
+| 1 | **UI Priority Stack** | BUS (wyniki zwarciowe, stan) > LINIA (prąd roboczy) > CAD (parametry katalogowe) |
+| 2 | **Dense SLD Rules** | System automatycznie przełącza tryby etykiet: INLINE → OFFSET → SIDE STACK (based on density) |
+| 3 | **Semantic Color Contract** | Kolor oznacza znaczenie (alarm, stan), nie typ elementu. Czerwony = błąd, Żółty = ostrzeżenie, Zielony = OK |
+| 4 | **Print-First Contract** | Ekran = PDF = prawda projektu. Wszystko widoczne w UI MUSI być drukowalne bez utraty informacji |
+| 5 | **Interaction Contract** | Hover = informacja (tooltip), Click = fokus + panel boczny, ESC = powrót |
+
+### 16.3 Implikacje dla warstw architektury
+
+#### 16.3.1 Application Layer (SLD)
+
+**MUST:**
+- Renderować wyniki BUS z absolutnym priorytetem wizualnym (UI Priority Stack § 1).
+- Wykrywać gęstość diagramu i automatycznie przełączać tryby etykiet (Dense SLD § 2).
+- Używać kolorów semantycznych (Semantic Color § 3): zielony/żółty/czerwony.
+- Generować wydruki 1:1 z widokiem ekranowym (Print-First § 4).
+- Implementować interakcje zgodnie z kontraktem (Interaction § 5): hover, click, ESC.
+
+**FORBIDDEN:**
+- Ukrywanie wyników BUS na wydruku (Print-First § 4).
+- Kolorowanie według typu elementu zamiast semantyki (Semantic Color § 3).
+- Zmiana stanu podczas hover (Interaction § 5).
+
+#### 16.3.2 Reporting Engine
+
+**MUST:**
+- Zachować wszystkie informacje z ekranu w PDF/DOCX (Print-First § 4).
+- Renderować kolory semantyczne lub zastępować wzorami w trybie monochromatycznym.
+- Zachować tryby etykiet (INLINE/OFFSET/SIDE STACK) zgodnie z ekranem.
+
+#### 16.3.3 Solver Layer (bez zmian)
+
+**Kontrakty UI NIE wpływają na Solver Layer** — to wyłącznie zasady prezentacji (Application Layer).
+
+### 16.4 Integracja z istniejącymi dokumentami
+
+| Dokument | Relacja do UI Contracts |
+|----------|------------------------|
+| `SLD_SCADA_CAD_CONTRACT.md` | Definiuje warstwy widoku (SCADA + CAD), UI Contracts definiują priorytety renderowania |
+| `SLD_SHORT_CIRCUIT_BUS_CENTRIC.md` | Definiuje prezentację wyników zwarciowych, UI Contracts definiują priorytet BUS |
+| `SHORT_CIRCUIT_PANELS_AND_PRINTING.md` | Definiuje panele i wydruk, UI Contracts definiują Print-First |
+| `sld_rules.md` | Podstawowe reguły SLD, UI Contracts rozszerzają o kontrakty interakcji |
+
+### 16.5 Compliance Checklist
+
+**Implementacja zgodna z UI Contracts, jeśli:**
+
+- [ ] BUS (wyniki) ma absolutny priorytet wizualny nad LINIA i CAD
+- [ ] System automatycznie wykrywa gęstość i przełącza tryby etykiet
+- [ ] Kolory oznaczają znaczenie (stan, alarm), nie typ elementu
+- [ ] Wszystko widoczne na ekranie jest widoczne w PDF (żadne auto-hide)
+- [ ] Hover = informacja, Click = fokus+panel, ESC = powrót (bez wyjątków)
+
+---
+
 **END OF ARCHITECTURE DOCUMENT**
