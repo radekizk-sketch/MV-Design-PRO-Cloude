@@ -103,14 +103,21 @@ def vdrop_test_input() -> VDROPInput:
 
 @pytest.fixture
 def sc1_test_input() -> SC1Input:
-    """Fixture: minimalne dane SC1 dla testów szkieletu."""
+    """Fixture: minimalne dane SC1 dla testów."""
     return SC1Input(
         project_name="Test Project",
         case_name="Test Case SC1",
         fault_node_id="B1",
-        fault_type="SC1F",
+        fault_type="ONE_PHASE_TO_GROUND",
         run_timestamp=datetime(2026, 1, 27, 10, 30, 0),
         solver_version="1.0.0-test",
+        u_n_kv=15.0,
+        c_factor=1.10,
+        u_prefault_kv=8.660,
+        z1_ohm=complex(0.5, 1.2),
+        z2_ohm=complex(0.5, 1.2),
+        z0_ohm=complex(0.8, 2.4),
+        a_operator=complex(-0.5, 0.8660),
     )
 
 
@@ -287,12 +294,12 @@ class TestVDROPProofGenerator:
 
 
 # =============================================================================
-# SC1 Tests (P11.1c Skeleton)
+# SC1 Tests (P11.1c)
 # =============================================================================
 
 
 class TestSC1ProofGenerator:
-    """Testy generatora dowodu SC1 (skeleton only)."""
+    """Testy generatora dowodu SC1."""
 
     def test_sc1_registry_ids_exist(self):
         """Rejestr SC1 zawiera wszystkie wymagane ID."""
@@ -303,6 +310,8 @@ class TestSC1ProofGenerator:
             "EQ_SC1_003",
             "EQ_SC1_004",
             "EQ_SC1_005",
+            "EQ_SC1_006",
+            "EQ_SC1_007",
         ]
         for eq_id in required:
             assert eq_id in sc1, f"Missing SC1 equation ID: {eq_id}"
@@ -313,24 +322,18 @@ class TestSC1ProofGenerator:
             "EQ_SC1_001",
             "EQ_SC1_002",
             "EQ_SC1_003",
-            "EQ_SC1_004",
-            "EQ_SC1_005",
+            "EQ_SC1_006",
+            "EQ_SC1_007",
         ]
-        assert EquationRegistry.get_sc1_step_order() == expected
+        assert EquationRegistry.get_sc1_step_order("SC1FZ") == expected
 
     def test_sc1_proof_document_builds(self, sc1_test_input: SC1Input):
-        """Generator SC1 buduje poprawny ProofDocument (skeleton)."""
+        """Generator SC1 buduje poprawny ProofDocument."""
         proof = ProofGenerator.generate_sc1_proof(sc1_test_input)
         assert proof is not None
         assert proof.proof_type == ProofType.SC1F_IEC60909
         assert proof.header.fault_location == sc1_test_input.fault_node_id
-        assert len(proof.steps) == len(EquationRegistry.get_sc1_step_order())
-
-    def test_sc1_no_numeric_results(self, sc1_test_input: SC1Input):
-        """Szkielet SC1 nie zawiera wyników liczbowych."""
-        proof = ProofGenerator.generate_sc1_proof(sc1_test_input)
-        for step in proof.steps:
-            assert not isinstance(step.result.value, (int, float, complex))
+        assert len(proof.steps) == len(EquationRegistry.get_sc1_step_order("SC1FZ"))
 
 
 # =============================================================================

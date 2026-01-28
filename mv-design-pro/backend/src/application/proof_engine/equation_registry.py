@@ -824,57 +824,317 @@ EQ_QU_005 = EquationDefinition(
 
 
 # =============================================================================
-# SC1 IEC 60909 — Zwarcia asymetryczne (P11.1c, SKELETON)
+# SC1 IEC 60909 — Zwarcia asymetryczne (P11.1c)
 # =============================================================================
 
 EQ_SC1_001 = EquationDefinition(
     equation_id="EQ_SC1_001",
-    name_pl="Impedancje składowych Z₁, Z₂, Z₀",
-    standard_ref="TODO",
-    latex="TODO",
-    symbols=(),
-    unit_derivation="TODO",
-    notes="P11.1c SKELETON — bez implementacji",
+    name_pl="Impedancje składowych zgodna/przeciwna/zerowa",
+    standard_ref="IEC 60909-0:2016 § 6 (składowe symetryczne)",
+    latex=(
+        r"\begin{aligned}"
+        r"Z_1 &= Z_{1,\mathrm{th}} \\"
+        r"Z_2 &= Z_{2,\mathrm{th}} \\"
+        r"Z_0 &= Z_{0,\mathrm{th}}"
+        r"\end{aligned}"
+    ),
+    symbols=(
+        SymbolDefinition(
+            symbol="Z_1",
+            unit="Ω",
+            description_pl="Impedancja składowej zgodnej",
+            mapping_key="z1_ohm",
+        ),
+        SymbolDefinition(
+            symbol="Z_2",
+            unit="Ω",
+            description_pl="Impedancja składowej przeciwnej",
+            mapping_key="z2_ohm",
+        ),
+        SymbolDefinition(
+            symbol="Z_0",
+            unit="Ω",
+            description_pl="Impedancja składowej zerowej",
+            mapping_key="z0_ohm",
+        ),
+    ),
+    unit_derivation="Ω = Ω",
+    notes="Źródło danych: white_box_trace/result. Definicje składowych symetrycznych.",
 )
 
 EQ_SC1_002 = EquationDefinition(
     equation_id="EQ_SC1_002",
-    name_pl="Transformacja składowych (Fortescue)",
-    standard_ref="TODO",
-    latex="TODO",
-    symbols=(),
-    unit_derivation="TODO",
-    notes="P11.1c SKELETON — bez implementacji",
+    name_pl="Operator a i macierz Fortescue (składowe → fazy)",
+    standard_ref="IEC 60909-0:2016 Annex B (składowe symetryczne)",
+    latex=(
+        r"a = e^{j 120^\circ}, \quad a^2 = e^{j 240^\circ} \\"
+        r"\begin{bmatrix} I_a \\ I_b \\ I_c \end{bmatrix} ="
+        r"\begin{bmatrix} 1 & 1 & 1 \\ 1 & a^2 & a \\ 1 & a & a^2 \end{bmatrix}"
+        r"\begin{bmatrix} I_0 \\ I_1 \\ I_2 \end{bmatrix}"
+    ),
+    symbols=(
+        SymbolDefinition(
+            symbol="a",
+            unit="—",
+            description_pl="Operator obrotu 120°",
+            mapping_key="a_operator",
+        ),
+        SymbolDefinition(
+            symbol="I_a",
+            unit="kA",
+            description_pl="Prąd fazowy a",
+            mapping_key="ia_ka",
+        ),
+        SymbolDefinition(
+            symbol="I_b",
+            unit="kA",
+            description_pl="Prąd fazowy b",
+            mapping_key="ib_ka",
+        ),
+        SymbolDefinition(
+            symbol="I_c",
+            unit="kA",
+            description_pl="Prąd fazowy c",
+            mapping_key="ic_ka",
+        ),
+        SymbolDefinition(
+            symbol="I_0",
+            unit="kA",
+            description_pl="Prąd składowej zerowej",
+            mapping_key="i0_ka",
+        ),
+        SymbolDefinition(
+            symbol="I_1",
+            unit="kA",
+            description_pl="Prąd składowej zgodnej",
+            mapping_key="i1_ka",
+        ),
+        SymbolDefinition(
+            symbol="I_2",
+            unit="kA",
+            description_pl="Prąd składowej przeciwnej",
+            mapping_key="i2_ka",
+        ),
+    ),
+    unit_derivation="—",
+    notes="Macierz Fortescue dla prądów (analogicznie dla napięć).",
 )
 
 EQ_SC1_003 = EquationDefinition(
     equation_id="EQ_SC1_003",
-    name_pl="Sieci składowe dla typu zwarcia",
-    standard_ref="TODO",
-    latex="TODO",
-    symbols=(),
-    unit_derivation="TODO",
-    notes="P11.1c SKELETON — bez implementacji",
+    name_pl="Sieć składowych dla zwarcia 1F–Z",
+    standard_ref="IEC 60909-0:2016 § 6.1",
+    latex=r"Z_k = Z_1 + Z_2 + Z_0",
+    symbols=(
+        SymbolDefinition(
+            symbol="Z_k",
+            unit="Ω",
+            description_pl="Impedancja zastępcza w miejscu zwarcia",
+            mapping_key="z_equiv_ohm",
+        ),
+        SymbolDefinition(
+            symbol="Z_1",
+            unit="Ω",
+            description_pl="Impedancja składowej zgodnej",
+            mapping_key="z1_ohm",
+        ),
+        SymbolDefinition(
+            symbol="Z_2",
+            unit="Ω",
+            description_pl="Impedancja składowej przeciwnej",
+            mapping_key="z2_ohm",
+        ),
+        SymbolDefinition(
+            symbol="Z_0",
+            unit="Ω",
+            description_pl="Impedancja składowej zerowej",
+            mapping_key="z0_ohm",
+        ),
+    ),
+    unit_derivation="Ω + Ω + Ω = Ω",
+    notes="Stosować wyłącznie dla zwarcia jednofazowego doziemnego (1F–Z).",
 )
 
 EQ_SC1_004 = EquationDefinition(
     equation_id="EQ_SC1_004",
-    name_pl="Wyznaczenie I₁, I₂, I₀",
-    standard_ref="TODO",
-    latex="TODO",
-    symbols=(),
-    unit_derivation="TODO",
-    notes="P11.1c SKELETON — bez implementacji",
+    name_pl="Sieć składowych dla zwarcia 2F",
+    standard_ref="IEC 60909-0:2016 § 6.2",
+    latex=r"Z_k = Z_1 + Z_2",
+    symbols=(
+        SymbolDefinition(
+            symbol="Z_k",
+            unit="Ω",
+            description_pl="Impedancja zastępcza w miejscu zwarcia",
+            mapping_key="z_equiv_ohm",
+        ),
+        SymbolDefinition(
+            symbol="Z_1",
+            unit="Ω",
+            description_pl="Impedancja składowej zgodnej",
+            mapping_key="z1_ohm",
+        ),
+        SymbolDefinition(
+            symbol="Z_2",
+            unit="Ω",
+            description_pl="Impedancja składowej przeciwnej",
+            mapping_key="z2_ohm",
+        ),
+    ),
+    unit_derivation="Ω + Ω = Ω",
+    notes="Stosować wyłącznie dla zwarcia dwufazowego (2F).",
 )
 
 EQ_SC1_005 = EquationDefinition(
     equation_id="EQ_SC1_005",
-    name_pl="Rekombinacja do prądów fazowych",
-    standard_ref="TODO",
-    latex="TODO",
-    symbols=(),
-    unit_derivation="TODO",
-    notes="P11.1c SKELETON — bez implementacji",
+    name_pl="Sieć składowych dla zwarcia 2F–Z",
+    standard_ref="IEC 60909-0:2016 § 6.3",
+    latex=r"Z_k = Z_1 + \frac{Z_2 \cdot Z_0}{Z_2 + Z_0}",
+    symbols=(
+        SymbolDefinition(
+            symbol="Z_k",
+            unit="Ω",
+            description_pl="Impedancja zastępcza w miejscu zwarcia",
+            mapping_key="z_equiv_ohm",
+        ),
+        SymbolDefinition(
+            symbol="Z_1",
+            unit="Ω",
+            description_pl="Impedancja składowej zgodnej",
+            mapping_key="z1_ohm",
+        ),
+        SymbolDefinition(
+            symbol="Z_2",
+            unit="Ω",
+            description_pl="Impedancja składowej przeciwnej",
+            mapping_key="z2_ohm",
+        ),
+        SymbolDefinition(
+            symbol="Z_0",
+            unit="Ω",
+            description_pl="Impedancja składowej zerowej",
+            mapping_key="z0_ohm",
+        ),
+    ),
+    unit_derivation="Ω + (Ω·Ω)/(Ω+Ω) = Ω",
+    notes="Stosować wyłącznie dla zwarcia dwufazowego doziemnego (2F–Z).",
+)
+
+EQ_SC1_006 = EquationDefinition(
+    equation_id="EQ_SC1_006",
+    name_pl="Wyznaczenie prądów składowych I₁, I₂, I₀",
+    standard_ref="IEC 60909-0:2016 Annex B",
+    latex=(
+        r"\begin{aligned}"
+        r"\text{1F–Z:} \quad & I_1 = I_2 = I_0 = \frac{U_f}{Z_k} \\"
+        r"\text{2F:} \quad & I_1 = \frac{U_f}{Z_k}, \quad I_2 = -I_1, \quad I_0 = 0 \\"
+        r"\text{2F–Z:} \quad & I_1 = \frac{U_f}{Z_k}, \quad"
+        r"I_2 = -\frac{Z_0}{Z_2 + Z_0} I_1, \quad"
+        r"I_0 = -\frac{Z_2}{Z_2 + Z_0} I_1"
+        r"\end{aligned}"
+    ),
+    symbols=(
+        SymbolDefinition(
+            symbol="I_1",
+            unit="kA",
+            description_pl="Prąd składowej zgodnej",
+            mapping_key="i1_ka",
+        ),
+        SymbolDefinition(
+            symbol="I_2",
+            unit="kA",
+            description_pl="Prąd składowej przeciwnej",
+            mapping_key="i2_ka",
+        ),
+        SymbolDefinition(
+            symbol="I_0",
+            unit="kA",
+            description_pl="Prąd składowej zerowej",
+            mapping_key="i0_ka",
+        ),
+        SymbolDefinition(
+            symbol="U_f",
+            unit="kV",
+            description_pl="Napięcie przedzwarciowe fazowe",
+            mapping_key="u_prefault_kv",
+        ),
+        SymbolDefinition(
+            symbol="Z_k",
+            unit="Ω",
+            description_pl="Impedancja zastępcza",
+            mapping_key="z_equiv_ohm",
+        ),
+        SymbolDefinition(
+            symbol="Z_2",
+            unit="Ω",
+            description_pl="Impedancja składowej przeciwnej",
+            mapping_key="z2_ohm",
+        ),
+        SymbolDefinition(
+            symbol="Z_0",
+            unit="Ω",
+            description_pl="Impedancja składowej zerowej",
+            mapping_key="z0_ohm",
+        ),
+    ),
+    unit_derivation="kV / Ω = kA",
+    notes="Stosować zgodnie z typem zwarcia oraz impedancją Z_k z EQ_SC1_003/004/005.",
+)
+
+EQ_SC1_007 = EquationDefinition(
+    equation_id="EQ_SC1_007",
+    name_pl="Rekonstrukcja prądów fazowych Ia, Ib, Ic",
+    standard_ref="IEC 60909-0:2016 Annex B",
+    latex=(
+        r"\begin{bmatrix} I_a \\ I_b \\ I_c \end{bmatrix} ="
+        r"\begin{bmatrix} 1 & 1 & 1 \\ 1 & a^2 & a \\ 1 & a & a^2 \end{bmatrix}"
+        r"\begin{bmatrix} I_0 \\ I_1 \\ I_2 \end{bmatrix}"
+    ),
+    symbols=(
+        SymbolDefinition(
+            symbol="I_a",
+            unit="kA",
+            description_pl="Prąd fazowy a",
+            mapping_key="ia_ka",
+        ),
+        SymbolDefinition(
+            symbol="I_b",
+            unit="kA",
+            description_pl="Prąd fazowy b",
+            mapping_key="ib_ka",
+        ),
+        SymbolDefinition(
+            symbol="I_c",
+            unit="kA",
+            description_pl="Prąd fazowy c",
+            mapping_key="ic_ka",
+        ),
+        SymbolDefinition(
+            symbol="I_0",
+            unit="kA",
+            description_pl="Prąd składowej zerowej",
+            mapping_key="i0_ka",
+        ),
+        SymbolDefinition(
+            symbol="I_1",
+            unit="kA",
+            description_pl="Prąd składowej zgodnej",
+            mapping_key="i1_ka",
+        ),
+        SymbolDefinition(
+            symbol="I_2",
+            unit="kA",
+            description_pl="Prąd składowej przeciwnej",
+            mapping_key="i2_ka",
+        ),
+        SymbolDefinition(
+            symbol="a",
+            unit="—",
+            description_pl="Operator obrotu 120°",
+            mapping_key="a_operator",
+        ),
+    ),
+    unit_derivation="kA = kA",
+    notes="Rekombinacja składowych symetrycznych do prądów fazowych.",
 )
 
 
@@ -1007,13 +1267,15 @@ class EquationRegistry:
         "EQ_QU_005": EQ_QU_005,  # P11.1c: VDROP link (no new physics)
     }
 
-    # SC1 equations registry (P11.1c, skeleton only)
+    # SC1 equations registry (P11.1c)
     SC1_EQUATIONS: dict[str, EquationDefinition] = {
         "EQ_SC1_001": EQ_SC1_001,
         "EQ_SC1_002": EQ_SC1_002,
         "EQ_SC1_003": EQ_SC1_003,
         "EQ_SC1_004": EQ_SC1_004,
         "EQ_SC1_005": EQ_SC1_005,
+        "EQ_SC1_006": EQ_SC1_006,
+        "EQ_SC1_007": EQ_SC1_007,
     }
 
     # Step order for SC3F proof (BINDING) — tylko równania dowodowe
@@ -1047,13 +1309,29 @@ class EquationRegistry:
         "EQ_QU_005",  # P11.1c: Q_cmd → U (VDROP link, no new physics)
     ]
 
-    # Step order for SC1 proof (BINDING) — P11.1c skeleton
-    SC1_STEP_ORDER: list[str] = [
+    # Step order for SC1 proofs (BINDING) — P11.1c
+    SC1FZ_STEP_ORDER: list[str] = [
         "EQ_SC1_001",  # Z₁, Z₂, Z₀
         "EQ_SC1_002",  # Transformacja Fortescue
-        "EQ_SC1_003",  # Sieci składowe
-        "EQ_SC1_004",  # I₁, I₂, I₀
-        "EQ_SC1_005",  # Rekombinacja fazowa
+        "EQ_SC1_003",  # Z_k dla 1F–Z
+        "EQ_SC1_006",  # I₁, I₂, I₀
+        "EQ_SC1_007",  # Rekombinacja fazowa
+    ]
+
+    SC2F_STEP_ORDER: list[str] = [
+        "EQ_SC1_001",  # Z₁, Z₂, Z₀
+        "EQ_SC1_002",  # Transformacja Fortescue
+        "EQ_SC1_004",  # Z_k dla 2F
+        "EQ_SC1_006",  # I₁, I₂, I₀
+        "EQ_SC1_007",  # Rekombinacja fazowa
+    ]
+
+    SC2FZ_STEP_ORDER: list[str] = [
+        "EQ_SC1_001",  # Z₁, Z₂, Z₀
+        "EQ_SC1_002",  # Transformacja Fortescue
+        "EQ_SC1_005",  # Z_k dla 2F–Z
+        "EQ_SC1_006",  # I₁, I₂, I₀
+        "EQ_SC1_007",  # Rekombinacja fazowa
     ]
 
     # Frozen IDs for stability tests (BINDING)
@@ -1070,6 +1348,12 @@ class EquationRegistry:
             "r_ohm", "x_ohm", "p_mw", "q_mvar",
             "delta_u_r_percent", "delta_u_x_percent",
             "delta_u_percent", "delta_u_total_percent",
+            # SC1
+            "z1_ohm", "z2_ohm", "z0_ohm", "z_equiv_ohm",
+            "u_prefault_kv",
+            "i1_ka", "i2_ka", "i0_ka",
+            "ia_ka", "ib_ka", "ic_ka",
+            "a_operator",
         ],
     }
 
@@ -1118,13 +1402,24 @@ class EquationRegistry:
 
     @classmethod
     def get_sc1_equations(cls) -> dict[str, EquationDefinition]:
-        """Zwraca wszystkie równania SC1 (P11.1c skeleton)."""
+        """Zwraca wszystkie równania SC1 (P11.1c)."""
         return cls.SC1_EQUATIONS.copy()
 
     @classmethod
-    def get_sc1_step_order(cls) -> list[str]:
-        """Zwraca kolejność kroków dla dowodu SC1 (P11.1c skeleton)."""
-        return cls.SC1_STEP_ORDER.copy()
+    def get_sc1_step_order(cls, fault_type: str) -> list[str]:
+        """
+        Zwraca kolejność kroków dla dowodu SC1 (P11.1c).
+
+        Args:
+            fault_type: Typ zwarcia (SC1FZ/SC2F/SC2FZ)
+        """
+        if fault_type == "SC1FZ":
+            return cls.SC1FZ_STEP_ORDER.copy()
+        if fault_type == "SC2F":
+            return cls.SC2F_STEP_ORDER.copy()
+        if fault_type == "SC2FZ":
+            return cls.SC2FZ_STEP_ORDER.copy()
+        raise ValueError(f"Unsupported SC1 fault type: {fault_type}")
 
     @classmethod
     def get_all_mapping_keys(cls) -> set[str]:
