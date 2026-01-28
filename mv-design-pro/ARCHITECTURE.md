@@ -1884,6 +1884,44 @@ Topology Tree **NIE jest** dodatkowym widokiem — to **kręgosłup nawigacji** 
 
 ---
 
+#### 18.2.7 Switching State Explorer (Eksploracja stanów łączeniowych)
+
+**Cel:** Dedykowane narzędzie UI dla eksploracji stanów łączeniowych aparatury (Switch) i ich wpływu na topologię efektywną sieci.
+
+**Funkcjonalność:**
+- **Eksploracja stanów aparatów:** lista wszystkich Switch z filtrami (Type, State OPEN/CLOSED, In Service, Feeder, Island ID),
+- **Effective Topology:** algorytmiczne przeliczanie topologii efektywnej po uwzględnieniu stanów aparatów (OPEN → krawędź usunięta) i flag `in_service`,
+- **Islands (algorytmiczne):** wykrywanie wysp (connected components) poprzez graph traversal (BFS/DFS),
+- **Topology Checks (pre-solver validation):** liczba Islands, Islands bez Source, dangling Bus,
+- **Toggle State:** przełączanie OPEN ↔ CLOSED z natychmiastową aktualizacją Effective Topology + Islands + SLD overlay (< 100 ms),
+- **SLD overlay Islands:** kolorowanie tła Bus lub obrys wysp (każda Island = inny kolor),
+- **Batch Operations:** grupowa zmiana stanów (z potwierdzeniem),
+- **Restore Normal State:** powrót do Case.baseline_switching_state,
+- **Invalidation Rule:** zmiana stanu aparatu → Result status = OUTDATED (z bannerem ostrzeżenia).
+
+**Integracje:**
+- **SLD:** overlay Islands (kolorowanie tła Bus), natychmiastowa zmiana symbolu aparatu (● CLOSED / ○ OPEN),
+- **Element Inspector (Switch):** zakładki Overview, Parameters, Switching History, Topology Impact,
+- **Results Browser:** invalidation wyników po zmianie stanów (Result status → OUTDATED),
+- **Topology Tree:** synchronizacja 4-widokowa (wybór aparatu w Explorerze → podświetlenie SLD/Tree/Inspector).
+
+**NOT-A-SOLVER rule (BINDING):**
+
+Switching State Explorer **NIE wykonuje** obliczeń fizycznych (prądy, napięcia). To wyłącznie warstwa topologiczna (Application Layer):
+- **Effective Topology:** graph traversal (NetworkX), NOT Power Flow,
+- **Islands:** connected components (BFS/DFS), NOT Short Circuit,
+- **Energized status:** interpretacja topologiczna (Island zawiera Source?), NOT wynik Power Flow (napięcia U).
+
+**FORBIDDEN:**
+- Wykonywanie obliczeń prądów, napięć w Switching Explorer (to Solver Layer),
+- Automatyczne uruchamianie solverów po zmianie stanu aparatu (użytkownik decyduje),
+- Automatyczne "naprawianie" topologii (przełączanie aparatów bez zgody użytkownika),
+- Prezentowanie "prądów w aparacie" (aparat nie ma impedancji, to interpretacja fizyczna z Power Flow).
+
+**Referencja:** `docs/ui/SWITCHING_STATE_EXPLORER_CONTRACT.md` (CANONICAL, BINDING)
+
+---
+
 ### 18.3 Implikacje dla warstw architektury
 
 #### 18.3.1 Application Layer (SLD, Topology Tree, Switching State View, Catalog Browser, Case Comparison)
@@ -1914,7 +1952,7 @@ Topology Tree **NIE jest** dodatkowym widokiem — to **kręgosłup nawigacji** 
 |----------|-------------------|
 | `SLD_RENDER_LAYERS_CONTRACT.md` | Definiuje warstwy CAD vs SCADA (tryby CAD/SCADA/HYBRID) |
 | `TOPOLOGY_TREE_CONTRACT.md` | Definiuje hierarchię topologiczną (Project → Station → VoltageLevel → Element) |
-| `SWITCHING_STATE_VIEW_CONTRACT.md` | Definiuje eksplorację stanów łączeniowych + Islands |
+| `SWITCHING_STATE_EXPLORER_CONTRACT.md` | **Definiuje eksplorację stanów łączeniowych (OPEN/CLOSED), algorytmiczną identyfikację Islands (graph traversal), Topology Checks (pre-solver validation), integracje SLD/Inspector/Results/Tree** |
 | `SC_NODE_RESULTS_CONTRACT.md` | Definiuje wyniki zwarciowe per BUS (ZAKAZ „na linii") |
 | `CATALOG_BROWSER_CONTRACT.md` | Definiuje przeglądanie katalogów + relacja Type → Instances |
 | `CASE_COMPARISON_UI_CONTRACT.md` | Definiuje porównanie Case A/B/C (Delta, SLD Overlay) |
