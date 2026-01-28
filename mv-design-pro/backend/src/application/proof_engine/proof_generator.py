@@ -2357,7 +2357,7 @@ class ProofGenerator:
         )
 
         substitution = (
-            f"S = \\sqrt{{{p_mw:.4f}^{{2}} + {q_mvar:.4f}^{{2}}} = "
+            f"S = \\sqrt{{{p_mw:.4f}^{{2}} + {q_mvar:.4f}^{{2}}}} = "
             f"{s_mva:.4f}\\,\\text{{MVA}}"
         )
 
