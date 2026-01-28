@@ -22,6 +22,7 @@ Ten pakiet zawiera **kanoniczne źródła wiedzy** dla systemu dowodów matematy
 | `P11_1b_REGULATION_Q_U.md` | Dowód regulatora Q(U), cosφ(P) | REFERENCE |
 | `P11_1c_SC_ASYMMETRICAL.md` | Składowe symetryczne, zwarcia niesymetryczne | REFERENCE |
 | `P11_1d_PROOF_UI_EXPORT.md` | Proof Inspector UI, eksport LaTeX/PDF/DOCX | REFERENCE |
+| `P14_PROOF_AUDIT_AND_COVERAGE.md` | Warstwa audytu pokrycia i kompletności Proof Packów | **BINDING** |
 | `PROOF_SCHEMAS.md` | Kanoniczne schematy JSON (ProofDocument, ProofStep) | **BINDING** |
 | `EQUATIONS_IEC60909_SC3F.md` | Rejestr równań SC3F z mapping keys | **BINDING** |
 | `EQUATIONS_VDROP.md` | Rejestr równań VDROP z mapping keys | **BINDING** |
@@ -119,6 +120,11 @@ $$
 ---
 
 ## TODO — Proof Packs P14–P17 (FUTURE PACKS)
+
+### P14 — Proof Audit & Coverage (DOC ONLY, META)
+
+P14 definiuje **kanoniczną warstwę audytu** kompletności i pokrycia Proof Packów
+oraz stanowi **prerequisite** dla P15–P17.
 
 ### TODO-P14-001 (PLANNED) — P14: Power Flow Proof Pack (audit wyników PF) [FUTURE PACK]
 - Priority: MUST
