@@ -26,6 +26,7 @@ class ProofType(str, Enum):
     SC2F_IEC60909 = "SC2F_IEC60909"
     SC2FG_IEC60909 = "SC2FG_IEC60909"
     Q_U_REGULATION = "Q_U_REGULATION"
+    EQUIPMENT_PROOF = "EQUIPMENT_PROOF"
 
 
 # =============================================================================
@@ -394,6 +395,8 @@ class ProofSummary:
     unit_check_passed: bool
     total_steps: int
     warnings: tuple[str, ...] = ()
+    overall_status: str | None = None
+    failed_checks: tuple[str, ...] = ()
 
     def __hash__(self) -> int:
         return hash(
@@ -402,6 +405,8 @@ class ProofSummary:
                 self.unit_check_passed,
                 self.total_steps,
                 self.warnings,
+                self.overall_status,
+                self.failed_checks,
             )
         )
 
@@ -413,6 +418,8 @@ class ProofSummary:
             "unit_check_passed": self.unit_check_passed,
             "total_steps": self.total_steps,
             "warnings": list(self.warnings),
+            "overall_status": self.overall_status,
+            "failed_checks": list(self.failed_checks),
         }
 
 

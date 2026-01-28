@@ -146,6 +146,8 @@ class SummaryView:
     unit_check_passed: bool
     total_steps: int
     warnings: tuple[str, ...] = ()
+    overall_status: str | None = None
+    failed_checks: tuple[str, ...] = ()
 
     def to_dict(self) -> dict[str, Any]:
         # Sortowanie key_results alfabetycznie (determinizm)
@@ -155,6 +157,8 @@ class SummaryView:
             "unit_check_passed": self.unit_check_passed,
             "total_steps": self.total_steps,
             "warnings": list(self.warnings),
+            "overall_status": self.overall_status,
+            "failed_checks": list(self.failed_checks),
         }
 
 

@@ -145,6 +145,11 @@ Ten dokument zawiera **kanoniczne schematy JSON** dla wszystkich struktur danych
         "warnings": {
           "type": "array",
           "items": { "type": "string" }
+        },
+        "overall_status": { "type": ["string", "null"] },
+        "failed_checks": {
+          "type": "array",
+          "items": { "type": "string" }
         }
       }
     },
