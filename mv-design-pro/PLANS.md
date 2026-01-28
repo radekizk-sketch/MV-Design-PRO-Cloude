@@ -173,6 +173,45 @@ Align documentation with DIgSILENT PowerFactory mental model for user interactio
 
 ---
 
+## 3.6 Phase 2.x.6: Case / Variant Comparison UI — DOC-LOCKED
+
+### 3.6.1 Goal
+
+Zdefiniować kanoniczny interfejs porównywania Case / Variant / Study umożliwiający inżynierską analizę różnic zgodnie z praktyką DIgSILENT PowerFactory i ETAP.
+
+### 3.6.2 Scope
+
+**IN SCOPE:**
+- Definicja pojęć Case / Variant / Study
+- Widoki porównawcze (tabela, SLD overlay, WHY panel)
+- Reguły porównań IEC 60909 i Power Flow
+- Scenariusze poprawne i zabronione
+- Integracja z Results Browser, Element Inspector, Topology Tree
+- Wydruk i audyt (PDF = ekran)
+
+**OUT OF SCOPE:**
+- Implementacja kodu
+- Zmiany w solverach
+- Zmiany w API
+- Zmiany w bazie danych
+
+### 3.6.3 Deliverables
+
+| File | Status | Description |
+|------|--------|-------------|
+| docs/ui/CASE_COMPARISON_UI_CONTRACT.md | DONE | Kanoniczny kontrakt UI porównań Case/Variant |
+| ARCHITECTURE.md Section 15 | DONE | Engineering Comparison Layer (PF-grade) |
+| INDEX.md | DONE | Link do nowego kontraktu |
+
+### 3.6.4 Completed Tasks
+
+- [x] Create docs/ui/CASE_COMPARISON_UI_CONTRACT.md
+- [x] Add Engineering Comparison Layer section to ARCHITECTURE.md
+- [x] Update INDEX.md with link to new contract
+- [x] Update PLANS.md with Phase 2.x.6
+
+---
+
 ## 4. Phase 2: NetworkModel Core (IN PROGRESS)
 
 ### 4.1 Task 2.1: Remove PCC from NetworkGraph (DONE)
@@ -453,6 +492,7 @@ class NetworkGraph:
 | 2025-03 | 2.8 | P6: Power Flow solver relocated to solver layer (PowerFactory boundary compliance) |
 | 2025-03 | 2.9 | Static inverter support (catalog + case setpoints) |
 | 2025-03 | 2.10 | Static converter sources (PV/WIND/BESS) – catalog + case setpoints |
+| 2026-01 | 2.11 | PHASE 2.x.6 DOC-LOCKED: Case/Variant Comparison UI (PF-grade) |
 
 ---
 

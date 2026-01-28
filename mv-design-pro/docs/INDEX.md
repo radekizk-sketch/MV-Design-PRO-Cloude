@@ -21,6 +21,7 @@
 - [docs/ui/powerfactory_ui_parity.md](./ui/powerfactory_ui_parity.md)
 - [docs/ui/wizard_screens.md](./ui/wizard_screens.md)
 - [docs/ui/sld_rules.md](./ui/sld_rules.md)
+- [docs/ui/CASE_COMPARISON_UI_CONTRACT.md](./ui/CASE_COMPARISON_UI_CONTRACT.md) — Case/Variant Comparison UI (PF-grade)
 
 ## Audit Reports
 - [docs/audit/spec_vs_code_gap_report.md](./audit/spec_vs_code_gap_report.md)

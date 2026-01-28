@@ -1147,4 +1147,83 @@ Edit via SLD    → NetworkModel updated → Wizard reflects immediately
 
 ---
 
+## 15. Engineering Comparison Layer (PF-grade)
+
+Warstwa porównań inżynierskich umożliwia analizę różnic między Case / Variant / Study zgodnie z paradygmatem DIgSILENT PowerFactory i ETAP.
+
+### 15.1 Cel warstwy
+
+Odpowiedź na pytanie fundamentalne: **CO się zmieniło, GDZIE, o ILE i DLACZEGO?**
+
+### 15.2 Architektura porównań
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    COMPARISON LAYER                              │
+│  ┌───────────────────────────────────────────────────────────┐  │
+│  │                  COMPARISON ENGINE                         │  │
+│  │  ┌─────────────┐  ┌─────────────┐  ┌─────────────────┐   │  │
+│  │  │ Case Diff   │  │ WHY Panel   │  │ Report Generator│   │  │
+│  │  │  Calculator │  │  Analyzer   │  │    (PDF)        │   │  │
+│  │  └──────┬──────┘  └──────┬──────┘  └────────┬────────┘   │  │
+│  └─────────┼────────────────┼──────────────────┼────────────┘  │
+│            │                │                  │                │
+│            ▼                ▼                  ▼                │
+│  ┌─────────────────────────────────────────────────────────────┐│
+│  │                    COMPARISON VIEWS                          ││
+│  │  ┌─────────────┐  ┌─────────────┐  ┌─────────────────────┐ ││
+│  │  │ Comparison  │  │ SLD Overlay │  │    WHY Panel        │ ││
+│  │  │   Table     │  │  (Diff)     │  │    (Causes)         │ ││
+│  │  └─────────────┘  └─────────────┘  └─────────────────────┘ ││
+│  └─────────────────────────────────────────────────────────────┘│
+│            ▲                ▲                  ▲                │
+│            │                │                  │                │
+│  ┌─────────┴────────────────┴──────────────────┴────────────┐  │
+│  │                    DATA SOURCES                           │  │
+│  │  ┌─────────────┐  ┌─────────────┐  ┌─────────────────┐   │  │
+│  │  │ Case A      │  │ Case B      │  │ Network         │   │  │
+│  │  │ Results     │  │ Results     │  │ Snapshots       │   │  │
+│  │  └─────────────┘  └─────────────┘  └─────────────────┘   │  │
+│  └───────────────────────────────────────────────────────────┘  │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### 15.3 Komponenty warstwy
+
+| Komponent | Odpowiedzialność |
+|-----------|------------------|
+| **Case Diff Calculator** | Obliczanie Δ i %Δ dla wszystkich wielkości |
+| **WHY Panel Analyzer** | Identyfikacja przyczyn różnic (topologia, stan, parametry) |
+| **Report Generator** | Generowanie PDF z pełnym kontekstem audytowym |
+| **Comparison Table** | Widok tabelaryczny różnic per element |
+| **SLD Overlay (Diff)** | Nakładka kolorystyczna różnic na diagramie |
+| **WHY Panel View** | Panel przyczyn z kategoryzacją zmian |
+
+### 15.4 Reguły warstwy (BINDING)
+
+| Reguła | Opis |
+|--------|------|
+| CMP-001 | Porównania zwarciowe WYŁĄCZNIE per BUS (IEC 60909) |
+| CMP-002 | Przepływy liniowe per instancja (LINE/TRAFO) |
+| CMP-003 | Różna topologia = jawne oznaczenie DIFFERENT TOPOLOGY |
+| CMP-004 | Wyniki OUTDATED = blokada porównania |
+| CMP-005 | Ekran = PDF (identyczna zawartość) |
+| CMP-006 | WHY Panel MUSI identyfikować przyczyny różnic |
+
+### 15.5 Integracja z warstwami
+
+| Warstwa | Integracja |
+|---------|------------|
+| Results Browser | Wybór Cases do porównania |
+| Element Inspector | Szczegóły elementu z tabeli porównań |
+| Topology Tree | Synchronizacja zaznaczenia |
+| SLD Layer | Overlay różnic (bez modyfikacji CAD) |
+| Analysis Layer | Źródło wyników do porównania |
+
+### 15.6 Referencja dokumentacji
+
+Pełna specyfikacja: `docs/ui/CASE_COMPARISON_UI_CONTRACT.md`
+
+---
+
 **END OF ARCHITECTURE DOCUMENT**
