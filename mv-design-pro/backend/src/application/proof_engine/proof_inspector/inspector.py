@@ -31,6 +31,28 @@ if TYPE_CHECKING:
         ProofValue,
     )
 
+from application.proof_engine.types import ProofType, SEMANTIC_ALIASES
+
+
+# =============================================================================
+# Completeness Requirements — P11.1e
+# =============================================================================
+
+# Required key_results keys for each proof type (structural completeness)
+COMPLETENESS_REQUIREMENTS: dict[str, tuple[str, ...]] = {
+    ProofType.SC3F_IEC60909.value: (
+        "ikss_ka",
+        "ip_ka",
+        "ith_ka",
+        "sk_mva",
+        # idyn_ka is optional: if absent, ip_ka acts as proxy (BINDING: I_dyn = i_p)
+    ),
+    ProofType.VDROP.value: (
+        "delta_u_total_percent",
+        "u_kv",
+    ),
+}
+
 
 class ProofInspector:
     """
@@ -166,6 +188,51 @@ class ProofInspector:
             keys[step.result.symbol] = step.result.mapping_key
         return dict(sorted(keys.items()))
 
+    def validate_completeness(self) -> tuple[bool, tuple[str, ...]]:
+        """
+        Waliduje kompletność strukturalną dokumentu dowodowego.
+
+        Sprawdza obecność wymaganych kluczy w key_results dla danego typu dowodu.
+        Brak obliczeń — tylko sprawdzenie strukturalne.
+
+        Returns:
+            Krotka (passed, missing_keys):
+            - passed: True jeśli wszystkie wymagane klucze są obecne
+            - missing_keys: Posortowana lista brakujących kluczy (deterministyczna)
+
+        Note:
+            Dla SC3F: jeśli brak idyn_ka, sprawdza czy ip_ka istnieje jako proxy.
+            BINDING: I_dyn = i_p (prąd dynamiczny = prąd udarowy).
+        """
+        proof_type = self._document.proof_type.value
+        key_results = self._document.summary.key_results
+
+        # Get requirements for this proof type
+        required_keys = COMPLETENESS_REQUIREMENTS.get(proof_type, ())
+        if not required_keys:
+            # No requirements defined for this proof type
+            return True, ()
+
+        present_keys = set(key_results.keys())
+        missing: list[str] = []
+
+        for key in required_keys:
+            if key not in present_keys:
+                missing.append(key)
+
+        # Special case for SC3F: idyn_ka uses ip_ka as proxy
+        if proof_type == ProofType.SC3F_IEC60909.value:
+            if "idyn_ka" not in present_keys and "ip_ka" in present_keys:
+                # ip_ka acts as proxy for idyn_ka (BINDING: I_dyn = i_p)
+                pass
+            elif "idyn_ka" not in present_keys and "ip_ka" not in present_keys:
+                # Both missing — report idyn_ka as missing (ip_ka already in list)
+                if "idyn_ka" not in missing:
+                    missing.append("idyn_ka")
+
+        # Return sorted missing keys for determinism
+        return len(missing) == 0, tuple(sorted(missing))
+
     # =========================================================================
     # Private methods
     # =========================================================================
@@ -247,7 +314,9 @@ class ProofInspector:
             source_keys=dict(sorted(step.source_keys.items())),
         )
 
-    def _build_value_view(self, val: ProofValue) -> ValueView:
+    def _build_value_view(
+        self, val: ProofValue, alias_pl: str | None = None
+    ) -> ValueView:
         """Buduje ValueView z ProofValue."""
         return ValueView(
             symbol=val.symbol,
@@ -255,16 +324,19 @@ class ProofInspector:
             raw_value=val.value,
             unit=val.unit,
             mapping_key=val.source_key,
+            alias_pl=alias_pl,
         )
 
     def _build_summary_view(self) -> SummaryView:
-        """Buduje SummaryView z ProofSummary."""
+        """Buduje SummaryView z ProofSummary z aliasami semantycznymi."""
         s = self._document.summary
 
-        key_results = {
-            key: self._build_value_view(val)
-            for key, val in sorted(s.key_results.items())
-        }
+        key_results: dict[str, ValueView] = {}
+        for key, val in sorted(s.key_results.items()):
+            # Lookup semantic alias for this key
+            alias = SEMANTIC_ALIASES.get(key)
+            alias_pl = alias.alias_pl if alias else None
+            key_results[key] = self._build_value_view(val, alias_pl=alias_pl)
 
         return SummaryView(
             key_results=key_results,

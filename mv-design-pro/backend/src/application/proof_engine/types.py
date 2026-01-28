@@ -28,6 +28,61 @@ class ProofType(str, Enum):
     Q_U_REGULATION = "Q_U_REGULATION"
 
 
+# =============================================================================
+# Semantic Aliases — P11.1e
+# =============================================================================
+
+
+@dataclass(frozen=True)
+class SemanticAlias:
+    """
+    Alias semantyczny dla doboru aparatury.
+
+    Mapuje klucz wynikowy na polski termin techniczny.
+    Używane przez Inspector do prezentacji wyników.
+
+    Attributes:
+        alias_pl: Polski termin techniczny (np. "prąd wyłączalny")
+        target_key: Klucz w key_results (np. "ikss_ka")
+        notes: Opcjonalne notatki
+    """
+
+    alias_pl: str
+    target_key: str
+    notes: str = ""
+
+
+# Kanoniczne aliasy semantyczne dla doboru aparatury (BINDING)
+# Mapowanie: target_key -> SemanticAlias
+SEMANTIC_ALIASES: dict[str, SemanticAlias] = {
+    "ikss_ka": SemanticAlias(
+        alias_pl="prąd wyłączalny",
+        target_key="ikss_ka",
+        notes="I_k'' wg IEC 60909",
+    ),
+    "ip_ka": SemanticAlias(
+        alias_pl="prąd udarowy",
+        target_key="ip_ka",
+        notes="i_p wg IEC 60909",
+    ),
+    "ith_ka": SemanticAlias(
+        alias_pl="prąd cieplny",
+        target_key="ith_ka",
+        notes="I_th wg IEC 60909",
+    ),
+    "idyn_ka": SemanticAlias(
+        alias_pl="prąd dynamiczny",
+        target_key="idyn_ka",
+        notes="I_dyn; jeśli brak, używa ip_ka jako proxy (BINDING: I_dyn = i_p)",
+    ),
+    "sk_mva": SemanticAlias(
+        alias_pl="moc zwarciowa",
+        target_key="sk_mva",
+        notes="S_k'' wg IEC 60909",
+    ),
+}
+
+
 @dataclass(frozen=True)
 class SymbolDefinition:
     """

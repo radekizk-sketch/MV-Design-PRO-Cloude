@@ -27,6 +27,7 @@ class ValueView:
         raw_value: Oryginalna wartosc (float/complex)
         unit: Jednostka
         mapping_key: Klucz mapowania do trace/result
+        alias_pl: Opcjonalny alias semantyczny (polski termin techniczny)
     """
 
     symbol: str
@@ -34,18 +35,22 @@ class ValueView:
     raw_value: float | complex | str
     unit: str
     mapping_key: str
+    alias_pl: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
         raw = self.raw_value
         if isinstance(raw, complex):
             raw = f"{raw.real:.4f}+j{raw.imag:.4f}"
-        return {
+        result = {
             "symbol": self.symbol,
             "value": self.value,
             "raw_value": raw,
             "unit": self.unit,
             "mapping_key": self.mapping_key,
         }
+        if self.alias_pl is not None:
+            result["alias_pl"] = self.alias_pl
+        return result
 
 
 @dataclass(frozen=True)
