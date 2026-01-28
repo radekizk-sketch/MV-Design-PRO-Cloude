@@ -613,6 +613,14 @@ Wprowadzenie warstwy **interpretacji dowodowej** (Proof Engine), która generuje
 - [x] UI eksportu JSON/LaTeX/PDF z deterministyczną nazwą pliku
 - [x] Minimalna dostępność: aria-labels, focus outline, nawigacja klawiaturą
 
+### 14.7 P11.3 — Proof Pack Publication (IN PROGRESS)
+
+**Definition of Done:**
+- [ ] Deterministyczny Proof Pack ZIP (manifest + proof.json + proof.tex + opcjonalny PDF)
+- [ ] API download `/api/proof/{project_id}/{case_id}/{run_id}/pack`
+- [ ] Testy determinism + manifest + checksum
+- [ ] Dokumentacja kontraktu ZIP w `docs/proof_engine/P11_3_PROOF_PACK_PUBLICATION.md`
+
 ---
 
 ## 15. P11 Compliance Checklist

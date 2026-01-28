@@ -30,6 +30,12 @@ from application.proof_engine.equation_registry import EquationRegistry
 from application.proof_engine.unit_verifier import UnitVerifier
 from application.proof_engine.proof_generator import ProofGenerator
 from application.proof_engine.latex_renderer import LaTeXRenderer
+from application.proof_engine.proof_pack import (
+    ProofPackBuilder,
+    ProofPackContext,
+    proof_pack_proof_type,
+    resolve_mv_design_pro_version,
+)
 
 # P11.1d: Proof Inspector (read-only viewer & export)
 from application.proof_engine.proof_inspector import (
@@ -92,4 +98,9 @@ __all__ = [
     "export_to_pdf",
     "export_to_tex",
     "is_pdf_export_available",
+    # P11.3: Proof Pack
+    "ProofPackBuilder",
+    "ProofPackContext",
+    "proof_pack_proof_type",
+    "resolve_mv_design_pro_version",
 ]
