@@ -814,6 +814,102 @@ Zdefiniowanie **Switching State Explorer** — narzędzia UI klasy DIgSILENT Pow
 
 ---
 
+## 12.9. Phase 2.x.4: SHORT-CIRCUIT NODE RESULTS — DOC LOCKED
+
+### 12.9.1. Cel fazy
+
+Zdefiniowanie **kanonicznego widoku wyników zwarciowych IEC 60909 prezentowanych WYŁĄCZNIE per WĘZEŁ (BUS)**, zgodnie z praktyką ETAP / DIgSILENT PowerFactory.
+
+**Zakres:**
+- Wyniki zwarciowe dotyczą **konkretnego BUS** (węzła),
+- **NIE dotyczą** linii jako całości,
+- **NIE mogą być** prezentowane „na długości linii".
+
+**Fundamentalna zasada (BINDING):**
+- **Wyniki SC = wyniki zwarcia w węźle (Bus)**,
+- **NIE ISTNIEJE** pojęcie „wynik zwarcia na linii",
+- **NIE ISTNIEJE** pojęcie „wynik zwarcia na transformatorze",
+- **Linia i transformator** to **elementy impedancyjne**, które **wpływają** na wynik SC w Bus, ale **NIE MAJĄ** własnych wyników SC.
+
+**INVARIANT:** Solver i Domain Layer pozostają **NIETKNIĘTE**. To wyłącznie dokumentacja UI.
+
+---
+
+### 12.9.2. Zakres fazy
+
+| W zakresie | Poza zakresem |
+|------------|---------------|
+| Definicja BUS-centric SC results | Implementacja kodu |
+| Mapowanie IEC 60909 → UI | Modyfikacja solverów |
+| Tabela wymaganych pól | Modyfikacja API |
+| Relacje z SLD / Results Browser / Topology | Nowe funkcjonalności backend |
+| Scenariusze poprawne i FORBIDDEN | Implementacja DB schema |
+| Odniesienia do praktyki ETAP / DIgSILENT | |
+
+---
+
+### 12.9.3. Deliverables (DOC ONLY)
+
+| Plik | Opis | Status |
+|------|------|--------|
+| `docs/ui/SC_NODE_RESULTS_CONTRACT.md` | Definicja BUS-centric SC results: struktura wyniku SC per Bus (Ik″, ip, Ith, Sk), prezentacja w Results Browser (tabela), Element Inspector (zakładka Results), SLD Viewer (nakładka tylko na Bus), terminologia FORBIDDEN („na linii", „na transformatorze"), parity z ETAP/PowerFactory | DONE |
+| `mv-design-pro/PLANS.md` | Dodanie Phase 2.x.4 | DONE |
+| `mv-design-pro/ARCHITECTURE.md` | Podrozdział: Short-Circuit Results as BUS-centric UI layer | DONE |
+| `docs/INDEX.md` | Link do SC_NODE_RESULTS_CONTRACT.md | DONE |
+
+---
+
+### 12.9.4. Completed Tasks
+
+- [x] Utworzenie `docs/ui/SC_NODE_RESULTS_CONTRACT.md`:
+  - Fundamentalna zasada: BUS-centric short-circuit results (§ 2),
+  - Struktura wyniku SC per Bus: Ik_max, Ik_min, ip, Ith, Sk, Fault Type, Status (§ 3),
+  - Prezentacja w Results Browser: tabela z kolumnami (Bus ID, Bus Name, Voltage, Fault Type, Ik_max, Ik_min, ip, Ith, Sk, Status) (§ 4.1),
+  - Prezentacja w Element Inspector (Bus): zakładka Results → sekcja Short-Circuit Results + Contributions (§ 4.2),
+  - Prezentacja w SLD Viewer: nakładka SC tylko na Bus (Ik_max [kA], Status kolor) (§ 4.3),
+  - Terminologia FORBIDDEN: „Prąd zwarciowy na linii", „Prąd zwarciowy na transformatorze", „Wynik SC dla Branch" (§ 5),
+  - Parity z ETAP / DIgSILENT PowerFactory: wyniki SC per Bus (węzłowo-centryczne), tabela SC, contributions, nakładka SC na SLD (tylko Bus), BRAK wyników SC „na linii", BRAK wyników SC „na transformatorze" (§ 6),
+  - Accessibility, Performance, ZABRONIONE PRAKTYKI (§ 7-9),
+  - Zależności od innych kontraktów: RESULTS_BROWSER_CONTRACT, ELEMENT_INSPECTOR_CONTRACT, SLD_RENDER_LAYERS_CONTRACT, GLOBAL_CONTEXT_BAR (§ 10).
+- [x] Aktualizacja `mv-design-pro/PLANS.md` (dodanie Phase 2.x.4)
+- [x] Aktualizacja `mv-design-pro/ARCHITECTURE.md` (podrozdział 18.2.4: SC Node Results)
+- [x] Aktualizacja `docs/INDEX.md` (sekcja 3.4: SC Node Results)
+
+---
+
+### 12.9.5. Key Principles (Summary)
+
+| # | Zasada | Opis |
+|---|--------|------|
+| 1 | **BUS-CENTRIC SHORT-CIRCUIT RESULTS** | Wyniki zwarciowe są WYŁĄCZNIE per BUS (węzeł sieci), NIE per linia, NIE per transformator |
+| 2 | **IEC 60909 Compliance** | Wyniki SC zawierają wszystkie parametry IEC 60909: Ik″ (max/min), ip, Ith, Sk, Fault Type, FaultSpec (c_max, c_min) |
+| 3 | **Results Browser Integration** | Tabela SC dostępna w Results Browser z sortowaniem, filtrowaniem (violations only), eksportem do CSV/Excel/PDF |
+| 4 | **Element Inspector Integration** | Zakładka Results (Bus) zawiera sekcję Short-Circuit Results + Contributions (kontrybutorzy do I_sc) |
+| 5 | **SLD Overlay (Bus ONLY)** | Nakładka SC tylko na symbolu Bus (Ik_max [kA], Status kolor), FORBIDDEN: nakładka SC na linii lub transformatorze |
+| 6 | **FORBIDDEN Terminology** | ZAKAZ terminologii: „Prąd zwarciowy na linii", „Prąd zwarciowy na transformatorze", „Fault current in line" |
+| 7 | **ETAP / PowerFactory Parity** | Pełna parity z ETAP / DIgSILENT PowerFactory w zakresie prezentacji wyników zwarciowych per BUS |
+
+---
+
+### 12.9.6. UI SC Node Results Compliance Checklist
+
+**Implementacja zgodna z SC_NODE_RESULTS_CONTRACT.md, jeśli:**
+
+- [ ] Wyniki SC są prezentowane WYŁĄCZNIE per BUS (nie ma wyników SC „na linii", „na transformatorze")
+- [ ] Results Browser implementuje tabelę SC z kolumnami: Bus ID, Bus Name, Voltage [kV], Fault Type, Ik_max [kA], Ik_min [kA], ip [kA], Ith [kA], Sk [MVA], Status
+- [ ] Element Inspector (Bus) zawiera zakładkę Results → sekcję Short-Circuit Results (Ik_max, Ik_min, ip, Ith, Sk, X/R Ratio)
+- [ ] Element Inspector (Bus) zawiera zakładkę Results → sekcję Contributions (kontrybutorzy do I_sc: Source Grid, Generator, Line backfeed)
+- [ ] SLD Viewer wyświetla nakładkę SC tylko na symbolu Bus (Ik_max [kA], Status kolor: zielony/żółty/czerwony)
+- [ ] FORBIDDEN: Nakładka SC na symbolu linii (linia NIE MA wyników SC)
+- [ ] FORBIDDEN: Nakładka SC na symbolu transformatora (transformator NIE MA wyników SC)
+- [ ] FORBIDDEN: Kolumna „Prąd zwarciowy na Branch" w Results Browser
+- [ ] FORBIDDEN: Terminologia „fault current in line" w UI (tylko „fault current at Bus")
+- [ ] Tabela SC obsługuje sortowanie (po dowolnej kolumnie), filtrowanie (violations only, voltage range, zone), eksport (CSV, Excel, PDF)
+- [ ] Accessibility: ARIA labels dla kolumn tabeli SC, screen reader support („Bus 15-01, Ik max 25.3 kiloamperes, Status OK")
+- [ ] Performance: renderowanie tabeli SC dla 1000 Bus < 1000 ms, sortowanie < 200 ms, filtrowanie < 300 ms, lazy loading (> 500 Bus)
+
+---
+
 ## 13. Phase P11: Proof Engine / Mathematical Proof Engine (DOC ONLY)
 
 ### 13.1 Cel fazy
@@ -1012,8 +1108,9 @@ P14 jest **warstwą meta** i stanowi **prerequisite** dla P15–P17.
 | 2026-03 | 2.16 | P12 MVP: Equipment Proof Pack (U, Icu, Idyn, Ith) |
 | 2026-04 | 2.17 | P14 Proof Audit & Coverage (doc-only, meta layer) |
 | 2026-05 | 2.18 | P15 Load Currents & Overload Proof Pack implemented (FULL MATH, deterministic) |
+| 2026-01 | 2.19 | Phase 2.x.3: SWITCHING STATE EXPLORER — DOC LOCKED (eksploracja stanów łączeniowych, Islands, pre-solver validation) |
+| 2026-01 | 2.20 | Phase 2.x.4: SHORT-CIRCUIT NODE RESULTS — DOC LOCKED (wyniki zwarciowe BUS-centric, IEC 60909, PF-grade) |
 | 2026-06 | 2.19 | Proof Engine: LS registry initialization fix (EquationRegistry merge/freeze + import smoke test) |
-| 2026-01 | 2.00 | Phase 2.x.3: SWITCHING STATE EXPLORER — DOC LOCKED (eksploracja stanów łączeniowych, Islands, pre-solver validation) |
 
 ---
 
