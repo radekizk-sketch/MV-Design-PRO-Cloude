@@ -46,6 +46,12 @@ from application.proof_engine.proof_inspector import (
     inspect,
     is_pdf_export_available,
 )
+from application.proof_engine.types import (
+    ProofHeader,
+    ProofSummary,
+    ProofValue,
+    SEMANTIC_ALIASES,
+)
 
 
 # =============================================================================
@@ -614,3 +620,208 @@ class TestInspectorViewSerialization:
         assert "case_name" in d
         assert "run_timestamp" in d
         assert "solver_version" in d
+
+
+# =============================================================================
+# Test: Completeness Validation — P11.1e
+# =============================================================================
+
+
+class TestInspectorCompleteness:
+    """
+    Testy: Walidacja kompletności strukturalnej.
+
+    Sprawdza czy wymagane klucze są obecne w key_results.
+    Bez wartości liczbowych — tylko sprawdzenie strukturalne.
+    """
+
+    def test_completeness_sc3f_passes(self, sc3f_proof: ProofDocument):
+        """SC3F proof z kompletnymi key_results przechodzi walidację."""
+        inspector = ProofInspector(sc3f_proof)
+        passed, missing = inspector.validate_completeness()
+
+        assert passed is True
+        assert missing == ()
+
+    def test_completeness_vdrop_passes(self, vdrop_proof: ProofDocument):
+        """VDROP proof z kompletnymi key_results przechodzi walidację."""
+        inspector = ProofInspector(vdrop_proof)
+        passed, missing = inspector.validate_completeness()
+
+        assert passed is True
+        assert missing == ()
+
+    def test_completeness_reports_missing_keys(
+        self, sc3f_test_input: SC3FInput
+    ):
+        """Walidacja zgłasza brakujące klucze gdy key_results jest niepełne."""
+        # Generate a valid proof first
+        proof = ProofGenerator.generate_sc3f_proof(sc3f_test_input)
+
+        # Create a modified proof with missing key_results
+        # We need to create a new ProofDocument with incomplete summary
+        incomplete_key_results = {
+            "ikss_ka": proof.summary.key_results["ikss_ka"],
+            # Missing: ip_ka, ith_ka, sk_mva, idyn_ka
+        }
+
+        incomplete_summary = ProofSummary(
+            key_results=incomplete_key_results,
+            unit_check_passed=proof.summary.unit_check_passed,
+            total_steps=proof.summary.total_steps,
+            warnings=(),
+        )
+
+        incomplete_proof = ProofDocument(
+            document_id=proof.document_id,
+            artifact_id=proof.artifact_id,
+            created_at=proof.created_at,
+            proof_type=proof.proof_type,
+            title_pl=proof.title_pl,
+            header=proof.header,
+            steps=proof.steps,
+            summary=incomplete_summary,
+        )
+
+        inspector = ProofInspector(incomplete_proof)
+        passed, missing = inspector.validate_completeness()
+
+        assert passed is False
+        # Missing keys should be sorted alphabetically
+        assert "ip_ka" in missing
+        assert "ith_ka" in missing
+        assert "sk_mva" in missing
+        # idyn_ka not in missing because ip_ka is also missing (proxy rule)
+        # But ip_ka is missing so idyn_ka should be reported
+        assert "idyn_ka" in missing
+        # Verify deterministic ordering (sorted)
+        assert missing == tuple(sorted(missing))
+
+    def test_completeness_idyn_proxy_rule(self, sc3f_test_input: SC3FInput):
+        """Jeśli brak idyn_ka ale jest ip_ka, walidacja przechodzi (proxy rule)."""
+        proof = ProofGenerator.generate_sc3f_proof(sc3f_test_input)
+
+        # Create key_results without idyn_ka but with ip_ka
+        key_results_no_idyn = {
+            k: v for k, v in proof.summary.key_results.items() if k != "idyn_ka"
+        }
+
+        # Make sure ip_ka is present (should be from original)
+        assert "ip_ka" in key_results_no_idyn
+
+        modified_summary = ProofSummary(
+            key_results=key_results_no_idyn,
+            unit_check_passed=proof.summary.unit_check_passed,
+            total_steps=proof.summary.total_steps,
+            warnings=(),
+        )
+
+        modified_proof = ProofDocument(
+            document_id=proof.document_id,
+            artifact_id=proof.artifact_id,
+            created_at=proof.created_at,
+            proof_type=proof.proof_type,
+            title_pl=proof.title_pl,
+            header=proof.header,
+            steps=proof.steps,
+            summary=modified_summary,
+        )
+
+        inspector = ProofInspector(modified_proof)
+        passed, missing = inspector.validate_completeness()
+
+        # Should pass because ip_ka acts as proxy for idyn_ka
+        assert passed is True
+        assert missing == ()
+
+
+# =============================================================================
+# Test: Semantic Aliases — P11.1e
+# =============================================================================
+
+
+class TestInspectorSemanticAliases:
+    """
+    Testy: Aliasy semantyczne dla doboru aparatury.
+
+    Sprawdza czy aliasy są poprawnie przypisywane do key_results.
+    """
+
+    def test_semantic_aliases_present_in_sc3f_summary_view(
+        self, sc3f_proof: ProofDocument
+    ):
+        """SC3F summary zawiera aliasy semantyczne dla kluczowych wyników."""
+        inspector = ProofInspector(sc3f_proof)
+        summary = inspector.get_summary()
+
+        # Check that ikss_ka has the correct alias
+        assert "ikss_ka" in summary.key_results
+        ikss = summary.key_results["ikss_ka"]
+        assert ikss.alias_pl == "prąd wyłączalny"
+
+        # Check ip_ka
+        assert "ip_ka" in summary.key_results
+        ip = summary.key_results["ip_ka"]
+        assert ip.alias_pl == "prąd udarowy"
+
+        # Check ith_ka
+        assert "ith_ka" in summary.key_results
+        ith = summary.key_results["ith_ka"]
+        assert ith.alias_pl == "prąd cieplny"
+
+        # Check idyn_ka
+        assert "idyn_ka" in summary.key_results
+        idyn = summary.key_results["idyn_ka"]
+        assert idyn.alias_pl == "prąd dynamiczny"
+
+        # Check sk_mva
+        assert "sk_mva" in summary.key_results
+        sk = summary.key_results["sk_mva"]
+        assert sk.alias_pl == "moc zwarciowa"
+
+    def test_semantic_aliases_not_present_for_non_aliased_keys(
+        self, sc3f_proof: ProofDocument
+    ):
+        """Klucze bez zdefiniowanych aliasów mają alias_pl = None."""
+        inspector = ProofInspector(sc3f_proof)
+        summary = inspector.get_summary()
+
+        # kappa doesn't have a semantic alias defined
+        if "kappa" in summary.key_results:
+            kappa = summary.key_results["kappa"]
+            assert kappa.alias_pl is None
+
+    def test_semantic_aliases_in_to_dict_output(self, sc3f_proof: ProofDocument):
+        """alias_pl pojawia się w to_dict() gdy jest zdefiniowany."""
+        inspector = ProofInspector(sc3f_proof)
+        summary = inspector.get_summary()
+
+        ikss = summary.key_results["ikss_ka"]
+        ikss_dict = ikss.to_dict()
+
+        assert "alias_pl" in ikss_dict
+        assert ikss_dict["alias_pl"] == "prąd wyłączalny"
+
+    def test_semantic_aliases_not_in_to_dict_when_none(
+        self, vdrop_proof: ProofDocument
+    ):
+        """alias_pl nie pojawia się w to_dict() gdy jest None."""
+        inspector = ProofInspector(vdrop_proof)
+        summary = inspector.get_summary()
+
+        # VDROP keys don't have semantic aliases
+        u_kv = summary.key_results["u_kv"]
+        u_dict = u_kv.to_dict()
+
+        # alias_pl should not be in dict when None
+        assert "alias_pl" not in u_dict
+
+    def test_semantic_aliases_constants_are_complete(self):
+        """Stałe SEMANTIC_ALIASES zawierają wszystkie wymagane aliasy."""
+        required_aliases = ["ikss_ka", "ip_ka", "ith_ka", "idyn_ka", "sk_mva"]
+
+        for key in required_aliases:
+            assert key in SEMANTIC_ALIASES
+            alias = SEMANTIC_ALIASES[key]
+            assert alias.alias_pl != ""
+            assert alias.target_key == key
