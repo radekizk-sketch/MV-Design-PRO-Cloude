@@ -720,6 +720,100 @@ Rozszerzenie i formalizacja **zasad synchronizacji selekcji** (Selection Sync) m
 
 ---
 
+## 12.8. Phase 2.x.3: SWITCHING STATE EXPLORER — DOC LOCKED
+
+### 12.8.1. Cel fazy
+
+Zdefiniowanie **Switching State Explorer** — narzędzia UI klasy DIgSILENT PowerFactory / ETAP dla eksploracji stanów łączeniowych aparatury (Switch) i ich wpływu na topologię efektywną sieci.
+
+**Zakres:**
+- Eksploracja stanów aparatów OPEN/CLOSED
+- Algorytmiczna identyfikacja wysp (Islands) — graph traversal
+- Ocena spójności i łączności sieci (pre-solver validation)
+- Integracja z SLD (overlay Islands), Element Inspector, Results Browser, Topology Tree
+
+**INVARIANT:** Solver i Domain Layer pozostają **NIETKNIĘTE**. To wyłącznie dokumentacja UI.
+
+**NOT-A-SOLVER rule:** Switching State Explorer **NIE wykonuje** obliczeń fizycznych (prądy, napięcia). Tylko analiza topologiczna (connected components).
+
+---
+
+### 12.8.2. Zakres fazy
+
+| W zakresie | Poza zakresem |
+|------------|---------------|
+| Definicje (Effective Topology, Island, Energized) | Implementacja kodu |
+| UX: layout (Explorer panel + SLD overlay + checks) | Modyfikacja solverów |
+| Integracje (SLD, Inspector, Results, Tree) | Modyfikacja API |
+| Reguły invalidation wyników | Nowe funkcjonalności backend |
+| Scenariusze poprawne i FORBIDDEN | Implementacja DB schema |
+| Przykłady ASCII (2 Islands, ring open point) | |
+
+---
+
+### 12.8.3. Deliverables (DOC ONLY)
+
+| Plik | Opis | Status |
+|------|------|--------|
+| `docs/ui/SWITCHING_STATE_EXPLORER_CONTRACT.md` | Definicje (Effective Topology, Island), UX (Explorer panel, SLD overlay, Topology Checks), integracje (SLD/Inspector/Results/Tree), scenariusze, przykłady ASCII | DONE |
+| `mv-design-pro/PLANS.md` | Dodanie Phase 2.x.3 | DONE |
+| `mv-design-pro/ARCHITECTURE.md` | Krótki podrozdział: Switching Explorer jako warstwa aplikacyjna, bez fizyki | DONE |
+| `docs/INDEX.md` | Link do SWITCHING_STATE_EXPLORER_CONTRACT.md | DONE |
+
+---
+
+### 12.8.4. Completed Tasks
+
+- [x] Utworzenie `docs/ui/SWITCHING_STATE_EXPLORER_CONTRACT.md`:
+  - Definicje: Switching Apparatus, Effective Topology, Island, Energized vs De-energized (interpretacja UI, NIE fizyka)
+  - UX: layout (Explorer panel z listą aparatów, filtrami, Topology Checks)
+  - Integracje: SLD (overlay Islands, natychmiastowa zmiana symbolu), Element Inspector (zakładki Switch), Results Browser (invalidation rule), Topology Tree (synchronizacja 4-widokowa)
+  - Reguły invalidation: zmiana stanu aparatu → Result status = OUTDATED
+  - Scenariusze poprawne: eksploracja stanów, toggle State, batch switching, restore normal state
+  - Scenariusze FORBIDDEN: auto-run solver, prezentacja "prądów w aparacie", auto-repair topology
+  - Przykłady ASCII: 2 Islands (feeder odłączony), ring otwarty (dwa punkty otwarcia)
+- [x] Aktualizacja `mv-design-pro/PLANS.md` (dodanie Phase 2.x.3)
+- [x] Aktualizacja `mv-design-pro/ARCHITECTURE.md` (Switching Explorer jako warstwa aplikacyjna)
+- [x] Aktualizacja `docs/INDEX.md` (link do kontraktu)
+
+---
+
+### 12.8.5. Key Principles (Summary)
+
+| # | Zasada | Opis |
+|---|--------|------|
+| 1 | **NOT-A-SOLVER rule** | Switching Explorer wykonuje wyłącznie analizę topologiczną (graph traversal), NIE obliczenia fizyczne (prądy, napięcia) |
+| 2 | **Effective Topology** | Graf sieci po uwzględnieniu stanów aparatów (OPEN → krawędź usunięta) i flag `in_service` |
+| 3 | **Islands (algorytmiczne)** | Identyfikacja wysp jako connected components (BFS/DFS), NIE wynik solverów |
+| 4 | **Natychmiastowa aktualizacja** | Toggle State → przeliczenie Effective Topology → aktualizacja Islands → aktualizacja SLD overlay (< 100 ms) |
+| 5 | **Invalidation Rule** | Zmiana stanu aparatu → Result status = OUTDATED (z bannerem ostrzeżenia) |
+| 6 | **Synchronizacja 4-widokowa** | Wybór aparatu w Explorerze → podświetlenie SLD/Tree/Inspector (zgodnie z Phase 2.x.2) |
+| 7 | **MAX DATA, MAX CONTROL** | Brak uproszczeń, wszystkie aparaty widoczne, użytkownik decyduje o filtrowaniu |
+
+---
+
+### 12.8.6. UI Switching Explorer Compliance Checklist
+
+**Implementacja zgodna z SWITCHING_STATE_EXPLORER_CONTRACT.md, jeśli:**
+
+- [ ] Switching Explorer panel zaimplementowany jako równorzędny widok (z SLD, Results Browser, Topology Tree)
+- [ ] Lista aparatów pokazuje wszystkie Switch z filtrami (Type, State, In Service, Feeder, Island)
+- [ ] Szybkie wyszukiwanie po nazwie/ID (regex support)
+- [ ] Toggle State (OPEN ↔ CLOSED) z natychmiastową aktualizacją Effective Topology + Islands
+- [ ] Effective Topology przeliczana algorytmicznie (graph traversal, NOT solver)
+- [ ] Islands wykrywane algorytmicznie (connected components, NOT solver)
+- [ ] SLD overlay Islands (kolorowanie tła Bus lub obrys wysp)
+- [ ] Topology Checks: liczba Islands, Islands bez Source, dangling Bus (pre-solver validation)
+- [ ] Invalidation Rule: zmiana stanu → Result status = OUTDATED (z bannerem)
+- [ ] Synchronizacja 4-widokowa: wybór aparatu → podświetlenie SLD/Tree/Inspector
+- [ ] Element Inspector (Switch): zakładki Overview, Parameters, Switching History, Topology Impact
+- [ ] Batch Operations: grupowa zmiana stanów (z potwierdzeniem)
+- [ ] Restore Normal State: powrót do Case.baseline_switching_state
+- [ ] Print/Export: wydruk listy aparatów + Island summary (PDF/Excel)
+- [ ] FORBIDDEN: Auto-repair topology, Auto-run solver, Prezentacja "prądów w aparacie"
+
+---
+
 ## 13. Phase P11: Proof Engine / Mathematical Proof Engine (DOC ONLY)
 
 ### 13.1 Cel fazy
@@ -918,6 +1012,7 @@ P14 jest **warstwą meta** i stanowi **prerequisite** dla P15–P17.
 | 2026-03 | 2.16 | P12 MVP: Equipment Proof Pack (U, Icu, Idyn, Ith) |
 | 2026-04 | 2.17 | P14 Proof Audit & Coverage (doc-only, meta layer) |
 | 2026-05 | 2.18 | P15 Load Currents & Overload Proof Pack implemented (FULL MATH, deterministic) |
+| 2026-01 | 2.19 | Phase 2.x.3: SWITCHING STATE EXPLORER — DOC LOCKED (eksploracja stanów łączeniowych, Islands, pre-solver validation) |
 
 ---
 
