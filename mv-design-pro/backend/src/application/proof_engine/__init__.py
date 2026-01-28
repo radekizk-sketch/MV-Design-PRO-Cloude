@@ -17,8 +17,9 @@ Moduły:
 
 from application.proof_engine.types import (
     EquationDefinition,
-    LossesElementKind,
-    LossesInput,
+    LoadCurrentsCounterfactualInput,
+    LoadCurrentsInput,
+    LoadElementKind,
     ProofDocument,
     ProofHeader,
     ProofStep,
@@ -65,8 +66,9 @@ from application.proof_engine.proof_inspector import (
 __all__ = [
     # Types
     "EquationDefinition",
-    "LossesElementKind",
-    "LossesInput",
+    "LoadCurrentsCounterfactualInput",
+    "LoadCurrentsInput",
+    "LoadElementKind",
     "ProofDocument",
     "ProofHeader",
     "ProofStep",

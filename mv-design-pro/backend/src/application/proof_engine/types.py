@@ -27,11 +27,11 @@ class ProofType(str, Enum):
     SC2FG_IEC60909 = "SC2FG_IEC60909"
     Q_U_REGULATION = "Q_U_REGULATION"
     EQUIPMENT_PROOF = "EQUIPMENT_PROOF"
-    LOSSES_POWER_ENERGY = "LOSSES_POWER_ENERGY"
+    LOAD_CURRENTS_OVERLOAD = "LOAD_CURRENTS_OVERLOAD"
 
 
-class LossesElementKind(str, Enum):
-    """Rodzaj elementu dla P16 (straty)."""
+class LoadElementKind(str, Enum):
+    """Rodzaj elementu dla P15: LINE, CABLE, TRANSFORMER."""
 
     LINE = "LINE"
     CABLE = "CABLE"
@@ -398,6 +398,7 @@ class ProofSummary:
         unit_check_passed: Czy wszystkie jednostki OK
         total_steps: Liczba kroków dowodu
         warnings: Ostrzeżenia (jeśli są)
+        counterfactual_diff: Różnice A vs B (jeśli dotyczy)
     """
 
     key_results: dict[str, ProofValue]
@@ -406,6 +407,7 @@ class ProofSummary:
     warnings: tuple[str, ...] = ()
     overall_status: str | None = None
     failed_checks: tuple[str, ...] = ()
+    counterfactual_diff: dict[str, ProofValue] = field(default_factory=dict)
 
     def __hash__(self) -> int:
         return hash(
@@ -416,12 +418,14 @@ class ProofSummary:
                 self.warnings,
                 self.overall_status,
                 self.failed_checks,
+                tuple(sorted((k, v) for k, v in self.counterfactual_diff.items())),
             )
         )
 
     def to_dict(self) -> dict[str, Any]:
         # Sortowanie key_results alfabetycznie (determinizm)
         sorted_results = dict(sorted(self.key_results.items()))
+        sorted_counterfactual = dict(sorted(self.counterfactual_diff.items()))
         return {
             "key_results": {k: v.to_dict() for k, v in sorted_results.items()},
             "unit_check_passed": self.unit_check_passed,
@@ -429,6 +433,9 @@ class ProofSummary:
             "warnings": list(self.warnings),
             "overall_status": self.overall_status,
             "failed_checks": list(self.failed_checks),
+            "counterfactual_diff": {
+                k: v.to_dict() for k, v in sorted_counterfactual.items()
+            },
         }
 
 
@@ -563,47 +570,49 @@ class QUCounterfactualInput:
 
 
 # =============================================================================
-# Losses Input — P16
+# Load Currents & Overload Input Types — P15
 # =============================================================================
 
 
 @dataclass
-class LossesInput:
+class LoadCurrentsInput:
     """
-    Dane wejściowe dla dowodu strat mocy i energii (P16).
+    Dane wejściowe dla dowodu P15: Prądy robocze i przeciążenia.
 
     Attributes:
         project_name: Nazwa projektu
         case_name: Nazwa przypadku obliczeniowego
         run_timestamp: Czas uruchomienia
+        target_id: Identyfikator elementu (linia/kabel/transformator)
+        u_ll_kv: Napięcie międzyfazowe [kV]
+        p_mw: Moc czynna [MW]
+        q_mvar: Moc bierna [Mvar]
+        in_a: Prąd znamionowy [A] (wymagany dla LINE/CABLE)
+        sn_mva: Moc znamionowa [MVA] (wymagana dla TRANSFORMER)
         element_kind: LINE | CABLE | TRANSFORMER
-        u_ll_kv: Napięcie międzyfazowe
-
-        # Line/Cable:
-        i_a: Prąd obciążenia [A]
-        s_mva: Moc pozorna [MVA] (jeśli i_a nie podano)
-        r_ohm: Rezystancja fazy (całkowita) [Ω]
-
-        # Transformer:
-        p0_kw: Straty jałowe [kW]
-        pk_kw: Straty obciążeniowe przy I_n [kW]
-        k_load: Stopień obciążenia (0–1)
-
-        # Energy profile (optional):
-        profile_hours: Lista godzin (Δt)
-        profile_factor: Lista współczynników obciążenia
     """
 
     project_name: str
     case_name: str
     run_timestamp: datetime
-    element_kind: LossesElementKind
+    target_id: str
     u_ll_kv: float
-    i_a: float | None = None
-    s_mva: float | None = None
-    r_ohm: float | None = None
-    p0_kw: float | None = None
-    pk_kw: float | None = None
-    k_load: float | None = None
-    profile_hours: list[float] | None = None
-    profile_factor: list[float] | None = None
+    p_mw: float
+    q_mvar: float
+    in_a: float | None
+    sn_mva: float | None
+    element_kind: LoadElementKind
+
+
+@dataclass
+class LoadCurrentsCounterfactualInput:
+    """
+    Dane wejściowe dla porównania A vs B (P15).
+
+    Attributes:
+        a: Dane scenariusza A
+        b: Dane scenariusza B
+    """
+
+    a: LoadCurrentsInput
+    b: LoadCurrentsInput

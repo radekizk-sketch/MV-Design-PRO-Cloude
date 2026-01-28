@@ -52,11 +52,18 @@ from application.proof_engine.equation_registry import (
     EQ_QU_003,
     EQ_QU_004,
     EQ_QU_005,  # P11.1c: VDROP link
+    EQ_LC_001,
+    EQ_LC_002,
+    EQ_LC_003,
+    EQ_LC_004,
+    EQ_LC_005,
+    EQ_LC_006,
 )
 from application.proof_engine.types import (
     EquationDefinition,
-    LossesElementKind,
-    LossesInput,
+    LoadCurrentsCounterfactualInput,
+    LoadCurrentsInput,
+    LoadElementKind,
     ProofDocument,
     ProofHeader,
     ProofStep,
@@ -2391,6 +2398,611 @@ class ProofGenerator:
                 "U_ref": "u_ref_kv",
                 "ΔU": "delta_u_kv",
             },
+        )
+
+    # =========================================================================
+    # P15: Load Currents & Overload
+    # =========================================================================
+
+    @classmethod
+    def generate_load_currents_proof(
+        cls,
+        data: LoadCurrentsInput,
+        artifact_id: UUID | None = None,
+    ) -> ProofDocument:
+        """
+        Generuje dowód P15: Prądy robocze i przeciążenia.
+
+        Reguły:
+        - LINE/CABLE: wymagany in_a, liczone k_I i m_I.
+        - TRANSFORMER: wymagany sn_mva, liczone k_S i m_S.
+        - Brakujące pola → ValueError (PL).
+        """
+        if artifact_id is None:
+            artifact_id = uuid4()
+
+        if data.element_kind in (LoadElementKind.LINE, LoadElementKind.CABLE):
+            if data.in_a is None:
+                raise ValueError("Brak prądu znamionowego in_a dla linii/kabla.")
+        elif data.element_kind == LoadElementKind.TRANSFORMER:
+            if data.sn_mva is None:
+                raise ValueError("Brak mocy znamionowej sn_mva dla transformatora.")
+        else:
+            raise ValueError(f"Nieobsługiwany element_kind: {data.element_kind}")
+
+        if data.u_ll_kv is None:
+            raise ValueError("Brak napięcia międzyfazowego u_ll_kv.")
+        if data.p_mw is None or data.q_mvar is None:
+            raise ValueError("Brak mocy czynnej/biernej p_mw/q_mvar.")
+
+        s_mva = math.sqrt(data.p_mw ** 2 + data.q_mvar ** 2)
+
+        compute_current = (
+            data.element_kind in (LoadElementKind.LINE, LoadElementKind.CABLE)
+            or data.in_a is not None
+        )
+        i_ka = (
+            s_mva / (math.sqrt(3) * data.u_ll_kv)
+            if compute_current
+            else None
+        )
+        in_ka = data.in_a / 1000.0 if data.in_a is not None else None
+
+        k_i_percent = (
+            100.0 * (i_ka / in_ka) if i_ka is not None and in_ka is not None else None
+        )
+
+        if i_ka is None or in_ka is None:
+            m_i_percent = None
+        elif i_ka == 0:
+            m_i_percent = "+∞"
+        else:
+            m_i_percent = 100.0 * ((in_ka / i_ka) - 1.0)
+
+        k_s_percent = (
+            100.0 * (s_mva / data.sn_mva)
+            if data.sn_mva is not None
+            else None
+        )
+
+        if data.sn_mva is None:
+            m_s_percent = None
+        elif s_mva == 0:
+            m_s_percent = "+∞"
+        else:
+            m_s_percent = 100.0 * ((data.sn_mva / s_mva) - 1.0)
+
+        steps: list[ProofStep] = []
+        step_number = 0
+
+        for eq_id in EquationRegistry.get_lc_step_order():
+            if eq_id == "EQ_LC_001":
+                step_number += 1
+                steps.append(
+                    cls._create_lc_step_s(
+                        step_number=step_number,
+                        p_mw=data.p_mw,
+                        q_mvar=data.q_mvar,
+                        s_mva=s_mva,
+                    )
+                )
+            elif eq_id == "EQ_LC_002" and compute_current:
+                step_number += 1
+                steps.append(
+                    cls._create_lc_step_i(
+                        step_number=step_number,
+                        s_mva=s_mva,
+                        u_ll_kv=data.u_ll_kv,
+                        i_ka=i_ka or 0.0,
+                    )
+                )
+            elif eq_id == "EQ_LC_003" and in_ka is not None and i_ka is not None:
+                step_number += 1
+                steps.append(
+                    cls._create_lc_step_k_i(
+                        step_number=step_number,
+                        i_ka=i_ka,
+                        in_ka=in_ka,
+                        k_i_percent=k_i_percent or 0.0,
+                    )
+                )
+            elif eq_id == "EQ_LC_004" and in_ka is not None and i_ka is not None:
+                step_number += 1
+                steps.append(
+                    cls._create_lc_step_m_i(
+                        step_number=step_number,
+                        i_ka=i_ka,
+                        in_ka=in_ka,
+                        m_i_percent=m_i_percent,
+                    )
+                )
+            elif eq_id == "EQ_LC_005" and data.element_kind == LoadElementKind.TRANSFORMER:
+                step_number += 1
+                steps.append(
+                    cls._create_lc_step_k_s(
+                        step_number=step_number,
+                        s_mva=s_mva,
+                        sn_mva=data.sn_mva or 0.0,
+                        k_s_percent=k_s_percent or 0.0,
+                    )
+                )
+            elif eq_id == "EQ_LC_006" and data.element_kind == LoadElementKind.TRANSFORMER:
+                step_number += 1
+                steps.append(
+                    cls._create_lc_step_m_s(
+                        step_number=step_number,
+                        s_mva=s_mva,
+                        sn_mva=data.sn_mva or 0.0,
+                        m_s_percent=m_s_percent,
+                    )
+                )
+
+        unit_checks_passed = all(step.unit_check.passed for step in steps)
+
+        key_results: dict[str, ProofValue] = {
+            "s_mva": ProofValue.create("S", s_mva, "MVA", "s_mva"),
+        }
+
+        if i_ka is not None:
+            key_results["i_ka"] = ProofValue.create("I", i_ka, "kA", "i_ka")
+        if k_i_percent is not None:
+            key_results["k_i_percent"] = ProofValue.create(
+                "k_I", k_i_percent, "%", "k_i_percent"
+            )
+        if m_i_percent is not None:
+            key_results["m_i_percent"] = cls._proof_value_from_maybe_string(
+                symbol="m_I",
+                value=m_i_percent,
+                unit="%",
+                source_key="m_i_percent",
+            )
+        if k_s_percent is not None:
+            key_results["k_s_percent"] = ProofValue.create(
+                "k_S", k_s_percent, "%", "k_s_percent"
+            )
+        if m_s_percent is not None:
+            key_results["m_s_percent"] = cls._proof_value_from_maybe_string(
+                symbol="m_S",
+                value=m_s_percent,
+                unit="%",
+                source_key="m_s_percent",
+            )
+
+        summary = ProofSummary(
+            key_results=key_results,
+            unit_check_passed=unit_checks_passed,
+            total_steps=len(steps),
+            warnings=(),
+        )
+
+        header = ProofHeader(
+            project_name=data.project_name,
+            case_name=data.case_name,
+            run_timestamp=data.run_timestamp,
+            solver_version="P15 Load Currents",
+        )
+
+        title = "Dowód: Prądy robocze i przeciążenia (P15)"
+
+        return ProofDocument.create(
+            artifact_id=artifact_id,
+            proof_type=ProofType.LOAD_CURRENTS_OVERLOAD,
+            title_pl=title,
+            header=header,
+            steps=steps,
+            summary=summary,
+        )
+
+    @classmethod
+    def generate_load_currents_counterfactual(
+        cls,
+        cf: LoadCurrentsCounterfactualInput,
+        artifact_id: UUID | None = None,
+    ) -> ProofDocument:
+        """
+        Generuje dowód porównawczy A vs B dla P15.
+
+        Do summary.counterfactual_diff trafiają wyłącznie różnice liczbowe.
+        """
+        if artifact_id is None:
+            artifact_id = uuid4()
+
+        proof_a = cls.generate_load_currents_proof(cf.a)
+        proof_b = cls.generate_load_currents_proof(cf.b)
+
+        steps: list[ProofStep] = []
+
+        for i, step in enumerate(proof_a.steps, start=1):
+            steps.append(
+                ProofStep(
+                    step_id=f"LC_CF_A_STEP_{i:03d}",
+                    step_number=i,
+                    title_pl=f"[A] {step.title_pl}",
+                    equation=step.equation,
+                    input_values=step.input_values,
+                    substitution_latex=step.substitution_latex,
+                    result=step.result,
+                    unit_check=step.unit_check,
+                    source_keys=step.source_keys,
+                )
+            )
+
+        offset = len(proof_a.steps)
+        for i, step in enumerate(proof_b.steps, start=1):
+            steps.append(
+                ProofStep(
+                    step_id=f"LC_CF_B_STEP_{i:03d}",
+                    step_number=offset + i,
+                    title_pl=f"[B] {step.title_pl}",
+                    equation=step.equation,
+                    input_values=step.input_values,
+                    substitution_latex=step.substitution_latex,
+                    result=step.result,
+                    unit_check=step.unit_check,
+                    source_keys=step.source_keys,
+                )
+            )
+
+        unit_checks_passed = all(step.unit_check.passed for step in steps)
+
+        key_results: dict[str, ProofValue] = {}
+        counterfactual_diff: dict[str, ProofValue] = {}
+
+        def _add_pair(key: str, symbol: str):
+            val_a = proof_a.summary.key_results.get(key)
+            val_b = proof_b.summary.key_results.get(key)
+            if not val_a or not val_b:
+                return
+            key_results[f"{key}_a"] = cls._clone_proof_value(
+                val_a, f"{symbol}_A", f"{key}_a"
+            )
+            key_results[f"{key}_b"] = cls._clone_proof_value(
+                val_b, f"{symbol}_B", f"{key}_b"
+            )
+            delta = cls._numeric_diff_value(
+                val_a.value, val_b.value, f"\\Delta {symbol}", val_a.unit, f"delta_{key}"
+            )
+            if delta is not None:
+                counterfactual_diff[f"delta_{key}"] = delta
+
+        _add_pair("s_mva", "S")
+        _add_pair("i_ka", "I")
+        _add_pair("k_i_percent", "k_I")
+        _add_pair("m_i_percent", "m_I")
+        _add_pair("k_s_percent", "k_S")
+        _add_pair("m_s_percent", "m_S")
+
+        summary = ProofSummary(
+            key_results=key_results,
+            unit_check_passed=unit_checks_passed,
+            total_steps=len(steps),
+            warnings=(),
+            counterfactual_diff=counterfactual_diff,
+        )
+
+        header = ProofHeader(
+            project_name=f"{cf.a.project_name} vs {cf.b.project_name}",
+            case_name=f"{cf.a.case_name} vs {cf.b.case_name}",
+            run_timestamp=cf.a.run_timestamp,
+            solver_version="P15 Counterfactual",
+        )
+
+        return ProofDocument.create(
+            artifact_id=artifact_id,
+            proof_type=ProofType.LOAD_CURRENTS_OVERLOAD,
+            title_pl="Dowód porównawczy (counterfactual) P15: A vs B",
+            header=header,
+            steps=steps,
+            summary=summary,
+        )
+
+    @staticmethod
+    def _proof_value_from_maybe_string(
+        symbol: str,
+        value: float | str,
+        unit: str,
+        source_key: str,
+    ) -> ProofValue:
+        if isinstance(value, str):
+            formatted = f"{value} {unit}".strip()
+            return ProofValue(
+                symbol=symbol,
+                value=value,
+                unit=unit,
+                formatted=formatted,
+                source_key=source_key,
+            )
+        return ProofValue.create(symbol, value, unit, source_key)
+
+    @staticmethod
+    def _clone_proof_value(
+        value: ProofValue,
+        symbol: str,
+        source_key: str,
+    ) -> ProofValue:
+        if isinstance(value.value, str):
+            formatted = f"{value.value} {value.unit}".strip()
+            return ProofValue(
+                symbol=symbol,
+                value=value.value,
+                unit=value.unit,
+                formatted=formatted,
+                source_key=source_key,
+            )
+        return ProofValue.create(symbol, float(value.value), value.unit, source_key)
+
+    @staticmethod
+    def _numeric_diff_value(
+        value_a: float | str,
+        value_b: float | str,
+        symbol: str,
+        unit: str,
+        source_key: str,
+    ) -> ProofValue | None:
+        if isinstance(value_a, (int, float)) and isinstance(value_b, (int, float)):
+            return ProofValue.create(symbol, value_b - value_a, unit, source_key)
+        return None
+
+    @classmethod
+    def _create_lc_step_s(
+        cls,
+        step_number: int,
+        p_mw: float,
+        q_mvar: float,
+        s_mva: float,
+    ) -> ProofStep:
+        equation = EQ_LC_001
+
+        input_values = (
+            ProofValue.create("P", p_mw, "MW", "p_mw"),
+            ProofValue.create("Q", q_mvar, "Mvar", "q_mvar"),
+        )
+
+        substitution = (
+            f"S = \\sqrt{{{p_mw:.4f}^{{2}} + {q_mvar:.4f}^{{2}}}} = "
+            f"{s_mva:.4f}\\,\\text{{MVA}}"
+        )
+
+        result = ProofValue.create("S", s_mva, "MVA", "s_mva")
+
+        unit_check = UnitVerifier.verify_step(
+            equation.equation_id,
+            [("P", "MW"), ("Q", "Mvar")],
+            "MVA",
+        )
+
+        return ProofStep(
+            step_id=ProofStep.generate_step_id("LC", step_number),
+            step_number=step_number,
+            title_pl=equation.name_pl,
+            equation=equation,
+            input_values=input_values,
+            substitution_latex=substitution,
+            result=result,
+            unit_check=unit_check,
+            source_keys={"P": "p_mw", "Q": "q_mvar", "S": "s_mva"},
+        )
+
+    @classmethod
+    def _create_lc_step_i(
+        cls,
+        step_number: int,
+        s_mva: float,
+        u_ll_kv: float,
+        i_ka: float,
+    ) -> ProofStep:
+        equation = EQ_LC_002
+
+        input_values = (
+            ProofValue.create("S", s_mva, "MVA", "s_mva"),
+            ProofValue.create("U_{LL}", u_ll_kv, "kV", "u_ll_kv"),
+        )
+
+        substitution = (
+            f"I = \\frac{{{s_mva:.4f}}}{{\\sqrt{{3}} \\cdot {u_ll_kv:.4f}}} = "
+            f"{i_ka:.4f}\\,\\text{{kA}}"
+        )
+
+        result = ProofValue.create("I", i_ka, "kA", "i_ka")
+
+        unit_check = UnitVerifier.verify_step(
+            equation.equation_id,
+            [("S", "MVA"), ("U_{LL}", "kV")],
+            "kA",
+        )
+
+        return ProofStep(
+            step_id=ProofStep.generate_step_id("LC", step_number),
+            step_number=step_number,
+            title_pl=equation.name_pl,
+            equation=equation,
+            input_values=input_values,
+            substitution_latex=substitution,
+            result=result,
+            unit_check=unit_check,
+            source_keys={"S": "s_mva", "U_{LL}": "u_ll_kv", "I": "i_ka"},
+        )
+
+    @classmethod
+    def _create_lc_step_k_i(
+        cls,
+        step_number: int,
+        i_ka: float,
+        in_ka: float,
+        k_i_percent: float,
+    ) -> ProofStep:
+        equation = EQ_LC_003
+
+        input_values = (
+            ProofValue.create("I", i_ka, "kA", "i_ka"),
+            ProofValue.create("I_n", in_ka, "kA", "in_a"),
+        )
+
+        substitution = (
+            f"k_I = 100 \\cdot \\frac{{{i_ka:.4f}}}{{{in_ka:.4f}}} = "
+            f"{k_i_percent:.4f}\\,\\text{{\\%}}"
+        )
+
+        result = ProofValue.create("k_I", k_i_percent, "%", "k_i_percent")
+
+        unit_check = UnitVerifier.verify_step(
+            equation.equation_id,
+            [("I", "kA"), ("I_n", "kA")],
+            "%",
+        )
+
+        return ProofStep(
+            step_id=ProofStep.generate_step_id("LC", step_number),
+            step_number=step_number,
+            title_pl=equation.name_pl,
+            equation=equation,
+            input_values=input_values,
+            substitution_latex=substitution,
+            result=result,
+            unit_check=unit_check,
+            source_keys={"I": "i_ka", "I_n": "in_a", "k_I": "k_i_percent"},
+        )
+
+    @classmethod
+    def _create_lc_step_m_i(
+        cls,
+        step_number: int,
+        i_ka: float,
+        in_ka: float,
+        m_i_percent: float | str | None,
+    ) -> ProofStep:
+        equation = EQ_LC_004
+
+        input_values = (
+            ProofValue.create("I_n", in_ka, "kA", "in_a"),
+            ProofValue.create("I", i_ka, "kA", "i_ka"),
+        )
+
+        if isinstance(m_i_percent, str):
+            substitution = (
+                f"m_I = 100 \\cdot \\left(\\frac{{{in_ka:.4f}}}{{0}} - 1\\right) = "
+                f"+\\infty\\,\\text{{\\%}}"
+            )
+            result = cls._proof_value_from_maybe_string(
+                symbol="m_I",
+                value=m_i_percent,
+                unit="%",
+                source_key="m_i_percent",
+            )
+        else:
+            substitution = (
+                f"m_I = 100 \\cdot \\left(\\frac{{{in_ka:.4f}}}{{{i_ka:.4f}}} - 1\\right) = "
+                f"{(m_i_percent or 0.0):.4f}\\,\\text{{\\%}}"
+            )
+            result = ProofValue.create("m_I", m_i_percent or 0.0, "%", "m_i_percent")
+
+        unit_check = UnitVerifier.verify_step(
+            equation.equation_id,
+            [("I_n", "kA"), ("I", "kA")],
+            "%",
+        )
+
+        return ProofStep(
+            step_id=ProofStep.generate_step_id("LC", step_number),
+            step_number=step_number,
+            title_pl=equation.name_pl,
+            equation=equation,
+            input_values=input_values,
+            substitution_latex=substitution,
+            result=result,
+            unit_check=unit_check,
+            source_keys={"I_n": "in_a", "I": "i_ka", "m_I": "m_i_percent"},
+        )
+
+    @classmethod
+    def _create_lc_step_k_s(
+        cls,
+        step_number: int,
+        s_mva: float,
+        sn_mva: float,
+        k_s_percent: float,
+    ) -> ProofStep:
+        equation = EQ_LC_005
+
+        input_values = (
+            ProofValue.create("S", s_mva, "MVA", "s_mva"),
+            ProofValue.create("S_n", sn_mva, "MVA", "sn_mva"),
+        )
+
+        substitution = (
+            f"k_S = 100 \\cdot \\frac{{{s_mva:.4f}}}{{{sn_mva:.4f}}} = "
+            f"{k_s_percent:.4f}\\,\\text{{\\%}}"
+        )
+
+        result = ProofValue.create("k_S", k_s_percent, "%", "k_s_percent")
+
+        unit_check = UnitVerifier.verify_step(
+            equation.equation_id,
+            [("S", "MVA"), ("S_n", "MVA")],
+            "%",
+        )
+
+        return ProofStep(
+            step_id=ProofStep.generate_step_id("LC", step_number),
+            step_number=step_number,
+            title_pl=equation.name_pl,
+            equation=equation,
+            input_values=input_values,
+            substitution_latex=substitution,
+            result=result,
+            unit_check=unit_check,
+            source_keys={"S": "s_mva", "S_n": "sn_mva", "k_S": "k_s_percent"},
+        )
+
+    @classmethod
+    def _create_lc_step_m_s(
+        cls,
+        step_number: int,
+        s_mva: float,
+        sn_mva: float,
+        m_s_percent: float | str | None,
+    ) -> ProofStep:
+        equation = EQ_LC_006
+
+        input_values = (
+            ProofValue.create("S_n", sn_mva, "MVA", "sn_mva"),
+            ProofValue.create("S", s_mva, "MVA", "s_mva"),
+        )
+
+        if isinstance(m_s_percent, str):
+            substitution = (
+                f"m_S = 100 \\cdot \\left(\\frac{{{sn_mva:.4f}}}{{0}} - 1\\right) = "
+                f"+\\infty\\,\\text{{\\%}}"
+            )
+            result = cls._proof_value_from_maybe_string(
+                symbol="m_S",
+                value=m_s_percent,
+                unit="%",
+                source_key="m_s_percent",
+            )
+        else:
+            substitution = (
+                f"m_S = 100 \\cdot \\left(\\frac{{{sn_mva:.4f}}}{{{s_mva:.4f}}} - 1\\right) = "
+                f"{(m_s_percent or 0.0):.4f}\\,\\text{{\\%}}"
+            )
+            result = ProofValue.create("m_S", m_s_percent or 0.0, "%", "m_s_percent")
+
+        unit_check = UnitVerifier.verify_step(
+            equation.equation_id,
+            [("S_n", "MVA"), ("S", "MVA")],
+            "%",
+        )
+
+        return ProofStep(
+            step_id=ProofStep.generate_step_id("LC", step_number),
+            step_number=step_number,
+            title_pl=equation.name_pl,
+            equation=equation,
+            input_values=input_values,
+            substitution_latex=substitution,
+            result=result,
+            unit_check=unit_check,
+            source_keys={"S_n": "sn_mva", "S": "s_mva", "m_S": "m_s_percent"},
         )
 
     @classmethod

@@ -28,8 +28,9 @@ from application.proof_engine.proof_generator import (
     VDROPSegmentInput,
 )
 from application.proof_engine.types import (
-    LossesElementKind,
-    LossesInput,
+    LoadCurrentsCounterfactualInput,
+    LoadCurrentsInput,
+    LoadElementKind,
     ProofType,
     QUCounterfactualInput,
     QUInput,
@@ -124,36 +125,41 @@ def sc1_test_input() -> SC1Input:
 
 
 # =============================================================================
-# Losses Fixtures (P16)
+# P15 Fixtures
 # =============================================================================
 
 
 @pytest.fixture
-def losses_line_input() -> LossesInput:
-    return LossesInput(
+def lc_line_input() -> LoadCurrentsInput:
+    """Fixture: dane P15 dla linii/kabla."""
+    return LoadCurrentsInput(
         project_name="Test Project",
-        case_name="Test Case Losses Line",
+        case_name="Test Case LC Line",
         run_timestamp=datetime(2026, 1, 27, 10, 30, 0),
-        element_kind=LossesElementKind.LINE,
+        target_id="LINE_01",
         u_ll_kv=15.0,
-        s_mva=2.5,
-        r_ohm=0.85,
-        profile_hours=[1.0, 2.0],
-        profile_factor=[0.6, 0.8],
+        p_mw=3.2,
+        q_mvar=1.5,
+        in_a=400.0,
+        sn_mva=None,
+        element_kind=LoadElementKind.LINE,
     )
 
 
 @pytest.fixture
-def losses_transformer_input() -> LossesInput:
-    return LossesInput(
+def lc_transformer_input() -> LoadCurrentsInput:
+    """Fixture: dane P15 dla transformatora."""
+    return LoadCurrentsInput(
         project_name="Test Project",
-        case_name="Test Case Losses Transformer",
+        case_name="Test Case LC Transformer",
         run_timestamp=datetime(2026, 1, 27, 10, 30, 0),
-        element_kind=LossesElementKind.TRANSFORMER,
+        target_id="TR_01",
         u_ll_kv=15.0,
-        p0_kw=1.2,
-        pk_kw=4.5,
-        k_load=0.75,
+        p_mw=5.0,
+        q_mvar=3.0,
+        in_a=None,
+        sn_mva=10.0,
+        element_kind=LoadElementKind.TRANSFORMER,
     )
 
 
@@ -473,6 +479,93 @@ class TestProofDeterminism:
         step_ids_2 = [s.step_id for s in proof_2.steps]
 
         assert step_ids_1 == step_ids_2
+
+
+# =============================================================================
+# P15 Tests
+# =============================================================================
+
+
+class TestLoadCurrentsProofGenerator:
+    """Testy generatora dowodów P15."""
+
+    def test_lc_step_order_is_stable(self):
+        """Kolejność kroków P15 jest stabilna."""
+        expected = [
+            "EQ_LC_001",
+            "EQ_LC_002",
+            "EQ_LC_003",
+            "EQ_LC_004",
+            "EQ_LC_005",
+            "EQ_LC_006",
+        ]
+        assert EquationRegistry.get_lc_step_order() == expected
+
+    def test_lc_proof_has_required_steps(self, lc_line_input: LoadCurrentsInput):
+        """Dowód P15 dla linii zawiera wymagane kroki."""
+        proof = ProofGenerator.generate_load_currents_proof(lc_line_input)
+        equation_ids = [step.equation.equation_id for step in proof.steps]
+        assert equation_ids == [
+            "EQ_LC_001",
+            "EQ_LC_002",
+            "EQ_LC_003",
+            "EQ_LC_004",
+        ]
+
+    def test_lc_units_pass_for_typical_case(self, lc_line_input: LoadCurrentsInput):
+        """Weryfikacja jednostek przechodzi dla typowego przypadku."""
+        proof = ProofGenerator.generate_load_currents_proof(lc_line_input)
+        assert proof.summary.unit_check_passed
+        for step in proof.steps:
+            assert step.unit_check.passed
+
+    def test_lc_proof_transformer_builds(self, lc_transformer_input: LoadCurrentsInput):
+        """Dowód P15 dla transformatora buduje wymagane wyniki."""
+        proof = ProofGenerator.generate_load_currents_proof(lc_transformer_input)
+        assert proof.proof_type == ProofType.LOAD_CURRENTS_OVERLOAD
+        assert "k_s_percent" in proof.summary.key_results
+        assert "m_s_percent" in proof.summary.key_results
+
+    def test_lc_determinism_json(self, lc_line_input: LoadCurrentsInput):
+        """Ten sam input P15 → identyczny proof.json."""
+        artifact_id = uuid4()
+
+        proof_1 = ProofGenerator.generate_load_currents_proof(lc_line_input, artifact_id)
+        proof_2 = ProofGenerator.generate_load_currents_proof(lc_line_input, artifact_id)
+
+        json_1 = proof_1.to_dict()
+        json_2 = proof_2.to_dict()
+
+        del json_1["document_id"]
+        del json_1["created_at"]
+        del json_2["document_id"]
+        del json_2["created_at"]
+
+        assert json_1 == json_2
+
+    def test_lc_counterfactual_diff_fields(self, lc_line_input: LoadCurrentsInput):
+        """Counterfactual P15 zawiera pola diff."""
+        alt_input = LoadCurrentsInput(
+            project_name="Test Project",
+            case_name="Test Case LC Line B",
+            run_timestamp=lc_line_input.run_timestamp,
+            target_id=lc_line_input.target_id,
+            u_ll_kv=lc_line_input.u_ll_kv,
+            p_mw=4.5,
+            q_mvar=2.0,
+            in_a=lc_line_input.in_a,
+            sn_mva=None,
+            element_kind=LoadElementKind.LINE,
+        )
+
+        cf = LoadCurrentsCounterfactualInput(a=lc_line_input, b=alt_input)
+        proof = ProofGenerator.generate_load_currents_counterfactual(cf)
+
+        diff = proof.summary.counterfactual_diff
+        assert "delta_s_mva" in diff
+        assert "delta_i_ka" in diff
+        assert "delta_k_i_percent" in diff
+        assert "delta_m_i_percent" in diff
 
 
 # =============================================================================

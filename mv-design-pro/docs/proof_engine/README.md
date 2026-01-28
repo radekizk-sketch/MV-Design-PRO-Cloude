@@ -24,6 +24,7 @@ Ten pakiet zawiera **kanoniczne źródła wiedzy** dla systemu dowodów matematy
 | `P11_1d_PROOF_UI_EXPORT.md` | Proof Inspector UI, eksport LaTeX/PDF/DOCX | REFERENCE |
 | `P16_LOSSES_POWER_ENERGY.md` | P16: Straty mocy i energii (linie/kable/trafo) | **BINDING** |
 | `P14_PROOF_AUDIT_AND_COVERAGE.md` | Warstwa audytu pokrycia i kompletności Proof Packów | **BINDING** |
+| `P15_LOAD_CURRENTS_OVERLOAD.md` | P15: Prądy robocze i przeciążenia | **BINDING** |
 | `PROOF_SCHEMAS.md` | Kanoniczne schematy JSON (ProofDocument, ProofStep) | **BINDING** |
 | `EQUATIONS_IEC60909_SC3F.md` | Rejestr równań SC3F z mapping keys | **BINDING** |
 | `EQUATIONS_VDROP.md` | Rejestr równań VDROP z mapping keys | **BINDING** |
@@ -156,25 +157,7 @@ oraz stanowi **prerequisite** dla P15–P17.
     \Delta P,\ \Delta Q,\ \Delta U
     $$
 
-### TODO-P15-001 (PLANNED) — P15: Load Currents & Overload Proof Pack [FUTURE PACK]
-- Priority: MUST
-- Inputs: TraceArtifact, PowerFlowResult, Catalog
-- Output: ProofPack P15 (ProofDocument: Prądy robocze i przeciążenia)
-- DoD:
-  - [ ] Prądy obciążenia linii/kabli wyprowadzone z mocy pozornej.
-
-    $$
-    I = \frac{S}{\sqrt{3} \cdot U}
-    $$
-
-  - [ ] Porównanie do prądu znamionowego z marginesem procentowym i statusem PASS/FAIL.
-  - [ ] Transformator: relacja obciążenia do mocy znamionowej i overload %.
-
-    $$
-    \frac{S}{S_n}
-    $$
-
-### DONE-P16-001 — P16: Losses & Energy Proof Pack
+### TODO-P16-001 (PLANNED) — P16: Losses & Energy Proof Pack [FUTURE PACK]
 - Priority: MUST
 - Inputs: TraceArtifact, PowerFlowResult, Catalog
 - Output: ProofPack P16 (ProofDocument: Straty mocy i energii)

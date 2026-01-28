@@ -209,31 +209,36 @@ class UnitVerifier:
             "inputs": {"U_{source}": "kV", "ΔU_{total}": "%"},
             "output": "kV",
         },
-        # P16 Losses
-        "EQ_LS_001": {
-            "rule": "MVA / kV = kA → A",
+        # P15: Load Currents & Overload
+        "EQ_LC_001": {
+            "rule": "MW² + Mvar² = MVA² → MVA",
+            "inputs": {"P": "MW", "Q": "Mvar"},
+            "output": "MVA",
+        },
+        "EQ_LC_002": {
+            "rule": "MVA / kV = kA",
             "inputs": {"S": "MVA", "U_{LL}": "kV"},
-            "output": "A",
+            "output": "kA",
         },
-        "EQ_LS_002": {
-            "rule": "A² · Ω = W → kW",
-            "inputs": {"I": "A", "R": "Ω"},
-            "output": "kW",
+        "EQ_LC_003": {
+            "rule": "100 · kA / kA = %",
+            "inputs": {"I": "kA", "I_n": "kA"},
+            "output": "%",
         },
-        "EQ_LS_003": {
-            "rule": "kW · — = kW",
-            "inputs": {"P_k": "kW", "k_{load}": "—"},
-            "output": "kW",
+        "EQ_LC_004": {
+            "rule": "100 · (kA / kA - 1) = %",
+            "inputs": {"I_n": "kA", "I": "kA"},
+            "output": "%",
         },
-        "EQ_LS_004": {
-            "rule": "kW + kW = kW",
-            "inputs": {"P_0": "kW", "P_{k,act}": "kW"},
-            "output": "kW",
+        "EQ_LC_005": {
+            "rule": "100 · MVA / MVA = %",
+            "inputs": {"S": "MVA", "S_n": "MVA"},
+            "output": "%",
         },
-        "EQ_LS_005": {
-            "rule": "kW · h = kWh",
-            "inputs": {"P_{loss,i}": "kW", "Δt": "h"},
-            "output": "kWh",
+        "EQ_LC_006": {
+            "rule": "100 · (MVA / MVA - 1) = %",
+            "inputs": {"S_n": "MVA", "S": "MVA"},
+            "output": "%",
         },
     }
 

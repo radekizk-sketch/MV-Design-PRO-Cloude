@@ -770,6 +770,7 @@ P14 jest **warstwą meta** i stanowi **prerequisite** dla P15–P17.
 | 2026-02 | 2.15 | P11.2 Proof Inspector UX/UI parity (PowerFactory-style, read-only) |
 | 2026-03 | 2.16 | P12 MVP: Equipment Proof Pack (U, Icu, Idyn, Ith) |
 | 2026-04 | 2.17 | P14 Proof Audit & Coverage (doc-only, meta layer) |
+| 2026-05 | 2.18 | P15 Load Currents & Overload Proof Pack implemented (FULL MATH, deterministic) |
 
 ---
 
@@ -811,19 +812,19 @@ i jest **prerequisite** dla P15–P17.
     \Delta P,\ \Delta Q,\ \Delta U
     $$
 
-### TODO-P15-001 (PLANNED) — P15: Load Currents & Overload Proof Pack [FUTURE PACK]
+### P15 — Load Currents & Overload Proof Pack (IMPLEMENTED)
 - Priority: MUST
 - Inputs: TraceArtifact, PowerFlowResult, Catalog
 - Output: ProofPack P15 (ProofDocument: Prądy robocze i przeciążenia)
-- DoD:
-  - [ ] Prądy obciążenia linii/kabli wyprowadzone z mocy pozornej.
+- DoD (DONE):
+  - [x] Prądy obciążenia linii/kabli wyprowadzone z mocy pozornej.
 
     $$
     I = \frac{S}{\sqrt{3} \cdot U}
     $$
 
-  - [ ] Porównanie do prądu znamionowego z marginesem procentowym i statusem PASS/FAIL.
-  - [ ] Transformator: relacja obciążenia do mocy znamionowej i overload %.
+  - [x] Marginesy procentowe dla prądów i obciążenia transformatora (bez oceny normowej).
+  - [x] Transformator: relacja obciążenia do mocy znamionowej.
 
     $$
     \frac{S}{S_n}
