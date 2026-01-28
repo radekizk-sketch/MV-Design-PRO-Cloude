@@ -21,6 +21,9 @@
 - [docs/ui/powerfactory_ui_parity.md](./ui/powerfactory_ui_parity.md)
 - [docs/ui/wizard_screens.md](./ui/wizard_screens.md)
 - [docs/ui/sld_rules.md](./ui/sld_rules.md)
+- [docs/ui/SLD_SCADA_CAD_CONTRACT.md](./ui/SLD_SCADA_CAD_CONTRACT.md) — **SCADA SLD + CAD overlay: kontrakt widoku (CANONICAL)**
+- [docs/ui/SLD_SHORT_CIRCUIT_BUS_CENTRIC.md](./ui/SLD_SHORT_CIRCUIT_BUS_CENTRIC.md) — **Prezentacja wyników zwarciowych: BUS-centric, Case MAX/MIN/N-1 (CANONICAL)**
+- [docs/ui/SHORT_CIRCUIT_PANELS_AND_PRINTING.md](./ui/SHORT_CIRCUIT_PANELS_AND_PRINTING.md) — **Panele zwarciowe, porównawcze, wydruk PDF/DOCX (CANONICAL)**
 
 ## Proof Engine (P11) — Canonical Knowledge Pack
 - [docs/proof_engine/README.md](./proof_engine/README.md) — Pakiet kanoniczny (BINDING)
@@ -29,6 +32,7 @@
 - [docs/proof_engine/P11_1b_REGULATION_Q_U.md](./proof_engine/P11_1b_REGULATION_Q_U.md) — Regulatory Q(U), cosφ(P)
 - [docs/proof_engine/P11_1c_SC_ASYMMETRICAL.md](./proof_engine/P11_1c_SC_ASYMMETRICAL.md) — Składowe symetryczne (SKELETON)
 - [docs/proof_engine/P11_1d_PROOF_UI_EXPORT.md](./proof_engine/P11_1d_PROOF_UI_EXPORT.md) — **Proof Inspector (CANONICAL): read-only viewer, eksport JSON/LaTeX/PDF/DOCX**
+- [docs/proof_engine/P11_SC_CASE_MAPPING.md](./proof_engine/P11_SC_CASE_MAPPING.md) — **Mapowanie Case zwarciowych (MAX/MIN/N-1) na ProofDocument: trace_id, snapshot, anti-double-counting (CANONICAL)**
 - [docs/proof_engine/PROOF_SCHEMAS.md](./proof_engine/PROOF_SCHEMAS.md) — Schematy JSON (BINDING)
 - [docs/proof_engine/EQUATIONS_IEC60909_SC3F.md](./proof_engine/EQUATIONS_IEC60909_SC3F.md) — Rejestr równań SC3F (BINDING)
 - [docs/proof_engine/EQUATIONS_VDROP.md](./proof_engine/EQUATIONS_VDROP.md) — Rejestr równań VDROP (BINDING)
