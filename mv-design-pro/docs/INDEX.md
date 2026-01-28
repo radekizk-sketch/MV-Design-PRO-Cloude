@@ -26,6 +26,13 @@
 - [docs/ui/SLD_SHORT_CIRCUIT_BUS_CENTRIC.md](./ui/SLD_SHORT_CIRCUIT_BUS_CENTRIC.md) — **Prezentacja wyników zwarciowych: BUS-centric, Case MAX/MIN/N-1 (CANONICAL)**
 - [docs/ui/SHORT_CIRCUIT_PANELS_AND_PRINTING.md](./ui/SHORT_CIRCUIT_PANELS_AND_PRINTING.md) — **Panele zwarciowe, porównawcze, wydruk PDF/DOCX (CANONICAL)**
 
+### UI Eksploracji Wyników i Inspekcji Elementów (ETAP / PowerFactory Grade)
+- [docs/ui/RESULTS_BROWSER_CONTRACT.md](./ui/RESULTS_BROWSER_CONTRACT.md) — **Results Browser: drzewo wyników, tabele, porównania Case/Snapshot, eksport (CANONICAL)**
+- [docs/ui/ELEMENT_INSPECTOR_CONTRACT.md](./ui/ELEMENT_INSPECTOR_CONTRACT.md) — **Element Inspector: zakładki (Overview, Parameters, Results, Contributions, Limits, Proof P11), multi-case view (CANONICAL)**
+- [docs/ui/EXPERT_MODES_CONTRACT.md](./ui/EXPERT_MODES_CONTRACT.md) — **Expert Modes: Operator, Designer, Analyst, Auditor — NO SIMPLIFICATION RULE (CANONICAL)**
+- [docs/ui/GLOBAL_CONTEXT_BAR.md](./ui/GLOBAL_CONTEXT_BAR.md) — **Global Context Bar: sticky top bar, drukowany w nagłówku PDF (CANONICAL)**
+- [docs/ui/UI_ETAP_POWERFACTORY_PARITY.md](./ui/UI_ETAP_POWERFACTORY_PARITY.md) — **UI Parity Matrix: MV-DESIGN-PRO vs ETAP vs PowerFactory (47 FULL, 35 SUPERIOR) (CANONICAL)**
+
 ## Proof Engine (P11) — Canonical Knowledge Pack
 - [docs/proof_engine/README.md](./proof_engine/README.md) — Pakiet kanoniczny (BINDING)
 - [docs/proof_engine/P11_OVERVIEW.md](./proof_engine/P11_OVERVIEW.md) — TraceArtifact, inwarianty, UX

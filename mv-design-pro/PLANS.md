@@ -225,6 +225,69 @@ Zdefiniowanie **wiążących kontraktów UI** dla warstwy prezentacji wyników i
 
 ---
 
+## 3.7 Phase 1.z: UI Eksploracji Wyników i Inspekcji Elementów (DOC ONLY) - COMPLETE
+
+### 3.7.1 Goal
+
+Zdefiniowanie **warstwy eksploracji wyników i inspekcji elementów UI** klasy ETAP / DIgSILENT PowerFactory:
+
+- **Results Browser**: pełna eksploracja wyników niezależnie od SLD,
+- **Element Inspector**: inspekcja dowolnego elementu (BUS, LINE, TRAFO, SOURCE, PROTECTION),
+- **Expert Modes**: tryby eksperckie (Operator, Designer, Analyst, Auditor),
+- **Global Context Bar**: kontekst zawsze widoczny (Case, Snapshot, Analysis, Norma, Mode),
+- **ETAP / PowerFactory UI Parity**: macierz feature-by-feature.
+
+### 3.7.2 Scope
+
+**IN SCOPE:**
+- Dokumentacja Results Browser (drzewo wyników, tabele, porównania, eksport)
+- Dokumentacja Element Inspector (zakładki: Overview, Parameters, Results, Contributions, Limits, Proof P11)
+- Dokumentacja Expert Modes (Operator, Designer, Analyst, Auditor — NO SIMPLIFICATION RULE)
+- Dokumentacja Global Context Bar (sticky top bar, drukowany w PDF)
+- Macierz UI Parity z ETAP / PowerFactory (feature-by-feature)
+
+**OUT OF SCOPE:**
+- Kod implementacyjny (tylko dokumentacja)
+- UI mockupy (tylko specyfikacja tekstowa)
+- Backend changes
+- Solver modifications
+
+### 3.7.3 Deliverables
+
+| File | Status | Description |
+|------|--------|-------------|
+| docs/ui/RESULTS_BROWSER_CONTRACT.md | DONE | Results Browser: drzewo, tabele, porównania, eksport (BINDING) |
+| docs/ui/ELEMENT_INSPECTOR_CONTRACT.md | DONE | Element Inspector: zakładki, multi-case view, Proof P11 (BINDING) |
+| docs/ui/EXPERT_MODES_CONTRACT.md | DONE | Expert Modes: Operator, Designer, Analyst, Auditor (BINDING) |
+| docs/ui/GLOBAL_CONTEXT_BAR.md | DONE | Global Context Bar: sticky top bar, PDF header (BINDING) |
+| docs/ui/UI_ETAP_POWERFACTORY_PARITY.md | DONE | Macierz UI Parity: MV-DESIGN-PRO vs ETAP vs PowerFactory (BINDING) |
+| PLANS.md | DONE | Dodanie Phase 1.z |
+| ARCHITECTURE.md | DONE | Referencja do UI Eksploracji Wyników |
+| docs/INDEX.md | DONE | Linki do kontraktów UI |
+
+### 3.7.4 Completed Tasks
+
+- [x] Utworzenie docs/ui/RESULTS_BROWSER_CONTRACT.md (hierarchia drzewa, tabele, porównania Case/Snapshot, eksport)
+- [x] Utworzenie docs/ui/ELEMENT_INSPECTOR_CONTRACT.md (zakładki: Overview, Parameters, Results, Contributions, Limits, Proof P11)
+- [x] Utworzenie docs/ui/EXPERT_MODES_CONTRACT.md (Operator, Designer, Analyst, Auditor — NO SIMPLIFICATION RULE)
+- [x] Utworzenie docs/ui/GLOBAL_CONTEXT_BAR.md (sticky top bar, drukowany w nagłówku PDF)
+- [x] Utworzenie docs/ui/UI_ETAP_POWERFACTORY_PARITY.md (macierz feature-by-feature, 47 FULL + 35 SUPERIOR)
+- [x] Aktualizacja PLANS.md (dodanie Phase 1.z)
+- [x] Aktualizacja ARCHITECTURE.md (referencja do UI Eksploracji Wyników)
+- [x] Aktualizacja docs/INDEX.md (linki)
+
+### 3.7.5 Key Principles (Summary)
+
+| # | Zasada | Opis |
+|---|--------|------|
+| 1 | **NO SIMPLIFICATION RULE** | Brak „basic UI" — jeden UI z opcjami, użytkownik decyduje co zwija |
+| 2 | **Multi-Case View** | Element Inspector pokazuje wyniki dla wszystkich Case'ów w jednej tabeli |
+| 3 | **Expert Modes ≠ Access Control** | Tryby zmieniają tylko domyślne rozwinięcia, NIE ukrywają danych |
+| 4 | **Global Context Bar Always Visible** | Sticky top bar, drukowany w nagłówku PDF przy eksporcie |
+| 5 | **ETAP / PowerFactory Parity** | MV-DESIGN-PRO ≥ ETAP ≥ PowerFactory (47 FULL, 35 SUPERIOR, 1 PARTIAL, 0 NO) |
+
+---
+
 ## 4. Phase 2: NetworkModel Core (IN PROGRESS)
 
 ### 4.1 Task 2.1: Remove PCC from NetworkGraph (DONE)
@@ -506,6 +569,7 @@ class NetworkGraph:
 | 2025-03 | 2.9 | Static inverter support (catalog + case setpoints) |
 | 2025-03 | 2.10 | Static converter sources (PV/WIND/BESS) – catalog + case setpoints |
 | 2026-01 | 2.11 | Phase 1.y: UI Contracts (SLD_UI_CONTRACT.md) – DOC LOCKED |
+| 2026-01 | 2.12 | Phase 1.z: UI Eksploracji Wyników i Inspekcji Elementów – DOC LOCKED |
 
 ---
 
