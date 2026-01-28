@@ -203,6 +203,42 @@ class UnitVerifier:
             "inputs": {"U_{source}": "kV", "ΔU_{total}": "%"},
             "output": "kV",
         },
+        # SC1 (P11.1c)
+        "EQ_SC1_001": {
+            "rule": "Ω = Ω",
+            "inputs": {"Z_1": "Ω", "Z_2": "Ω", "Z_0": "Ω"},
+            "output": "Ω",
+        },
+        "EQ_SC1_002": {
+            "rule": "— (bezwymiarowy)",
+            "inputs": {},
+            "output": "—",
+        },
+        "EQ_SC1_003": {
+            "rule": "Ω + Ω + Ω = Ω",
+            "inputs": {"Z_1": "Ω", "Z_2": "Ω", "Z_0": "Ω"},
+            "output": "Ω",
+        },
+        "EQ_SC1_004": {
+            "rule": "Ω + Ω = Ω",
+            "inputs": {"Z_1": "Ω", "Z_2": "Ω"},
+            "output": "Ω",
+        },
+        "EQ_SC1_005": {
+            "rule": "Ω + (Ω·Ω)/(Ω+Ω) = Ω",
+            "inputs": {"Z_1": "Ω", "Z_2": "Ω", "Z_0": "Ω"},
+            "output": "Ω",
+        },
+        "EQ_SC1_006": {
+            "rule": "kV / Ω = kA",
+            "inputs": {"U_f": "kV", "Z_k": "Ω"},
+            "output": "kA",
+        },
+        "EQ_SC1_007": {
+            "rule": "kA = kA",
+            "inputs": {"I_0": "kA", "I_1": "kA", "I_2": "kA"},
+            "output": "kA",
+        },
     }
 
     @classmethod

@@ -28,6 +28,13 @@ from application.proof_engine.equation_registry import (
     EQ_SC3F_007,
     EQ_SC3F_008,
     EQ_SC3F_008a,
+    EQ_SC1_001,
+    EQ_SC1_002,
+    EQ_SC1_003,
+    EQ_SC1_004,
+    EQ_SC1_005,
+    EQ_SC1_006,
+    EQ_SC1_007,
     EQ_VDROP_001,
     EQ_VDROP_002,
     EQ_VDROP_003,
@@ -163,14 +170,28 @@ class VDROPInput:
 
 @dataclass
 class SC1Input:
-    """Dane wejściowe dla generatora dowodu SC1 (P11.1c skeleton)."""
+    """Dane wejściowe dla generatora dowodu SC1 (P11.1c FULL)."""
 
+    # Identyfikacja
     project_name: str
     case_name: str
     fault_node_id: str
     fault_type: str
     run_timestamp: datetime
     solver_version: str
+
+    # Dane znamionowe / prefault
+    u_n_kv: float
+    c_factor: float
+    u_prefault_kv: float
+
+    # Składowe impedancji
+    z1_ohm: complex
+    z2_ohm: complex
+    z0_ohm: complex
+
+    # Operator a (Fortescue)
+    a_operator: complex
 
 
 class ProofGenerator:
@@ -359,7 +380,7 @@ class ProofGenerator:
         )
 
     # =========================================================================
-    # SC1 Generator (P11.1c Skeleton)
+    # SC1 Generator (P11.1c FULL)
     # =========================================================================
 
     @classmethod
@@ -369,51 +390,93 @@ class ProofGenerator:
         artifact_id: UUID | None = None,
     ) -> ProofDocument:
         """
-        Generuje szkic dowodu SC1 (zwarcia asymetryczne) — skeleton only.
-
-        Brak obliczeń liczbowych. Każda próba obliczeń -> NotImplementedError.
+        Generuje dowód SC1 (zwarcia asymetryczne) — FULL MATH.
         """
         if artifact_id is None:
             artifact_id = uuid4()
 
-        def _raise_calculation() -> None:
-            raise NotImplementedError("P11.1c — skeleton only")
+        fault_type = cls._normalize_sc1_fault_type(data.fault_type)
+        proof_type = cls._map_sc1_proof_type(fault_type)
+        step_order = EquationRegistry.get_sc1_step_order(fault_type)
 
-        _ = _raise_calculation
+        z_equiv = cls._compute_sc1_equiv_impedance(
+            fault_type=fault_type,
+            z1=data.z1_ohm,
+            z2=data.z2_ohm,
+            z0=data.z0_ohm,
+        )
+
+        i1, i2, i0 = cls._compute_sc1_sequence_currents(
+            fault_type=fault_type,
+            u_prefault_kv=data.u_prefault_kv,
+            z_equiv=z_equiv,
+            z2=data.z2_ohm,
+            z0=data.z0_ohm,
+        )
+
+        ia, ib, ic = cls._compute_sc1_phase_currents(
+            a_operator=data.a_operator,
+            i0=i0,
+            i1=i1,
+            i2=i2,
+        )
 
         steps: list[ProofStep] = []
         step_number = 0
 
-        for eq_id in EquationRegistry.get_sc1_step_order():
+        for eq_id in step_order:
             equation = EquationRegistry.get_equation(eq_id)
             if equation is None:
                 raise ValueError(f"Missing equation definition for {eq_id}")
             step_number += 1
-            steps.append(
-                ProofStep(
-                    step_id=ProofStep.generate_step_id("SC1", step_number),
+
+            if eq_id == "EQ_SC1_001":
+                step = cls._create_sc1_step_z_sequence(
                     step_number=step_number,
-                    title_pl=equation.name_pl,
-                    equation=equation,
-                    input_values=(),
-                    substitution_latex="TODO",
-                    result=ProofValue(
-                        symbol="TODO",
-                        value="TODO",
-                        unit="—",
-                        formatted="TODO",
-                        source_key="TODO",
-                    ),
-                    unit_check=UnitCheckResult(
-                        passed=False,
-                        expected_unit="TODO",
-                        computed_unit="TODO",
-                        input_units={},
-                        derivation="P11.1c SKELETON",
-                    ),
-                    source_keys={},
+                    z1=data.z1_ohm,
+                    z2=data.z2_ohm,
+                    z0=data.z0_ohm,
                 )
-            )
+            elif eq_id == "EQ_SC1_002":
+                step = cls._create_sc1_step_a_operator(
+                    step_number=step_number,
+                    a_operator=data.a_operator,
+                )
+            elif eq_id in {"EQ_SC1_003", "EQ_SC1_004", "EQ_SC1_005"}:
+                step = cls._create_sc1_step_equiv_impedance(
+                    step_number=step_number,
+                    equation_id=eq_id,
+                    z1=data.z1_ohm,
+                    z2=data.z2_ohm,
+                    z0=data.z0_ohm,
+                    z_equiv=z_equiv,
+                )
+            elif eq_id == "EQ_SC1_006":
+                step = cls._create_sc1_step_sequence_currents(
+                    step_number=step_number,
+                    fault_type=fault_type,
+                    u_prefault_kv=data.u_prefault_kv,
+                    z_equiv=z_equiv,
+                    z2=data.z2_ohm,
+                    z0=data.z0_ohm,
+                    i1=i1,
+                    i2=i2,
+                    i0=i0,
+                )
+            elif eq_id == "EQ_SC1_007":
+                step = cls._create_sc1_step_phase_currents(
+                    step_number=step_number,
+                    a_operator=data.a_operator,
+                    i0=i0,
+                    i1=i1,
+                    i2=i2,
+                    ia=ia,
+                    ib=ib,
+                    ic=ic,
+                )
+            else:
+                raise ValueError(f"Unsupported SC1 equation in step order: {eq_id}")
+            steps.append(step)
 
         header = ProofHeader(
             project_name=data.project_name,
@@ -421,29 +484,425 @@ class ProofGenerator:
             run_timestamp=data.run_timestamp,
             solver_version=data.solver_version,
             fault_location=data.fault_node_id,
-            fault_type=data.fault_type,
-            voltage_factor=None,
+            fault_type=fault_type,
+            voltage_factor=data.c_factor,
         )
 
+        unit_checks_passed = all(s.unit_check.passed for s in steps)
+        key_results = {
+            "z_equiv_ohm": ProofValue.create("Z_k", z_equiv, "Ω", "z_equiv_ohm"),
+            "i1_ka": ProofValue.create("I_1", i1, "kA", "i1_ka"),
+            "i2_ka": ProofValue.create("I_2", i2, "kA", "i2_ka"),
+            "i0_ka": ProofValue.create("I_0", i0, "kA", "i0_ka"),
+            "ia_ka": ProofValue.create("I_a", ia, "kA", "ia_ka"),
+            "ib_ka": ProofValue.create("I_b", ib, "kA", "ib_ka"),
+            "ic_ka": ProofValue.create("I_c", ic, "kA", "ic_ka"),
+        }
+
         summary = ProofSummary(
-            key_results={},
-            unit_check_passed=False,
+            key_results=key_results,
+            unit_check_passed=unit_checks_passed,
             total_steps=len(steps),
-            warnings=("P11.1c — skeleton only",),
+            warnings=(),
         )
 
         return ProofDocument.create(
             artifact_id=artifact_id,
-            proof_type=ProofType.SC1F_IEC60909,
-            title_pl="P11.1c — Zwarcia asymetryczne (SC1) — Skeleton",
+            proof_type=proof_type,
+            title_pl="Dowód obliczeń zwarciowych IEC 60909 — zwarcie asymetryczne",
             header=header,
             steps=steps,
             summary=summary,
         )
 
+    @staticmethod
+    def _map_sc1_proof_type(fault_type: str) -> ProofType:
+        if fault_type == "SC1FZ":
+            return ProofType.SC1F_IEC60909
+        if fault_type == "SC2F":
+            return ProofType.SC2F_IEC60909
+        if fault_type == "SC2FZ":
+            return ProofType.SC2FG_IEC60909
+        raise ValueError(f"Unsupported SC1 fault type: {fault_type}")
+
+    @staticmethod
+    def _normalize_sc1_fault_type(fault_type: str) -> str:
+        mapping = {
+            "ONE_PHASE_TO_GROUND": "SC1FZ",
+            "TWO_PHASE": "SC2F",
+            "TWO_PHASE_TO_GROUND": "SC2FZ",
+            "SC1FZ": "SC1FZ",
+            "SC2F": "SC2F",
+            "SC2FZ": "SC2FZ",
+        }
+        if fault_type not in mapping:
+            raise ValueError(f"Unsupported SC1 fault type: {fault_type}")
+        return mapping[fault_type]
+
+    @staticmethod
+    def _compute_sc1_equiv_impedance(
+        *,
+        fault_type: str,
+        z1: complex,
+        z2: complex,
+        z0: complex,
+    ) -> complex:
+        if fault_type == "SC1FZ":
+            return z1 + z2 + z0
+        if fault_type == "SC2F":
+            return z1 + z2
+        if fault_type == "SC2FZ":
+            denominator = z2 + z0
+            if denominator == 0:
+                raise ValueError("Z2 + Z0 = 0; cannot compute 2F–Z equivalent impedance")
+            return z1 + (z2 * z0) / denominator
+        raise ValueError(f"Unsupported SC1 fault type: {fault_type}")
+
+    @staticmethod
+    def _compute_sc1_sequence_currents(
+        *,
+        fault_type: str,
+        u_prefault_kv: float,
+        z_equiv: complex,
+        z2: complex,
+        z0: complex,
+    ) -> tuple[complex, complex, complex]:
+        if z_equiv == 0:
+            raise ValueError("Z_k = 0; cannot compute sequence currents")
+        i1 = u_prefault_kv / z_equiv
+        if fault_type == "SC1FZ":
+            return i1, i1, i1
+        if fault_type == "SC2F":
+            return i1, -i1, 0.0
+        if fault_type == "SC2FZ":
+            denominator = z2 + z0
+            if denominator == 0:
+                raise ValueError("Z2 + Z0 = 0; cannot compute 2F–Z sequence currents")
+            i2 = -(z0 / denominator) * i1
+            i0 = -(z2 / denominator) * i1
+            return i1, i2, i0
+        raise ValueError(f"Unsupported SC1 fault type: {fault_type}")
+
+    @staticmethod
+    def _compute_sc1_phase_currents(
+        *,
+        a_operator: complex,
+        i0: complex,
+        i1: complex,
+        i2: complex,
+    ) -> tuple[complex, complex, complex]:
+        a = a_operator
+        a2 = a ** 2
+        ia = i0 + i1 + i2
+        ib = i0 + a2 * i1 + a * i2
+        ic = i0 + a * i1 + a2 * i2
+        return ia, ib, ic
+
     # =========================================================================
     # SC3F Step Builders
     # =========================================================================
+
+    @staticmethod
+    def _format_complex_latex(value: complex, unit: str) -> str:
+        real = value.real
+        imag = value.imag
+        sign = "+" if imag >= 0 else "-"
+        return f"{real:.4f} {sign} j{abs(imag):.4f}\\,\\text{{{unit}}}"
+
+    @classmethod
+    def _create_sc1_step_z_sequence(
+        cls,
+        *,
+        step_number: int,
+        z1: complex,
+        z2: complex,
+        z0: complex,
+    ) -> ProofStep:
+        equation = EQ_SC1_001
+        input_values = (
+            ProofValue.create("Z_1", z1, "Ω", "z1_ohm"),
+            ProofValue.create("Z_2", z2, "Ω", "z2_ohm"),
+            ProofValue.create("Z_0", z0, "Ω", "z0_ohm"),
+        )
+
+        substitution = (
+            f"Z_1 = {cls._format_complex_latex(z1, 'Ω')}, \\quad "
+            f"Z_2 = {cls._format_complex_latex(z2, 'Ω')}, \\quad "
+            f"Z_0 = {cls._format_complex_latex(z0, 'Ω')}"
+        )
+
+        result = ProofValue.create("Z_1", z1, "Ω", "z1_ohm")
+        unit_check = UnitVerifier.verify_step(
+            equation.equation_id,
+            [("Z_1", "Ω"), ("Z_2", "Ω"), ("Z_0", "Ω")],
+            "Ω",
+        )
+
+        return ProofStep(
+            step_id=ProofStep.generate_step_id("SC1", step_number),
+            step_number=step_number,
+            title_pl=equation.name_pl,
+            equation=equation,
+            input_values=input_values,
+            substitution_latex=substitution,
+            result=result,
+            unit_check=unit_check,
+            source_keys={
+                "Z_1": "z1_ohm",
+                "Z_2": "z2_ohm",
+                "Z_0": "z0_ohm",
+            },
+        )
+
+    @classmethod
+    def _create_sc1_step_a_operator(
+        cls,
+        *,
+        step_number: int,
+        a_operator: complex,
+    ) -> ProofStep:
+        equation = EQ_SC1_002
+        input_values: tuple[ProofValue, ...] = ()
+        substitution = (
+            r"a = e^{j 120^\circ} = "
+            f"{cls._format_complex_latex(a_operator, '—')}"
+        )
+        result = ProofValue.create("a", a_operator, "—", "a_operator")
+        unit_check = UnitVerifier.verify_step(
+            equation.equation_id,
+            [],
+            "—",
+        )
+
+        return ProofStep(
+            step_id=ProofStep.generate_step_id("SC1", step_number),
+            step_number=step_number,
+            title_pl=equation.name_pl,
+            equation=equation,
+            input_values=input_values,
+            substitution_latex=substitution,
+            result=result,
+            unit_check=unit_check,
+            source_keys={"a": "a_operator"},
+        )
+
+    @classmethod
+    def _create_sc1_step_equiv_impedance(
+        cls,
+        *,
+        step_number: int,
+        equation_id: str,
+        z1: complex,
+        z2: complex,
+        z0: complex,
+        z_equiv: complex,
+    ) -> ProofStep:
+        equation = EquationRegistry.get_equation(equation_id)
+        if equation is None:
+            raise ValueError(f"Missing equation definition for {equation_id}")
+
+        if equation_id == "EQ_SC1_003":
+            substitution = (
+                f"Z_k = {cls._format_complex_latex(z1, 'Ω')} + "
+                f"{cls._format_complex_latex(z2, 'Ω')} + "
+                f"{cls._format_complex_latex(z0, 'Ω')} = "
+                f"{cls._format_complex_latex(z_equiv, 'Ω')}"
+            )
+            input_symbols = [("Z_1", "Ω"), ("Z_2", "Ω"), ("Z_0", "Ω")]
+            input_values = (
+                ProofValue.create("Z_1", z1, "Ω", "z1_ohm"),
+                ProofValue.create("Z_2", z2, "Ω", "z2_ohm"),
+                ProofValue.create("Z_0", z0, "Ω", "z0_ohm"),
+            )
+            source_keys = {
+                "Z_k": "z_equiv_ohm",
+                "Z_1": "z1_ohm",
+                "Z_2": "z2_ohm",
+                "Z_0": "z0_ohm",
+            }
+        elif equation_id == "EQ_SC1_004":
+            substitution = (
+                f"Z_k = {cls._format_complex_latex(z1, 'Ω')} + "
+                f"{cls._format_complex_latex(z2, 'Ω')} = "
+                f"{cls._format_complex_latex(z_equiv, 'Ω')}"
+            )
+            input_symbols = [("Z_1", "Ω"), ("Z_2", "Ω")]
+            input_values = (
+                ProofValue.create("Z_1", z1, "Ω", "z1_ohm"),
+                ProofValue.create("Z_2", z2, "Ω", "z2_ohm"),
+            )
+            source_keys = {
+                "Z_k": "z_equiv_ohm",
+                "Z_1": "z1_ohm",
+                "Z_2": "z2_ohm",
+            }
+        else:
+            denominator = z2 + z0
+            substitution = (
+                f"Z_k = {cls._format_complex_latex(z1, 'Ω')} + "
+                f"({cls._format_complex_latex(z2, 'Ω')} \\cdot "
+                f"{cls._format_complex_latex(z0, 'Ω')}) / "
+                f"{cls._format_complex_latex(denominator, 'Ω')} = "
+                f"{cls._format_complex_latex(z_equiv, 'Ω')}"
+            )
+            input_symbols = [("Z_1", "Ω"), ("Z_2", "Ω"), ("Z_0", "Ω")]
+            input_values = (
+                ProofValue.create("Z_1", z1, "Ω", "z1_ohm"),
+                ProofValue.create("Z_2", z2, "Ω", "z2_ohm"),
+                ProofValue.create("Z_0", z0, "Ω", "z0_ohm"),
+            )
+            source_keys = {
+                "Z_k": "z_equiv_ohm",
+                "Z_1": "z1_ohm",
+                "Z_2": "z2_ohm",
+                "Z_0": "z0_ohm",
+            }
+        result = ProofValue.create("Z_k", z_equiv, "Ω", "z_equiv_ohm")
+        unit_check = UnitVerifier.verify_step(
+            equation_id,
+            input_symbols,
+            "Ω",
+        )
+
+        return ProofStep(
+            step_id=ProofStep.generate_step_id("SC1", step_number),
+            step_number=step_number,
+            title_pl=equation.name_pl,
+            equation=equation,
+            input_values=input_values,
+            substitution_latex=substitution,
+            result=result,
+            unit_check=unit_check,
+            source_keys=source_keys,
+        )
+
+    @classmethod
+    def _create_sc1_step_sequence_currents(
+        cls,
+        *,
+        step_number: int,
+        fault_type: str,
+        u_prefault_kv: float,
+        z_equiv: complex,
+        z2: complex,
+        z0: complex,
+        i1: complex,
+        i2: complex,
+        i0: complex,
+    ) -> ProofStep:
+        equation = EQ_SC1_006
+        input_values = (
+            ProofValue.create("U_f", u_prefault_kv, "kV", "u_prefault_kv"),
+            ProofValue.create("Z_k", z_equiv, "Ω", "z_equiv_ohm"),
+            ProofValue.create("Z_2", z2, "Ω", "z2_ohm"),
+            ProofValue.create("Z_0", z0, "Ω", "z0_ohm"),
+        )
+
+        if fault_type == "SC1FZ":
+            substitution = (
+                f"I_1 = I_2 = I_0 = {u_prefault_kv:.4f} / "
+                f"{cls._format_complex_latex(z_equiv, 'Ω')} = "
+                f"{cls._format_complex_latex(i1, 'kA')}"
+            )
+        elif fault_type == "SC2F":
+            substitution = (
+                f"I_1 = {u_prefault_kv:.4f} / {cls._format_complex_latex(z_equiv, 'Ω')} = "
+                f"{cls._format_complex_latex(i1, 'kA')}, \\quad "
+                f"I_2 = -I_1 = {cls._format_complex_latex(i2, 'kA')}, \\quad "
+                r"I_0 = 0"
+            )
+        else:
+            denominator = z2 + z0
+            substitution = (
+                f"I_1 = {u_prefault_kv:.4f} / {cls._format_complex_latex(z_equiv, 'Ω')} = "
+                f"{cls._format_complex_latex(i1, 'kA')}, \\quad "
+                f"I_2 = -\\frac{{Z_0}}{{Z_2 + Z_0}} I_1 = "
+                f"{cls._format_complex_latex(i2, 'kA')}, \\quad "
+                f"I_0 = -\\frac{{Z_2}}{{Z_2 + Z_0}} I_1 = "
+                f"{cls._format_complex_latex(i0, 'kA')}, \\quad "
+                f"Z_2 + Z_0 = {cls._format_complex_latex(denominator, 'Ω')}"
+            )
+
+        result = ProofValue.create("I_1", i1, "kA", "i1_ka")
+        unit_check = UnitVerifier.verify_step(
+            equation.equation_id,
+            [("U_f", "kV"), ("Z_k", "Ω")],
+            "kA",
+        )
+
+        return ProofStep(
+            step_id=ProofStep.generate_step_id("SC1", step_number),
+            step_number=step_number,
+            title_pl=equation.name_pl,
+            equation=equation,
+            input_values=input_values,
+            substitution_latex=substitution,
+            result=result,
+            unit_check=unit_check,
+            source_keys={
+                "U_f": "u_prefault_kv",
+                "Z_k": "z_equiv_ohm",
+                "Z_2": "z2_ohm",
+                "Z_0": "z0_ohm",
+                "I_1": "i1_ka",
+                "I_2": "i2_ka",
+                "I_0": "i0_ka",
+            },
+        )
+
+    @classmethod
+    def _create_sc1_step_phase_currents(
+        cls,
+        *,
+        step_number: int,
+        a_operator: complex,
+        i0: complex,
+        i1: complex,
+        i2: complex,
+        ia: complex,
+        ib: complex,
+        ic: complex,
+    ) -> ProofStep:
+        equation = EQ_SC1_007
+        input_values = (
+            ProofValue.create("I_0", i0, "kA", "i0_ka"),
+            ProofValue.create("I_1", i1, "kA", "i1_ka"),
+            ProofValue.create("I_2", i2, "kA", "i2_ka"),
+            ProofValue.create("a", a_operator, "—", "a_operator"),
+        )
+
+        substitution = (
+            f"I_a = I_0 + I_1 + I_2 = {cls._format_complex_latex(ia, 'kA')}, \\quad "
+            f"I_b = I_0 + a^2 I_1 + a I_2 = {cls._format_complex_latex(ib, 'kA')}, \\quad "
+            f"I_c = I_0 + a I_1 + a^2 I_2 = {cls._format_complex_latex(ic, 'kA')}"
+        )
+
+        result = ProofValue.create("I_a", ia, "kA", "ia_ka")
+        unit_check = UnitVerifier.verify_step(
+            equation.equation_id,
+            [("I_0", "kA"), ("I_1", "kA"), ("I_2", "kA")],
+            "kA",
+        )
+
+        return ProofStep(
+            step_id=ProofStep.generate_step_id("SC1", step_number),
+            step_number=step_number,
+            title_pl=equation.name_pl,
+            equation=equation,
+            input_values=input_values,
+            substitution_latex=substitution,
+            result=result,
+            unit_check=unit_check,
+            source_keys={
+                "I_0": "i0_ka",
+                "I_1": "i1_ka",
+                "I_2": "i2_ka",
+                "I_a": "ia_ka",
+                "I_b": "ib_ka",
+                "I_c": "ic_ka",
+                "a": "a_operator",
+            },
+        )
 
     @classmethod
     def _create_sc3f_step_z_th(
