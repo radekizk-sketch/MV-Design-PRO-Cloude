@@ -203,6 +203,37 @@ class UnitVerifier:
             "inputs": {"U_{source}": "kV", "ΔU_{total}": "%"},
             "output": "kV",
         },
+        # P15: Load Currents & Overload
+        "EQ_LC_001": {
+            "rule": "MW² + Mvar² = MVA² → MVA",
+            "inputs": {"P": "MW", "Q": "Mvar"},
+            "output": "MVA",
+        },
+        "EQ_LC_002": {
+            "rule": "MVA / kV = kA",
+            "inputs": {"S": "MVA", "U_{LL}": "kV"},
+            "output": "kA",
+        },
+        "EQ_LC_003": {
+            "rule": "100 · kA / kA = %",
+            "inputs": {"I": "kA", "I_n": "kA"},
+            "output": "%",
+        },
+        "EQ_LC_004": {
+            "rule": "100 · (kA / kA - 1) = %",
+            "inputs": {"I_n": "kA", "I": "kA"},
+            "output": "%",
+        },
+        "EQ_LC_005": {
+            "rule": "100 · MVA / MVA = %",
+            "inputs": {"S": "MVA", "S_n": "MVA"},
+            "output": "%",
+        },
+        "EQ_LC_006": {
+            "rule": "100 · (MVA / MVA - 1) = %",
+            "inputs": {"S_n": "MVA", "S": "MVA"},
+            "output": "%",
+        },
     }
 
     @classmethod
