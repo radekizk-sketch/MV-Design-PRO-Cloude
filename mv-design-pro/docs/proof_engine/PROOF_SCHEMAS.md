@@ -53,7 +53,7 @@ Ten dokument zawiera **kanoniczne schematy JSON** dla wszystkich struktur danych
     },
     "proof_type": {
       "type": "string",
-      "enum": ["SC3F_IEC60909", "VDROP", "SC1F_IEC60909", "SC2F_IEC60909", "SC2FG_IEC60909", "Q_U_REGULATION"],
+      "enum": ["SC3F_IEC60909", "VDROP", "SC1F_IEC60909", "SC2F_IEC60909", "SC2FG_IEC60909", "Q_U_REGULATION", "LOAD_CURRENTS_OVERLOAD"],
       "description": "Typ dowodu"
     },
     "title_pl": {
@@ -150,6 +150,10 @@ Ten dokument zawiera **kanoniczne schematy JSON** dla wszystkich struktur danych
         "failed_checks": {
           "type": "array",
           "items": { "type": "string" }
+        },
+        "counterfactual_diff": {
+          "type": "object",
+          "additionalProperties": { "$ref": "#/$defs/ProofValue" }
         }
       }
     },
