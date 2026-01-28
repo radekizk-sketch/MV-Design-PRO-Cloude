@@ -220,21 +220,77 @@ Topology Tree **MUST** posiadać **Search Box** (pole wyszukiwania):
 
 ---
 
-## 5. SELEKCJA I SYNCHRONIZACJA
+## 5. SELEKCJA I SYNCHRONIZACJA (BINDING)
+
+### 5.0. SINGLE GLOBAL FOCUS — Zasada jednej prawdy selekcji
+
+MV-DESIGN-PRO **MUST** implementować **jeden globalny fokus selekcji** (Single Source of Truth for Selection):
+
+**Definicja Global Focus:**
+
+```
+Global Focus = (Target Element, Active Case, Active Run, Active Snapshot, Active Analysis)
+```
+
+**INVARIANT:**
+
+- W danym momencie **dokładnie jeden** element może być w fokusie (selected),
+- Fokus jest **współdzielony** między wszystkimi widokami: **Topology Tree, SLD, Results Browser, Element Inspector**,
+- Zmiana fokusu w **dowolnym** widoku **MUST** zaktualizować wszystkie pozostałe widoki,
+- **FORBIDDEN**: rozjazd selekcji między widokami (np. Bus-01 zaznaczony w Tree, ale Bus-02 w SLD).
+
+**Global Focus Stack:**
+
+Fokus może być **zagnieżdżony** (hierarchiczny):
+
+```
+Level 0: Project
+Level 1: Case
+Level 2: Snapshot
+Level 3: Analysis Run
+Level 4: Target Element (Bus, Line, Trafo, Source, etc.)
+```
+
+**ESC Behavior (BINDING):**
+
+- **ESC** cofa fokus o jeden poziom wstecz (np. z Element → Analysis Run → Snapshot → Case → Project),
+- **ESC** **NIE resetuje** Active Case, Active Run, Active Snapshot (kontekst pozostaje),
+- **ESC** na poziomie Project **SHOULD** zamknąć aktywny panel (Element Inspector, Results Browser).
+
+**Przykład:**
+
+1. Użytkownik wybiera: Case 1 → Snapshot A → SC Run #3 → Bus 15-01,
+2. Global Focus = `(Bus 15-01, Case 1, SC Run #3, Snapshot A, SC)`,
+3. Użytkownik klika ESC:
+   - Fokus wraca do `SC Run #3` (widok wyników dla całego Run),
+   - Case 1, Snapshot A, SC Run #3 **pozostają aktywne**,
+   - Element Inspector zamyka się (lub pokazuje podsumowanie Run).
+
+---
 
 ### 5.1. Kliknięcie w element drzewa (BINDING)
 
 Kliknięcie w element w Topology Tree **MUST**:
 
-1. **Otworzyć Element Inspector** (z zakładką zależną od Expert Mode),
-2. **Podświetlić element na SLD** (jeśli widoczny),
-3. **Zachować kontekst** (aktywny Case, Snapshot, Analysis).
+1. **Ustawić Global Focus** na (Target Element, Active Case, Active Run, Active Snapshot, Active Analysis),
+2. **Otworzyć Element Inspector** (z zakładką zależną od Expert Mode),
+3. **Podświetlić element na SLD** (jeśli widoczny w aktualnym viewport),
+4. **Podświetlić wiersz w Results Browser** (jeśli Results Browser jest otwarty),
+5. **Zachować kontekst** (Active Case, Snapshot, Analysis **NIE są resetowane**).
 
 **Przykład:**
 
-- użytkownik klika "Bus 15-01" w drzewie,
-- otwiera się Element Inspector z zakładką "Overview" (dla Operator Mode),
-- Bus 15-01 zostaje podświetlony na SLD (żółte obramowanie).
+- Użytkownik klika "Bus 15-01" w drzewie,
+- Global Focus = `(Bus 15-01, Case 1, LF Run #2, Snapshot A, LF)`,
+- Element Inspector otwiera się z zakładką "Overview" (dla Operator Mode),
+- Bus 15-01 zostaje podświetlony na SLD (żółte obramowanie),
+- Results Browser podświetla wiersz "Bus 15-01" w tabeli (jeśli otwarty).
+
+**FORBIDDEN:**
+
+- Zmiana Active Case przy kliknięciu w element (Case pozostaje ten sam),
+- Resetowanie Active Snapshot przy kliknięciu w element,
+- Otwarcie Element Inspector bez ustawienia Global Focus.
 
 ---
 
@@ -242,24 +298,136 @@ Kliknięcie w element w Topology Tree **MUST**:
 
 Kliknięcie elementu na SLD **MUST**:
 
-1. **Podświetlić odpowiedni węzeł w Topology Tree** (żółte tło),
-2. **Rozwinąć ścieżkę do elementu** (Station → Voltage Level → Element),
-3. **Scrollować do elementu** (jeśli poza widokiem).
+1. **Ustawić Global Focus** na (Target Element, Active Case, Active Run, Active Snapshot, Active Analysis),
+2. **Podświetlić odpowiedni węzeł w Topology Tree** (żółte tło),
+3. **Rozwinąć ścieżkę do elementu** (Station → Voltage Level → Element),
+4. **Scrollować Topology Tree do elementu** (jeśli poza widokiem),
+5. **Otworzyć Element Inspector** (jeśli nie jest otwarty) lub **zaktualizować** (jeśli otwarty),
+6. **Podświetlić wiersz w Results Browser** (jeśli Results Browser jest otwarty).
 
 **Przykład:**
 
-- użytkownik klika Bus 15-01 na SLD,
-- Topology Tree automatycznie rozwija: Station #1 → Voltage Level 15 kV → Bus 15-01 (podświetlony).
+- Użytkownik klika Bus 15-01 na SLD,
+- Global Focus = `(Bus 15-01, Case 1, LF Run #2, Snapshot A, LF)`,
+- Topology Tree automatycznie rozwija: Station #1 → Voltage Level 15 kV → Bus 15-01 (podświetlony),
+- Element Inspector otwiera się lub aktualizuje na Bus 15-01,
+- Results Browser podświetla wiersz "Bus 15-01" (jeśli otwarty).
+
+**FORBIDDEN:**
+
+- Brak synchronizacji z Topology Tree (element nie podświetlony w drzewie),
+- Brak rozwinięcia ścieżki do elementu w drzewie,
+- Zmiana Active Case przy kliknięciu w element na SLD.
 
 ---
 
-### 5.3. Multi-select (opcjonalnie, SHOULD)
+### 5.3. Kliknięcie wiersza w Results Browser → synchronizacja (BINDING)
+
+Kliknięcie wiersza w Results Browser (zdefiniowanym w `RESULTS_BROWSER_CONTRACT.md`) **MUST**:
+
+1. **Ustawić Global Focus** na (Target Element, Active Case, Active Run, Active Snapshot, Active Analysis),
+2. **Podświetlić odpowiedni węzeł w Topology Tree** (żółte tło + rozwinięcie ścieżki),
+3. **Podświetlić element na SLD** (jeśli widoczny w aktualnym viewport),
+4. **Otworzyć Element Inspector** (jeśli nie jest otwarty) lub **zaktualizować** (jeśli otwarty).
+
+**Przykład:**
+
+- Użytkownik klika wiersz "Line 15-02" w Results Browser,
+- Global Focus = `(Line 15-02, Case 2, LF Run #5, Snapshot B, LF)`,
+- Topology Tree podświetla: Station #1 → Voltage Level 15 kV → Line 15-02,
+- SLD podświetla Line 15-02 (jeśli widoczna),
+- Element Inspector otwiera się z zakładką "Overview" dla Line 15-02.
+
+**FORBIDDEN:**
+
+- Brak synchronizacji z Topology Tree,
+- Brak synchronizacji z SLD,
+- Otwarcie Element Inspector bez podświetlenia w Tree i SLD.
+
+---
+
+### 5.4. Element Inspector → synchronizacja z innymi widokami (BINDING)
+
+Element Inspector (zdefiniowany w `ELEMENT_INSPECTOR_CONTRACT.md`) **MUST** być **read-only** w kontekście selekcji:
+
+- **NIE modyfikuje** Global Focus (tylko odczytuje),
+- **Zamknięcie Inspector'a** **NIE resetuje** Global Focus (element pozostaje podświetlony w Tree i SLD),
+- **Przełączenie zakładki w Inspector** (Overview → Parameters → Results) **NIE zmienia** Global Focus.
+
+**FORBIDDEN:**
+
+- Reset Global Focus przy zamknięciu Inspector'a,
+- Zmiana selekcji w Tree/SLD przy przełączaniu zakładek w Inspector.
+
+---
+
+### 5.5. Multi-select (opcjonalnie, SHOULD)
 
 Topology Tree **SHOULD** umożliwiać multi-select (zaznaczenie wielu elementów):
 
-- **Ctrl+Click**: dodaj element do selekcji,
+- **Ctrl+Click**: dodaj element do selekcji (Global Focus = ostatnio kliknięty element),
 - **Shift+Click**: zaznacz zakres elementów (od ostatniego do klikniętego),
 - **Selekcja wielu elementów → Element Inspector**: wyświetlenie „Multi-Element View" (porównanie parametrów).
+
+**Multi-Select Synchronization:**
+
+- **SLD** **SHOULD** podświetlić wszystkie zaznaczone elementy (różne kolory lub obramowania),
+- **Results Browser** **SHOULD** podświetlić wszystkie zaznaczone wiersze,
+- **Element Inspector** **SHOULD** wyświetlić „Multi-Element View" (tabela porównawcza).
+
+**FORBIDDEN:**
+
+- Brak synchronizacji multi-select między widokami,
+- Zmiana Active Case przy multi-select.
+
+---
+
+### 5.6. Zachowanie kontekstu przy przełączaniu widoków (BINDING)
+
+**Scenariusz:** Użytkownik przełącza między widokami (SLD ↔ Results Browser ↔ Topology Tree).
+
+**MUST:**
+
+- **Global Focus** **MUST** być zachowany przy przełączaniu widoków,
+- **Active Case, Active Run, Active Snapshot** **MUST** być zachowane,
+- **Selekcja elementu** **MUST** być zachowana (podświetlenie w nowym widoku).
+
+**Przykład:**
+
+1. Użytkownik ma wybrany Bus 15-01 w SLD (Global Focus = `(Bus 15-01, Case 1, LF Run #2, Snapshot A, LF)`),
+2. Użytkownik przełącza na Results Browser (kliknięcie zakładki "Results"),
+3. Results Browser **MUST** automatycznie podświetlić wiersz "Bus 15-01" w tabeli,
+4. Global Focus pozostaje `(Bus 15-01, Case 1, LF Run #2, Snapshot A, LF)`.
+
+**FORBIDDEN:**
+
+- Reset selekcji przy przełączaniu widoków (np. Bus 15-01 zaznaczony w SLD, ale nie podświetlony w Results Browser),
+- Reset Active Case/Snapshot przy przełączaniu widoków,
+- Utrata kontekstu Global Focus.
+
+---
+
+### 5.7. FORBIDDEN — Rozjazd selekcji (BINDING)
+
+**Następujące sytuacje są ZABRONIONE (FORBIDDEN):**
+
+1. **Wiele aktywnych fokusów jednocześnie:**
+   - Bus 15-01 zaznaczony w Topology Tree, ale Bus 15-02 zaznaczony w SLD,
+   - Różne elementy podświetlone w różnych widokach.
+
+2. **Rozjazd kontekstu:**
+   - Case 1 aktywny w Topology Tree, ale Case 2 aktywny w Results Browser,
+   - Snapshot A aktywny w SLD, ale Snapshot B aktywny w Element Inspector.
+
+3. **Reset kontekstu przy zmianie widoku:**
+   - Przełączenie SLD → Results Browser resetuje Active Case,
+   - Kliknięcie w Topology Tree resetuje Active Snapshot.
+
+4. **Brak synchronizacji:**
+   - Kliknięcie w SLD nie podświetla elementu w Topology Tree,
+   - Kliknięcie w Results Browser nie podświetla elementu na SLD.
+
+**Każda z powyższych sytuacji jest REGRESJĄ wymagającą HOTFIX.**
 
 ---
 

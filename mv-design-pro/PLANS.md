@@ -571,6 +571,7 @@ class NetworkGraph:
 | 2026-01 | 2.11 | Phase 1.y: UI Contracts (SLD_UI_CONTRACT.md) – DOC LOCKED |
 | 2026-01 | 2.12 | Phase 1.z: UI Eksploracji Wyników i Inspekcji Elementów – DOC LOCKED |
 | 2026-01 | 2.13 | Phase 2.x: UI PF++ (PowerFactory++ Parity) – DOC LOCKED |
+| 2026-01 | 2.14 | Phase 2.x.2: TOPOLOGY TREE & SELECTION SYNC – DOC LOCKED |
 
 ---
 
@@ -648,6 +649,74 @@ Rozszerzenie warstwy UI do poziomu pełnej parytetu z ETAP / DIgSILENT PowerFact
 | **Hybrid Mode (konfigurowalne nakładki)** | ✗ | ✗            | ✓             | ➕ SUPERIOR  |
 
 **Ocena końcowa:** **MV-DESIGN-PRO UI ≥ PowerFactory UI** w zakresie eksploracji i kontroli UI ✅
+
+---
+
+## 12.7. Phase 2.x.2: TOPOLOGY TREE & SELECTION SYNC — DOC LOCKED
+
+### 12.7.1. Cel fazy
+
+Rozszerzenie i formalizacja **zasad synchronizacji selekcji** (Selection Sync) między wszystkimi widokami UI:
+- **Topology Tree**,
+- **SLD**,
+- **Results Browser**,
+- **Element Inspector**.
+
+**Zasada:** **SINGLE GLOBAL FOCUS** — jeden globalny fokus współdzielony przez wszystkie widoki (Single Source of Truth for Selection).
+
+**INVARIANT:** Solver i Domain Layer pozostają **NIETKNIĘTE**. To wyłącznie dokumentacja UI.
+
+### 12.7.2. Zakres fazy
+
+| W zakresie | Poza zakresem |
+|------------|---------------|
+| Definicja Single Global Focus | Implementacja kodu |
+| Zasady synchronizacji selekcji | Modyfikacja solverów |
+| ESC behavior (cofanie fokusu) | Modyfikacja API |
+| FORBIDDEN practices dla selekcji | Nowe funkcjonalności backend |
+
+### 12.7.3. Deliverables (DOC ONLY)
+
+| Plik | Opis | Status |
+|------|------|--------|
+| `docs/ui/TOPOLOGY_TREE_CONTRACT.md` (v1.1) | Rozszerzona sekcja 5: SELECTION & SYNC (Single Global Focus, ESC behavior, FORBIDDEN) | DONE |
+| `mv-design-pro/PLANS.md` | Dodanie Phase 2.x.2 | DONE |
+| `mv-design-pro/ARCHITECTURE.md` | Rozszerzenie § 18: Topology Tree jako kręgosłup nawigacji | DONE |
+
+### 12.7.4. Completed Tasks
+
+- [x] Rozszerzenie sekcji 5 w `docs/ui/TOPOLOGY_TREE_CONTRACT.md`:
+  - Definicja Single Global Focus (Target Element, Active Case, Active Run, Active Snapshot, Active Analysis),
+  - Global Focus Stack (hierarchiczny fokus),
+  - ESC Behavior (cofanie fokusu bez resetowania kontekstu),
+  - Synchronizacja Tree ↔ SLD,
+  - Synchronizacja Tree ↔ Results Browser,
+  - Synchronizacja Tree ↔ Element Inspector,
+  - FORBIDDEN practices (rozjazd selekcji, wiele aktywnych fokusów).
+- [x] Aktualizacja `mv-design-pro/PLANS.md` (dodanie Phase 2.x.2).
+- [x] Aktualizacja `mv-design-pro/ARCHITECTURE.md` (rozszerzenie § 18.2.2: Topology Tree jako kręgosłup nawigacji).
+
+### 12.7.5. Key Principles (Summary)
+
+| # | Zasada | Opis |
+|---|--------|------|
+| 1 | **SINGLE GLOBAL FOCUS** | Jeden globalny fokus = (Target Element, Active Case, Active Run, Active Snapshot, Active Analysis) |
+| 2 | **Synchronizacja 4-widokowa** | Topology Tree ↔ SLD ↔ Results Browser ↔ Element Inspector (każdy zmiana w jednym → aktualizacja wszystkich) |
+| 3 | **ESC Behavior** | ESC cofa fokus o poziom wstecz (Element → Run → Snapshot → Case), **NIE resetuje** Active Case/Snapshot |
+| 4 | **FORBIDDEN: Rozjazd selekcji** | Wiele aktywnych fokusów = regresja wymagająca hotfix |
+
+### 12.7.6. UI Synchronization Contract (Extended)
+
+**Before Phase 2.x.2:**
+- Topology Tree synchro z SLD (klik w Tree → highlight SLD),
+- Brak formalnej definicji "jednej prawdy selekcji",
+- Brak zasad zachowania kontekstu przy przełączaniu widoków.
+
+**After Phase 2.x.2 (DOC-LOCKED):**
+- **SINGLE GLOBAL FOCUS** zdefiniowany jako INVARIANT,
+- **Synchronizacja 4-widokowa** (Tree ↔ SLD ↔ Results ↔ Inspector) — każda zmiana w jednym widoku aktualizuje wszystkie pozostałe,
+- **ESC Behavior** sformalizowany (cofanie fokusu bez resetowania kontekstu),
+- **FORBIDDEN practices** (rozjazd selekcji, wiele fokusów) → każda to REGRESJA wymagająca HOTFIX.
 
 ---
 

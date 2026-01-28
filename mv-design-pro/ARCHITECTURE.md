@@ -1750,6 +1750,69 @@ Results (Wyniki)
 - Brak synchronizacji z SLD (kliknięcie w drzewo MUST podświetlić element na SLD),
 - Ukrywanie elementów "out of service" domyślnie (użytkownik decyduje przez filtr).
 
+##### 18.2.2.1 Topology Tree jako kręgosłup nawigacji (Phase 2.x.2)
+
+**Pozycja w architekturze:**
+
+Topology Tree **NIE jest** dodatkowym widokiem — to **kręgosłup nawigacji** (navigation backbone) dla całej aplikacji:
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│                        NAVIGATION LAYER                                  │
+│  ┌───────────────────────────────────────────────────────────────────┐  │
+│  │                      SINGLE GLOBAL FOCUS                          │  │
+│  │  Global Focus = (Target Element, Case, Run, Snapshot, Analysis)  │  │
+│  └───────────┬───────────────────────────────────────────────────────┘  │
+│              │                                                            │
+│              ├──────────┬──────────┬──────────┬──────────┐               │
+│              ▼          ▼          ▼          ▼          ▼               │
+│  ┌────────────────┐ ┌────┐ ┌──────────┐ ┌─────────┐ ┌──────────┐       │
+│  │ Topology Tree  │ │SLD │ │ Results  │ │ Element │ │  Global  │       │
+│  │   (PRIMARY)    │ │    │ │ Browser  │ │Inspector│ │ Context  │       │
+│  │                │ │    │ │          │ │         │ │   Bar    │       │
+│  └────────────────┘ └────┘ └──────────┘ └─────────┘ └──────────┘       │
+│         │              │          │            │            │            │
+│         └──────────────┴──────────┴────────────┴────────────┘            │
+│                            (synchronizacja 4-widokowa)                   │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+**Zasady (BINDING — Phase 2.x.2):**
+
+1. **SINGLE GLOBAL FOCUS:**
+   - W danym momencie **dokładnie jeden** element może być w fokusie,
+   - Fokus jest **współdzielony** między **wszystkimi** widokami (Tree, SLD, Results Browser, Element Inspector),
+   - Zmiana fokusu w **dowolnym** widoku **MUST** zaktualizować **wszystkie** pozostałe widoki.
+
+2. **Global Focus Stack (hierarchiczny fokus):**
+   ```
+   Level 0: Project
+   Level 1: Case
+   Level 2: Snapshot
+   Level 3: Analysis Run
+   Level 4: Target Element (Bus, Line, Trafo, Source, etc.)
+   ```
+
+3. **Synchronizacja 4-widokowa (BINDING):**
+   - **Klik w Topology Tree** → ustawia Global Focus + podświetla w SLD + otwiera Inspector + podświetla w Results Browser,
+   - **Klik w SLD** → ustawia Global Focus + podświetla w Tree + rozwija ścieżkę + otwiera Inspector + podświetla w Results Browser,
+   - **Klik w Results Browser** → ustawia Global Focus + podświetla w Tree + podświetla w SLD + otwiera Inspector,
+   - **Otwarcie Inspector** → odczytuje Global Focus (read-only).
+
+4. **ESC Behavior (cofanie fokusu):**
+   - **ESC** cofa fokus o jeden poziom wstecz (np. Element → Run → Snapshot → Case → Project),
+   - **ESC** **NIE resetuje** Active Case, Active Run, Active Snapshot (kontekst pozostaje),
+   - **ESC** na poziomie Project **SHOULD** zamknąć aktywny panel.
+
+**FORBIDDEN (każda z poniższych sytuacji to REGRESJA wymagająca HOTFIX):**
+
+- Wiele aktywnych fokusów jednocześnie (np. Bus-01 w Tree, Bus-02 w SLD),
+- Rozjazd kontekstu (np. Case 1 aktywny w Tree, Case 2 aktywny w Results Browser),
+- Reset kontekstu przy zmianie widoku (np. przełączenie SLD → Results resetuje Active Case),
+- Brak synchronizacji (np. kliknięcie w SLD nie podświetla elementu w Tree).
+
+**Referencja:** `docs/ui/TOPOLOGY_TREE_CONTRACT.md` § 5.0 (SINGLE GLOBAL FOCUS).
+
 ---
 
 #### 18.2.3 Switching State View (Stany łączeniowe)
@@ -1869,6 +1932,10 @@ Results (Wyniki)
 - [ ] SLD Render Layers implementuje tryby CAD, SCADA, HYBRID (zgodnie z kontraktem)
 - [ ] Topology Tree implementuje hierarchię Project → Station → VoltageLevel → Element
 - [ ] Topology Tree synchronizuje selekcję z SLD i Element Inspector
+- [ ] **SINGLE GLOBAL FOCUS** zaimplementowany (jeden globalny fokus współdzielony przez Tree, SLD, Results Browser, Element Inspector) — **Phase 2.x.2**
+- [ ] **Synchronizacja 4-widokowa** (klik w dowolnym widoku → aktualizacja wszystkich pozostałych) — **Phase 2.x.2**
+- [ ] **ESC Behavior** (cofanie fokusu bez resetowania Active Case/Snapshot) — **Phase 2.x.2**
+- [ ] **FORBIDDEN: Rozjazd selekcji** (brak wielu aktywnych fokusów, brak rozjazdu kontekstu) — **Phase 2.x.2**
 - [ ] Switching State View identyfikuje Islands algorytmicznie (graph traversal)
 - [ ] SC Node Results prezentuje wyniki WYŁĄCZNIE per BUS (ZAKAZ „na linii")
 - [ ] Catalog Browser implementuje relację Type → Instances
