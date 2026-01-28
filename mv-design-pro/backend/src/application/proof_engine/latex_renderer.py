@@ -184,11 +184,15 @@ class LaTeXRenderer:
             and "delta_q_cmd" in doc.summary.key_results
         )
 
+        is_lc_counterfactual = bool(doc.summary.counterfactual_diff)
+
         # P11.1c: Sprawdź czy ma dane VDROP (wpływ Q na U)
         has_vdrop_link = "vdrop_u_kv" in doc.summary.key_results
 
         if is_counterfactual:
             lines.extend(cls._render_counterfactual_table(doc))
+        elif is_lc_counterfactual:
+            lines.extend(cls._render_load_currents_counterfactual_table(doc))
         elif has_vdrop_link:
             # P11.1c: Sekcja "Wpływ Q na U"
             lines.extend(cls._render_vdrop_link_section(doc))
@@ -304,6 +308,63 @@ class LaTeXRenderer:
             lines.append(r"  \item")
             lines.append(cls._math_block(
                 f"\\Delta U_{{(B-A)}} = {delta_u:.4f}\\,\\text{{kV}}"
+            ))
+
+        lines.append(r"\end{itemize}")
+
+        return lines
+
+    @classmethod
+    def _render_load_currents_counterfactual_table(cls, doc: ProofDocument) -> list[str]:
+        """Renderuje tabelę A/B/Δ dla counterfactual P15."""
+        kr = doc.summary.key_results
+        diff = doc.summary.counterfactual_diff
+
+        rows: list[tuple[str, str, str, str]] = []
+
+        def _add_row(key: str, label: str, unit: str):
+            key_a = f"{key}_a"
+            key_b = f"{key}_b"
+            key_d = f"delta_{key}"
+            if key_a in kr and key_b in kr and key_d in diff:
+                a_val = cls._format_numeric_value(kr[key_a].value)
+                b_val = cls._format_numeric_value(kr[key_b].value)
+                d_val = cls._format_numeric_value(diff[key_d].value)
+                rows.append((f"{label} [{unit}]", a_val, b_val, d_val))
+
+        _add_row("s_mva", "S", "MVA")
+        _add_row("i_ka", "I", "kA")
+        _add_row("k_i_percent", "k_I", "%")
+        _add_row("m_i_percent", "m_I", "%")
+        _add_row("k_s_percent", "k_S", "%")
+        _add_row("m_s_percent", "m_S", "%")
+
+        lines = [
+            r"\textbf{Porównanie scenariuszy A vs B (P15):}",
+            "",
+            r"\begin{center}",
+            r"\begin{tabular}{lccc}",
+            r"\toprule",
+            r"\textbf{Wielkość} & \textbf{A} & \textbf{B} & \textbf{$\Delta$ (B-A)} \\",
+            r"\midrule",
+        ]
+
+        for label, a_val, b_val, d_val in rows:
+            lines.append(rf"{label} & {a_val} & {b_val} & {d_val} \\")
+
+        lines.extend([
+            r"\bottomrule",
+            r"\end{tabular}",
+            r"\end{center}",
+            "",
+            r"\textbf{Różnice (counterfactual diff):}",
+            r"\begin{itemize}",
+        ])
+
+        for key, val in sorted(diff.items()):
+            lines.append(r"  \item")
+            lines.append(cls._math_block(
+                f"{val.symbol} = {cls._format_numeric_value(val.value)}\\,\\text{{{val.unit}}}"
             ))
 
         lines.append(r"\end{itemize}")

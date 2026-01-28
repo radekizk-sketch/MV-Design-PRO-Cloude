@@ -1696,6 +1696,187 @@ Results (Wyniki)
 
 ---
 
+## 18. UI Eksploracji i Kontroli UI (Phase 2.x)
+
+### 18.1 Pozycja w architekturze
+
+**UI Eksploracji i Kontroli UI** definiuje warstwę prezentacji klasy ETAP / DIgSILENT PowerFactory++ dla:
+
+- **renderingu SLD** (warstwy CAD vs SCADA),
+- **eksploracji topologii** (drzewo hierarchiczne),
+- **analizy stanów łączeniowych** (OPEN/CLOSED + Islands),
+- **prezentacji wyników zwarciowych** (węzłowo-centryczne),
+- **przeglądania katalogów** (Type Library),
+- **porównywania wariantów** (Case A/B/C).
+
+**Referencje (CANONICAL, BINDING):**
+- `docs/ui/SLD_RENDER_LAYERS_CONTRACT.md`
+- `docs/ui/TOPOLOGY_TREE_CONTRACT.md`
+- `docs/ui/SWITCHING_STATE_VIEW_CONTRACT.md`
+- `docs/ui/SC_NODE_RESULTS_CONTRACT.md`
+- `docs/ui/CATALOG_BROWSER_CONTRACT.md`
+- `docs/ui/CASE_COMPARISON_UI_CONTRACT.md`
+
+### 18.2 Komponenty UI PF++
+
+#### 18.2.1 SLD Render Layers (CAD vs SCADA)
+
+**Cel:** Rozdział semantyk renderingu SLD — statyczny schemat techniczny (CAD) vs runtime monitoring (SCADA).
+
+**Funkcjonalność:**
+- **SLD_CAD_LAYER**: statyczny, drukowany, zgodny z normami IEC 61082, IEEE 315, wszystkie dane techniczne,
+- **SLD_SCADA_LAYER**: dynamiczny, runtime, kolory semantyczne (czerwony/żółty/zielony), animacje przepływu mocy,
+- **Tryby pracy:** CAD Mode (tylko CAD), SCADA Mode (CAD + SCADA overlay), Hybrid Mode (konfigurowalne nakładki).
+
+**Zakazy:**
+- Mieszanie semantyk warstw (parametry katalogowe w SCADA, wyniki runtime w CAD),
+- Eksport SCADA bez warstwy CAD (wyniki bez schematów),
+- Brak legendy kolorów przy eksporcie SCADA do PDF.
+
+---
+
+#### 18.2.2 Topology Tree (Eksploracja topologii)
+
+**Cel:** Hierarchiczna eksploracja struktury sieci jako alternatywa dla nawigacji SLD.
+
+**Funkcjonalność:**
+- **Hierarchia:** Project → Station → Voltage Level → Elements (Bus, Line, Trafo, Source, Load, Switch),
+- **Synchronizacja:** kliknięcie w drzewie → podświetlenie na SLD + otwarcie Element Inspector,
+- **Filtrowanie:** po typie elementu, napięciu, strefie,
+- **Wyszukiwanie:** po nazwie (regex), po ID.
+
+**Zakazy:**
+- Przechowywanie danych topologii w Topology Tree (tylko odczyt z NetworkModel),
+- Brak synchronizacji z SLD (kliknięcie w drzewo MUST podświetlić element na SLD),
+- Ukrywanie elementów "out of service" domyślnie (użytkownik decyduje przez filtr).
+
+---
+
+#### 18.2.3 Switching State View (Stany łączeniowe)
+
+**Cel:** Eksploracja stanów łączeniowych przełączników + identyfikacja izolowanych wysp (Islands).
+
+**Funkcjonalność:**
+- **Switch List:** tabela wszystkich przełączników (ID, Name, Type, State, From Bus, To Bus),
+- **Island View:** algorytmiczna identyfikacja izolowanych wysp (connected components),
+- **Switching Scenario Manager:** symulacja wpływu operacji łączeniowych na spójność sieci,
+- **Wizualizacja Islands na SLD:** kolorowanie tła Bus (każda Island = inny kolor), boundary markers (czerwona linia przerywana).
+
+**Zakazy:**
+- Permanentna zmiana stanów przełączników bez zapisu jako Snapshot,
+- Automatyczne uruchamianie solverów (LF, SC) po Toggle (użytkownik decyduje),
+- Brak walidacji spójności sieci (Islands MUST być identyfikowane).
+
+---
+
+#### 18.2.4 SC Node Results (Wyniki zwarciowe per BUS)
+
+**Cel:** Prezentacja wyników zwarciowych WYŁĄCZNIE per BUS (węzłowo-centryczne).
+
+**Funkcjonalność:**
+- **Tabela SC:** Bus ID, Bus Name, Fault Type, Ik_max, Ik_min, ip, Ith, Sk, Status,
+- **Element Inspector (Bus):** zakładka Results → sekcja Short-Circuit Results + Contributions,
+- **SLD Overlay:** nakładka SC tylko na Bus (Ik_max [kA], Status kolor).
+
+**Zakazy (FUNDAMENTALNE):**
+- Prezentacja wyników SC „na linii" (linia to impedancja, nie węzeł),
+- Prezentacja wyników SC „na transformatorze" (transformator to impedancja, nie węzeł),
+- Kolumna „Prąd zwarciowy na Branch" w Results Browser,
+- Nakładka „Ik [kA]" na symbolu linii w SLD,
+- Używanie terminologii „fault current in line" w UI.
+
+---
+
+#### 18.2.5 Catalog Browser (Type Library)
+
+**Cel:** Przeglądanie katalogów typów elementów + relacja Type → Instances.
+
+**Funkcjonalność:**
+- **Type Category List:** Line Types, Cable Types, Transformer Types, Switch Types, Source Types,
+- **Type List:** tabela typów (Type ID, Type Name, Manufacturer, Rating, Instances Count),
+- **Type Details:** zakładki (Overview, Parameters, Instances, Technical Data),
+- **Zarządzanie katalogiem (Designer Mode):** dodawanie, edycja, usuwanie typów.
+
+**Zakazy:**
+- Edycja typów w trybie Operator / Analyst (tylko Designer),
+- Usuwanie typu z instancjami (Instances > 0),
+- Brak ostrzeżenia przy edycji typu z instancjami.
+
+---
+
+#### 18.2.6 Case Comparison UI (Porównanie Case A/B/C)
+
+**Cel:** Porównanie dwóch lub trzech Case'ów + wizualizacja różnic (Delta).
+
+**Funkcjonalność:**
+- **Case Selector:** wybór Case A (baseline), Case B (comparison), Case C (optional),
+- **Comparison Table:** Delta (B - A), Delta %, Status Change (IMPROVED, REGRESSED, NO_CHANGE),
+- **SLD Overlay:** wizualizacja różnic na SLD (ΔV [%], ΔI [%], kolory zielony/czerwony),
+- **Eksport:** PDF (tabela + SLD Overlay + legenda), Excel (wszystkie kolumny + summary).
+
+**Zakazy:**
+- Porównanie Case'ów bez wyników (walidacja obowiązkowa),
+- Brak filtra "Show Only Changes",
+- Brak legendy różnic na SLD Overlay.
+
+---
+
+### 18.3 Implikacje dla warstw architektury
+
+#### 18.3.1 Application Layer (SLD, Topology Tree, Switching State View, Catalog Browser, Case Comparison)
+
+**MUST:**
+- Implementować wszystkie komponenty UI PF++ zgodnie z kontraktami,
+- Synchronizować selekcję między SLD, Topology Tree, Element Inspector,
+- Zachować spójność kontekstu (aktywny Case, Snapshot, Analysis) przy przełączaniu widoków.
+
+**FORBIDDEN:**
+- Mieszanie semantyk warstw (CAD vs SCADA),
+- Przechowywanie danych w komponentach UI (tylko odczyt z NetworkModel),
+- Brak synchronizacji między widokami.
+
+#### 18.3.2 Domain Layer (bez zmian)
+
+**UI Eksploracji i Kontroli UI NIE wpływa na Domain Layer** — to wyłącznie warstwa prezentacji (Application Layer).
+
+#### 18.3.3 Solver Layer (bez zmian)
+
+**UI Eksploracji i Kontroli UI NIE wpływa na Solver Layer** — to wyłącznie warstwa prezentacji (Application Layer).
+
+---
+
+### 18.4 Integracja z istniejącymi dokumentami
+
+| Dokument | Relacja do UI PF++ |
+|----------|-------------------|
+| `SLD_RENDER_LAYERS_CONTRACT.md` | Definiuje warstwy CAD vs SCADA (tryby CAD/SCADA/HYBRID) |
+| `TOPOLOGY_TREE_CONTRACT.md` | Definiuje hierarchię topologiczną (Project → Station → VoltageLevel → Element) |
+| `SWITCHING_STATE_VIEW_CONTRACT.md` | Definiuje eksplorację stanów łączeniowych + Islands |
+| `SC_NODE_RESULTS_CONTRACT.md` | Definiuje wyniki zwarciowe per BUS (ZAKAZ „na linii") |
+| `CATALOG_BROWSER_CONTRACT.md` | Definiuje przeglądanie katalogów + relacja Type → Instances |
+| `CASE_COMPARISON_UI_CONTRACT.md` | Definiuje porównanie Case A/B/C (Delta, SLD Overlay) |
+| `RESULTS_BROWSER_CONTRACT.md` | Integracja z Results Browser (hierarchia Case → Snapshot → Analysis) |
+| `ELEMENT_INSPECTOR_CONTRACT.md` | Integracja z Element Inspector (zakładki, multi-case view) |
+| `EXPERT_MODES_CONTRACT.md` | Integracja z Expert Modes (domyślne rozwinięcia, widoczność sekcji) |
+| `GLOBAL_CONTEXT_BAR.md` | Integracja z Global Context Bar (sticky, drukowany w PDF) |
+
+---
+
+### 18.5 UI PF++ Compliance Checklist
+
+**Implementacja zgodna z UI PF++, jeśli:**
+
+- [ ] SLD Render Layers implementuje tryby CAD, SCADA, HYBRID (zgodnie z kontraktem)
+- [ ] Topology Tree implementuje hierarchię Project → Station → VoltageLevel → Element
+- [ ] Topology Tree synchronizuje selekcję z SLD i Element Inspector
+- [ ] Switching State View identyfikuje Islands algorytmicznie (graph traversal)
+- [ ] SC Node Results prezentuje wyniki WYŁĄCZNIE per BUS (ZAKAZ „na linii")
+- [ ] Catalog Browser implementuje relację Type → Instances
+- [ ] Case Comparison UI implementuje porównanie A/B/C (Delta, SLD Overlay)
+- [ ] Wszystkie komponenty UI PF++ są dostępne w każdym trybie eksperckim (zgodnie z EXPERT_MODES_CONTRACT.md)
+
+---
+
 **END OF ARCHITECTURE DOCUMENT**
 
 ## TODO — Proof Packs P14–P17 (FUTURE PACKS)

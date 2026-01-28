@@ -640,6 +640,185 @@ EQ_VDROP_007 = EquationDefinition(
 )
 
 
+# -----------------------------------------------------------------------------
+# P15: Load Currents & Overload — równania dowodowe
+# -----------------------------------------------------------------------------
+
+EQ_LC_001 = EquationDefinition(
+    equation_id="EQ_LC_001",
+    name_pl="Moc pozorna",
+    standard_ref="praktyka inżynierska",
+    latex=r"S = \sqrt{P^{2} + Q^{2}}",
+    symbols=(
+        SymbolDefinition(
+            symbol="S",
+            unit="MVA",
+            description_pl="Moc pozorna",
+            mapping_key="s_mva",
+        ),
+        SymbolDefinition(
+            symbol="P",
+            unit="MW",
+            description_pl="Moc czynna",
+            mapping_key="p_mw",
+        ),
+        SymbolDefinition(
+            symbol="Q",
+            unit="Mvar",
+            description_pl="Moc bierna",
+            mapping_key="q_mvar",
+        ),
+    ),
+    unit_derivation="MW² + Mvar² = MVA² → MVA",
+    notes="Moc pozorna liczona z mocy czynnej i biernej.",
+)
+
+EQ_LC_002 = EquationDefinition(
+    equation_id="EQ_LC_002",
+    name_pl="Prąd roboczy trójfazowy",
+    standard_ref="praktyka inżynierska",
+    latex=r"I = \frac{S}{\sqrt{3}\,U_{LL}}",
+    symbols=(
+        SymbolDefinition(
+            symbol="I",
+            unit="kA",
+            description_pl="Prąd roboczy linii/kabla",
+            mapping_key="i_ka",
+        ),
+        SymbolDefinition(
+            symbol="S",
+            unit="MVA",
+            description_pl="Moc pozorna",
+            mapping_key="s_mva",
+        ),
+        SymbolDefinition(
+            symbol="U_{LL}",
+            unit="kV",
+            description_pl="Napięcie międzyfazowe",
+            mapping_key="u_ll_kv",
+        ),
+    ),
+    unit_derivation="MVA / kV = kA (MVA = kV · kA)",
+    notes="Uwaga jednostkowa: S w MVA, U w kV → wynik w kA.",
+)
+
+EQ_LC_003 = EquationDefinition(
+    equation_id="EQ_LC_003",
+    name_pl="Procent obciążenia prądowego",
+    standard_ref="praktyka inżynierska",
+    latex=r"k_I = 100\cdot\frac{I}{I_n}",
+    symbols=(
+        SymbolDefinition(
+            symbol="k_I",
+            unit="%",
+            description_pl="Procent obciążenia prądowego",
+            mapping_key="k_i_percent",
+        ),
+        SymbolDefinition(
+            symbol="I",
+            unit="kA",
+            description_pl="Prąd roboczy",
+            mapping_key="i_ka",
+        ),
+        SymbolDefinition(
+            symbol="I_n",
+            unit="kA",
+            description_pl="Prąd znamionowy (przeliczony na kA)",
+            mapping_key="in_a",
+        ),
+    ),
+    unit_derivation="100 · kA / kA = %",
+    notes="I_n przeliczany z A na kA dla spójności jednostek.",
+)
+
+EQ_LC_004 = EquationDefinition(
+    equation_id="EQ_LC_004",
+    name_pl="Margines prądowy",
+    standard_ref="praktyka inżynierska",
+    latex=r"m_I = 100\cdot\left(\frac{I_n}{I}-1\right)",
+    symbols=(
+        SymbolDefinition(
+            symbol="m_I",
+            unit="%",
+            description_pl="Margines prądowy",
+            mapping_key="m_i_percent",
+        ),
+        SymbolDefinition(
+            symbol="I_n",
+            unit="kA",
+            description_pl="Prąd znamionowy (przeliczony na kA)",
+            mapping_key="in_a",
+        ),
+        SymbolDefinition(
+            symbol="I",
+            unit="kA",
+            description_pl="Prąd roboczy",
+            mapping_key="i_ka",
+        ),
+    ),
+    unit_derivation="100 · (kA / kA - 1) = %",
+    notes="Dla I = 0 margines definiowany jako +∞ (deterministycznie).",
+)
+
+EQ_LC_005 = EquationDefinition(
+    equation_id="EQ_LC_005",
+    name_pl="Obciążenie transformatora (procent)",
+    standard_ref="praktyka inżynierska",
+    latex=r"k_S = 100\cdot\frac{S}{S_n}",
+    symbols=(
+        SymbolDefinition(
+            symbol="k_S",
+            unit="%",
+            description_pl="Procent obciążenia transformatora",
+            mapping_key="k_s_percent",
+        ),
+        SymbolDefinition(
+            symbol="S",
+            unit="MVA",
+            description_pl="Moc pozorna",
+            mapping_key="s_mva",
+        ),
+        SymbolDefinition(
+            symbol="S_n",
+            unit="MVA",
+            description_pl="Moc znamionowa transformatora",
+            mapping_key="sn_mva",
+        ),
+    ),
+    unit_derivation="100 · MVA / MVA = %",
+    notes="Obciążenie transformatora względem mocy znamionowej.",
+)
+
+EQ_LC_006 = EquationDefinition(
+    equation_id="EQ_LC_006",
+    name_pl="Margines transformatora",
+    standard_ref="praktyka inżynierska",
+    latex=r"m_S = 100\cdot\left(\frac{S_n}{S}-1\right)",
+    symbols=(
+        SymbolDefinition(
+            symbol="m_S",
+            unit="%",
+            description_pl="Margines obciążenia transformatora",
+            mapping_key="m_s_percent",
+        ),
+        SymbolDefinition(
+            symbol="S_n",
+            unit="MVA",
+            description_pl="Moc znamionowa transformatora",
+            mapping_key="sn_mva",
+        ),
+        SymbolDefinition(
+            symbol="S",
+            unit="MVA",
+            description_pl="Moc pozorna",
+            mapping_key="s_mva",
+        ),
+    ),
+    unit_derivation="100 · (MVA / MVA - 1) = %",
+    notes="Dla S = 0 margines definiowany jako +∞ (deterministycznie).",
+)
+
+
 # =============================================================================
 # Q(U) Regulation — Kanoniczne równania (BINDING) P11.1b
 # =============================================================================
@@ -1258,6 +1437,16 @@ class EquationRegistry:
         "EQ_VDROP_007": EQ_VDROP_007,
     }
 
+    # P15: Load Currents & Overload equations registry
+    LC_EQUATIONS: dict[str, EquationDefinition] = {
+        "EQ_LC_001": EQ_LC_001,
+        "EQ_LC_002": EQ_LC_002,
+        "EQ_LC_003": EQ_LC_003,
+        "EQ_LC_004": EQ_LC_004,
+        "EQ_LC_005": EQ_LC_005,
+        "EQ_LC_006": EQ_LC_006,
+    }
+
     # Q(U) equations registry (P11.1b + P11.1c)
     QU_EQUATIONS: dict[str, EquationDefinition] = {
         "EQ_QU_001": EQ_QU_001,
@@ -1300,6 +1489,16 @@ class EquationRegistry:
         "EQ_VDROP_007",  # Napięcie w punkcie U
     ]
 
+    # Step order for P15 (BINDING)
+    LC_STEP_ORDER: list[str] = [
+        "EQ_LC_001",  # Moc pozorna
+        "EQ_LC_002",  # Prąd roboczy 3-f
+        "EQ_LC_003",  # Procent obciążenia prądowego
+        "EQ_LC_004",  # Margines prądowy
+        "EQ_LC_005",  # Obciążenie transformatora
+        "EQ_LC_006",  # Margines transformatora
+    ]
+
     # Step order for Q(U) proof (BINDING) — P11.1b + P11.1c
     QU_STEP_ORDER: list[str] = [
         "EQ_QU_001",  # ΔU = U_meas - U_ref
@@ -1339,6 +1538,7 @@ class EquationRegistry:
         "sc3f_equations": list(SC3F_EQUATIONS.keys()),
         "vdrop_equations": list(VDROP_EQUATIONS.keys()),
         "sc1_equations": list(SC1_EQUATIONS.keys()),
+        "lc_equations": list(LC_EQUATIONS.keys()),
         "mapping_keys": [
             # SC3F
             "ikss_ka", "ip_ka", "ith_ka", "idyn_ka", "sk_mva",
@@ -1354,6 +1554,9 @@ class EquationRegistry:
             "i1_ka", "i2_ka", "i0_ka",
             "ia_ka", "ib_ka", "ic_ka",
             "a_operator",
+            # P15
+            "u_ll_kv", "p_mw", "q_mvar", "s_mva", "i_ka", "in_a",
+            "k_i_percent", "m_i_percent", "sn_mva", "k_s_percent", "m_s_percent",
         ],
     }
 
@@ -1364,6 +1567,8 @@ class EquationRegistry:
             return cls.SC3F_EQUATIONS[equation_id]
         if equation_id in cls.VDROP_EQUATIONS:
             return cls.VDROP_EQUATIONS[equation_id]
+        if equation_id in cls.LC_EQUATIONS:
+            return cls.LC_EQUATIONS[equation_id]
         if equation_id in cls.QU_EQUATIONS:
             return cls.QU_EQUATIONS[equation_id]
         if equation_id in cls.SC1_EQUATIONS:
@@ -1381,6 +1586,11 @@ class EquationRegistry:
         return cls.VDROP_EQUATIONS.copy()
 
     @classmethod
+    def get_lc_equations(cls) -> dict[str, EquationDefinition]:
+        """Zwraca wszystkie równania P15 (Load Currents)."""
+        return cls.LC_EQUATIONS.copy()
+
+    @classmethod
     def get_sc3f_proof_step_order(cls) -> list[str]:
         """Zwraca kolejność kroków dla dowodu SC3F (tylko równania dowodowe)."""
         return cls.SC3F_PROOF_STEP_ORDER.copy()
@@ -1389,6 +1599,11 @@ class EquationRegistry:
     def get_vdrop_step_order(cls) -> list[str]:
         """Zwraca kolejność kroków dla dowodu VDROP."""
         return cls.VDROP_STEP_ORDER.copy()
+
+    @classmethod
+    def get_lc_step_order(cls) -> list[str]:
+        """Zwraca kolejność kroków dla dowodu P15."""
+        return cls.LC_STEP_ORDER.copy()
 
     @classmethod
     def get_qu_equations(cls) -> dict[str, EquationDefinition]:
@@ -1431,6 +1646,9 @@ class EquationRegistry:
         for eq in cls.VDROP_EQUATIONS.values():
             for sym in eq.symbols:
                 keys.add(sym.mapping_key)
+        for eq in cls.LC_EQUATIONS.values():
+            for sym in eq.symbols:
+                keys.add(sym.mapping_key)
         for eq in cls.QU_EQUATIONS.values():
             for sym in eq.symbols:
                 keys.add(sym.mapping_key)
@@ -1456,6 +1674,10 @@ class EquationRegistry:
         for eq_id in cls.FROZEN_IDS["sc1_equations"]:
             if eq_id not in cls.SC1_EQUATIONS:
                 raise ValueError(f"Frozen equation ID {eq_id} usunięty z SC1!")
+
+        for eq_id in cls.FROZEN_IDS["lc_equations"]:
+            if eq_id not in cls.LC_EQUATIONS:
+                raise ValueError(f"Frozen equation ID {eq_id} usunięty z P15!")
 
         current_keys = cls.get_all_mapping_keys()
         for key in cls.FROZEN_IDS["mapping_keys"]:
