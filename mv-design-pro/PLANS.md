@@ -550,6 +550,16 @@ Wprowadzenie warstwy **interpretacji dowodowej** (Proof Engine), która generuje
 - [x] Komponenty UI wyspecyfikowane
 - [x] Wymagania dostępności (a11y) opisane
 
+### 14.6 P11.2 — Proof Inspector UX / UI Parity (PowerFactory-style)
+
+**Definition of Done:**
+- [x] Dwupanelowy układ PF (drzewo dowodu + szczegóły kroku)
+- [x] Nagłówek PF-style z metadanymi i banerem „Tylko do odczytu"
+- [x] Tryby widoku Executive/Engineering/Academic (read-only filtr prezentacji)
+- [x] Porównanie A/B dla counterfactual (tabela + szybkie skoki)
+- [x] UI eksportu JSON/LaTeX/PDF z deterministyczną nazwą pliku
+- [x] Minimalna dostępność: aria-labels, focus outline, nawigacja klawiaturą
+
 ---
 
 ## 15. P11 Compliance Checklist
@@ -590,6 +600,7 @@ Wprowadzenie warstwy **interpretacji dowodowej** (Proof Engine), która generuje
 | 2026-01 | 2.12 | P11.1a MVP: SC3F IEC60909 + VDROP proof specifications |
 | 2026-01 | 2.13 | P11.1b-d: Regulation Q(U), asymmetrical SC, UI/export specs |
 | 2026-01 | 2.14 | P11 Professor Audit: LaTeX-only policy, I_dyn/I_th mandatory, SC3F Gold Standard |
+| 2026-02 | 2.15 | P11.2 Proof Inspector UX/UI parity (PowerFactory-style, read-only) |
 
 ---
 
