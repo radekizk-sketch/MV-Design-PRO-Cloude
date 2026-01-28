@@ -1694,6 +1694,138 @@ Results (Wyniki)
 - [ ] Global Context Bar jest sticky (zawsze widoczny) i drukowany w nagłówku PDF
 - [ ] UI osiąga parity z ETAP / PowerFactory (minimum 47 FULL PARITY features)
 
+### 17.7 Results Tables — szczegółowa specyfikacja
+
+**Referencja (CANONICAL, BINDING):**
+- `docs/ui/RESULTS_TABLES_CONTRACT.md`
+
+#### 17.7.1 Cel
+
+**Results Tables** stanowią szczegółową specyfikację tabelarycznej prezentacji wyników, komplementarną do Results Browser:
+
+- **Porównania A/B/C/D/...**: dowolna liczba Case/Run/Snapshot w jednej tabeli,
+- **Widoki Min/Max**: envelope wyników (minimum i maksimum z wielu Case'ów),
+- **Zaawansowane filtrowanie i sortowanie**: Status, Violation, Zone, Voltage, Custom Expression,
+- **Grupowanie**: po Zone, Voltage Level, Status, Element Type,
+- **Eksport z kontekstem**: CSV, Excel, PDF z pełnym nagłówkiem Global Context Bar.
+
+#### 17.7.2 Rodzaje tabel (BINDING)
+
+| Rodzaj tabeli | Opis | Wymagane |
+|---------------|------|----------|
+| **Single Case Table** | Wyniki dla jednego Case / Run | MUST |
+| **Comparison Table (A/B)** | Porównanie dwóch Case'ów | MUST |
+| **Multi-Comparison Table (A/B/C/...)** | Porównanie 3+ Case'ów | MUST |
+| **Min/Max Table** | Minimum i maksimum z wielu Case'ów | MUST |
+| **Time-Series Table** | Wyniki dla serii czasowej (opcjonalnie) | MAY |
+
+#### 17.7.3 Multi-Comparison (A/B/C/...)
+
+Multi-Comparison Table umożliwia porównanie **3 lub więcej Case'ów** w jednej tabeli:
+
+**Kolumny (BINDING):**
+- Element ID, Element Name, Parameter,
+- Case A, Case B, Case C, ... (dowolna liczba Case'ów),
+- Min, Max, Range, Std Dev (opcjonalnie).
+
+**Highlighting:**
+- **Zielony**: poprawa (VIOLATION → OK),
+- **Czerwony**: pogorszenie (OK → VIOLATION),
+- **Żółty**: bez zmiany, wciąż violation.
+
+#### 17.7.4 Min/Max Views
+
+Min/Max Views umożliwiają analizę **envelope** wyników z wielu Case'ów:
+
+**Kolumny (BINDING):**
+- Element ID, Element Name, Parameter,
+- Min Value, Case of Min,
+- Max Value, Case of Max,
+- Range, Status (Min), Status (Max).
+
+**Zastosowania:**
+- Analizy N-1 (Case MAX, Case MIN, Case N-1),
+- Analizy scenariuszy (porównanie wielu wariantów rozwoju sieci),
+- Analizy wrażliwości (minimum i maksimum dla różnych parametrów).
+
+#### 17.7.5 Performance (BINDING)
+
+| Operacja | Liczba wierszy | Max czas | Wymagane |
+|----------|----------------|----------|----------|
+| **Renderowanie tabeli** | 10 000 | < 500 ms | MUST |
+| **Sortowanie** | 10 000 | < 300 ms | MUST |
+| **Filtrowanie** | 10 000 | < 400 ms | MUST |
+| **Eksport CSV** | 100 000 | < 5 s | MUST |
+| **Eksport Excel** | 100 000 | < 10 s | MUST |
+| **Eksport PDF** | 10 000 | < 15 s | MUST |
+
+**Optymalizacje:**
+- Wirtualizacja wierszy (lazy loading) dla > 1 000 wierszy,
+- Server-side filtering dla > 100 000 wierszy,
+- Cachowanie danych w pamięci (w ramach sesji).
+
+#### 17.7.6 Eksport PDF z kontekstem
+
+Eksport PDF MUST zawierać nagłówek z Global Context Bar:
+
+```
+─────────────────────────────────────────────────────────────────────
+MV-DESIGN-PRO — Results Table
+─────────────────────────────────────────────────────────────────────
+Project:       [Project Name]
+Case:          [Case Name] (lub: Case A, Case B, Case C — dla porównań)
+Snapshot:      [Snapshot Name] (Timestamp: [YYYY-MM-DD HH:MM:SS])
+Analysis:      [Analysis Type] (Status: [Success/Warning/Error])
+Norma:         [Norma Name] ([Version])
+Expert Mode:   [Mode Name]
+Generated:     [YYYY-MM-DD HH:MM:SS]
+User:          [Username]
+─────────────────────────────────────────────────────────────────────
+```
+
+**Formatowanie:**
+- Orientacja: automatyczna (Portrait / Landscape),
+- Font: Times New Roman, 10pt (nagłówki: 12pt bold),
+- Kolory: zachowanie kolorów semantycznych (zielony/żółty/czerwony),
+- Paginacja: numeracja stron (Page X of Y).
+
+#### 17.7.7 Implikacje dla warstw architektury
+
+**Application Layer (Results Tables):**
+
+**MUST:**
+- Implementować wszystkie rodzaje tabel (Single Case, A/B, A/B/C, Min/Max),
+- Implementować zaawansowane filtrowanie (Status, Violation, Zone, Voltage, Custom Expression),
+- Implementować grupowanie (Zone, Voltage Level, Status, Element Type),
+- Implementować eksport z kontekstem (CSV, Excel, PDF z nagłówkiem Global Context Bar),
+- Spełniać wymagania wydajnościowe (wirtualizacja, server-side filtering).
+
+**FORBIDDEN:**
+- Ukrywanie kolumn "dla uproszczenia" — użytkownik decyduje,
+- Tworzenie "basic table" i "advanced table" — jedna tabela z opcjami,
+- Eksport PDF bez nagłówka kontekstu (Global Context Bar),
+- Eksport CSV bez jednostek w nazwach kolumn,
+- Tabele bez wirtualizacji dla > 1 000 wierszy.
+
+**Domain Layer (bez zmian):**
+
+**Results Tables NIE wpływają na Domain Layer** — to wyłącznie warstwa prezentacji (Application Layer).
+
+**Solver Layer (bez zmian):**
+
+**Results Tables NIE wpływają na Solver Layer** — to wyłącznie warstwa prezentacji (Application Layer).
+
+#### 17.7.8 Integracja z istniejącymi dokumentami
+
+| Dokument | Relacja do Results Tables |
+|----------|--------------------------|
+| `RESULTS_BROWSER_CONTRACT.md` | Results Browser (ogólna koncepcja drzewa + tabel) |
+| `RESULTS_TABLES_CONTRACT.md` | Results Tables (szczegółowa specyfikacja tabel) |
+| `ELEMENT_INSPECTOR_CONTRACT.md` | Kliknięcie w wiersz tabeli otwiera Element Inspector |
+| `GLOBAL_CONTEXT_BAR.md` | Context Bar drukowany w nagłówku PDF przy eksporcie |
+| `EXPERT_MODES_CONTRACT.md` | Results Tables reagują na zmianę Expert Mode |
+| `UI_ETAP_POWERFACTORY_PARITY.md` | Results Tables spełniają parity z ETAP/PowerFactory |
+
 ---
 
 **END OF ARCHITECTURE DOCUMENT**

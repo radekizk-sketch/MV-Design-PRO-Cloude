@@ -288,6 +288,65 @@ Zdefiniowanie **warstwy eksploracji wyników i inspekcji elementów UI** klasy E
 
 ---
 
+## 3.8 Phase 2.1: Results Navigation & Comparison (DOC-LOCKED) - COMPLETE
+
+### 3.8.1 Goal
+
+Zdefiniowanie **globalnej nawigacji i eksploracji wyników** klasy ETAP / DIgSILENT PowerFactory:
+
+- **Results Browser**: pełna eksploracja wyników niezależnie od SLD,
+- **Results Tables**: tabelaryczna prezentacja z porównaniami A/B/C i widokami Min/Max,
+- **Maksymalna ilość danych**: brak uproszczeń, maksymalna kontrola użytkownika,
+- **Minimum funkcjonalne**: parity z ETAP / DIgSILENT PowerFactory.
+
+### 3.8.2 Scope
+
+**IN SCOPE:**
+- Dokumentacja Results Tables (szczegółowa specyfikacja tabel wyników)
+- Porównania A/B/C/D… (dowolna liczba Case/Run/Snapshot)
+- Widoki Min/Max (minimum i maksimum z wielu Case'ów)
+- Zaawansowane sortowanie, filtrowanie, grupowanie
+- Eksport i wydruk (CSV, Excel, PDF) z pełnym kontekstem
+- Performance i skalowalność (wirtualizacja, server-side filtering)
+
+**OUT OF SCOPE:**
+- Kod implementacyjny (tylko dokumentacja)
+- UI mockupy (tylko specyfikacja tekstowa)
+- Backend changes
+- Solver modifications
+
+### 3.8.3 Deliverables
+
+| File | Status | Description |
+|------|--------|-------------|
+| docs/ui/RESULTS_BROWSER_CONTRACT.md | ALREADY EXISTS | Results Browser: drzewo, tabele, porównania (BINDING) |
+| docs/ui/RESULTS_TABLES_CONTRACT.md | DONE | Results Tables: porównania A/B/C, Min/Max, eksport (BINDING) |
+| PLANS.md | DONE | Dodanie Phase 2.1 |
+| ARCHITECTURE.md | DONE | Referencja do Results Navigation & Comparison |
+| docs/INDEX.md | DONE | Linki do RESULTS_TABLES_CONTRACT.md |
+
+### 3.8.4 Completed Tasks
+
+- [x] Potwierdzenie istnienia docs/ui/RESULTS_BROWSER_CONTRACT.md (już kompletny)
+- [x] Utworzenie docs/ui/RESULTS_TABLES_CONTRACT.md (szczegółowa specyfikacja tabel)
+- [x] Aktualizacja PLANS.md (dodanie Phase 2.1)
+- [x] Aktualizacja ARCHITECTURE.md (referencja do Results Navigation)
+- [x] Aktualizacja docs/INDEX.md (linki)
+
+### 3.8.5 Key Features (Summary)
+
+| # | Feature | Opis |
+|---|---------|------|
+| 1 | **Multi-Comparison (A/B/C/...)** | Porównanie 3+ Case'ów w jednej tabeli z Delta columns |
+| 2 | **Min/Max Views** | Envelope wyników: minimum i maksimum z wielu Case'ów |
+| 3 | **Advanced Filtering** | Status, Violation, Zone, Voltage, Name Search, Custom Expression |
+| 4 | **Grouping** | Grupowanie po Zone, Voltage Level, Status, Element Type |
+| 5 | **Export with Context** | CSV, Excel, PDF z pełnym nagłówkiem Global Context Bar |
+| 6 | **Performance** | Wirtualizacja (10k rows < 500ms), server-side filtering (100k+ rows) |
+| 7 | **Accessibility** | Keyboard navigation, ARIA labels, screen readers |
+
+---
+
 ## 4. Phase 2: NetworkModel Core (IN PROGRESS)
 
 ### 4.1 Task 2.1: Remove PCC from NetworkGraph (DONE)
@@ -570,6 +629,7 @@ class NetworkGraph:
 | 2025-03 | 2.10 | Static converter sources (PV/WIND/BESS) – catalog + case setpoints |
 | 2026-01 | 2.11 | Phase 1.y: UI Contracts (SLD_UI_CONTRACT.md) – DOC LOCKED |
 | 2026-01 | 2.12 | Phase 1.z: UI Eksploracji Wyników i Inspekcji Elementów – DOC LOCKED |
+| 2026-01 | 2.13 | Phase 2.1: Results Navigation & Comparison (RESULTS_TABLES_CONTRACT.md) – DOC LOCKED |
 
 ---
 
