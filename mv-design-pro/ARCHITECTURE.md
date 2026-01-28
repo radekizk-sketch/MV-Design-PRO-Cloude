@@ -1550,4 +1550,150 @@ Results (Wyniki)
 
 ---
 
+## 17. UI Eksploracji Wyników i Inspekcji Elementów
+
+### 17.1 Pozycja w architekturze
+
+**UI Eksploracji Wyników** definiuje warstwę prezentacji wyników klasy ETAP / DIgSILENT PowerFactory:
+
+- **Results Browser**: pełna eksploracja wyników niezależnie od SLD,
+- **Element Inspector**: inspekcja dowolnego elementu (BUS, LINE, TRAFO, SOURCE, PROTECTION),
+- **Expert Modes**: tryby eksperckie (Operator, Designer, Analyst, Auditor),
+- **Global Context Bar**: kontekst zawsze widoczny (Case, Snapshot, Analysis, Norma, Mode).
+
+**Referencje (CANONICAL, BINDING):**
+- `docs/ui/RESULTS_BROWSER_CONTRACT.md`
+- `docs/ui/ELEMENT_INSPECTOR_CONTRACT.md`
+- `docs/ui/EXPERT_MODES_CONTRACT.md`
+- `docs/ui/GLOBAL_CONTEXT_BAR.md`
+- `docs/ui/UI_ETAP_POWERFACTORY_PARITY.md`
+
+### 17.2 Komponenty UI
+
+#### 17.2.1 Results Browser
+
+**Cel:** Eksploracja wyników jako alternatywa dla nawigacji SLD.
+
+**Funkcjonalność:**
+- Hierarchiczne drzewo: Project → Case → Snapshot → Analysis → Target (Buses, Lines, Transformers, Sources, Protections).
+- Tabele wyników z sortowaniem, filtrowaniem (violations only, zone, voltage range).
+- Porównania Case/Snapshot (Delta view, highlighting improvements/regressions).
+- Eksport do CSV, Excel, PDF.
+
+**Równorzędność z SLD:**
+- Widok SLD = spatial navigation (przestrzenna),
+- Widok tabelaryczny = data navigation (analityczna),
+- Przełączanie SLD ↔ Table bez utraty kontekstu.
+
+#### 17.2.2 Element Inspector
+
+**Cel:** Inspekcja dowolnego elementu sieci (BUS, LINE, TRAFO, SOURCE, PROTECTION).
+
+**Zakładki (BINDING):**
+1. **Overview**: identyfikacja, status, kluczowe wartości,
+2. **Parameters**: parametry techniczne (edycja w trybie Designer),
+3. **Results**: wyniki obliczeń w multi-case view (wszystkie Case'y w jednej tabeli),
+4. **Contributions**: kontrybutorzy do I_sc (Bus), obciążeń (Line, Trafo),
+5. **Limits**: limity normatywne z marginesami (PN-EN 50160, IEC 60909),
+6. **Proof (P11)**: dowód P11 (tylko Bus, Protection) z eksportem do PDF.
+
+**Multi-Case View:**
+- Wyniki dla wszystkich Case'ów w jednej tabeli,
+- Filtrowanie po Case, Snapshot, Analysis,
+- Porównanie wartości między Case'ami (Delta column).
+
+#### 17.2.3 Expert Modes
+
+**Cel:** Dostosowanie UI do roli użytkownika bez ukrywania danych.
+
+**Tryby (BINDING):**
+- **Operator**: domyślne rozwinięcia (Case → Snapshot), widoczne kolumny podstawowe (Name, Status, Voltage, Violation).
+- **Designer**: domyślne rozwinięcia (Case → Snapshot → Analysis), widoczne kolumny (+ P, Q, I, Losses), edycja parametrów.
+- **Analyst**: wszystkie poziomy rozwinięte, wszystkie kolumny widoczne, wykresy contributions.
+- **Auditor**: wszystkie poziomy rozwinięte, wszystkie kolumny + metadane (Timestamp, User, Diff), Proof (P11) domyślnie otwarty.
+
+**NO SIMPLIFICATION RULE:**
+- Tryby **NIE ukrywają danych** — tylko zmieniają domyślne rozwinięcia i widoczność kolumn.
+- Użytkownik zawsze może rozwinąć/dodać ukryte sekcje.
+- **FORBIDDEN**: tworzenie „basic UI" i „advanced UI" (dwa osobne interfejsy).
+
+#### 17.2.4 Global Context Bar
+
+**Cel:** Kontekst zawsze widoczny i drukowany w PDF.
+
+**Sekcje (BINDING):**
+- **Project Name**, **Active Case**, **Active Snapshot**, **Active Analysis**, **Active Norma**, **Expert Mode**, **Active Element** (opcjonalnie), **Timestamp**.
+
+**Właściwości:**
+- **Sticky top bar** (zawsze widoczny przy scrollowaniu),
+- **Drukowany w nagłówku PDF** przy eksporcie (Reports, Proof P11),
+- **Dropdown menu** dla przełączania Case, Snapshot, Analysis, Norma, Expert Mode.
+
+### 17.3 ETAP / PowerFactory UI Parity
+
+**Macierz feature-by-feature:**
+
+| Kategoria                  | ✅ FULL | 🟡 PARTIAL | ❌ NO | ➕ SUPERIOR |
+|----------------------------|---------|-----------|-------|-----------|
+| Results Browser            | 12      | 0         | 0     | 5         |
+| Element Inspector          | 18      | 0         | 0     | 11        |
+| Expert Modes               | 0       | 0         | 0     | 6         |
+| Global Context Bar         | 5       | 0         | 0     | 6         |
+| SLD Viewer                 | 8       | 1         | 0     | 2         |
+| Accessibility              | 1       | 0         | 0     | 4         |
+| Performance                | 3       | 0         | 0     | 1         |
+| **TOTAL**                  | **47**  | **1**     | **0** | **35**    |
+
+**Ocena końcowa:** **MV-DESIGN-PRO UI ≥ ETAP UI**, **MV-DESIGN-PRO UI ≥ PowerFactory UI** ✅
+
+### 17.4 Implikacje dla warstw architektury
+
+#### 17.4.1 Application Layer (Results Browser, Element Inspector)
+
+**MUST:**
+- Implementować Results Browser jako równorzędny widok z SLD.
+- Implementować Element Inspector z wszystkimi zakładkami (Overview, Parameters, Results, Contributions, Limits, Proof P11).
+- Implementować Expert Modes (Operator, Designer, Analyst, Auditor) zgodnie z NO SIMPLIFICATION RULE.
+- Implementować Global Context Bar (sticky, drukowany w PDF).
+
+**FORBIDDEN:**
+- Tworzenie „basic UI" i „advanced UI" (dwa osobne interfejsy).
+- Ukrywanie zakładek lub kolumn „dla uproszczenia" — użytkownik decyduje.
+- Pomijanie multi-case view w Element Inspector.
+- Brak eksportu Proof (P11) do PDF.
+
+#### 17.4.2 Domain Layer (bez zmian)
+
+**UI Eksploracji Wyników NIE wpływa na Domain Layer** — to wyłącznie warstwa prezentacji (Application Layer).
+
+#### 17.4.3 Solver Layer (bez zmian)
+
+**UI Eksploracji Wyników NIE wpływa na Solver Layer** — to wyłącznie warstwa prezentacji (Application Layer).
+
+### 17.5 Integracja z istniejącymi dokumentami
+
+| Dokument | Relacja do UI Eksploracji Wyników |
+|----------|-----------------------------------|
+| `RESULTS_BROWSER_CONTRACT.md` | Definiuje Results Browser (hierarchia drzewa, tabele, porównania) |
+| `ELEMENT_INSPECTOR_CONTRACT.md` | Definiuje Element Inspector (zakładki, multi-case view, Proof P11) |
+| `EXPERT_MODES_CONTRACT.md` | Definiuje Expert Modes (Operator, Designer, Analyst, Auditor) |
+| `GLOBAL_CONTEXT_BAR.md` | Definiuje Global Context Bar (sticky, drukowany w PDF) |
+| `UI_ETAP_POWERFACTORY_PARITY.md` | Definiuje macierz UI Parity (47 FULL, 35 SUPERIOR) |
+| `SLD_UI_CONTRACT.md` | Kontrakty UI dla SLD (Priority Stack, Dense SLD, Semantic Color, Print-First, Interaction) |
+| `P11_1d_PROOF_UI_EXPORT.md` | Definiuje Proof Inspector (zakładka Proof P11 w Element Inspector) |
+
+### 17.6 Compliance Checklist
+
+**Implementacja zgodna z UI Eksploracji Wyników, jeśli:**
+
+- [ ] Results Browser implementuje hierarchię: Project → Case → Snapshot → Analysis → Target
+- [ ] Results Browser umożliwia porównanie Case/Snapshot (Delta view)
+- [ ] Element Inspector posiada wszystkie zakładki (Overview, Parameters, Results, Contributions, Limits, Proof P11)
+- [ ] Element Inspector implementuje multi-case view (wyniki dla wszystkich Case'ów w jednej tabeli)
+- [ ] Expert Modes (Operator, Designer, Analyst, Auditor) NIE ukrywają danych (NO SIMPLIFICATION RULE)
+- [ ] Global Context Bar jest sticky (zawsze widoczny) i drukowany w nagłówku PDF
+- [ ] UI osiąga parity z ETAP / PowerFactory (minimum 47 FULL PARITY features)
+
+---
+
 **END OF ARCHITECTURE DOCUMENT**
