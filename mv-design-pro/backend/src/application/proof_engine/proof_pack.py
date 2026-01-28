@@ -50,7 +50,9 @@ class ProofPackBuilder:
             json.dumps(manifest, ensure_ascii=False, indent=2, sort_keys=True)
         ).encode("utf-8")
 
-        return self._build_zip(file_entries, manifest_bytes)
+        signature_bytes = self._build_signature(file_entries, manifest_bytes)
+
+        return self._build_zip(file_entries, manifest_bytes, signature_bytes)
 
     def _maybe_export_pdf(self, proof_doc: ProofDocument) -> bytes | None:
         if not is_pdf_export_available():
@@ -103,11 +105,68 @@ class ProofPackBuilder:
             },
         }
 
-    def _build_zip(self, file_entries: dict[str, bytes], manifest_bytes: bytes) -> bytes:
+    def _build_signature(
+        self,
+        file_entries: dict[str, bytes],
+        manifest_bytes: bytes,
+    ) -> bytes:
+        signature_files = self._signature_files(file_entries, manifest_bytes)
+        pack_fingerprint = _pack_fingerprint(signature_files)
+        latex_engine = "pdflatex" if "proof_pack/proof.pdf" in file_entries else None
+
+        signature_payload = {
+            "schema_version": "1.0",
+            "algorithm": "SHA-256",
+            "pack_fingerprint": pack_fingerprint,
+            "files": signature_files,
+            "toolchain": {
+                "mv_design_pro_version": self._context.mv_design_pro_version,
+                "python_version": sys.version,
+                "latex_engine": latex_engine,
+            },
+            "notes_pl": (
+                "Plik signature.json służy wyłącznie do weryfikacji integralności "
+                "pakietu. Nie jest podpisem kryptograficznym."
+            ),
+        }
+
+        return _normalize_newlines(
+            json.dumps(signature_payload, ensure_ascii=False, indent=2, sort_keys=True)
+        ).encode("utf-8")
+
+    def _signature_files(
+        self,
+        file_entries: dict[str, bytes],
+        manifest_bytes: bytes,
+    ) -> list[dict[str, object]]:
+        signature_entries = {
+            "proof_pack/manifest.json": manifest_bytes,
+            **file_entries,
+        }
+        files: list[dict[str, object]] = []
+        for path in sorted(signature_entries.keys()):
+            payload = signature_entries[path]
+            file_record: dict[str, object] = {
+                "path": path,
+                "sha256": _sha256_hex(payload),
+                "bytes": len(payload),
+            }
+            if path == "proof_pack/proof.pdf":
+                file_record["optional"] = True
+            files.append(file_record)
+        return files
+
+    def _build_zip(
+        self,
+        file_entries: dict[str, bytes],
+        manifest_bytes: bytes,
+        signature_bytes: bytes,
+    ) -> bytes:
         entries = {
             "assets/": b"",
             "proof_pack/": b"",
             "proof_pack/manifest.json": manifest_bytes,
+            "proof_pack/signature.json": signature_bytes,
             **file_entries,
         }
 
@@ -183,6 +242,11 @@ def _normalize_newlines(text: str) -> str:
 
 def _sha256_hex(payload: bytes) -> str:
     return hashlib.sha256(payload).hexdigest()
+
+
+def _pack_fingerprint(files: list[dict[str, object]]) -> str:
+    concatenated_hashes = "".join(file_entry["sha256"] for file_entry in files)
+    return hashlib.sha256(concatenated_hashes.encode("utf-8")).hexdigest()
 
 
 def _python_version() -> str:

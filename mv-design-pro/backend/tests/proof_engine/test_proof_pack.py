@@ -68,6 +68,7 @@ def test_proof_pack_contains_expected_files():
         names = set(zf.namelist())
 
     assert "proof_pack/manifest.json" in names
+    assert "proof_pack/signature.json" in names
     assert "proof_pack/proof.json" in names
     assert "proof_pack/proof.tex" in names
     assert "assets/" in names
@@ -89,3 +90,44 @@ def test_proof_pack_manifest_contains_hashes():
             assert file_entry["bytes"] == len(payload)
 
     assert manifest["proof_fingerprint"] == sha256(proof_json).hexdigest()
+
+
+def test_signature_json_present_in_zip():
+    proof = _build_sc3f_proof()
+    pack_bytes = ProofPackBuilder(_build_context()).build(proof)
+
+    with _read_zip(pack_bytes) as zf:
+        signature = json.loads(zf.read("proof_pack/signature.json").decode("utf-8"))
+
+    assert signature["schema_version"] == "1.0"
+    assert signature["algorithm"] == "SHA-256"
+
+
+def test_signature_json_deterministic():
+    proof = _build_sc3f_proof()
+    context = _build_context()
+    builder = ProofPackBuilder(context)
+
+    first = builder.build(proof)
+    second = builder.build(proof)
+
+    with _read_zip(first) as zf:
+        first_signature = zf.read("proof_pack/signature.json")
+    with _read_zip(second) as zf:
+        second_signature = zf.read("proof_pack/signature.json")
+
+    assert first_signature == second_signature
+
+
+def test_signature_matches_files_hashes():
+    proof = _build_sc3f_proof()
+    pack_bytes = ProofPackBuilder(_build_context()).build(proof)
+
+    with _read_zip(pack_bytes) as zf:
+        signature = json.loads(zf.read("proof_pack/signature.json").decode("utf-8"))
+        signature_files = signature["files"]
+
+        for file_entry in signature_files:
+            payload = zf.read(file_entry["path"])
+            assert file_entry["sha256"] == sha256(payload).hexdigest()
+            assert file_entry["bytes"] == len(payload)
