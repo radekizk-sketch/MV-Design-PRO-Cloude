@@ -123,13 +123,14 @@ Station:
 
 A Case is a calculation scenario that:
 - **CANNOT mutate** the Network Model
-- Stores **ONLY** calculation parameters
+- Stores **ONLY** calculation parameters (configuration)
 - References the Network Model (read-only)
 
 ### 3.2 Case Types
 
 | Case Type | Purpose | Standard |
 |-----------|---------|----------|
+| **StudyCase** | Generic calculation scenario | P10 FULL MAX |
 | **ShortCircuitCase** | Fault current calculations | IEC 60909 |
 | **PowerFlowCase** | Load flow analysis | Newton-Raphson |
 | **ProtectionCase** | Protection coordination | IEC 60255 (prospective) |
@@ -139,12 +140,84 @@ A Case is a calculation scenario that:
 ```
 NetworkModel (MUTABLE by Wizard/SLD)
     │
+    ├── StudyCase (config-only, P10 FULL MAX)
     ├── ShortCircuitCase (READ-ONLY view of model)
     ├── PowerFlowCase (READ-ONLY view of model)
     └── ProtectionCase (READ-ONLY view of model)
 ```
 
 **Invariant:** Multiple Cases can reference the same NetworkModel. No Case can modify the model.
+
+### 3.4 Study Case Lifecycle (P10 FULL MAX)
+
+#### 3.4.1 Active Case Invariant
+
+**BINDING:** Exactly ONE StudyCase can be active per project at any time.
+
+| Operation | Effect |
+|-----------|--------|
+| Activate case A | All other cases deactivated, A becomes active |
+| Create new case | New case is NOT active (unless explicitly set) |
+| Clone case | Cloned case is NOT active |
+| Delete active case | No active case until user selects another |
+
+#### 3.4.2 Result Status Lifecycle
+
+```
+StudyCase.result_status:
+
+NONE ─────────────► FRESH (after successful calculation)
+  │                    │
+  │                    │
+  │                    ▼
+  │               OUTDATED (after model or config change)
+  │                    │
+  └────────────────────┘ (re-calculation)
+```
+
+| Status | Description |
+|--------|-------------|
+| **NONE** | Never computed, no results |
+| **FRESH** | Results computed on current model snapshot |
+| **OUTDATED** | Model or config changed since last computation |
+
+#### 3.4.3 Invalidation Rules (PowerFactory-grade)
+
+| Event | Effect |
+|-------|--------|
+| NetworkModel change | ALL cases marked OUTDATED |
+| Case config change | ONLY that case marked OUTDATED |
+| Successful calculation | Case marked FRESH |
+| Case clone | New case has NONE status (no results copied) |
+
+#### 3.4.4 Clone vs Copy
+
+**Clone** (PowerFactory-style):
+- Configuration is COPIED
+- Results are NOT copied
+- Status = NONE
+- is_active = False
+
+```python
+cloned = source_case.clone(new_name="Case (kopia)")
+# cloned.config == source_case.config (copy)
+# cloned.result_status == NONE
+# cloned.result_refs == () (empty)
+# cloned.is_active == False
+```
+
+#### 3.4.5 Compare Operation
+
+Compare is a **100% read-only** operation:
+- No mutations allowed
+- Shows configuration differences between two cases
+- Available in ALL operating modes
+
+```python
+comparison = compare_study_cases(case_a, case_b)
+# comparison.case_a_name, comparison.case_b_name
+# comparison.config_differences: List[ConfigDifference]
+```
 
 ---
 
@@ -749,4 +822,216 @@ LoadSymbol     ↔    Load
 
 ---
 
+## 19. Proof Pack / Mathematical Proof Engine (P11)
+
+### 19.1 Pozycja w architekturze
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                      SOLVER LAYER                            │
+│  - IEC 60909 Short Circuit (FROZEN)                          │
+│  - Newton-Raphson Power Flow (FROZEN)                        │
+│  - WhiteBoxTrace (intermediate values)                       │
+└─────────────────────────┬───────────────────────────────────┘
+                          │ trace + result (READ-ONLY)
+                          ▼
+┌─────────────────────────────────────────────────────────────┐
+│                 INTERPRETATION LAYER                         │
+│  ┌─────────────────────────────────────────────────────┐    │
+│  │           PROOF ENGINE (P11)                         │    │
+│  │  - TraceArtifact (immutable)                         │    │
+│  │  - ProofDocument generator                           │    │
+│  │  - Equation Registry (SC3F, VDROP)                   │    │
+│  │  - Unit verification                                 │    │
+│  │  - Export: JSON, LaTeX, PDF, DOCX                    │    │
+│  └─────────────────────────────────────────────────────┘    │
+│  - BoundaryIdentifier (PCC)                                  │
+│  - Thermal Analysis                                          │
+│  - Voltage Analysis                                          │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### 19.2 Kontrakty wejścia/wyjścia (BINDING)
+
+#### 19.2.1 Wejście
+
+| Źródło | Typ | Opis |
+|--------|-----|------|
+| `WhiteBoxTrace` | READ-ONLY | Wartości pośrednie z solvera |
+| `SolverResult` | READ-ONLY | Wyniki końcowe (ikss_ka, ip_ka, ...) |
+| `NetworkSnapshot` | READ-ONLY | Zamrożony stan sieci |
+| `SolverConfig` | READ-ONLY | Parametry uruchomienia (c_factor, fault_type, ...) |
+
+#### 19.2.2 Wyjście
+
+| Artefakt | Format | Opis |
+|----------|--------|------|
+| `TraceArtifact` | frozen dataclass | Pełny ślad obliczeń |
+| `ProofDocument` | JSON + LaTeX | Formalny dowód matematyczny |
+| `proof.json` | JSON | Serializacja dowodu |
+| `proof.tex` | LaTeX | Kod źródłowy dokumentu |
+| `proof.pdf` | PDF | Dokument do wydruku |
+
+### 19.3 Inwarianty (BINDING)
+
+| Inwariant | Opis |
+|-----------|------|
+| **Solver nietknięty** | Proof Engine NIE modyfikuje solverów ani Result API |
+| **Determinism** | Ten sam `run_id` → identyczny `proof.json` i `proof.tex` |
+| **Czysta interpretacja** | Dowód generowany z gotowych danych trace/result |
+| **Kompletność kroku** | Każdy krok ma: Wzór → Dane → Podstawienie → Wynik → Weryfikacja jednostek |
+| **Traceability** | Każda wartość ma mapping key do źródła w trace/result |
+| **LaTeX-only proof** | Proof Pack odrzuca „pół-matematykę"; dowód TYLKO w blokowym LaTeX `$$...$$` |
+| **I_dyn mandatory** | Prąd dynamiczny jest OBOWIĄZKOWY w każdym dowodzie SC3F |
+| **I_th mandatory** | Prąd cieplny równoważny jest OBOWIĄZKOWY w każdym dowodzie SC3F |
+
+### 19.4 Terminologia UI (BINDING)
+
+| Termin polski | Termin angielski | Lokalizacja UI |
+|---------------|------------------|----------------|
+| Ślad obliczeń | Trace | Results → [Case] → [Run] → Ślad obliczeń |
+| Dowód matematyczny | Mathematical Proof | Results → [Case] → [Run] → Dowód matematyczny |
+| Weryfikacja jednostek | Unit Check | Sekcja w każdym kroku dowodu |
+| Krok dowodu | Proof Step | Element listy w Proof Inspector |
+
+### 19.5 Proof Inspector (P11.1d) — warstwa prezentacji
+
+#### 19.5.1 Definicja
+
+**Proof Inspector** to kanoniczny komponent warstwy prezentacji, odpowiedzialny za:
+- Wyświetlanie `ProofDocument` użytkownikowi (read-only)
+- Eksport do formatów: JSON, LaTeX, PDF, DOCX
+- Audyt dowodu (ślad obliczeń — White Box)
+
+#### 19.5.2 Pozycja w architekturze
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│ SOLVER LAYER (FROZEN)                                            │
+│   WhiteBoxTrace + SolverResult                                   │
+└──────────────────────────┬──────────────────────────────────────┘
+                           │ (READ-ONLY)
+                           ▼
+┌─────────────────────────────────────────────────────────────────┐
+│ INTERPRETATION LAYER                                             │
+│   Proof Engine: TraceArtifact → ProofDocument                   │
+└──────────────────────────┬──────────────────────────────────────┘
+                           │ (READ-ONLY)
+                           ▼
+┌─────────────────────────────────────────────────────────────────┐
+│ PRESENTATION LAYER                                               │
+│   ┌─────────────────────────────────────────────────────────┐   │
+│   │              PROOF INSPECTOR (P11.1d)                    │   │
+│   │  - Read-only viewer                                      │   │
+│   │  - Eksport: JSON / LaTeX / PDF / DOCX                   │   │
+│   │  - ZERO LOGIKI OBLICZENIOWEJ                            │   │
+│   │  - ZERO INTERPRETACJI NORMOWEJ                          │   │
+│   └─────────────────────────────────────────────────────────┘   │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+#### 19.5.3 Inwarianty Proof Inspector (BINDING)
+
+| Inwariant | Opis |
+|-----------|------|
+| **Read-only** | Proof Inspector NIE modyfikuje ProofDocument |
+| **No physics** | Brak obliczeń — tylko prezentacja |
+| **No interpretation** | Brak oceny normowej, brak kolorowania pass/fail |
+| **Deterministic export** | Ten sam ProofDocument → identyczny eksport |
+| **5-section step** | Każdy krok: Wzór → Dane → Podstawienie → Wynik → Weryfikacja |
+
+### 19.6 Kanoniczne źródła (docs/proof_engine/)
+
+| Dokument | Zawartość | Status |
+|----------|-----------|--------|
+| `PROOF_SCHEMAS.md` | Schematy JSON (ProofDocument, ProofStep) | BINDING |
+| `EQUATIONS_IEC60909_SC3F.md` | Rejestr równań SC3F z mapping keys | BINDING |
+| `EQUATIONS_VDROP.md` | Rejestr równań VDROP z mapping keys | BINDING |
+| `P11_1a_MVP_SC3F_AND_VDROP.md` | Specyfikacja MVP | BINDING |
+| `P11_OVERVIEW.md` | Definicja TraceArtifact, inwarianty | BINDING |
+| `P11_1d_PROOF_UI_EXPORT.md` | **Proof Inspector UI + eksport** | **CANONICAL & BINDING** |
+
+---
+
 **END OF CANONICAL SPECIFICATION**
+
+## TODO — Proof Packs P14–P17 (FUTURE PACKS)
+
+### TODO-P14-001 (PLANNED) — P14: Power Flow Proof Pack (audit wyników PF) [FUTURE PACK]
+- Priority: MUST
+- Inputs: TraceArtifact, PowerFlowResult
+- Output: ProofPack P14 (ProofDocument: Audit rozpływu mocy)
+- DoD:
+  - [ ] Dowód bilansu węzła dla mocy czynnej i biernej z mapowaniem do TraceArtifact.
+
+    $$
+    \sum P = 0,\quad \sum Q = 0
+    $$
+
+  - [ ] Bilans gałęzi dla mocy czynnej i biernej uwzględnia straty oraz spadek napięcia.
+
+    $$
+    P_{in} \rightarrow P_{out} + P_{loss},\quad Q_{in} \rightarrow Q_{out} + \Delta U
+    $$
+
+  - [ ] Straty linii liczone jawnie z prądu i rezystancji.
+
+    $$
+    P_{loss} = I^{2} \cdot R
+    $$
+
+  - [ ] Porównanie counterfactual Case A vs Case B z raportem różnic.
+
+    $$
+    \Delta P,\ \Delta Q,\ \Delta U
+    $$
+
+### TODO-P15-001 (PLANNED) — P15: Load Currents & Overload Proof Pack [FUTURE PACK]
+- Priority: MUST
+- Inputs: TraceArtifact, PowerFlowResult, Catalog
+- Output: ProofPack P15 (ProofDocument: Prądy robocze i przeciążenia)
+- DoD:
+  - [ ] Prądy obciążenia linii/kabli wyprowadzone z mocy pozornej.
+
+    $$
+    I = \frac{S}{\sqrt{3} \cdot U}
+    $$
+
+  - [ ] Porównanie do prądu znamionowego z marginesem procentowym i statusem PASS/FAIL.
+  - [ ] Transformator: relacja obciążenia do mocy znamionowej i overload %.
+
+    $$
+    \frac{S}{S_n}
+    $$
+
+### TODO-P16-001 (PLANNED) — P16: Losses & Energy Proof Pack [FUTURE PACK]
+- Priority: MUST
+- Inputs: TraceArtifact, PowerFlowResult, Catalog
+- Output: ProofPack P16 (ProofDocument: Straty mocy i energii)
+- DoD:
+  - [ ] Straty linii wyprowadzone z prądu i rezystancji.
+
+    $$
+    P_{loss,line} = I^{2} \cdot R
+    $$
+
+  - [ ] Straty transformatora z danych katalogowych: suma P0 i Pk.
+
+    $$
+    P_{loss,trafo} = P_{0} + P_{k}
+    $$
+
+  - [ ] Energia strat z profilu obciążenia (integracja w czasie).
+
+    $$
+    E_{loss} = \int P_{loss} \, dt
+    $$
+
+### TODO-P17-001 (PLANNED) — P17: Earthing / Ground Fault Proof Pack (SN) [FUTURE PACK]
+- Priority: MUST
+- Inputs: TraceArtifact, Catalog
+- Output: ProofPack P17 (ProofDocument: Doziemienia / uziemienia SN)
+- DoD:
+  - [ ] Jeśli SN: prądy doziemne z uwzględnieniem impedancji uziemienia i rozdziału prądu.
+  - [ ] Tryb uproszczonych napięć dotykowych z wyraźnymi zastrzeżeniami.
+  - [ ] Terminologia w ProofDocument: 1F-Z, 2F, 2F-Z oraz PCC – punkt wspólnego przyłączenia.

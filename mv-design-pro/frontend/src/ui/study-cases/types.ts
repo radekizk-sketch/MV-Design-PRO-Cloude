@@ -1,0 +1,143 @@
+/**
+ * Study Cases Types — P10 FULL MAX
+ *
+ * Type definitions for study case management.
+ * Matches backend domain models for type safety.
+ */
+
+/**
+ * Study case result status (PowerFactory-grade).
+ */
+export type StudyCaseResultStatus = 'NONE' | 'FRESH' | 'OUTDATED';
+
+/**
+ * Study case configuration parameters.
+ */
+export interface StudyCaseConfig {
+  // Short-circuit parameters
+  c_factor_max: number;
+  c_factor_min: number;
+
+  // Power flow parameters
+  base_mva: number;
+  max_iterations: number;
+  tolerance: number;
+
+  // Analysis options
+  include_motor_contribution: boolean;
+  include_inverter_contribution: boolean;
+  thermal_time_seconds: number;
+}
+
+/**
+ * Study case result reference.
+ */
+export interface StudyCaseResultRef {
+  analysis_run_id: string;
+  analysis_type: string;
+  calculated_at: string;
+  input_hash: string;
+}
+
+/**
+ * Study case entity.
+ */
+export interface StudyCase {
+  id: string;
+  project_id: string;
+  name: string;
+  description: string;
+  config: StudyCaseConfig;
+  result_status: StudyCaseResultStatus;
+  is_active: boolean;
+  result_refs: StudyCaseResultRef[];
+  revision: number;
+  created_at: string;
+  updated_at: string;
+}
+
+/**
+ * Study case list item (summary).
+ */
+export interface StudyCaseListItem {
+  id: string;
+  name: string;
+  description: string;
+  result_status: StudyCaseResultStatus;
+  is_active: boolean;
+  updated_at: string;
+}
+
+/**
+ * Study case comparison result.
+ */
+export interface StudyCaseComparison {
+  case_a_id: string;
+  case_b_id: string;
+  case_a_name: string;
+  case_b_name: string;
+  config_differences: Array<{
+    field: string;
+    value_a: unknown;
+    value_b: unknown;
+  }>;
+  status_a: StudyCaseResultStatus;
+  status_b: StudyCaseResultStatus;
+}
+
+/**
+ * Create study case request.
+ */
+export interface CreateStudyCaseRequest {
+  project_id: string;
+  name: string;
+  description?: string;
+  config?: Partial<StudyCaseConfig>;
+  set_active?: boolean;
+}
+
+/**
+ * Update study case request.
+ */
+export interface UpdateStudyCaseRequest {
+  name?: string;
+  description?: string;
+  config?: Partial<StudyCaseConfig>;
+}
+
+/**
+ * Default configuration values.
+ */
+export const DEFAULT_STUDY_CASE_CONFIG: StudyCaseConfig = {
+  c_factor_max: 1.10,
+  c_factor_min: 0.95,
+  base_mva: 100.0,
+  max_iterations: 50,
+  tolerance: 1e-6,
+  include_motor_contribution: true,
+  include_inverter_contribution: true,
+  thermal_time_seconds: 1.0,
+};
+
+/**
+ * Polish labels for result status.
+ */
+export const RESULT_STATUS_LABELS: Record<StudyCaseResultStatus, string> = {
+  NONE: 'Brak wyników',
+  FRESH: 'Wyniki aktualne',
+  OUTDATED: 'Wyniki nieaktualne',
+};
+
+/**
+ * Polish labels for configuration fields.
+ */
+export const CONFIG_FIELD_LABELS: Record<keyof StudyCaseConfig, string> = {
+  c_factor_max: 'Współczynnik napięciowy (max)',
+  c_factor_min: 'Współczynnik napięciowy (min)',
+  base_mva: 'Moc bazowa [MVA]',
+  max_iterations: 'Maksymalna liczba iteracji',
+  tolerance: 'Tolerancja zbieżności',
+  include_motor_contribution: 'Wkład silników',
+  include_inverter_contribution: 'Wkład inwerterów',
+  thermal_time_seconds: 'Czas cieplny [s]',
+};

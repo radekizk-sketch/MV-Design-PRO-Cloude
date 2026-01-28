@@ -1,8 +1,8 @@
 # MV-DESIGN-PRO PowerFactory Compliance Checklist
 
-**Version:** 2.6
+**Version:** 3.0
 **Status:** AUDIT DOCUMENT (Updated 2026-01)
-**Reference:** SYSTEM_SPEC.md, PLANS.md, sld_rules.md
+**Reference:** SYSTEM_SPEC.md, PLANS.md, sld_rules.md, P11_1d_PROOF_UI_EXPORT.md
 
 ---
 
@@ -330,7 +330,9 @@ This document provides a comprehensive checklist for verifying compliance with D
 | UI Parity | 31 | 31 | 0 | 0 |
 | **Type Catalog UI (P8.2)** | **43** | **43** | **0** | **0** |
 | **Project Tree & Data Manager (P9)** | **52** | **52** | **0** | **0** |
-| **TOTAL** | **225** | **187** | **0** | **38** |
+| **Study Cases (P10 FULL MAX)** | **64** | **64** | **0** | **0** |
+| **Proof Inspector (P11.1d)** | **33** | **1** | **0** | **32 (SPEC)** |
+| **TOTAL** | **322** | **252** | **0** | **70** |
 
 ### 9.2 Critical Failures
 
@@ -412,6 +414,8 @@ All remediations verified via:
 | 2026-01 | System | 2.4 | UI Parity: Property Grid + Context Menu + Selection (31/31 PASS, 55 tests) |
 | 2026-01 | System | 2.5 | Type Catalog UI (P8.2): Assign/Clear Type + Type Picker (43/43 PASS, 15 tests) |
 | 2026-01 | System | 2.6 | P9 FULL: Project Tree + Data Manager (52/52 PASS, 52 tests) |
+| 2026-01 | System | 2.7 | P10 FULL MAX: Study Cases / Variants (64/64 PASS, 26 tests) |
+| 2026-01 | System | 3.0 | **P11.1d Proof Inspector: 33 checklisty (1 PASS, 32 SPEC), canonical presentation layer** |
 
 ---
 
@@ -684,6 +688,263 @@ All remediations verified via:
 
 ---
 
+## 16. Study Cases (P10 FULL MAX)
+
+### 16.1 Study Case Lifecycle
+
+| ID | Requirement | Verification | Status |
+|----|-------------|--------------|--------|
+| P10-001 | StudyCase as configuration-only entity | Check: domain/study_case.py | PASS |
+| P10-002 | StudyCase CANNOT mutate NetworkModel | Check: frozen dataclass | PASS |
+| P10-003 | Exactly one active case per project | Check: set_active_study_case | PASS |
+| P10-004 | Full CRUD: create, read, update, delete | Check: StudyCaseService | PASS |
+| P10-005 | Clone: copy config, NOT results | Check: clone() method | PASS |
+| P10-006 | Compare: read-only diff between cases | Check: compare_study_cases | PASS |
+
+**Code locations:**
+- `backend/src/domain/study_case.py` (domain model)
+- `backend/src/application/study_case/service.py` (service)
+- `backend/src/infrastructure/persistence/repositories/case_repository.py` (repository)
+
+### 16.2 Result Status Management
+
+| ID | Requirement | Verification | Status |
+|----|-------------|--------------|--------|
+| P10-010 | Result status enum: NONE, FRESH, OUTDATED | Check: StudyCaseResultStatus | PASS |
+| P10-011 | NetworkModel change → ALL cases OUTDATED | Check: mark_all_cases_outdated | PASS |
+| P10-012 | Case config change → ONLY that case OUTDATED | Check: mark_case_outdated | PASS |
+| P10-013 | Successful calculation → case FRESH | Check: mark_case_fresh | PASS |
+| P10-014 | Case clone → new case NONE (no results) | Check: clone() sets NONE | PASS |
+
+**Status lifecycle:**
+```
+NONE → FRESH (after calculation)
+FRESH → OUTDATED (after model/config change)
+OUTDATED → FRESH (after re-calculation)
+```
+
+### 16.3 Active Case Management
+
+| ID | Requirement | Verification | Status |
+|----|-------------|--------------|--------|
+| P10-020 | Exactly one active case per project | Check: _deactivate_all_cases | PASS |
+| P10-021 | set_active deactivates all others first | Check: set_active_study_case | PASS |
+| P10-022 | Cloned case is NOT active | Check: clone() is_active=False | PASS |
+| P10-023 | Active case required for calculations | Check: require_active_case | PASS |
+
+### 16.4 Mode Gating (MODEL_EDIT/CASE_CONFIG/RESULT_VIEW)
+
+| ID | Requirement | Verification | Status |
+|----|-------------|--------------|--------|
+| P10-030 | MODEL_EDIT: full case management | Check: modeGating.ts | PASS |
+| P10-031 | MODEL_EDIT: create, rename, delete, clone | Check: useCanManageCases | PASS |
+| P10-032 | MODEL_EDIT: activate case | Check: useCanActivateCase | PASS |
+| P10-033 | MODEL_EDIT: edit config (marks OUTDATED) | Check: useCanEditCaseConfig | PASS |
+| P10-034 | MODEL_EDIT: run calculations | Check: useCanCalculate | PASS |
+| P10-035 | CASE_CONFIG: edit config only | Check: modeGating rules | PASS |
+| P10-036 | CASE_CONFIG: no case management | Check: create/delete blocked | PASS |
+| P10-037 | RESULT_VIEW: 100% read-only | Check: all mutations blocked | PASS |
+| P10-038 | Compare: allowed in all modes (read-only) | Check: compare always enabled | PASS |
+
+**Code location:** `frontend/src/ui/study-cases/modeGating.ts`
+
+### 16.5 API Endpoints
+
+| ID | Requirement | Verification | Status |
+|----|-------------|--------------|--------|
+| P10-040 | POST /cases — create case | Check: api/study_cases.py | PASS |
+| P10-041 | GET /cases — list cases | Check: api/study_cases.py | PASS |
+| P10-042 | GET /cases/{id} — get case | Check: api/study_cases.py | PASS |
+| P10-043 | PATCH /cases/{id} — update case | Check: api/study_cases.py | PASS |
+| P10-044 | DELETE /cases/{id} — delete case | Check: api/study_cases.py | PASS |
+| P10-045 | POST /cases/{id}/clone — clone case | Check: api/study_cases.py | PASS |
+| P10-046 | POST /cases/{id}/activate — activate case | Check: api/study_cases.py | PASS |
+| P10-047 | GET /cases/compare — compare two cases | Check: api/study_cases.py | PASS |
+| P10-048 | POST /cases/invalidate-all — mark all OUTDATED | Check: api/study_cases.py | PASS |
+
+**Code location:** `backend/src/api/study_cases.py`
+
+### 16.6 Frontend Components
+
+| ID | Requirement | Verification | Status |
+|----|-------------|--------------|--------|
+| P10-050 | StudyCase store (Zustand) | Check: study-cases/store.ts | PASS |
+| P10-051 | StudyCaseList component | Check: StudyCaseList.tsx | PASS |
+| P10-052 | CaseCompareView component | Check: CaseCompareView.tsx | PASS |
+| P10-053 | CreateCaseDialog component | Check: CreateCaseDialog.tsx | PASS |
+| P10-054 | Mode gating hooks | Check: modeGating.ts | PASS |
+| P10-055 | Polish labels throughout | Check: all UI strings | PASS |
+
+**Code location:** `frontend/src/ui/study-cases/`
+
+### 16.7 Project Tree Integration
+
+| ID | Requirement | Verification | Status |
+|----|-------------|--------------|--------|
+| P10-060 | STUDY_CASE node type in tree | Check: TreeNodeType | PASS |
+| P10-061 | Active case indicator (★) | Check: isActive rendering | PASS |
+| P10-062 | Result status badge (NONE/FRESH/OUTDATED) | Check: resultStatus tooltip | PASS |
+| P10-063 | Double-click to activate | Check: handleDoubleClick | PASS |
+| P10-064 | Context menu for case management | Check: context menu actions | PASS |
+
+**Code location:** `frontend/src/ui/project-tree/ProjectTree.tsx`
+
+### 16.8 Test Coverage (P10)
+
+| Test Suite | Tests | Status |
+|------------|-------|--------|
+| StudyCase domain model | 8 | PASS |
+| Status transitions | 4 | PASS |
+| Clone behavior | 3 | PASS |
+| Compare operations | 4 | PASS |
+| Active case management | 3 | PASS |
+| Serialization | 2 | PASS |
+| Invariants | 2 | PASS |
+| **Total** | **26** | **PASS** |
+
+**Test location:** `backend/tests/application/study_case/test_study_case_lifecycle.py`
+
+---
+
+## 17. Proof Engine / Mathematical Proof Engine (P11/P11.1)
+
+### 17.1 Checklisty dowodu akademickiego (PF++)
+
+| ID | Requirement | Verification | Status |
+|----|-------------|--------------|--------|
+| PE-001 | Solver nietknięty (FROZEN) | Check: no changes to solvers | PASS |
+| PE-002 | Result API nietknięte (FROZEN) | Check: no changes to ShortCircuitResult | PASS |
+| PE-003 | TraceArtifact immutable | Check: frozen dataclass | VERIFY |
+| PE-004 | ProofDocument deterministic | Check: same input → same output | VERIFY |
+| PE-005 | Mapping keys literalne | Check: no interpretation of keys | VERIFY |
+| PE-006 | Rejestr równań SC3F kompletny | Check: EQUATIONS_IEC60909_SC3F.md | PASS |
+| PE-007 | Rejestr równań VDROP kompletny | Check: EQUATIONS_VDROP.md | PASS |
+| PE-008 | ProofStep format: Wzór→Dane→Podstawienie→Wynik→Jednostki | Check: PROOF_SCHEMAS.md | PASS |
+| PE-009 | Unit verification w każdym kroku | Check: UnitCheckResult schema | PASS |
+| PE-010 | Eksport JSON deterministyczny | Check: proof.json stable | VERIFY |
+| PE-011 | Eksport LaTeX deterministyczny | Check: proof.tex stable | VERIFY |
+| **PE-012** | **LaTeX-only proof (block mode)** | Check: no inline math/numbers in text | **PASS** |
+| **PE-013** | **I_dyn mandatory** | Check: EQ_SC3F_008a defined | **PASS** |
+| **PE-014** | **I_th mandatory** | Check: EQ_SC3F_008 status=MANDATORY | **PASS** |
+| **PE-015** | **SC3F Gold Standard** | Check: Section 9 in P11_1a | **PASS** |
+
+### 17.2 Dokumentacja (DOC ONLY) — Status PASS
+
+| ID | Dokument | Zawartość | Status |
+|----|----------|-----------|--------|
+| PE-D01 | `docs/proof_engine/README.md` | Pakiet kanoniczny | PASS |
+| PE-D02 | `docs/proof_engine/P11_OVERVIEW.md` | TraceArtifact, inwarianty | PASS |
+| PE-D03 | `docs/proof_engine/P11_1a_MVP_SC3F_AND_VDROP.md` | MVP specyfikacja | PASS |
+| PE-D04 | `docs/proof_engine/P11_1b_REGULATION_Q_U.md` | Q(U), cosφ(P) | PASS |
+| PE-D05 | `docs/proof_engine/P11_1c_SC_ASYMMETRICAL.md` | Składowe symetryczne | PASS |
+| PE-D06 | `docs/proof_engine/P11_1d_PROOF_UI_EXPORT.md` | UI + eksport | PASS |
+| PE-D07 | `docs/proof_engine/PROOF_SCHEMAS.md` | Schematy JSON | PASS |
+| PE-D08 | `docs/proof_engine/EQUATIONS_IEC60909_SC3F.md` | Rejestr SC3F | PASS |
+| PE-D09 | `docs/proof_engine/EQUATIONS_VDROP.md` | Rejestr VDROP | PASS |
+
+### 17.3 Testy determinism (wymagane przy implementacji)
+
+| Test | Description | Status |
+|------|-------------|--------|
+| `test_trace_artifact_determinism` | Same run → identical artifact | SPEC |
+| `test_proof_json_determinism` | Same artifact → identical JSON | SPEC |
+| `test_proof_tex_determinism` | Same artifact → identical LaTeX | SPEC |
+| `test_proof_step_order_stable` | Step order is fixed | SPEC |
+| `test_mapping_keys_stable` | Keys don't change between versions | SPEC |
+
+### 17.4 Proof Inspector (P11.1d) — Canonical Presentation Layer
+
+#### 17.4.1 Model mentalny
+
+| ID | Requirement | Verification | Status |
+|----|-------------|--------------|--------|
+| PI-001 | Proof Inspector = read-only viewer | Check: no edit actions | SPEC |
+| PI-002 | ZERO logiki obliczeniowej | Check: no physics in UI | SPEC |
+| PI-003 | ZERO interpretacji normowej | Check: no limits, no pass/fail | SPEC |
+| PI-004 | Prezentacja 1:1 z ProofDocument | Check: no data transformation | SPEC |
+
+#### 17.4.2 Struktura widoku
+
+| ID | Requirement | Verification | Status |
+|----|-------------|--------------|--------|
+| PI-010 | Nagłówek z metadanymi (proof_type, norma, case, run) | Check: ProofHeaderView | SPEC |
+| PI-011 | Lista kroków (sekwencyjna, read-only) | Check: StepList | SPEC |
+| PI-012 | Każdy krok ma 5 sekcji (WZÓR/DANE/PODSTAWIENIE/WYNIK/WERYFIKACJA) | Check: StepView | SPEC |
+| PI-013 | Podsumowanie liczbowe bez interpretacji | Check: SummaryView | SPEC |
+| PI-014 | Fingerprint (SHA-256) w nagłówku | Check: fingerprint field | SPEC |
+
+#### 17.4.3 Nawigacja i UX
+
+| ID | Requirement | Verification | Status |
+|----|-------------|--------------|--------|
+| PI-020 | Two-panel layout (lewa lista → prawa treść) | Check: UI mockup | SPEC |
+| PI-021 | Brak sortowania kroków (fixed order) | Check: no sort UI | SPEC |
+| PI-022 | Brak filtrowania kroków (complete proof) | Check: no filter UI | SPEC |
+| PI-023 | Skróty klawiszowe (←/→/Home/End/Esc) | Check: keyboard nav | SPEC |
+| PI-024 | Terminologia polska normowa | Check: SECTION_LABELS | SPEC |
+
+#### 17.4.4 Tryb Read-Only
+
+| ID | Requirement | Verification | Status |
+|----|-------------|--------------|--------|
+| PI-030 | Dozwolone: przeglądanie, kopiowanie, eksport | Check: allowed actions | SPEC |
+| PI-031 | Zabronione: edycja, dodawanie, usuwanie kroków | Check: no mutation UI | SPEC |
+| PI-032 | Zabronione: ponowne obliczenie | Check: no recalc action | SPEC |
+| PI-033 | Zabronione: zmiana kolejności kroków | Check: no drag-drop | SPEC |
+
+#### 17.4.5 Eksport
+
+| ID | Requirement | Verification | Status |
+|----|-------------|--------------|--------|
+| PI-040 | JSON: 1:1 z ProofDocument | Check: ExportJSON | SPEC |
+| PI-041 | LaTeX: blokowy `$$...$$` only | Check: ExportLaTeX | SPEC |
+| PI-042 | PDF: via LaTeX, A4, numeracja | Check: ExportPDF | SPEC |
+| PI-043 | DOCX: Microsoft Word | Check: ExportDOCX | SPEC |
+| PI-044 | Determinizm: identyczne wejście → identyczny eksport | Check: fingerprint test | SPEC |
+| PI-045 | Fingerprint SHA-256 w każdym eksporcie | Check: export response | SPEC |
+
+#### 17.4.6 Zakazy absolutne
+
+| ID | Requirement | Verification | Status |
+|----|-------------|--------------|--------|
+| PI-050 | ❌ Brak interpretacji norm | Check: no limits in UI | SPEC |
+| PI-051 | ❌ Brak kolorowania pass/fail | Check: no color logic | SPEC |
+| PI-052 | ❌ Brak inline LaTeX | Check: only `$$...$$` | SPEC |
+| PI-053 | ❌ Brak modyfikacji solverów | Check: solver untouched | PASS |
+| PI-054 | ❌ Brak modyfikacji ProofDocument | Check: immutable | SPEC |
+
+#### 17.4.7 Dostępność (a11y)
+
+| ID | Requirement | Verification | Status |
+|----|-------------|--------------|--------|
+| PI-060 | Nawigacja klawiaturą | Check: keyboard nav | SPEC |
+| PI-061 | Screen reader (ARIA labels) | Check: ARIA attributes | SPEC |
+| PI-062 | Kontrast WCAG AA (4.5:1) | Check: color contrast | SPEC |
+| PI-063 | Focus visible | Check: focus styling | SPEC |
+
+### 17.5 P11.1d Summary
+
+| Category | Items | SPEC | PASS | VERIFY |
+|----------|-------|------|------|--------|
+| Model mentalny | 4 | 4 | 0 | 0 |
+| Struktura widoku | 5 | 5 | 0 | 0 |
+| Nawigacja i UX | 5 | 5 | 0 | 0 |
+| Tryb Read-Only | 4 | 4 | 0 | 0 |
+| Eksport | 6 | 6 | 0 | 0 |
+| Zakazy absolutne | 5 | 4 | 1 | 0 |
+| Dostępność | 4 | 4 | 0 | 0 |
+| **TOTAL** | **33** | **32** | **1** | **0** |
+
+### 17.6 Audit Trail (P11)
+
+| Date | Auditor | Version | Findings |
+|------|---------|---------|----------|
+| 2026-01 | System | 2.8 | P11/P11.1 DOC ONLY: 9/9 documents PASS, 11 items VERIFY (pending implementation) |
+| 2026-01 | Professor Audit | 2.9 | LaTeX-only policy, I_dyn/I_th mandatory, SC3F Gold Standard: 15/15 PASS |
+| 2026-01 | System | 3.0 | **P11.1d Proof Inspector: 33 checklisty SPEC, canonical presentation layer** |
+
+---
+
 ## 13. Verification Commands
 
 ### 12.1 Check for PCC in Model
@@ -711,3 +972,93 @@ grep -r "frozen=True" backend/src/network_model/solvers/
 ---
 
 **END OF COMPLIANCE CHECKLIST**
+
+## 7. Proof Packs Compliance (P14–P17) — FUTURE PACKS
+
+### 7.1 Checklist
+
+- [ ] TODO-P14-001 — P14: Power Flow Proof Pack (audit wyników PF)
+- [ ] TODO-P15-001 — P15: Load Currents & Overload Proof Pack
+- [ ] TODO-P16-001 — P16: Losses & Energy Proof Pack
+- [ ] TODO-P17-001 — P17: Earthing / Ground Fault Proof Pack (SN)
+
+## TODO — Proof Packs P14–P17 (FUTURE PACKS)
+
+### TODO-P14-001 (PLANNED) — P14: Power Flow Proof Pack (audit wyników PF) [FUTURE PACK]
+- Priority: MUST
+- Inputs: TraceArtifact, PowerFlowResult
+- Output: ProofPack P14 (ProofDocument: Audit rozpływu mocy)
+- DoD:
+  - [ ] Dowód bilansu węzła dla mocy czynnej i biernej z mapowaniem do TraceArtifact.
+
+    $$
+    \sum P = 0,\quad \sum Q = 0
+    $$
+
+  - [ ] Bilans gałęzi dla mocy czynnej i biernej uwzględnia straty oraz spadek napięcia.
+
+    $$
+    P_{in} \rightarrow P_{out} + P_{loss},\quad Q_{in} \rightarrow Q_{out} + \Delta U
+    $$
+
+  - [ ] Straty linii liczone jawnie z prądu i rezystancji.
+
+    $$
+    P_{loss} = I^{2} \cdot R
+    $$
+
+  - [ ] Porównanie counterfactual Case A vs Case B z raportem różnic.
+
+    $$
+    \Delta P,\ \Delta Q,\ \Delta U
+    $$
+
+### TODO-P15-001 (PLANNED) — P15: Load Currents & Overload Proof Pack [FUTURE PACK]
+- Priority: MUST
+- Inputs: TraceArtifact, PowerFlowResult, Catalog
+- Output: ProofPack P15 (ProofDocument: Prądy robocze i przeciążenia)
+- DoD:
+  - [ ] Prądy obciążenia linii/kabli wyprowadzone z mocy pozornej.
+
+    $$
+    I = \frac{S}{\sqrt{3} \cdot U}
+    $$
+
+  - [ ] Porównanie do prądu znamionowego z marginesem procentowym i statusem PASS/FAIL.
+  - [ ] Transformator: relacja obciążenia do mocy znamionowej i overload %.
+
+    $$
+    \frac{S}{S_n}
+    $$
+
+### TODO-P16-001 (PLANNED) — P16: Losses & Energy Proof Pack [FUTURE PACK]
+- Priority: MUST
+- Inputs: TraceArtifact, PowerFlowResult, Catalog
+- Output: ProofPack P16 (ProofDocument: Straty mocy i energii)
+- DoD:
+  - [ ] Straty linii wyprowadzone z prądu i rezystancji.
+
+    $$
+    P_{loss,line} = I^{2} \cdot R
+    $$
+
+  - [ ] Straty transformatora z danych katalogowych: suma P0 i Pk.
+
+    $$
+    P_{loss,trafo} = P_{0} + P_{k}
+    $$
+
+  - [ ] Energia strat z profilu obciążenia (integracja w czasie).
+
+    $$
+    E_{loss} = \int P_{loss} \, dt
+    $$
+
+### TODO-P17-001 (PLANNED) — P17: Earthing / Ground Fault Proof Pack (SN) [FUTURE PACK]
+- Priority: MUST
+- Inputs: TraceArtifact, Catalog
+- Output: ProofPack P17 (ProofDocument: Doziemienia / uziemienia SN)
+- DoD:
+  - [ ] Jeśli SN: prądy doziemne z uwzględnieniem impedancji uziemienia i rozdziału prądu.
+  - [ ] Tryb uproszczonych napięć dotykowych z wyraźnymi zastrzeżeniami.
+  - [ ] Terminologia w ProofDocument: 1F-Z, 2F, 2F-Z oraz PCC – punkt wspólnego przyłączenia.

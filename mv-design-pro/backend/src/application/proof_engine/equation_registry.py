@@ -1,0 +1,1723 @@
+"""
+Equation Registry — Rejestr równań dla Proof Engine P11.1a
+
+STATUS: CANONICAL & BINDING
+Reference: EQUATIONS_IEC60909_SC3F.md, EQUATIONS_VDROP.md
+
+Rejestr równań jest JEDYNYM źródłem prawdy dla matematyki w dowodach.
+Wszystkie równania są zdefiniowane tutaj na podstawie dokumentacji kanonicznej.
+
+=============================================================================
+ANTI-DOUBLE-COUNTING AUDIT — Współczynnik napięciowy c
+=============================================================================
+
+Model: A1 (CANONICAL)
+---------------------
+Współczynnik napięciowy c występuje WYŁĄCZNIE w równaniu EQ_SC3F_004:
+
+    I_k'' = (c · U_n) / (√3 · |Z_th|)
+
+c NIE występuje w żadnym innym równaniu używanym bezpośrednio w dowodzie.
+
+Status: PASS
+Weryfikacja: 2026-01-27 (P11.1a MVP)
+
+Pełna lista równań SC3F z audytem c:
+| Equation ID   | c występuje | Uwagi                                    |
+|---------------|-------------|------------------------------------------|
+| EQ_SC3F_003   | NIE         | Impedancja Thevenina (suma Z)            |
+| EQ_SC3F_004   | TAK         | Jedyne miejsce z c                       |
+| EQ_SC3F_005   | NIE         | Współczynnik κ (R/X)                     |
+| EQ_SC3F_006   | NIE         | Prąd udarowy (κ·√2·I_k'')                |
+| EQ_SC3F_007   | NIE         | Moc S_k'' (√3·U_n·I_k'')                 |
+| EQ_SC3F_008   | NIE         | Prąd cieplny (I_k''·√(m+n))              |
+| EQ_SC3F_008a  | NIE         | Prąd dynamiczny (= i_p)                  |
+
+Równania pomocnicze (NIE używane bezpośrednio w dowodzie):
+| Equation ID   | c występuje | Uwagi                                    |
+|---------------|-------------|------------------------------------------|
+| EQ_SC3F_002   | TAK         | Pomocniczy: Z_Q z S_kQ'' (solver only)   |
+| EQ_SC3F_002a  | NIE         | Rozkład R/X                              |
+| EQ_SC3F_009   | NIE         | Impedancja transformatora                |
+| EQ_SC3F_010   | NIE         | Impedancja linii/kabla                   |
+
+=============================================================================
+"""
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+from typing import Any
+
+from application.proof_engine.registries.ls_equations import LS_EQUATIONS
+from application.proof_engine.types import EquationDefinition, SymbolDefinition
+
+
+# =============================================================================
+# SC3F IEC 60909 — Kanoniczne równania (BINDING)
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# RÓWNANIA POMOCNICZE (solver-only, NIE używane bezpośrednio w dowodzie)
+# -----------------------------------------------------------------------------
+
+EQ_SC3F_002 = EquationDefinition(
+    equation_id="EQ_SC3F_002",
+    name_pl="Impedancja źródła (sieci zasilającej)",
+    standard_ref="IEC 60909-0:2016 eq. (10)",
+    latex=r"Z_Q = \frac{c \cdot U_n^2}{S_{kQ}''}",
+    symbols=(
+        SymbolDefinition(
+            symbol="Z_Q",
+            unit="Ω",
+            description_pl="Impedancja źródła",
+            mapping_key="z_source_ohm",
+        ),
+        SymbolDefinition(
+            symbol="c",
+            unit="—",
+            description_pl="Współczynnik napięciowy",
+            mapping_key="c_factor",
+        ),
+        SymbolDefinition(
+            symbol="U_n",
+            unit="kV",
+            description_pl="Napięcie znamionowe",
+            mapping_key="u_n_kv",
+        ),
+        SymbolDefinition(
+            symbol="S_{kQ}''",
+            unit="MVA",
+            description_pl="Moc zwarciowa źródła",
+            mapping_key="sk_source_mva",
+        ),
+    ),
+    unit_derivation="kV² / MVA = Ω",
+    notes="POMOCNICZY: używany przez solver do przeliczenia mocy zwarciowej na impedancję. "
+          "NIE używany bezpośrednio w dowodzie — c jest już uwzględnione w EQ_SC3F_004.",
+)
+
+EQ_SC3F_002a = EquationDefinition(
+    equation_id="EQ_SC3F_002a",
+    name_pl="Rozkład impedancji źródła na składowe R i X",
+    standard_ref="IEC 60909-0:2016 Table 2",
+    latex=r"R_Q = \frac{Z_Q}{\sqrt{1 + (X/R)^2}}, \quad X_Q = R_Q \cdot (X/R)",
+    symbols=(
+        SymbolDefinition(
+            symbol="R_Q",
+            unit="Ω",
+            description_pl="Rezystancja źródła",
+            mapping_key="r_source_ohm",
+        ),
+        SymbolDefinition(
+            symbol="X_Q",
+            unit="Ω",
+            description_pl="Reaktancja źródła",
+            mapping_key="x_source_ohm",
+        ),
+        SymbolDefinition(
+            symbol="Z_Q",
+            unit="Ω",
+            description_pl="Impedancja źródła",
+            mapping_key="z_source_ohm",
+        ),
+        SymbolDefinition(
+            symbol="X/R",
+            unit="—",
+            description_pl="Stosunek reaktancji do rezystancji",
+            mapping_key="xr_ratio",
+        ),
+    ),
+    unit_derivation="Ω / — = Ω",
+    notes="POMOCNICZY: rozkład impedancji na składowe.",
+)
+
+EQ_SC3F_009 = EquationDefinition(
+    equation_id="EQ_SC3F_009",
+    name_pl="Impedancja transformatora (przeliczona na stronę zwarcia)",
+    standard_ref="IEC 60909-0:2016 eq. (7)",
+    latex=r"Z_T = \frac{u_k\% \cdot U_n^2}{100 \cdot S_r}",
+    symbols=(
+        SymbolDefinition(
+            symbol="Z_T",
+            unit="Ω",
+            description_pl="Impedancja transformatora",
+            mapping_key="z_transformer_ohm",
+        ),
+        SymbolDefinition(
+            symbol="u_k\\%",
+            unit="%",
+            description_pl="Napięcie zwarcia transformatora",
+            mapping_key="uk_percent",
+        ),
+        SymbolDefinition(
+            symbol="U_n",
+            unit="kV",
+            description_pl="Napięcie znamionowe (strona zwarcia)",
+            mapping_key="u_n_kv",
+        ),
+        SymbolDefinition(
+            symbol="S_r",
+            unit="MVA",
+            description_pl="Moc znamionowa transformatora",
+            mapping_key="s_rated_mva",
+        ),
+    ),
+    unit_derivation="(% · kV²) / (100 · MVA) = Ω",
+    notes="POMOCNICZY: przeliczenie parametrów transformatora.",
+)
+
+EQ_SC3F_010 = EquationDefinition(
+    equation_id="EQ_SC3F_010",
+    name_pl="Impedancja linii lub kabla",
+    standard_ref="—",
+    latex=r"Z_L = (r + jx) \cdot l",
+    symbols=(
+        SymbolDefinition(
+            symbol="Z_L",
+            unit="Ω",
+            description_pl="Impedancja linii/kabla",
+            mapping_key="z_line_ohm",
+        ),
+        SymbolDefinition(
+            symbol="r",
+            unit="Ω/km",
+            description_pl="Rezystancja jednostkowa",
+            mapping_key="r_ohm_per_km",
+        ),
+        SymbolDefinition(
+            symbol="x",
+            unit="Ω/km",
+            description_pl="Reaktancja jednostkowa",
+            mapping_key="x_ohm_per_km",
+        ),
+        SymbolDefinition(
+            symbol="l",
+            unit="km",
+            description_pl="Długość linii/kabla",
+            mapping_key="length_km",
+        ),
+    ),
+    unit_derivation="Ω/km · km = Ω",
+    notes="POMOCNICZY: obliczenie impedancji linii/kabla.",
+)
+
+# -----------------------------------------------------------------------------
+# RÓWNANIA DOWODOWE (używane bezpośrednio w dowodzie SC3F)
+# -----------------------------------------------------------------------------
+
+EQ_SC3F_003 = EquationDefinition(
+    equation_id="EQ_SC3F_003",
+    name_pl="Impedancja zastępcza Thevenina w miejscu zwarcia",
+    standard_ref="IEC 60909-0:2016 § 4.2",
+    latex=r"Z_{th} = Z_Q + Z_T + Z_L",
+    symbols=(
+        SymbolDefinition(
+            symbol="Z_{th}",
+            unit="Ω",
+            description_pl="Impedancja zastępcza Thevenina",
+            mapping_key="z_thevenin_ohm",
+        ),
+        SymbolDefinition(
+            symbol="Z_Q",
+            unit="Ω",
+            description_pl="Impedancja źródła",
+            mapping_key="z_source_ohm",
+        ),
+        SymbolDefinition(
+            symbol="Z_T",
+            unit="Ω",
+            description_pl="Impedancja transformatora (przeliczona)",
+            mapping_key="z_transformer_ohm",
+        ),
+        SymbolDefinition(
+            symbol="Z_L",
+            unit="Ω",
+            description_pl="Impedancja linii/kabla",
+            mapping_key="z_line_ohm",
+        ),
+    ),
+    unit_derivation="Ω + Ω + Ω = Ω",
+    notes="Dla sieci promieniowych suma szeregowa. Dla sieci złożonych: redukcja metodą Thevenina. "
+          "AUDIT: c NIE występuje w tym równaniu.",
+)
+
+EQ_SC3F_004 = EquationDefinition(
+    equation_id="EQ_SC3F_004",
+    name_pl="Początkowy prąd zwarciowy symetryczny",
+    standard_ref="IEC 60909-0:2016 eq. (29)",
+    latex=r"I_k'' = \frac{c \cdot U_n}{\sqrt{3} \cdot |Z_{th}|}",
+    symbols=(
+        SymbolDefinition(
+            symbol="I_k''",
+            unit="kA",
+            description_pl="Początkowy prąd zwarciowy symetryczny",
+            mapping_key="ikss_ka",
+        ),
+        SymbolDefinition(
+            symbol="c",
+            unit="—",
+            description_pl="Współczynnik napięciowy",
+            mapping_key="c_factor",
+        ),
+        SymbolDefinition(
+            symbol="U_n",
+            unit="kV",
+            description_pl="Napięcie znamionowe",
+            mapping_key="u_n_kv",
+        ),
+        SymbolDefinition(
+            symbol="Z_{th}",
+            unit="Ω",
+            description_pl="Impedancja zastępcza Thevenina",
+            mapping_key="z_thevenin_ohm",
+        ),
+    ),
+    unit_derivation="kV / Ω = kA",
+    notes="AUDIT: c występuje WYŁĄCZNIE w tym równaniu (Anti-Double-Counting: PASS).",
+)
+
+EQ_SC3F_005 = EquationDefinition(
+    equation_id="EQ_SC3F_005",
+    name_pl="Współczynnik udaru",
+    standard_ref="IEC 60909-0:2016 eq. (55)",
+    latex=r"\kappa = 1.02 + 0.98 \cdot e^{-3 \cdot R_{th}/X_{th}}",
+    symbols=(
+        SymbolDefinition(
+            symbol="\\kappa",
+            unit="—",
+            description_pl="Współczynnik udaru",
+            mapping_key="kappa",
+        ),
+        SymbolDefinition(
+            symbol="R_{th}",
+            unit="Ω",
+            description_pl="Rezystancja zastępcza Thevenina",
+            mapping_key="r_thevenin_ohm",
+        ),
+        SymbolDefinition(
+            symbol="X_{th}",
+            unit="Ω",
+            description_pl="Reaktancja zastępcza Thevenina",
+            mapping_key="x_thevenin_ohm",
+        ),
+    ),
+    unit_derivation="— (bezwymiarowy)",
+    notes="Wartość κ mieści się w zakresie 1.02 ≤ κ ≤ 2.00. AUDIT: c NIE występuje.",
+)
+
+EQ_SC3F_006 = EquationDefinition(
+    equation_id="EQ_SC3F_006",
+    name_pl="Prąd udarowy (szczytowy)",
+    standard_ref="IEC 60909-0:2016 eq. (54)",
+    latex=r"i_p = \kappa \cdot \sqrt{2} \cdot I_k''",
+    symbols=(
+        SymbolDefinition(
+            symbol="i_p",
+            unit="kA",
+            description_pl="Prąd udarowy (wartość szczytowa)",
+            mapping_key="ip_ka",
+        ),
+        SymbolDefinition(
+            symbol="\\kappa",
+            unit="—",
+            description_pl="Współczynnik udaru",
+            mapping_key="kappa",
+        ),
+        SymbolDefinition(
+            symbol="I_k''",
+            unit="kA",
+            description_pl="Początkowy prąd zwarciowy symetryczny",
+            mapping_key="ikss_ka",
+        ),
+    ),
+    unit_derivation="— · — · kA = kA",
+    notes="AUDIT: c NIE występuje (używa I_k'' które już zawiera c).",
+)
+
+EQ_SC3F_007 = EquationDefinition(
+    equation_id="EQ_SC3F_007",
+    name_pl="Moc zwarciowa początkowa",
+    standard_ref="IEC 60909-0:2016 eq. (33)",
+    latex=r"S_k'' = \sqrt{3} \cdot U_n \cdot I_k''",
+    symbols=(
+        SymbolDefinition(
+            symbol="S_k''",
+            unit="MVA",
+            description_pl="Moc zwarciowa początkowa",
+            mapping_key="sk_mva",
+        ),
+        SymbolDefinition(
+            symbol="U_n",
+            unit="kV",
+            description_pl="Napięcie znamionowe",
+            mapping_key="u_n_kv",
+        ),
+        SymbolDefinition(
+            symbol="I_k''",
+            unit="kA",
+            description_pl="Początkowy prąd zwarciowy symetryczny",
+            mapping_key="ikss_ka",
+        ),
+    ),
+    unit_derivation="kV · kA = MVA",
+    notes="AUDIT: c NIE występuje (używa I_k'' które już zawiera c).",
+)
+
+EQ_SC3F_008 = EquationDefinition(
+    equation_id="EQ_SC3F_008",
+    name_pl="Prąd cieplny równoważny",
+    standard_ref="IEC 60909-0:2016 eq. (100)–(105)",
+    latex=r"I_{th} = I_k'' \cdot \sqrt{m + n}",
+    symbols=(
+        SymbolDefinition(
+            symbol="I_{th}",
+            unit="kA",
+            description_pl="Prąd cieplny równoważny",
+            mapping_key="ith_ka",
+        ),
+        SymbolDefinition(
+            symbol="I_k''",
+            unit="kA",
+            description_pl="Początkowy prąd zwarciowy symetryczny",
+            mapping_key="ikss_ka",
+        ),
+        SymbolDefinition(
+            symbol="m",
+            unit="—",
+            description_pl="Współczynnik dla składowej nieokresowej (DC)",
+            mapping_key="m_factor",
+        ),
+        SymbolDefinition(
+            symbol="n",
+            unit="—",
+            description_pl="Współczynnik dla składowej okresowej (AC decay)",
+            mapping_key="n_factor",
+        ),
+    ),
+    unit_derivation="kA · — = kA",
+    notes="AUDIT: c NIE występuje (używa I_k'' które już zawiera c).",
+)
+
+EQ_SC3F_008a = EquationDefinition(
+    equation_id="EQ_SC3F_008a",
+    name_pl="Prąd dynamiczny",
+    standard_ref="IEC 60909-0:2016 § 4.3.1.2",
+    latex=r"I_{dyn} = i_p",
+    symbols=(
+        SymbolDefinition(
+            symbol="I_{dyn}",
+            unit="kA",
+            description_pl="Prąd dynamiczny (do wymiarowania wytrzymałości dynamicznej)",
+            mapping_key="idyn_ka",
+        ),
+        SymbolDefinition(
+            symbol="i_p",
+            unit="kA",
+            description_pl="Prąd udarowy (szczytowy)",
+            mapping_key="ip_ka",
+        ),
+    ),
+    unit_derivation="kA = kA",
+    notes="Prąd dynamiczny służy do wymiarowania aparatury na wytrzymałość elektrodynamiczną. "
+          "AUDIT: c NIE występuje.",
+)
+
+
+# =============================================================================
+# VDROP — Kanoniczne równania (BINDING)
+# =============================================================================
+
+EQ_VDROP_001 = EquationDefinition(
+    equation_id="EQ_VDROP_001",
+    name_pl="Rezystancja odcinka linii lub kabla",
+    standard_ref="—",
+    latex=r"R = r \cdot l",
+    symbols=(
+        SymbolDefinition(
+            symbol="R",
+            unit="Ω",
+            description_pl="Rezystancja odcinka",
+            mapping_key="r_ohm",
+        ),
+        SymbolDefinition(
+            symbol="r",
+            unit="Ω/km",
+            description_pl="Rezystancja jednostkowa",
+            mapping_key="r_ohm_per_km",
+        ),
+        SymbolDefinition(
+            symbol="l",
+            unit="km",
+            description_pl="Długość odcinka",
+            mapping_key="length_km",
+        ),
+    ),
+    unit_derivation="Ω/km · km = Ω",
+)
+
+EQ_VDROP_002 = EquationDefinition(
+    equation_id="EQ_VDROP_002",
+    name_pl="Reaktancja odcinka linii lub kabla",
+    standard_ref="—",
+    latex=r"X = x \cdot l",
+    symbols=(
+        SymbolDefinition(
+            symbol="X",
+            unit="Ω",
+            description_pl="Reaktancja odcinka",
+            mapping_key="x_ohm",
+        ),
+        SymbolDefinition(
+            symbol="x",
+            unit="Ω/km",
+            description_pl="Reaktancja jednostkowa",
+            mapping_key="x_ohm_per_km",
+        ),
+        SymbolDefinition(
+            symbol="l",
+            unit="km",
+            description_pl="Długość odcinka",
+            mapping_key="length_km",
+        ),
+    ),
+    unit_derivation="Ω/km · km = Ω",
+)
+
+EQ_VDROP_003 = EquationDefinition(
+    equation_id="EQ_VDROP_003",
+    name_pl="Składowa czynna spadku napięcia (R·P)",
+    standard_ref="—",
+    latex=r"\Delta U_R = \frac{R \cdot P}{U_n^2} \cdot 100\%",
+    symbols=(
+        SymbolDefinition(
+            symbol="\\Delta U_R",
+            unit="%",
+            description_pl="Składowa czynna spadku napięcia",
+            mapping_key="delta_u_r_percent",
+        ),
+        SymbolDefinition(
+            symbol="R",
+            unit="Ω",
+            description_pl="Rezystancja odcinka",
+            mapping_key="r_ohm",
+        ),
+        SymbolDefinition(
+            symbol="P",
+            unit="MW",
+            description_pl="Moc czynna przepływająca",
+            mapping_key="p_mw",
+        ),
+        SymbolDefinition(
+            symbol="U_n",
+            unit="kV",
+            description_pl="Napięcie znamionowe",
+            mapping_key="u_n_kv",
+        ),
+    ),
+    unit_derivation="(Ω · MW) / kV² = %",
+    notes="Dla sieci trójfazowej: P to moc trójfazowa.",
+)
+
+EQ_VDROP_004 = EquationDefinition(
+    equation_id="EQ_VDROP_004",
+    name_pl="Składowa bierna spadku napięcia (X·Q)",
+    standard_ref="—",
+    latex=r"\Delta U_X = \frac{X \cdot Q}{U_n^2} \cdot 100\%",
+    symbols=(
+        SymbolDefinition(
+            symbol="\\Delta U_X",
+            unit="%",
+            description_pl="Składowa bierna spadku napięcia",
+            mapping_key="delta_u_x_percent",
+        ),
+        SymbolDefinition(
+            symbol="X",
+            unit="Ω",
+            description_pl="Reaktancja odcinka",
+            mapping_key="x_ohm",
+        ),
+        SymbolDefinition(
+            symbol="Q",
+            unit="Mvar",
+            description_pl="Moc bierna przepływająca",
+            mapping_key="q_mvar",
+        ),
+        SymbolDefinition(
+            symbol="U_n",
+            unit="kV",
+            description_pl="Napięcie znamionowe",
+            mapping_key="u_n_kv",
+        ),
+    ),
+    unit_derivation="(Ω · Mvar) / kV² = %",
+    notes="Q dodatnie = indukcyjna (pobór), Q ujemne = pojemnościowa (generacja).",
+)
+
+EQ_VDROP_005 = EquationDefinition(
+    equation_id="EQ_VDROP_005",
+    name_pl="Całkowity spadek napięcia na odcinku",
+    standard_ref="—",
+    latex=r"\Delta U = \Delta U_R + \Delta U_X",
+    symbols=(
+        SymbolDefinition(
+            symbol="\\Delta U",
+            unit="%",
+            description_pl="Spadek napięcia na odcinku",
+            mapping_key="delta_u_percent",
+        ),
+        SymbolDefinition(
+            symbol="\\Delta U_R",
+            unit="%",
+            description_pl="Składowa czynna spadku",
+            mapping_key="delta_u_r_percent",
+        ),
+        SymbolDefinition(
+            symbol="\\Delta U_X",
+            unit="%",
+            description_pl="Składowa bierna spadku",
+            mapping_key="delta_u_x_percent",
+        ),
+    ),
+    unit_derivation="% + % = %",
+    notes="Suma algebraiczna — ΔU_X może być ujemne (wzrost napięcia).",
+)
+
+EQ_VDROP_006 = EquationDefinition(
+    equation_id="EQ_VDROP_006",
+    name_pl="Sumaryczny spadek napięcia od źródła do punktu",
+    standard_ref="—",
+    latex=r"\Delta U_{total} = \sum_{i=1}^{n} \Delta U_i",
+    symbols=(
+        SymbolDefinition(
+            symbol="\\Delta U_{total}",
+            unit="%",
+            description_pl="Sumaryczny spadek napięcia",
+            mapping_key="delta_u_total_percent",
+        ),
+        SymbolDefinition(
+            symbol="\\Delta U_i",
+            unit="%",
+            description_pl="Spadek napięcia na i-tym odcinku",
+            mapping_key="delta_u_segments",
+        ),
+        SymbolDefinition(
+            symbol="n",
+            unit="—",
+            description_pl="Liczba odcinków na ścieżce",
+            mapping_key="segment_count",
+        ),
+    ),
+    unit_derivation="Σ % = %",
+    notes="Suma po wszystkich odcinkach od źródła do punktu.",
+)
+
+EQ_VDROP_007 = EquationDefinition(
+    equation_id="EQ_VDROP_007",
+    name_pl="Napięcie w punkcie po uwzględnieniu spadku",
+    standard_ref="—",
+    latex=r"U = U_{source} \cdot \left(1 - \frac{\Delta U_{total}}{100}\right)",
+    symbols=(
+        SymbolDefinition(
+            symbol="U",
+            unit="kV",
+            description_pl="Napięcie w punkcie",
+            mapping_key="u_kv",
+        ),
+        SymbolDefinition(
+            symbol="U_{source}",
+            unit="kV",
+            description_pl="Napięcie źródła",
+            mapping_key="u_source_kv",
+        ),
+        SymbolDefinition(
+            symbol="\\Delta U_{total}",
+            unit="%",
+            description_pl="Sumaryczny spadek napięcia",
+            mapping_key="delta_u_total_percent",
+        ),
+    ),
+    unit_derivation="kV · — = kV",
+)
+
+
+# -----------------------------------------------------------------------------
+# P15: Load Currents & Overload — równania dowodowe
+# -----------------------------------------------------------------------------
+
+EQ_LC_001 = EquationDefinition(
+    equation_id="EQ_LC_001",
+    name_pl="Moc pozorna",
+    standard_ref="praktyka inżynierska",
+    latex=r"S = \sqrt{P^{2} + Q^{2}}",
+    symbols=(
+        SymbolDefinition(
+            symbol="S",
+            unit="MVA",
+            description_pl="Moc pozorna",
+            mapping_key="s_mva",
+        ),
+        SymbolDefinition(
+            symbol="P",
+            unit="MW",
+            description_pl="Moc czynna",
+            mapping_key="p_mw",
+        ),
+        SymbolDefinition(
+            symbol="Q",
+            unit="Mvar",
+            description_pl="Moc bierna",
+            mapping_key="q_mvar",
+        ),
+    ),
+    unit_derivation="MW² + Mvar² = MVA² → MVA",
+    notes="Moc pozorna liczona z mocy czynnej i biernej.",
+)
+
+EQ_LC_002 = EquationDefinition(
+    equation_id="EQ_LC_002",
+    name_pl="Prąd roboczy trójfazowy",
+    standard_ref="praktyka inżynierska",
+    latex=r"I = \frac{S}{\sqrt{3}\,U_{LL}}",
+    symbols=(
+        SymbolDefinition(
+            symbol="I",
+            unit="kA",
+            description_pl="Prąd roboczy linii/kabla",
+            mapping_key="i_ka",
+        ),
+        SymbolDefinition(
+            symbol="S",
+            unit="MVA",
+            description_pl="Moc pozorna",
+            mapping_key="s_mva",
+        ),
+        SymbolDefinition(
+            symbol="U_{LL}",
+            unit="kV",
+            description_pl="Napięcie międzyfazowe",
+            mapping_key="u_ll_kv",
+        ),
+    ),
+    unit_derivation="MVA / kV = kA (MVA = kV · kA)",
+    notes="Uwaga jednostkowa: S w MVA, U w kV → wynik w kA.",
+)
+
+EQ_LC_003 = EquationDefinition(
+    equation_id="EQ_LC_003",
+    name_pl="Procent obciążenia prądowego",
+    standard_ref="praktyka inżynierska",
+    latex=r"k_I = 100\cdot\frac{I}{I_n}",
+    symbols=(
+        SymbolDefinition(
+            symbol="k_I",
+            unit="%",
+            description_pl="Procent obciążenia prądowego",
+            mapping_key="k_i_percent",
+        ),
+        SymbolDefinition(
+            symbol="I",
+            unit="kA",
+            description_pl="Prąd roboczy",
+            mapping_key="i_ka",
+        ),
+        SymbolDefinition(
+            symbol="I_n",
+            unit="kA",
+            description_pl="Prąd znamionowy (przeliczony na kA)",
+            mapping_key="in_a",
+        ),
+    ),
+    unit_derivation="100 · kA / kA = %",
+    notes="I_n przeliczany z A na kA dla spójności jednostek.",
+)
+
+EQ_LC_004 = EquationDefinition(
+    equation_id="EQ_LC_004",
+    name_pl="Margines prądowy",
+    standard_ref="praktyka inżynierska",
+    latex=r"m_I = 100\cdot\left(\frac{I_n}{I}-1\right)",
+    symbols=(
+        SymbolDefinition(
+            symbol="m_I",
+            unit="%",
+            description_pl="Margines prądowy",
+            mapping_key="m_i_percent",
+        ),
+        SymbolDefinition(
+            symbol="I_n",
+            unit="kA",
+            description_pl="Prąd znamionowy (przeliczony na kA)",
+            mapping_key="in_a",
+        ),
+        SymbolDefinition(
+            symbol="I",
+            unit="kA",
+            description_pl="Prąd roboczy",
+            mapping_key="i_ka",
+        ),
+    ),
+    unit_derivation="100 · (kA / kA - 1) = %",
+    notes="Dla I = 0 margines definiowany jako +∞ (deterministycznie).",
+)
+
+EQ_LC_005 = EquationDefinition(
+    equation_id="EQ_LC_005",
+    name_pl="Obciążenie transformatora (procent)",
+    standard_ref="praktyka inżynierska",
+    latex=r"k_S = 100\cdot\frac{S}{S_n}",
+    symbols=(
+        SymbolDefinition(
+            symbol="k_S",
+            unit="%",
+            description_pl="Procent obciążenia transformatora",
+            mapping_key="k_s_percent",
+        ),
+        SymbolDefinition(
+            symbol="S",
+            unit="MVA",
+            description_pl="Moc pozorna",
+            mapping_key="s_mva",
+        ),
+        SymbolDefinition(
+            symbol="S_n",
+            unit="MVA",
+            description_pl="Moc znamionowa transformatora",
+            mapping_key="sn_mva",
+        ),
+    ),
+    unit_derivation="100 · MVA / MVA = %",
+    notes="Obciążenie transformatora względem mocy znamionowej.",
+)
+
+EQ_LC_006 = EquationDefinition(
+    equation_id="EQ_LC_006",
+    name_pl="Margines transformatora",
+    standard_ref="praktyka inżynierska",
+    latex=r"m_S = 100\cdot\left(\frac{S_n}{S}-1\right)",
+    symbols=(
+        SymbolDefinition(
+            symbol="m_S",
+            unit="%",
+            description_pl="Margines obciążenia transformatora",
+            mapping_key="m_s_percent",
+        ),
+        SymbolDefinition(
+            symbol="S_n",
+            unit="MVA",
+            description_pl="Moc znamionowa transformatora",
+            mapping_key="sn_mva",
+        ),
+        SymbolDefinition(
+            symbol="S",
+            unit="MVA",
+            description_pl="Moc pozorna",
+            mapping_key="s_mva",
+        ),
+    ),
+    unit_derivation="100 · (MVA / MVA - 1) = %",
+    notes="Dla S = 0 margines definiowany jako +∞ (deterministycznie).",
+)
+
+
+# =============================================================================
+# Q(U) Regulation — Kanoniczne równania (BINDING) P11.1b
+# =============================================================================
+
+EQ_QU_001 = EquationDefinition(
+    equation_id="EQ_QU_001",
+    name_pl="Odchylenie napięcia od wartości referencyjnej",
+    standard_ref="Q(U) regulation",
+    latex=r"\Delta U = U_{meas} - U_{ref}",
+    symbols=(
+        SymbolDefinition(
+            symbol="\\Delta U",
+            unit="kV",
+            description_pl="Odchylenie napięcia",
+            mapping_key="delta_u_kv",
+        ),
+        SymbolDefinition(
+            symbol="U_{meas}",
+            unit="kV",
+            description_pl="Napięcie zmierzone",
+            mapping_key="u_meas_kv",
+        ),
+        SymbolDefinition(
+            symbol="U_{ref}",
+            unit="kV",
+            description_pl="Napięcie referencyjne",
+            mapping_key="u_ref_kv",
+        ),
+    ),
+    unit_derivation="kV - kV = kV",
+)
+
+EQ_QU_002 = EquationDefinition(
+    equation_id="EQ_QU_002",
+    name_pl="Funkcja martwej strefy (deadband)",
+    standard_ref="Q(U) regulation",
+    latex=(
+        r"s(U) = \begin{cases} "
+        r"\Delta U - U_{dead} & \text{if } \Delta U > U_{dead} \\ "
+        r"0 & \text{if } |\Delta U| \le U_{dead} \\ "
+        r"\Delta U + U_{dead} & \text{if } \Delta U < -U_{dead} "
+        r"\end{cases}"
+    ),
+    symbols=(
+        SymbolDefinition(
+            symbol="s(U)",
+            unit="kV",
+            description_pl="Sygnał po deadband",
+            mapping_key="s_u_kv",
+        ),
+        SymbolDefinition(
+            symbol="\\Delta U",
+            unit="kV",
+            description_pl="Odchylenie napięcia",
+            mapping_key="delta_u_kv",
+        ),
+        SymbolDefinition(
+            symbol="U_{dead}",
+            unit="kV",
+            description_pl="Szerokość martwej strefy",
+            mapping_key="u_dead_kv",
+        ),
+    ),
+    unit_derivation="kV ± kV = kV",
+)
+
+EQ_QU_003 = EquationDefinition(
+    equation_id="EQ_QU_003",
+    name_pl="Surowa wartość mocy biernej Q",
+    standard_ref="Q(U) regulation",
+    latex=r"Q_{raw} = k_Q \cdot s(U)",
+    symbols=(
+        SymbolDefinition(
+            symbol="Q_{raw}",
+            unit="Mvar",
+            description_pl="Surowa moc bierna",
+            mapping_key="q_raw_mvar",
+        ),
+        SymbolDefinition(
+            symbol="k_Q",
+            unit="Mvar/kV",
+            description_pl="Współczynnik regulacji Q(U)",
+            mapping_key="k_q_mvar_per_kv",
+        ),
+        SymbolDefinition(
+            symbol="s(U)",
+            unit="kV",
+            description_pl="Sygnał po deadband",
+            mapping_key="s_u_kv",
+        ),
+    ),
+    unit_derivation="Mvar/kV · kV = Mvar",
+)
+
+EQ_QU_004 = EquationDefinition(
+    equation_id="EQ_QU_004",
+    name_pl="Końcowa moc bierna z limitami",
+    standard_ref="Q(U) regulation",
+    latex=r"Q_{cmd} = \min(\max(Q_{raw}, Q_{min}), Q_{max})",
+    symbols=(
+        SymbolDefinition(
+            symbol="Q_{cmd}",
+            unit="Mvar",
+            description_pl="Komenda mocy biernej",
+            mapping_key="q_cmd_mvar",
+        ),
+        SymbolDefinition(
+            symbol="Q_{raw}",
+            unit="Mvar",
+            description_pl="Surowa moc bierna",
+            mapping_key="q_raw_mvar",
+        ),
+        SymbolDefinition(
+            symbol="Q_{min}",
+            unit="Mvar",
+            description_pl="Minimalna moc bierna",
+            mapping_key="q_min_mvar",
+        ),
+        SymbolDefinition(
+            symbol="Q_{max}",
+            unit="Mvar",
+            description_pl="Maksymalna moc bierna",
+            mapping_key="q_max_mvar",
+        ),
+    ),
+    unit_derivation="Mvar = Mvar",
+)
+
+# =============================================================================
+# EQ_QU_005 — Wpływ Q_cmd na napięcie U (LINK-ONLY, P11.1c)
+# =============================================================================
+#
+# Ten krok jest REFERENCJĄ do istniejących równań VDROP (EQ_VDROP_004..007).
+# NIE DUPLIKUJE wzorów VDROP — tylko wskazuje na ich użycie.
+# NIE LICZY niczego nowego — tylko prezentuje wyniki VDROP.
+#
+# Łańcuch zależności:
+#   Q_cmd (z Q(U)) → ΔU_X (EQ_VDROP_004) → ΔU (EQ_VDROP_005)
+#                  → ΔU_total (EQ_VDROP_006) → U (EQ_VDROP_007)
+# =============================================================================
+
+EQ_QU_005 = EquationDefinition(
+    equation_id="EQ_QU_005",
+    name_pl="Wpływ Q_cmd na napięcie U (referencja VDROP)",
+    standard_ref="Q(U) regulation → VDROP link",
+    latex=(
+        r"Q_{cmd} \xrightarrow{\text{VDROP}} \Delta U_X \to \Delta U \to U"
+    ),
+    symbols=(
+        SymbolDefinition(
+            symbol="Q_{cmd}",
+            unit="Mvar",
+            description_pl="Komenda mocy biernej (z regulacji Q(U))",
+            mapping_key="q_cmd_mvar",
+        ),
+        SymbolDefinition(
+            symbol="\\Delta U_X",
+            unit="%",
+            description_pl="Składowa bierna spadku napięcia (EQ_VDROP_004)",
+            mapping_key="delta_u_x_percent",
+        ),
+        SymbolDefinition(
+            symbol="\\Delta U",
+            unit="%",
+            description_pl="Spadek napięcia na odcinku (EQ_VDROP_005)",
+            mapping_key="delta_u_percent",
+        ),
+        SymbolDefinition(
+            symbol="U",
+            unit="kV",
+            description_pl="Napięcie w punkcie (EQ_VDROP_007)",
+            mapping_key="u_kv",
+        ),
+    ),
+    unit_derivation="Mvar → % → kV (VDROP link)",
+    notes=(
+        "LINK-ONLY: Referencja do istniejących równań VDROP. "
+        "Q_cmd wpływa na ΔU_X przez EQ_VDROP_004: ΔU_X = (X·Q)/U_n²·100%. "
+        "NIE DUPLIKUJE wzorów — tylko pokazuje zależność."
+    ),
+)
+
+
+# =============================================================================
+# SC1 IEC 60909 — Zwarcia asymetryczne (P11.1c)
+# =============================================================================
+
+EQ_SC1_001 = EquationDefinition(
+    equation_id="EQ_SC1_001",
+    name_pl="Impedancje składowych zgodna/przeciwna/zerowa",
+    standard_ref="IEC 60909-0:2016 § 6 (składowe symetryczne)",
+    latex=(
+        r"\begin{aligned}"
+        r"Z_1 &= Z_{1,\mathrm{th}} \\"
+        r"Z_2 &= Z_{2,\mathrm{th}} \\"
+        r"Z_0 &= Z_{0,\mathrm{th}}"
+        r"\end{aligned}"
+    ),
+    symbols=(
+        SymbolDefinition(
+            symbol="Z_1",
+            unit="Ω",
+            description_pl="Impedancja składowej zgodnej",
+            mapping_key="z1_ohm",
+        ),
+        SymbolDefinition(
+            symbol="Z_2",
+            unit="Ω",
+            description_pl="Impedancja składowej przeciwnej",
+            mapping_key="z2_ohm",
+        ),
+        SymbolDefinition(
+            symbol="Z_0",
+            unit="Ω",
+            description_pl="Impedancja składowej zerowej",
+            mapping_key="z0_ohm",
+        ),
+    ),
+    unit_derivation="Ω = Ω",
+    notes="Źródło danych: white_box_trace/result. Definicje składowych symetrycznych.",
+)
+
+EQ_SC1_002 = EquationDefinition(
+    equation_id="EQ_SC1_002",
+    name_pl="Operator a i macierz Fortescue (składowe → fazy)",
+    standard_ref="IEC 60909-0:2016 Annex B (składowe symetryczne)",
+    latex=(
+        r"a = e^{j 120^\circ}, \quad a^2 = e^{j 240^\circ} \\"
+        r"\begin{bmatrix} I_a \\ I_b \\ I_c \end{bmatrix} ="
+        r"\begin{bmatrix} 1 & 1 & 1 \\ 1 & a^2 & a \\ 1 & a & a^2 \end{bmatrix}"
+        r"\begin{bmatrix} I_0 \\ I_1 \\ I_2 \end{bmatrix}"
+    ),
+    symbols=(
+        SymbolDefinition(
+            symbol="a",
+            unit="—",
+            description_pl="Operator obrotu 120°",
+            mapping_key="a_operator",
+        ),
+        SymbolDefinition(
+            symbol="I_a",
+            unit="kA",
+            description_pl="Prąd fazowy a",
+            mapping_key="ia_ka",
+        ),
+        SymbolDefinition(
+            symbol="I_b",
+            unit="kA",
+            description_pl="Prąd fazowy b",
+            mapping_key="ib_ka",
+        ),
+        SymbolDefinition(
+            symbol="I_c",
+            unit="kA",
+            description_pl="Prąd fazowy c",
+            mapping_key="ic_ka",
+        ),
+        SymbolDefinition(
+            symbol="I_0",
+            unit="kA",
+            description_pl="Prąd składowej zerowej",
+            mapping_key="i0_ka",
+        ),
+        SymbolDefinition(
+            symbol="I_1",
+            unit="kA",
+            description_pl="Prąd składowej zgodnej",
+            mapping_key="i1_ka",
+        ),
+        SymbolDefinition(
+            symbol="I_2",
+            unit="kA",
+            description_pl="Prąd składowej przeciwnej",
+            mapping_key="i2_ka",
+        ),
+    ),
+    unit_derivation="—",
+    notes="Macierz Fortescue dla prądów (analogicznie dla napięć).",
+)
+
+EQ_SC1_003 = EquationDefinition(
+    equation_id="EQ_SC1_003",
+    name_pl="Sieć składowych dla zwarcia 1F–Z",
+    standard_ref="IEC 60909-0:2016 § 6.1",
+    latex=r"Z_k = Z_1 + Z_2 + Z_0",
+    symbols=(
+        SymbolDefinition(
+            symbol="Z_k",
+            unit="Ω",
+            description_pl="Impedancja zastępcza w miejscu zwarcia",
+            mapping_key="z_equiv_ohm",
+        ),
+        SymbolDefinition(
+            symbol="Z_1",
+            unit="Ω",
+            description_pl="Impedancja składowej zgodnej",
+            mapping_key="z1_ohm",
+        ),
+        SymbolDefinition(
+            symbol="Z_2",
+            unit="Ω",
+            description_pl="Impedancja składowej przeciwnej",
+            mapping_key="z2_ohm",
+        ),
+        SymbolDefinition(
+            symbol="Z_0",
+            unit="Ω",
+            description_pl="Impedancja składowej zerowej",
+            mapping_key="z0_ohm",
+        ),
+    ),
+    unit_derivation="Ω + Ω + Ω = Ω",
+    notes="Stosować wyłącznie dla zwarcia jednofazowego doziemnego (1F–Z).",
+)
+
+EQ_SC1_004 = EquationDefinition(
+    equation_id="EQ_SC1_004",
+    name_pl="Sieć składowych dla zwarcia 2F",
+    standard_ref="IEC 60909-0:2016 § 6.2",
+    latex=r"Z_k = Z_1 + Z_2",
+    symbols=(
+        SymbolDefinition(
+            symbol="Z_k",
+            unit="Ω",
+            description_pl="Impedancja zastępcza w miejscu zwarcia",
+            mapping_key="z_equiv_ohm",
+        ),
+        SymbolDefinition(
+            symbol="Z_1",
+            unit="Ω",
+            description_pl="Impedancja składowej zgodnej",
+            mapping_key="z1_ohm",
+        ),
+        SymbolDefinition(
+            symbol="Z_2",
+            unit="Ω",
+            description_pl="Impedancja składowej przeciwnej",
+            mapping_key="z2_ohm",
+        ),
+    ),
+    unit_derivation="Ω + Ω = Ω",
+    notes="Stosować wyłącznie dla zwarcia dwufazowego (2F).",
+)
+
+EQ_SC1_005 = EquationDefinition(
+    equation_id="EQ_SC1_005",
+    name_pl="Sieć składowych dla zwarcia 2F–Z",
+    standard_ref="IEC 60909-0:2016 § 6.3",
+    latex=r"Z_k = Z_1 + \frac{Z_2 \cdot Z_0}{Z_2 + Z_0}",
+    symbols=(
+        SymbolDefinition(
+            symbol="Z_k",
+            unit="Ω",
+            description_pl="Impedancja zastępcza w miejscu zwarcia",
+            mapping_key="z_equiv_ohm",
+        ),
+        SymbolDefinition(
+            symbol="Z_1",
+            unit="Ω",
+            description_pl="Impedancja składowej zgodnej",
+            mapping_key="z1_ohm",
+        ),
+        SymbolDefinition(
+            symbol="Z_2",
+            unit="Ω",
+            description_pl="Impedancja składowej przeciwnej",
+            mapping_key="z2_ohm",
+        ),
+        SymbolDefinition(
+            symbol="Z_0",
+            unit="Ω",
+            description_pl="Impedancja składowej zerowej",
+            mapping_key="z0_ohm",
+        ),
+    ),
+    unit_derivation="Ω + (Ω·Ω)/(Ω+Ω) = Ω",
+    notes="Stosować wyłącznie dla zwarcia dwufazowego doziemnego (2F–Z).",
+)
+
+EQ_SC1_006 = EquationDefinition(
+    equation_id="EQ_SC1_006",
+    name_pl="Wyznaczenie prądów składowych I₁, I₂, I₀",
+    standard_ref="IEC 60909-0:2016 Annex B",
+    latex=(
+        r"\begin{aligned}"
+        r"\text{1F–Z:} \quad & I_1 = I_2 = I_0 = \frac{U_f}{Z_k} \\"
+        r"\text{2F:} \quad & I_1 = \frac{U_f}{Z_k}, \quad I_2 = -I_1, \quad I_0 = 0 \\"
+        r"\text{2F–Z:} \quad & I_1 = \frac{U_f}{Z_k}, \quad"
+        r"I_2 = -\frac{Z_0}{Z_2 + Z_0} I_1, \quad"
+        r"I_0 = -\frac{Z_2}{Z_2 + Z_0} I_1"
+        r"\end{aligned}"
+    ),
+    symbols=(
+        SymbolDefinition(
+            symbol="I_1",
+            unit="kA",
+            description_pl="Prąd składowej zgodnej",
+            mapping_key="i1_ka",
+        ),
+        SymbolDefinition(
+            symbol="I_2",
+            unit="kA",
+            description_pl="Prąd składowej przeciwnej",
+            mapping_key="i2_ka",
+        ),
+        SymbolDefinition(
+            symbol="I_0",
+            unit="kA",
+            description_pl="Prąd składowej zerowej",
+            mapping_key="i0_ka",
+        ),
+        SymbolDefinition(
+            symbol="U_f",
+            unit="kV",
+            description_pl="Napięcie przedzwarciowe fazowe",
+            mapping_key="u_prefault_kv",
+        ),
+        SymbolDefinition(
+            symbol="Z_k",
+            unit="Ω",
+            description_pl="Impedancja zastępcza",
+            mapping_key="z_equiv_ohm",
+        ),
+        SymbolDefinition(
+            symbol="Z_2",
+            unit="Ω",
+            description_pl="Impedancja składowej przeciwnej",
+            mapping_key="z2_ohm",
+        ),
+        SymbolDefinition(
+            symbol="Z_0",
+            unit="Ω",
+            description_pl="Impedancja składowej zerowej",
+            mapping_key="z0_ohm",
+        ),
+    ),
+    unit_derivation="kV / Ω = kA",
+    notes="Stosować zgodnie z typem zwarcia oraz impedancją Z_k z EQ_SC1_003/004/005.",
+)
+
+EQ_SC1_007 = EquationDefinition(
+    equation_id="EQ_SC1_007",
+    name_pl="Rekonstrukcja prądów fazowych Ia, Ib, Ic",
+    standard_ref="IEC 60909-0:2016 Annex B",
+    latex=(
+        r"\begin{bmatrix} I_a \\ I_b \\ I_c \end{bmatrix} ="
+        r"\begin{bmatrix} 1 & 1 & 1 \\ 1 & a^2 & a \\ 1 & a & a^2 \end{bmatrix}"
+        r"\begin{bmatrix} I_0 \\ I_1 \\ I_2 \end{bmatrix}"
+    ),
+    symbols=(
+        SymbolDefinition(
+            symbol="I_a",
+            unit="kA",
+            description_pl="Prąd fazowy a",
+            mapping_key="ia_ka",
+        ),
+        SymbolDefinition(
+            symbol="I_b",
+            unit="kA",
+            description_pl="Prąd fazowy b",
+            mapping_key="ib_ka",
+        ),
+        SymbolDefinition(
+            symbol="I_c",
+            unit="kA",
+            description_pl="Prąd fazowy c",
+            mapping_key="ic_ka",
+        ),
+        SymbolDefinition(
+            symbol="I_0",
+            unit="kA",
+            description_pl="Prąd składowej zerowej",
+            mapping_key="i0_ka",
+        ),
+        SymbolDefinition(
+            symbol="I_1",
+            unit="kA",
+            description_pl="Prąd składowej zgodnej",
+            mapping_key="i1_ka",
+        ),
+        SymbolDefinition(
+            symbol="I_2",
+            unit="kA",
+            description_pl="Prąd składowej przeciwnej",
+            mapping_key="i2_ka",
+        ),
+        SymbolDefinition(
+            symbol="a",
+            unit="—",
+            description_pl="Operator obrotu 120°",
+            mapping_key="a_operator",
+        ),
+    ),
+    unit_derivation="kA = kA",
+    notes="Rekombinacja składowych symetrycznych do prądów fazowych.",
+)
+
+
+# =============================================================================
+# ANTI-DOUBLE-COUNTING AUDIT
+# =============================================================================
+
+
+class AntiDoubleCountingAudit:
+    """
+    Anti-Double-Counting Audit dla współczynnika napięciowego c.
+
+    Model: A1 (CANONICAL)
+    c występuje WYŁĄCZNIE w: EQ_SC3F_004
+
+    Status: PASS
+    """
+
+    MODEL = "A1"
+    C_FACTOR_EQUATION = "EQ_SC3F_004"
+    STATUS = "PASS"
+
+    # Równania dowodowe SC3F z audytem c
+    PROOF_EQUATIONS_AUDIT: dict[str, bool] = {
+        "EQ_SC3F_003": False,   # Impedancja Thevenina — c NIE występuje
+        "EQ_SC3F_004": True,    # Prąd I_k'' — c WYSTĘPUJE (jedyne miejsce)
+        "EQ_SC3F_005": False,   # Współczynnik κ — c NIE występuje
+        "EQ_SC3F_006": False,   # Prąd udarowy — c NIE występuje
+        "EQ_SC3F_007": False,   # Moc S_k'' — c NIE występuje
+        "EQ_SC3F_008": False,   # Prąd cieplny — c NIE występuje
+        "EQ_SC3F_008a": False,  # Prąd dynamiczny — c NIE występuje
+    }
+
+    # Równania pomocnicze (solver-only)
+    HELPER_EQUATIONS_AUDIT: dict[str, bool] = {
+        "EQ_SC3F_002": True,    # Z_Q z S_kQ'' — c występuje (solver only)
+        "EQ_SC3F_002a": False,  # Rozkład R/X — c NIE występuje
+        "EQ_SC3F_009": False,   # Impedancja transformatora — c NIE występuje
+        "EQ_SC3F_010": False,   # Impedancja linii — c NIE występuje
+    }
+
+    @classmethod
+    def verify(cls) -> bool:
+        """
+        Weryfikuje, że c występuje DOKŁADNIE RAZ w równaniach dowodowych.
+
+        Returns:
+            True jeśli audit PASS, False jeśli FAIL
+        """
+        c_count = sum(1 for has_c in cls.PROOF_EQUATIONS_AUDIT.values() if has_c)
+        if c_count != 1:
+            return False
+        if not cls.PROOF_EQUATIONS_AUDIT.get(cls.C_FACTOR_EQUATION, False):
+            return False
+        return True
+
+    @classmethod
+    def get_audit_report(cls) -> str:
+        """Zwraca raport audytu w formie tekstowej."""
+        lines = [
+            "ANTI-DOUBLE-COUNTING AUDIT — Współczynnik napięciowy c",
+            "=" * 60,
+            f"Model: {cls.MODEL}",
+            f"c występuje w: {cls.C_FACTOR_EQUATION}",
+            "",
+            "Równania dowodowe SC3F:",
+        ]
+        for eq_id, has_c in sorted(cls.PROOF_EQUATIONS_AUDIT.items()):
+            status = "TAK" if has_c else "NIE"
+            lines.append(f"  {eq_id}: c {status}")
+
+        lines.append("")
+        lines.append("Równania pomocnicze (solver-only):")
+        for eq_id, has_c in sorted(cls.HELPER_EQUATIONS_AUDIT.items()):
+            status = "TAK" if has_c else "NIE"
+            lines.append(f"  {eq_id}: c {status}")
+
+        lines.append("")
+        passed = cls.verify()
+        lines.append(f"Status: {'PASS' if passed else 'FAIL'}")
+
+        return "\n".join(lines)
+
+
+# =============================================================================
+# EquationRegistry — Rejestr równań
+# =============================================================================
+
+
+class _EquationRegistryStore:
+    def __init__(self) -> None:
+        self._equations: dict[str, EquationDefinition] = {}
+        self._frozen = False
+
+    def merge(self, equations: dict[str, EquationDefinition]) -> None:
+        if self._frozen:
+            raise RuntimeError("Equation registry is frozen.")
+        duplicates = set(self._equations).intersection(equations)
+        if duplicates:
+            duplicates_list = ", ".join(sorted(duplicates))
+            raise ValueError(f"Duplicate equation IDs: {duplicates_list}")
+        self._equations.update(equations)
+
+    def freeze(self) -> None:
+        self._frozen = True
+
+    def get(self, equation_id: str) -> EquationDefinition | None:
+        return self._equations.get(equation_id)
+
+    def values(self):
+        return self._equations.values()
+
+    def all(self) -> dict[str, EquationDefinition]:
+        return self._equations.copy()
+
+
+# SC3F equations registry (wszystkie, włącznie z pomocniczymi)
+SC3F_EQUATIONS: dict[str, EquationDefinition] = {
+    "EQ_SC3F_002": EQ_SC3F_002,
+    "EQ_SC3F_002a": EQ_SC3F_002a,
+    "EQ_SC3F_003": EQ_SC3F_003,
+    "EQ_SC3F_004": EQ_SC3F_004,
+    "EQ_SC3F_005": EQ_SC3F_005,
+    "EQ_SC3F_006": EQ_SC3F_006,
+    "EQ_SC3F_007": EQ_SC3F_007,
+    "EQ_SC3F_008": EQ_SC3F_008,
+    "EQ_SC3F_008a": EQ_SC3F_008a,
+    "EQ_SC3F_009": EQ_SC3F_009,
+    "EQ_SC3F_010": EQ_SC3F_010,
+}
+
+# VDROP equations registry
+VDROP_EQUATIONS: dict[str, EquationDefinition] = {
+    "EQ_VDROP_001": EQ_VDROP_001,
+    "EQ_VDROP_002": EQ_VDROP_002,
+    "EQ_VDROP_003": EQ_VDROP_003,
+    "EQ_VDROP_004": EQ_VDROP_004,
+    "EQ_VDROP_005": EQ_VDROP_005,
+    "EQ_VDROP_006": EQ_VDROP_006,
+    "EQ_VDROP_007": EQ_VDROP_007,
+}
+
+# P15: Load Currents & Overload equations registry
+LC_EQUATIONS: dict[str, EquationDefinition] = {
+    "EQ_LC_001": EQ_LC_001,
+    "EQ_LC_002": EQ_LC_002,
+    "EQ_LC_003": EQ_LC_003,
+    "EQ_LC_004": EQ_LC_004,
+    "EQ_LC_005": EQ_LC_005,
+    "EQ_LC_006": EQ_LC_006,
+}
+
+# Q(U) equations registry (P11.1b + P11.1c)
+QU_EQUATIONS: dict[str, EquationDefinition] = {
+    "EQ_QU_001": EQ_QU_001,
+    "EQ_QU_002": EQ_QU_002,
+    "EQ_QU_003": EQ_QU_003,
+    "EQ_QU_004": EQ_QU_004,
+    "EQ_QU_005": EQ_QU_005,  # P11.1c: VDROP link (no new physics)
+}
+
+# SC1 equations registry (P11.1c)
+SC1_EQUATIONS: dict[str, EquationDefinition] = {
+    "EQ_SC1_001": EQ_SC1_001,
+    "EQ_SC1_002": EQ_SC1_002,
+    "EQ_SC1_003": EQ_SC1_003,
+    "EQ_SC1_004": EQ_SC1_004,
+    "EQ_SC1_005": EQ_SC1_005,
+    "EQ_SC1_006": EQ_SC1_006,
+    "EQ_SC1_007": EQ_SC1_007,
+}
+
+# Step order for SC3F proof (BINDING) — tylko równania dowodowe
+SC3F_PROOF_STEP_ORDER: list[str] = [
+    "EQ_SC3F_003",  # Impedancja Thevenina
+    "EQ_SC3F_004",  # Prąd zwarciowy I_k'' (c TUTAJ)
+    "EQ_SC3F_005",  # Współczynnik udaru κ
+    "EQ_SC3F_006",  # Prąd udarowy i_p
+    "EQ_SC3F_008a", # Prąd dynamiczny I_dyn (OBOWIĄZKOWY)
+    "EQ_SC3F_008",  # Prąd cieplny I_th (OBOWIĄZKOWY)
+    "EQ_SC3F_007",  # Moc zwarciowa S_k''
+]
+
+# Step order for VDROP (BINDING)
+VDROP_STEP_ORDER: list[str] = [
+    "EQ_VDROP_001",  # Rezystancja odcinka
+    "EQ_VDROP_002",  # Reaktancja odcinka
+    "EQ_VDROP_003",  # Składowa czynna ΔU_R
+    "EQ_VDROP_004",  # Składowa bierna ΔU_X
+    "EQ_VDROP_005",  # Spadek na odcinku ΔU
+    "EQ_VDROP_006",  # Suma spadków ΔU_total
+    "EQ_VDROP_007",  # Napięcie w punkcie U
+]
+
+# Step order for P15 (BINDING)
+LC_STEP_ORDER: list[str] = [
+    "EQ_LC_001",  # Moc pozorna
+    "EQ_LC_002",  # Prąd roboczy 3-f
+    "EQ_LC_003",  # Procent obciążenia prądowego
+    "EQ_LC_004",  # Margines prądowy
+    "EQ_LC_005",  # Obciążenie transformatora
+    "EQ_LC_006",  # Margines transformatora
+]
+
+# Step order for Q(U) proof (BINDING) — P11.1b + P11.1c
+QU_STEP_ORDER: list[str] = [
+    "EQ_QU_001",  # ΔU = U_meas - U_ref
+    "EQ_QU_002",  # s(U) deadband
+    "EQ_QU_003",  # Q_raw = k_Q · s(U)
+    "EQ_QU_004",  # Q_cmd with limits
+    "EQ_QU_005",  # P11.1c: Q_cmd → U (VDROP link, no new physics)
+]
+
+# Step order for SC1 proofs (BINDING) — P11.1c
+SC1FZ_STEP_ORDER: list[str] = [
+    "EQ_SC1_001",  # Z₁, Z₂, Z₀
+    "EQ_SC1_002",  # Transformacja Fortescue
+    "EQ_SC1_003",  # Z_k dla 1F–Z
+    "EQ_SC1_006",  # I₁, I₂, I₀
+    "EQ_SC1_007",  # Rekombinacja fazowa
+]
+
+SC2F_STEP_ORDER: list[str] = [
+    "EQ_SC1_001",  # Z₁, Z₂, Z₀
+    "EQ_SC1_002",  # Transformacja Fortescue
+    "EQ_SC1_004",  # Z_k dla 2F
+    "EQ_SC1_006",  # I₁, I₂, I₀
+    "EQ_SC1_007",  # Rekombinacja fazowa
+]
+
+SC2FZ_STEP_ORDER: list[str] = [
+    "EQ_SC1_001",  # Z₁, Z₂, Z₀
+    "EQ_SC1_002",  # Transformacja Fortescue
+    "EQ_SC1_005",  # Z_k dla 2F–Z
+    "EQ_SC1_006",  # I₁, I₂, I₀
+    "EQ_SC1_007",  # Rekombinacja fazowa
+]
+
+# Frozen IDs for stability tests (BINDING)
+FROZEN_IDS: dict[str, list[str]] = {
+    "sc3f_equations": list(SC3F_EQUATIONS.keys()),
+    "vdrop_equations": list(VDROP_EQUATIONS.keys()),
+    "sc1_equations": list(SC1_EQUATIONS.keys()),
+    "lc_equations": list(LC_EQUATIONS.keys()),
+    "mapping_keys": [
+        # SC3F
+        "ikss_ka", "ip_ka", "ith_ka", "idyn_ka", "sk_mva",
+        "kappa", "z_thevenin_ohm", "r_thevenin_ohm", "x_thevenin_ohm",
+        "c_factor", "u_n_kv",
+        # VDROP
+        "r_ohm", "x_ohm", "p_mw", "q_mvar",
+        "delta_u_r_percent", "delta_u_x_percent",
+        "delta_u_percent", "delta_u_total_percent",
+        # SC1
+        "z1_ohm", "z2_ohm", "z0_ohm", "z_equiv_ohm",
+        "u_prefault_kv",
+        "i1_ka", "i2_ka", "i0_ka",
+        "ia_ka", "ib_ka", "ic_ka",
+        "a_operator",
+        # P15
+        "u_ll_kv", "p_mw", "q_mvar", "s_mva", "i_ka", "in_a",
+        "k_i_percent", "m_i_percent", "sn_mva", "k_s_percent", "m_s_percent",
+    ],
+}
+
+registry = _EquationRegistryStore()
+registry.merge(SC3F_EQUATIONS)
+registry.merge(VDROP_EQUATIONS)
+registry.merge(LC_EQUATIONS)
+registry.merge(QU_EQUATIONS)
+registry.merge(SC1_EQUATIONS)
+registry.merge(LS_EQUATIONS)
+registry.freeze()
+
+
+class EquationRegistry:
+    """
+    Rejestr równań dla Proof Engine.
+
+    Rejestr jest JEDYNYM źródłem prawdy dla wszystkich równań używanych w dowodach.
+    Wszystkie equation_id są STABILNE i NIE MOGĄ się zmienić między wersjami.
+    """
+
+    @classmethod
+    def get_equation(cls, equation_id: str) -> EquationDefinition | None:
+        """Zwraca definicję równania po ID."""
+        return registry.get(equation_id)
+
+    @classmethod
+    def get_sc3f_equations(cls) -> dict[str, EquationDefinition]:
+        """Zwraca wszystkie równania SC3F."""
+        return SC3F_EQUATIONS.copy()
+
+    @classmethod
+    def get_vdrop_equations(cls) -> dict[str, EquationDefinition]:
+        """Zwraca wszystkie równania VDROP."""
+        return VDROP_EQUATIONS.copy()
+
+    @classmethod
+    def get_lc_equations(cls) -> dict[str, EquationDefinition]:
+        """Zwraca wszystkie równania P15 (Load Currents)."""
+        return LC_EQUATIONS.copy()
+
+    @classmethod
+    def get_sc3f_proof_step_order(cls) -> list[str]:
+        """Zwraca kolejność kroków dla dowodu SC3F (tylko równania dowodowe)."""
+        return SC3F_PROOF_STEP_ORDER.copy()
+
+    @classmethod
+    def get_vdrop_step_order(cls) -> list[str]:
+        """Zwraca kolejność kroków dla dowodu VDROP."""
+        return VDROP_STEP_ORDER.copy()
+
+    @classmethod
+    def get_lc_step_order(cls) -> list[str]:
+        """Zwraca kolejność kroków dla dowodu P15."""
+        return LC_STEP_ORDER.copy()
+
+    @classmethod
+    def get_qu_equations(cls) -> dict[str, EquationDefinition]:
+        """Zwraca wszystkie równania Q(U)."""
+        return QU_EQUATIONS.copy()
+
+    @classmethod
+    def get_qu_step_order(cls) -> list[str]:
+        """Zwraca kolejność kroków dla dowodu Q(U)."""
+        return QU_STEP_ORDER.copy()
+
+    @classmethod
+    def get_sc1_equations(cls) -> dict[str, EquationDefinition]:
+        """Zwraca wszystkie równania SC1 (P11.1c)."""
+        return SC1_EQUATIONS.copy()
+
+    @classmethod
+    def get_sc1_step_order(cls, fault_type: str) -> list[str]:
+        """
+        Zwraca kolejność kroków dla dowodu SC1 (P11.1c).
+
+        Args:
+            fault_type: Typ zwarcia (SC1FZ/SC2F/SC2FZ)
+        """
+        if fault_type == "SC1FZ":
+            return SC1FZ_STEP_ORDER.copy()
+        if fault_type == "SC2F":
+            return SC2F_STEP_ORDER.copy()
+        if fault_type == "SC2FZ":
+            return SC2FZ_STEP_ORDER.copy()
+        raise ValueError(f"Unsupported SC1 fault type: {fault_type}")
+
+    @classmethod
+    def get_all_mapping_keys(cls) -> set[str]:
+        """Zwraca wszystkie mapping_key używane w rejestrze."""
+        keys: set[str] = set()
+        for eq in registry.values():
+            for sym in eq.symbols:
+                keys.add(sym.mapping_key)
+        return keys
+
+    @classmethod
+    def validate_id_stability(cls) -> bool:
+        """
+        Weryfikuje, że żaden istniejący ID nie został zmieniony.
+        Używane w testach regresji.
+        """
+        for eq_id in FROZEN_IDS["sc3f_equations"]:
+            if eq_id not in SC3F_EQUATIONS:
+                raise ValueError(f"Frozen equation ID {eq_id} usunięty z SC3F!")
+
+        for eq_id in FROZEN_IDS["vdrop_equations"]:
+            if eq_id not in VDROP_EQUATIONS:
+                raise ValueError(f"Frozen equation ID {eq_id} usunięty z VDROP!")
+
+        for eq_id in FROZEN_IDS["sc1_equations"]:
+            if eq_id not in SC1_EQUATIONS:
+                raise ValueError(f"Frozen equation ID {eq_id} usunięty z SC1!")
+
+        for eq_id in FROZEN_IDS["lc_equations"]:
+            if eq_id not in LC_EQUATIONS:
+                raise ValueError(f"Frozen equation ID {eq_id} usunięty z P15!")
+
+        current_keys = cls.get_all_mapping_keys()
+        for key in FROZEN_IDS["mapping_keys"]:
+            if key not in current_keys:
+                raise ValueError(f"Frozen mapping key {key} usunięty!")
+
+        return True
+
+    @classmethod
+    def verify_anti_double_counting(cls) -> bool:
+        """Weryfikuje audit anti-double-counting."""
+        return AntiDoubleCountingAudit.verify()
+
+
+EquationRegistry.SC3F_EQUATIONS = SC3F_EQUATIONS
+EquationRegistry.VDROP_EQUATIONS = VDROP_EQUATIONS
+EquationRegistry.LC_EQUATIONS = LC_EQUATIONS
+EquationRegistry.QU_EQUATIONS = QU_EQUATIONS
+EquationRegistry.SC1_EQUATIONS = SC1_EQUATIONS
+EquationRegistry.SC3F_PROOF_STEP_ORDER = SC3F_PROOF_STEP_ORDER
+EquationRegistry.VDROP_STEP_ORDER = VDROP_STEP_ORDER
+EquationRegistry.LC_STEP_ORDER = LC_STEP_ORDER
+EquationRegistry.QU_STEP_ORDER = QU_STEP_ORDER
+EquationRegistry.SC1FZ_STEP_ORDER = SC1FZ_STEP_ORDER
+EquationRegistry.SC2F_STEP_ORDER = SC2F_STEP_ORDER
+EquationRegistry.SC2FZ_STEP_ORDER = SC2FZ_STEP_ORDER
+EquationRegistry.FROZEN_IDS = FROZEN_IDS

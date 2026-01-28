@@ -163,6 +163,7 @@ export type TreeNodeType =
   | 'TRANSFORMER_TYPES'
   | 'SWITCH_EQUIPMENT_TYPES'
   | 'CASES'
+  | 'STUDY_CASE'  // P10: Individual study case node
   | 'RESULTS'
   | 'ELEMENT'; // Individual element node
 
@@ -179,6 +180,10 @@ export interface TreeNode {
   count?: number; // Number of items in category
   expanded?: boolean;
   icon?: string;
+  // P10: Study case properties
+  studyCaseId?: string; // For STUDY_CASE nodes
+  isActive?: boolean; // For STUDY_CASE nodes - active case indicator
+  resultStatus?: ResultStatus; // For STUDY_CASE nodes - result status
 }
 
 // ============================================================================
@@ -187,6 +192,7 @@ export interface TreeNode {
 
 /**
  * Data Manager column definition.
+ * P9.2: Extended with editability metadata for inline editing.
  */
 export interface DataManagerColumn {
   key: string;
@@ -195,6 +201,11 @@ export interface DataManagerColumn {
   unit?: string;
   sortable: boolean;
   width?: number;
+  // P9.2: Inline editing metadata
+  editable?: boolean; // Can be edited inline (only in MODEL_EDIT, only instance fields)
+  source?: 'instance' | 'type' | 'calculated'; // Source of the value
+  enumOptions?: string[]; // For enum type fields
+  validation?: (value: unknown) => string | null; // Inline validation function
 }
 
 /**
@@ -218,7 +229,23 @@ export interface DataManagerFilter {
   withTypeOnly: boolean;
   withoutTypeOnly: boolean;
   switchStateFilter: 'ALL' | 'OPEN' | 'CLOSED';
+  showErrorsOnly: boolean; // P9.1: Filter for elements with validation errors
 }
+
+/**
+ * Column view preset types.
+ * P9.1: PowerFactory-like column view presets.
+ */
+export type ColumnViewPreset = 'BASIC' | 'TECHNICAL' | 'OPERATIONAL';
+
+/**
+ * Column view preset labels (Polish).
+ */
+export const COLUMN_VIEW_PRESET_LABELS: Record<ColumnViewPreset, string> = {
+  BASIC: 'Widok podstawowy',
+  TECHNICAL: 'Parametry techniczne',
+  OPERATIONAL: 'Eksploatacja',
+};
 
 /**
  * Data Manager row (generic element representation).
@@ -237,12 +264,14 @@ export interface DataManagerRow {
 
 /**
  * Batch edit operation type.
+ * P9.2: Extended with SET_PARAMETER for generic parameter editing.
  */
 export type BatchEditOperation =
   | { type: 'SET_IN_SERVICE'; value: boolean }
   | { type: 'ASSIGN_TYPE'; typeId: string }
   | { type: 'CLEAR_TYPE' }
-  | { type: 'SET_SWITCH_STATE'; state: SwitchState };
+  | { type: 'SET_SWITCH_STATE'; state: SwitchState }
+  | { type: 'SET_PARAMETER'; field: string; value: unknown }; // P9.2: Generic parameter edit
 
 /**
  * Batch edit result.
@@ -251,4 +280,51 @@ export interface BatchEditResult {
   success: boolean;
   affectedCount: number;
   errors: Array<{ elementId: string; message: string }>;
+}
+
+// ============================================================================
+// P9.2: Inline Editing Types
+// ============================================================================
+
+/**
+ * Inline edit state (tracks currently edited cell).
+ */
+export interface InlineEditState {
+  rowId: string;
+  columnKey: string;
+  value: unknown;
+}
+
+/**
+ * Inline edit validation result.
+ */
+export interface InlineEditValidation {
+  valid: boolean;
+  error?: string;
+}
+
+// ============================================================================
+// P9.2: Batch Edit Diff Preview Types
+// ============================================================================
+
+/**
+ * Single change in batch edit preview.
+ */
+export interface BatchEditChange {
+  elementId: string;
+  elementName: string;
+  field: string;
+  fieldLabel: string;
+  oldValue: unknown;
+  newValue: unknown;
+  validation: InlineEditValidation;
+}
+
+/**
+ * Batch edit preview (shown before applying changes).
+ */
+export interface BatchEditPreview {
+  operation: BatchEditOperation;
+  changes: BatchEditChange[];
+  hasErrors: boolean;
 }

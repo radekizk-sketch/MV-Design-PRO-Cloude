@@ -279,7 +279,49 @@ When making changes:
 
 ---
 
-## 10. Escalation
+## 10. Źródła kanoniczne — Proof Pack (BINDING)
+
+### 10.1 Przeznaczenie
+
+Ten pakiet zawiera **kanoniczne źródła wiedzy** dla Proof Engine (P11).
+**Wszystkie agenty (Claude, Codex, inne LLM) MUSZĄ traktować zawartość tych dokumentów jako BINDING REFERENCE.**
+
+### 10.2 Dokumenty BINDING
+
+Pełna lista dokumentów kanonicznych:
+
+- `docs/proof_engine/README.md` — Polityka LaTeX-only, inwarianty pakietu
+- `docs/proof_engine/PROOF_SCHEMAS.md` — Schematy JSON (ProofDocument, ProofStep)
+- `docs/proof_engine/EQUATIONS_IEC60909_SC3F.md` — Rejestr równań SC3F z mapping keys
+- `docs/proof_engine/EQUATIONS_VDROP.md` — Rejestr równań VDROP z mapping keys
+- `docs/proof_engine/P11_1a_MVP_SC3F_AND_VDROP.md` — Specyfikacja MVP, kroki dowodu
+- `docs/proof_engine/P11_1c_SC_ASYMMETRICAL.md` — P11.1c Proof Pack (structure-only, SKELETON)
+- `docs/proof_engine/P11_OVERVIEW.md` — TraceArtifact, hierarchia, UX
+
+### 10.3 Reguły dla agentów AI
+
+1. **NIE INTERPRETUJ** — bierz dosłownie definicje, schematy JSON, równania LaTeX
+2. **NIE MODYFIKUJ** solverów ani Result API IEC 60909
+3. **UŻYWAJ mapping keys** literalnie przy implementacji
+4. **ZACHOWAJ determinism** — identyczne wejścia → identyczne wyjścia
+5. **FORMAT KROKU**: Wzór → Dane → Podstawienie → Wynik → Weryfikacja jednostek
+6. **LaTeX BLOKOWY** — wyłącznie `$$...$$`, zakaz inline `$...$`
+
+### 10.4 Inwarianty Proof Engine
+
+- **Solver nietknięty** — Proof Engine NIE modyfikuje solverów ani Result API
+- **Determinism** — ten sam `run_id` → identyczny `proof.json` i `proof.tex`
+- **Czysta interpretacja** — dowód generowany z gotowych danych trace/result
+- **Traceability** — każda wartość ma mapping key do źródła
+- **LaTeX-only math** — WSZYSTKIE symbole/jednostki WYŁĄCZNIE w blokach `$$...$$`
+- **Prąd dynamiczny OBOWIĄZKOWY** — obowiązkowy wynik SC3F
+- **Prąd cieplny OBOWIĄZKOWY** — obowiązkowy wynik SC3F z pełnym obliczeniem
+- **Anti-double-counting** — współczynnik c dokładnie raz w łańcuchu
+- **BEZ UPROSZCZEŃ** — pełne wzory na m i n, brak przybliżeń
+
+---
+
+## 11. Escalation
 
 If any rule conflict is detected:
 1. Stop implementation
@@ -290,3 +332,102 @@ If any rule conflict is detected:
 ---
 
 **END OF AGENT GOVERNANCE**
+
+## 12. Źródła kanoniczne — P14–P17 (doc-only)
+
+Poniższe dokumenty zawierają **CANONICAL SOURCES** dla pakietów P14–P17
+(doc-only, FUTURE PACKS):
+
+- `PLANS.md` — TODO backlog P14–P17 (CANONICAL SOURCES)
+- `SYSTEM_SPEC.md` — sekcje TODO P14–P17 (CANONICAL SOURCES)
+- `ARCHITECTURE.md` — sekcje TODO P14–P17 (CANONICAL SOURCES)
+- `POWERFACTORY_COMPLIANCE.md` — checklisty P14–P17 (CANONICAL SOURCES)
+- `docs/INDEX.md` — indeks źródeł P14–P17 (CANONICAL SOURCES)
+- `docs/proof_engine/README.md` — reguły Proof Engine + TODO P14–P17 (CANONICAL SOURCES)
+- `docs/proof_engine/P11_OVERVIEW.md` — TODO P14–P17 (CANONICAL SOURCES)
+- `docs/proof_engine/P11_1a_MVP_SC3F_AND_VDROP.md` — TODO P14–P17 (CANONICAL SOURCES)
+- `docs/proof_engine/P11_1b_REGULATION_Q_U.md` — TODO P14–P17 (CANONICAL SOURCES)
+- `docs/proof_engine/P11_1c_SC_ASYMMETRICAL.md` — TODO P14–P17 (CANONICAL SOURCES)
+- `docs/proof_engine/P11_1d_PROOF_UI_EXPORT.md` — TODO P14–P17 (CANONICAL SOURCES)
+- `docs/proof_engine/PROOF_SCHEMAS.md` — TODO P14–P17 (CANONICAL SOURCES)
+
+## TODO — Proof Packs P14–P17 (FUTURE PACKS)
+
+### TODO-P14-001 (PLANNED) — P14: Power Flow Proof Pack (audit wyników PF) [FUTURE PACK]
+- Priority: MUST
+- Inputs: TraceArtifact, PowerFlowResult
+- Output: ProofPack P14 (ProofDocument: Audit rozpływu mocy)
+- DoD:
+  - [ ] Dowód bilansu węzła dla mocy czynnej i biernej z mapowaniem do TraceArtifact.
+
+    $$
+    \sum P = 0,\quad \sum Q = 0
+    $$
+
+  - [ ] Bilans gałęzi dla mocy czynnej i biernej uwzględnia straty oraz spadek napięcia.
+
+    $$
+    P_{in} \rightarrow P_{out} + P_{loss},\quad Q_{in} \rightarrow Q_{out} + \Delta U
+    $$
+
+  - [ ] Straty linii liczone jawnie z prądu i rezystancji.
+
+    $$
+    P_{loss} = I^{2} \cdot R
+    $$
+
+  - [ ] Porównanie counterfactual Case A vs Case B z raportem różnic.
+
+    $$
+    \Delta P,\ \Delta Q,\ \Delta U
+    $$
+
+### TODO-P15-001 (PLANNED) — P15: Load Currents & Overload Proof Pack [FUTURE PACK]
+- Priority: MUST
+- Inputs: TraceArtifact, PowerFlowResult, Catalog
+- Output: ProofPack P15 (ProofDocument: Prądy robocze i przeciążenia)
+- DoD:
+  - [ ] Prądy obciążenia linii/kabli wyprowadzone z mocy pozornej.
+
+    $$
+    I = \frac{S}{\sqrt{3} \cdot U}
+    $$
+
+  - [ ] Porównanie do prądu znamionowego z marginesem procentowym i statusem PASS/FAIL.
+  - [ ] Transformator: relacja obciążenia do mocy znamionowej i overload %.
+
+    $$
+    \frac{S}{S_n}
+    $$
+
+### TODO-P16-001 (PLANNED) — P16: Losses & Energy Proof Pack [FUTURE PACK]
+- Priority: MUST
+- Inputs: TraceArtifact, PowerFlowResult, Catalog
+- Output: ProofPack P16 (ProofDocument: Straty mocy i energii)
+- DoD:
+  - [ ] Straty linii wyprowadzone z prądu i rezystancji.
+
+    $$
+    P_{loss,line} = I^{2} \cdot R
+    $$
+
+  - [ ] Straty transformatora z danych katalogowych: suma P0 i Pk.
+
+    $$
+    P_{loss,trafo} = P_{0} + P_{k}
+    $$
+
+  - [ ] Energia strat z profilu obciążenia (integracja w czasie).
+
+    $$
+    E_{loss} = \int P_{loss} \, dt
+    $$
+
+### TODO-P17-001 (PLANNED) — P17: Earthing / Ground Fault Proof Pack (SN) [FUTURE PACK]
+- Priority: MUST
+- Inputs: TraceArtifact, Catalog
+- Output: ProofPack P17 (ProofDocument: Doziemienia / uziemienia SN)
+- DoD:
+  - [ ] Jeśli SN: prądy doziemne z uwzględnieniem impedancji uziemienia i rozdziału prądu.
+  - [ ] Tryb uproszczonych napięć dotykowych z wyraźnymi zastrzeżeniami.
+  - [ ] Terminologia w ProofDocument: 1F-Z, 2F, 2F-Z oraz PCC – punkt wspólnego przyłączenia.

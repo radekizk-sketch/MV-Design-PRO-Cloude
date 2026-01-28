@@ -439,30 +439,75 @@ class ValidationReport:
 
 ## 5. Case Layer
 
-### 5.1 Case Definition
+### 5.1 Case Definition (P10 FULL MAX)
 
 ```python
-@dataclass
+@dataclass(frozen=True)
 class StudyCase:
     """
-    Base class for all study cases.
+    Study case for calculation variants (P10 FULL MAX).
     CANNOT mutate the network model.
+    Configuration-only entity.
     """
     id: UUID
-    name: str
     project_id: UUID
+    name: str
+    description: str
 
-    # Reference to network snapshot (immutable)
-    network_snapshot_id: UUID
+    # Configuration (calculation parameters)
+    config: StudyCaseConfig
 
-    # Case-specific parameters
-    parameters: Dict[str, Any]
+    # Result status lifecycle
+    result_status: StudyCaseResultStatus  # NONE, FRESH, OUTDATED
 
-    # Result state
-    result_state: ResultState  # NONE, FRESH, OUTDATED
+    # Active case management
+    is_active: bool
 
-    def get_network_snapshot(self) -> NetworkSnapshot:
-        """Get the immutable network state for this case."""
+    # Result references (for FRESH status)
+    result_refs: Tuple[StudyCaseResult, ...]
+
+    # Versioning
+    revision: int
+    created_at: datetime
+    updated_at: datetime
+
+    def clone(self, new_name: str | None = None) -> StudyCase:
+        """
+        Clone this case (PowerFactory-style).
+        - Config is COPIED
+        - Results are NOT copied
+        - Status = NONE
+        - is_active = False
+        """
+
+    def mark_as_fresh(self, result: StudyCaseResult) -> StudyCase:
+        """Mark case as FRESH after successful calculation."""
+
+    def mark_as_outdated(self) -> StudyCase:
+        """Mark case as OUTDATED (model/config changed)."""
+
+    def with_updated_config(self, new_config: StudyCaseConfig) -> StudyCase:
+        """Update config and mark as OUTDATED."""
+
+
+@dataclass(frozen=True)
+class StudyCaseConfig:
+    """
+    Calculation configuration for a study case.
+    Immutable — changes create new config.
+    """
+    voltage_factor_cmax: float = 1.1
+    voltage_factor_cmin: float = 1.0
+    calculation_method: str = "IEC_60909"
+    fault_type: str = "THREE_PHASE"
+    additional_params: Dict[str, Any] = field(default_factory=dict)
+
+
+class StudyCaseResultStatus(str, Enum):
+    """Result freshness status."""
+    NONE = "NONE"        # Never computed
+    FRESH = "FRESH"      # Results current
+    OUTDATED = "OUTDATED"  # Model/config changed
 ```
 
 ### 5.2 Short Circuit Case (IEC 60909)
@@ -502,6 +547,55 @@ class PowerFlowCase(StudyCase):
 
     # Result (when computed)
     result: PowerFlowResult | None = None
+```
+
+### 5.4 Study Case Service (P10 FULL MAX)
+
+```python
+class StudyCaseService:
+    """
+    Application service for study case management.
+    Implements full lifecycle with PowerFactory-grade semantics.
+    """
+
+    # CRUD Operations
+    def create_case(self, project_id, name, description, config) -> StudyCase: ...
+    def get_case(self, case_id) -> StudyCase: ...
+    def list_cases(self, project_id) -> List[StudyCaseListItem]: ...
+    def update_case(self, case_id, name, description, config) -> StudyCase: ...
+    def delete_case(self, case_id) -> bool: ...
+
+    # Clone Operation (PowerFactory-style)
+    def clone_case(self, case_id, new_name) -> StudyCase:
+        """
+        Clone rules:
+        - Configuration is COPIED
+        - Results are NOT copied (status = NONE)
+        - is_active = False
+        """
+
+    # Active Case Management
+    def get_active_case(self, project_id) -> StudyCase | None: ...
+    def set_active_case(self, project_id, case_id) -> StudyCase:
+        """
+        Active case invariant:
+        - Deactivates all other cases first
+        - Exactly one active case per project
+        """
+
+    # Compare Operation (read-only)
+    def compare_cases(self, case_a_id, case_b_id) -> StudyCaseComparison:
+        """100% read-only — no mutations."""
+
+    # Result Status Management
+    def mark_all_outdated(self, project_id) -> int:
+        """Called when NetworkModel changes."""
+
+    def mark_case_outdated(self, case_id) -> bool:
+        """Called when case config changes."""
+
+    def mark_case_fresh(self, case_id, result_ref) -> bool:
+        """Called after successful calculation."""
 ```
 
 ---
@@ -1147,83 +1241,841 @@ Edit via SLD    → NetworkModel updated → Wizard reflects immediately
 
 ---
 
-## 15. Engineering Comparison Layer (PF-grade)
+## 15. Interpretation Layer: Proof Engine (P11)
 
-Warstwa porównań inżynierskich umożliwia analizę różnic między Case / Variant / Study zgodnie z paradygmatem DIgSILENT PowerFactory i ETAP.
-
-### 15.1 Cel warstwy
-
-Odpowiedź na pytanie fundamentalne: **CO się zmieniło, GDZIE, o ILE i DLACZEGO?**
-
-### 15.2 Architektura porównań
+### 15.1 Pozycja w warstwach
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                    COMPARISON LAYER                              │
+│                      SOLVER LAYER                                │
 │  ┌───────────────────────────────────────────────────────────┐  │
-│  │                  COMPARISON ENGINE                         │  │
-│  │  ┌─────────────┐  ┌─────────────┐  ┌─────────────────┐   │  │
-│  │  │ Case Diff   │  │ WHY Panel   │  │ Report Generator│   │  │
-│  │  │  Calculator │  │  Analyzer   │  │    (PDF)        │   │  │
-│  │  └──────┬──────┘  └──────┬──────┘  └────────┬────────┘   │  │
-│  └─────────┼────────────────┼──────────────────┼────────────┘  │
-│            │                │                  │                │
-│            ▼                ▼                  ▼                │
-│  ┌─────────────────────────────────────────────────────────────┐│
-│  │                    COMPARISON VIEWS                          ││
-│  │  ┌─────────────┐  ┌─────────────┐  ┌─────────────────────┐ ││
-│  │  │ Comparison  │  │ SLD Overlay │  │    WHY Panel        │ ││
-│  │  │   Table     │  │  (Diff)     │  │    (Causes)         │ ││
-│  │  └─────────────┘  └─────────────┘  └─────────────────────┘ ││
-│  └─────────────────────────────────────────────────────────────┘│
-│            ▲                ▲                  ▲                │
-│            │                │                  │                │
-│  ┌─────────┴────────────────┴──────────────────┴────────────┐  │
-│  │                    DATA SOURCES                           │  │
-│  │  ┌─────────────┐  ┌─────────────┐  ┌─────────────────┐   │  │
-│  │  │ Case A      │  │ Case B      │  │ Network         │   │  │
-│  │  │ Results     │  │ Results     │  │ Snapshots       │   │  │
-│  │  └─────────────┘  └─────────────┘  └─────────────────┘   │  │
+│  │              WHITE BOX SOLVERS (FROZEN)                    │  │
+│  │  ┌─────────────────┐    ┌─────────────────────────┐       │  │
+│  │  │   IEC 60909     │    │    NEWTON-RAPHSON       │       │  │
+│  │  │ Short Circuit   │    │     Power Flow          │       │  │
+│  │  └────────┬────────┘    └────────────┬────────────┘       │  │
+│  │           │                          │                     │  │
+│  │           └──────────┬───────────────┘                     │  │
+│  │                      │                                     │  │
+│  │              WhiteBoxTrace + SolverResult                  │  │
+│  └──────────────────────┼────────────────────────────────────┘  │
+└─────────────────────────┼───────────────────────────────────────┘
+                          │ (READ-ONLY)
+                          ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                   INTERPRETATION LAYER                           │
+│                                                                  │
+│  ┌───────────────────────────────────────────────────────────┐  │
+│  │                    PROOF ENGINE (P11)                      │  │
+│  │                                                            │  │
+│  │  ┌──────────────┐  ┌──────────────┐  ┌──────────────────┐ │  │
+│  │  │ TraceArtifact│  │ ProofDocument│  │ Equation Registry│ │  │
+│  │  │  (immutable) │  │  Generator   │  │  (SC3F, VDROP)   │ │  │
+│  │  └──────────────┘  └──────────────┘  └──────────────────┘ │  │
+│  │                                                            │  │
+│  │  ┌──────────────┐  ┌──────────────┐  ┌──────────────────┐ │  │
+│  │  │ Unit Checker │  │ LaTeX Export │  │ Proof Inspector  │ │  │
+│  │  │              │  │              │  │      (UI)        │ │  │
+│  │  └──────────────┘  └──────────────┘  └──────────────────┘ │  │
 │  └───────────────────────────────────────────────────────────┘  │
+│                                                                  │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────────────────┐  │
+│  │ Boundary    │  │  Thermal    │  │      Voltage            │  │
+│  │ Identifier  │  │  Analysis   │  │      Analysis           │  │
+│  │   (PCC)     │  │             │  │                         │  │
+│  └─────────────┘  └─────────────┘  └─────────────────────────┘  │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
-### 15.3 Komponenty warstwy
+### 15.2 Pipeline generowania dowodu
 
-| Komponent | Odpowiedzialność |
-|-----------|------------------|
-| **Case Diff Calculator** | Obliczanie Δ i %Δ dla wszystkich wielkości |
-| **WHY Panel Analyzer** | Identyfikacja przyczyn różnic (topologia, stan, parametry) |
-| **Report Generator** | Generowanie PDF z pełnym kontekstem audytowym |
-| **Comparison Table** | Widok tabelaryczny różnic per element |
-| **SLD Overlay (Diff)** | Nakładka kolorystyczna różnic na diagramie |
-| **WHY Panel View** | Panel przyczyn z kategoryzacją zmian |
+```
+┌─────────────────────────────────────────────────────────────────┐
+│ 1. Solver Execution                                              │
+│    Input: NetworkSnapshot + SolverConfig                         │
+│    Output: SolverResult + WhiteBoxTrace                          │
+└────────────────────────────┬────────────────────────────────────┘
+                             │
+                             ▼
+┌─────────────────────────────────────────────────────────────────┐
+│ 2. TraceArtifact Creation                                        │
+│    - Capture: input, config, intermediate, output                │
+│    - Assign: artifact_id, run_id, snapshot_id                    │
+│    - Status: IMMUTABLE after creation                            │
+└────────────────────────────┬────────────────────────────────────┘
+                             │
+                             ▼
+┌─────────────────────────────────────────────────────────────────┐
+│ 3. ProofDocument Generation (on demand or automatic)             │
+│    - Load: Equation Registry (EQUATIONS_*.md)                    │
+│    - Map: trace values → equation symbols                        │
+│    - Generate: substitutions, results, unit checks               │
+│    - Build: ProofStep[] → ProofDocument                          │
+└────────────────────────────┬────────────────────────────────────┘
+                             │
+                             ▼
+┌─────────────────────────────────────────────────────────────────┐
+│ 4. Export                                                        │
+│    - proof.json (JSON serialization)                             │
+│    - proof.tex (LaTeX source)                                    │
+│    - proof.pdf (rendered PDF)                                    │
+│    - proof.docx (Word document)                                  │
+└─────────────────────────────────────────────────────────────────┘
+```
 
-### 15.4 Reguły warstwy (BINDING)
+### 15.3 Komponenty Proof Engine
 
-| Reguła | Opis |
-|--------|------|
-| CMP-001 | Porównania zwarciowe WYŁĄCZNIE per BUS (IEC 60909) |
-| CMP-002 | Przepływy liniowe per instancja (LINE/TRAFO) |
-| CMP-003 | Różna topologia = jawne oznaczenie DIFFERENT TOPOLOGY |
-| CMP-004 | Wyniki OUTDATED = blokada porównania |
-| CMP-005 | Ekran = PDF (identyczna zawartość) |
-| CMP-006 | WHY Panel MUSI identyfikować przyczyny różnic |
+#### 15.3.1 TraceArtifact
 
-### 15.5 Integracja z warstwami
+```python
+@dataclass(frozen=True)
+class TraceArtifact:
+    artifact_id: UUID
+    project_id: UUID
+    case_id: UUID
+    run_id: UUID
+    snapshot_id: UUID
 
-| Warstwa | Integracja |
-|---------|------------|
-| Results Browser | Wybór Cases do porównania |
-| Element Inspector | Szczegóły elementu z tabeli porównań |
-| Topology Tree | Synchronizacja zaznaczenia |
-| SLD Layer | Overlay różnic (bez modyfikacji CAD) |
-| Analysis Layer | Źródło wyników do porównania |
+    solver_type: str
+    created_at: datetime
+    solver_version: str
 
-### 15.6 Referencja dokumentacji
+    input_snapshot: NetworkSnapshot
+    solver_config: Dict[str, Any]
+    intermediate_values: Dict[str, Any]
+    output_results: Dict[str, Any]
 
-Pełna specyfikacja: `docs/ui/CASE_COMPARISON_UI_CONTRACT.md`
+    proof_document: ProofDocument | None
+```
+
+#### 15.3.2 ProofDocument
+
+```python
+@dataclass(frozen=True)
+class ProofDocument:
+    document_id: UUID
+    artifact_id: UUID
+    created_at: datetime
+
+    proof_type: str
+    title_pl: str
+
+    header: ProofHeader
+    steps: Tuple[ProofStep, ...]
+    summary: ProofSummary
+
+    json_representation: str
+    latex_representation: str
+```
+
+#### 15.3.3 ProofStep
+
+```python
+@dataclass(frozen=True)
+class ProofStep:
+    step_id: str
+    step_number: int
+    title_pl: str
+
+    equation: EquationDefinition
+    input_values: Tuple[ProofValue, ...]
+    substitution_latex: str
+    result: ProofValue
+    unit_check: UnitCheckResult
+
+    source_keys: Dict[str, str]
+```
+
+### 15.4 Equation Registry
+
+| Registry | Zawartość | Lokalizacja |
+|----------|-----------|-------------|
+| SC3F | EQ_SC3F_001..010 (zwarcia trójfazowe) | `docs/proof_engine/EQUATIONS_IEC60909_SC3F.md` |
+| VDROP | EQ_VDROP_001..009 (spadki napięć) | `docs/proof_engine/EQUATIONS_VDROP.md` |
+| SC1F | (prospektywne) zwarcia jednofazowe | `docs/proof_engine/P11_1c_SC_ASYMMETRICAL.md` |
+| Q_U | (prospektywne) regulatory Q(U) | `docs/proof_engine/P11_1b_REGULATION_Q_U.md` |
+
+### 15.5 Inwarianty (BINDING)
+
+1. **Solver FROZEN** — Proof Engine NIE modyfikuje solverów ani Result API
+2. **Determinism** — ten sam `run_id` → identyczny `proof.json` + `proof.tex`
+3. **Immutability** — TraceArtifact jest frozen po utworzeniu
+4. **Completeness** — każdy ProofStep ma 5 sekcji: Wzór, Dane, Podstawienie, Wynik, Weryfikacja jednostek
+5. **Traceability** — każda wartość ma literalny `source_key` do trace/result
+
+### 15.6 Proof Inspector (P11.1d) — warstwa prezentacji
+
+#### 15.6.1 Pozycja w przepływie danych
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│ 1. SOLVER EXECUTION (FROZEN)                                             │
+│    ┌─────────────────┐    ┌─────────────────────────┐                   │
+│    │   IEC 60909     │    │    NEWTON-RAPHSON       │                   │
+│    │ Short Circuit   │    │     Power Flow          │                   │
+│    └────────┬────────┘    └────────────┬────────────┘                   │
+│             │                          │                                │
+│             └──────────┬───────────────┘                                │
+│                        │                                                │
+│                WhiteBoxTrace + SolverResult                             │
+└────────────────────────┼────────────────────────────────────────────────┘
+                         │ (READ-ONLY — Proof Inspector NIE modyfikuje)
+                         ▼
+┌─────────────────────────────────────────────────────────────────────────┐
+│ 2. PROOF ENGINE (P11)                                                    │
+│    ┌──────────────┐  ┌──────────────┐  ┌──────────────────┐             │
+│    │ TraceArtifact│  │ ProofDocument│  │ Equation Registry│             │
+│    │  (immutable) │  │  Generator   │  │  (SC3F, VDROP)   │             │
+│    └──────────────┘  └──────────────┘  └──────────────────┘             │
+│                              │                                          │
+│                     ProofDocument (JSON)                                │
+└──────────────────────────────┼──────────────────────────────────────────┘
+                               │ (READ-ONLY)
+                               ▼
+┌─────────────────────────────────────────────────────────────────────────┐
+│ 3. PROOF INSPECTOR (P11.1d) — PRESENTATION LAYER                         │
+│    ┌─────────────────────────────────────────────────────────────────┐  │
+│    │                       READ-ONLY VIEWER                          │  │
+│    │  ┌─────────────┐  ┌─────────────┐  ┌─────────────────────────┐ │  │
+│    │  │ Step View   │  │ Summary     │  │     Export Menu         │ │  │
+│    │  │ (5 sections)│  │ View        │  │ JSON/LaTeX/PDF/DOCX     │ │  │
+│    │  └─────────────┘  └─────────────┘  └─────────────────────────┘ │  │
+│    └─────────────────────────────────────────────────────────────────┘  │
+│                                                                         │
+│    ZAKAZY:                                                              │
+│    ❌ Brak obliczeń (to Solver Layer)                                   │
+│    ❌ Brak interpretacji normowej (to Analysis Layer)                   │
+│    ❌ Brak kolorowania pass/fail                                        │
+│    ❌ Brak modyfikacji ProofDocument                                    │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+#### 15.6.2 Struktura widoku kroku (BINDING)
+
+Każdy krok w Proof Inspector prezentowany jest w **5 obowiązkowych sekcjach**:
+
+| # | Sekcja | Zawartość |
+|---|--------|-----------|
+| 1 | **WZÓR** | Równanie LaTeX z rejestru (EQ_*) + ref do normy |
+| 2 | **DANE** | Wartości wejściowe z jednostkami + source_key |
+| 3 | **PODSTAWIENIE** | Wzór z podstawionymi liczbami |
+| 4 | **WYNIK** | Wartość końcowa w ramce |
+| 5 | **WERYFIKACJA JEDNOSTEK** | Status ✓/✗ + derywacja jednostek |
+
+#### 15.6.3 Eksport (deterministyczny)
+
+| Format | Opis | Gwarancja |
+|--------|------|-----------|
+| JSON | 1:1 z ProofDocument | SHA-256 fingerprint stabilny |
+| LaTeX | Blokowy `$$...$$` only | Kompilowalne bez modyfikacji |
+| PDF | Via LaTeX | A4, Times New Roman, numeracja |
+| DOCX | Microsoft Word | Wierna reprezentacja UI |
+
+#### 15.6.4 Lokalizacja w UI
+
+```
+Results (Wyniki)
+  └── [Case Name]
+        └── [Run Timestamp]
+              ├── Wyniki (tabela) ← Analysis Layer
+              ├── Ślad obliczeń (raw trace)
+              └── Dowód matematyczny ← PROOF INSPECTOR
+```
+
+---
+
+## 16. UI Contracts (SLD_UI_CONTRACT.md)
+
+### 16.1 Pozycja w architekturze
+
+**Kontrakty UI** definiują zasady prezentacji i renderowania dla warstwy Application Layer (SLD, Wizard, Reporting).
+
+**Referencja:** `docs/ui/SLD_UI_CONTRACT.md` (CANONICAL, BINDING)
+
+### 16.2 Pięć kontraktów fundamentalnych
+
+| # | Kontrakt | Zasada |
+|---|----------|--------|
+| 1 | **UI Priority Stack** | BUS (wyniki zwarciowe, stan) > LINIA (prąd roboczy) > CAD (parametry katalogowe) |
+| 2 | **Dense SLD Rules** | System automatycznie przełącza tryby etykiet: INLINE → OFFSET → SIDE STACK (based on density) |
+| 3 | **Semantic Color Contract** | Kolor oznacza znaczenie (alarm, stan), nie typ elementu. Czerwony = błąd, Żółty = ostrzeżenie, Zielony = OK |
+| 4 | **Print-First Contract** | Ekran = PDF = prawda projektu. Wszystko widoczne w UI MUSI być drukowalne bez utraty informacji |
+| 5 | **Interaction Contract** | Hover = informacja (tooltip), Click = fokus + panel boczny, ESC = powrót |
+
+### 16.3 Implikacje dla warstw architektury
+
+#### 16.3.1 Application Layer (SLD)
+
+**MUST:**
+- Renderować wyniki BUS z absolutnym priorytetem wizualnym (UI Priority Stack § 1).
+- Wykrywać gęstość diagramu i automatycznie przełączać tryby etykiet (Dense SLD § 2).
+- Używać kolorów semantycznych (Semantic Color § 3): zielony/żółty/czerwony.
+- Generować wydruki 1:1 z widokiem ekranowym (Print-First § 4).
+- Implementować interakcje zgodnie z kontraktem (Interaction § 5): hover, click, ESC.
+
+**FORBIDDEN:**
+- Ukrywanie wyników BUS na wydruku (Print-First § 4).
+- Kolorowanie według typu elementu zamiast semantyki (Semantic Color § 3).
+- Zmiana stanu podczas hover (Interaction § 5).
+
+#### 16.3.2 Reporting Engine
+
+**MUST:**
+- Zachować wszystkie informacje z ekranu w PDF/DOCX (Print-First § 4).
+- Renderować kolory semantyczne lub zastępować wzorami w trybie monochromatycznym.
+- Zachować tryby etykiet (INLINE/OFFSET/SIDE STACK) zgodnie z ekranem.
+
+#### 16.3.3 Solver Layer (bez zmian)
+
+**Kontrakty UI NIE wpływają na Solver Layer** — to wyłącznie zasady prezentacji (Application Layer).
+
+### 16.4 Integracja z istniejącymi dokumentami
+
+| Dokument | Relacja do UI Contracts |
+|----------|------------------------|
+| `SLD_SCADA_CAD_CONTRACT.md` | Definiuje warstwy widoku (SCADA + CAD), UI Contracts definiują priorytety renderowania |
+| `SLD_SHORT_CIRCUIT_BUS_CENTRIC.md` | Definiuje prezentację wyników zwarciowych, UI Contracts definiują priorytet BUS |
+| `SHORT_CIRCUIT_PANELS_AND_PRINTING.md` | Definiuje panele i wydruk, UI Contracts definiują Print-First |
+| `sld_rules.md` | Podstawowe reguły SLD, UI Contracts rozszerzają o kontrakty interakcji |
+
+### 16.5 Compliance Checklist
+
+**Implementacja zgodna z UI Contracts, jeśli:**
+
+- [ ] BUS (wyniki) ma absolutny priorytet wizualny nad LINIA i CAD
+- [ ] System automatycznie wykrywa gęstość i przełącza tryby etykiet
+- [ ] Kolory oznaczają znaczenie (stan, alarm), nie typ elementu
+- [ ] Wszystko widoczne na ekranie jest widoczne w PDF (żadne auto-hide)
+- [ ] Hover = informacja, Click = fokus+panel, ESC = powrót (bez wyjątków)
+
+---
+
+## 17. UI Eksploracji Wyników i Inspekcji Elementów
+
+### 17.1 Pozycja w architekturze
+
+**UI Eksploracji Wyników** definiuje warstwę prezentacji wyników klasy ETAP / DIgSILENT PowerFactory:
+
+- **Results Browser**: pełna eksploracja wyników niezależnie od SLD,
+- **Element Inspector**: inspekcja dowolnego elementu (BUS, LINE, TRAFO, SOURCE, PROTECTION),
+- **Expert Modes**: tryby eksperckie (Operator, Designer, Analyst, Auditor),
+- **Global Context Bar**: kontekst zawsze widoczny (Case, Snapshot, Analysis, Norma, Mode).
+
+**Referencje (CANONICAL, BINDING):**
+- `docs/ui/RESULTS_BROWSER_CONTRACT.md`
+- `docs/ui/ELEMENT_INSPECTOR_CONTRACT.md`
+- `docs/ui/EXPERT_MODES_CONTRACT.md`
+- `docs/ui/GLOBAL_CONTEXT_BAR.md`
+- `docs/ui/UI_ETAP_POWERFACTORY_PARITY.md`
+
+### 17.2 Komponenty UI
+
+#### 17.2.1 Results Browser
+
+**Cel:** Eksploracja wyników jako alternatywa dla nawigacji SLD.
+
+**Funkcjonalność:**
+- Hierarchiczne drzewo: Project → Case → Snapshot → Analysis → Target (Buses, Lines, Transformers, Sources, Protections).
+- Tabele wyników z sortowaniem, filtrowaniem (violations only, zone, voltage range).
+- Porównania Case/Snapshot (Delta view, highlighting improvements/regressions).
+- Eksport do CSV, Excel, PDF.
+
+**Równorzędność z SLD:**
+- Widok SLD = spatial navigation (przestrzenna),
+- Widok tabelaryczny = data navigation (analityczna),
+- Przełączanie SLD ↔ Table bez utraty kontekstu.
+
+#### 17.2.2 Element Inspector
+
+**Cel:** Inspekcja dowolnego elementu sieci (BUS, LINE, TRAFO, SOURCE, PROTECTION).
+
+**Zakładki (BINDING):**
+1. **Overview**: identyfikacja, status, kluczowe wartości,
+2. **Parameters**: parametry techniczne (edycja w trybie Designer),
+3. **Results**: wyniki obliczeń w multi-case view (wszystkie Case'y w jednej tabeli),
+4. **Contributions**: kontrybutorzy do I_sc (Bus), obciążeń (Line, Trafo),
+5. **Limits**: limity normatywne z marginesami (PN-EN 50160, IEC 60909),
+6. **Proof (P11)**: dowód P11 (tylko Bus, Protection) z eksportem do PDF.
+
+**Multi-Case View:**
+- Wyniki dla wszystkich Case'ów w jednej tabeli,
+- Filtrowanie po Case, Snapshot, Analysis,
+- Porównanie wartości między Case'ami (Delta column).
+
+#### 17.2.3 Expert Modes
+
+**Cel:** Dostosowanie UI do roli użytkownika bez ukrywania danych.
+
+**Tryby (BINDING):**
+- **Operator**: domyślne rozwinięcia (Case → Snapshot), widoczne kolumny podstawowe (Name, Status, Voltage, Violation).
+- **Designer**: domyślne rozwinięcia (Case → Snapshot → Analysis), widoczne kolumny (+ P, Q, I, Losses), edycja parametrów.
+- **Analyst**: wszystkie poziomy rozwinięte, wszystkie kolumny widoczne, wykresy contributions.
+- **Auditor**: wszystkie poziomy rozwinięte, wszystkie kolumny + metadane (Timestamp, User, Diff), Proof (P11) domyślnie otwarty.
+
+**NO SIMPLIFICATION RULE:**
+- Tryby **NIE ukrywają danych** — tylko zmieniają domyślne rozwinięcia i widoczność kolumn.
+- Użytkownik zawsze może rozwinąć/dodać ukryte sekcje.
+- **FORBIDDEN**: tworzenie „basic UI" i „advanced UI" (dwa osobne interfejsy).
+
+#### 17.2.4 Global Context Bar
+
+**Cel:** Kontekst zawsze widoczny i drukowany w PDF.
+
+**Sekcje (BINDING):**
+- **Project Name**, **Active Case**, **Active Snapshot**, **Active Analysis**, **Active Norma**, **Expert Mode**, **Active Element** (opcjonalnie), **Timestamp**.
+
+**Właściwości:**
+- **Sticky top bar** (zawsze widoczny przy scrollowaniu),
+- **Drukowany w nagłówku PDF** przy eksporcie (Reports, Proof P11),
+- **Dropdown menu** dla przełączania Case, Snapshot, Analysis, Norma, Expert Mode.
+
+### 17.3 ETAP / PowerFactory UI Parity
+
+**Macierz feature-by-feature:**
+
+| Kategoria                  | ✅ FULL | 🟡 PARTIAL | ❌ NO | ➕ SUPERIOR |
+|----------------------------|---------|-----------|-------|-----------|
+| Results Browser            | 12      | 0         | 0     | 5         |
+| Element Inspector          | 18      | 0         | 0     | 11        |
+| Expert Modes               | 0       | 0         | 0     | 6         |
+| Global Context Bar         | 5       | 0         | 0     | 6         |
+| SLD Viewer                 | 8       | 1         | 0     | 2         |
+| Accessibility              | 1       | 0         | 0     | 4         |
+| Performance                | 3       | 0         | 0     | 1         |
+| **TOTAL**                  | **47**  | **1**     | **0** | **35**    |
+
+**Ocena końcowa:** **MV-DESIGN-PRO UI ≥ ETAP UI**, **MV-DESIGN-PRO UI ≥ PowerFactory UI** ✅
+
+### 17.4 Implikacje dla warstw architektury
+
+#### 17.4.1 Application Layer (Results Browser, Element Inspector)
+
+**MUST:**
+- Implementować Results Browser jako równorzędny widok z SLD.
+- Implementować Element Inspector z wszystkimi zakładkami (Overview, Parameters, Results, Contributions, Limits, Proof P11).
+- Implementować Expert Modes (Operator, Designer, Analyst, Auditor) zgodnie z NO SIMPLIFICATION RULE.
+- Implementować Global Context Bar (sticky, drukowany w PDF).
+
+**FORBIDDEN:**
+- Tworzenie „basic UI" i „advanced UI" (dwa osobne interfejsy).
+- Ukrywanie zakładek lub kolumn „dla uproszczenia" — użytkownik decyduje.
+- Pomijanie multi-case view w Element Inspector.
+- Brak eksportu Proof (P11) do PDF.
+
+#### 17.4.2 Domain Layer (bez zmian)
+
+**UI Eksploracji Wyników NIE wpływa na Domain Layer** — to wyłącznie warstwa prezentacji (Application Layer).
+
+#### 17.4.3 Solver Layer (bez zmian)
+
+**UI Eksploracji Wyników NIE wpływa na Solver Layer** — to wyłącznie warstwa prezentacji (Application Layer).
+
+### 17.5 Integracja z istniejącymi dokumentami
+
+| Dokument | Relacja do UI Eksploracji Wyników |
+|----------|-----------------------------------|
+| `RESULTS_BROWSER_CONTRACT.md` | Definiuje Results Browser (hierarchia drzewa, tabele, porównania) |
+| `ELEMENT_INSPECTOR_CONTRACT.md` | Definiuje Element Inspector (zakładki, multi-case view, Proof P11) |
+| `EXPERT_MODES_CONTRACT.md` | Definiuje Expert Modes (Operator, Designer, Analyst, Auditor) |
+| `GLOBAL_CONTEXT_BAR.md` | Definiuje Global Context Bar (sticky, drukowany w PDF) |
+| `UI_ETAP_POWERFACTORY_PARITY.md` | Definiuje macierz UI Parity (47 FULL, 35 SUPERIOR) |
+| `SLD_UI_CONTRACT.md` | Kontrakty UI dla SLD (Priority Stack, Dense SLD, Semantic Color, Print-First, Interaction) |
+| `P11_1d_PROOF_UI_EXPORT.md` | Definiuje Proof Inspector (zakładka Proof P11 w Element Inspector) |
+
+### 17.6 Compliance Checklist
+
+**Implementacja zgodna z UI Eksploracji Wyników, jeśli:**
+
+- [ ] Results Browser implementuje hierarchię: Project → Case → Snapshot → Analysis → Target
+- [ ] Results Browser umożliwia porównanie Case/Snapshot (Delta view)
+- [ ] Element Inspector posiada wszystkie zakładki (Overview, Parameters, Results, Contributions, Limits, Proof P11)
+- [ ] Element Inspector implementuje multi-case view (wyniki dla wszystkich Case'ów w jednej tabeli)
+- [ ] Expert Modes (Operator, Designer, Analyst, Auditor) NIE ukrywają danych (NO SIMPLIFICATION RULE)
+- [ ] Global Context Bar jest sticky (zawsze widoczny) i drukowany w nagłówku PDF
+- [ ] UI osiąga parity z ETAP / PowerFactory (minimum 47 FULL PARITY features)
+
+---
+
+## 18. UI Eksploracji i Kontroli UI (Phase 2.x)
+
+### 18.1 Pozycja w architekturze
+
+**UI Eksploracji i Kontroli UI** definiuje warstwę prezentacji klasy ETAP / DIgSILENT PowerFactory++ dla:
+
+- **renderingu SLD** (warstwy CAD vs SCADA),
+- **eksploracji topologii** (drzewo hierarchiczne),
+- **analizy stanów łączeniowych** (OPEN/CLOSED + Islands),
+- **prezentacji wyników zwarciowych** (węzłowo-centryczne),
+- **przeglądania katalogów** (Type Library),
+- **porównywania wariantów** (Case A/B/C).
+
+**Referencje (CANONICAL, BINDING):**
+- `docs/ui/SLD_RENDER_LAYERS_CONTRACT.md`
+- `docs/ui/TOPOLOGY_TREE_CONTRACT.md`
+- `docs/ui/SWITCHING_STATE_VIEW_CONTRACT.md`
+- `docs/ui/SC_NODE_RESULTS_CONTRACT.md`
+- `docs/ui/CATALOG_BROWSER_CONTRACT.md`
+- `docs/ui/CASE_COMPARISON_UI_CONTRACT.md`
+
+### 18.2 Komponenty UI PF++
+
+#### 18.2.1 SLD Render Layers (CAD vs SCADA)
+
+**Cel:** Rozdział semantyk renderingu SLD — statyczny schemat techniczny (CAD) vs runtime monitoring (SCADA).
+
+**Funkcjonalność:**
+- **SLD_CAD_LAYER**: statyczny, drukowany, zgodny z normami IEC 61082, IEEE 315, wszystkie dane techniczne,
+- **SLD_SCADA_LAYER**: dynamiczny, runtime, kolory semantyczne (czerwony/żółty/zielony), animacje przepływu mocy,
+- **Tryby pracy:** CAD Mode (tylko CAD), SCADA Mode (CAD + SCADA overlay), Hybrid Mode (konfigurowalne nakładki).
+
+**Zakazy:**
+- Mieszanie semantyk warstw (parametry katalogowe w SCADA, wyniki runtime w CAD),
+- Eksport SCADA bez warstwy CAD (wyniki bez schematów),
+- Brak legendy kolorów przy eksporcie SCADA do PDF.
+
+---
+
+#### 18.2.2 Topology Tree (Eksploracja topologii)
+
+**Cel:** Hierarchiczna eksploracja struktury sieci jako alternatywa dla nawigacji SLD.
+
+**Funkcjonalność:**
+- **Hierarchia:** Project → Station → Voltage Level → Elements (Bus, Line, Trafo, Source, Load, Switch),
+- **Synchronizacja:** kliknięcie w drzewie → podświetlenie na SLD + otwarcie Element Inspector,
+- **Filtrowanie:** po typie elementu, napięciu, strefie,
+- **Wyszukiwanie:** po nazwie (regex), po ID.
+
+**Zakazy:**
+- Przechowywanie danych topologii w Topology Tree (tylko odczyt z NetworkModel),
+- Brak synchronizacji z SLD (kliknięcie w drzewo MUST podświetlić element na SLD),
+- Ukrywanie elementów "out of service" domyślnie (użytkownik decyduje przez filtr).
+
+##### 18.2.2.1 Topology Tree jako kręgosłup nawigacji (Phase 2.x.2)
+
+**Pozycja w architekturze:**
+
+Topology Tree **NIE jest** dodatkowym widokiem — to **kręgosłup nawigacji** (navigation backbone) dla całej aplikacji:
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│                        NAVIGATION LAYER                                  │
+│  ┌───────────────────────────────────────────────────────────────────┐  │
+│  │                      SINGLE GLOBAL FOCUS                          │  │
+│  │  Global Focus = (Target Element, Case, Run, Snapshot, Analysis)  │  │
+│  └───────────┬───────────────────────────────────────────────────────┘  │
+│              │                                                            │
+│              ├──────────┬──────────┬──────────┬──────────┐               │
+│              ▼          ▼          ▼          ▼          ▼               │
+│  ┌────────────────┐ ┌────┐ ┌──────────┐ ┌─────────┐ ┌──────────┐       │
+│  │ Topology Tree  │ │SLD │ │ Results  │ │ Element │ │  Global  │       │
+│  │   (PRIMARY)    │ │    │ │ Browser  │ │Inspector│ │ Context  │       │
+│  │                │ │    │ │          │ │         │ │   Bar    │       │
+│  └────────────────┘ └────┘ └──────────┘ └─────────┘ └──────────┘       │
+│         │              │          │            │            │            │
+│         └──────────────┴──────────┴────────────┴────────────┘            │
+│                            (synchronizacja 4-widokowa)                   │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+**Zasady (BINDING — Phase 2.x.2):**
+
+1. **SINGLE GLOBAL FOCUS:**
+   - W danym momencie **dokładnie jeden** element może być w fokusie,
+   - Fokus jest **współdzielony** między **wszystkimi** widokami (Tree, SLD, Results Browser, Element Inspector),
+   - Zmiana fokusu w **dowolnym** widoku **MUST** zaktualizować **wszystkie** pozostałe widoki.
+
+2. **Global Focus Stack (hierarchiczny fokus):**
+   ```
+   Level 0: Project
+   Level 1: Case
+   Level 2: Snapshot
+   Level 3: Analysis Run
+   Level 4: Target Element (Bus, Line, Trafo, Source, etc.)
+   ```
+
+3. **Synchronizacja 4-widokowa (BINDING):**
+   - **Klik w Topology Tree** → ustawia Global Focus + podświetla w SLD + otwiera Inspector + podświetla w Results Browser,
+   - **Klik w SLD** → ustawia Global Focus + podświetla w Tree + rozwija ścieżkę + otwiera Inspector + podświetla w Results Browser,
+   - **Klik w Results Browser** → ustawia Global Focus + podświetla w Tree + podświetla w SLD + otwiera Inspector,
+   - **Otwarcie Inspector** → odczytuje Global Focus (read-only).
+
+4. **ESC Behavior (cofanie fokusu):**
+   - **ESC** cofa fokus o jeden poziom wstecz (np. Element → Run → Snapshot → Case → Project),
+   - **ESC** **NIE resetuje** Active Case, Active Run, Active Snapshot (kontekst pozostaje),
+   - **ESC** na poziomie Project **SHOULD** zamknąć aktywny panel.
+
+**FORBIDDEN (każda z poniższych sytuacji to REGRESJA wymagająca HOTFIX):**
+
+- Wiele aktywnych fokusów jednocześnie (np. Bus-01 w Tree, Bus-02 w SLD),
+- Rozjazd kontekstu (np. Case 1 aktywny w Tree, Case 2 aktywny w Results Browser),
+- Reset kontekstu przy zmianie widoku (np. przełączenie SLD → Results resetuje Active Case),
+- Brak synchronizacji (np. kliknięcie w SLD nie podświetla elementu w Tree).
+
+**Referencja:** `docs/ui/TOPOLOGY_TREE_CONTRACT.md` § 5.0 (SINGLE GLOBAL FOCUS).
+
+---
+
+#### 18.2.3 Switching State View (Stany łączeniowe)
+
+**Cel:** Eksploracja stanów łączeniowych przełączników + identyfikacja izolowanych wysp (Islands).
+
+**Funkcjonalność:**
+- **Switch List:** tabela wszystkich przełączników (ID, Name, Type, State, From Bus, To Bus),
+- **Island View:** algorytmiczna identyfikacja izolowanych wysp (connected components),
+- **Switching Scenario Manager:** symulacja wpływu operacji łączeniowych na spójność sieci,
+- **Wizualizacja Islands na SLD:** kolorowanie tła Bus (każda Island = inny kolor), boundary markers (czerwona linia przerywana).
+
+**Zakazy:**
+- Permanentna zmiana stanów przełączników bez zapisu jako Snapshot,
+- Automatyczne uruchamianie solverów (LF, SC) po Toggle (użytkownik decyduje),
+- Brak walidacji spójności sieci (Islands MUST być identyfikowane).
+
+---
+
+#### 18.2.4 SC Node Results (Wyniki zwarciowe per BUS)
+
+**Cel:** Prezentacja wyników zwarciowych WYŁĄCZNIE per BUS (węzłowo-centryczne).
+
+**Funkcjonalność:**
+- **Tabela SC:** Bus ID, Bus Name, Fault Type, Ik_max, Ik_min, ip, Ith, Sk, Status,
+- **Element Inspector (Bus):** zakładka Results → sekcja Short-Circuit Results + Contributions,
+- **SLD Overlay:** nakładka SC tylko na Bus (Ik_max [kA], Status kolor).
+
+**Zakazy (FUNDAMENTALNE):**
+- Prezentacja wyników SC „na linii" (linia to impedancja, nie węzeł),
+- Prezentacja wyników SC „na transformatorze" (transformator to impedancja, nie węzeł),
+- Kolumna „Prąd zwarciowy na Branch" w Results Browser,
+- Nakładka „Ik [kA]" na symbolu linii w SLD,
+- Używanie terminologii „fault current in line" w UI.
+
+---
+
+#### 18.2.5 Catalog Browser (Type Library — PASYWNE ELEMENTY TYLKO)
+
+**Cel:** Przeglądanie katalogów typów PASYWNYCH elementów sieci + relacja Type → Instances.
+
+**Paradygmat Type-centric (ETAP / PowerFactory aligned):**
+
+> **TYPE jest źródłem prawdy. INSTANCES są tylko użyciami.**
+
+**Funkcjonalność:**
+- **Type Category List (PASYWNE TYLKO):** Line Types, Cable Types, Transformer Types, Switch Types,
+- **Type List:** tabela typów (Type ID, Type Name, Manufacturer, Rating, Instances Count),
+- **Type Details:** zakładki (Overview, Parameters, Instances, Technical Data),
+- **Zarządzanie katalogiem (Designer Mode):** dodawanie, edycja, usuwanie typów,
+- **Propagacja zmian TYPE → INSTANCES:** edycja TYPE → automatyczna zmiana wszystkich INSTANCES (po potwierdzeniu).
+
+**Zakazy (BINDING):**
+- **FORBIDDEN:** kategoria "Source Types" (Grid, Generator, PV, FW, BESS) — parametry Case-dependent, nie katalogowe,
+- **FORBIDDEN:** kategoria "Load Types" — parametry Case-dependent, nie katalogowe,
+- **FORBIDDEN:** kategoria "Protection Types" — parametry nastawcze, nie katalogowe,
+- **FORBIDDEN:** edycja typów w trybie Operator / Analyst (tylko Designer),
+- **FORBIDDEN:** usuwanie typu z instancjami (Instances > 0),
+- **FORBIDDEN:** brak ostrzeżenia przy edycji typu z instancjami.
+
+**Uzasadnienie:**
+- **Catalog Browser zarządza wyłącznie parametrami NIEZMIENNYMI** (R, X, B, I_nom, S_nom),
+- **Parametry ZMIENNE** (P_gen, Q_gen, U_setpoint, I_set, t_trip) są zarządzane przez **Case / Scenario**, nie przez Catalog,
+- **ETAP / PowerFactory** realizują identyczny podział: **Type Library** dla pasywnych, **Case Config** dla aktywnych.
+
+**Referencja:** `docs/ui/CATALOG_BROWSER_CONTRACT.md` (CANONICAL, BINDING)
+
+---
+
+#### 18.2.6 Case Comparison UI (Porównanie Case A/B/C)
+
+**Cel:** Porównanie dwóch lub trzech Case'ów + wizualizacja różnic (Delta).
+
+**Funkcjonalność:**
+- **Case Selector:** wybór Case A (baseline), Case B (comparison), Case C (optional),
+- **Comparison Table:** Delta (B - A), Delta %, Status Change (IMPROVED, REGRESSED, NO_CHANGE),
+- **SLD Overlay:** wizualizacja różnic na SLD (ΔV [%], ΔI [%], kolory zielony/czerwony),
+- **Eksport:** PDF (tabela + SLD Overlay + legenda), Excel (wszystkie kolumny + summary).
+
+**Zakazy:**
+- Porównanie Case'ów bez wyników (walidacja obowiązkowa),
+- Brak filtra "Show Only Changes",
+- Brak legendy różnic na SLD Overlay.
+
+---
+
+#### 18.2.7 Switching State Explorer (Eksploracja stanów łączeniowych)
+
+**Cel:** Dedykowane narzędzie UI dla eksploracji stanów łączeniowych aparatury (Switch) i ich wpływu na topologię efektywną sieci.
+
+**Funkcjonalność:**
+- **Eksploracja stanów aparatów:** lista wszystkich Switch z filtrami (Type, State OPEN/CLOSED, In Service, Feeder, Island ID),
+- **Effective Topology:** algorytmiczne przeliczanie topologii efektywnej po uwzględnieniu stanów aparatów (OPEN → krawędź usunięta) i flag `in_service`,
+- **Islands (algorytmiczne):** wykrywanie wysp (connected components) poprzez graph traversal (BFS/DFS),
+- **Topology Checks (pre-solver validation):** liczba Islands, Islands bez Source, dangling Bus,
+- **Toggle State:** przełączanie OPEN ↔ CLOSED z natychmiastową aktualizacją Effective Topology + Islands + SLD overlay (< 100 ms),
+- **SLD overlay Islands:** kolorowanie tła Bus lub obrys wysp (każda Island = inny kolor),
+- **Batch Operations:** grupowa zmiana stanów (z potwierdzeniem),
+- **Restore Normal State:** powrót do Case.baseline_switching_state,
+- **Invalidation Rule:** zmiana stanu aparatu → Result status = OUTDATED (z bannerem ostrzeżenia).
+
+**Integracje:**
+- **SLD:** overlay Islands (kolorowanie tła Bus), natychmiastowa zmiana symbolu aparatu (● CLOSED / ○ OPEN),
+- **Element Inspector (Switch):** zakładki Overview, Parameters, Switching History, Topology Impact,
+- **Results Browser:** invalidation wyników po zmianie stanów (Result status → OUTDATED),
+- **Topology Tree:** synchronizacja 4-widokowa (wybór aparatu w Explorerze → podświetlenie SLD/Tree/Inspector).
+
+**NOT-A-SOLVER rule (BINDING):**
+
+Switching State Explorer **NIE wykonuje** obliczeń fizycznych (prądy, napięcia). To wyłącznie warstwa topologiczna (Application Layer):
+- **Effective Topology:** graph traversal (NetworkX), NOT Power Flow,
+- **Islands:** connected components (BFS/DFS), NOT Short Circuit,
+- **Energized status:** interpretacja topologiczna (Island zawiera Source?), NOT wynik Power Flow (napięcia U).
+
+**FORBIDDEN:**
+- Wykonywanie obliczeń prądów, napięć w Switching Explorer (to Solver Layer),
+- Automatyczne uruchamianie solverów po zmianie stanu aparatu (użytkownik decyduje),
+- Automatyczne "naprawianie" topologii (przełączanie aparatów bez zgody użytkownika),
+- Prezentowanie "prądów w aparacie" (aparat nie ma impedancji, to interpretacja fizyczna z Power Flow).
+
+**Referencja:** `docs/ui/SWITCHING_STATE_EXPLORER_CONTRACT.md` (CANONICAL, BINDING)
+
+---
+
+### 18.3 Implikacje dla warstw architektury
+
+#### 18.3.1 Application Layer (SLD, Topology Tree, Switching State View, Catalog Browser, Case Comparison)
+
+**MUST:**
+- Implementować wszystkie komponenty UI PF++ zgodnie z kontraktami,
+- Synchronizować selekcję między SLD, Topology Tree, Element Inspector,
+- Zachować spójność kontekstu (aktywny Case, Snapshot, Analysis) przy przełączaniu widoków.
+
+**FORBIDDEN:**
+- Mieszanie semantyk warstw (CAD vs SCADA),
+- Przechowywanie danych w komponentach UI (tylko odczyt z NetworkModel),
+- Brak synchronizacji między widokami.
+
+#### 18.3.2 Domain Layer (bez zmian)
+
+**UI Eksploracji i Kontroli UI NIE wpływa na Domain Layer** — to wyłącznie warstwa prezentacji (Application Layer).
+
+#### 18.3.3 Solver Layer (bez zmian)
+
+**UI Eksploracji i Kontroli UI NIE wpływa na Solver Layer** — to wyłącznie warstwa prezentacji (Application Layer).
+
+---
+
+### 18.4 Integracja z istniejącymi dokumentami
+
+| Dokument | Relacja do UI PF++ |
+|----------|-------------------|
+| `SLD_RENDER_LAYERS_CONTRACT.md` | Definiuje warstwy CAD vs SCADA (tryby CAD/SCADA/HYBRID) |
+| `TOPOLOGY_TREE_CONTRACT.md` | Definiuje hierarchię topologiczną (Project → Station → VoltageLevel → Element) |
+| `SWITCHING_STATE_EXPLORER_CONTRACT.md` | **Definiuje eksplorację stanów łączeniowych (OPEN/CLOSED), algorytmiczną identyfikację Islands (graph traversal), Topology Checks (pre-solver validation), integracje SLD/Inspector/Results/Tree** |
+| `SC_NODE_RESULTS_CONTRACT.md` | Definiuje wyniki zwarciowe per BUS (ZAKAZ „na linii") |
+| `CATALOG_BROWSER_CONTRACT.md` | Definiuje przeglądanie katalogów + relacja Type → Instances |
+| `CASE_COMPARISON_UI_CONTRACT.md` | Definiuje porównanie Case A/B/C (Delta, SLD Overlay) |
+| `RESULTS_BROWSER_CONTRACT.md` | Integracja z Results Browser (hierarchia Case → Snapshot → Analysis) |
+| `ELEMENT_INSPECTOR_CONTRACT.md` | Integracja z Element Inspector (zakładki, multi-case view) |
+| `EXPERT_MODES_CONTRACT.md` | Integracja z Expert Modes (domyślne rozwinięcia, widoczność sekcji) |
+| `GLOBAL_CONTEXT_BAR.md` | Integracja z Global Context Bar (sticky, drukowany w PDF) |
+
+---
+
+### 18.5 UI PF++ Compliance Checklist
+
+**Implementacja zgodna z UI PF++, jeśli:**
+
+- [ ] SLD Render Layers implementuje tryby CAD, SCADA, HYBRID (zgodnie z kontraktem)
+- [ ] Topology Tree implementuje hierarchię Project → Station → VoltageLevel → Element
+- [ ] Topology Tree synchronizuje selekcję z SLD i Element Inspector
+- [ ] **SINGLE GLOBAL FOCUS** zaimplementowany (jeden globalny fokus współdzielony przez Tree, SLD, Results Browser, Element Inspector) — **Phase 2.x.2**
+- [ ] **Synchronizacja 4-widokowa** (klik w dowolnym widoku → aktualizacja wszystkich pozostałych) — **Phase 2.x.2**
+- [ ] **ESC Behavior** (cofanie fokusu bez resetowania Active Case/Snapshot) — **Phase 2.x.2**
+- [ ] **FORBIDDEN: Rozjazd selekcji** (brak wielu aktywnych fokusów, brak rozjazdu kontekstu) — **Phase 2.x.2**
+- [ ] Switching State View identyfikuje Islands algorytmicznie (graph traversal)
+- [ ] SC Node Results prezentuje wyniki WYŁĄCZNIE per BUS (ZAKAZ „na linii")
+- [ ] Catalog Browser implementuje relację Type → Instances
+- [ ] Case Comparison UI implementuje porównanie A/B/C (Delta, SLD Overlay)
+- [ ] Wszystkie komponenty UI PF++ są dostępne w każdym trybie eksperckim (zgodnie z EXPERT_MODES_CONTRACT.md)
 
 ---
 
 **END OF ARCHITECTURE DOCUMENT**
+
+## TODO — Proof Packs P14–P17 (FUTURE PACKS)
+
+### TODO-P14-001 (PLANNED) — P14: Power Flow Proof Pack (audit wyników PF) [FUTURE PACK]
+- Priority: MUST
+- Inputs: TraceArtifact, PowerFlowResult
+- Output: ProofPack P14 (ProofDocument: Audit rozpływu mocy)
+- DoD:
+  - [ ] Dowód bilansu węzła dla mocy czynnej i biernej z mapowaniem do TraceArtifact.
+
+    $$
+    \sum P = 0,\quad \sum Q = 0
+    $$
+
+  - [ ] Bilans gałęzi dla mocy czynnej i biernej uwzględnia straty oraz spadek napięcia.
+
+    $$
+    P_{in} \rightarrow P_{out} + P_{loss},\quad Q_{in} \rightarrow Q_{out} + \Delta U
+    $$
+
+  - [ ] Straty linii liczone jawnie z prądu i rezystancji.
+
+    $$
+    P_{loss} = I^{2} \cdot R
+    $$
+
+  - [ ] Porównanie counterfactual Case A vs Case B z raportem różnic.
+
+    $$
+    \Delta P,\ \Delta Q,\ \Delta U
+    $$
+
+### TODO-P15-001 (PLANNED) — P15: Load Currents & Overload Proof Pack [FUTURE PACK]
+- Priority: MUST
+- Inputs: TraceArtifact, PowerFlowResult, Catalog
+- Output: ProofPack P15 (ProofDocument: Prądy robocze i przeciążenia)
+- DoD:
+  - [ ] Prądy obciążenia linii/kabli wyprowadzone z mocy pozornej.
+
+    $$
+    I = \frac{S}{\sqrt{3} \cdot U}
+    $$
+
+  - [ ] Porównanie do prądu znamionowego z marginesem procentowym i statusem PASS/FAIL.
+  - [ ] Transformator: relacja obciążenia do mocy znamionowej i overload %.
+
+    $$
+    \frac{S}{S_n}
+    $$
+
+### TODO-P16-001 (PLANNED) — P16: Losses & Energy Proof Pack [FUTURE PACK]
+- Priority: MUST
+- Inputs: TraceArtifact, PowerFlowResult, Catalog
+- Output: ProofPack P16 (ProofDocument: Straty mocy i energii)
+- DoD:
+  - [ ] Straty linii wyprowadzone z prądu i rezystancji.
+
+    $$
+    P_{loss,line} = I^{2} \cdot R
+    $$
+
+  - [ ] Straty transformatora z danych katalogowych: suma P0 i Pk.
+
+    $$
+    P_{loss,trafo} = P_{0} + P_{k}
+    $$
+
+  - [ ] Energia strat z profilu obciążenia (integracja w czasie).
+
+    $$
+    E_{loss} = \int P_{loss} \, dt
+    $$
+
+### TODO-P17-001 (PLANNED) — P17: Earthing / Ground Fault Proof Pack (SN) [FUTURE PACK]
+- Priority: MUST
+- Inputs: TraceArtifact, Catalog
+- Output: ProofPack P17 (ProofDocument: Doziemienia / uziemienia SN)
+- DoD:
+  - [ ] Jeśli SN: prądy doziemne z uwzględnieniem impedancji uziemienia i rozdziału prądu.
+  - [ ] Tryb uproszczonych napięć dotykowych z wyraźnymi zastrzeżeniami.
+  - [ ] Terminologia w ProofDocument: 1F-Z, 2F, 2F-Z oraz PCC – punkt wspólnego przyłączenia.
