@@ -1,9 +1,10 @@
 # Prezentacja wyników zwarciowych: BUS-centric (CANONICAL)
 
 **Status:** CANONICAL (BINDING)
-**Wersja:** 1.0
+**Wersja:** 1.1
 **Data:** 2026-01-28
 **Referencje:**
+- `SLD_UI_CONTRACT.md` — kontrakty UI (priorytet BUS, gęstość, kolory, wydruk)
 - `SLD_SCADA_CAD_CONTRACT.md` — kontrakt widoku SLD
 - `SHORT_CIRCUIT_PANELS_AND_PRINTING.md` — panele i wydruk
 - `P11_SC_CASE_MAPPING.md` — mapowanie na P11 (White Box)
@@ -600,6 +601,162 @@ Każda para **(BUS, Case)** generuje osobny **ProofDocument** w systemie P11:
 - [ ] Wydruk (PDF) zawiera: fragment SLD + tabela wyników + tabela wkładów + metadane.
 - [ ] Każda para (BUS, Case) ma osobny **ProofDocument** w P11.
 - [ ] Każda wartość ma **trace_id** (dowodowo).
+
+---
+
+## 13. Integracja z kontraktami UI (SLD_UI_CONTRACT.md)
+
+### 13.1 Pozycja dokumentu
+
+**BINDING:**
+
+`SLD_SHORT_CIRCUIT_BUS_CENTRIC.md` (ten dokument) definiuje **prezentację wyników zwarciowych** (BUS-centric, Case, wkłady).
+
+`SLD_UI_CONTRACT.md` definiuje **kontrakty renderowania** (priorytety, gęstość, kolory, wydruk, interakcja).
+
+Oba dokumenty są **komplementarne** i obowiązują równocześnie.
+
+### 13.2 UI Priority Stack: BUS ma absolutny priorytet
+
+**BINDING:**
+
+Zgodnie z `SLD_UI_CONTRACT.md` § 3 (UI Priority Stack):
+
+> **BUS (wyniki zwarciowe, stan) > LINIA (prąd roboczy) > CAD (parametry katalogowe)**
+
+**Implikacje dla prezentacji wyników zwarciowych:**
+
+1. Wyniki zwarciowe przy BUS (`Ik″`, `ip`, `Ith`, `Sk″`) **MUSZĄ** być widoczne zawsze (§ 4.1 tego dokumentu).
+2. Wyniki BUS **nigdy nie są ukryte** ani przesuwane do SIDE STACK (§ 3.2 tego dokumentu).
+3. W przypadku kolizji z etykietami CAD → **CAD ustępuje miejsca** (przesunięcie OFFSET lub SIDE STACK).
+
+**Przykład (zgodny z § 9.3):**
+
+```
+════════════════════════════════════════════════════════════
+   Szyna SN-01 | 15 kV                      [PRIORYTET 1: BUS]
+   ───────────────────────────────────────────────────────
+   Ik″ = 12.5 kA  │  ip = 32.8 kA  │  Sk″ = 325 MVA
+   ───────────────────────────────────────────────────────
+   ↑ Absolutny priorytet wizualny (ZAWSZE INLINE/OFFSET)
+
+                     ┌─────────────────────┐
+          ╭─ ─ ─ ─ ─ │ CAD: Główna         │
+          │          │ Izolowana           │
+══════════┴══════════┴─────────────────────┴══════════════
+                     ↑ CAD ustępuje miejsca (OFFSET)
+```
+
+### 13.3 Dense SLD: Wyniki BUS NIE są przesuwane do SIDE STACK
+
+**BINDING:**
+
+Zgodnie z `SLD_UI_CONTRACT.md` § 4 (Dense SLD Rules):
+
+- Gęstość diagramu **nie wpływa** na widoczność wyników BUS.
+- Wyniki BUS pozostają **INLINE lub OFFSET** niezależnie od gęstości.
+- Tylko etykiety CAD mogą być przesuwane do SIDE STACK (§ 5 `SLD_SCADA_CAD_CONTRACT.md`).
+
+**Reguła BINDING:**
+
+| Gęstość diagramu | Etykiety CAD | Wyniki BUS |
+|------------------|--------------|-----------|
+| < 0.10 elem/cm² | INLINE | INLINE |
+| 0.10 – 0.20 elem/cm² | OFFSET | INLINE |
+| > 0.20 elem/cm² | SIDE STACK | **INLINE** (absolutny priorytet) |
+
+### 13.4 Semantic Color: Kolory wyników zwarciowych
+
+**BINDING:**
+
+Zgodnie z `SLD_UI_CONTRACT.md` § 5 (Semantic Color Contract):
+
+Kolor BUS w trybie zwarciowym oznacza **poziom prądu zwarciowego** (zgodnie z § 9.3 tego dokumentu):
+
+| Wartość `Ik″` | Kolor BUS | Semantyka |
+|---------------|-----------|-----------|
+| `Ik″ < 5 kA` | **Zielony** | Niski prąd zwarciowy |
+| `5 kA ≤ Ik″ < 15 kA` | **Żółty** | Średni prąd zwarciowy |
+| `Ik″ ≥ 15 kA` | **Czerwony** | Wysoki prąd zwarciowy |
+
+**FORBIDDEN:**
+
+- Kolorowanie BUS według typu (np. "wszystkie BUS czerwone bo to SN").
+- Używanie kolorów bez semantyki (np. "niebieski bo ładnie wygląda").
+
+### 13.5 Print-First: Wyniki BUS na wydruku
+
+**BINDING:**
+
+Zgodnie z `SLD_UI_CONTRACT.md` § 6 (Print-First Contract):
+
+> **Ekran = PDF = prawda projektu**
+
+**Implikacje dla wydruku (§ 10 tego dokumentu):**
+
+- Wszystkie wyniki BUS widoczne na ekranie **MUSZĄ** być widoczne w PDF (żadne auto-hide).
+- Tabela wyników (§ 10.1) **MUSI** zawierać wszystkie BUS + Case MAX/MIN/N-1.
+- Tabela wkładów (§ 6.3) **MUSI** być pełna (nie obcięta).
+
+**Format wydruku (zgodny z § 10.1):**
+
+```
+PDF (A4, strona 1/2):
+
+┌─────────────────────────────────────────────────────────┐
+│ Projekt: Stacja SN-01        Data: 2026-01-28 12:30:45 │
+│ Case: MAX (3F)               Norma: IEC 60909          │
+└─────────────────────────────────────────────────────────┘
+
+════════════════════════════════════════════════════════════
+   Szyna SN-01 | 15 kV
+   Ik″ = 12.5 kA  │  ip = 32.8 kA  │  Sk″ = 325 MVA
+════════════════════════════════════════════════════════════
+
+[Tabela wyników]
+┌─────────┬─────────┬─────────┬─────────┬─────────┐
+│ BUS     │ Ik″ [kA]│ ip [kA] │ Ith [kA]│ Sk″ [MVA]│
+├─────────┼─────────┼─────────┼─────────┼─────────┤
+│ B-01    │ 12.5    │ 32.8    │ 11.2    │ 325     │
+│ B-02    │ 10.8    │ 28.3    │ 9.7     │ 280     │
+└─────────┴─────────┴─────────┴─────────┴─────────┘
+
+──────────────────────────────────────────────────────────
+Strona 1/2        Trace ID: trace_SC_MAX_20260128_123045
+```
+
+### 13.6 Interaction Contract: Hover, Click, ESC
+
+**BINDING:**
+
+Zgodnie z `SLD_UI_CONTRACT.md` § 7 (Interaction Contract):
+
+- **Hover nad BUS** → tooltip z wynikami zwarciowymi (§ 4.1 tego dokumentu):
+
+```
+┌─────────────────────────────────────────────┐
+│ Szyna SN-01                                 │
+├─────────────────────────────────────────────┤
+│ [WYNIKI ZWARCIOWE - Case MAX]              │
+│ Ik″ = 12.5 kA                               │
+│ ip  = 32.8 kA                               │
+│ Ith = 11.2 kA                               │
+│ Sk″ = 325 MVA                               │
+├─────────────────────────────────────────────┤
+│ [WKŁADY]                                    │
+│ GRID:  5.8 kA (46.4%)                       │
+│ T-01:  3.5 kA (28.0%)                       │
+│ PV-01: 1.2 kA (9.6%)                        │
+└─────────────────────────────────────────────┘
+```
+
+- **Click na BUS** → fokus + panel boczny z pełnymi danymi (§ 6.3, tabela wkładów).
+- **ESC** → zamknięcie panelu, powrót do widoku ogólnego.
+
+**FORBIDDEN:**
+
+- Hover zmieniający stan (np. hover otwiera panel wkładów — to tylko Click może zrobić).
+- Click bez wizualnej informacji zwrotnej (brak podświetlenia BUS).
 
 ---
 

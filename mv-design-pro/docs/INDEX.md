@@ -21,6 +21,7 @@
 - [docs/ui/powerfactory_ui_parity.md](./ui/powerfactory_ui_parity.md)
 - [docs/ui/wizard_screens.md](./ui/wizard_screens.md)
 - [docs/ui/sld_rules.md](./ui/sld_rules.md)
+- [docs/ui/SLD_UI_CONTRACT.md](./ui/SLD_UI_CONTRACT.md) — **Kontrakty UI: Priority Stack, Dense SLD, Semantic Color, Print-First, Interaction (CANONICAL)**
 - [docs/ui/SLD_SCADA_CAD_CONTRACT.md](./ui/SLD_SCADA_CAD_CONTRACT.md) — **SCADA SLD + CAD overlay: kontrakt widoku (CANONICAL)**
 - [docs/ui/SLD_SHORT_CIRCUIT_BUS_CENTRIC.md](./ui/SLD_SHORT_CIRCUIT_BUS_CENTRIC.md) — **Prezentacja wyników zwarciowych: BUS-centric, Case MAX/MIN/N-1 (CANONICAL)**
 - [docs/ui/SHORT_CIRCUIT_PANELS_AND_PRINTING.md](./ui/SHORT_CIRCUIT_PANELS_AND_PRINTING.md) — **Panele zwarciowe, porównawcze, wydruk PDF/DOCX (CANONICAL)**

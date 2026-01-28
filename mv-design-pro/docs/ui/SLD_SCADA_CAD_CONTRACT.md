@@ -1,9 +1,10 @@
 # SLD SCADA + CAD: Kontrakt Widoku (CANONICAL)
 
 **Status:** CANONICAL (BINDING)
-**Wersja:** 1.0
+**Wersja:** 1.1
 **Data:** 2026-01-28
 **Referencje:**
+- `SLD_UI_CONTRACT.md` — kontrakty UI (priorytet, gęstość, kolory, wydruk, interakcja)
 - `sld_rules.md` — podstawowe reguły SLD
 - `wizard_screens.md` — tryby pracy
 - `SHORT_CIRCUIT_PANELS_AND_PRINTING.md` — wydruk
@@ -598,6 +599,111 @@ Jeśli konflikt pozostaje nierozstrzygnięty → **zgłoś jako Issue** (REPOSIT
 - [ ] Terminologia: **PCC** (punkt wspólnego przyłączenia), **BUS-centric**, **Case** (MAX/MIN/N-1).
 - [ ] Duplikacja SCADA ↔ CAD dozwolona **tylko jeśli poprawia czytelność** i nie zmienia semantyki.
 - [ ] System automatycznie wykrywa kolizje etykiet i przełącza tryby (collision_ratio).
+
+---
+
+## 13. Integracja z kontraktami UI (SLD_UI_CONTRACT.md)
+
+### 13.1 Pozycja dokumentu
+
+**BINDING:**
+
+`SLD_SCADA_CAD_CONTRACT.md` (ten dokument) definiuje **warstwy widoku** (SCADA + CAD).
+
+`SLD_UI_CONTRACT.md` definiuje **kontrakty renderowania i interakcji** (priorytety, gęstość, kolory, wydruk, interakcja).
+
+Oba dokumenty są **komplementarne** i obowiązują równocześnie.
+
+### 13.2 UI Priority Stack (kontrakt #1)
+
+**BINDING:**
+
+Zgodnie z `SLD_UI_CONTRACT.md` § 3 (UI Priority Stack):
+
+1. **BUS** (wyniki zwarciowe, stan) — absolutny priorytet wizualny.
+2. **LINIA** (prąd roboczy `I`) — priorytet 2.
+3. **CAD** (parametry katalogowe) — najniższy priorytet.
+
+**Implikacje dla SLD_SCADA_CAD_CONTRACT:**
+
+- Wyniki zwarciowe przy BUS (§ 4.3 tego dokumentu) **MUSZĄ** być widoczne zawsze (INLINE lub OFFSET, nigdy SIDE STACK).
+- Parametry CAD (§ 7 tego dokumentu) **MOGĄ** być przesuwane do OFFSET lub SIDE STACK przy kolizji z wynikami BUS.
+- Prąd roboczy linii (§ 4.3 tego dokumentu) **MUSI** być widoczny, ale może ustąpić miejsca wynikom BUS.
+
+### 13.3 Dense SLD Rules (kontrakt #2)
+
+**BINDING:**
+
+Zgodnie z `SLD_UI_CONTRACT.md` § 4 (Dense SLD Rules):
+
+- System automatycznie wykrywa gęstość diagramu (`density > 0.10 elem/cm²`).
+- Etykiety CAD przełączają się: **INLINE → OFFSET → SIDE STACK** (zgodnie z § 5 tego dokumentu).
+- Wyniki BUS pozostają **INLINE lub OFFSET** niezależnie od gęstości (zgodnie z § 4 tego dokumentu).
+
+**Reguła rozszerzona:**
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│  Gęstość < 0.10 elem/cm²:                                    │
+│  - CAD: INLINE (domyślnie)                                   │
+│  - Wyniki BUS: INLINE                                        │
+│                                                              │
+│  Gęstość 0.10 – 0.20 elem/cm²:                               │
+│  - CAD: OFFSET (auto fallback)                               │
+│  - Wyniki BUS: INLINE (priorytet)                            │
+│                                                              │
+│  Gęstość > 0.20 elem/cm²:                                    │
+│  - CAD: SIDE STACK (wymuszony)                               │
+│  - Wyniki BUS: INLINE (absolutny priorytet)                  │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### 13.4 Semantic Color Contract (kontrakt #3)
+
+**BINDING:**
+
+Zgodnie z `SLD_UI_CONTRACT.md` § 5 (Semantic Color Contract):
+
+- Kolor oznacza **znaczenie** (stan, alarm), nie typ elementu.
+- SCADA SLD (§ 3.1 tego dokumentu) używa kolorów semantycznych:
+  - **Zielony** = stan normalny,
+  - **Żółty** = ostrzeżenie (loading 80-100%),
+  - **Czerwony** = przeciążenie (loading > 100%) lub błąd,
+  - **Szary** = `in_service=False`.
+
+**CAD overlay (§ 3.2 tego dokumentu) używa kolorów neutralnych:**
+- Czarny/ciemny dla tekstu i symboli (brak semantyki operacyjnej).
+
+### 13.5 Print-First Contract (kontrakt #4)
+
+**BINDING:**
+
+Zgodnie z `SLD_UI_CONTRACT.md` § 6 (Print-First Contract):
+
+> **Ekran = PDF = prawda projektu**
+
+**Implikacje dla wydruku (§ 9 tego dokumentu):**
+
+- Wszystko widoczne na ekranie **MUSI** być widoczne w PDF (żadne auto-hide).
+- Wyniki BUS i prądy linii **zawsze widoczne** na wydruku.
+- Tryb etykiet (INLINE/OFFSET/SIDE STACK) **zachowany** w PDF.
+
+### 13.6 Interaction Contract (kontrakt #5)
+
+**BINDING:**
+
+Zgodnie z `SLD_UI_CONTRACT.md` § 7 (Interaction Contract):
+
+- **Hover** = informacja (tooltip), nie zmienia stanu.
+- **Click** = fokus + panel boczny (zgodnie z § 10.1 `SLD_SCADA_CAD_CONTRACT.md`).
+- **ESC** = zamknięcie panelu / anulowanie fokusa.
+
+**Tooltip (SCADA + CAD):**
+
+Hover nad BUS wyświetla:
+1. SCADA: napięcie operacyjne, stan (`in_service`),
+2. Wyniki: `Ik″`, `ip`, `Ith`, `Sk″` (jeśli RESULT_VIEW),
+3. CAD: typ szyny, napięcie znamionowe.
 
 ---
 
