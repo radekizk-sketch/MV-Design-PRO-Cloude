@@ -108,7 +108,13 @@ UNIT_DIMENSIONS: dict[str, UnitDimension] = {
     # Czas
     "s": UnitDimension(s=1),
     "ms": UnitDimension(s=1),
+    "h": UnitDimension(s=1),
     "Hz": UnitDimension(s=-1),
+
+    # Energia
+    "Wh": UnitDimension(W=1, s=1),
+    "kWh": UnitDimension(W=1, s=1),
+    "MWh": UnitDimension(W=1, s=1),
 }
 
 
@@ -202,6 +208,32 @@ class UnitVerifier:
             "rule": "kV · (1 - %) = kV",
             "inputs": {"U_{source}": "kV", "ΔU_{total}": "%"},
             "output": "kV",
+        },
+        # P16 Losses
+        "EQ_LS_001": {
+            "rule": "MVA / kV = kA → A",
+            "inputs": {"S": "MVA", "U_{LL}": "kV"},
+            "output": "A",
+        },
+        "EQ_LS_002": {
+            "rule": "A² · Ω = W → kW",
+            "inputs": {"I": "A", "R": "Ω"},
+            "output": "kW",
+        },
+        "EQ_LS_003": {
+            "rule": "kW · — = kW",
+            "inputs": {"P_k": "kW", "k_{load}": "—"},
+            "output": "kW",
+        },
+        "EQ_LS_004": {
+            "rule": "kW + kW = kW",
+            "inputs": {"P_0": "kW", "P_{k,act}": "kW"},
+            "output": "kW",
+        },
+        "EQ_LS_005": {
+            "rule": "kW · h = kWh",
+            "inputs": {"P_{loss,i}": "kW", "Δt": "h"},
+            "output": "kWh",
         },
     }
 

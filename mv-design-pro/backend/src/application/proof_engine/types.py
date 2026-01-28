@@ -27,6 +27,15 @@ class ProofType(str, Enum):
     SC2FG_IEC60909 = "SC2FG_IEC60909"
     Q_U_REGULATION = "Q_U_REGULATION"
     EQUIPMENT_PROOF = "EQUIPMENT_PROOF"
+    LOSSES_POWER_ENERGY = "LOSSES_POWER_ENERGY"
+
+
+class LossesElementKind(str, Enum):
+    """Rodzaj elementu dla P16 (straty)."""
+
+    LINE = "LINE"
+    CABLE = "CABLE"
+    TRANSFORMER = "TRANSFORMER"
 
 
 # =============================================================================
@@ -551,3 +560,50 @@ class QUCounterfactualInput:
 
     a: QUInput
     b: QUInput
+
+
+# =============================================================================
+# Losses Input — P16
+# =============================================================================
+
+
+@dataclass
+class LossesInput:
+    """
+    Dane wejściowe dla dowodu strat mocy i energii (P16).
+
+    Attributes:
+        project_name: Nazwa projektu
+        case_name: Nazwa przypadku obliczeniowego
+        run_timestamp: Czas uruchomienia
+        element_kind: LINE | CABLE | TRANSFORMER
+        u_ll_kv: Napięcie międzyfazowe
+
+        # Line/Cable:
+        i_a: Prąd obciążenia [A]
+        s_mva: Moc pozorna [MVA] (jeśli i_a nie podano)
+        r_ohm: Rezystancja fazy (całkowita) [Ω]
+
+        # Transformer:
+        p0_kw: Straty jałowe [kW]
+        pk_kw: Straty obciążeniowe przy I_n [kW]
+        k_load: Stopień obciążenia (0–1)
+
+        # Energy profile (optional):
+        profile_hours: Lista godzin (Δt)
+        profile_factor: Lista współczynników obciążenia
+    """
+
+    project_name: str
+    case_name: str
+    run_timestamp: datetime
+    element_kind: LossesElementKind
+    u_ll_kv: float
+    i_a: float | None = None
+    s_mva: float | None = None
+    r_ohm: float | None = None
+    p0_kw: float | None = None
+    pk_kw: float | None = None
+    k_load: float | None = None
+    profile_hours: list[float] | None = None
+    profile_factor: list[float] | None = None

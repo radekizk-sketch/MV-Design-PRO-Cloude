@@ -219,6 +219,8 @@ def proof_pack_proof_type(proof_type: ProofType) -> str:
         return "QU_REGULATION"
     if proof_type == ProofType.EQUIPMENT_PROOF:
         return "P12"
+    if proof_type == ProofType.LOSSES_POWER_ENERGY:
+        return "P16"
     if proof_type in {
         ProofType.SC1F_IEC60909,
         ProofType.SC2F_IEC60909,

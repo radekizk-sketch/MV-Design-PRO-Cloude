@@ -40,6 +40,7 @@
 - [docs/proof_engine/P11_1b_REGULATION_Q_U.md](./proof_engine/P11_1b_REGULATION_Q_U.md) — Regulatory Q(U), cosφ(P)
 - [docs/proof_engine/P11_1c_SC_ASYMMETRICAL.md](./proof_engine/P11_1c_SC_ASYMMETRICAL.md) — Składowe symetryczne (SKELETON)
 - [docs/proof_engine/P11_1d_PROOF_UI_EXPORT.md](./proof_engine/P11_1d_PROOF_UI_EXPORT.md) — **Proof Inspector (CANONICAL): read-only viewer, eksport JSON/LaTeX/PDF/DOCX**
+- [docs/proof_engine/P16_LOSSES_POWER_ENERGY.md](./proof_engine/P16_LOSSES_POWER_ENERGY.md) — **P16: Straty mocy i energii (CANONICAL)**
 - [docs/proof_engine/P14_PROOF_AUDIT_AND_COVERAGE.md](./proof_engine/P14_PROOF_AUDIT_AND_COVERAGE.md) — **P14: Proof Audit & Coverage (CANONICAL, META)**
 - [docs/proof_engine/P11_SC_CASE_MAPPING.md](./proof_engine/P11_SC_CASE_MAPPING.md) — **Mapowanie Case zwarciowych (MAX/MIN/N-1) na ProofDocument: trace_id, snapshot, anti-double-counting (CANONICAL)**
 - [docs/proof_engine/PROOF_SCHEMAS.md](./proof_engine/PROOF_SCHEMAS.md) — Schematy JSON (BINDING)
@@ -115,24 +116,24 @@
     \frac{S}{S_n}
     $$
 
-### TODO-P16-001 (PLANNED) — P16: Losses & Energy Proof Pack [FUTURE PACK]
+### DONE-P16-001 — P16: Losses & Energy Proof Pack
 - Priority: MUST
 - Inputs: TraceArtifact, PowerFlowResult, Catalog
 - Output: ProofPack P16 (ProofDocument: Straty mocy i energii)
 - DoD:
-  - [ ] Straty linii wyprowadzone z prądu i rezystancji.
+  - [x] Straty linii wyprowadzone z prądu i rezystancji.
 
     $$
     P_{loss,line} = I^{2} \cdot R
     $$
 
-  - [ ] Straty transformatora z danych katalogowych: suma P0 i Pk.
+  - [x] Straty transformatora z danych katalogowych: suma P0 i Pk.
 
     $$
     P_{loss,trafo} = P_{0} + P_{k}
     $$
 
-  - [ ] Energia strat z profilu obciążenia (integracja w czasie).
+  - [x] Energia strat z profilu obciążenia (integracja w czasie).
 
     $$
     E_{loss} = \int P_{loss} \, dt

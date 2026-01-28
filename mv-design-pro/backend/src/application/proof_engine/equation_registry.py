@@ -641,6 +641,154 @@ EQ_VDROP_007 = EquationDefinition(
 
 
 # =============================================================================
+# Losses — P16 (Lines & Transformers)
+# =============================================================================
+
+EQ_LS_001 = EquationDefinition(
+    equation_id="EQ_LS_001",
+    name_pl="Prąd roboczy z mocy pozornej",
+    standard_ref="—",
+    latex=r"I = \frac{S}{\sqrt{3} \cdot U_{LL}}",
+    symbols=(
+        SymbolDefinition(
+            symbol="I",
+            unit="A",
+            description_pl="Prąd roboczy",
+            mapping_key="i_a",
+        ),
+        SymbolDefinition(
+            symbol="S",
+            unit="MVA",
+            description_pl="Moc pozorna",
+            mapping_key="s_mva",
+        ),
+        SymbolDefinition(
+            symbol="U_{LL}",
+            unit="kV",
+            description_pl="Napięcie międzyfazowe",
+            mapping_key="u_ll_kv",
+        ),
+    ),
+    unit_derivation="MVA / kV = kA → A",
+    notes="Konwersja: MVA/kV = kA, następnie kA → A.",
+)
+
+EQ_LS_002 = EquationDefinition(
+    equation_id="EQ_LS_002",
+    name_pl="Straty mocy w linii/kablu",
+    standard_ref="—",
+    latex=r"P_{loss} = 3 I^{2} R",
+    symbols=(
+        SymbolDefinition(
+            symbol="P_{loss}",
+            unit="kW",
+            description_pl="Straty mocy czynnej",
+            mapping_key="p_loss_kw",
+        ),
+        SymbolDefinition(
+            symbol="I",
+            unit="A",
+            description_pl="Prąd roboczy",
+            mapping_key="i_a",
+        ),
+        SymbolDefinition(
+            symbol="R",
+            unit="Ω",
+            description_pl="Rezystancja fazy (całkowita)",
+            mapping_key="r_ohm",
+        ),
+    ),
+    unit_derivation="A² · Ω = W → kW",
+    notes="R — rezystancja jednej fazy na całej długości.",
+)
+
+EQ_LS_003 = EquationDefinition(
+    equation_id="EQ_LS_003",
+    name_pl="Straty obciążeniowe transformatora",
+    standard_ref="—",
+    latex=r"P_{k,act} = P_k \cdot k_{load}^{2}",
+    symbols=(
+        SymbolDefinition(
+            symbol="P_{k,act}",
+            unit="kW",
+            description_pl="Straty obciążeniowe przy aktualnym obciążeniu",
+            mapping_key="p_k_act_kw",
+        ),
+        SymbolDefinition(
+            symbol="P_k",
+            unit="kW",
+            description_pl="Straty obciążeniowe przy prądzie znamionowym",
+            mapping_key="pk_kw",
+        ),
+        SymbolDefinition(
+            symbol="k_{load}",
+            unit="—",
+            description_pl="Stopień obciążenia",
+            mapping_key="k_load",
+        ),
+    ),
+    unit_derivation="kW · — = kW",
+)
+
+EQ_LS_004 = EquationDefinition(
+    equation_id="EQ_LS_004",
+    name_pl="Straty całkowite transformatora",
+    standard_ref="—",
+    latex=r"P_{loss} = P_0 + P_{k,act}",
+    symbols=(
+        SymbolDefinition(
+            symbol="P_{loss}",
+            unit="kW",
+            description_pl="Straty całkowite transformatora",
+            mapping_key="p_loss_kw",
+        ),
+        SymbolDefinition(
+            symbol="P_0",
+            unit="kW",
+            description_pl="Straty jałowe",
+            mapping_key="p0_kw",
+        ),
+        SymbolDefinition(
+            symbol="P_{k,act}",
+            unit="kW",
+            description_pl="Straty obciążeniowe przy aktualnym obciążeniu",
+            mapping_key="p_k_act_kw",
+        ),
+    ),
+    unit_derivation="kW + kW = kW",
+)
+
+EQ_LS_005 = EquationDefinition(
+    equation_id="EQ_LS_005",
+    name_pl="Energia strat w profilu czasowym",
+    standard_ref="—",
+    latex=r"E_{loss} = \sum P_{loss,i} \cdot \Delta t",
+    symbols=(
+        SymbolDefinition(
+            symbol="E_{loss}",
+            unit="kWh",
+            description_pl="Energia strat",
+            mapping_key="e_loss_kwh",
+        ),
+        SymbolDefinition(
+            symbol="P_{loss,i}",
+            unit="kW",
+            description_pl="Straty mocy w i-tym przedziale",
+            mapping_key="p_loss_profile_kw",
+        ),
+        SymbolDefinition(
+            symbol="\\Delta t",
+            unit="h",
+            description_pl="Czas trwania przedziału",
+            mapping_key="profile_hours",
+        ),
+    ),
+    unit_derivation="kW · h = kWh",
+    notes="Sumowanie po wszystkich przedziałach profilu czasu.",
+)
+
+
+# =============================================================================
 # Q(U) Regulation — Kanoniczne równania (BINDING) P11.1b
 # =============================================================================
 
@@ -1258,6 +1406,15 @@ class EquationRegistry:
         "EQ_VDROP_007": EQ_VDROP_007,
     }
 
+    # Losses equations registry (P16)
+    LS_EQUATIONS: dict[str, EquationDefinition] = {
+        "EQ_LS_001": EQ_LS_001,
+        "EQ_LS_002": EQ_LS_002,
+        "EQ_LS_003": EQ_LS_003,
+        "EQ_LS_004": EQ_LS_004,
+        "EQ_LS_005": EQ_LS_005,
+    }
+
     # Q(U) equations registry (P11.1b + P11.1c)
     QU_EQUATIONS: dict[str, EquationDefinition] = {
         "EQ_QU_001": EQ_QU_001,
@@ -1300,6 +1457,15 @@ class EquationRegistry:
         "EQ_VDROP_007",  # Napięcie w punkcie U
     ]
 
+    # Step order for P16 Losses (BINDING)
+    LS_STEP_ORDER: list[str] = [
+        "EQ_LS_001",  # Prąd roboczy
+        "EQ_LS_002",  # Straty linii/kabla
+        "EQ_LS_003",  # Straty obciążeniowe transformatora
+        "EQ_LS_004",  # Straty całkowite transformatora
+        "EQ_LS_005",  # Energia strat
+    ]
+
     # Step order for Q(U) proof (BINDING) — P11.1b + P11.1c
     QU_STEP_ORDER: list[str] = [
         "EQ_QU_001",  # ΔU = U_meas - U_ref
@@ -1338,6 +1504,7 @@ class EquationRegistry:
     FROZEN_IDS: dict[str, list[str]] = {
         "sc3f_equations": list(SC3F_EQUATIONS.keys()),
         "vdrop_equations": list(VDROP_EQUATIONS.keys()),
+        "ls_equations": list(LS_EQUATIONS.keys()),
         "sc1_equations": list(SC1_EQUATIONS.keys()),
         "mapping_keys": [
             # SC3F
@@ -1354,6 +1521,10 @@ class EquationRegistry:
             "i1_ka", "i2_ka", "i0_ka",
             "ia_ka", "ib_ka", "ic_ka",
             "a_operator",
+            # Losses (P16)
+            "i_a", "s_mva", "u_ll_kv", "r_ohm",
+            "p_loss_kw", "p0_kw", "pk_kw", "k_load", "p_k_act_kw",
+            "e_loss_kwh", "p_loss_profile_kw", "profile_hours",
         ],
     }
 
@@ -1364,6 +1535,8 @@ class EquationRegistry:
             return cls.SC3F_EQUATIONS[equation_id]
         if equation_id in cls.VDROP_EQUATIONS:
             return cls.VDROP_EQUATIONS[equation_id]
+        if equation_id in cls.LS_EQUATIONS:
+            return cls.LS_EQUATIONS[equation_id]
         if equation_id in cls.QU_EQUATIONS:
             return cls.QU_EQUATIONS[equation_id]
         if equation_id in cls.SC1_EQUATIONS:
@@ -1381,6 +1554,11 @@ class EquationRegistry:
         return cls.VDROP_EQUATIONS.copy()
 
     @classmethod
+    def get_ls_equations(cls) -> dict[str, EquationDefinition]:
+        """Zwraca wszystkie równania strat P16."""
+        return cls.LS_EQUATIONS.copy()
+
+    @classmethod
     def get_sc3f_proof_step_order(cls) -> list[str]:
         """Zwraca kolejność kroków dla dowodu SC3F (tylko równania dowodowe)."""
         return cls.SC3F_PROOF_STEP_ORDER.copy()
@@ -1389,6 +1567,11 @@ class EquationRegistry:
     def get_vdrop_step_order(cls) -> list[str]:
         """Zwraca kolejność kroków dla dowodu VDROP."""
         return cls.VDROP_STEP_ORDER.copy()
+
+    @classmethod
+    def get_ls_step_order(cls) -> list[str]:
+        """Zwraca kolejność kroków dla dowodu strat P16."""
+        return cls.LS_STEP_ORDER.copy()
 
     @classmethod
     def get_qu_equations(cls) -> dict[str, EquationDefinition]:
@@ -1431,6 +1614,9 @@ class EquationRegistry:
         for eq in cls.VDROP_EQUATIONS.values():
             for sym in eq.symbols:
                 keys.add(sym.mapping_key)
+        for eq in cls.LS_EQUATIONS.values():
+            for sym in eq.symbols:
+                keys.add(sym.mapping_key)
         for eq in cls.QU_EQUATIONS.values():
             for sym in eq.symbols:
                 keys.add(sym.mapping_key)
@@ -1452,6 +1638,10 @@ class EquationRegistry:
         for eq_id in cls.FROZEN_IDS["vdrop_equations"]:
             if eq_id not in cls.VDROP_EQUATIONS:
                 raise ValueError(f"Frozen equation ID {eq_id} usunięty z VDROP!")
+
+        for eq_id in cls.FROZEN_IDS["ls_equations"]:
+            if eq_id not in cls.LS_EQUATIONS:
+                raise ValueError(f"Frozen equation ID {eq_id} usunięty z P16!")
 
         for eq_id in cls.FROZEN_IDS["sc1_equations"]:
             if eq_id not in cls.SC1_EQUATIONS:

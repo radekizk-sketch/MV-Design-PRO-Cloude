@@ -829,24 +829,24 @@ i jest **prerequisite** dla P15–P17.
     \frac{S}{S_n}
     $$
 
-### TODO-P16-001 (PLANNED) — P16: Losses & Energy Proof Pack [FUTURE PACK]
+### DONE-P16-001 — P16: Losses & Energy Proof Pack
 - Priority: MUST
 - Inputs: TraceArtifact, PowerFlowResult, Catalog
 - Output: ProofPack P16 (ProofDocument: Straty mocy i energii)
 - DoD:
-  - [ ] Straty linii wyprowadzone z prądu i rezystancji.
+  - [x] Straty linii wyprowadzone z prądu i rezystancji.
 
     $$
     P_{loss,line} = I^{2} \cdot R
     $$
 
-  - [ ] Straty transformatora z danych katalogowych: suma P0 i Pk.
+  - [x] Straty transformatora z danych katalogowych: suma P0 i Pk.
 
     $$
     P_{loss,trafo} = P_{0} + P_{k}
     $$
 
-  - [ ] Energia strat z profilu obciążenia (integracja w czasie).
+  - [x] Energia strat z profilu obciążenia (integracja w czasie).
 
     $$
     E_{loss} = \int P_{loss} \, dt

@@ -21,6 +21,11 @@ from uuid import UUID, uuid4
 from application.proof_engine.equation_registry import (
     AntiDoubleCountingAudit,
     EquationRegistry,
+    EQ_LS_001,
+    EQ_LS_002,
+    EQ_LS_003,
+    EQ_LS_004,
+    EQ_LS_005,
     EQ_SC3F_003,
     EQ_SC3F_004,
     EQ_SC3F_005,
@@ -50,6 +55,8 @@ from application.proof_engine.equation_registry import (
 )
 from application.proof_engine.types import (
     EquationDefinition,
+    LossesElementKind,
+    LossesInput,
     ProofDocument,
     ProofHeader,
     ProofStep,
@@ -1358,6 +1365,403 @@ class ProofGenerator:
             header=header,
             steps=steps,
             summary=summary,
+        )
+
+    # =========================================================================
+    # Losses Generator — P16
+    # =========================================================================
+
+    @classmethod
+    def generate_losses_proof(
+        cls,
+        data: LossesInput,
+        artifact_id: UUID | None = None,
+    ) -> ProofDocument:
+        """
+        Generuje dowód strat mocy i energii (P16).
+
+        LINE/CABLE:
+        - EQ_LS_001 (opcjonalnie jeśli brak I)
+        - EQ_LS_002 (straty linii)
+
+        TRANSFORMER:
+        - EQ_LS_003 (straty obciążeniowe)
+        - EQ_LS_004 (straty całkowite)
+
+        Energia (opcjonalnie):
+        - EQ_LS_005 jeśli podano profil czasu
+        """
+        if artifact_id is None:
+            artifact_id = uuid4()
+
+        cls._validate_losses_input(data)
+
+        steps: list[ProofStep] = []
+        step_number = 1
+
+        if data.element_kind in {LossesElementKind.LINE, LossesElementKind.CABLE}:
+            i_a = data.i_a
+            if i_a is None:
+                i_a = cls._calculate_line_current_from_power(
+                    s_mva=data.s_mva,
+                    u_ll_kv=data.u_ll_kv,
+                )
+                steps.append(
+                    cls._create_ls_step_current(
+                        step_number=step_number,
+                        s_mva=data.s_mva,
+                        u_ll_kv=data.u_ll_kv,
+                        i_a=i_a,
+                    )
+                )
+                step_number += 1
+
+            p_loss_kw = cls._calculate_line_loss_kw(i_a=i_a, r_ohm=data.r_ohm)
+            steps.append(
+                cls._create_ls_step_line_loss(
+                    step_number=step_number,
+                    i_a=i_a,
+                    r_ohm=data.r_ohm,
+                    p_loss_kw=p_loss_kw,
+                )
+            )
+            step_number += 1
+
+            energy_step = cls._maybe_create_losses_energy_step(
+                step_number=step_number,
+                base_current_a=i_a,
+                data=data,
+            )
+            if energy_step:
+                steps.append(energy_step)
+
+            key_results = {
+                "i_a": ProofValue.create("I", i_a, "A", "i_a"),
+                "p_loss_kw": ProofValue.create("P_{loss}", p_loss_kw, "kW", "p_loss_kw"),
+            }
+        else:
+            p_k_act_kw = data.pk_kw * data.k_load ** 2
+            steps.append(
+                cls._create_ls_step_transformer_load_loss(
+                    step_number=step_number,
+                    pk_kw=data.pk_kw,
+                    k_load=data.k_load,
+                    p_k_act_kw=p_k_act_kw,
+                )
+            )
+            step_number += 1
+
+            p_loss_kw = data.p0_kw + p_k_act_kw
+            steps.append(
+                cls._create_ls_step_transformer_total_loss(
+                    step_number=step_number,
+                    p0_kw=data.p0_kw,
+                    p_k_act_kw=p_k_act_kw,
+                    p_loss_kw=p_loss_kw,
+                )
+            )
+            step_number += 1
+
+            energy_step = cls._maybe_create_losses_energy_step(
+                step_number=step_number,
+                base_current_a=None,
+                data=data,
+            )
+            if energy_step:
+                steps.append(energy_step)
+
+            key_results = {
+                "p0_kw": ProofValue.create("P_0", data.p0_kw, "kW", "p0_kw"),
+                "pk_kw": ProofValue.create("P_k", data.pk_kw, "kW", "pk_kw"),
+                "k_load": ProofValue.create("k_{load}", data.k_load, "—", "k_load"),
+                "p_k_act_kw": ProofValue.create("P_{k,act}", p_k_act_kw, "kW", "p_k_act_kw"),
+                "p_loss_kw": ProofValue.create("P_{loss}", p_loss_kw, "kW", "p_loss_kw"),
+            }
+
+        if steps and steps[-1].equation.equation_id == EQ_LS_005.equation_id:
+            energy_value = steps[-1].result
+            key_results["e_loss_kwh"] = ProofValue.create(
+                "E_{loss}", float(energy_value.value), "kWh", "e_loss_kwh"
+            )
+
+        unit_checks_passed = all(step.unit_check.passed for step in steps)
+
+        summary = ProofSummary(
+            key_results=key_results,
+            unit_check_passed=unit_checks_passed,
+            total_steps=len(steps),
+            warnings=(),
+        )
+
+        header = ProofHeader(
+            project_name=data.project_name,
+            case_name=data.case_name,
+            run_timestamp=data.run_timestamp,
+            solver_version="P16 Losses",
+        )
+
+        return ProofDocument.create(
+            artifact_id=artifact_id,
+            proof_type=ProofType.LOSSES_POWER_ENERGY,
+            title_pl="Dowód strat mocy i energii (P16)",
+            header=header,
+            steps=steps,
+            summary=summary,
+        )
+
+    @classmethod
+    def _validate_losses_input(cls, data: LossesInput) -> None:
+        if data.element_kind in {LossesElementKind.LINE, LossesElementKind.CABLE}:
+            if data.i_a is None and data.s_mva is None:
+                raise ValueError("Brak danych: i_a lub s_mva jest wymagane dla linii/kabla.")
+            if data.r_ohm is None:
+                raise ValueError("Brak danych: r_ohm jest wymagane dla linii/kabla.")
+        elif data.element_kind == LossesElementKind.TRANSFORMER:
+            if data.p0_kw is None or data.pk_kw is None or data.k_load is None:
+                raise ValueError("Brak danych: p0_kw, pk_kw, k_load są wymagane dla transformatora.")
+        else:
+            raise ValueError(f"Nieobsługiwany element_kind: {data.element_kind}")
+
+        if (data.profile_hours is None) != (data.profile_factor is None):
+            raise ValueError("Profil strat wymaga profile_hours oraz profile_factor.")
+        if data.profile_hours is not None:
+            if len(data.profile_hours) != len(data.profile_factor):
+                raise ValueError("profile_hours i profile_factor muszą mieć ten sam rozmiar.")
+            if not data.profile_hours:
+                raise ValueError("profile_hours nie może być puste.")
+
+    @staticmethod
+    def _calculate_line_current_from_power(s_mva: float, u_ll_kv: float) -> float:
+        sqrt3 = math.sqrt(3)
+        return (s_mva * 1_000_000.0) / (sqrt3 * u_ll_kv * 1_000.0)
+
+    @staticmethod
+    def _calculate_line_loss_kw(i_a: float, r_ohm: float) -> float:
+        p_loss_w = 3.0 * i_a ** 2 * r_ohm
+        return p_loss_w / 1000.0
+
+    @classmethod
+    def _create_ls_step_current(
+        cls,
+        step_number: int,
+        s_mva: float,
+        u_ll_kv: float,
+        i_a: float,
+    ) -> ProofStep:
+        equation = EQ_LS_001
+        sqrt3 = math.sqrt(3)
+
+        input_values = (
+            ProofValue.create("S", s_mva, "MVA", "s_mva"),
+            ProofValue.create("U_{LL}", u_ll_kv, "kV", "u_ll_kv"),
+        )
+
+        substitution = (
+            f"I = \\frac{{{s_mva:.4f} \\cdot 10^6}}{{\\sqrt{{3}} \\cdot {u_ll_kv:.4f} \\cdot 10^3}} = "
+            f"\\frac{{{s_mva * 1_000_000.0:.4f}}}{{{sqrt3:.4f} \\cdot {u_ll_kv * 1_000.0:.4f}}} = "
+            f"{i_a:.4f}\\,\\text{{A}}"
+        )
+
+        result = ProofValue.create("I", i_a, "A", "i_a")
+
+        unit_check = UnitVerifier.verify_equation(
+            equation.equation_id,
+            {"S": "MVA", "U_{LL}": "kV"},
+            "A",
+        )
+
+        return ProofStep(
+            step_id=ProofStep.generate_step_id("P16", step_number),
+            step_number=step_number,
+            title_pl=equation.name_pl,
+            equation=equation,
+            input_values=input_values,
+            substitution_latex=substitution,
+            result=result,
+            unit_check=unit_check,
+            source_keys={"S": "s_mva", "U_{LL}": "u_ll_kv", "I": "i_a"},
+        )
+
+    @classmethod
+    def _create_ls_step_line_loss(
+        cls,
+        step_number: int,
+        i_a: float,
+        r_ohm: float,
+        p_loss_kw: float,
+    ) -> ProofStep:
+        equation = EQ_LS_002
+        p_loss_w = 3.0 * i_a ** 2 * r_ohm
+
+        input_values = (
+            ProofValue.create("I", i_a, "A", "i_a"),
+            ProofValue.create("R", r_ohm, "Ω", "r_ohm"),
+        )
+
+        substitution = (
+            f"P_{{loss}} = 3 \\cdot {i_a:.4f}^2 \\cdot {r_ohm:.4f} = "
+            f"{p_loss_w:.4f}\\,\\text{{W}} = {p_loss_kw:.4f}\\,\\text{{kW}}"
+        )
+
+        result = ProofValue.create("P_{loss}", p_loss_kw, "kW", "p_loss_kw")
+
+        unit_check = UnitVerifier.verify_equation(
+            equation.equation_id,
+            {"I": "A", "R": "Ω"},
+            "kW",
+        )
+
+        return ProofStep(
+            step_id=ProofStep.generate_step_id("P16", step_number),
+            step_number=step_number,
+            title_pl=equation.name_pl,
+            equation=equation,
+            input_values=input_values,
+            substitution_latex=substitution,
+            result=result,
+            unit_check=unit_check,
+            source_keys={"I": "i_a", "R": "r_ohm", "P_{loss}": "p_loss_kw"},
+        )
+
+    @classmethod
+    def _create_ls_step_transformer_load_loss(
+        cls,
+        step_number: int,
+        pk_kw: float,
+        k_load: float,
+        p_k_act_kw: float,
+    ) -> ProofStep:
+        equation = EQ_LS_003
+
+        input_values = (
+            ProofValue.create("P_k", pk_kw, "kW", "pk_kw"),
+            ProofValue.create("k_{load}", k_load, "—", "k_load"),
+        )
+
+        substitution = (
+            f"P_{{k,act}} = {pk_kw:.4f} \\cdot {k_load:.4f}^2 = {p_k_act_kw:.4f}\\,\\text{{kW}}"
+        )
+
+        result = ProofValue.create("P_{k,act}", p_k_act_kw, "kW", "p_k_act_kw")
+
+        unit_check = UnitVerifier.verify_equation(
+            equation.equation_id,
+            {"P_k": "kW", "k_{load}": "—"},
+            "kW",
+        )
+
+        return ProofStep(
+            step_id=ProofStep.generate_step_id("P16", step_number),
+            step_number=step_number,
+            title_pl=equation.name_pl,
+            equation=equation,
+            input_values=input_values,
+            substitution_latex=substitution,
+            result=result,
+            unit_check=unit_check,
+            source_keys={"P_k": "pk_kw", "k_{load}": "k_load", "P_{k,act}": "p_k_act_kw"},
+        )
+
+    @classmethod
+    def _create_ls_step_transformer_total_loss(
+        cls,
+        step_number: int,
+        p0_kw: float,
+        p_k_act_kw: float,
+        p_loss_kw: float,
+    ) -> ProofStep:
+        equation = EQ_LS_004
+
+        input_values = (
+            ProofValue.create("P_0", p0_kw, "kW", "p0_kw"),
+            ProofValue.create("P_{k,act}", p_k_act_kw, "kW", "p_k_act_kw"),
+        )
+
+        substitution = (
+            f"P_{{loss}} = {p0_kw:.4f} + {p_k_act_kw:.4f} = {p_loss_kw:.4f}\\,\\text{{kW}}"
+        )
+
+        result = ProofValue.create("P_{loss}", p_loss_kw, "kW", "p_loss_kw")
+
+        unit_check = UnitVerifier.verify_equation(
+            equation.equation_id,
+            {"P_0": "kW", "P_{k,act}": "kW"},
+            "kW",
+        )
+
+        return ProofStep(
+            step_id=ProofStep.generate_step_id("P16", step_number),
+            step_number=step_number,
+            title_pl=equation.name_pl,
+            equation=equation,
+            input_values=input_values,
+            substitution_latex=substitution,
+            result=result,
+            unit_check=unit_check,
+            source_keys={"P_0": "p0_kw", "P_{k,act}": "p_k_act_kw", "P_{loss}": "p_loss_kw"},
+        )
+
+    @classmethod
+    def _maybe_create_losses_energy_step(
+        cls,
+        step_number: int,
+        base_current_a: float | None,
+        data: LossesInput,
+    ) -> ProofStep | None:
+        if data.profile_hours is None:
+            return None
+
+        profile_hours = data.profile_hours
+        profile_factor = data.profile_factor
+
+        if data.element_kind in {LossesElementKind.LINE, LossesElementKind.CABLE}:
+            losses_kw = [
+                cls._calculate_line_loss_kw(
+                    i_a=base_current_a * factor,
+                    r_ohm=data.r_ohm,
+                )
+                for factor in profile_factor
+            ]
+        else:
+            losses_kw = [
+                data.p0_kw + data.pk_kw * (data.k_load * factor) ** 2
+                for factor in profile_factor
+            ]
+
+        energy_kwh = sum(loss * hours for loss, hours in zip(losses_kw, profile_hours))
+
+        equation = EQ_LS_005
+        input_values = tuple(
+            [ProofValue.create("P_{loss,i}", loss, "kW", "p_loss_profile_kw") for loss in losses_kw]
+            + [ProofValue.create("\\Delta t", hours, "h", "profile_hours") for hours in profile_hours]
+        )
+
+        terms = " + ".join(
+            f"{loss:.4f} \\cdot {hours:.4f}"
+            for loss, hours in zip(losses_kw, profile_hours)
+        )
+        substitution = (
+            f"E_{{loss}} = {terms} = {energy_kwh:.4f}\\,\\text{{kWh}}"
+        )
+
+        result = ProofValue.create("E_{loss}", energy_kwh, "kWh", "e_loss_kwh")
+
+        unit_check = UnitVerifier.verify_equation(
+            equation.equation_id,
+            {"P_{loss,i}": "kW", "Δt": "h"},
+            "kWh",
+        )
+
+        return ProofStep(
+            step_id=ProofStep.generate_step_id("P16", step_number),
+            step_number=step_number,
+            title_pl=equation.name_pl,
+            equation=equation,
+            input_values=input_values,
+            substitution_latex=substitution,
+            result=result,
+            unit_check=unit_check,
+            source_keys={"P_{loss,i}": "p_loss_profile_kw", "\\Delta t": "profile_hours", "E_{loss}": "e_loss_kwh"},
         )
 
     # =========================================================================

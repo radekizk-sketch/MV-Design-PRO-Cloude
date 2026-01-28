@@ -22,6 +22,7 @@ Ten pakiet zawiera **kanoniczne źródła wiedzy** dla systemu dowodów matematy
 | `P11_1b_REGULATION_Q_U.md` | Dowód regulatora Q(U), cosφ(P) | REFERENCE |
 | `P11_1c_SC_ASYMMETRICAL.md` | Składowe symetryczne, zwarcia niesymetryczne | REFERENCE |
 | `P11_1d_PROOF_UI_EXPORT.md` | Proof Inspector UI, eksport LaTeX/PDF/DOCX | REFERENCE |
+| `P16_LOSSES_POWER_ENERGY.md` | P16: Straty mocy i energii (linie/kable/trafo) | **BINDING** |
 | `P14_PROOF_AUDIT_AND_COVERAGE.md` | Warstwa audytu pokrycia i kompletności Proof Packów | **BINDING** |
 | `PROOF_SCHEMAS.md` | Kanoniczne schematy JSON (ProofDocument, ProofStep) | **BINDING** |
 | `EQUATIONS_IEC60909_SC3F.md` | Rejestr równań SC3F z mapping keys | **BINDING** |
@@ -173,24 +174,24 @@ oraz stanowi **prerequisite** dla P15–P17.
     \frac{S}{S_n}
     $$
 
-### TODO-P16-001 (PLANNED) — P16: Losses & Energy Proof Pack [FUTURE PACK]
+### DONE-P16-001 — P16: Losses & Energy Proof Pack
 - Priority: MUST
 - Inputs: TraceArtifact, PowerFlowResult, Catalog
 - Output: ProofPack P16 (ProofDocument: Straty mocy i energii)
 - DoD:
-  - [ ] Straty linii wyprowadzone z prądu i rezystancji.
+  - [x] Straty linii wyprowadzone z prądu i rezystancji.
 
     $$
     P_{loss,line} = I^{2} \cdot R
     $$
 
-  - [ ] Straty transformatora z danych katalogowych: suma P0 i Pk.
+  - [x] Straty transformatora z danych katalogowych: suma P0 i Pk.
 
     $$
     P_{loss,trafo} = P_{0} + P_{k}
     $$
 
-  - [ ] Energia strat z profilu obciążenia (integracja w czasie).
+  - [x] Energia strat z profilu obciążenia (integracja w czasie).
 
     $$
     E_{loss} = \int P_{loss} \, dt

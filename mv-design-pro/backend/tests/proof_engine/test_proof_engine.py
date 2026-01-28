@@ -28,6 +28,8 @@ from application.proof_engine.proof_generator import (
     VDROPSegmentInput,
 )
 from application.proof_engine.types import (
+    LossesElementKind,
+    LossesInput,
     ProofType,
     QUCounterfactualInput,
     QUInput,
@@ -118,6 +120,40 @@ def sc1_test_input() -> SC1Input:
         z2_ohm=complex(0.5, 1.2),
         z0_ohm=complex(0.8, 2.4),
         a_operator=complex(-0.5, 0.8660),
+    )
+
+
+# =============================================================================
+# Losses Fixtures (P16)
+# =============================================================================
+
+
+@pytest.fixture
+def losses_line_input() -> LossesInput:
+    return LossesInput(
+        project_name="Test Project",
+        case_name="Test Case Losses Line",
+        run_timestamp=datetime(2026, 1, 27, 10, 30, 0),
+        element_kind=LossesElementKind.LINE,
+        u_ll_kv=15.0,
+        s_mva=2.5,
+        r_ohm=0.85,
+        profile_hours=[1.0, 2.0],
+        profile_factor=[0.6, 0.8],
+    )
+
+
+@pytest.fixture
+def losses_transformer_input() -> LossesInput:
+    return LossesInput(
+        project_name="Test Project",
+        case_name="Test Case Losses Transformer",
+        run_timestamp=datetime(2026, 1, 27, 10, 30, 0),
+        element_kind=LossesElementKind.TRANSFORMER,
+        u_ll_kv=15.0,
+        p0_kw=1.2,
+        pk_kw=4.5,
+        k_load=0.75,
     )
 
 
@@ -335,6 +371,49 @@ class TestSC1ProofGenerator:
         assert proof.header.fault_location == sc1_test_input.fault_node_id
         assert len(proof.steps) == len(EquationRegistry.get_sc1_step_order("SC1FZ"))
 
+
+# =============================================================================
+# Losses Tests (P16)
+# =============================================================================
+
+
+class TestLossesProofGenerator:
+    """Testy generatora dowodów strat P16."""
+
+    def test_losses_line_step_order(self, losses_line_input: LossesInput):
+        proof = ProofGenerator.generate_losses_proof(losses_line_input)
+        equation_ids = [step.equation.equation_id for step in proof.steps]
+        assert equation_ids == ["EQ_LS_001", "EQ_LS_002", "EQ_LS_005"]
+
+    def test_losses_transformer_step_order(self, losses_transformer_input: LossesInput):
+        proof = ProofGenerator.generate_losses_proof(losses_transformer_input)
+        equation_ids = [step.equation.equation_id for step in proof.steps]
+        assert equation_ids == ["EQ_LS_003", "EQ_LS_004"]
+
+    def test_losses_unit_checks_pass(self, losses_line_input: LossesInput):
+        proof = ProofGenerator.generate_losses_proof(losses_line_input)
+        for step in proof.steps:
+            assert step.unit_check.passed, (
+                f"Unit check failed for step {step.step_id}: "
+                f"expected {step.unit_check.expected_unit}, "
+                f"computed {step.unit_check.computed_unit}"
+            )
+        assert proof.summary.unit_check_passed
+
+    def test_losses_determinism(self, losses_line_input: LossesInput):
+        artifact_id = uuid4()
+        proof_1 = ProofGenerator.generate_losses_proof(losses_line_input, artifact_id)
+        proof_2 = ProofGenerator.generate_losses_proof(losses_line_input, artifact_id)
+
+        json_1 = proof_1.to_dict()
+        json_2 = proof_2.to_dict()
+
+        del json_1["document_id"]
+        del json_1["created_at"]
+        del json_2["document_id"]
+        del json_2["created_at"]
+
+        assert json_1 == json_2
 
 # =============================================================================
 # Determinism Tests

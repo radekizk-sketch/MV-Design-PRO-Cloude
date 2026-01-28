@@ -180,6 +180,7 @@ mv-design-pro/
 | [docs/audit/](./docs/audit/) | Raporty audytowe i materiały historyczne (non-canonical) |
 | [docs/](./docs/) | Dokumentacja operacyjna |
 | [docs/INDEX.md](./docs/INDEX.md) | Spis treści dokumentacji |
+| [docs/proof_engine/P16_LOSSES_POWER_ENERGY.md](./docs/proof_engine/P16_LOSSES_POWER_ENERGY.md) | P16: Straty mocy i energii |
 
 ---
 

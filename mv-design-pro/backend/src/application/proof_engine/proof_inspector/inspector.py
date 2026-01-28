@@ -58,6 +58,9 @@ COMPLETENESS_REQUIREMENTS: dict[str, tuple[str, ...]] = {
         "ith_ok",
         "overall_ok",
     ),
+    ProofType.LOSSES_POWER_ENERGY.value: (
+        "p_loss_kw",
+    ),
 }
 
 

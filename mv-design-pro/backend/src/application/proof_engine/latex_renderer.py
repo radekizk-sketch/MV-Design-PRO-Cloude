@@ -122,6 +122,9 @@ class LaTeXRenderer:
     @classmethod
     def _render_steps(cls, doc: ProofDocument) -> str:
         """Renderuje kroki dowodu."""
+        if doc.proof_type.value == "LOSSES_POWER_ENERGY":
+            return cls._render_losses_steps(doc)
+
         lines = [r"\section{Dowód}"]
 
         for step in sorted(doc.steps, key=lambda s: s.step_number):
@@ -132,8 +135,13 @@ class LaTeXRenderer:
     @classmethod
     def _render_step(cls, step: ProofStep) -> str:
         """Renderuje pojedynczy krok dowodu."""
+        return cls._render_step_with_heading(step, heading="subsection")
+
+    @classmethod
+    def _render_step_with_heading(cls, step: ProofStep, heading: str) -> str:
+        """Renderuje pojedynczy krok dowodu z podanym poziomem nagłówka."""
         parts = [
-            rf"\subsection{{Krok {step.step_number}: {cls._escape(step.title_pl)}}}",
+            rf"\{heading}{{Krok {step.step_number}: {cls._escape(step.title_pl)}}}",
             "",
             r"\textbf{Wzór:}",
             cls._math_block(step.equation.latex.strip()),
@@ -168,6 +176,31 @@ class LaTeXRenderer:
         ])
 
         return "\n".join(parts)
+
+    @classmethod
+    def _render_losses_steps(cls, doc: ProofDocument) -> str:
+        """Renderuje kroki P16 z podziałem na straty mocy i energię."""
+        lines = [r"\section{P16 — Straty mocy i energii}"]
+
+        loss_steps = [
+            step for step in sorted(doc.steps, key=lambda s: s.step_number)
+            if step.equation.equation_id != "EQ_LS_005"
+        ]
+        energy_steps = [
+            step for step in sorted(doc.steps, key=lambda s: s.step_number)
+            if step.equation.equation_id == "EQ_LS_005"
+        ]
+
+        lines.append(r"\subsection{Straty mocy}")
+        for step in loss_steps:
+            lines.append(cls._render_step_with_heading(step, heading="subsubsection"))
+
+        if energy_steps:
+            lines.append(r"\subsection{Energia strat}")
+            for step in energy_steps:
+                lines.append(cls._render_step_with_heading(step, heading="subsubsection"))
+
+        return "\n\n".join(lines)
 
     @classmethod
     def _render_summary(cls, doc: ProofDocument) -> str:
