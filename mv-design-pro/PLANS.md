@@ -684,6 +684,7 @@ Wprowadzenie warstwy **interpretacji dowodowej** (Proof Engine), która generuje
 - [ ] API download `/api/proof/{project_id}/{case_id}/{run_id}/pack`
 - [ ] Testy determinism + manifest + checksum
 - [ ] Dokumentacja kontraktu ZIP w `docs/proof_engine/P11_3_PROOF_PACK_PUBLICATION.md`
+- [x] P11.4-min Proof Pack integrity-only (signature.json SHA-256)
 
 ---
 
