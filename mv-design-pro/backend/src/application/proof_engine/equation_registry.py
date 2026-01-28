@@ -49,6 +49,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
+from application.proof_engine.registries.ls_equations import LS_EQUATIONS
 from application.proof_engine.types import EquationDefinition, SymbolDefinition
 
 
@@ -1403,6 +1404,192 @@ class AntiDoubleCountingAudit:
 # =============================================================================
 
 
+class _EquationRegistryStore:
+    def __init__(self) -> None:
+        self._equations: dict[str, EquationDefinition] = {}
+        self._frozen = False
+
+    def merge(self, equations: dict[str, EquationDefinition]) -> None:
+        if self._frozen:
+            raise RuntimeError("Equation registry is frozen.")
+        duplicates = set(self._equations).intersection(equations)
+        if duplicates:
+            duplicates_list = ", ".join(sorted(duplicates))
+            raise ValueError(f"Duplicate equation IDs: {duplicates_list}")
+        self._equations.update(equations)
+
+    def freeze(self) -> None:
+        self._frozen = True
+
+    def get(self, equation_id: str) -> EquationDefinition | None:
+        return self._equations.get(equation_id)
+
+    def values(self):
+        return self._equations.values()
+
+    def all(self) -> dict[str, EquationDefinition]:
+        return self._equations.copy()
+
+
+# SC3F equations registry (wszystkie, włącznie z pomocniczymi)
+SC3F_EQUATIONS: dict[str, EquationDefinition] = {
+    "EQ_SC3F_002": EQ_SC3F_002,
+    "EQ_SC3F_002a": EQ_SC3F_002a,
+    "EQ_SC3F_003": EQ_SC3F_003,
+    "EQ_SC3F_004": EQ_SC3F_004,
+    "EQ_SC3F_005": EQ_SC3F_005,
+    "EQ_SC3F_006": EQ_SC3F_006,
+    "EQ_SC3F_007": EQ_SC3F_007,
+    "EQ_SC3F_008": EQ_SC3F_008,
+    "EQ_SC3F_008a": EQ_SC3F_008a,
+    "EQ_SC3F_009": EQ_SC3F_009,
+    "EQ_SC3F_010": EQ_SC3F_010,
+}
+
+# VDROP equations registry
+VDROP_EQUATIONS: dict[str, EquationDefinition] = {
+    "EQ_VDROP_001": EQ_VDROP_001,
+    "EQ_VDROP_002": EQ_VDROP_002,
+    "EQ_VDROP_003": EQ_VDROP_003,
+    "EQ_VDROP_004": EQ_VDROP_004,
+    "EQ_VDROP_005": EQ_VDROP_005,
+    "EQ_VDROP_006": EQ_VDROP_006,
+    "EQ_VDROP_007": EQ_VDROP_007,
+}
+
+# P15: Load Currents & Overload equations registry
+LC_EQUATIONS: dict[str, EquationDefinition] = {
+    "EQ_LC_001": EQ_LC_001,
+    "EQ_LC_002": EQ_LC_002,
+    "EQ_LC_003": EQ_LC_003,
+    "EQ_LC_004": EQ_LC_004,
+    "EQ_LC_005": EQ_LC_005,
+    "EQ_LC_006": EQ_LC_006,
+}
+
+# Q(U) equations registry (P11.1b + P11.1c)
+QU_EQUATIONS: dict[str, EquationDefinition] = {
+    "EQ_QU_001": EQ_QU_001,
+    "EQ_QU_002": EQ_QU_002,
+    "EQ_QU_003": EQ_QU_003,
+    "EQ_QU_004": EQ_QU_004,
+    "EQ_QU_005": EQ_QU_005,  # P11.1c: VDROP link (no new physics)
+}
+
+# SC1 equations registry (P11.1c)
+SC1_EQUATIONS: dict[str, EquationDefinition] = {
+    "EQ_SC1_001": EQ_SC1_001,
+    "EQ_SC1_002": EQ_SC1_002,
+    "EQ_SC1_003": EQ_SC1_003,
+    "EQ_SC1_004": EQ_SC1_004,
+    "EQ_SC1_005": EQ_SC1_005,
+    "EQ_SC1_006": EQ_SC1_006,
+    "EQ_SC1_007": EQ_SC1_007,
+}
+
+# Step order for SC3F proof (BINDING) — tylko równania dowodowe
+SC3F_PROOF_STEP_ORDER: list[str] = [
+    "EQ_SC3F_003",  # Impedancja Thevenina
+    "EQ_SC3F_004",  # Prąd zwarciowy I_k'' (c TUTAJ)
+    "EQ_SC3F_005",  # Współczynnik udaru κ
+    "EQ_SC3F_006",  # Prąd udarowy i_p
+    "EQ_SC3F_008a", # Prąd dynamiczny I_dyn (OBOWIĄZKOWY)
+    "EQ_SC3F_008",  # Prąd cieplny I_th (OBOWIĄZKOWY)
+    "EQ_SC3F_007",  # Moc zwarciowa S_k''
+]
+
+# Step order for VDROP (BINDING)
+VDROP_STEP_ORDER: list[str] = [
+    "EQ_VDROP_001",  # Rezystancja odcinka
+    "EQ_VDROP_002",  # Reaktancja odcinka
+    "EQ_VDROP_003",  # Składowa czynna ΔU_R
+    "EQ_VDROP_004",  # Składowa bierna ΔU_X
+    "EQ_VDROP_005",  # Spadek na odcinku ΔU
+    "EQ_VDROP_006",  # Suma spadków ΔU_total
+    "EQ_VDROP_007",  # Napięcie w punkcie U
+]
+
+# Step order for P15 (BINDING)
+LC_STEP_ORDER: list[str] = [
+    "EQ_LC_001",  # Moc pozorna
+    "EQ_LC_002",  # Prąd roboczy 3-f
+    "EQ_LC_003",  # Procent obciążenia prądowego
+    "EQ_LC_004",  # Margines prądowy
+    "EQ_LC_005",  # Obciążenie transformatora
+    "EQ_LC_006",  # Margines transformatora
+]
+
+# Step order for Q(U) proof (BINDING) — P11.1b + P11.1c
+QU_STEP_ORDER: list[str] = [
+    "EQ_QU_001",  # ΔU = U_meas - U_ref
+    "EQ_QU_002",  # s(U) deadband
+    "EQ_QU_003",  # Q_raw = k_Q · s(U)
+    "EQ_QU_004",  # Q_cmd with limits
+    "EQ_QU_005",  # P11.1c: Q_cmd → U (VDROP link, no new physics)
+]
+
+# Step order for SC1 proofs (BINDING) — P11.1c
+SC1FZ_STEP_ORDER: list[str] = [
+    "EQ_SC1_001",  # Z₁, Z₂, Z₀
+    "EQ_SC1_002",  # Transformacja Fortescue
+    "EQ_SC1_003",  # Z_k dla 1F–Z
+    "EQ_SC1_006",  # I₁, I₂, I₀
+    "EQ_SC1_007",  # Rekombinacja fazowa
+]
+
+SC2F_STEP_ORDER: list[str] = [
+    "EQ_SC1_001",  # Z₁, Z₂, Z₀
+    "EQ_SC1_002",  # Transformacja Fortescue
+    "EQ_SC1_004",  # Z_k dla 2F
+    "EQ_SC1_006",  # I₁, I₂, I₀
+    "EQ_SC1_007",  # Rekombinacja fazowa
+]
+
+SC2FZ_STEP_ORDER: list[str] = [
+    "EQ_SC1_001",  # Z₁, Z₂, Z₀
+    "EQ_SC1_002",  # Transformacja Fortescue
+    "EQ_SC1_005",  # Z_k dla 2F–Z
+    "EQ_SC1_006",  # I₁, I₂, I₀
+    "EQ_SC1_007",  # Rekombinacja fazowa
+]
+
+# Frozen IDs for stability tests (BINDING)
+FROZEN_IDS: dict[str, list[str]] = {
+    "sc3f_equations": list(SC3F_EQUATIONS.keys()),
+    "vdrop_equations": list(VDROP_EQUATIONS.keys()),
+    "sc1_equations": list(SC1_EQUATIONS.keys()),
+    "lc_equations": list(LC_EQUATIONS.keys()),
+    "mapping_keys": [
+        # SC3F
+        "ikss_ka", "ip_ka", "ith_ka", "idyn_ka", "sk_mva",
+        "kappa", "z_thevenin_ohm", "r_thevenin_ohm", "x_thevenin_ohm",
+        "c_factor", "u_n_kv",
+        # VDROP
+        "r_ohm", "x_ohm", "p_mw", "q_mvar",
+        "delta_u_r_percent", "delta_u_x_percent",
+        "delta_u_percent", "delta_u_total_percent",
+        # SC1
+        "z1_ohm", "z2_ohm", "z0_ohm", "z_equiv_ohm",
+        "u_prefault_kv",
+        "i1_ka", "i2_ka", "i0_ka",
+        "ia_ka", "ib_ka", "ic_ka",
+        "a_operator",
+        # P15
+        "u_ll_kv", "p_mw", "q_mvar", "s_mva", "i_ka", "in_a",
+        "k_i_percent", "m_i_percent", "sn_mva", "k_s_percent", "m_s_percent",
+    ],
+}
+
+registry = _EquationRegistryStore()
+registry.merge(SC3F_EQUATIONS)
+registry.merge(VDROP_EQUATIONS)
+registry.merge(LC_EQUATIONS)
+registry.merge(QU_EQUATIONS)
+registry.merge(SC1_EQUATIONS)
+registry.merge(LS_EQUATIONS)
+registry.freeze()
+
+
 class EquationRegistry:
     """
     Rejestr równań dla Proof Engine.
@@ -1411,214 +1598,55 @@ class EquationRegistry:
     Wszystkie equation_id są STABILNE i NIE MOGĄ się zmienić między wersjami.
     """
 
-    # SC3F equations registry (wszystkie, włącznie z pomocniczymi)
-    SC3F_EQUATIONS: dict[str, EquationDefinition] = {
-        "EQ_SC3F_002": EQ_SC3F_002,
-        "EQ_SC3F_002a": EQ_SC3F_002a,
-        "EQ_SC3F_003": EQ_SC3F_003,
-        "EQ_SC3F_004": EQ_SC3F_004,
-        "EQ_SC3F_005": EQ_SC3F_005,
-        "EQ_SC3F_006": EQ_SC3F_006,
-        "EQ_SC3F_007": EQ_SC3F_007,
-        "EQ_SC3F_008": EQ_SC3F_008,
-        "EQ_SC3F_008a": EQ_SC3F_008a,
-        "EQ_SC3F_009": EQ_SC3F_009,
-        "EQ_SC3F_010": EQ_SC3F_010,
-    }
-
-    # VDROP equations registry
-    VDROP_EQUATIONS: dict[str, EquationDefinition] = {
-        "EQ_VDROP_001": EQ_VDROP_001,
-        "EQ_VDROP_002": EQ_VDROP_002,
-        "EQ_VDROP_003": EQ_VDROP_003,
-        "EQ_VDROP_004": EQ_VDROP_004,
-        "EQ_VDROP_005": EQ_VDROP_005,
-        "EQ_VDROP_006": EQ_VDROP_006,
-        "EQ_VDROP_007": EQ_VDROP_007,
-    }
-
-    # P15: Load Currents & Overload equations registry
-    LC_EQUATIONS: dict[str, EquationDefinition] = {
-        "EQ_LC_001": EQ_LC_001,
-        "EQ_LC_002": EQ_LC_002,
-        "EQ_LC_003": EQ_LC_003,
-        "EQ_LC_004": EQ_LC_004,
-        "EQ_LC_005": EQ_LC_005,
-        "EQ_LC_006": EQ_LC_006,
-    }
-
-    # Q(U) equations registry (P11.1b + P11.1c)
-    QU_EQUATIONS: dict[str, EquationDefinition] = {
-        "EQ_QU_001": EQ_QU_001,
-        "EQ_QU_002": EQ_QU_002,
-        "EQ_QU_003": EQ_QU_003,
-        "EQ_QU_004": EQ_QU_004,
-        "EQ_QU_005": EQ_QU_005,  # P11.1c: VDROP link (no new physics)
-    }
-
-    # SC1 equations registry (P11.1c)
-    SC1_EQUATIONS: dict[str, EquationDefinition] = {
-        "EQ_SC1_001": EQ_SC1_001,
-        "EQ_SC1_002": EQ_SC1_002,
-        "EQ_SC1_003": EQ_SC1_003,
-        "EQ_SC1_004": EQ_SC1_004,
-        "EQ_SC1_005": EQ_SC1_005,
-        "EQ_SC1_006": EQ_SC1_006,
-        "EQ_SC1_007": EQ_SC1_007,
-    }
-
-    # Step order for SC3F proof (BINDING) — tylko równania dowodowe
-    SC3F_PROOF_STEP_ORDER: list[str] = [
-        "EQ_SC3F_003",  # Impedancja Thevenina
-        "EQ_SC3F_004",  # Prąd zwarciowy I_k'' (c TUTAJ)
-        "EQ_SC3F_005",  # Współczynnik udaru κ
-        "EQ_SC3F_006",  # Prąd udarowy i_p
-        "EQ_SC3F_008a", # Prąd dynamiczny I_dyn (OBOWIĄZKOWY)
-        "EQ_SC3F_008",  # Prąd cieplny I_th (OBOWIĄZKOWY)
-        "EQ_SC3F_007",  # Moc zwarciowa S_k''
-    ]
-
-    # Step order for VDROP (BINDING)
-    VDROP_STEP_ORDER: list[str] = [
-        "EQ_VDROP_001",  # Rezystancja odcinka
-        "EQ_VDROP_002",  # Reaktancja odcinka
-        "EQ_VDROP_003",  # Składowa czynna ΔU_R
-        "EQ_VDROP_004",  # Składowa bierna ΔU_X
-        "EQ_VDROP_005",  # Spadek na odcinku ΔU
-        "EQ_VDROP_006",  # Suma spadków ΔU_total
-        "EQ_VDROP_007",  # Napięcie w punkcie U
-    ]
-
-    # Step order for P15 (BINDING)
-    LC_STEP_ORDER: list[str] = [
-        "EQ_LC_001",  # Moc pozorna
-        "EQ_LC_002",  # Prąd roboczy 3-f
-        "EQ_LC_003",  # Procent obciążenia prądowego
-        "EQ_LC_004",  # Margines prądowy
-        "EQ_LC_005",  # Obciążenie transformatora
-        "EQ_LC_006",  # Margines transformatora
-    ]
-
-    # Step order for Q(U) proof (BINDING) — P11.1b + P11.1c
-    QU_STEP_ORDER: list[str] = [
-        "EQ_QU_001",  # ΔU = U_meas - U_ref
-        "EQ_QU_002",  # s(U) deadband
-        "EQ_QU_003",  # Q_raw = k_Q · s(U)
-        "EQ_QU_004",  # Q_cmd with limits
-        "EQ_QU_005",  # P11.1c: Q_cmd → U (VDROP link, no new physics)
-    ]
-
-    # Step order for SC1 proofs (BINDING) — P11.1c
-    SC1FZ_STEP_ORDER: list[str] = [
-        "EQ_SC1_001",  # Z₁, Z₂, Z₀
-        "EQ_SC1_002",  # Transformacja Fortescue
-        "EQ_SC1_003",  # Z_k dla 1F–Z
-        "EQ_SC1_006",  # I₁, I₂, I₀
-        "EQ_SC1_007",  # Rekombinacja fazowa
-    ]
-
-    SC2F_STEP_ORDER: list[str] = [
-        "EQ_SC1_001",  # Z₁, Z₂, Z₀
-        "EQ_SC1_002",  # Transformacja Fortescue
-        "EQ_SC1_004",  # Z_k dla 2F
-        "EQ_SC1_006",  # I₁, I₂, I₀
-        "EQ_SC1_007",  # Rekombinacja fazowa
-    ]
-
-    SC2FZ_STEP_ORDER: list[str] = [
-        "EQ_SC1_001",  # Z₁, Z₂, Z₀
-        "EQ_SC1_002",  # Transformacja Fortescue
-        "EQ_SC1_005",  # Z_k dla 2F–Z
-        "EQ_SC1_006",  # I₁, I₂, I₀
-        "EQ_SC1_007",  # Rekombinacja fazowa
-    ]
-
-    # Frozen IDs for stability tests (BINDING)
-    FROZEN_IDS: dict[str, list[str]] = {
-        "sc3f_equations": list(SC3F_EQUATIONS.keys()),
-        "vdrop_equations": list(VDROP_EQUATIONS.keys()),
-        "sc1_equations": list(SC1_EQUATIONS.keys()),
-        "lc_equations": list(LC_EQUATIONS.keys()),
-        "mapping_keys": [
-            # SC3F
-            "ikss_ka", "ip_ka", "ith_ka", "idyn_ka", "sk_mva",
-            "kappa", "z_thevenin_ohm", "r_thevenin_ohm", "x_thevenin_ohm",
-            "c_factor", "u_n_kv",
-            # VDROP
-            "r_ohm", "x_ohm", "p_mw", "q_mvar",
-            "delta_u_r_percent", "delta_u_x_percent",
-            "delta_u_percent", "delta_u_total_percent",
-            # SC1
-            "z1_ohm", "z2_ohm", "z0_ohm", "z_equiv_ohm",
-            "u_prefault_kv",
-            "i1_ka", "i2_ka", "i0_ka",
-            "ia_ka", "ib_ka", "ic_ka",
-            "a_operator",
-            # P15
-            "u_ll_kv", "p_mw", "q_mvar", "s_mva", "i_ka", "in_a",
-            "k_i_percent", "m_i_percent", "sn_mva", "k_s_percent", "m_s_percent",
-        ],
-    }
-
     @classmethod
     def get_equation(cls, equation_id: str) -> EquationDefinition | None:
         """Zwraca definicję równania po ID."""
-        if equation_id in cls.SC3F_EQUATIONS:
-            return cls.SC3F_EQUATIONS[equation_id]
-        if equation_id in cls.VDROP_EQUATIONS:
-            return cls.VDROP_EQUATIONS[equation_id]
-        if equation_id in cls.LC_EQUATIONS:
-            return cls.LC_EQUATIONS[equation_id]
-        if equation_id in cls.QU_EQUATIONS:
-            return cls.QU_EQUATIONS[equation_id]
-        if equation_id in cls.SC1_EQUATIONS:
-            return cls.SC1_EQUATIONS[equation_id]
-        return None
+        return registry.get(equation_id)
 
     @classmethod
     def get_sc3f_equations(cls) -> dict[str, EquationDefinition]:
         """Zwraca wszystkie równania SC3F."""
-        return cls.SC3F_EQUATIONS.copy()
+        return SC3F_EQUATIONS.copy()
 
     @classmethod
     def get_vdrop_equations(cls) -> dict[str, EquationDefinition]:
         """Zwraca wszystkie równania VDROP."""
-        return cls.VDROP_EQUATIONS.copy()
+        return VDROP_EQUATIONS.copy()
 
     @classmethod
     def get_lc_equations(cls) -> dict[str, EquationDefinition]:
         """Zwraca wszystkie równania P15 (Load Currents)."""
-        return cls.LC_EQUATIONS.copy()
+        return LC_EQUATIONS.copy()
 
     @classmethod
     def get_sc3f_proof_step_order(cls) -> list[str]:
         """Zwraca kolejność kroków dla dowodu SC3F (tylko równania dowodowe)."""
-        return cls.SC3F_PROOF_STEP_ORDER.copy()
+        return SC3F_PROOF_STEP_ORDER.copy()
 
     @classmethod
     def get_vdrop_step_order(cls) -> list[str]:
         """Zwraca kolejność kroków dla dowodu VDROP."""
-        return cls.VDROP_STEP_ORDER.copy()
+        return VDROP_STEP_ORDER.copy()
 
     @classmethod
     def get_lc_step_order(cls) -> list[str]:
         """Zwraca kolejność kroków dla dowodu P15."""
-        return cls.LC_STEP_ORDER.copy()
+        return LC_STEP_ORDER.copy()
 
     @classmethod
     def get_qu_equations(cls) -> dict[str, EquationDefinition]:
         """Zwraca wszystkie równania Q(U)."""
-        return cls.QU_EQUATIONS.copy()
+        return QU_EQUATIONS.copy()
 
     @classmethod
     def get_qu_step_order(cls) -> list[str]:
         """Zwraca kolejność kroków dla dowodu Q(U)."""
-        return cls.QU_STEP_ORDER.copy()
+        return QU_STEP_ORDER.copy()
 
     @classmethod
     def get_sc1_equations(cls) -> dict[str, EquationDefinition]:
         """Zwraca wszystkie równania SC1 (P11.1c)."""
-        return cls.SC1_EQUATIONS.copy()
+        return SC1_EQUATIONS.copy()
 
     @classmethod
     def get_sc1_step_order(cls, fault_type: str) -> list[str]:
@@ -1629,30 +1657,18 @@ class EquationRegistry:
             fault_type: Typ zwarcia (SC1FZ/SC2F/SC2FZ)
         """
         if fault_type == "SC1FZ":
-            return cls.SC1FZ_STEP_ORDER.copy()
+            return SC1FZ_STEP_ORDER.copy()
         if fault_type == "SC2F":
-            return cls.SC2F_STEP_ORDER.copy()
+            return SC2F_STEP_ORDER.copy()
         if fault_type == "SC2FZ":
-            return cls.SC2FZ_STEP_ORDER.copy()
+            return SC2FZ_STEP_ORDER.copy()
         raise ValueError(f"Unsupported SC1 fault type: {fault_type}")
 
     @classmethod
     def get_all_mapping_keys(cls) -> set[str]:
         """Zwraca wszystkie mapping_key używane w rejestrze."""
         keys: set[str] = set()
-        for eq in cls.SC3F_EQUATIONS.values():
-            for sym in eq.symbols:
-                keys.add(sym.mapping_key)
-        for eq in cls.VDROP_EQUATIONS.values():
-            for sym in eq.symbols:
-                keys.add(sym.mapping_key)
-        for eq in cls.LC_EQUATIONS.values():
-            for sym in eq.symbols:
-                keys.add(sym.mapping_key)
-        for eq in cls.QU_EQUATIONS.values():
-            for sym in eq.symbols:
-                keys.add(sym.mapping_key)
-        for eq in cls.SC1_EQUATIONS.values():
+        for eq in registry.values():
             for sym in eq.symbols:
                 keys.add(sym.mapping_key)
         return keys
@@ -1663,24 +1679,24 @@ class EquationRegistry:
         Weryfikuje, że żaden istniejący ID nie został zmieniony.
         Używane w testach regresji.
         """
-        for eq_id in cls.FROZEN_IDS["sc3f_equations"]:
-            if eq_id not in cls.SC3F_EQUATIONS:
+        for eq_id in FROZEN_IDS["sc3f_equations"]:
+            if eq_id not in SC3F_EQUATIONS:
                 raise ValueError(f"Frozen equation ID {eq_id} usunięty z SC3F!")
 
-        for eq_id in cls.FROZEN_IDS["vdrop_equations"]:
-            if eq_id not in cls.VDROP_EQUATIONS:
+        for eq_id in FROZEN_IDS["vdrop_equations"]:
+            if eq_id not in VDROP_EQUATIONS:
                 raise ValueError(f"Frozen equation ID {eq_id} usunięty z VDROP!")
 
-        for eq_id in cls.FROZEN_IDS["sc1_equations"]:
-            if eq_id not in cls.SC1_EQUATIONS:
+        for eq_id in FROZEN_IDS["sc1_equations"]:
+            if eq_id not in SC1_EQUATIONS:
                 raise ValueError(f"Frozen equation ID {eq_id} usunięty z SC1!")
 
-        for eq_id in cls.FROZEN_IDS["lc_equations"]:
-            if eq_id not in cls.LC_EQUATIONS:
+        for eq_id in FROZEN_IDS["lc_equations"]:
+            if eq_id not in LC_EQUATIONS:
                 raise ValueError(f"Frozen equation ID {eq_id} usunięty z P15!")
 
         current_keys = cls.get_all_mapping_keys()
-        for key in cls.FROZEN_IDS["mapping_keys"]:
+        for key in FROZEN_IDS["mapping_keys"]:
             if key not in current_keys:
                 raise ValueError(f"Frozen mapping key {key} usunięty!")
 
@@ -1690,3 +1706,18 @@ class EquationRegistry:
     def verify_anti_double_counting(cls) -> bool:
         """Weryfikuje audit anti-double-counting."""
         return AntiDoubleCountingAudit.verify()
+
+
+EquationRegistry.SC3F_EQUATIONS = SC3F_EQUATIONS
+EquationRegistry.VDROP_EQUATIONS = VDROP_EQUATIONS
+EquationRegistry.LC_EQUATIONS = LC_EQUATIONS
+EquationRegistry.QU_EQUATIONS = QU_EQUATIONS
+EquationRegistry.SC1_EQUATIONS = SC1_EQUATIONS
+EquationRegistry.SC3F_PROOF_STEP_ORDER = SC3F_PROOF_STEP_ORDER
+EquationRegistry.VDROP_STEP_ORDER = VDROP_STEP_ORDER
+EquationRegistry.LC_STEP_ORDER = LC_STEP_ORDER
+EquationRegistry.QU_STEP_ORDER = QU_STEP_ORDER
+EquationRegistry.SC1FZ_STEP_ORDER = SC1FZ_STEP_ORDER
+EquationRegistry.SC2F_STEP_ORDER = SC2F_STEP_ORDER
+EquationRegistry.SC2FZ_STEP_ORDER = SC2FZ_STEP_ORDER
+EquationRegistry.FROZEN_IDS = FROZEN_IDS

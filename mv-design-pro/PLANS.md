@@ -1012,7 +1012,8 @@ P14 jest **warstwą meta** i stanowi **prerequisite** dla P15–P17.
 | 2026-03 | 2.16 | P12 MVP: Equipment Proof Pack (U, Icu, Idyn, Ith) |
 | 2026-04 | 2.17 | P14 Proof Audit & Coverage (doc-only, meta layer) |
 | 2026-05 | 2.18 | P15 Load Currents & Overload Proof Pack implemented (FULL MATH, deterministic) |
-| 2026-01 | 2.19 | Phase 2.x.3: SWITCHING STATE EXPLORER — DOC LOCKED (eksploracja stanów łączeniowych, Islands, pre-solver validation) |
+| 2026-06 | 2.19 | Proof Engine: LS registry initialization fix (EquationRegistry merge/freeze + import smoke test) |
+| 2026-01 | 2.00 | Phase 2.x.3: SWITCHING STATE EXPLORER — DOC LOCKED (eksploracja stanów łączeniowych, Islands, pre-solver validation) |
 
 ---
 
