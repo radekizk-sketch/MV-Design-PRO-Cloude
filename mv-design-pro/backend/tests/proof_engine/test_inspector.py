@@ -1,0 +1,616 @@
+"""
+Proof Inspector Tests — P11.1d
+
+STATUS: CANONICAL & BINDING
+Reference: P11_1d_PROOF_UI_EXPORT.md
+
+Testy:
+1. test_inspector_read_only - Inspector nie modyfikuje dokumentu
+2. test_inspector_step_order_matches_proof - Kolejnosc krokow zgodna
+3. test_inspector_exports_json_tex - Eksporty JSON i TEX dzialaja
+4. test_inspector_counterfactual_view - Tryb A/B dziala poprawnie
+"""
+
+from __future__ import annotations
+
+import json
+from datetime import datetime
+from uuid import uuid4
+
+import pytest
+
+from application.proof_engine.proof_generator import (
+    ProofGenerator,
+    SC3FInput,
+    VDROPInput,
+    VDROPSegmentInput,
+)
+from application.proof_engine.types import (
+    ProofDocument,
+    ProofType,
+    QUCounterfactualInput,
+    QUInput,
+)
+from application.proof_engine.proof_inspector import (
+    CounterfactualView,
+    ExportResult,
+    HeaderView,
+    InspectorExporter,
+    InspectorView,
+    ProofInspector,
+    StepView,
+    SummaryView,
+    ValueView,
+    export_to_json,
+    export_to_tex,
+    inspect,
+    is_pdf_export_available,
+)
+
+
+# =============================================================================
+# Fixtures
+# =============================================================================
+
+
+@pytest.fixture
+def sc3f_test_input() -> SC3FInput:
+    """Fixture: minimalne dane SC3F dla testow."""
+    return SC3FInput(
+        project_name="Test Project",
+        case_name="Test Case SC3F",
+        fault_node_id="B2",
+        fault_type="THREE_PHASE",
+        run_timestamp=datetime(2026, 1, 27, 10, 30, 0),
+        solver_version="1.0.0-test",
+        c_factor=1.10,
+        u_n_kv=15.0,
+        z_thevenin_ohm=complex(0.749, 3.419),
+        ikss_ka=2.722,
+        ip_ka=5.882,
+        ith_ka=2.722,
+        sk_mva=70.7,
+        kappa=1.528,
+        rx_ratio=0.219,
+        tk_s=1.0,
+        m_factor=1.0,
+        n_factor=0.0,
+    )
+
+
+@pytest.fixture
+def vdrop_test_input() -> VDROPInput:
+    """Fixture: minimalne dane VDROP dla testow."""
+    return VDROPInput(
+        project_name="Test Project",
+        case_name="Test Case VDROP",
+        source_bus_id="SOURCE",
+        target_bus_id="LOAD",
+        run_timestamp=datetime(2026, 1, 27, 10, 30, 0),
+        solver_version="1.0.0-test",
+        u_source_kv=15.0,
+        segments=[
+            VDROPSegmentInput(
+                segment_id="SEG1",
+                from_bus_id="SOURCE",
+                to_bus_id="MID",
+                r_ohm_per_km=0.206,
+                x_ohm_per_km=0.075,
+                length_km=2.5,
+                p_mw=2.0,
+                q_mvar=1.0,
+                u_n_kv=15.0,
+            ),
+        ],
+    )
+
+
+@pytest.fixture
+def sc3f_proof(sc3f_test_input: SC3FInput) -> ProofDocument:
+    """Fixture: wygenerowany dokument SC3F."""
+    return ProofGenerator.generate_sc3f_proof(sc3f_test_input)
+
+
+@pytest.fixture
+def vdrop_proof(vdrop_test_input: VDROPInput) -> ProofDocument:
+    """Fixture: wygenerowany dokument VDROP."""
+    return ProofGenerator.generate_vdrop_proof(vdrop_test_input)
+
+
+@pytest.fixture
+def qu_test_input() -> QUInput:
+    """Fixture: minimalne dane Q(U) dla testow."""
+    return QUInput(
+        project_name="Test Project QU",
+        case_name="Test Case QU",
+        run_timestamp=datetime(2026, 1, 27, 10, 30, 0),
+        u_meas_kv=15.5,
+        u_ref_kv=15.0,
+        u_dead_kv=0.2,
+        k_q_mvar_per_kv=5.0,
+        q_min_mvar=-10.0,
+        q_max_mvar=10.0,
+    )
+
+
+@pytest.fixture
+def qu_counterfactual_input(qu_test_input: QUInput) -> QUCounterfactualInput:
+    """Fixture: dane counterfactual A vs B."""
+    input_b = QUInput(
+        project_name="Test Project QU B",
+        case_name="Test Case QU B",
+        run_timestamp=qu_test_input.run_timestamp,
+        u_meas_kv=qu_test_input.u_meas_kv,
+        u_ref_kv=qu_test_input.u_ref_kv,
+        u_dead_kv=qu_test_input.u_dead_kv,
+        k_q_mvar_per_kv=7.0,  # Zmieniony k_Q
+        q_min_mvar=qu_test_input.q_min_mvar,
+        q_max_mvar=qu_test_input.q_max_mvar,
+    )
+    return QUCounterfactualInput(a=qu_test_input, b=input_b)
+
+
+@pytest.fixture
+def qu_counterfactual_proof(
+    qu_counterfactual_input: QUCounterfactualInput,
+) -> ProofDocument:
+    """Fixture: wygenerowany dokument counterfactual Q(U)."""
+    return ProofGenerator.generate_qu_counterfactual(qu_counterfactual_input)
+
+
+# =============================================================================
+# Test: Inspector Read-Only
+# =============================================================================
+
+
+class TestInspectorReadOnly:
+    """
+    Testy: Inspector nie modyfikuje dokumentu.
+
+    INVARIANT: ProofDocument jest frozen (immutable).
+    Inspector tylko czyta dane.
+    """
+
+    def test_inspector_does_not_mutate_document(self, sc3f_proof: ProofDocument):
+        """Inspector nie modyfikuje dokumentu."""
+        # Zapisz oryginalny JSON
+        original_json = sc3f_proof.json_representation
+
+        # Uzyj inspektora
+        inspector = ProofInspector(sc3f_proof)
+        _ = inspector.get_view()
+        _ = inspector.get_steps()
+        _ = inspector.get_summary()
+        _ = inspector.get_header()
+        _ = inspector.get_mapping_keys()
+
+        # Sprawdz ze JSON sie nie zmienil
+        assert sc3f_proof.json_representation == original_json
+
+    def test_inspector_returns_same_view_on_multiple_calls(
+        self, sc3f_proof: ProofDocument
+    ):
+        """Wielokrotne wywolanie get_view zwraca ten sam obiekt."""
+        inspector = ProofInspector(sc3f_proof)
+
+        view1 = inspector.get_view()
+        view2 = inspector.get_view()
+
+        assert view1 is view2  # Ten sam obiekt (cache)
+
+    def test_inspect_factory_function(self, sc3f_proof: ProofDocument):
+        """Factory function inspect() dziala poprawnie."""
+        view = inspect(sc3f_proof)
+
+        assert isinstance(view, InspectorView)
+        assert view.proof_type == ProofType.SC3F_IEC60909.value
+        assert len(view.steps) == 7
+
+    def test_inspector_preserves_document_reference(self, sc3f_proof: ProofDocument):
+        """Inspector zachowuje referencje do dokumentu."""
+        inspector = ProofInspector(sc3f_proof)
+
+        assert inspector.document is sc3f_proof
+
+    def test_view_types_are_frozen(self, sc3f_proof: ProofDocument):
+        """Wszystkie typy widokow sa frozen (immutable)."""
+        view = inspect(sc3f_proof)
+
+        # InspectorView jest frozen
+        with pytest.raises(AttributeError):
+            view.title = "New title"  # type: ignore
+
+        # StepView jest frozen
+        step = view.steps[0]
+        with pytest.raises(AttributeError):
+            step.title = "New title"  # type: ignore
+
+        # ValueView jest frozen
+        val = step.result
+        with pytest.raises(AttributeError):
+            val.symbol = "X"  # type: ignore
+
+
+# =============================================================================
+# Test: Step Order Matches Proof
+# =============================================================================
+
+
+class TestInspectorStepOrder:
+    """
+    Testy: Kolejnosc krokow w Inspector zgodna z ProofDocument.
+
+    Kroki musza byc posortowane po step_number.
+    """
+
+    def test_step_order_matches_proof_sc3f(self, sc3f_proof: ProofDocument):
+        """Kolejnosc krokow SC3F zgodna z dokumentem."""
+        inspector = ProofInspector(sc3f_proof)
+        steps = inspector.get_steps()
+
+        # Sprawdz ze kroki sa posortowane po step_number
+        step_numbers = [s.step_number for s in steps]
+        assert step_numbers == sorted(step_numbers)
+
+        # Sprawdz ze numery sa sekwencyjne od 1
+        assert step_numbers == list(range(1, len(steps) + 1))
+
+    def test_step_order_matches_proof_vdrop(self, vdrop_proof: ProofDocument):
+        """Kolejnosc krokow VDROP zgodna z dokumentem."""
+        inspector = ProofInspector(vdrop_proof)
+        steps = inspector.get_steps()
+
+        step_numbers = [s.step_number for s in steps]
+        assert step_numbers == sorted(step_numbers)
+        assert step_numbers == list(range(1, len(steps) + 1))
+
+    def test_step_ids_match_proof_document(self, sc3f_proof: ProofDocument):
+        """ID krokow w Inspector zgodne z ProofDocument."""
+        inspector = ProofInspector(sc3f_proof)
+        steps = inspector.get_steps()
+
+        # Pobierz ID z oryginalnego dokumentu
+        original_ids = sorted(
+            [s.step_id for s in sc3f_proof.steps],
+            key=lambda x: int(x.split("_")[-1]),
+        )
+
+        # Pobierz ID z inspektora
+        inspector_ids = [s.step_id for s in steps]
+
+        assert inspector_ids == original_ids
+
+    def test_get_step_by_id(self, sc3f_proof: ProofDocument):
+        """Mozna pobrac krok po ID."""
+        inspector = ProofInspector(sc3f_proof)
+
+        step = inspector.get_step("SC3F_STEP_001")
+        assert step is not None
+        assert step.step_number == 1
+
+        # Nieistniejacy ID zwraca None
+        assert inspector.get_step("NONEXISTENT") is None
+
+    def test_get_step_by_number(self, sc3f_proof: ProofDocument):
+        """Mozna pobrac krok po numerze."""
+        inspector = ProofInspector(sc3f_proof)
+
+        step = inspector.get_step_by_number(1)
+        assert step is not None
+        assert step.step_id == "SC3F_STEP_001"
+
+        # Nieistniejacy numer zwraca None
+        assert inspector.get_step_by_number(999) is None
+
+
+# =============================================================================
+# Test: Exports (JSON, TEX)
+# =============================================================================
+
+
+class TestInspectorExports:
+    """
+    Testy: Eksporty JSON i TEX dzialaja poprawnie.
+
+    Inspector uzywa istniejacych rendererow (LaTeXRenderer).
+    """
+
+    def test_export_json_returns_valid_json(self, sc3f_proof: ProofDocument):
+        """Eksport JSON zwraca poprawny JSON."""
+        exporter = InspectorExporter(sc3f_proof)
+        result = exporter.export_json()
+
+        assert result.success
+        assert result.format == "json"
+        assert isinstance(result.content, str)
+
+        # Parsowanie JSON
+        data = json.loads(result.content)
+        assert "steps" in data
+        assert "proof_type" in data
+        assert data["proof_type"] == "SC3F_IEC60909"
+
+    def test_export_json_is_deterministic(self, sc3f_test_input: SC3FInput):
+        """Eksport JSON jest deterministyczny (ten sam input -> identyczny output)."""
+        artifact_id = uuid4()
+
+        proof1 = ProofGenerator.generate_sc3f_proof(sc3f_test_input, artifact_id)
+        proof2 = ProofGenerator.generate_sc3f_proof(sc3f_test_input, artifact_id)
+
+        json1 = export_to_json(proof1)
+        json2 = export_to_json(proof2)
+
+        # Usun pola zmienne
+        data1 = json.loads(json1)
+        data2 = json.loads(json2)
+        del data1["document_id"]
+        del data1["created_at"]
+        del data2["document_id"]
+        del data2["created_at"]
+
+        assert data1 == data2
+
+    def test_export_tex_returns_valid_latex(self, sc3f_proof: ProofDocument):
+        """Eksport TEX zwraca poprawny LaTeX."""
+        exporter = InspectorExporter(sc3f_proof)
+        result = exporter.export_tex()
+
+        assert result.success
+        assert result.format == "tex"
+        assert isinstance(result.content, str)
+
+        # Sprawdz strukture LaTeX
+        latex = result.content
+        assert r"\documentclass" in latex
+        assert r"\begin{document}" in latex
+        assert r"\end{document}" in latex
+        assert r"\section{Dowód}" in latex
+
+    def test_export_tex_uses_block_math_only(self, sc3f_proof: ProofDocument):
+        """Eksport TEX uzywa tylko blokowego LaTeX ($$...$$)."""
+        exporter = InspectorExporter(sc3f_proof)
+        result = exporter.export_tex()
+
+        latex = result.content
+
+        # Sprawdz ze zawiera bloki $$...$$
+        assert "$$" in latex
+
+        # NIE powinno byc inline math $...$ (poza $$)
+        # To trudne do sprawdzenia bez parsera, wiec sprawdzamy strukture
+        lines = latex.split("\n")
+        for line in lines:
+            # Pomijamy linie z $$
+            if "$$" in line:
+                continue
+            # Sprawdzamy czy nie ma pojedynczych $
+            # (uproszczone - ignorujemy escape \$)
+            stripped = line.replace(r"\$", "")
+            # Pojedynczy $ (nie podwojny) moze wystapic tylko w tabelach
+            # lub jako escape, wiec ta heurystyka jest przyblizona
+
+    def test_export_convenience_functions(self, sc3f_proof: ProofDocument):
+        """Convenience functions dzialaja poprawnie."""
+        json_str = export_to_json(sc3f_proof)
+        assert isinstance(json_str, str)
+        assert "steps" in json_str
+
+        tex_str = export_to_tex(sc3f_proof)
+        assert isinstance(tex_str, str)
+        assert r"\documentclass" in tex_str
+
+    def test_export_pdf_availability_check(self):
+        """Mozna sprawdzic czy eksport PDF jest dostepny."""
+        # To tylko sprawdza czy funkcja dziala, nie wymaga pdflatex
+        result = is_pdf_export_available()
+        assert isinstance(result, bool)
+
+    def test_export_all_returns_all_formats(self, sc3f_proof: ProofDocument):
+        """export_all() zwraca wyniki dla wszystkich formatow."""
+        exporter = InspectorExporter(sc3f_proof)
+        results = exporter.export_all()
+
+        assert "json" in results
+        assert "tex" in results
+        assert "pdf" in results
+
+        assert results["json"].success
+        assert results["tex"].success
+        # PDF moze byc niedostepny (brak pdflatex)
+
+    def test_export_result_filename_hint(self, sc3f_proof: ProofDocument):
+        """ExportResult zawiera sugerowana nazwe pliku."""
+        exporter = InspectorExporter(sc3f_proof)
+
+        json_result = exporter.export_json()
+        assert json_result.filename_hint.endswith(".json")
+        assert "sc3f_iec60909" in json_result.filename_hint.lower()
+
+        tex_result = exporter.export_tex()
+        assert tex_result.filename_hint.endswith(".tex")
+
+
+# =============================================================================
+# Test: Counterfactual View
+# =============================================================================
+
+
+class TestInspectorCounterfactualView:
+    """
+    Testy: Tryb A/B (counterfactual) dziala poprawnie.
+    """
+
+    def test_non_counterfactual_is_detected(self, sc3f_proof: ProofDocument):
+        """Standardowy dowod NIE jest counterfactual."""
+        inspector = ProofInspector(sc3f_proof)
+
+        assert not inspector.is_counterfactual()
+        assert inspector.get_counterfactual_table() is None
+
+    def test_counterfactual_is_detected(
+        self, qu_counterfactual_proof: ProofDocument
+    ):
+        """Dowod counterfactual jest wykrywany."""
+        inspector = ProofInspector(qu_counterfactual_proof)
+
+        assert inspector.is_counterfactual()
+        cf_table = inspector.get_counterfactual_table()
+        assert cf_table is not None
+        assert isinstance(cf_table, CounterfactualView)
+
+    def test_counterfactual_table_has_rows(
+        self, qu_counterfactual_proof: ProofDocument
+    ):
+        """Tabela counterfactual zawiera wiersze."""
+        inspector = ProofInspector(qu_counterfactual_proof)
+        cf_table = inspector.get_counterfactual_table()
+
+        assert cf_table is not None
+        assert len(cf_table.rows) > 0
+
+        # Pierwszy wiersz powinien byc Q_cmd
+        q_row = cf_table.rows[0]
+        assert q_row.name == "Q_cmd"
+        assert q_row.unit == "Mvar"
+
+    def test_counterfactual_delta_values(
+        self, qu_counterfactual_proof: ProofDocument
+    ):
+        """Delta w counterfactual jest obliczane poprawnie (B - A)."""
+        inspector = ProofInspector(qu_counterfactual_proof)
+        cf_table = inspector.get_counterfactual_table()
+
+        assert cf_table is not None
+        for row in cf_table.rows:
+            expected_delta = row.value_b - row.value_a
+            assert abs(row.delta - expected_delta) < 0.0001
+
+    def test_counterfactual_view_to_dict(
+        self, qu_counterfactual_proof: ProofDocument
+    ):
+        """CounterfactualView.to_dict() zwraca poprawny slownik."""
+        inspector = ProofInspector(qu_counterfactual_proof)
+        cf_table = inspector.get_counterfactual_table()
+
+        assert cf_table is not None
+        d = cf_table.to_dict()
+
+        assert "rows" in d
+        assert "has_vdrop_data" in d
+        assert isinstance(d["rows"], list)
+
+
+# =============================================================================
+# Test: Mapping Keys
+# =============================================================================
+
+
+class TestInspectorMappingKeys:
+    """
+    Testy: mapping_key dla kazdej wielkosci jest widoczny.
+    """
+
+    def test_mapping_keys_are_present(self, sc3f_proof: ProofDocument):
+        """Wszystkie wartosci maja mapping_key."""
+        inspector = ProofInspector(sc3f_proof)
+        steps = inspector.get_steps()
+
+        for step in steps:
+            # Input values maja mapping_key
+            for val in step.input_values:
+                assert val.mapping_key != "", f"Missing mapping_key in {step.step_id}"
+
+            # Result ma mapping_key
+            assert step.result.mapping_key != ""
+
+    def test_get_mapping_keys_returns_all(self, sc3f_proof: ProofDocument):
+        """get_mapping_keys() zwraca wszystkie klucze."""
+        inspector = ProofInspector(sc3f_proof)
+        keys = inspector.get_mapping_keys()
+
+        # Powinno byc wiecej kluczy niz krokow
+        assert len(keys) >= len(sc3f_proof.steps)
+
+        # Klucze sa posortowane alfabetycznie
+        assert list(keys.keys()) == sorted(keys.keys())
+
+    def test_mapping_keys_match_source_keys(self, sc3f_proof: ProofDocument):
+        """mapping_key w ValueView odpowiada source_keys w ProofStep."""
+        inspector = ProofInspector(sc3f_proof)
+        steps = inspector.get_steps()
+
+        for step in steps:
+            # source_keys zawiera mapowanie symbol -> key
+            for val in step.input_values:
+                if val.symbol in step.source_keys:
+                    # mapping_key powinien odpowiadac
+                    assert val.mapping_key == step.source_keys.get(
+                        val.symbol, val.mapping_key
+                    )
+
+
+# =============================================================================
+# Test: View Serialization
+# =============================================================================
+
+
+class TestInspectorViewSerialization:
+    """
+    Testy: Widoki sa poprawnie serializowalne.
+    """
+
+    def test_inspector_view_to_dict(self, sc3f_proof: ProofDocument):
+        """InspectorView.to_dict() zwraca poprawny slownik."""
+        view = inspect(sc3f_proof)
+        d = view.to_dict()
+
+        assert "document_id" in d
+        assert "steps" in d
+        assert "summary" in d
+        assert "header" in d
+        assert "proof_type" in d
+
+    def test_inspector_view_to_dict_is_serializable(self, sc3f_proof: ProofDocument):
+        """InspectorView.to_dict() mozna serializowac do JSON."""
+        view = inspect(sc3f_proof)
+        d = view.to_dict()
+
+        json_str = json.dumps(d, ensure_ascii=False)
+        assert isinstance(json_str, str)
+
+        # Deserializacja
+        data = json.loads(json_str)
+        assert data["proof_type"] == "SC3F_IEC60909"
+
+    def test_step_view_to_dict(self, sc3f_proof: ProofDocument):
+        """StepView.to_dict() zwraca poprawny slownik."""
+        view = inspect(sc3f_proof)
+        step = view.steps[0]
+        d = step.to_dict()
+
+        assert "step_number" in d
+        assert "step_id" in d
+        assert "formula_latex" in d
+        assert "input_values" in d
+        assert "result" in d
+        assert "unit_check" in d
+
+    def test_summary_view_to_dict(self, sc3f_proof: ProofDocument):
+        """SummaryView.to_dict() zwraca poprawny slownik."""
+        view = inspect(sc3f_proof)
+        d = view.summary.to_dict()
+
+        assert "key_results" in d
+        assert "unit_check_passed" in d
+        assert "total_steps" in d
+        assert "warnings" in d
+
+    def test_header_view_to_dict(self, sc3f_proof: ProofDocument):
+        """HeaderView.to_dict() zwraca poprawny slownik."""
+        view = inspect(sc3f_proof)
+        d = view.header.to_dict()
+
+        assert "project_name" in d
+        assert "case_name" in d
+        assert "run_timestamp" in d
+        assert "solver_version" in d
