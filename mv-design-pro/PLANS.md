@@ -736,7 +736,30 @@ doboru aparatury na podstawie wyników P11 (bez nowych obliczeń fizycznych).
 
 ---
 
-## 17. Change Log (continued)
+## 17. Phase P14: Proof Audit & Coverage (DOC ONLY) — DONE
+
+### 17.1 Cel fazy
+
+Wprowadzenie **kanonicznej warstwy audytu** kompletności i pokrycia Proof Packów
+bez dodawania obliczeń i bez modyfikacji solverów.
+
+### 17.2 Deliverables (DOC ONLY)
+
+| Plik | Opis | Status |
+|------|------|--------|
+| `docs/proof_engine/P14_PROOF_AUDIT_AND_COVERAGE.md` | Warstwa audytu: definicje, coverage, checklist | DONE |
+| `docs/proof_engine/README.md` | Referencja do P14 (meta) | DONE |
+| `docs/proof_engine/P11_OVERVIEW.md` | Referencja do P14 (meta) | DONE |
+| `docs/INDEX.md` | Indeks P14 | DONE |
+| `PLANS.md` | Aktualizacja planu | DONE |
+
+### 17.3 Relacje
+
+P14 jest **warstwą meta** i stanowi **prerequisite** dla P15–P17.
+
+---
+
+## 18. Change Log (continued)
 
 | Date | Version | Changes |
 |------|---------|---------|
@@ -746,12 +769,18 @@ doboru aparatury na podstawie wyników P11 (bez nowych obliczeń fizycznych).
 | 2026-01 | 2.14 | P11 Professor Audit: LaTeX-only policy, I_dyn/I_th mandatory, SC3F Gold Standard |
 | 2026-02 | 2.15 | P11.2 Proof Inspector UX/UI parity (PowerFactory-style, read-only) |
 | 2026-03 | 2.16 | P12 MVP: Equipment Proof Pack (U, Icu, Idyn, Ith) |
+| 2026-04 | 2.17 | P14 Proof Audit & Coverage (doc-only, meta layer) |
 
 ---
 
 **END OF EXECUTION PLAN**
 
 ## TODO — Proof Packs P14–P17 (FUTURE PACKS)
+
+### P14 — Proof Audit & Coverage (DOC ONLY, META)
+
+P14 definiuje **kanoniczną warstwę audytu** kompletności i pokrycia Proof Packów
+i jest **prerequisite** dla P15–P17.
 
 ### TODO-P14-001 (PLANNED) — P14: Power Flow Proof Pack (audit wyników PF) [FUTURE PACK]
 - Priority: MUST
