@@ -590,7 +590,6 @@ Wprowadzenie warstwy **interpretacji dowodowej** (Proof Engine), która generuje
 | 2026-01 | 2.12 | P11.1a MVP: SC3F IEC60909 + VDROP proof specifications |
 | 2026-01 | 2.13 | P11.1b-d: Regulation Q(U), asymmetrical SC, UI/export specs |
 | 2026-01 | 2.14 | P11 Professor Audit: LaTeX-only policy, I_dyn/I_th mandatory, SC3F Gold Standard |
-| 2026-02 | 2.15 | P11.1c FULL: asymmetrical fault proofs implemented (SC1 1F–Z/2F/2F–Z) |
 
 ---
 
