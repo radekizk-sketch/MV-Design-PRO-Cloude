@@ -1110,7 +1110,89 @@ P14 jest **warstwą meta** i stanowi **prerequisite** dla P15–P17.
 | 2026-05 | 2.18 | P15 Load Currents & Overload Proof Pack implemented (FULL MATH, deterministic) |
 | 2026-01 | 2.19 | Phase 2.x.3: SWITCHING STATE EXPLORER — DOC LOCKED (eksploracja stanów łączeniowych, Islands, pre-solver validation) |
 | 2026-01 | 2.20 | Phase 2.x.4: SHORT-CIRCUIT NODE RESULTS — DOC LOCKED (wyniki zwarciowe BUS-centric, IEC 60909, PF-grade) |
+| 2026-01 | 2.21 | Phase 2.x.5: CATALOG BROWSER (PASSIVE EQUIPMENT) — DOC LOCKED (Type → Instances, pasywne elementy tylko, PF-grade) |
 | 2026-06 | 2.19 | Proof Engine: LS registry initialization fix (EquationRegistry merge/freeze + import smoke test) |
+
+---
+
+## 12.10. Phase 2.x.5: CATALOG BROWSER (PASSIVE EQUIPMENT) — DOC LOCKED
+
+### 12.10.1. Cel fazy
+
+Zdefiniowanie **kanonicznego Catalog Browser** dla **PASYWNYCH ELEMENTÓW SIECI**, zgodnie z praktyką **ETAP / DIgSILENT PowerFactory**, oparty na zasadzie:
+
+> **TYPE jest źródłem prawdy, INSTANCES są tylko użyciami.**
+
+Catalog Browser ma umożliwiać:
+- pełny przegląd typów (LineType, CableType, TransformerType, SwitchType),
+- audyt parametrów katalogowych,
+- śledzenie użycia typu w sieci (Type → Instances).
+
+**INVARIANT:** Solver i Domain Layer pozostają **NIETKNIĘTE**. To wyłącznie dokumentacja UI.
+
+---
+
+### 12.10.2. Zakres fazy
+
+| W zakresie | Poza zakresem |
+|------------|---------------|
+| Dokumentacja Catalog Browser (PASYWNE ONLY) | Implementacja kodu |
+| Definicja Type-centric modelu | Modyfikacja solverów |
+| Zakres pasywnych typów (LINE, CABLE, TRAFO, SWITCH) | Modyfikacja API |
+| FORBIDDEN: Source Types, Load Types, Protection Types | Nowe funkcjonalności backend |
+
+---
+
+### 12.10.3. Deliverables (DOC ONLY)
+
+| Plik | Opis | Status |
+|------|------|--------|
+| `docs/ui/CATALOG_BROWSER_CONTRACT.md` (v1.1) | Aktualizacja: PASYWNE TYLKO, FORBIDDEN dla Source/Load/Protection, wzmocnienie paradygmatu Type → Instances | DONE |
+| `mv-design-pro/PLANS.md` | Dodanie Phase 2.x.5 | DONE |
+| `mv-design-pro/ARCHITECTURE.md` | Podrozdział: Type-centric Catalog UI (PF-grade) | DONE |
+| `docs/INDEX.md` | Weryfikacja linku do CATALOG_BROWSER_CONTRACT.md | DONE |
+
+---
+
+### 12.10.4. Completed Tasks
+
+- [x] Aktualizacja `docs/ui/CATALOG_BROWSER_CONTRACT.md`:
+  - § 1.1: dodanie paradygmatu "TYPE jest źródłem prawdy, INSTANCES są tylko użyciami",
+  - § 1.3: definicja zakresu (PASYWNE TYLKO: LineType, CableType, TransformerType, SwitchType),
+  - § 1.3: tabela FORBIDDEN (Source Types, Load Types, Protection Types),
+  - § 3.2.1: aktualizacja Type Category List (usunięcie Source Types),
+  - § 6.1: rozszerzenie PowerFactory Parity (Type-centric model, propagacja zmian TYPE → INSTANCES),
+  - § 6.2: dodanie sekcji "Różnice vs ETAP / PowerFactory" (uzasadnienie PASYWNE ONLY),
+  - § 9.1: dodanie sekcji FORBIDDEN dla kategorii (Source, Load, Protection).
+- [x] Aktualizacja `mv-design-pro/PLANS.md` (dodanie Phase 2.x.5)
+- [x] Aktualizacja `mv-design-pro/ARCHITECTURE.md` (podrozdział 18.2.5: Type-centric Catalog UI)
+- [x] Weryfikacja `docs/INDEX.md` (link do CATALOG_BROWSER_CONTRACT.md)
+
+---
+
+### 12.10.5. Key Principles (Summary)
+
+| # | Zasada | Opis |
+|---|--------|------|
+| 1 | **TYPE → INSTANCES (1:N)** | TYPE definiuje parametry katalogowe (R, X, B, I_nom, S_nom), INSTANCES odwołują się do TYPE |
+| 2 | **PASYWNE ELEMENTY TYLKO** | Catalog Browser obejmuje wyłącznie: LineType, CableType, TransformerType, SwitchType |
+| 3 | **FORBIDDEN: Source/Load/Protection** | Źródła, obciążenia, zabezpieczenia mają parametry Case-dependent lub nastawcze, nie katalogowe |
+| 4 | **Propagacja zmian TYPE → INSTANCES** | Edycja TYPE → automatyczna zmiana wszystkich INSTANCES (po potwierdzeniu użytkownika) |
+| 5 | **ETAP / PowerFactory Parity** | MV-DESIGN-PRO Catalog Browser ≥ ETAP ≥ PowerFactory dla elementów pasywnych |
+
+---
+
+### 12.10.6. UI Catalog Browser Contract (Extended)
+
+**Before Phase 2.x.5:**
+- Catalog Browser obejmował wszystkie typy elementów (w tym Source Types),
+- Brak wyraźnego rozdziału między parametrami NIEZMIENNYMI (katalogowe) i ZMIENNYMI (Case-dependent).
+
+**After Phase 2.x.5 (DOC-LOCKED):**
+- **PASYWNE ELEMENTY TYLKO** (LineType, CableType, TransformerType, SwitchType),
+- **FORBIDDEN**: Source Types, Load Types, Protection Types,
+- **Paradygmat Type-centric** wzmocniony (TYPE jako źródło prawdy, INSTANCES jako użycia),
+- **PowerFactory Parity** rozszerzona (propagacja zmian TYPE → INSTANCES, audyt użycia typu).
 
 ---
 

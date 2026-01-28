@@ -1850,20 +1850,35 @@ Topology Tree **NIE jest** dodatkowym widokiem — to **kręgosłup nawigacji** 
 
 ---
 
-#### 18.2.5 Catalog Browser (Type Library)
+#### 18.2.5 Catalog Browser (Type Library — PASYWNE ELEMENTY TYLKO)
 
-**Cel:** Przeglądanie katalogów typów elementów + relacja Type → Instances.
+**Cel:** Przeglądanie katalogów typów PASYWNYCH elementów sieci + relacja Type → Instances.
+
+**Paradygmat Type-centric (ETAP / PowerFactory aligned):**
+
+> **TYPE jest źródłem prawdy. INSTANCES są tylko użyciami.**
 
 **Funkcjonalność:**
-- **Type Category List:** Line Types, Cable Types, Transformer Types, Switch Types, Source Types,
+- **Type Category List (PASYWNE TYLKO):** Line Types, Cable Types, Transformer Types, Switch Types,
 - **Type List:** tabela typów (Type ID, Type Name, Manufacturer, Rating, Instances Count),
 - **Type Details:** zakładki (Overview, Parameters, Instances, Technical Data),
-- **Zarządzanie katalogiem (Designer Mode):** dodawanie, edycja, usuwanie typów.
+- **Zarządzanie katalogiem (Designer Mode):** dodawanie, edycja, usuwanie typów,
+- **Propagacja zmian TYPE → INSTANCES:** edycja TYPE → automatyczna zmiana wszystkich INSTANCES (po potwierdzeniu).
 
-**Zakazy:**
-- Edycja typów w trybie Operator / Analyst (tylko Designer),
-- Usuwanie typu z instancjami (Instances > 0),
-- Brak ostrzeżenia przy edycji typu z instancjami.
+**Zakazy (BINDING):**
+- **FORBIDDEN:** kategoria "Source Types" (Grid, Generator, PV, FW, BESS) — parametry Case-dependent, nie katalogowe,
+- **FORBIDDEN:** kategoria "Load Types" — parametry Case-dependent, nie katalogowe,
+- **FORBIDDEN:** kategoria "Protection Types" — parametry nastawcze, nie katalogowe,
+- **FORBIDDEN:** edycja typów w trybie Operator / Analyst (tylko Designer),
+- **FORBIDDEN:** usuwanie typu z instancjami (Instances > 0),
+- **FORBIDDEN:** brak ostrzeżenia przy edycji typu z instancjami.
+
+**Uzasadnienie:**
+- **Catalog Browser zarządza wyłącznie parametrami NIEZMIENNYMI** (R, X, B, I_nom, S_nom),
+- **Parametry ZMIENNE** (P_gen, Q_gen, U_setpoint, I_set, t_trip) są zarządzane przez **Case / Scenario**, nie przez Catalog,
+- **ETAP / PowerFactory** realizują identyczny podział: **Type Library** dla pasywnych, **Case Config** dla aktywnych.
+
+**Referencja:** `docs/ui/CATALOG_BROWSER_CONTRACT.md` (CANONICAL, BINDING)
 
 ---
 

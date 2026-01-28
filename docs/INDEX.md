@@ -158,19 +158,23 @@ Każdy kontrakt jest **BINDING** (wiążący) dla implementacji UI.
 
 ---
 
-### 3.5. Catalog Browser
+### 3.5. Catalog Browser (PASYWNE ELEMENTY TYLKO)
 
 **Plik:** [`docs/ui/CATALOG_BROWSER_CONTRACT.md`](./ui/CATALOG_BROWSER_CONTRACT.md)
 
-**Opis:** Przeglądanie katalogów typów elementów (LineType, TrafoType, SwitchType, SourceType) + relacja Type → Instances.
+**Opis:** Przeglądanie katalogów typów PASYWNYCH elementów sieci (LineType, CableType, TransformerType, SwitchType) + relacja Type → Instances.
+
+**Paradygmat:** **TYPE jest źródłem prawdy, INSTANCES są tylko użyciami.**
 
 **Kluczowe funkcje:**
-- **Type Category List:** Line Types, Cable Types, Transformer Types, Switch Types, Source Types,
+- **Type Category List (PASYWNE TYLKO):** Line Types, Cable Types, Transformer Types, Switch Types,
 - **Type List:** tabela typów (Type ID, Type Name, Manufacturer, Rating, Instances Count),
 - **Type Details:** zakładki (Overview, Parameters, Instances, Technical Data),
-- **Zarządzanie katalogiem (Designer Mode):** dodawanie, edycja, usuwanie typów.
+- **Zarządzanie katalogiem (Designer Mode):** dodawanie, edycja, usuwanie typów,
+- **Propagacja zmian TYPE → INSTANCES:** edycja TYPE → automatyczna zmiana wszystkich INSTANCES.
 
 **Zakazy:**
+- **FORBIDDEN:** Source Types, Load Types, Protection Types (parametry Case-dependent lub nastawcze, nie katalogowe),
 - Edycja typów w trybie Operator / Analyst (tylko Designer),
 - Usuwanie typu z instancjami (Instances > 0).
 

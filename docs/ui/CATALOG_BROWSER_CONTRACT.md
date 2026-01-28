@@ -13,11 +13,20 @@
 
 Niniejszy dokument definiuje **Catalog Browser** — komponent UI MV-DESIGN-PRO, który:
 
-- **umożliwia przeglądanie katalogów typów elementów** (LineType, TrafoType, SwitchType, SourceType),
+- **umożliwia przeglądanie katalogów typów PASYWNYCH elementów sieci** (LineType, CableType, TransformerType, SwitchType),
 - **wyświetla relację Type → Instances** (które elementy sieci używają danego typu),
 - **prezentuje pełne parametry katalogowe** (R/X/B, ratings, manufacturer),
 - **umożliwia zarządzanie katalogiem** (dodawanie, edycja, usuwanie typów),
 - **osiąga parity z ETAP / DIgSILENT PowerFactory w zakresie zarządzania katalogiem**.
+
+**Paradygmat fundamentalny (BINDING):**
+
+> **TYPE jest źródłem prawdy. INSTANCES są tylko użyciami.**
+
+Catalog Browser realizuje model **Type-centric** zgodnie z praktyką ETAP / DIgSILENT PowerFactory:
+- **TYPE** definiuje parametry katalogowe (R, X, B, I_nom, S_nom),
+- **INSTANCE** (element w sieci) **odwołuje się** do TYPE i używa jego parametrów,
+- Zmiana TYPE → automatyczna zmiana wszystkich INSTANCES (po potwierdzeniu użytkownika).
 
 ### 1.2. Zakres obowiązywania
 
@@ -25,6 +34,30 @@ Niniejszy dokument definiuje **Catalog Browser** — komponent UI MV-DESIGN-PRO,
 - aplikuje się do wszystkich trybów eksperckich (szczególnie Designer, Analyst),
 - komponent MUST być dostępny niezależnie od widoku SLD,
 - naruszenie kontraktu = regresja wymagająca hotfix.
+
+### 1.3. Zakres katalogu (PASYWNE ELEMENTY TYLKO)
+
+**Catalog Browser obejmuje WYŁĄCZNIE elementy pasywne sieci:**
+
+| Kategoria             | Typ                     | Zakres parametrów                         |
+|-----------------------|-------------------------|-------------------------------------------|
+| **Line Types**        | LineType                | R, X, B, I_nom, I_max, conductor material |
+| **Cable Types**       | CableType               | R, X, C, I_nom, I_max, voltage rating     |
+| **Transformer Types** | TransformerType         | S_nom, V_prim, V_sec, u_k, P_fe, P_cu    |
+| **Switch Types**      | SwitchType              | I_nom, I_breaking, type (breaker, disconnector) |
+
+**FORBIDDEN (kategorie wykluczone):**
+
+| Kategoria             | Powód wykluczenia                                           |
+|-----------------------|-------------------------------------------------------------|
+| **Source Types**      | Źródła (Grid, Generator, PV, FW, BESS) mają **parametry Case-dependent** (P_gen, Q_gen, U_setpoint), nie katalogowe |
+| **Load Types**        | Obciążenia mają **parametry Case-dependent** (P_load, Q_load, profil czasowy), nie katalogowe |
+| **Protection Types**  | Zabezpieczenia mają **parametry nastawcze** (I_set, t_trip, charakterystyki), nie katalogowe |
+
+**Zasada (BINDING):**
+- **Catalog Browser** zarządza wyłącznie **parametrami fizycznymi elementów pasywnych** (impedancje, ratinki),
+- **NIE zarządza** parametrami generacji, obciążenia, nastaw zabezpieczeń,
+- **NIE zarządza** parametrami Case-dependent (P, Q, U_setpoint).
 
 ---
 
@@ -67,13 +100,19 @@ Catalog Browser **MUST** składać się z trzech sekcji:
 
 #### 3.2.1. Kategorie typów (BINDING)
 
-| Kategoria             | Ikona      | Liczba typów (przykład) |
-|-----------------------|------------|-------------------------|
-| **Line Types**        | ─          | 25                      |
-| **Cable Types**       | ═          | 15                      |
-| **Transformer Types** | ⚡          | 10                      |
-| **Switch Types**      | ⚙️          | 8                       |
-| **Source Types**      | ⚡          | 5                       |
+**PASYWNE ELEMENTY TYLKO:**
+
+| Kategoria             | Ikona      | Liczba typów (przykład) | Opis                                      |
+|-----------------------|------------|-------------------------|-------------------------------------------|
+| **Line Types**        | ─          | 25                      | Linie napowietrzne (overhead lines)       |
+| **Cable Types**       | ═          | 15                      | Kable (underground cables)                |
+| **Transformer Types** | ⚡          | 10                      | Transformatory (two-winding transformers) |
+| **Switch Types**      | ⚙️          | 8                       | Aparatura łączeniowa (switching apparatus) |
+
+**FORBIDDEN:**
+- **Source Types** (Grid, Generator, PV, FW, BESS) — parametry Case-dependent, nie katalogowe,
+- **Load Types** — parametry Case-dependent, nie katalogowe,
+- **Protection Types** — parametry nastawcze, nie katalogowe.
 
 #### 3.2.2. Interakcja
 
@@ -279,17 +318,41 @@ Tabela instancji używających danego typu:
 
 ## 6. PARITY Z ETAP / DIGSILENT POWERFACTORY
 
-### 6.1. PowerFactory Parity
+### 6.1. PowerFactory Parity (Passive Equipment)
+
+**Paradygmat Type-centric (ETAP / PowerFactory aligned):**
+
+MV-DESIGN-PRO realizuje **identyczny** model Type Library jak ETAP / DIgSILENT PowerFactory dla elementów pasywnych:
 
 | Feature                          | ETAP       | PowerFactory | MV-DESIGN-PRO | Status       |
 |----------------------------------|------------|--------------|---------------|--------------|
-| Katalog typów (Type Library)     | ✓          | ✓            | ✓             | ✅ FULL      |
-| Hierarchia: Category → Type → Instances | ✓ | ✓            | ✓             | ✅ FULL      |
-| Edycja typów (Designer Mode)     | ✓          | ✓            | ✓             | ✅ FULL      |
-| Relacja Type → Instances         | ✓          | ✓            | ✓             | ✅ FULL      |
-| Import / Export katalogu (JSON, CSV, Excel) | ✓ | ✗           | ✓             | ➕ SUPERIOR  |
-| Ostrzeżenie przy edycji typu z instancjami | ✓ | ✓          | ✓             | ✅ FULL      |
-| Zabronione usuwanie typu z instancjami | ✓   | ✓            | ✓             | ✅ FULL      |
+| **Katalog typów (Type Library)**     | ✓          | ✓            | ✓             | ✅ FULL      |
+| **TYPE → INSTANCES (relacja 1:N)**  | ✓          | ✓            | ✓             | ✅ FULL      |
+| **TYPE jako źródło prawdy**         | ✓          | ✓            | ✓             | ✅ FULL      |
+| **Hierarchia: Category → Type → Instances** | ✓ | ✓            | ✓             | ✅ FULL      |
+| **Edycja typów (Designer Mode)**    | ✓          | ✓            | ✓             | ✅ FULL      |
+| **Propagacja zmian TYPE → INSTANCES** | ✓        | ✓            | ✓             | ✅ FULL      |
+| **Ostrzeżenie przy edycji typu z instancjami** | ✓ | ✓          | ✓             | ✅ FULL      |
+| **Zabronione usuwanie typu z instancjami** | ✓   | ✓            | ✓             | ✅ FULL      |
+| **Import / Export katalogu (JSON, CSV, Excel)** | ✓ | ✗           | ✓             | ➕ SUPERIOR  |
+| **Audyt użycia typu (Instances Count)** | ✓     | ✓            | ✓             | ✅ FULL      |
+
+**Ocena końcowa:** **MV-DESIGN-PRO Catalog Browser ≥ ETAP ≥ PowerFactory** dla elementów pasywnych ✅
+
+### 6.2. Różnice vs ETAP / PowerFactory
+
+| Aspekt                  | ETAP / PowerFactory                        | MV-DESIGN-PRO                             |
+|-------------------------|--------------------------------------------|-------------------------------------------|
+| **Zakres katalogu**     | Wszystkie elementy (w tym Source, Load)    | **PASYWNE TYLKO** (Line, Cable, Trafo, Switch) |
+| **Parametry Source**    | W katalogu (jako SourceType)              | **FORBIDDEN** (parametry Case-dependent)  |
+| **Parametry Load**      | W katalogu (jako LoadType)                | **FORBIDDEN** (parametry Case-dependent)  |
+| **Parametry Protection**| W katalogu (jako ProtectionType)          | **FORBIDDEN** (parametry nastawcze)       |
+
+**Uzasadnienie:**
+- **TYPE** definiuje **parametry niezmienne** (R, X, B, I_nom, S_nom),
+- **Source, Load, Protection** mają **parametry zmienne** (P_gen, Q_gen, U_setpoint, I_set, t_trip),
+- **ETAP / PowerFactory** zarządzają parametrami zmiennymi przez **Case / Scenario**, nie przez Catalog,
+- **MV-DESIGN-PRO** rozdziela **katalog (pasywne)** od **konfiguracji (aktywne)** dla maksymalnej przejrzystości.
 
 ---
 
@@ -324,10 +387,22 @@ Tabela instancji używających danego typu:
 
 ### 9.1. FORBIDDEN
 
+**UI i zarządzanie:**
 - **FORBIDDEN**: edycja typów w trybie Operator / Analyst (tylko Designer),
 - **FORBIDDEN**: usuwanie typu z instancjami (Instances > 0),
 - **FORBIDDEN**: brak ostrzeżenia przy edycji typu z instancjami,
 - **FORBIDDEN**: hard-coded typy katalogowe (wszystkie typy w bazie danych, konfigurowalne).
+
+**Zakres katalogu (BINDING):**
+- **FORBIDDEN**: kategoria "Source Types" (Grid, Generator, PV, FW, BESS) w Catalog Browser,
+- **FORBIDDEN**: kategoria "Load Types" w Catalog Browser,
+- **FORBIDDEN**: kategoria "Protection Types" w Catalog Browser,
+- **FORBIDDEN**: parametry Case-dependent (P_gen, Q_gen, U_setpoint) w Type Details,
+- **FORBIDDEN**: parametry nastawcze (I_set, t_trip, charakterystyki) w Type Details.
+
+**Uzasadnienie:**
+- **Catalog Browser zarządza wyłącznie parametrami NIEZMIENNYMI** (impedancje, ratinki),
+- **Parametry ZMIENNE** (generacja, obciążenie, nastawy) są zarządzane przez **Case / Scenario**, nie przez Catalog.
 
 ---
 
