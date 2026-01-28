@@ -45,8 +45,103 @@
 - [docs/proof_engine/EQUATIONS_IEC60909_SC3F.md](./proof_engine/EQUATIONS_IEC60909_SC3F.md) — Rejestr równań SC3F (BINDING)
 - [docs/proof_engine/EQUATIONS_VDROP.md](./proof_engine/EQUATIONS_VDROP.md) — Rejestr równań VDROP (BINDING)
 
+## Proof Packs P14–P17 (FUTURE) — Canonical Sources (doc-only)
+- [PLANS.md](../PLANS.md) — TODO backlog P14–P17 (CANONICAL SOURCES)
+- [SYSTEM_SPEC.md](../SYSTEM_SPEC.md) — sekcje TODO P14–P17 (CANONICAL SOURCES)
+- [ARCHITECTURE.md](../ARCHITECTURE.md) — sekcje TODO P14–P17 (CANONICAL SOURCES)
+- [POWERFACTORY_COMPLIANCE.md](../POWERFACTORY_COMPLIANCE.md) — checklisty P14–P17 (CANONICAL SOURCES)
+- [AGENTS.md](../AGENTS.md) — reguły + TODO P14–P17 (CANONICAL SOURCES)
+- [docs/proof_engine/README.md](./proof_engine/README.md) — reguły Proof Engine + TODO P14–P17 (CANONICAL SOURCES)
+- [docs/proof_engine/P11_OVERVIEW.md](./proof_engine/P11_OVERVIEW.md) — TODO P14–P17 (CANONICAL SOURCES)
+- [docs/proof_engine/P11_1a_MVP_SC3F_AND_VDROP.md](./proof_engine/P11_1a_MVP_SC3F_AND_VDROP.md) — TODO P14–P17 (CANONICAL SOURCES)
+- [docs/proof_engine/P11_1b_REGULATION_Q_U.md](./proof_engine/P11_1b_REGULATION_Q_U.md) — TODO P14–P17 (CANONICAL SOURCES)
+- [docs/proof_engine/P11_1c_SC_ASYMMETRICAL.md](./proof_engine/P11_1c_SC_ASYMMETRICAL.md) — TODO P14–P17 (CANONICAL SOURCES)
+- [docs/proof_engine/P11_1d_PROOF_UI_EXPORT.md](./proof_engine/P11_1d_PROOF_UI_EXPORT.md) — TODO P14–P17 (CANONICAL SOURCES)
+- [docs/proof_engine/PROOF_SCHEMAS.md](./proof_engine/PROOF_SCHEMAS.md) — TODO P14–P17 (CANONICAL SOURCES)
+
 ## Audit Reports
 - [docs/audit/spec_vs_code_gap_report.md](./audit/spec_vs_code_gap_report.md)
 
 ## Historical (Non-Canonical)
 - [docs/audit/historical_execplans/](./audit/historical_execplans/) — legacy ExecPlans
+
+## TODO — Proof Packs P14–P17 (FUTURE PACKS)
+
+### TODO-P14-001 (PLANNED) — P14: Power Flow Proof Pack (audit wyników PF) [FUTURE PACK]
+- Priority: MUST
+- Inputs: TraceArtifact, PowerFlowResult
+- Output: ProofPack P14 (ProofDocument: Audit rozpływu mocy)
+- DoD:
+  - [ ] Dowód bilansu węzła dla mocy czynnej i biernej z mapowaniem do TraceArtifact.
+
+    $$
+    \sum P = 0,\quad \sum Q = 0
+    $$
+
+  - [ ] Bilans gałęzi dla mocy czynnej i biernej uwzględnia straty oraz spadek napięcia.
+
+    $$
+    P_{in} \rightarrow P_{out} + P_{loss},\quad Q_{in} \rightarrow Q_{out} + \Delta U
+    $$
+
+  - [ ] Straty linii liczone jawnie z prądu i rezystancji.
+
+    $$
+    P_{loss} = I^{2} \cdot R
+    $$
+
+  - [ ] Porównanie counterfactual Case A vs Case B z raportem różnic.
+
+    $$
+    \Delta P,\ \Delta Q,\ \Delta U
+    $$
+
+### TODO-P15-001 (PLANNED) — P15: Load Currents & Overload Proof Pack [FUTURE PACK]
+- Priority: MUST
+- Inputs: TraceArtifact, PowerFlowResult, Catalog
+- Output: ProofPack P15 (ProofDocument: Prądy robocze i przeciążenia)
+- DoD:
+  - [ ] Prądy obciążenia linii/kabli wyprowadzone z mocy pozornej.
+
+    $$
+    I = \frac{S}{\sqrt{3} \cdot U}
+    $$
+
+  - [ ] Porównanie do prądu znamionowego z marginesem procentowym i statusem PASS/FAIL.
+  - [ ] Transformator: relacja obciążenia do mocy znamionowej i overload %.
+
+    $$
+    \frac{S}{S_n}
+    $$
+
+### TODO-P16-001 (PLANNED) — P16: Losses & Energy Proof Pack [FUTURE PACK]
+- Priority: MUST
+- Inputs: TraceArtifact, PowerFlowResult, Catalog
+- Output: ProofPack P16 (ProofDocument: Straty mocy i energii)
+- DoD:
+  - [ ] Straty linii wyprowadzone z prądu i rezystancji.
+
+    $$
+    P_{loss,line} = I^{2} \cdot R
+    $$
+
+  - [ ] Straty transformatora z danych katalogowych: suma P0 i Pk.
+
+    $$
+    P_{loss,trafo} = P_{0} + P_{k}
+    $$
+
+  - [ ] Energia strat z profilu obciążenia (integracja w czasie).
+
+    $$
+    E_{loss} = \int P_{loss} \, dt
+    $$
+
+### TODO-P17-001 (PLANNED) — P17: Earthing / Ground Fault Proof Pack (SN) [FUTURE PACK]
+- Priority: MUST
+- Inputs: TraceArtifact, Catalog
+- Output: ProofPack P17 (ProofDocument: Doziemienia / uziemienia SN)
+- DoD:
+  - [ ] Jeśli SN: prądy doziemne z uwzględnieniem impedancji uziemienia i rozdziału prądu.
+  - [ ] Tryb uproszczonych napięć dotykowych z wyraźnymi zastrzeżeniami.
+  - [ ] Terminologia w ProofDocument: 1F-Z, 2F, 2F-Z oraz PCC – punkt wspólnego przyłączenia.
