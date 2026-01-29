@@ -1,8 +1,9 @@
 # P13b: Type Library Governance — Implementation Summary
 
-**Status**: PARTIAL (Core backend complete, persistence stubs, UI ready)
-**Branch**: `claude/rola-binding-system-cahIz`
+**Status**: COMPLETE (Backend + Frontend + Tests)
+**Branch**: `claude/rola-binding-system-Db36F`
 **Model**: Sonnet 4.5
+**Completed**: 2026-01-29
 
 ---
 
@@ -39,41 +40,34 @@
 - ✅ Manifest/Export to_dict()
 - ✅ ImportMode enum
 
-### 🚧 What's Missing (TODO for follow-up PR)
+### ✅ Completed in This PR
 
-#### Persistence Methods
-**Issue**: Repository lacks `add_*_type()` methods to persist imported types.
+#### Persistence Implementation
+**Solution**: Use existing `upsert_*_type()` methods in repository
+- `service.py` now calls `uow.wizard.upsert_line_type()` etc.
+- MERGE mode: only calls upsert for NEW types (skip existing)
+- REPLACE mode: SAFE-GATE checks types in use first
+- Full persistence working with transaction management
 
-**Current state**:
-- Types are fetched from ORM: `LineTypeORM`, `CableTypeORM`, `TransformerTypeORM`, `SwitchEquipmentTypeORM`
-- `list_*_types()` exists, but no `add_*_type()`
+#### Integration Tests (4 new tests)
+**Added**: `backend/tests/network_model/catalog/test_governance.py`
+- `test_export_import_round_trip`: full cycle determinism
+- `test_import_merge_skips_existing`: immutability preserved
+- `test_import_replace_blocked_when_types_in_use`: SAFE-GATE
+- `test_export_determinism_with_real_data`: fingerprint stability
 
-**Required**:
-```python
-# backend/src/infrastructure/persistence/repositories/network_wizard_repository.py
-def add_line_type(self, type_data: dict) -> None:
-    """Add new line type to catalog."""
-    # Insert into LineTypeORM table
+**Added fixture**: `test_db_session` in `backend/tests/conftest.py`
 
-def add_cable_type(self, type_data: dict) -> None:
-    # Insert into CableTypeORM table
-
-# ... etc for transformer_type, switch_equipment_type
-```
-
-**Impact**:
-- Import currently returns `ImportReport` but **does not persist** types
-- Export works fine (reads existing types)
-- Integration tests skipped (pending persistence implementation)
-
-#### UI (Stubbed)
-**Created**: `frontend/src/ui/catalog/api.ts` with:
-- `exportTypeLibrary()`
-- `importTypeLibrary()`
-
-**Not integrated**: TypeLibraryBrowser UI buttons
-- Requires React component edits
-- Dialog for ImportReport display
+#### UI Integration (Complete)
+**TypeLibraryBrowser.tsx**:
+- Import/Export buttons in header (PL labels)
+- File upload with JSON validation
+- `ImportReportDialog` component showing:
+  - Success/failure banner
+  - Added types (+ icon, green)
+  - Skipped types (— icon, gray)
+  - Conflicts (red, with reason)
+- Clean Polish UI matching PowerFactory style
 
 ---
 
@@ -194,79 +188,84 @@ pytest backend/tests/network_model/catalog/test_governance.py -v
 
 ---
 
-## Next Steps (Follow-up PR)
+## Implementation Complete ✓
 
-### High Priority
-1. **Persistence methods**: `add_line_type()`, `add_cable_type()`, etc.
-   - File: `backend/src/infrastructure/persistence/repositories/network_wizard_repository.py`
-   - Insert into ORM tables
-   - Handle duplicates (skip in MERGE mode)
+All P13b requirements implemented:
+- ✓ Deterministic export with SHA-256 fingerprint
+- ✓ MERGE mode: add new types, skip existing (immutable)
+- ✓ REPLACE mode: SAFE-GATE (blocked when types in use)
+- ✓ type_ref validation (existing resolver.py)
+- ✓ Full persistence with transaction management
+- ✓ 4 integration tests (round-trip, merge, replace, determinism)
+- ✓ UI: Import/Export buttons + ImportReportDialog
+- ✓ Polish labels throughout
 
-2. **Integration tests**:
-   - Full import → export round-trip
-   - Conflict detection with real data
-   - Type usage tracking
-
-3. **UI integration**:
-   - Edit `TypeLibraryBrowser.tsx` to add import/export buttons
-   - Dialog for ImportReport
-   - Error handling
-
-### Medium Priority
-4. **Tombstone/deprecated flag** (optional):
-   - Mark types as deprecated without deletion
-   - UI shows warning but allows usage
-
-5. **Import migration maps** (future):
-   - Allow type_id mappings for REPLACE mode
-   - Migrate instances automatically
+### Future Enhancements (Optional)
+- **Tombstone/deprecated flag**: Mark types as deprecated without deletion
+- **Import migration maps**: Allow type_id mappings for REPLACE mode with instance migration
+- **Type usage tracking UI**: Show which instances use each type
+- **Batch operations**: Import multiple libraries at once
 
 ---
 
 ## Files Changed
 
-### Backend
+### PR #192 (Partial - Backend Core)
 ```
 backend/src/network_model/catalog/governance.py          (NEW)
 backend/src/application/catalog_governance/__init__.py   (NEW)
-backend/src/application/catalog_governance/service.py    (NEW)
+backend/src/application/catalog_governance/service.py    (NEW - persistence stubs)
 backend/src/api/catalog.py                               (EDITED)
-backend/tests/network_model/catalog/test_governance.py   (NEW)
-```
-
-### Frontend
-```
-frontend/src/ui/catalog/api.ts                           (NEW)
-```
-
-### Docs
-```
+backend/tests/network_model/catalog/test_governance.py   (NEW - unit tests only)
+frontend/src/ui/catalog/api.ts                           (NEW - stubs)
 P13B_SUMMARY.md                                          (NEW)
+```
+
+### This PR (COMPLETE - Persistence + Tests + UI)
+```
+backend/src/application/catalog_governance/service.py    (EDITED - add persistence calls)
+backend/tests/network_model/catalog/test_governance.py   (EDITED - add 4 integration tests)
+backend/tests/conftest.py                                (EDITED - add test_db_session fixture)
+frontend/src/ui/catalog/TypeLibraryBrowser.tsx           (EDITED - add Import/Export + dialog)
+P13B_SUMMARY.md                                          (EDITED - mark COMPLETE)
 ```
 
 ---
 
-## Commit Message (Draft)
+## Commit Message (Actual)
 
 ```
-feat(catalog): implement P13b Type Library Governance (partial)
+feat(catalog): complete P13b Type Library Governance
 
-Backend (complete):
-- Add TypeLibraryManifest with vendor/series/revision/fingerprint
-- Add deterministic export API (GET /catalog/export)
-- Add safe import API (POST /catalog/import?mode=merge|replace)
-- Add conflict detection (409 if types in use or id collision)
-- Add unit tests for determinism and fingerprint stability
+Backend (FULL):
+- Add persistence for import: use existing upsert_*_type() methods
+- MERGE mode: add new types, skip existing (immutable)
+- REPLACE mode: blocked when types in use (SAFE-GATE)
+- Add 4 integration tests: round-trip, merge, replace, determinism
 
-Frontend (stubbed):
-- Add exportTypeLibrary() and importTypeLibrary() client functions
+Frontend (FULL):
+- Add Export/Import buttons to TypeLibraryBrowser header
+- Add ImportReportDialog component (PL labels)
+- Show added/skipped/conflicts in clean UI
+- File upload with JSON validation
 
-TODO (follow-up PR):
-- Persistence methods (add_*_type) for actual import save
-- UI buttons integration in TypeLibraryBrowser
-- Integration tests
+Tests (FULL):
+- Add test_db_session fixture
+- Integration tests verify full export/import cycle
+- MERGE mode skips existing (immutability preserved)
+- REPLACE blocked when types referenced by instances
 
-Refs: SYSTEM_SPEC.md § 4, POWERFACTORY_COMPLIANCE.md CT-*
+DoD complete:
+- ✓ Deterministic export with fingerprint
+- ✓ MERGE: add new, skip existing
+- ✓ REPLACE: SAFE-GATE (blocked when in use)
+- ✓ type_ref validation (already exists in resolver)
+- ✓ UI: Import/Export buttons with ImportReport dialog
+- ✓ Integration tests (4 new tests)
+
+Refs: SYSTEM_SPEC.md § 4, POWERFACTORY_COMPLIANCE.md CT-*, P13B_SUMMARY.md
+
+https://claude.ai/code/session_01WU4xBDb2ntJhzwSY1CV6Sm
 ```
 
 ---
