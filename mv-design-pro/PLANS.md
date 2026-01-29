@@ -1189,6 +1189,7 @@ P14 jest **warstwą meta** i stanowi **prerequisite** dla P15–P20.
 | 2026-06 | 2.22.1 | P16.1 CI stabilization: test harness isolation for FastAPI-only fixtures |
 | 2026-06 | 2.22.2 | P17 Losses Energy Profile Proof Pack implemented (FULL MATH, deterministic) |
 | 2026-01 | 2.23 | **P10a STATE / LIFECYCLE** — Project → StudyCase → Run → Snapshot model (DONE) |
+| 2026-01 | 2.24 | **P10b RESULT STATE + COMPARISON** — RunResultState + Case A/B Comparison Service (DONE) |
 
 _Versioning note: entries are normalized to 2.22.x to preserve monotonic versioning and avoid legacy 2.19.x references._
 
@@ -1242,6 +1243,82 @@ This is the **system layer** for MV-DESIGN-PRO, not UI.
 
 - ❌ Solvers (IEC 60909, Power Flow)
 - ❌ Result API
+- ❌ white_box_trace
+- ❌ UI / frontend
+- ❌ PROOF / P11
+
+---
+
+## 20. P10b RESULT STATE + COMPARISON — DONE
+
+### 20.1 Overview
+
+**P10b** introduces **Result State** for Run lifecycle and **Case A/B Comparison Service**:
+- Canonical `RunResultState` enum (NONE/FRESH/OUTDATED)
+- Read-only comparison between two Study Runs
+- Deterministic delta computation (no physics, no mutations)
+
+This is the **backend-only** layer for result comparison, not UI.
+
+### 20.2 Implemented Components
+
+| Component | Description | Status |
+|-----------|-------------|--------|
+| **RunResultState** | Enum for Run result lifecycle (NONE/FRESH/OUTDATED) | DONE |
+| **NumericDelta** | Numeric difference with delta, percent, sign | DONE |
+| **ComplexDelta** | Complex number difference for impedances | DONE |
+| **ShortCircuitComparison** | SC comparison (Ik'', Sk'', Zth, Ip, Ith) | DONE |
+| **PowerFlowComparison** | PF comparison (losses, slack, per-node U, per-branch P/Q) | DONE |
+| **RunComparisonResult** | Top-level comparison DTO | DONE |
+| **ComparisonService** | Application service for run comparison | DONE |
+| **Comparison API** | REST endpoint `/api/comparison/runs` | DONE |
+
+### 20.3 Key Invariants
+
+1. **READ-ONLY** — Zero physics calculations, zero state mutations
+2. **SAME PROJECT** — Both runs must belong to the same project
+3. **SAME ANALYSIS TYPE** — Both runs must have the same analysis type
+4. **DATA FROM RESULT API** — Uses only stored result payloads
+5. **DETERMINISTIC** — Same inputs produce identical comparison output
+
+### 20.4 Comparison Scope (IEC 60909 / Power Flow)
+
+| Analysis | Compared Values | Units |
+|----------|-----------------|-------|
+| **Short Circuit** | Ik'' (initial), Sk'' (power), Zth (impedance), Ip (peak), Ith (thermal) | A, MVA, Ω |
+| **Power Flow** | Total losses (P, Q), Slack power, Per-node voltages, Per-branch powers | pu, kV, MW, Mvar |
+
+### 20.5 Files Added/Modified
+
+| Layer | Files |
+|-------|-------|
+| **Domain** | `domain/results.py` (NEW) — RunResultState, comparison DTOs |
+| **Application** | `application/comparison/service.py` (NEW) — ComparisonService |
+| **API** | `api/comparison.py` (NEW) — REST endpoint |
+| **Tests** | `tests/test_p10b_comparison.py` (NEW) — determinism tests |
+
+### 20.6 API Endpoint
+
+```
+POST /api/comparison/runs
+Request: { "run_a_id": "<uuid>", "run_b_id": "<uuid>" }
+Response: RunComparisonResult with all computed deltas
+```
+
+### 20.7 Test Coverage
+
+- NumericDelta computation determinism
+- ComplexDelta computation determinism
+- ShortCircuitComparison construction
+- PowerFlowComparison construction
+- RunComparisonResult serialization
+- Exception handling (ProjectMismatch, AnalysisTypeMismatch, RunNotFound)
+- Edge cases (zero values, identical values, negative values)
+
+### 20.8 Exclusions (NOT modified)
+
+- ❌ Solvers (IEC 60909, Power Flow)
+- ❌ Result API (frozen)
 - ❌ white_box_trace
 - ❌ UI / frontend
 - ❌ PROOF / P11
