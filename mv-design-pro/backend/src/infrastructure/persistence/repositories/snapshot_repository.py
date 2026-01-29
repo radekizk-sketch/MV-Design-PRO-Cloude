@@ -14,6 +14,7 @@ class SnapshotRepository:
         self._session = session
 
     def add_snapshot(self, snapshot: NetworkSnapshot, *, commit: bool = True) -> None:
+        """Add a snapshot with P10a fingerprint support."""
         payload = snapshot.to_dict()
         meta = snapshot.meta
         created_at = _parse_created_at(meta.created_at)
@@ -24,6 +25,7 @@ class SnapshotRepository:
                 created_at=created_at,
                 schema_version=meta.schema_version,
                 network_model_id=meta.network_model_id,
+                fingerprint=meta.fingerprint,  # P10a
                 snapshot_json=payload,
             )
         )
@@ -73,6 +75,25 @@ class SnapshotRepository:
             current_id = row.parent_snapshot_id
         return list(reversed(lineage))
 
+    # P10a: Fingerprint-based operations
+    def get_fingerprint(self, snapshot_id: str) -> str | None:
+        """P10a: Get the fingerprint for a snapshot."""
+        stmt = select(NetworkSnapshotORM.fingerprint).where(
+            NetworkSnapshotORM.snapshot_id == snapshot_id
+        )
+        return self._session.execute(stmt).scalar_one_or_none()
+
+    def find_by_fingerprint(self, fingerprint: str) -> NetworkSnapshot | None:
+        """P10a: Find a snapshot by its fingerprint (for deduplication)."""
+        stmt = select(NetworkSnapshotORM).where(
+            NetworkSnapshotORM.fingerprint == fingerprint
+        ).limit(1)
+        row = self._session.execute(stmt).scalar_one_or_none()
+        if row is None:
+            return None
+        payload = _hydrate_payload(row)
+        return NetworkSnapshot.from_dict(payload)
+
 
 def _parse_created_at(value: str) -> datetime:
     try:
@@ -85,16 +106,19 @@ def _parse_created_at(value: str) -> datetime:
 
 
 def _meta_from_row(row: NetworkSnapshotORM) -> SnapshotMeta:
+    """P10a: Include fingerprint in metadata."""
     return SnapshotMeta(
         snapshot_id=row.snapshot_id,
         parent_snapshot_id=row.parent_snapshot_id,
         created_at=row.created_at.isoformat(),
         schema_version=row.schema_version,
         network_model_id=row.network_model_id,
+        fingerprint=row.fingerprint,  # P10a
     )
 
 
 def _hydrate_payload(row: NetworkSnapshotORM) -> dict:
+    """P10a: Hydrate payload with fingerprint support."""
     payload = row.snapshot_json
     if not isinstance(payload, dict):
         payload = {}
@@ -109,5 +133,6 @@ def _hydrate_payload(row: NetworkSnapshotORM) -> dict:
     meta.setdefault("created_at", row.created_at.isoformat())
     meta.setdefault("schema_version", row.schema_version)
     meta.setdefault("network_model_id", row.network_model_id)
+    meta.setdefault("fingerprint", row.fingerprint)  # P10a
     payload["meta"] = meta
     return payload

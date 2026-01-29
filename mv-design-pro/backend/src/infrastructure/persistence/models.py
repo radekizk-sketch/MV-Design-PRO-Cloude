@@ -92,12 +92,19 @@ class DeterministicJSON(TypeDecorator[Any]):
 
 
 class ProjectORM(Base):
+    """
+    Project ORM model — P10a root aggregate.
+
+    P10a: active_network_snapshot_id tracks the current state of the network.
+    """
     __tablename__ = "projects"
 
     id: Mapped[UUID] = mapped_column(GUID(), primary_key=True)
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     schema_version: Mapped[str] = mapped_column(String(50), nullable=False)
+    # P10a: Reference to the active (current) network snapshot
+    active_network_snapshot_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
     pcc_node_id: Mapped[UUID | None] = mapped_column(
         GUID(), ForeignKey("network_nodes.id", use_alter=True, name="fk_projects_pcc_node")
     )
@@ -109,6 +116,11 @@ class ProjectORM(Base):
 
 
 class NetworkSnapshotORM(Base):
+    """
+    Network Snapshot ORM model — P10a first-class object.
+
+    P10a: Snapshot has deterministic fingerprint for change detection.
+    """
     __tablename__ = "network_snapshots"
 
     snapshot_id: Mapped[str] = mapped_column(String(64), primary_key=True)
@@ -116,6 +128,8 @@ class NetworkSnapshotORM(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     schema_version: Mapped[str | None] = mapped_column(String(50))
     network_model_id: Mapped[str | None] = mapped_column(String(64))
+    # P10a: Deterministic fingerprint (SHA-256) of graph content
+    fingerprint: Mapped[str | None] = mapped_column(String(64), nullable=True)
     snapshot_json: Mapped[dict[str, Any]] = mapped_column(DeterministicJSON(), nullable=False)
 
 
@@ -259,13 +273,14 @@ class OperatingCaseORM(Base):
 
 class StudyCaseORM(Base):
     """
-    Study Case ORM model — P10 FULL MAX.
+    Study Case ORM model — P10a.
 
     Extended with:
     - is_active: Active case indicator (exactly one per project)
     - result_status: NONE / FRESH / OUTDATED lifecycle
     - description: Case description
     - result_refs_jsonb: References to calculation results
+    - network_snapshot_id: P10a binding to specific network snapshot
     """
     __tablename__ = "study_cases"
 
@@ -273,6 +288,8 @@ class StudyCaseORM(Base):
     project_id: Mapped[UUID] = mapped_column(GUID(), ForeignKey("projects.id"), nullable=False)
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     description: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    # P10a: Reference to the network snapshot this case is bound to
+    network_snapshot_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
     study_jsonb: Mapped[dict[str, Any]] = mapped_column(DeterministicJSON(), nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     result_status: Mapped[str] = mapped_column(String(20), nullable=False, default="NONE")
@@ -351,6 +368,14 @@ class AnalysisRunIndexORM(Base):
 
 
 class StudyRunORM(Base):
+    """
+    Study Run ORM model — P10a immutable calculation execution.
+
+    P10a ADDITIONS:
+    - network_snapshot_id: BINDING reference to specific snapshot
+    - solver_version_hash: Ensures reproducibility
+    - result_state: VALID / OUTDATED validity tracking
+    """
     __tablename__ = "study_runs"
 
     id: Mapped[UUID] = mapped_column(GUID(), primary_key=True)
@@ -358,6 +383,12 @@ class StudyRunORM(Base):
     case_id: Mapped[UUID] = mapped_column(GUID(), ForeignKey("study_cases.id"), nullable=False)
     analysis_type: Mapped[str] = mapped_column(String(100), nullable=False)
     input_hash: Mapped[str] = mapped_column(String(128), nullable=False)
+    # P10a: BINDING reference to specific network snapshot
+    network_snapshot_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    # P10a: Hash of solver version for reproducibility
+    solver_version_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    # P10a: Result validity state (VALID, OUTDATED)
+    result_state: Mapped[str] = mapped_column(String(20), nullable=False, default="VALID")
     status: Mapped[str] = mapped_column(String(50), nullable=False)
     started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

@@ -8,10 +8,25 @@ from domain.project_design_mode import ProjectDesignMode
 
 @dataclass(frozen=True)
 class Project:
+    """
+    Project — root aggregate for MV-DESIGN-PRO (P10a).
+
+    CANONICAL ALIGNMENT:
+    - Project is the top-level container for NetworkModel, StudyCases, and Runs
+    - One Project = One NetworkModel (invariant from SYSTEM_SPEC.md)
+    - active_network_snapshot_id tracks the current state of the network
+
+    LIFECYCLE:
+    - Project holds reference to the active network snapshot
+    - All StudyCases and Runs reference specific snapshots
+    - Changing the network creates a new snapshot, invalidating results
+    """
     id: UUID
     name: str
     description: str | None = None
     schema_version: str = "1.0"
+    # P10a: Reference to the active (current) network snapshot
+    active_network_snapshot_id: str | None = None
     created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
     updated_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
 
@@ -60,18 +75,47 @@ class Scenario:
 
 @dataclass(frozen=True)
 class StudyRun:
+    """
+    Run — a concrete calculation execution (P10a).
+
+    CANONICAL ALIGNMENT:
+    - Run is IMMUTABLE after execution (frozen dataclass)
+    - Uniquely identifies: project, case, snapshot, solver version
+    - Stores input_hash for result caching/deduplication
+
+    INVARIANTS:
+    - network_snapshot_id is BINDING — Run is tied to specific snapshot
+    - solver_version_hash ensures reproducibility
+    - result_state tracks validity: VALID / OUTDATED
+    """
     id: UUID
     project_id: UUID
     case_id: UUID
     analysis_type: str
     input_hash: str
+    # P10a: BINDING reference to specific network snapshot
+    network_snapshot_id: str | None = None
+    # P10a: Hash of solver version for reproducibility
+    solver_version_hash: str | None = None
+    # P10a: Result validity state (VALID, OUTDATED)
+    result_state: str = "VALID"
     status: str = "pending"
     started_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
     finished_at: datetime | None = None
 
 
-def new_project(name: str, description: str | None = None) -> Project:
-    return Project(id=uuid4(), name=name, description=description)
+def new_project(
+    name: str,
+    description: str | None = None,
+    active_network_snapshot_id: str | None = None,
+) -> Project:
+    """Create a new Project (P10a)."""
+    return Project(
+        id=uuid4(),
+        name=name,
+        description=description,
+        active_network_snapshot_id=active_network_snapshot_id,
+    )
 
 
 def new_network(project_id: UUID, name: str) -> Network:
@@ -106,11 +150,16 @@ def new_study_run(
     case_id: UUID,
     analysis_type: str,
     input_hash: str,
+    network_snapshot_id: str | None = None,
+    solver_version_hash: str | None = None,
 ) -> StudyRun:
+    """Create a new StudyRun (P10a)."""
     return StudyRun(
         id=uuid4(),
         project_id=project_id,
         case_id=case_id,
         analysis_type=analysis_type,
         input_hash=input_hash,
+        network_snapshot_id=network_snapshot_id,
+        solver_version_hash=solver_version_hash,
     )

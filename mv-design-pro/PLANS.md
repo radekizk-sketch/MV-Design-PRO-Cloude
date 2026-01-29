@@ -1188,8 +1188,63 @@ P14 jest **warstwą meta** i stanowi **prerequisite** dla P15–P20.
 | 2026-06 | 2.22 | Proof Engine: LS registry initialization fix (EquationRegistry merge/freeze + import smoke test) |
 | 2026-06 | 2.22.1 | P16.1 CI stabilization: test harness isolation for FastAPI-only fixtures |
 | 2026-06 | 2.22.2 | P17 Losses Energy Profile Proof Pack implemented (FULL MATH, deterministic) |
+| 2026-01 | 2.23 | **P10a STATE / LIFECYCLE** — Project → StudyCase → Run → Snapshot model (DONE) |
 
 _Versioning note: entries are normalized to 2.22.x to preserve monotonic versioning and avoid legacy 2.19.x references._
+
+---
+
+## 19. P10a STATE / LIFECYCLE — DONE
+
+### 19.1 Overview
+
+**P10a** introduces the **canonical, persistent, and deterministic** lifecycle model:
+**Project → StudyCase → Run → Snapshot**
+
+This is the **system layer** for MV-DESIGN-PRO, not UI.
+
+### 19.2 Implemented Components
+
+| Component | Description | Status |
+|-----------|-------------|--------|
+| **Project** | Root aggregate with `active_network_snapshot_id` | DONE |
+| **StudyCase** | Calculation configuration with `network_snapshot_id` binding | DONE |
+| **Run** (StudyRun) | Immutable calculation execution with `network_snapshot_id`, `solver_version_hash`, `result_state` | DONE |
+| **NetworkSnapshot** | First-class object with deterministic `fingerprint` (SHA-256) | DONE |
+| **LifecycleService** | Application service for result invalidation on model change | DONE |
+
+### 19.3 Key Invariants
+
+1. **Project.active_network_snapshot_id** — tracks current network state
+2. **StudyCase.network_snapshot_id** — binding to specific snapshot, invalidated on change
+3. **Run is immutable** — frozen dataclass, cannot be modified after creation
+4. **Snapshot.fingerprint** — deterministic SHA-256 hash of canonical JSON
+5. **Result invalidation** — when snapshot changes, FRESH → OUTDATED
+
+### 19.4 Files Modified
+
+| Layer | Files |
+|-------|-------|
+| **Domain** | `domain/models.py`, `domain/study_case.py` |
+| **Network Model** | `network_model/core/snapshot.py` |
+| **Persistence** | `infrastructure/persistence/models.py`, `infrastructure/persistence/repositories/*.py`, `infrastructure/persistence/unit_of_work.py` |
+| **Application** | `application/lifecycle/service.py` (NEW) |
+| **Tests** | `tests/test_p10a_lifecycle.py` (NEW, 22 tests) |
+
+### 19.5 Test Coverage
+
+- 22 determinism tests passing
+- Fingerprint determinism verified
+- Result invalidation lifecycle verified
+- Domain model immutability verified
+
+### 19.6 Exclusions (NOT modified)
+
+- ❌ Solvers (IEC 60909, Power Flow)
+- ❌ Result API
+- ❌ white_box_trace
+- ❌ UI / frontend
+- ❌ PROOF / P11
 
 ---
 

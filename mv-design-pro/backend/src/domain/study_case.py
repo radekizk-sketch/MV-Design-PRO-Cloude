@@ -123,7 +123,7 @@ class StudyCaseResult:
 @dataclass(frozen=True)
 class StudyCase:
     """
-    Study Case entity — configuration for calculations.
+    Study Case entity — configuration for calculations (P10a).
 
     INVARIANTS:
     - StudyCase is a configuration entity, NOT a domain entity
@@ -131,11 +131,19 @@ class StudyCase:
     - Contains only calculation parameters
     - Results belong to the case, not to the model
     - Exactly one case can be active per project
+
+    P10a ADDITIONS:
+    - network_snapshot_id: Reference to the snapshot this case was configured against
+    - When NetworkModel changes (new snapshot), result_status becomes OUTDATED
     """
     id: UUID
     project_id: UUID
     name: str
     description: str = ""
+
+    # P10a: Reference to the network snapshot this case is bound to
+    # When model changes (new snapshot_id), results become OUTDATED
+    network_snapshot_id: str | None = None
 
     # Configuration (calculation parameters only)
     config: StudyCaseConfig = field(default_factory=StudyCaseConfig)
@@ -167,6 +175,7 @@ class StudyCase:
             project_id=self.project_id,
             name=self.name,
             description=self.description,
+            network_snapshot_id=self.network_snapshot_id,
             config=config,
             result_status=StudyCaseResultStatus.OUTDATED if self.result_status == StudyCaseResultStatus.FRESH else self.result_status,
             is_active=self.is_active,
@@ -184,6 +193,7 @@ class StudyCase:
             project_id=self.project_id,
             name=name,
             description=self.description,
+            network_snapshot_id=self.network_snapshot_id,
             config=self.config,
             result_status=self.result_status,
             is_active=self.is_active,
@@ -201,6 +211,7 @@ class StudyCase:
             project_id=self.project_id,
             name=self.name,
             description=description,
+            network_snapshot_id=self.network_snapshot_id,
             config=self.config,
             result_status=self.result_status,
             is_active=self.is_active,
@@ -218,6 +229,7 @@ class StudyCase:
             project_id=self.project_id,
             name=self.name,
             description=self.description,
+            network_snapshot_id=self.network_snapshot_id,
             config=self.config,
             result_status=self.result_status,
             is_active=True,
@@ -235,6 +247,7 @@ class StudyCase:
             project_id=self.project_id,
             name=self.name,
             description=self.description,
+            network_snapshot_id=self.network_snapshot_id,
             config=self.config,
             result_status=self.result_status,
             is_active=False,
@@ -257,6 +270,7 @@ class StudyCase:
             project_id=self.project_id,
             name=self.name,
             description=self.description,
+            network_snapshot_id=self.network_snapshot_id,
             config=self.config,
             result_status=StudyCaseResultStatus.OUTDATED,
             is_active=self.is_active,
@@ -277,11 +291,42 @@ class StudyCase:
             project_id=self.project_id,
             name=self.name,
             description=self.description,
+            network_snapshot_id=self.network_snapshot_id,
             config=self.config,
             result_status=StudyCaseResultStatus.FRESH,
             is_active=self.is_active,
             result_refs=(*self.result_refs, result_ref),
             revision=self.revision,
+            created_at=self.created_at,
+            updated_at=datetime.now(timezone.utc),
+            study_payload=self.study_payload,
+        )
+
+    def with_network_snapshot_id(self, network_snapshot_id: str) -> StudyCase:
+        """
+        P10a: Bind this case to a new network snapshot.
+
+        INVALIDATION RULE (PowerFactory-grade):
+        - If snapshot changes AND case has FRESH results → mark as OUTDATED
+        - If snapshot changes AND case has NONE results → keep NONE
+        """
+        # Determine if results should be invalidated
+        new_status = self.result_status
+        if self.network_snapshot_id != network_snapshot_id:
+            if self.result_status == StudyCaseResultStatus.FRESH:
+                new_status = StudyCaseResultStatus.OUTDATED
+
+        return StudyCase(
+            id=self.id,
+            project_id=self.project_id,
+            name=self.name,
+            description=self.description,
+            network_snapshot_id=network_snapshot_id,
+            config=self.config,
+            result_status=new_status,
+            is_active=self.is_active,
+            result_refs=self.result_refs,
+            revision=self.revision + 1,
             created_at=self.created_at,
             updated_at=datetime.now(timezone.utc),
             study_payload=self.study_payload,
@@ -293,6 +338,7 @@ class StudyCase:
 
         CLONING RULES (PowerFactory-style):
         - Configuration is copied
+        - network_snapshot_id is copied (same snapshot binding)
         - Results are NOT copied (status = NONE)
         - New case is NOT active
         """
@@ -302,6 +348,7 @@ class StudyCase:
             project_id=self.project_id,
             name=new_name or f"{self.name} (kopia)",
             description=self.description,
+            network_snapshot_id=self.network_snapshot_id,  # P10a: Copy snapshot binding
             config=self.config,
             result_status=StudyCaseResultStatus.NONE,  # No results for clone
             is_active=False,  # Clone is not active
@@ -319,6 +366,7 @@ class StudyCase:
             "project_id": str(self.project_id),
             "name": self.name,
             "description": self.description,
+            "network_snapshot_id": self.network_snapshot_id,  # P10a
             "config": self.config.to_dict(),
             "result_status": self.result_status.value,
             "is_active": self.is_active,
@@ -341,6 +389,7 @@ class StudyCase:
             project_id=UUID(data["project_id"]),
             name=data["name"],
             description=data.get("description", ""),
+            network_snapshot_id=data.get("network_snapshot_id"),  # P10a
             config=config,
             result_status=StudyCaseResultStatus(data.get("result_status", "NONE")),
             is_active=data.get("is_active", False),
@@ -358,9 +407,10 @@ def new_study_case(
     description: str = "",
     config: StudyCaseConfig | None = None,
     is_active: bool = False,
+    network_snapshot_id: str | None = None,
 ) -> StudyCase:
     """
-    Factory function to create a new StudyCase.
+    Factory function to create a new StudyCase (P10a).
 
     Args:
         project_id: ID of the project this case belongs to
@@ -368,6 +418,7 @@ def new_study_case(
         description: Optional description
         config: Calculation configuration (defaults to standard values)
         is_active: Whether this case should be active
+        network_snapshot_id: P10a - Snapshot this case is bound to
 
     Returns:
         New StudyCase instance with status NONE
@@ -379,6 +430,7 @@ def new_study_case(
         project_id=project_id,
         name=name,
         description=description,
+        network_snapshot_id=network_snapshot_id,
         config=cfg,
         result_status=StudyCaseResultStatus.NONE,
         is_active=is_active,
