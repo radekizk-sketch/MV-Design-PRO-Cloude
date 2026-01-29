@@ -22,6 +22,42 @@ from network_model.catalog.governance import (
 )
 
 
+def _has_whitespace_outside_strings(s: str) -> bool:
+    """
+    Check if JSON string contains whitespace outside of string values.
+
+    Returns True if structural whitespace (spaces, newlines, tabs) exists
+    outside of JSON string literals. Spacje wewnątrz stringów (np. "Line A")
+    są legalne i nie są wykrywane.
+
+    Args:
+        s: JSON string to check
+
+    Returns:
+        True if whitespace found outside strings, False otherwise
+    """
+    in_str = False
+    esc = False
+    for ch in s:
+        if in_str:
+            if esc:
+                esc = False
+                continue
+            if ch == "\\":
+                esc = True
+                continue
+            if ch == '"':
+                in_str = False
+            continue
+        else:
+            if ch == '"':
+                in_str = True
+                continue
+            if ch in (" ", "\n", "\t", "\r"):
+                return True
+    return False
+
+
 def test_sort_types_deterministically():
     """Types are sorted by (name, id)."""
     types = [
@@ -146,7 +182,7 @@ def test_fingerprint_changes_with_content():
 
 
 def test_canonical_json_is_deterministic():
-    """Same export → identical canonical JSON (no whitespace variance)."""
+    """Same export → identical canonical JSON (no structural whitespace variance)."""
     manifest = TypeLibraryManifest(
         library_id="lib1",
         name_pl="Test",
@@ -170,7 +206,7 @@ def test_canonical_json_is_deterministic():
     json2 = export.to_canonical_json()
 
     assert json1 == json2
-    assert " " not in json1  # No whitespace
+    assert not _has_whitespace_outside_strings(json1)  # No structural whitespace outside JSON strings
 
 
 def test_manifest_to_dict_preserves_order():
