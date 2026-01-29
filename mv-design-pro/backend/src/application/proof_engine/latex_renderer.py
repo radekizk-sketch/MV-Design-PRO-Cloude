@@ -105,6 +105,10 @@ class LaTeXRenderer:
             rf"  \item Wersja solvera: {cls._escape(h.solver_version)}",
         ]
 
+        if h.target_id:
+            lines.append(rf"  \item Element: {cls._escape(h.target_id)}")
+        if h.element_kind:
+            lines.append(rf"  \item Typ elementu: {cls._escape(h.element_kind)}")
         if h.fault_location:
             lines.append(rf"  \item Miejsce zwarcia: {cls._escape(h.fault_location)}")
         if h.fault_type:

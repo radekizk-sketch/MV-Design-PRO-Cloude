@@ -1279,7 +1279,7 @@ Wszystkie pakiety pozostają POST-HOC i nie modyfikują solverów ani Result API
 
 ### P15 — Load Currents & Overload Proof Pack
 
-**Status:** CANONICAL | IN PROGRESS
+**Status:** DONE | CANONICAL & BINDING
 
 - Prądy robocze LINE / CABLE / TRANSFORMER
 - Przeciążenia (%In, %Sn), warianty A/B + $$\Delta$$
@@ -1287,14 +1287,14 @@ Wszystkie pakiety pozostają POST-HOC i nie modyfikują solverów ani Result API
 - **Prerequisite:** P11.1a, P14
 
 **DoD (target):**
-- [ ] Prądy obciążenia linii/kabli wyprowadzone z mocy pozornej.
+- [x] Prądy obciążenia linii/kabli wyprowadzone z mocy pozornej.
 
   $$
   I = \frac{S}{\sqrt{3} \cdot U}
   $$
 
-- [ ] Przeciążenia linii/kabli (%In) z pełną weryfikacją jednostek.
-- [ ] Transformator: relacja obciążenia do mocy znamionowej i overload %.
+- [x] Przeciążenia linii/kabli (%In) z pełną weryfikacją jednostek.
+- [x] Transformator: relacja obciążenia do mocy znamionowej i overload %.
 
   $$
   \frac{S}{S_n}

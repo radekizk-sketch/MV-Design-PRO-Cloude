@@ -39,6 +39,8 @@ def _proof_header_from_dict(payload: dict[str, Any]) -> ProofHeader:
         case_name=str(payload.get("case_name", "")),
         run_timestamp=_parse_datetime(payload.get("run_timestamp")),
         solver_version=str(payload.get("solver_version", "")),
+        target_id=payload.get("target_id"),
+        element_kind=payload.get("element_kind"),
         fault_location=payload.get("fault_location"),
         fault_type=payload.get("fault_type"),
         voltage_factor=_optional_float(payload.get("voltage_factor")),
@@ -52,6 +54,10 @@ def _proof_summary_from_dict(payload: dict[str, Any]) -> ProofSummary:
         key: _proof_value_from_dict(value)
         for key, value in payload.get("key_results", {}).items()
     }
+    counterfactual_diff = {
+        key: _proof_value_from_dict(value)
+        for key, value in payload.get("counterfactual_diff", {}).items()
+    }
     warnings = tuple(payload.get("warnings", []) or ())
     return ProofSummary(
         key_results=key_results,
@@ -60,6 +66,7 @@ def _proof_summary_from_dict(payload: dict[str, Any]) -> ProofSummary:
         warnings=warnings,
         overall_status=payload.get("overall_status"),
         failed_checks=tuple(payload.get("failed_checks", []) or ()),
+        counterfactual_diff=counterfactual_diff,
     )
 
 

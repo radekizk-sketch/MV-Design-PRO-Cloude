@@ -284,6 +284,8 @@ class ProofInspector:
             case_name=h.case_name,
             run_timestamp=h.run_timestamp,
             solver_version=h.solver_version,
+            target_id=h.target_id,
+            element_kind=h.element_kind,
             fault_location=h.fault_location,
             fault_type=h.fault_type,
             voltage_factor=h.voltage_factor,
@@ -362,7 +364,52 @@ class ProofInspector:
 
         Sprawdza obecnosc kluczy delta_* w key_results.
         """
-        kr = self._document.summary.key_results
+        summary = self._document.summary
+        kr = summary.key_results
+        proof_type = self._document.proof_type.value
+
+        if proof_type == ProofType.LOAD_CURRENTS_OVERLOAD.value:
+            rows: list[CounterfactualRow] = []
+            diff = summary.counterfactual_diff
+
+            def _coerce_float(value: object) -> float | None:
+                if isinstance(value, (int, float)):
+                    return float(value)
+                return None
+
+            def _add_row(key: str, symbol_latex: str, unit: str) -> None:
+                key_a = f"{key}_a"
+                key_b = f"{key}_b"
+                key_d = f"delta_{key}"
+                if key_a not in kr or key_b not in kr or key_d not in diff:
+                    return
+                value_a = _coerce_float(kr[key_a].value)
+                value_b = _coerce_float(kr[key_b].value)
+                delta = _coerce_float(diff[key_d].value)
+                if value_a is None or value_b is None or delta is None:
+                    return
+                rows.append(CounterfactualRow(
+                    name=key,
+                    symbol_latex=symbol_latex,
+                    unit=unit,
+                    value_a=value_a,
+                    value_b=value_b,
+                    delta=delta,
+                ))
+
+            _add_row("s_mva", r"S", "MVA")
+            _add_row("i_ka", r"I", "kA")
+            _add_row("k_i_percent", r"k_{I}", "%")
+            _add_row("m_i_percent", r"m_{I}", "%")
+            _add_row("k_s_percent", r"k_{S}", "%")
+            _add_row("m_s_percent", r"m_{S}", "%")
+
+            if rows:
+                return True, CounterfactualView(
+                    rows=tuple(rows),
+                    has_vdrop_data=False,
+                )
+            return False, None
 
         # Check for counterfactual markers
         is_cf = (
