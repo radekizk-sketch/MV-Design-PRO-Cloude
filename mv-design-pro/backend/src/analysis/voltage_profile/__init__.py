@@ -1,6 +1,5 @@
 """Voltage profile (BUS-centric) view builder (P21)."""
 
-from analysis.voltage_profile.builder import VoltageProfileBuilder
 from analysis.voltage_profile.models import (
     VoltageProfileContext,
     VoltageProfileRow,
@@ -17,3 +16,11 @@ __all__ = [
     "VoltageProfileSummary",
     "VoltageProfileView",
 ]
+
+
+def __getattr__(name: str):
+    if name == "VoltageProfileBuilder":
+        from analysis.voltage_profile.builder import VoltageProfileBuilder
+
+        return VoltageProfileBuilder
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

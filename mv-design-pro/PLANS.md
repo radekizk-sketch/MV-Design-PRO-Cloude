@@ -1359,6 +1359,54 @@ Warstwa analityczna dla selektywności i rezerwowości zabezpieczeń (P22a), bez
 
 ---
 
+## 12.13. Phase 2.x.8: PDF REPORT P24+ (ETAP+ SUPERIOR)
+
+### 12.13.1. Cel fazy
+
+Wdrożenie **deterministycznego raportu PDF P24+** klasy **ETAP+**:
+- jawna ścieżka decyzyjna (WHY + margines + limit),
+- osobna sekcja NOT COMPUTED,
+- ranking krytycznych BUS,
+- jawny ślad dowodowy (ProofDocument ID + hash),
+- deterministyczny PDF (byte-identical).
+
+**INVARIANT:** brak zmian w solverach i Result API.
+
+---
+
+### 12.13.2. Zakres fazy
+
+| W zakresie | Poza zakresem |
+|------------|---------------|
+| Renderer PDF (backend) | Solver changes |
+| Layout P24+ (sekcje stałe) | Frontend/UI |
+| Determinism + hash | Krzywe I–t |
+| Testy determinism | Zmiany P20/P18 |
+
+---
+
+### 12.13.3. Deliverables
+
+| Plik | Opis | Status |
+|------|------|--------|
+| `backend/src/analysis/reporting/pdf/` | Renderer PDF P24+ (deterministic) | DONE |
+| `backend/tests/analysis/test_pdf_report_p24_plus.py` | Testy: determinism, NOT COMPUTED, WHY, ranking | DONE |
+| `docs/ui/PDF_REPORT_SUPERIOR_CONTRACT.md` | Kontrakt raportu P24+ (ETAP+) | DONE |
+| `docs/INDEX.md` | Link do kontraktu P24+ | DONE |
+
+---
+
+### 12.13.4. Completed Tasks
+
+- [x] Implementacja deterministycznego renderera PDF P24+ (reportlab, invariant=1).
+- [x] Jawna ścieżka decyzyjna: źródło → reguła → wartość → limit → margines → decyzja.
+- [x] Sekcja NOT COMPUTED z brakami danych.
+- [x] Ranking Top 5 krytycznych BUS (P21).
+- [x] Sekcja śladu dowodowego (ProofDocument ID + hash).
+- [x] Testy determinism i kompletności sekcji.
+
+---
+
 ## 19. Proof Packs Roadmap (P15–P20) — CANONICAL
 
 Poniższa roadmapa jest **jedynym kanonicznym planem** rozwoju Proof Packów.
