@@ -20,6 +20,7 @@ class ProjectRepository:
                 name=project.name,
                 description=project.description,
                 schema_version=project.schema_version,
+                active_network_snapshot_id=project.active_network_snapshot_id,  # P10a
                 pcc_node_id=None,
                 sources_jsonb=[],
                 created_at=project.created_at,
@@ -39,6 +40,7 @@ class ProjectRepository:
             name=result.name,
             description=result.description,
             schema_version=result.schema_version,
+            active_network_snapshot_id=result.active_network_snapshot_id,  # P10a
             created_at=result.created_at,
             updated_at=result.updated_at,
         )
@@ -52,6 +54,7 @@ class ProjectRepository:
                 name=row.name,
                 description=row.description,
                 schema_version=row.schema_version,
+                active_network_snapshot_id=row.active_network_snapshot_id,  # P10a
                 created_at=row.created_at,
                 updated_at=row.updated_at,
             )
@@ -64,6 +67,7 @@ class ProjectRepository:
         row.name = project.name
         row.description = project.description
         row.schema_version = project.schema_version
+        row.active_network_snapshot_id = project.active_network_snapshot_id  # P10a
         row.updated_at = project.updated_at
         if commit:
             self._session.commit()
@@ -97,5 +101,21 @@ class ProjectRepository:
         stmt = select(ProjectORM).where(ProjectORM.id == project_id)
         row = self._session.execute(stmt).scalar_one()
         row.sources_jsonb = sources
+        if commit:
+            self._session.commit()
+
+    # P10a: Active network snapshot management
+    def get_active_snapshot_id(self, project_id: UUID) -> str | None:
+        """P10a: Get the active network snapshot ID for a project."""
+        stmt = select(ProjectORM.active_network_snapshot_id).where(ProjectORM.id == project_id)
+        return self._session.execute(stmt).scalar_one_or_none()
+
+    def set_active_snapshot_id(
+        self, project_id: UUID, snapshot_id: str | None, *, commit: bool = True
+    ) -> None:
+        """P10a: Set the active network snapshot ID for a project."""
+        stmt = select(ProjectORM).where(ProjectORM.id == project_id)
+        row = self._session.execute(stmt).scalar_one()
+        row.active_network_snapshot_id = snapshot_id
         if commit:
             self._session.commit()

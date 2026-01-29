@@ -25,9 +25,16 @@ from infrastructure.persistence.repositories.project_repository import ProjectRe
 from infrastructure.persistence.repositories.result_repository import ResultRepository
 from infrastructure.persistence.repositories.snapshot_repository import SnapshotRepository
 from infrastructure.persistence.repositories.sld_repository import SldRepository
+from infrastructure.persistence.repositories.study_run_repository import StudyRunRepository
 
 
 class UnitOfWork(AbstractContextManager["UnitOfWork"]):
+    """
+    Unit of Work pattern for transactional operations.
+
+    P10a: Added study_runs repository for Run lifecycle management.
+    """
+
     def __init__(self, session_factory: sessionmaker[Session]) -> None:
         self._session_factory = session_factory
         self.session: Session | None = None
@@ -40,6 +47,7 @@ class UnitOfWork(AbstractContextManager["UnitOfWork"]):
         self.analysis_runs: AnalysisRunRepository | None = None
         self.analysis_runs_index: AnalysisRunIndexRepository | None = None
         self.snapshots: SnapshotRepository | None = None
+        self.study_runs: StudyRunRepository | None = None  # P10a
         self.design_specs: DesignSpecRepository | None = None
         self.design_proposals: DesignProposalRepository | None = None
         self.design_evidence: DesignEvidenceRepository | None = None
@@ -55,6 +63,7 @@ class UnitOfWork(AbstractContextManager["UnitOfWork"]):
         self.analysis_runs = AnalysisRunRepository(self.session)
         self.analysis_runs_index = AnalysisRunIndexRepository(self.session)
         self.snapshots = SnapshotRepository(self.session)
+        self.study_runs = StudyRunRepository(self.session)  # P10a
         self.design_specs = DesignSpecRepository(self.session)
         self.design_proposals = DesignProposalRepository(self.session)
         self.design_evidence = DesignEvidenceRepository(self.session)

@@ -1,13 +1,19 @@
 """
-Case Repository — P10 FULL MAX
+Case Repository — P10a STATE / LIFECYCLE
 
 Repository for OperatingCase and StudyCase entities.
 Implements full CRUD, clone, and active case management for StudyCase.
+
+P10a ADDITIONS:
+- network_snapshot_id binding for StudyCase
+- Snapshot-based invalidation methods
+- Snapshot binding update methods
 
 INVARIANTS:
 - Exactly one StudyCase can be active per project
 - Setting a case as active deactivates all other cases in the project
 - Result status is managed via dedicated methods
+- When snapshot changes, FRESH cases become OUTDATED
 """
 
 from __future__ import annotations
@@ -102,7 +108,7 @@ class CaseRepository:
     # =========================================================================
 
     def _row_to_study_case(self, row: StudyCaseORM) -> StudyCase:
-        """Convert ORM row to StudyCase domain entity."""
+        """Convert ORM row to StudyCase domain entity (P10a)."""
         config = StudyCaseConfig.from_dict(row.study_jsonb)
         result_refs = tuple(
             StudyCaseResult.from_dict(ref)
@@ -113,6 +119,7 @@ class CaseRepository:
             project_id=row.project_id,
             name=row.name,
             description=row.description or "",
+            network_snapshot_id=row.network_snapshot_id,  # P10a
             config=config,
             result_status=StudyCaseResultStatus(row.result_status or "NONE"),
             is_active=row.is_active or False,
@@ -124,12 +131,13 @@ class CaseRepository:
         )
 
     def add_study_case(self, case: StudyCase, *, commit: bool = True) -> None:
-        """Add a new StudyCase to the database."""
+        """Add a new StudyCase to the database (P10a)."""
         # Support both old (study_payload) and new (P10: config, is_active, etc.) models
         is_active = getattr(case, "is_active", False)
         description = getattr(case, "description", "")
         result_status = getattr(case, "result_status", None)
         result_refs = getattr(case, "result_refs", ())
+        network_snapshot_id = getattr(case, "network_snapshot_id", None)  # P10a
 
         # Determine study_jsonb from config (P10) or study_payload (legacy)
         if hasattr(case, "config") and case.config is not None:
@@ -147,6 +155,7 @@ class CaseRepository:
                 project_id=case.project_id,
                 name=case.name,
                 description=description,
+                network_snapshot_id=network_snapshot_id,  # P10a
                 study_jsonb=study_jsonb,
                 is_active=is_active,
                 result_status=result_status.value if result_status else "NONE",
@@ -160,7 +169,7 @@ class CaseRepository:
             self._session.commit()
 
     def update_study_case(self, case: StudyCase, *, commit: bool = True) -> None:
-        """Update an existing StudyCase."""
+        """Update an existing StudyCase (P10a)."""
         stmt = select(StudyCaseORM).where(StudyCaseORM.id == case.id)
         row = self._session.execute(stmt).scalar_one()
 
@@ -169,6 +178,7 @@ class CaseRepository:
         description = getattr(case, "description", "")
         result_status = getattr(case, "result_status", None)
         result_refs = getattr(case, "result_refs", ())
+        network_snapshot_id = getattr(case, "network_snapshot_id", None)  # P10a
 
         if hasattr(case, "config") and case.config is not None:
             study_jsonb = case.config.to_dict()
@@ -181,6 +191,7 @@ class CaseRepository:
 
         row.name = case.name
         row.description = description
+        row.network_snapshot_id = network_snapshot_id  # P10a
         row.study_jsonb = study_jsonb
         row.is_active = is_active
         row.result_status = result_status.value if result_status else "NONE"
@@ -361,3 +372,77 @@ class CaseRepository:
         """Count StudyCases for a project."""
         stmt = select(StudyCaseORM).where(StudyCaseORM.project_id == project_id)
         return len(self._session.execute(stmt).scalars().all())
+
+    # P10a: Snapshot-based operations
+    def list_cases_by_snapshot(self, network_snapshot_id: str) -> list[StudyCase]:
+        """P10a: List all StudyCases bound to a specific network snapshot."""
+        stmt = select(StudyCaseORM).where(
+            StudyCaseORM.network_snapshot_id == network_snapshot_id
+        )
+        rows = self._session.execute(stmt).scalars().all()
+        return [self._row_to_study_case(row) for row in rows]
+
+    def invalidate_cases_for_snapshot(
+        self, network_snapshot_id: str, *, commit: bool = True
+    ) -> int:
+        """
+        P10a: Mark all StudyCases bound to a snapshot as OUTDATED.
+
+        Called when network model changes (new snapshot is created).
+        Returns the number of cases invalidated.
+        """
+        stmt = (
+            update(StudyCaseORM)
+            .where(StudyCaseORM.network_snapshot_id == network_snapshot_id)
+            .where(StudyCaseORM.result_status == "FRESH")
+            .values(
+                result_status="OUTDATED",
+                updated_at=datetime.now(timezone.utc),
+            )
+        )
+        result = self._session.execute(stmt)
+        if commit:
+            self._session.commit()
+        return result.rowcount
+
+    def update_cases_snapshot_binding(
+        self,
+        project_id: UUID,
+        old_snapshot_id: str | None,
+        new_snapshot_id: str,
+        *,
+        commit: bool = True,
+    ) -> int:
+        """
+        P10a: Update all cases bound to old snapshot to reference new snapshot.
+
+        Also marks them as OUTDATED since the model changed.
+        Returns the number of cases updated.
+        """
+        if old_snapshot_id is None:
+            # Bind all cases without a snapshot
+            stmt = (
+                update(StudyCaseORM)
+                .where(StudyCaseORM.project_id == project_id)
+                .where(StudyCaseORM.network_snapshot_id.is_(None))
+                .values(
+                    network_snapshot_id=new_snapshot_id,
+                    updated_at=datetime.now(timezone.utc),
+                )
+            )
+        else:
+            # Update cases from old to new snapshot, mark as OUTDATED
+            stmt = (
+                update(StudyCaseORM)
+                .where(StudyCaseORM.project_id == project_id)
+                .where(StudyCaseORM.network_snapshot_id == old_snapshot_id)
+                .values(
+                    network_snapshot_id=new_snapshot_id,
+                    result_status="OUTDATED",
+                    updated_at=datetime.now(timezone.utc),
+                )
+            )
+        result = self._session.execute(stmt)
+        if commit:
+            self._session.commit()
+        return result.rowcount
