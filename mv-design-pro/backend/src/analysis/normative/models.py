@@ -26,6 +26,8 @@ class NormativeSeverity(str, Enum):
 class NormativeConfig:
     loading_warn_pct: float = 80.0
     loading_fail_pct: float = 100.0
+    voltage_warn_pct: float = 5.0
+    voltage_fail_pct: float = 10.0
     touch_voltage_warn_v: float | None = None
     touch_voltage_fail_v: float | None = None
     selectivity_required: bool = True
@@ -43,6 +45,8 @@ class NormativeConfig:
             "standard_ref": self.standard_ref,
             "touch_voltage_fail_v": self.touch_voltage_fail_v,
             "touch_voltage_warn_v": self.touch_voltage_warn_v,
+            "voltage_fail_pct": self.voltage_fail_pct,
+            "voltage_warn_pct": self.voltage_warn_pct,
         }
 
 

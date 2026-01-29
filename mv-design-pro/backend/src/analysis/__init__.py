@@ -2,4 +2,5 @@
 
 __all__ = [
     "normative",
+    "voltage_profile",
 ]
