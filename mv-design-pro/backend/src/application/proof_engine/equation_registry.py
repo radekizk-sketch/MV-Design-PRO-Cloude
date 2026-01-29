@@ -821,6 +821,117 @@ EQ_LC_006 = EquationDefinition(
 
 
 # =============================================================================
+# P17: Losses Energy Profile — Kanoniczne równania (BINDING)
+# =============================================================================
+
+EQ_LE_001 = EquationDefinition(
+    equation_id="EQ_LE_001",
+    name_pl="Krok czasowy profilu strat",
+    standard_ref="—",
+    latex=r"\Delta t_i = t_{i} - t_{i-1}",
+    symbols=(
+        SymbolDefinition(
+            symbol="\\Delta t_i",
+            unit="h",
+            description_pl="Przyrost czasu",
+            mapping_key="delta_t_h",
+        ),
+        SymbolDefinition(
+            symbol="t_{i}",
+            unit="h",
+            description_pl="Czas bieżący",
+            mapping_key="t_h",
+        ),
+        SymbolDefinition(
+            symbol="t_{i-1}",
+            unit="h",
+            description_pl="Czas poprzedni",
+            mapping_key="t_h",
+        ),
+    ),
+    unit_derivation="h - h = h",
+)
+
+EQ_LE_002 = EquationDefinition(
+    equation_id="EQ_LE_002",
+    name_pl="Energia w kroku profilu strat",
+    standard_ref="—",
+    latex=r"E_i = P_{loss,i}\cdot \Delta t_i",
+    symbols=(
+        SymbolDefinition(
+            symbol="E_i",
+            unit="kWh",
+            description_pl="Energia strat w kroku",
+            mapping_key="e_i_kwh",
+        ),
+        SymbolDefinition(
+            symbol="P_{loss,i}",
+            unit="kW",
+            description_pl="Moc strat w kroku",
+            mapping_key="p_loss_kw",
+        ),
+        SymbolDefinition(
+            symbol="\\Delta t_i",
+            unit="h",
+            description_pl="Przyrost czasu",
+            mapping_key="delta_t_h",
+        ),
+    ),
+    unit_derivation="kW · h = kWh",
+)
+
+EQ_LE_003 = EquationDefinition(
+    equation_id="EQ_LE_003",
+    name_pl="Suma energii strat",
+    standard_ref="—",
+    latex=r"E_{loss}=\sum_i E_i",
+    symbols=(
+        SymbolDefinition(
+            symbol="E_{loss}",
+            unit="kWh",
+            description_pl="Energia strat",
+            mapping_key="e_loss_kwh",
+        ),
+        SymbolDefinition(
+            symbol="E_i",
+            unit="kWh",
+            description_pl="Energia strat w kroku",
+            mapping_key="e_i_kwh",
+        ),
+    ),
+    unit_derivation="kWh + ... = kWh",
+)
+
+EQ_LE_004 = EquationDefinition(
+    equation_id="EQ_LE_004",
+    name_pl="Energia strat (wariant stały)",
+    standard_ref="—",
+    latex=r"E_{loss}=P_{loss}\cdot t",
+    symbols=(
+        SymbolDefinition(
+            symbol="E_{loss}",
+            unit="kWh",
+            description_pl="Energia strat",
+            mapping_key="e_loss_kwh",
+        ),
+        SymbolDefinition(
+            symbol="P_{loss}",
+            unit="kW",
+            description_pl="Moc strat",
+            mapping_key="p_loss_kw",
+        ),
+        SymbolDefinition(
+            symbol="t",
+            unit="h",
+            description_pl="Czas trwania",
+            mapping_key="t_h",
+        ),
+    ),
+    unit_derivation="kW · h = kWh",
+)
+
+
+# =============================================================================
 # Q(U) Regulation — Kanoniczne równania (BINDING) P11.1b
 # =============================================================================
 
@@ -1467,6 +1578,14 @@ LC_EQUATIONS: dict[str, EquationDefinition] = {
     "EQ_LC_006": EQ_LC_006,
 }
 
+# P17: Losses Energy Profile equations registry
+LE_EQUATIONS: dict[str, EquationDefinition] = {
+    "EQ_LE_001": EQ_LE_001,
+    "EQ_LE_002": EQ_LE_002,
+    "EQ_LE_003": EQ_LE_003,
+    "EQ_LE_004": EQ_LE_004,
+}
+
 # Q(U) equations registry (P11.1b + P11.1c)
 QU_EQUATIONS: dict[str, EquationDefinition] = {
     "EQ_QU_001": EQ_QU_001,
@@ -1519,6 +1638,14 @@ LC_STEP_ORDER: list[str] = [
     "EQ_LC_006",  # Margines transformatora
 ]
 
+# Step order for P17 (BINDING)
+LE_STEP_ORDER: list[str] = [
+    "EQ_LE_001",  # Δt_i = t_i - t_{i-1}
+    "EQ_LE_002",  # E_i = P_loss,i * Δt_i
+    "EQ_LE_003",  # E_loss = Σ E_i
+    "EQ_LE_004",  # E_loss = P_loss * t (wariant stały)
+]
+
 # Step order for Q(U) proof (BINDING) — P11.1b + P11.1c
 QU_STEP_ORDER: list[str] = [
     "EQ_QU_001",  # ΔU = U_meas - U_ref
@@ -1559,6 +1686,7 @@ FROZEN_IDS: dict[str, list[str]] = {
     "vdrop_equations": list(VDROP_EQUATIONS.keys()),
     "sc1_equations": list(SC1_EQUATIONS.keys()),
     "lc_equations": list(LC_EQUATIONS.keys()),
+    "le_equations": list(LE_EQUATIONS.keys()),
     "mapping_keys": [
         # SC3F
         "ikss_ka", "ip_ka", "ith_ka", "idyn_ka", "sk_mva",
@@ -1577,6 +1705,8 @@ FROZEN_IDS: dict[str, list[str]] = {
         # P15
         "u_ll_kv", "p_mw", "q_mvar", "s_mva", "i_ka", "in_a",
         "k_i_percent", "m_i_percent", "sn_mva", "k_s_percent", "m_s_percent",
+        # P17
+        "t_h", "p_loss_kw", "delta_t_h", "e_i_kwh", "e_loss_kwh",
     ],
 }
 
@@ -1584,6 +1714,7 @@ registry = _EquationRegistryStore()
 registry.merge(SC3F_EQUATIONS)
 registry.merge(VDROP_EQUATIONS)
 registry.merge(LC_EQUATIONS)
+registry.merge(LE_EQUATIONS)
 registry.merge(QU_EQUATIONS)
 registry.merge(SC1_EQUATIONS)
 registry.merge(LS_EQUATIONS)
@@ -1632,6 +1763,16 @@ class EquationRegistry:
     def get_lc_step_order(cls) -> list[str]:
         """Zwraca kolejność kroków dla dowodu P15."""
         return LC_STEP_ORDER.copy()
+
+    @classmethod
+    def get_le_equations(cls) -> dict[str, EquationDefinition]:
+        """Zwraca wszystkie równania P17 (Losses Energy)."""
+        return LE_EQUATIONS.copy()
+
+    @classmethod
+    def get_le_step_order(cls) -> list[str]:
+        """Zwraca kolejność kroków dla dowodu P17."""
+        return LE_STEP_ORDER.copy()
 
     @classmethod
     def get_qu_equations(cls) -> dict[str, EquationDefinition]:
@@ -1695,6 +1836,10 @@ class EquationRegistry:
             if eq_id not in LC_EQUATIONS:
                 raise ValueError(f"Frozen equation ID {eq_id} usunięty z P15!")
 
+        for eq_id in FROZEN_IDS["le_equations"]:
+            if eq_id not in LE_EQUATIONS:
+                raise ValueError(f"Frozen equation ID {eq_id} usunięty z P17!")
+
         current_keys = cls.get_all_mapping_keys()
         for key in FROZEN_IDS["mapping_keys"]:
             if key not in current_keys:
@@ -1711,11 +1856,13 @@ class EquationRegistry:
 EquationRegistry.SC3F_EQUATIONS = SC3F_EQUATIONS
 EquationRegistry.VDROP_EQUATIONS = VDROP_EQUATIONS
 EquationRegistry.LC_EQUATIONS = LC_EQUATIONS
+EquationRegistry.LE_EQUATIONS = LE_EQUATIONS
 EquationRegistry.QU_EQUATIONS = QU_EQUATIONS
 EquationRegistry.SC1_EQUATIONS = SC1_EQUATIONS
 EquationRegistry.SC3F_PROOF_STEP_ORDER = SC3F_PROOF_STEP_ORDER
 EquationRegistry.VDROP_STEP_ORDER = VDROP_STEP_ORDER
 EquationRegistry.LC_STEP_ORDER = LC_STEP_ORDER
+EquationRegistry.LE_STEP_ORDER = LE_STEP_ORDER
 EquationRegistry.QU_STEP_ORDER = QU_STEP_ORDER
 EquationRegistry.SC1FZ_STEP_ORDER = SC1FZ_STEP_ORDER
 EquationRegistry.SC2F_STEP_ORDER = SC2F_STEP_ORDER

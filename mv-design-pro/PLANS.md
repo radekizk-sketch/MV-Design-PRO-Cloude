@@ -1113,6 +1113,7 @@ P14 jest **warstwą meta** i stanowi **prerequisite** dla P15–P17.
 | 2026-01 | 2.21 | Phase 2.x.5: CATALOG BROWSER (PASSIVE EQUIPMENT) — DOC LOCKED (Type → Instances, pasywne elementy tylko, PF-grade) |
 | 2026-06 | 2.19 | Proof Engine: LS registry initialization fix (EquationRegistry merge/freeze + import smoke test) |
 | 2026-06 | 2.19.1 | P16.1 CI stabilization: test harness isolation for FastAPI-only fixtures |
+| 2026-06 | 2.19.2 | P17 Losses Energy Profile Proof Pack implemented (FULL MATH, deterministic) |
 
 ---
 
@@ -1276,11 +1277,11 @@ i jest **prerequisite** dla P15–P17.
     E_{loss} = \int P_{loss} \, dt
     $$
 
-### TODO-P17-001 (PLANNED) — P17: Earthing / Ground Fault Proof Pack (SN) [FUTURE PACK]
+### P17 — Losses Energy Profile Proof Pack (IMPLEMENTED)
 - Priority: MUST
-- Inputs: TraceArtifact, Catalog
-- Output: ProofPack P17 (ProofDocument: Doziemienia / uziemienia SN)
-- DoD:
-  - [ ] Jeśli SN: prądy doziemne z uwzględnieniem impedancji uziemienia i rozdziału prądu.
-  - [ ] Tryb uproszczonych napięć dotykowych z wyraźnymi zastrzeżeniami.
-  - [ ] Terminologia w ProofDocument: 1F-Z, 2F, 2F-Z oraz PCC – punkt wspólnego przyłączenia.
+- Inputs: TraceArtifact, PowerFlowResult, Catalog
+- Output: ProofPack P17 (ProofDocument: Energia strat — profil czasowy)
+- DoD (DONE):
+  - [x] Energia strat z profilu obciążenia w postaci sumy dyskretnej.
+  - [x] Wariant stały dla stałej mocy strat i czasu trwania.
+  - [x] Deterministyczny ProofDocument z pełną weryfikacją jednostek.

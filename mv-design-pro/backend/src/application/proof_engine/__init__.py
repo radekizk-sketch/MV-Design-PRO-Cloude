@@ -17,9 +17,12 @@ Moduły:
 
 from application.proof_engine.types import (
     EquationDefinition,
+    EnergyProfilePoint,
     LoadCurrentsCounterfactualInput,
     LoadCurrentsInput,
     LoadElementKind,
+    LossesEnergyInput,
+    LossesEnergyTargetKind,
     ProofDocument,
     ProofHeader,
     ProofStep,
@@ -66,9 +69,12 @@ from application.proof_engine.proof_inspector import (
 __all__ = [
     # Types
     "EquationDefinition",
+    "EnergyProfilePoint",
     "LoadCurrentsCounterfactualInput",
     "LoadCurrentsInput",
     "LoadElementKind",
+    "LossesEnergyInput",
+    "LossesEnergyTargetKind",
     "ProofDocument",
     "ProofHeader",
     "ProofStep",
