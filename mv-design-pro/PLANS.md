@@ -1190,6 +1190,7 @@ P14 jest **warstwą meta** i stanowi **prerequisite** dla P15–P20.
 | 2026-06 | 2.22.2 | P17 Losses Energy Profile Proof Pack implemented (FULL MATH, deterministic) |
 | 2026-01 | 2.23 | **P10a STATE / LIFECYCLE** — Project → StudyCase → Run → Snapshot model (DONE) |
 | 2026-01 | 2.24 | **P10b RESULT STATE + COMPARISON** — RunResultState + Case A/B Comparison Service (DONE) |
+| 2026-01 | 2.25 | **P11a RESULTS INSPECTOR** — READ-ONLY Results Inspector + Trace View + SLD Overlay API (DONE) |
 
 _Versioning note: entries are normalized to 2.22.x to preserve monotonic versioning and avoid legacy 2.19.x references._
 
@@ -1322,6 +1323,89 @@ Response: RunComparisonResult with all computed deltas
 - ❌ white_box_trace
 - ❌ UI / frontend
 - ❌ PROOF / P11
+
+---
+
+## 21. P11a RESULTS INSPECTOR (READ-ONLY) + TRACE VIEW + SLD OVERLAY — DONE
+
+### 21.1 Overview
+
+**P11a** introduces the **Results Inspector** layer for deterministic, read-only exploration of analysis results:
+- Deterministic result tables (Bus/Branch-centric)
+- White box trace retrieval with run context
+- SLD overlay API for mapping results to diagram symbols
+
+This is the **backend-only** layer for RESULT_VIEW mode, not UI implementation.
+
+### 21.2 Implemented Components
+
+| Component | Description | Status |
+|-----------|-------------|--------|
+| **RunHeaderDTO** | Run metadata (id, project_id, case_id, snapshot_id, status, result_state, solver_kind, input_hash) | DONE |
+| **ResultsIndexDTO** | Index of available tables with column metadata and units | DONE |
+| **BusResultsDTO** | Deterministically sorted bus results (name, id) | DONE |
+| **BranchResultsDTO** | Deterministically sorted branch results (name, id) | DONE |
+| **ShortCircuitResultsDTO** | Deterministically sorted SC results (target_id) | DONE |
+| **ExtendedTraceDTO** | White box trace + run context (snapshot_id, input_hash) | DONE |
+| **SldResultOverlayDTO** | SLD overlay mapping (nodes + branches + result_status) | DONE |
+| **ResultsInspectorService** | Application service for building DTOs from stored results | DONE |
+
+### 21.3 API Endpoints
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/analysis-runs/{run_id}/results/index` | GET | Results index with available tables |
+| `/analysis-runs/{run_id}/results/buses` | GET | Bus results table |
+| `/analysis-runs/{run_id}/results/branches` | GET | Branch results table |
+| `/analysis-runs/{run_id}/results/short-circuit` | GET | Short-circuit results (SC runs only) |
+| `/analysis-runs/{run_id}/results/trace` | GET | Extended trace with run context |
+| `/projects/{project_id}/sld/{diagram_id}/overlay?run_id=...` | GET | SLD result overlay |
+
+### 21.4 Key Invariants
+
+1. **READ-ONLY** — Zero physics calculations, zero state mutations
+2. **NO PHYSICS** — All data from stored Result API + Run metadata only
+3. **DETERMINISTIC SORTING** — Buses/Branches by (name, id), SC by target_id
+4. **DETERMINISTIC JSON** — Same inputs produce identical responses
+5. **POLISH LABELS** — UI-ready labels in Polish (label_pl)
+6. **SLD OVERLAY IS MAPPING ONLY** — Does not mutate NetworkModel or SLD diagram
+
+### 21.5 Column Definitions (Polish)
+
+| Table | Columns (key: label_pl [unit]) |
+|-------|--------------------------------|
+| **buses** | bus_id: ID węzła, name: Nazwa, un_kv: Napięcie znamionowe [kV], u_kv: Napięcie [kV], u_pu: Napięcie [pu], angle_deg: Kąt [°], flags: Flagi |
+| **branches** | branch_id: ID gałęzi, name: Nazwa, from_bus: Węzeł początkowy, to_bus: Węzeł końcowy, i_a: Prąd [A], s_mva: Moc pozorna [MVA], p_mw: Moc czynna [MW], q_mvar: Moc bierna [Mvar], loading_pct: Obciążenie [%], flags: Flagi |
+| **short-circuit** | target_id: ID węzła zwarcia, target_name: Nazwa węzła, ikss_ka: Ik'' [kA], ip_ka: ip [kA], ith_ka: Ith [kA], sk_mva: Sk'' [MVA], fault_type: Rodzaj zwarcia, flags: Flagi |
+
+### 21.6 Files Added/Modified
+
+| Layer | Files |
+|-------|-------|
+| **DTOs** | `application/analysis_run/dtos.py` — P11a DTOs |
+| **Service** | `application/analysis_run/results_inspector.py` (NEW) — ResultsInspectorService |
+| **API** | `api/analysis_runs.py` — Results Inspector endpoints |
+| **API** | `api/sld.py` (NEW) — SLD overlay endpoint |
+| **Main** | `api/main.py` — Router registration |
+| **Tests** | `tests/test_p11a_results_inspector.py` (NEW) — determinism tests |
+
+### 21.7 Test Coverage
+
+- DTO construction and serialization
+- Deterministic sorting (name, id) for buses and branches
+- Deterministic sorting (target_id) for short-circuit results
+- SLD overlay mapping (no physics, no mutations)
+- ExtendedTraceDTO construction
+- ResultsIndexDTO column metadata
+- Edge cases (empty results, missing data, Unicode)
+
+### 21.8 Exclusions (NOT modified)
+
+- ❌ Solvers (IEC 60909, Power Flow)
+- ❌ Result API (frozen)
+- ❌ white_box_trace format/semantics
+- ❌ UI / frontend
+- ❌ Proof Engine (P11.1+)
 
 ---
 
