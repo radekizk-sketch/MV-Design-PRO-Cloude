@@ -165,6 +165,7 @@ export type TreeNodeType =
   | 'CASES'
   | 'STUDY_CASE'  // P10: Individual study case node
   | 'RESULTS'
+  | 'RUN_ITEM'    // P11c: Individual analysis run in results history
   | 'ELEMENT'; // Individual element node
 
 /**
@@ -184,6 +185,11 @@ export interface TreeNode {
   studyCaseId?: string; // For STUDY_CASE nodes
   isActive?: boolean; // For STUDY_CASE nodes - active case indicator
   resultStatus?: ResultStatus; // For STUDY_CASE nodes - result status
+  // P11c: Run item properties (for RUN_ITEM nodes in results history)
+  runId?: string; // For RUN_ITEM nodes - analysis run UUID
+  solverKind?: string; // For RUN_ITEM nodes - solver type (PF, SC)
+  createdAt?: string; // For RUN_ITEM nodes - timestamp
+  caseId?: string; // For RUN_ITEM nodes - parent case UUID
 }
 
 // ============================================================================

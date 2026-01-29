@@ -1193,6 +1193,7 @@ P14 jest **warstwą meta** i stanowi **prerequisite** dla P15–P20.
 | 2026-01 | 2.25 | **P11a RESULTS INSPECTOR** — READ-ONLY Results Inspector + Trace View + SLD Overlay API (DONE) |
 | 2026-01 | 2.26 | **P11b FRONTEND RESULTS INSPECTOR** — Frontend RESULT_VIEW mode + SLD Overlay rendering (DONE) |
 
+| 2026-01 | 2.27 | **P11c RESULTS BROWSER + A/B COMPARE (UI-ONLY)** — Results history tree + A/B comparison UI + SLD comparison mode (DONE) |
 _Versioning note: entries are normalized to 2.22.x to preserve monotonic versioning and avoid legacy 2.19.x references._
 
 ---
@@ -2062,3 +2063,101 @@ i bez recompute, z deterministycznym śladem audytowym.
 ---
 
 **END OF EXECUTION PLAN**
+
+---
+
+## 23. P11c RESULTS BROWSER + A/B COMPARE (UI-ONLY) — DONE
+
+### 23.1 Overview
+
+**P11c** introduces the **Results Browser** (run history tree) and **A/B Comparison UI** for comparing two Study Run results in PowerFactory-style interface.
+
+This is **100% UI-only, read-only** — no physics calculations, no solver invocations, no model mutations.
+
+### 23.2 Implemented Components
+
+| Component | Description | Status |
+|-----------|-------------|--------|
+| **Run History Tree** | ProjectTree extended with RUN_ITEM nodes in "Wyniki" section | DONE |
+| **RunHistoryItem** | Type for run metadata (run_id, case_name, solver_kind, created_at, result_state) | DONE |
+| **ResultsComparisonPage** | UI component for A/B run comparison with delta tables | DONE |
+| **Comparison API Client** | Frontend client for `/api/comparison/runs` endpoint (P10b) | DONE |
+| **NumericDelta Types** | Frontend types matching backend DTOs (delta, percent, sign) | DONE |
+| **Polish Labels** | 100% Polish UI labels for all comparison elements | DONE |
+| **SLD Comparison Mode** | Documentation for overlay A/B switching (no delta calculation in UI) | DONE |
+| **Minimal Tests** | Tests for comparison types, run history sorting, Polish labels | DONE |
+
+### 23.3 Key Invariants
+
+1. **UI-ONLY** — Zero physics calculations in frontend
+2. **READ-ONLY** — No model mutations, no result modifications
+3. **100% POLISH** — All UI labels in Polish language
+4. **DETERMINISTIC** — Run history sorted by created_at DESC (newest first)
+5. **BACKEND DELTAS** — All delta calculations performed by P10b backend
+6. **NO SLD DELTA** — UI does not calculate overlay delta, only switches between A and B
+
+### 23.4 UI Features
+
+| Feature | Description |
+|---------|-------------|
+| **Run History in Tree** | "Wyniki" section shows chronological list of runs with status icons (FRESH/OUTDATED) |
+| **Run Click** | Opens Results Inspector for selected run (P11b integration) |
+| **A/B Selector** | Dropdown selectors for Run A (baseline) and Run B (comparison) |
+| **Compare Button** | Triggers comparison via P10b backend API |
+| **Delta Tables** | Buses (U_kv, U_pu) and Branches (P_mw, Q_mvar) with delta columns |
+| **Show Only Changes** | Checkbox to filter rows with delta ≠ 0 |
+| **Status Classification** | IMPROVED (green), REGRESSED (red), NO_CHANGE (gray) |
+
+### 23.5 Files Modified/Created
+
+| Path | Description |
+|------|-------------|
+| `frontend/src/ui/types.ts` | Added RUN_ITEM node type and run properties to TreeNode |
+| `frontend/src/ui/project-tree/ProjectTree.tsx` | Extended with runHistory prop and buildRunNodes() |
+| `frontend/src/ui/comparison/types.ts` | Comparison types (NumericDelta, RunComparisonResult, etc.) |
+| `frontend/src/ui/comparison/api.ts` | API client for compareRuns() and fetchRunHistory() |
+| `frontend/src/ui/comparison/ResultsComparisonPage.tsx` | Main comparison UI component |
+| `frontend/src/ui/comparison/SLD_COMPARISON_MODE.md` | Documentation for SLD overlay A/B switching |
+| `frontend/src/ui/comparison/__tests__/comparison.test.ts` | Minimal tests for comparison module |
+| `frontend/src/ui/__tests__/project-tree-run-history.test.ts` | Tests for run history tree rendering |
+
+### 23.6 API Integration (P10b)
+
+Uses backend comparison endpoint:
+
+```
+POST /api/comparison/runs
+Request: { "run_a_id": "<uuid>", "run_b_id": "<uuid>" }
+Response: RunComparisonResult with node_voltages, branch_powers, short_circuit deltas
+```
+
+### 23.7 Tests
+
+- Comparison type exports (Polish labels, colors)
+- Run history sorting determinism (created_at DESC)
+- Delta sign classification (positive, negative, zero)
+- Polish UI labels verification (no English terms)
+- ProjectTree RUN_ITEM node structure
+- Solver kind Polish labels (PF → "Rozpływ", SC → "Zwarcie")
+
+### 23.8 Documentation
+
+- `SLD_COMPARISON_MODE.md` — How to use SldOverlay in comparison mode
+- `RESULTS_BROWSER_CONTRACT.md` — Run history specification (pre-existing)
+- `CASE_COMPARISON_UI_CONTRACT.md` — A/B comparison specification (pre-existing)
+
+### 23.9 DoD (Definition of Done)
+
+- [x] "Wyniki" section in ProjectTree shows run history
+- [x] Run click opens Results Inspector (P11b)
+- [x] ResultsComparisonPage with A/B selectors and Compare button
+- [x] Delta tables for Buses and Branches
+- [x] 100% Polish UI (all labels, messages)
+- [x] Deterministic run sorting (created_at DESC)
+- [x] No physics calculations in UI
+- [x] No model mutations in RESULT_VIEW mode
+- [x] Minimal tests passing
+- [x] PLANS.md updated with P11c as DONE
+
+---
+
