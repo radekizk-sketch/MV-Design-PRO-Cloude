@@ -171,6 +171,7 @@ export function getLineBranchFieldDefinitions(): PropertySection[] {
       fields: [
         { key: 'r_ohm_per_km', label: "Rezystancja R'", value: 0, type: 'number', unit: 'Ω/km', editable: false, source: 'type' },
         { key: 'x_ohm_per_km', label: "Reaktancja X'", value: 0, type: 'number', unit: 'Ω/km', editable: false, source: 'type' },
+        { key: 'c_nf_per_km', label: "Pojemność C' (kabel)", value: 0, type: 'number', unit: 'nF/km', editable: false, source: 'type' },
         { key: 'b_us_per_km', label: "Susceptancja B'", value: 0, type: 'number', unit: 'μS/km', editable: false, source: 'type' },
         { key: 'rated_current_a', label: 'Prąd dopuszczalny', value: 0, type: 'number', unit: 'A', editable: false, source: 'type' },
       ],
@@ -262,6 +263,8 @@ export function getTransformerBranchFieldDefinitions(): PropertySection[] {
         { key: 'voltage_lv_kv', label: 'Napięcie DN', value: 0, type: 'number', unit: 'kV', editable: false, source: 'type' },
         { key: 'uk_percent', label: 'Napięcie zwarcia uk%', value: 0, type: 'number', unit: '%', editable: false, source: 'type' },
         { key: 'pk_kw', label: 'Straty obciążeniowe Pk', value: 0, type: 'number', unit: 'kW', editable: false, source: 'type' },
+        { key: 'i0_percent', label: 'Prąd jałowy i0%', value: 0, type: 'number', unit: '%', editable: false, source: 'type' },
+        { key: 'p0_kw', label: 'Straty jałowe P0', value: 0, type: 'number', unit: 'kW', editable: false, source: 'type' },
         { key: 'vector_group', label: 'Grupa połączeń', value: 'Dyn11', type: 'string', editable: false, source: 'type' },
       ],
     },
@@ -342,6 +345,17 @@ export function getSwitchFieldDefinitions(): PropertySection[] {
           editable: true, // Buttons available in MODEL_EDIT
           source: 'type',
         },
+      ],
+    },
+    {
+      id: 'type_params',
+      label: SECTION_LABELS.type_params,
+      fields: [
+        { key: 'un_kv', label: 'Napięcie znamionowe Un', value: 0, type: 'number', unit: 'kV', editable: false, source: 'type' },
+        { key: 'in_a', label: 'Prąd znamionowy In', value: 0, type: 'number', unit: 'A', editable: false, source: 'type' },
+        { key: 'ik_ka', label: 'Prąd wyłączalny Ik', value: 0, type: 'number', unit: 'kA', editable: false, source: 'type' },
+        { key: 'icw_ka', label: 'Prąd wytrzymałości Icw', value: 0, type: 'number', unit: 'kA', editable: false, source: 'type' },
+        { key: 'medium', label: 'Ośrodek gaszący', value: '', type: 'string', editable: false, source: 'type' },
       ],
     },
     {
