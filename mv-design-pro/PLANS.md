@@ -1115,6 +1115,8 @@ P14 jest **warstwą meta** i stanowi **prerequisite** dla P15–P19.
 | 2026-06 | 2.22.1 | P16.1 CI stabilization: test harness isolation for FastAPI-only fixtures |
 | 2026-06 | 2.22.2 | P17 Losses Energy Profile Proof Pack implemented (FULL MATH, deterministic) |
 
+_Versioning note: 2026-06 entries are normalized to 2.22.x to avoid duplicate 2.19 across months._
+
 ---
 
 ## 12.10. Phase 2.x.5: CATALOG BROWSER (PASSIVE EQUIPMENT) — DOC LOCKED
