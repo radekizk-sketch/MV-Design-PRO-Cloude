@@ -16,6 +16,7 @@ Moduły:
 """
 
 from application.proof_engine.types import (
+    EarthingGroundFaultInput,
     EquationDefinition,
     EnergyProfilePoint,
     LoadCurrentsCounterfactualInput,
@@ -73,6 +74,7 @@ from application.proof_engine.proof_inspector import (
 __all__ = [
     # Types
     "EquationDefinition",
+    "EarthingGroundFaultInput",
     "EnergyProfilePoint",
     "LoadCurrentsCounterfactualInput",
     "LoadCurrentsInput",
