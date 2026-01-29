@@ -367,6 +367,8 @@ class ProofHeader:
         case_name: Nazwa przypadku obliczeniowego
         run_timestamp: Czas uruchomienia
         solver_version: Wersja solvera
+        target_id: Identyfikator elementu (np. LINE/TR)
+        element_kind: Rodzaj elementu (LINE/CABLE/TRANSFORMER)
         fault_location: Lokalizacja zwarcia (dla SC)
         fault_type: Typ zwarcia (dla SC)
         voltage_factor: Współczynnik napięciowy (dla SC)
@@ -378,6 +380,8 @@ class ProofHeader:
     case_name: str
     run_timestamp: datetime
     solver_version: str
+    target_id: str | None = None
+    element_kind: str | None = None
     fault_location: str | None = None
     fault_type: str | None = None
     voltage_factor: float | None = None
@@ -390,6 +394,8 @@ class ProofHeader:
             "case_name": self.case_name,
             "run_timestamp": self.run_timestamp.isoformat(),
             "solver_version": self.solver_version,
+            "target_id": self.target_id,
+            "element_kind": self.element_kind,
             "fault_location": self.fault_location,
             "fault_type": self.fault_type,
             "voltage_factor": self.voltage_factor,

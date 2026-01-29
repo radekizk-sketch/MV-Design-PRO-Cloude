@@ -483,6 +483,12 @@ class TestLoadCurrentsProofGenerator:
         assert "k_s_percent" in proof.summary.key_results
         assert "m_s_percent" in proof.summary.key_results
 
+    def test_lc_header_includes_target_and_kind(self, lc_line_input: LoadCurrentsInput):
+        """Nagłówek P15 zawiera identyfikator elementu i jego typ."""
+        proof = ProofGenerator.generate_load_currents_proof(lc_line_input)
+        assert proof.header.target_id == lc_line_input.target_id
+        assert proof.header.element_kind == lc_line_input.element_kind.value
+
     def test_lc_determinism_json(self, lc_line_input: LoadCurrentsInput):
         """Ten sam input P15 → identyczny proof.json."""
         artifact_id = uuid4()

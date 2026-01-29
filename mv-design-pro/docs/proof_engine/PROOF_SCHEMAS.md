@@ -92,6 +92,8 @@ Ten dokument zawiera **kanoniczne schematy JSON** dla wszystkich struktur danych
         "case_name": { "type": "string" },
         "run_timestamp": { "type": "string", "format": "date-time" },
         "solver_version": { "type": "string" },
+        "target_id": { "type": ["string", "null"] },
+        "element_kind": { "type": ["string", "null"] },
         "fault_location": { "type": ["string", "null"] },
         "fault_type": { "type": ["string", "null"] },
         "voltage_factor": { "type": ["number", "null"] },
@@ -741,19 +743,19 @@ def test_id_stability():
     \Delta P,\ \Delta Q,\ \Delta U
     $$
 
-### TODO-P15-001 (PLANNED) — P15: Load Currents & Overload Proof Pack [FUTURE PACK]
+### P15 — Load Currents & Overload Proof Pack (IMPLEMENTED)
 - Priority: MUST
 - Inputs: TraceArtifact, PowerFlowResult, Catalog
 - Output: ProofPack P15 (ProofDocument: Prądy robocze i przeciążenia)
 - DoD:
-  - [ ] Prądy obciążenia linii/kabli wyprowadzone z mocy pozornej.
+  - [x] Prądy obciążenia linii/kabli wyprowadzone z mocy pozornej.
 
     $$
     I = \frac{S}{\sqrt{3} \cdot U}
     $$
 
-  - [ ] Porównanie do prądu znamionowego z marginesem procentowym i statusem PASS/FAIL.
-  - [ ] Transformator: relacja obciążenia do mocy znamionowej i overload %.
+  - [x] Porównanie do prądu znamionowego z marginesem procentowym (bez PASS/FAIL).
+  - [x] Transformator: relacja obciążenia do mocy znamionowej i overload %.
 
     $$
     \frac{S}{S_n}

@@ -172,6 +172,8 @@ class HeaderView:
         case_name: Nazwa przypadku
         run_timestamp: Czas uruchomienia
         solver_version: Wersja solvera
+        target_id: Identyfikator elementu (opcjonalne)
+        element_kind: Rodzaj elementu (opcjonalne)
         fault_location: Lokalizacja zwarcia (opcjonalne)
         fault_type: Typ zwarcia (opcjonalne)
         voltage_factor: Wspolczynnik napiecia (opcjonalne)
@@ -183,6 +185,8 @@ class HeaderView:
     case_name: str
     run_timestamp: datetime
     solver_version: str
+    target_id: str | None = None
+    element_kind: str | None = None
     fault_location: str | None = None
     fault_type: str | None = None
     voltage_factor: float | None = None
@@ -195,6 +199,8 @@ class HeaderView:
             "case_name": self.case_name,
             "run_timestamp": self.run_timestamp.isoformat(),
             "solver_version": self.solver_version,
+            "target_id": self.target_id,
+            "element_kind": self.element_kind,
             "fault_location": self.fault_location,
             "fault_type": self.fault_type,
             "voltage_factor": self.voltage_factor,

@@ -2491,6 +2491,8 @@ class ProofGenerator:
             case_name=data.case_name,
             run_timestamp=data.run_timestamp,
             solver_version="P15 Load Currents",
+            target_id=data.target_id,
+            element_kind=data.element_kind.value,
         )
 
         title = "Dowód: Prądy robocze i przeciążenia (P15)"
@@ -2596,6 +2598,8 @@ class ProofGenerator:
             case_name=f"{cf.a.case_name} vs {cf.b.case_name}",
             run_timestamp=cf.a.run_timestamp,
             solver_version="P15 Counterfactual",
+            target_id=f"{cf.a.target_id} vs {cf.b.target_id}",
+            element_kind=f"{cf.a.element_kind.value} vs {cf.b.element_kind.value}",
         )
 
         return ProofDocument.create(

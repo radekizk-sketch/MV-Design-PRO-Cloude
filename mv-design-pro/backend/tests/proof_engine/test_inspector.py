@@ -30,6 +30,9 @@ from application.proof_engine.types import (
     ProofType,
     QUCounterfactualInput,
     QUInput,
+    LoadCurrentsCounterfactualInput,
+    LoadCurrentsInput,
+    LoadElementKind,
 )
 from application.proof_engine.proof_inspector import (
     CounterfactualView,
@@ -162,6 +165,44 @@ def qu_counterfactual_proof(
 ) -> ProofDocument:
     """Fixture: wygenerowany dokument counterfactual Q(U)."""
     return ProofGenerator.generate_qu_counterfactual(qu_counterfactual_input)
+
+
+@pytest.fixture
+def lc_line_input() -> LoadCurrentsInput:
+    """Fixture: dane P15 dla linii."""
+    return LoadCurrentsInput(
+        project_name="Test Project LC",
+        case_name="Test Case LC",
+        run_timestamp=datetime(2026, 1, 27, 10, 30, 0),
+        target_id="LINE_01",
+        u_ll_kv=15.0,
+        p_mw=3.2,
+        q_mvar=1.5,
+        in_a=400.0,
+        sn_mva=None,
+        element_kind=LoadElementKind.LINE,
+    )
+
+
+@pytest.fixture
+def lc_counterfactual_proof(
+    lc_line_input: LoadCurrentsInput,
+) -> ProofDocument:
+    """Fixture: wygenerowany dokument counterfactual P15."""
+    input_b = LoadCurrentsInput(
+        project_name="Test Project LC B",
+        case_name="Test Case LC B",
+        run_timestamp=lc_line_input.run_timestamp,
+        target_id=lc_line_input.target_id,
+        u_ll_kv=lc_line_input.u_ll_kv,
+        p_mw=4.5,
+        q_mvar=2.0,
+        in_a=lc_line_input.in_a,
+        sn_mva=None,
+        element_kind=LoadElementKind.LINE,
+    )
+    cf_input = LoadCurrentsCounterfactualInput(a=lc_line_input, b=input_b)
+    return ProofGenerator.generate_load_currents_counterfactual(cf_input)
 
 
 # =============================================================================
@@ -464,6 +505,17 @@ class TestInspectorCounterfactualView:
         assert cf_table is not None
         assert isinstance(cf_table, CounterfactualView)
 
+    def test_counterfactual_p15_is_detected(
+        self, lc_counterfactual_proof: ProofDocument
+    ):
+        """Counterfactual P15 jest wykrywany."""
+        inspector = ProofInspector(lc_counterfactual_proof)
+
+        assert inspector.is_counterfactual()
+        cf_table = inspector.get_counterfactual_table()
+        assert cf_table is not None
+        assert any(row.name == "s_mva" for row in cf_table.rows)
+
     def test_counterfactual_table_has_rows(
         self, qu_counterfactual_proof: ProofDocument
     ):
@@ -620,6 +672,16 @@ class TestInspectorViewSerialization:
         assert "case_name" in d
         assert "run_timestamp" in d
         assert "solver_version" in d
+
+    def test_header_view_contains_target_for_p15(
+        self, lc_line_input: LoadCurrentsInput
+    ):
+        """Nagłówek P15 zawiera identyfikator i typ elementu."""
+        proof = ProofGenerator.generate_load_currents_proof(lc_line_input)
+        view = inspect(proof)
+
+        assert view.header.target_id == lc_line_input.target_id
+        assert view.header.element_kind == lc_line_input.element_kind.value
 
 
 # =============================================================================
