@@ -14,6 +14,9 @@
 - [03-Analyses.md](./03-Analyses.md)
 - [04-Application.md](./04-Application.md)
 - [docs/analysis/SENSITIVITY_ANALYSIS_ETAP_PLUS.md](./analysis/SENSITIVITY_ANALYSIS_ETAP_PLUS.md) — **P25: Sensitivity & margin analysis (ETAP++)**
+- [docs/analysis/P26_AUTO_RECOMMENDATIONS_ETAP_PLUS.md](./analysis/P26_AUTO_RECOMMENDATIONS_ETAP_PLUS.md) — **P26: Auto recommendations (ETAP+++)**
+- [docs/analysis/P27_SCENARIO_COMPARISON_ETAP_PLUS.md](./analysis/P27_SCENARIO_COMPARISON_ETAP_PLUS.md) — **P27: Scenario comparison (ETAP+++)**
+- [docs/analysis/P28_COVERAGE_COMPLETENESS_SCORE.md](./analysis/P28_COVERAGE_COMPLETENESS_SCORE.md) — **P28: Coverage completeness score (ETAP+++)**
 - [docs/architecture/STUDY_SCENARIO_WORKFLOW_ETAP_PLUS.md](./architecture/STUDY_SCENARIO_WORKFLOW_ETAP_PLUS.md) — **P23: Study/Scenario/Run workflow (ETAP++)**
 - [GO-LIVE-CHECKLIST.md](./GO-LIVE-CHECKLIST.md)
 - [REPOSITORY-HYGIENE.md](./REPOSITORY-HYGIENE.md)

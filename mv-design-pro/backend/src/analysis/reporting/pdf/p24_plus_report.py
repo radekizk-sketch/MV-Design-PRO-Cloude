@@ -5,6 +5,9 @@ Input sources (read-only):
 - VoltageProfileView (P21)
 - ProtectionInsightView (P22a)
 - SensitivityView (P25)
+- RecommendationView (P26)
+- ScenarioComparisonView (P27)
+- CoverageScoreView (P28)
 - NormativeReport (P20)
 - ProofDocument metadata (P11–P19)
 """
@@ -27,6 +30,9 @@ from analysis.protection_insight.models import (
     ProtectionInsightView,
     ProtectionSelectivityStatus,
 )
+from analysis.coverage_score.models import CoverageScoreView
+from analysis.recommendations.models import RecommendationEffect, RecommendationEntry, RecommendationView
+from analysis.scenario_comparison.models import ScenarioComparisonEntry, ScenarioComparisonView
 from analysis.sensitivity.models import (
     SensitivityDecision,
     SensitivityDriver,
@@ -62,6 +68,9 @@ def export_p24_plus_report_pdf(
     protection_insight: ProtectionInsightView | None,
     protection_curves_it: ProtectionCurvesITView | None,
     sensitivity: SensitivityView | None = None,
+    recommendations: RecommendationView | None = None,
+    scenario_comparison: ScenarioComparisonView | None = None,
+    coverage_score: CoverageScoreView | None = None,
     normative_report: NormativeReport | None,
     proof_documents: Sequence[ProofDocument],
 ) -> bytes:
@@ -139,6 +148,8 @@ def export_p24_plus_report_pdf(
         protection_insight,
         protection_curves_it,
         sensitivity,
+        recommendations,
+        coverage_score,
         normative_report,
     )
     report_hash = _report_hash(
@@ -146,6 +157,9 @@ def export_p24_plus_report_pdf(
         protection_insight=protection_insight,
         protection_curves_it=protection_curves_it,
         sensitivity=sensitivity,
+        recommendations=recommendations,
+        scenario_comparison=scenario_comparison,
+        coverage_score=coverage_score,
         normative_report=normative_report,
         proof_documents=proof_documents,
     )
@@ -169,6 +183,9 @@ def export_p24_plus_report_pdf(
         protection_insight=protection_insight,
         protection_curves_it=protection_curves_it,
         sensitivity=sensitivity,
+        recommendations=recommendations,
+        scenario_comparison=scenario_comparison,
+        coverage_score=coverage_score,
         normative_report=normative_report,
     )
     for line in summary_lines:
@@ -249,12 +266,59 @@ def export_p24_plus_report_pdf(
                 draw_wrapped(_format_sensitivity_entry(entry))
     y -= section_spacing
 
-    draw_heading("8. Jawne braki danych (NOT COMPUTED)")
+    draw_heading("8. Rekomendacje (P26)")
+    if recommendations is None:
+        draw_text("Brak danych P26.")
+    else:
+        if recommendations.primary is None:
+            draw_text("Brak rekomendacji głównej (NOT COMPUTED).")
+        else:
+            draw_text("Rekomendacja główna:", bold=True)
+            draw_wrapped(_format_recommendation_entry(recommendations.primary))
+        if recommendations.alternatives:
+            draw_text("Alternatywy:", bold=True)
+            for entry in recommendations.alternatives:
+                draw_wrapped(_format_recommendation_entry(entry))
+    y -= section_spacing
+
+    draw_heading("9. Porównanie scenariuszy (P27)")
+    if scenario_comparison is None:
+        draw_text("Brak danych P27.")
+    else:
+        if scenario_comparison.winner_scenario_id is None:
+            draw_text("Brak zwycięzcy (NOT COMPUTED).")
+        else:
+            draw_text(
+                f"Zwycięzca: {scenario_comparison.winner_scenario_id}",
+                bold=True,
+            )
+        for entry in scenario_comparison.scenarios:
+            draw_wrapped(_format_scenario_entry(entry))
+            draw_wrapped(f"WHY: {entry.why_pl}")
+    y -= section_spacing
+
+    draw_heading("10. Kompletność analizy (P28)")
+    if coverage_score is None:
+        draw_text("Brak danych P28.")
+    else:
+        draw_text(f"Wynik kompletności: {coverage_score.total_score:.1f}/100")
+        if coverage_score.missing_items:
+            draw_text("Braki:", bold=True)
+            for item in coverage_score.missing_items:
+                draw_wrapped(f"- {item}")
+        if coverage_score.critical_gaps:
+            draw_text("Krytyczne luki:", bold=True)
+            for item in coverage_score.critical_gaps:
+                draw_wrapped(f"- {item}")
+    y -= section_spacing
+
+    draw_heading("11. Jawne braki danych (NOT COMPUTED)")
     missing_lines = _build_missing_data_lines(
         voltage_profile=voltage_profile,
         protection_insight=protection_insight,
         protection_curves_it=protection_curves_it,
         sensitivity=sensitivity,
+        recommendations=recommendations,
         normative_report=normative_report,
     )
     if not missing_lines:
@@ -264,7 +328,7 @@ def export_p24_plus_report_pdf(
             draw_wrapped(line)
     y -= section_spacing
 
-    draw_heading("9. Ślad dowodowy (ProofDocument)")
+    draw_heading("12. Ślad dowodowy (ProofDocument)")
     if not proof_documents:
         draw_text("Brak ProofDocument.")
     else:
@@ -272,12 +336,12 @@ def export_p24_plus_report_pdf(
             draw_wrapped(_format_proof_reference(doc))
     y -= section_spacing
 
-    draw_heading("10. Ograniczenia i zastrzeżenia")
+    draw_heading("13. Ograniczenia i zastrzeżenia")
     for line in _LIMITATIONS:
         draw_wrapped(line)
     y -= section_spacing
 
-    draw_heading("11. Stopka deterministyczna")
+    draw_heading("14. Stopka deterministyczna")
     draw_text("Deterministic Report: TAK")
     draw_text(f"MV-DESIGN-PRO version: {resolve_mv_design_pro_version() or '—'}")
     draw_text(f"Report hash (SHA-256): {report_hash}")
@@ -291,6 +355,8 @@ def _resolve_context(
     protection_insight: ProtectionInsightView | None,
     protection_curves_it: ProtectionCurvesITView | None,
     sensitivity: SensitivityView | None,
+    recommendations: RecommendationView | None,
+    coverage_score: CoverageScoreView | None,
     normative_report: NormativeReport | None,
 ) -> ReportContext:
     for ctx in (
@@ -298,6 +364,8 @@ def _resolve_context(
         protection_insight.context if protection_insight else None,
         protection_curves_it.context if protection_curves_it else None,
         sensitivity.context if sensitivity else None,
+        recommendations.context if recommendations else None,
+        coverage_score.context if coverage_score else None,
         normative_report.context if normative_report else None,
     ):
         if ctx is not None:
@@ -323,6 +391,9 @@ def _report_hash(
     protection_insight: ProtectionInsightView | None,
     protection_curves_it: ProtectionCurvesITView | None,
     sensitivity: SensitivityView | None,
+    recommendations: RecommendationView | None,
+    scenario_comparison: ScenarioComparisonView | None,
+    coverage_score: CoverageScoreView | None,
     normative_report: NormativeReport | None,
     proof_documents: Sequence[ProofDocument],
 ) -> str:
@@ -335,6 +406,11 @@ def _report_hash(
             protection_curves_it.to_dict() if protection_curves_it else None
         ),
         "sensitivity": sensitivity.to_dict() if sensitivity else None,
+        "recommendations": recommendations.to_dict() if recommendations else None,
+        "scenario_comparison": (
+            scenario_comparison.to_dict() if scenario_comparison else None
+        ),
+        "coverage_score": coverage_score.to_dict() if coverage_score else None,
         "normative_report": normative_report.to_dict() if normative_report else None,
         "proof_metadata": [
             _proof_metadata(doc) for doc in _sorted_proof_documents(proof_documents)
@@ -387,6 +463,9 @@ def _build_summary_lines(
     protection_insight: ProtectionInsightView | None,
     protection_curves_it: ProtectionCurvesITView | None,
     sensitivity: SensitivityView | None,
+    recommendations: RecommendationView | None,
+    scenario_comparison: ScenarioComparisonView | None,
+    coverage_score: CoverageScoreView | None,
     normative_report: NormativeReport | None,
 ) -> list[str]:
     lines: list[str] = []
@@ -439,6 +518,33 @@ def _build_summary_lines(
                 drivers=len(sensitivity.top_drivers),
                 nc=sensitivity.summary.not_computed_count,
             )
+        )
+    if recommendations is None:
+        lines.append("P26: brak rekomendacji.")
+    else:
+        lines.append(
+            "P26: primary={primary}, alternatives={alt}, not_computed={nc}".format(
+                primary="TAK" if recommendations.primary else "NIE",
+                alt=len(recommendations.alternatives),
+                nc=recommendations.summary.not_computed_count,
+            )
+        )
+    if scenario_comparison is None:
+        lines.append("P27: brak porównania scenariuszy.")
+    else:
+        lines.append(
+            "P27: scenarios={count}, winner={winner}".format(
+                count=len(scenario_comparison.scenarios),
+                winner=scenario_comparison.winner_scenario_id or "—",
+            )
+        )
+    if coverage_score is None:
+        lines.append("P28: brak audytu kompletności.")
+    else:
+        lines.append(
+            f"P28: score={coverage_score.total_score:.1f}/100 | "
+            f"missing={len(coverage_score.missing_items)} | "
+            f"gaps={len(coverage_score.critical_gaps)}"
         )
     return lines
 
@@ -544,6 +650,24 @@ def _format_sensitivity_driver(driver: SensitivityDriver) -> str:
     )
 
 
+def _format_recommendation_entry(entry: RecommendationEntry) -> str:
+    current = _format_value(entry.current_value, entry.current_unit)
+    delta = _format_value(entry.required_delta, entry.delta_unit)
+    return (
+        f"P26 {entry.parameter_id} {entry.target_id} | "
+        f"Current={current} | Required Δ={delta} | "
+        f"Effect={entry.expected_effect.value} | Note: {entry.confidence_note}"
+    )
+
+
+def _format_scenario_entry(entry: ScenarioComparisonEntry) -> str:
+    delta_margin = _format_percent(entry.delta_margin)
+    return (
+        f"P27 {entry.scenario_id} | Risk={entry.risk_score:.2f} | "
+        f"ΔMargin={delta_margin} | RankΔ={entry.delta_risk_rank}"
+    )
+
+
 def _selectivity_decision(status: ProtectionSelectivityStatus) -> str:
     if status == ProtectionSelectivityStatus.OK:
         return "PASS"
@@ -588,6 +712,7 @@ def _build_missing_data_lines(
     protection_insight: ProtectionInsightView | None,
     protection_curves_it: ProtectionCurvesITView | None,
     sensitivity: SensitivityView | None,
+    recommendations: RecommendationView | None,
     normative_report: NormativeReport | None,
 ) -> list[str]:
     lines: list[str] = []
@@ -619,6 +744,16 @@ def _build_missing_data_lines(
                 lines.append(
                     f"P25 {entry.parameter_id} {entry.target_id}: brak danych wejściowych."
                 )
+    if recommendations is not None:
+        entries = []
+        if recommendations.primary is not None:
+            entries.append(recommendations.primary)
+        entries.extend(recommendations.alternatives)
+        for entry in entries:
+            if entry.expected_effect == RecommendationEffect.NOT_COMPUTED:
+                lines.append(
+                    f"P26 {entry.parameter_id} {entry.target_id}: {entry.confidence_note}"
+                )
     return lines
 
 
@@ -649,5 +784,8 @@ _LIMITATIONS = (
     "Krzywe I–t są prezentacją danych wejściowych i normatywnych (read-only).",
     "Decyzje PASS/WARNING/FAIL pochodzą z P20 i P22a (bez modyfikacji solverów).",
     "Analiza P25 jest post-hoc (perturbacje bez recompute fizyki).",
+    "Rekomendacje P26 są estymacją post-hoc na bazie P25 (bez zmian solverów).",
+    "Porównanie scenariuszy P27 jest deterministyczne i opisowe (brak nowych obliczeń).",
+    "Kompletność P28 to audyt informacyjny (bez PASS/FAIL).",
     "NOT COMPUTED oznacza brak danych wejściowych, a nie negatywny wynik.",
 )
