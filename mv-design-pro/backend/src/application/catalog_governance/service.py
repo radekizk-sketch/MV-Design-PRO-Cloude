@@ -236,6 +236,10 @@ class CatalogGovernanceService:
         """
         Get set of type IDs that are in use by instances.
 
+        Scans actual network tables for type_ref usage:
+        - NetworkBranchORM.params_jsonb["type_ref"] (lines/cables)
+        - SwitchEquipmentAssignmentORM.equipment_type_id (switches)
+
         Args:
             uow: Unit of Work.
 
@@ -244,28 +248,26 @@ class CatalogGovernanceService:
         """
         types_in_use = set()
 
-        # Check all projects for type_ref usage
-        projects = uow.project_repository.list_all()
-        for project_record in projects:
-            project_data = project_record.get("data", {})
-            network = project_data.get("network", {})
+        # Get all projects to scan their networks
+        projects = uow.projects.list_all()
 
-            # Check branches (lines/cables)
-            for branch in network.get("branches", []):
-                type_ref = branch.get("type_ref")
+        for project in projects:
+            # Check branches (lines/cables) for type_ref in params
+            branches = uow.network.list_branches(project.id)
+            for branch in branches:
+                type_ref = branch.get("params", {}).get("type_ref")
                 if type_ref:
                     types_in_use.add(str(type_ref))
 
-            # Check transformers
-            for transformer in network.get("transformers", []):
-                type_ref = transformer.get("type_ref")
-                if type_ref:
-                    types_in_use.add(str(type_ref))
-
-            # Check switches
-            for switch in network.get("switches", []):
-                equipment_type = switch.get("equipment_type")
-                if equipment_type:
-                    types_in_use.add(str(equipment_type))
+            # Check switch equipment assignments
+            # Note: Using raw session query as wizard repository doesn't expose this
+            from infrastructure.persistence.models import SwitchEquipmentAssignmentORM
+            switch_assignments = (
+                uow.session.query(SwitchEquipmentAssignmentORM)
+                .filter(SwitchEquipmentAssignmentORM.project_id == project.id)
+                .all()
+            )
+            for assignment in switch_assignments:
+                types_in_use.add(str(assignment.equipment_type_id))
 
         return types_in_use

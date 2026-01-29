@@ -79,6 +79,16 @@ class UnitOfWork(AbstractContextManager["UnitOfWork"]):
         self.session.close()
         return False
 
+    def commit(self) -> None:
+        """Commit the current transaction."""
+        if self.session is not None:
+            self.session.commit()
+
+    def rollback(self) -> None:
+        """Rollback the current transaction."""
+        if self.session is not None:
+            self.session.rollback()
+
 
 def build_uow_factory(
     session_factory: sessionmaker[Session],

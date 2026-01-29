@@ -396,14 +396,18 @@ def test_import_replace_blocked_when_types_in_use(test_db_session):
     """REPLACE mode blocked when types are referenced by instances."""
     from application.catalog_governance.service import CatalogGovernanceService
     from infrastructure.persistence.repositories.unit_of_work import UnitOfWorkFactory
-    from infrastructure.persistence.models import ProjectORM
+    from infrastructure.persistence.models import ProjectORM, NetworkBranchORM, NetworkNodeORM
     from uuid import uuid4
+    from datetime import datetime, timezone
 
     uow_factory = UnitOfWorkFactory(lambda: test_db_session)
     service = CatalogGovernanceService(uow_factory)
 
     type_id = str(uuid4())
     project_id = uuid4()
+    node_from_id = uuid4()
+    node_to_id = uuid4()
+    branch_id = uuid4()
 
     # Add type
     with uow_factory() as uow:
@@ -412,19 +416,51 @@ def test_import_replace_blocked_when_types_in_use(test_db_session):
             commit=False,
         )
 
-        # Add project with instance using this type
+        # Add project (required for FK)
         project = ProjectORM(
             id=project_id,
             name="Test Project",
-            data={
-                "network": {
-                    "branches": [
-                        {"id": str(uuid4()), "type_ref": type_id, "name": "Branch 1"}
-                    ]
-                }
-            },
+            description="Test",
+            schema_version="1.0",
+            sources_jsonb=[],
+            created_at=datetime.now(timezone.utc),
+            updated_at=datetime.now(timezone.utc),
         )
         test_db_session.add(project)
+
+        # Add nodes (required for FK)
+        node_from = NetworkNodeORM(
+            id=node_from_id,
+            project_id=project_id,
+            name="Node From",
+            node_type="bus",
+            base_kv=15.0,
+            attrs_jsonb={},
+        )
+        node_to = NetworkNodeORM(
+            id=node_to_id,
+            project_id=project_id,
+            name="Node To",
+            node_type="bus",
+            base_kv=15.0,
+            attrs_jsonb={},
+        )
+        test_db_session.add(node_from)
+        test_db_session.add(node_to)
+
+        # Add branch with type_ref in params
+        branch = NetworkBranchORM(
+            id=branch_id,
+            project_id=project_id,
+            name="Branch 1",
+            branch_type="line",
+            from_node_id=node_from_id,
+            to_node_id=node_to_id,
+            in_service=True,
+            params_jsonb={"type_ref": type_id},  # This references the type
+        )
+        test_db_session.add(branch)
+
         uow.commit()
 
     # Try to REPLACE
