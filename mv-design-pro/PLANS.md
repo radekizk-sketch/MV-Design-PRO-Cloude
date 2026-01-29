@@ -1323,12 +1323,18 @@ Wszystkie pakiety pozostają POST-HOC i nie modyfikują solverów ani Result API
 
 ### P18 — Protection Proof Pack (Overcurrent / Selectivity)
 
-**Status:** PLANNED | FUTURE
+**Status:** DONE | CANONICAL & BINDING
 
 - Porównania: $$I_{k}''$$ vs $$I_{cu}$$ / $$I_{dyn}$$ / $$I_{th}$$
 - Selektywność (analityczna, bez EMT)
 - Zabezpieczenia podstawowe i rezerwowe
 - **Prerequisite:** P11.1a, P14, P15
+- Deliverables:
+   - [x] Generator dowodu P18 (Proof Engine)
+   - [x] Rejestr równań i weryfikacja jednostek
+   - [x] Widok Proof Inspector: tabele porównań i WHY
+   - [x] Testy determinism + warnings
+   - [x] Dokumentacja `docs/proof_engine/P18_PROTECTION_PROOF.md`
 
 ### P19 — Earthing / Ground Fault Proof Pack (SN)
 

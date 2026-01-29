@@ -932,6 +932,131 @@ EQ_LE_004 = EquationDefinition(
 
 
 # =============================================================================
+# P18: Protection Overcurrent & Selectivity — Kanoniczne równania (BINDING)
+# =============================================================================
+
+EQ_PR_001 = EquationDefinition(
+    equation_id="EQ_PR_001",
+    name_pl="Warunek wyłączalności",
+    standard_ref="IEC 60947-2 / IEC 60909 (P18)",
+    latex=r"\text{OK}_{breaking} = (I_k'' \le I_{cu})",
+    symbols=(
+        SymbolDefinition(
+            symbol=r"\text{OK}_{breaking}",
+            unit="—",
+            description_pl="Status warunku wyłączalności",
+            mapping_key="breaking_ok",
+        ),
+        SymbolDefinition(
+            symbol="I_k''",
+            unit="kA",
+            description_pl="Prąd zwarciowy początkowy",
+            mapping_key="ikss_ka",
+        ),
+        SymbolDefinition(
+            symbol="I_{cu}",
+            unit="kA",
+            description_pl="Zdolność wyłączalna",
+            mapping_key="icu_ka",
+        ),
+    ),
+    unit_derivation="kA ≤ kA → —",
+)
+
+EQ_PR_002 = EquationDefinition(
+    equation_id="EQ_PR_002",
+    name_pl="Warunek dynamiczny",
+    standard_ref="IEC 60947-2 / IEC 60909 (P18)",
+    latex=r"\text{OK}_{dynamic} = (i_p \le I_{dyn})",
+    symbols=(
+        SymbolDefinition(
+            symbol=r"\text{OK}_{dynamic}",
+            unit="—",
+            description_pl="Status warunku dynamicznego",
+            mapping_key="dynamic_ok",
+        ),
+        SymbolDefinition(
+            symbol="i_p",
+            unit="kA",
+            description_pl="Prąd udarowy",
+            mapping_key="ip_ka",
+        ),
+        SymbolDefinition(
+            symbol="I_{dyn}",
+            unit="kA",
+            description_pl="Wytrzymałość dynamiczna",
+            mapping_key="idyn_ka",
+        ),
+    ),
+    unit_derivation="kA ≤ kA → —",
+)
+
+EQ_PR_003 = EquationDefinition(
+    equation_id="EQ_PR_003",
+    name_pl="Warunek cieplny",
+    standard_ref="IEC 60947-2 / IEC 60909 (P18)",
+    latex=r"\text{OK}_{thermal} = \left(\int i^{2} dt \le I_{th}\right)",
+    symbols=(
+        SymbolDefinition(
+            symbol=r"\text{OK}_{thermal}",
+            unit="—",
+            description_pl="Status warunku cieplnego",
+            mapping_key="thermal_ok",
+        ),
+        SymbolDefinition(
+            symbol=r"\int i^{2} dt",
+            unit="kA²s",
+            description_pl="Energia zwarcia",
+            mapping_key="i2t_ka2s",
+        ),
+        SymbolDefinition(
+            symbol="I_{th}",
+            unit="kA²s",
+            description_pl="Wytrzymałość cieplna (I²t)",
+            mapping_key="ith_limit_ka2s",
+        ),
+    ),
+    unit_derivation="kA²s ≤ kA²s → —",
+)
+
+EQ_PR_004 = EquationDefinition(
+    equation_id="EQ_PR_004",
+    name_pl="Selektywność (granice charakterystyk)",
+    standard_ref="IEC 60255 / praktyka inżynierska (P18)",
+    latex=(
+        r"\text{OK}_{selectivity} = (t_{down,max} + \Delta t \le t_{up,min})"
+    ),
+    symbols=(
+        SymbolDefinition(
+            symbol=r"\text{OK}_{selectivity}",
+            unit="—",
+            description_pl="Status selektywności",
+            mapping_key="selectivity_ok",
+        ),
+        SymbolDefinition(
+            symbol="t_{down,max}",
+            unit="s",
+            description_pl="Maksymalny czas zabezpieczenia dolnego",
+            mapping_key="selectivity_downstream_max_s",
+        ),
+        SymbolDefinition(
+            symbol="t_{up,min}",
+            unit="s",
+            description_pl="Minimalny czas zabezpieczenia górnego",
+            mapping_key="selectivity_upstream_min_s",
+        ),
+        SymbolDefinition(
+            symbol="\\Delta t",
+            unit="s",
+            description_pl="Margines selektywności",
+            mapping_key="selectivity_margin_setting_s",
+        ),
+    ),
+    unit_derivation="s + s ≤ s → —",
+)
+
+
+# =============================================================================
 # Q(U) Regulation — Kanoniczne równania (BINDING) P11.1b
 # =============================================================================
 
@@ -1586,6 +1711,14 @@ LE_EQUATIONS: dict[str, EquationDefinition] = {
     "EQ_LE_004": EQ_LE_004,
 }
 
+# P18: Protection Overcurrent & Selectivity equations registry
+PR_EQUATIONS: dict[str, EquationDefinition] = {
+    "EQ_PR_001": EQ_PR_001,
+    "EQ_PR_002": EQ_PR_002,
+    "EQ_PR_003": EQ_PR_003,
+    "EQ_PR_004": EQ_PR_004,
+}
+
 # Q(U) equations registry (P11.1b + P11.1c)
 QU_EQUATIONS: dict[str, EquationDefinition] = {
     "EQ_QU_001": EQ_QU_001,
@@ -1646,6 +1779,14 @@ LE_STEP_ORDER: list[str] = [
     "EQ_LE_004",  # E_loss = P_loss * t (wariant stały)
 ]
 
+# Step order for P18 (BINDING)
+PR_STEP_ORDER: list[str] = [
+    "EQ_PR_001",  # Warunek wyłączalności
+    "EQ_PR_002",  # Warunek dynamiczny
+    "EQ_PR_003",  # Warunek cieplny
+    "EQ_PR_004",  # Selektywność
+]
+
 # Step order for Q(U) proof (BINDING) — P11.1b + P11.1c
 QU_STEP_ORDER: list[str] = [
     "EQ_QU_001",  # ΔU = U_meas - U_ref
@@ -1687,6 +1828,7 @@ FROZEN_IDS: dict[str, list[str]] = {
     "sc1_equations": list(SC1_EQUATIONS.keys()),
     "lc_equations": list(LC_EQUATIONS.keys()),
     "le_equations": list(LE_EQUATIONS.keys()),
+    "pr_equations": list(PR_EQUATIONS.keys()),
     "mapping_keys": [
         # SC3F
         "ikss_ka", "ip_ka", "ith_ka", "idyn_ka", "sk_mva",
@@ -1707,6 +1849,11 @@ FROZEN_IDS: dict[str, list[str]] = {
         "k_i_percent", "m_i_percent", "sn_mva", "k_s_percent", "m_s_percent",
         # P17
         "t_h", "p_loss_kw", "delta_t_h", "e_i_kwh", "e_loss_kwh",
+        # P18
+        "breaking_ok", "dynamic_ok", "thermal_ok", "selectivity_ok",
+        "icu_ka", "idyn_ka", "i2t_ka2s", "ith_limit_ka2s",
+        "selectivity_downstream_max_s", "selectivity_upstream_min_s",
+        "selectivity_margin_setting_s",
     ],
 }
 
@@ -1715,6 +1862,7 @@ registry.merge(SC3F_EQUATIONS)
 registry.merge(VDROP_EQUATIONS)
 registry.merge(LC_EQUATIONS)
 registry.merge(LE_EQUATIONS)
+registry.merge(PR_EQUATIONS)
 registry.merge(QU_EQUATIONS)
 registry.merge(SC1_EQUATIONS)
 registry.merge(LS_EQUATIONS)
@@ -1773,6 +1921,16 @@ class EquationRegistry:
     def get_le_step_order(cls) -> list[str]:
         """Zwraca kolejność kroków dla dowodu P17."""
         return LE_STEP_ORDER.copy()
+
+    @classmethod
+    def get_pr_equations(cls) -> dict[str, EquationDefinition]:
+        """Zwraca wszystkie równania P18 (Protection Overcurrent)."""
+        return PR_EQUATIONS.copy()
+
+    @classmethod
+    def get_pr_step_order(cls) -> list[str]:
+        """Zwraca kolejność kroków dla dowodu P18."""
+        return PR_STEP_ORDER.copy()
 
     @classmethod
     def get_qu_equations(cls) -> dict[str, EquationDefinition]:
@@ -1840,6 +1998,10 @@ class EquationRegistry:
             if eq_id not in LE_EQUATIONS:
                 raise ValueError(f"Frozen equation ID {eq_id} usunięty z P17!")
 
+        for eq_id in FROZEN_IDS["pr_equations"]:
+            if eq_id not in PR_EQUATIONS:
+                raise ValueError(f"Frozen equation ID {eq_id} usunięty z P18!")
+
         current_keys = cls.get_all_mapping_keys()
         for key in FROZEN_IDS["mapping_keys"]:
             if key not in current_keys:
@@ -1857,12 +2019,14 @@ EquationRegistry.SC3F_EQUATIONS = SC3F_EQUATIONS
 EquationRegistry.VDROP_EQUATIONS = VDROP_EQUATIONS
 EquationRegistry.LC_EQUATIONS = LC_EQUATIONS
 EquationRegistry.LE_EQUATIONS = LE_EQUATIONS
+EquationRegistry.PR_EQUATIONS = PR_EQUATIONS
 EquationRegistry.QU_EQUATIONS = QU_EQUATIONS
 EquationRegistry.SC1_EQUATIONS = SC1_EQUATIONS
 EquationRegistry.SC3F_PROOF_STEP_ORDER = SC3F_PROOF_STEP_ORDER
 EquationRegistry.VDROP_STEP_ORDER = VDROP_STEP_ORDER
 EquationRegistry.LC_STEP_ORDER = LC_STEP_ORDER
 EquationRegistry.LE_STEP_ORDER = LE_STEP_ORDER
+EquationRegistry.PR_STEP_ORDER = PR_STEP_ORDER
 EquationRegistry.QU_STEP_ORDER = QU_STEP_ORDER
 EquationRegistry.SC1FZ_STEP_ORDER = SC1FZ_STEP_ORDER
 EquationRegistry.SC2F_STEP_ORDER = SC2F_STEP_ORDER
