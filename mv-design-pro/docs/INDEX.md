@@ -17,6 +17,7 @@
 - [docs/analysis/P26_AUTO_RECOMMENDATIONS_ETAP_PLUS.md](./analysis/P26_AUTO_RECOMMENDATIONS_ETAP_PLUS.md) — **P26: Auto recommendations (ETAP+++)**
 - [docs/analysis/P27_SCENARIO_COMPARISON_ETAP_PLUS.md](./analysis/P27_SCENARIO_COMPARISON_ETAP_PLUS.md) — **P27: Scenario comparison (ETAP+++)**
 - [docs/analysis/P28_COVERAGE_COMPLETENESS_SCORE.md](./analysis/P28_COVERAGE_COMPLETENESS_SCORE.md) — **P28: Coverage completeness score (ETAP+++)**
+- [docs/analysis/P33_LF_SENSITIVITY_ETAP_KILLER.md](./analysis/P33_LF_SENSITIVITY_ETAP_KILLER.md) — **P33: Wrażliwość napięć (ETAP-killer)**
 - [docs/architecture/STUDY_SCENARIO_WORKFLOW_ETAP_PLUS.md](./architecture/STUDY_SCENARIO_WORKFLOW_ETAP_PLUS.md) — **P23: Study/Scenario/Run workflow (ETAP++)**
 - [GO-LIVE-CHECKLIST.md](./GO-LIVE-CHECKLIST.md)
 - [REPOSITORY-HYGIENE.md](./REPOSITORY-HYGIENE.md)
@@ -57,6 +58,7 @@
 - [docs/proof_engine/P11_1b_REGULATION_Q_U.md](./proof_engine/P11_1b_REGULATION_Q_U.md) — Regulatory Q(U), cosφ(P)
 - [docs/proof_engine/P11_1c_SC_ASYMMETRICAL.md](./proof_engine/P11_1c_SC_ASYMMETRICAL.md) — Składowe symetryczne (SKELETON)
 - [docs/proof_engine/P11_1d_PROOF_UI_EXPORT.md](./proof_engine/P11_1d_PROOF_UI_EXPORT.md) — **Proof Inspector (CANONICAL): read-only viewer, eksport JSON/LaTeX/PDF/DOCX**
+- [docs/proof_engine/P32_LOAD_FLOW_VOLTAGE_PROOF.md](./proof_engine/P32_LOAD_FLOW_VOLTAGE_PROOF.md) — **P32: Load Flow i spadki napięć (CANONICAL)**
 - [docs/proof_engine/P14_PROOF_AUDIT_AND_COVERAGE.md](./proof_engine/P14_PROOF_AUDIT_AND_COVERAGE.md) — **P14: Proof Audit, Coverage Matrix (CANONICAL, META)**
 - [docs/proof_engine/P15_LOAD_CURRENTS_OVERLOAD.md](./proof_engine/P15_LOAD_CURRENTS_OVERLOAD.md) — **P15: Prądy robocze i przeciążenia (CANONICAL)**
 - [docs/proof_engine/P17_LOSSES_ENERGY_PROFILE.md](./proof_engine/P17_LOSSES_ENERGY_PROFILE.md) — **P17: Energia strat (profil czasowy) (CANONICAL)**

@@ -1497,6 +1497,36 @@ Wdrożenie **deterministycznej analizy wrażliwości i marginesów** (P25) jako 
 
 ---
 
+## 12.14.5. Phase 2.x.9a: LOAD FLOW PROOF PACK (P32) + LF SENSITIVITY (P33) — ETAP-killer
+
+**Status:** IN REVIEW — oznaczyć jako DONE po merge.
+
+### 12.14.5.1. Cel
+
+Deterministyczny dowód Load Flow i spadków napięć oraz analiza wrażliwości napięć w trybie post-hoc, bez ingerencji w solvery.
+
+### 12.14.5.2. Deliverables
+
+| Deliverable | Opis | Status |
+|-------------|------|--------|
+| `backend/src/application/proof_engine/` | ProofType i generator P32 | IN REVIEW |
+| `backend/src/analysis/lf_sensitivity/` | Modele, builder, serializer P33 | IN REVIEW |
+| `backend/src/analysis/reporting/pdf/p24_plus_report.py` | Sekcja P33 w raporcie PDF | IN REVIEW |
+| `docs/proof_engine/P32_LOAD_FLOW_VOLTAGE_PROOF.md` | Specyfikacja P32 | IN REVIEW |
+| `docs/analysis/P33_LF_SENSITIVITY_ETAP_KILLER.md` | Specyfikacja P33 | IN REVIEW |
+| `backend/tests/proof_engine/test_load_flow_voltage_proof_p32.py` | Testy P32 | IN REVIEW |
+| `backend/tests/analysis/test_lf_sensitivity_p33.py` | Testy P33 | IN REVIEW |
+| `docs/INDEX.md` | Linki P32 i P33 | IN REVIEW |
+
+### 12.14.5.3. Definition of Done
+
+- [ ] Dowód P32 z deterministyczną kolejnością kroków i weryfikacją jednostek.
+- [ ] Analiza P33 z rankingiem driverów oraz NOT COMPUTED.
+- [ ] Integracja z PDF P24+ (sekcja P33).
+- [ ] Oznaczenie statusu jako DONE po merge.
+
+---
+
 ## 12.15. Phase 2.x.10: AUTO RECOMMENDATIONS (P26) — ETAP+++
 
 ### 12.15.1. Cel fazy

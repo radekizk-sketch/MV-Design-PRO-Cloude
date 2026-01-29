@@ -53,7 +53,7 @@ Ten dokument zawiera **kanoniczne schematy JSON** dla wszystkich struktur danych
     },
     "proof_type": {
       "type": "string",
-      "enum": ["SC3F_IEC60909", "VDROP", "SC1F_IEC60909", "SC2F_IEC60909", "SC2FG_IEC60909", "Q_U_REGULATION", "LOAD_CURRENTS_OVERLOAD", "EARTHING_GROUND_FAULT_SN"],
+      "enum": ["SC3F_IEC60909", "VDROP", "LOAD_FLOW_VOLTAGE", "SC1F_IEC60909", "SC2F_IEC60909", "SC2FG_IEC60909", "Q_U_REGULATION", "LOAD_CURRENTS_OVERLOAD", "EARTHING_GROUND_FAULT_SN"],
       "description": "Typ dowodu"
     },
     "title_pl": {

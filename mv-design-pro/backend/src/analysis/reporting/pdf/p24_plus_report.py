@@ -5,6 +5,7 @@ Input sources (read-only):
 - VoltageProfileView (P21)
 - ProtectionInsightView (P22a)
 - SensitivityView (P25)
+- LFSensitivityView (P33)
 - RecommendationView (P26)
 - ScenarioComparisonView (P27)
 - CoverageScoreView (P28)
@@ -30,6 +31,7 @@ from analysis.protection_insight.models import (
     ProtectionInsightView,
     ProtectionSelectivityStatus,
 )
+from analysis.lf_sensitivity.models import LFSensitivityDriver, LFSensitivityEntry, LFSensitivityView
 from analysis.coverage_score.models import CoverageScoreView
 from analysis.recommendations.models import RecommendationEffect, RecommendationEntry, RecommendationView
 from analysis.scenario_comparison.models import ScenarioComparisonEntry, ScenarioComparisonView
@@ -68,6 +70,7 @@ def export_p24_plus_report_pdf(
     protection_insight: ProtectionInsightView | None,
     protection_curves_it: ProtectionCurvesITView | None,
     sensitivity: SensitivityView | None = None,
+    lf_sensitivity: LFSensitivityView | None = None,
     recommendations: RecommendationView | None = None,
     scenario_comparison: ScenarioComparisonView | None = None,
     coverage_score: CoverageScoreView | None = None,
@@ -148,6 +151,7 @@ def export_p24_plus_report_pdf(
         protection_insight,
         protection_curves_it,
         sensitivity,
+        lf_sensitivity,
         recommendations,
         coverage_score,
         normative_report,
@@ -157,6 +161,7 @@ def export_p24_plus_report_pdf(
         protection_insight=protection_insight,
         protection_curves_it=protection_curves_it,
         sensitivity=sensitivity,
+        lf_sensitivity=lf_sensitivity,
         recommendations=recommendations,
         scenario_comparison=scenario_comparison,
         coverage_score=coverage_score,
@@ -174,7 +179,7 @@ def export_p24_plus_report_pdf(
     draw_text(f"Run timestamp: {_format_timestamp(context.run_timestamp)}")
     draw_text(f"Snapshot ID: {context.snapshot_id or '—'}")
     draw_text(f"Trace ID: {context.trace_id or '—'}")
-    draw_text("Zakres: P11–P25, P24+")
+    draw_text("Zakres: P11–P33, P24+")
     y -= section_spacing
 
     draw_heading("2. Executive Summary (1 strona)")
@@ -183,6 +188,7 @@ def export_p24_plus_report_pdf(
         protection_insight=protection_insight,
         protection_curves_it=protection_curves_it,
         sensitivity=sensitivity,
+        lf_sensitivity=lf_sensitivity,
         recommendations=recommendations,
         scenario_comparison=scenario_comparison,
         coverage_score=coverage_score,
@@ -266,7 +272,21 @@ def export_p24_plus_report_pdf(
                 draw_wrapped(_format_sensitivity_entry(entry))
     y -= section_spacing
 
-    draw_heading("8. Rekomendacje (P26)")
+    draw_heading("8. Wrażliwość napięć (P33) — Top 5 driverów")
+    if lf_sensitivity is None:
+        draw_text("Brak danych P33 (NOT COMPUTED).")
+    else:
+        if not lf_sensitivity.top_drivers:
+            draw_text("Brak driverów P33.")
+        else:
+            for driver in lf_sensitivity.top_drivers:
+                draw_wrapped(_format_lf_sensitivity_driver(driver))
+        for entry in lf_sensitivity.entries:
+            if entry.missing_data:
+                draw_wrapped(_format_lf_sensitivity_entry(entry))
+    y -= section_spacing
+
+    draw_heading("9. Rekomendacje (P26)")
     if recommendations is None:
         draw_text("Brak danych P26.")
     else:
@@ -281,7 +301,7 @@ def export_p24_plus_report_pdf(
                 draw_wrapped(_format_recommendation_entry(entry))
     y -= section_spacing
 
-    draw_heading("9. Porównanie scenariuszy (P27)")
+    draw_heading("10. Porównanie scenariuszy (P27)")
     if scenario_comparison is None:
         draw_text("Brak danych P27.")
     else:
@@ -297,7 +317,7 @@ def export_p24_plus_report_pdf(
             draw_wrapped(f"WHY: {entry.why_pl}")
     y -= section_spacing
 
-    draw_heading("10. Kompletność analizy (P28)")
+    draw_heading("11. Kompletność analizy (P28)")
     if coverage_score is None:
         draw_text("Brak danych P28.")
     else:
@@ -312,12 +332,13 @@ def export_p24_plus_report_pdf(
                 draw_wrapped(f"- {item}")
     y -= section_spacing
 
-    draw_heading("11. Jawne braki danych (NOT COMPUTED)")
+    draw_heading("12. Jawne braki danych (NOT COMPUTED)")
     missing_lines = _build_missing_data_lines(
         voltage_profile=voltage_profile,
         protection_insight=protection_insight,
         protection_curves_it=protection_curves_it,
         sensitivity=sensitivity,
+        lf_sensitivity=lf_sensitivity,
         recommendations=recommendations,
         normative_report=normative_report,
     )
@@ -328,7 +349,7 @@ def export_p24_plus_report_pdf(
             draw_wrapped(line)
     y -= section_spacing
 
-    draw_heading("12. Ślad dowodowy (ProofDocument)")
+    draw_heading("13. Ślad dowodowy (ProofDocument)")
     if not proof_documents:
         draw_text("Brak ProofDocument.")
     else:
@@ -336,12 +357,12 @@ def export_p24_plus_report_pdf(
             draw_wrapped(_format_proof_reference(doc))
     y -= section_spacing
 
-    draw_heading("13. Ograniczenia i zastrzeżenia")
+    draw_heading("14. Ograniczenia i zastrzeżenia")
     for line in _LIMITATIONS:
         draw_wrapped(line)
     y -= section_spacing
 
-    draw_heading("14. Stopka deterministyczna")
+    draw_heading("15. Stopka deterministyczna")
     draw_text("Deterministic Report: TAK")
     draw_text(f"MV-DESIGN-PRO version: {resolve_mv_design_pro_version() or '—'}")
     draw_text(f"Report hash (SHA-256): {report_hash}")
@@ -355,6 +376,7 @@ def _resolve_context(
     protection_insight: ProtectionInsightView | None,
     protection_curves_it: ProtectionCurvesITView | None,
     sensitivity: SensitivityView | None,
+    lf_sensitivity: LFSensitivityView | None,
     recommendations: RecommendationView | None,
     coverage_score: CoverageScoreView | None,
     normative_report: NormativeReport | None,
@@ -364,6 +386,7 @@ def _resolve_context(
         protection_insight.context if protection_insight else None,
         protection_curves_it.context if protection_curves_it else None,
         sensitivity.context if sensitivity else None,
+        lf_sensitivity.context if lf_sensitivity else None,
         recommendations.context if recommendations else None,
         coverage_score.context if coverage_score else None,
         normative_report.context if normative_report else None,
@@ -391,6 +414,7 @@ def _report_hash(
     protection_insight: ProtectionInsightView | None,
     protection_curves_it: ProtectionCurvesITView | None,
     sensitivity: SensitivityView | None,
+    lf_sensitivity: LFSensitivityView | None,
     recommendations: RecommendationView | None,
     scenario_comparison: ScenarioComparisonView | None,
     coverage_score: CoverageScoreView | None,
@@ -406,6 +430,7 @@ def _report_hash(
             protection_curves_it.to_dict() if protection_curves_it else None
         ),
         "sensitivity": sensitivity.to_dict() if sensitivity else None,
+        "lf_sensitivity": lf_sensitivity.to_dict() if lf_sensitivity else None,
         "recommendations": recommendations.to_dict() if recommendations else None,
         "scenario_comparison": (
             scenario_comparison.to_dict() if scenario_comparison else None
@@ -463,6 +488,7 @@ def _build_summary_lines(
     protection_insight: ProtectionInsightView | None,
     protection_curves_it: ProtectionCurvesITView | None,
     sensitivity: SensitivityView | None,
+    lf_sensitivity: LFSensitivityView | None,
     recommendations: RecommendationView | None,
     scenario_comparison: ScenarioComparisonView | None,
     coverage_score: CoverageScoreView | None,
@@ -517,6 +543,16 @@ def _build_summary_lines(
                 entries=len(sensitivity.entries),
                 drivers=len(sensitivity.top_drivers),
                 nc=sensitivity.summary.not_computed_count,
+            )
+        )
+    if lf_sensitivity is None:
+        lines.append("P33: brak wrażliwości napięć.")
+    else:
+        lines.append(
+            "P33: entries={entries}, top_drivers={drivers}, not_computed={nc}".format(
+                entries=len(lf_sensitivity.entries),
+                drivers=len(lf_sensitivity.top_drivers),
+                nc=lf_sensitivity.summary.not_computed_count,
             )
         )
     if recommendations is None:
@@ -650,6 +686,21 @@ def _format_sensitivity_driver(driver: SensitivityDriver) -> str:
     )
 
 
+def _format_lf_sensitivity_driver(driver: LFSensitivityDriver) -> str:
+    delta = _format_percent(driver.delta_delta_pct)
+    margin = _format_percent(driver.delta_margin_pct)
+    return (
+        f"{driver.bus_id} {driver.parameter} | "
+        f"Perturb={driver.perturbation} | ΔΔ%={delta} | "
+        f"ΔMargin={margin}"
+    )
+
+
+def _format_lf_sensitivity_entry(entry: LFSensitivityEntry) -> str:
+    missing = ", ".join(entry.missing_data)
+    return f"P33 BUS {entry.bus_id}: NOT COMPUTED ({missing})."
+
+
 def _format_recommendation_entry(entry: RecommendationEntry) -> str:
     current = _format_value(entry.current_value, entry.current_unit)
     delta = _format_value(entry.required_delta, entry.delta_unit)
@@ -712,6 +763,7 @@ def _build_missing_data_lines(
     protection_insight: ProtectionInsightView | None,
     protection_curves_it: ProtectionCurvesITView | None,
     sensitivity: SensitivityView | None,
+    lf_sensitivity: LFSensitivityView | None,
     recommendations: RecommendationView | None,
     normative_report: NormativeReport | None,
 ) -> list[str]:
@@ -744,6 +796,10 @@ def _build_missing_data_lines(
                 lines.append(
                     f"P25 {entry.parameter_id} {entry.target_id}: brak danych wejściowych."
                 )
+    if lf_sensitivity is not None:
+        for entry in lf_sensitivity.entries:
+            if entry.missing_data:
+                lines.append(_format_lf_sensitivity_entry(entry))
     if recommendations is not None:
         entries = []
         if recommendations.primary is not None:
@@ -784,6 +840,7 @@ _LIMITATIONS = (
     "Krzywe I–t są prezentacją danych wejściowych i normatywnych (read-only).",
     "Decyzje PASS/WARNING/FAIL pochodzą z P20 i P22a (bez modyfikacji solverów).",
     "Analiza P25 jest post-hoc (perturbacje bez recompute fizyki).",
+    "Analiza P33 jest post-hoc i opiera się na dowodzie P32 (bez uruchamiania solvera).",
     "Rekomendacje P26 są estymacją post-hoc na bazie P25 (bez zmian solverów).",
     "Porównanie scenariuszy P27 jest deterministyczne i opisowe (brak nowych obliczeń).",
     "Kompletność P28 to audyt informacyjny (bez PASS/FAIL).",

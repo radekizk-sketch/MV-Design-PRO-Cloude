@@ -642,6 +642,221 @@ EQ_VDROP_007 = EquationDefinition(
 
 
 # -----------------------------------------------------------------------------
+# P32: Load Flow & Voltage Drop Proof Pack — równania dowodowe
+# -----------------------------------------------------------------------------
+
+EQ_LF_001 = EquationDefinition(
+    equation_id="EQ_LF_001",
+    name_pl="Moc pozorna",
+    standard_ref="praktyka inżynierska",
+    latex=r"S = \sqrt{P^{2} + Q^{2}}",
+    symbols=(
+        SymbolDefinition(
+            symbol="S",
+            unit="MVA",
+            description_pl="Moc pozorna",
+            mapping_key="s_mva",
+        ),
+        SymbolDefinition(
+            symbol="P",
+            unit="MW",
+            description_pl="Moc czynna",
+            mapping_key="p_mw",
+        ),
+        SymbolDefinition(
+            symbol="Q",
+            unit="Mvar",
+            description_pl="Moc bierna",
+            mapping_key="q_mvar",
+        ),
+    ),
+    unit_derivation="MW² + Mvar² = MVA² → MVA",
+    notes="Moc pozorna dla kroku post-hoc.",
+)
+
+EQ_LF_002 = EquationDefinition(
+    equation_id="EQ_LF_002",
+    name_pl="Prąd roboczy trójfazowy",
+    standard_ref="praktyka inżynierska",
+    latex=r"I = \frac{S}{\sqrt{3}\,U_{LL}}",
+    symbols=(
+        SymbolDefinition(
+            symbol="I",
+            unit="kA",
+            description_pl="Prąd roboczy",
+            mapping_key="i_ka",
+        ),
+        SymbolDefinition(
+            symbol="S",
+            unit="MVA",
+            description_pl="Moc pozorna",
+            mapping_key="s_mva",
+        ),
+        SymbolDefinition(
+            symbol="U_{LL}",
+            unit="kV",
+            description_pl="Napięcie międzyfazowe",
+            mapping_key="u_ll_kv",
+        ),
+    ),
+    unit_derivation="MVA / kV = kA (MVA = kV · kA)",
+    notes="Prąd roboczy liczony post-hoc.",
+)
+
+EQ_LF_003 = EquationDefinition(
+    equation_id="EQ_LF_003",
+    name_pl="Składowa rezystancyjna spadku napięcia",
+    standard_ref="praktyka inżynierska",
+    latex=r"\Delta U_{R} = \frac{R\cdot P}{U_{n}}",
+    symbols=(
+        SymbolDefinition(
+            symbol="\\Delta U_{R}",
+            unit="kV",
+            description_pl="Składowa rezystancyjna spadku",
+            mapping_key="delta_u_r_kv",
+        ),
+        SymbolDefinition(
+            symbol="R",
+            unit="Ω",
+            description_pl="Rezystancja elementu",
+            mapping_key="r_ohm",
+        ),
+        SymbolDefinition(
+            symbol="P",
+            unit="MW",
+            description_pl="Moc czynna",
+            mapping_key="p_mw",
+        ),
+        SymbolDefinition(
+            symbol="U_{n}",
+            unit="kV",
+            description_pl="Napięcie znamionowe",
+            mapping_key="u_nom_kv",
+        ),
+    ),
+    unit_derivation="Ω · MW / kV = kV",
+)
+
+EQ_LF_004 = EquationDefinition(
+    equation_id="EQ_LF_004",
+    name_pl="Składowa reaktancyjna spadku napięcia",
+    standard_ref="praktyka inżynierska",
+    latex=r"\Delta U_{X} = \frac{X\cdot Q}{U_{n}}",
+    symbols=(
+        SymbolDefinition(
+            symbol="\\Delta U_{X}",
+            unit="kV",
+            description_pl="Składowa reaktancyjna spadku",
+            mapping_key="delta_u_x_kv",
+        ),
+        SymbolDefinition(
+            symbol="X",
+            unit="Ω",
+            description_pl="Reaktancja elementu",
+            mapping_key="x_ohm",
+        ),
+        SymbolDefinition(
+            symbol="Q",
+            unit="Mvar",
+            description_pl="Moc bierna",
+            mapping_key="q_mvar",
+        ),
+        SymbolDefinition(
+            symbol="U_{n}",
+            unit="kV",
+            description_pl="Napięcie znamionowe",
+            mapping_key="u_nom_kv",
+        ),
+    ),
+    unit_derivation="Ω · Mvar / kV = kV",
+)
+
+EQ_LF_005 = EquationDefinition(
+    equation_id="EQ_LF_005",
+    name_pl="Całkowity spadek napięcia",
+    standard_ref="praktyka inżynierska",
+    latex=r"\Delta U = \Delta U_{R} + \Delta U_{X}",
+    symbols=(
+        SymbolDefinition(
+            symbol="\\Delta U",
+            unit="kV",
+            description_pl="Całkowity spadek napięcia",
+            mapping_key="delta_u_kv",
+        ),
+        SymbolDefinition(
+            symbol="\\Delta U_{R}",
+            unit="kV",
+            description_pl="Składowa rezystancyjna spadku",
+            mapping_key="delta_u_r_kv",
+        ),
+        SymbolDefinition(
+            symbol="\\Delta U_{X}",
+            unit="kV",
+            description_pl="Składowa reaktancyjna spadku",
+            mapping_key="delta_u_x_kv",
+        ),
+    ),
+    unit_derivation="kV + kV = kV",
+)
+
+EQ_LF_006 = EquationDefinition(
+    equation_id="EQ_LF_006",
+    name_pl="Napięcie w jednostkach względnych",
+    standard_ref="praktyka inżynierska",
+    latex=r"U_{pu} = \frac{U}{U_{n}}",
+    symbols=(
+        SymbolDefinition(
+            symbol="U_{pu}",
+            unit="p.u.",
+            description_pl="Napięcie w jednostkach względnych",
+            mapping_key="u_pu",
+        ),
+        SymbolDefinition(
+            symbol="U",
+            unit="kV",
+            description_pl="Napięcie rzeczywiste",
+            mapping_key="u_ll_kv",
+        ),
+        SymbolDefinition(
+            symbol="U_{n}",
+            unit="kV",
+            description_pl="Napięcie znamionowe",
+            mapping_key="u_nom_kv",
+        ),
+    ),
+    unit_derivation="kV / kV = p.u.",
+)
+
+EQ_LF_007 = EquationDefinition(
+    equation_id="EQ_LF_007",
+    name_pl="Odchyłka napięcia",
+    standard_ref="praktyka inżynierska",
+    latex=r"\delta_{U}[\%] = 100\cdot\frac{U - U_{n}}{U_{n}}",
+    symbols=(
+        SymbolDefinition(
+            symbol="\\delta_{U}",
+            unit="%",
+            description_pl="Odchyłka napięcia",
+            mapping_key="delta_pct",
+        ),
+        SymbolDefinition(
+            symbol="U",
+            unit="kV",
+            description_pl="Napięcie rzeczywiste",
+            mapping_key="u_ll_kv",
+        ),
+        SymbolDefinition(
+            symbol="U_{n}",
+            unit="kV",
+            description_pl="Napięcie znamionowe",
+            mapping_key="u_nom_kv",
+        ),
+    ),
+    unit_derivation="kV / kV = %",
+)
+
+
+# -----------------------------------------------------------------------------
 # P15: Load Currents & Overload — równania dowodowe
 # -----------------------------------------------------------------------------
 
@@ -1783,6 +1998,17 @@ VDROP_EQUATIONS: dict[str, EquationDefinition] = {
     "EQ_VDROP_007": EQ_VDROP_007,
 }
 
+# P32: Load Flow & Voltage Drop equations registry
+LF_EQUATIONS: dict[str, EquationDefinition] = {
+    "EQ_LF_001": EQ_LF_001,
+    "EQ_LF_002": EQ_LF_002,
+    "EQ_LF_003": EQ_LF_003,
+    "EQ_LF_004": EQ_LF_004,
+    "EQ_LF_005": EQ_LF_005,
+    "EQ_LF_006": EQ_LF_006,
+    "EQ_LF_007": EQ_LF_007,
+}
+
 # P15: Load Currents & Overload equations registry
 LC_EQUATIONS: dict[str, EquationDefinition] = {
     "EQ_LC_001": EQ_LC_001,
@@ -1858,6 +2084,17 @@ VDROP_STEP_ORDER: list[str] = [
     "EQ_VDROP_007",  # Napięcie w punkcie U
 ]
 
+# Step order for P32 (BINDING)
+LF_STEP_ORDER: list[str] = [
+    "EQ_LF_001",  # Moc pozorna
+    "EQ_LF_002",  # Prąd roboczy
+    "EQ_LF_003",  # Składowa rezystancyjna ΔU_R
+    "EQ_LF_004",  # Składowa reaktancyjna ΔU_X
+    "EQ_LF_005",  # Całkowity spadek ΔU
+    "EQ_LF_006",  # U_pu
+    "EQ_LF_007",  # delta%
+]
+
 # Step order for P15 (BINDING)
 LC_STEP_ORDER: list[str] = [
     "EQ_LC_001",  # Moc pozorna
@@ -1929,6 +2166,7 @@ SC2FZ_STEP_ORDER: list[str] = [
 FROZEN_IDS: dict[str, list[str]] = {
     "sc3f_equations": list(SC3F_EQUATIONS.keys()),
     "vdrop_equations": list(VDROP_EQUATIONS.keys()),
+    "lf_equations": list(LF_EQUATIONS.keys()),
     "sc1_equations": list(SC1_EQUATIONS.keys()),
     "lc_equations": list(LC_EQUATIONS.keys()),
     "le_equations": list(LE_EQUATIONS.keys()),
@@ -1943,6 +2181,9 @@ FROZEN_IDS: dict[str, list[str]] = {
         "r_ohm", "x_ohm", "p_mw", "q_mvar",
         "delta_u_r_percent", "delta_u_x_percent",
         "delta_u_percent", "delta_u_total_percent",
+        # P32
+        "u_nom_kv", "u_pu", "delta_pct",
+        "delta_u_r_kv", "delta_u_x_kv", "delta_u_kv",
         # SC1
         "z1_ohm", "z2_ohm", "z0_ohm", "z_equiv_ohm",
         "u_prefault_kv",
@@ -1967,6 +2208,7 @@ FROZEN_IDS: dict[str, list[str]] = {
 registry = _EquationRegistryStore()
 registry.merge(SC3F_EQUATIONS)
 registry.merge(VDROP_EQUATIONS)
+registry.merge(LF_EQUATIONS)
 registry.merge(LC_EQUATIONS)
 registry.merge(LE_EQUATIONS)
 registry.merge(PR_EQUATIONS)
@@ -2001,6 +2243,11 @@ class EquationRegistry:
         return VDROP_EQUATIONS.copy()
 
     @classmethod
+    def get_lf_equations(cls) -> dict[str, EquationDefinition]:
+        """Zwraca wszystkie równania P32 (Load Flow)."""
+        return LF_EQUATIONS.copy()
+
+    @classmethod
     def get_lc_equations(cls) -> dict[str, EquationDefinition]:
         """Zwraca wszystkie równania P15 (Load Currents)."""
         return LC_EQUATIONS.copy()
@@ -2014,6 +2261,11 @@ class EquationRegistry:
     def get_vdrop_step_order(cls) -> list[str]:
         """Zwraca kolejność kroków dla dowodu VDROP."""
         return VDROP_STEP_ORDER.copy()
+
+    @classmethod
+    def get_lf_step_order(cls) -> list[str]:
+        """Zwraca kolejność kroków dla dowodu P32."""
+        return LF_STEP_ORDER.copy()
 
     @classmethod
     def get_lc_step_order(cls) -> list[str]:
@@ -2104,6 +2356,10 @@ class EquationRegistry:
             if eq_id not in VDROP_EQUATIONS:
                 raise ValueError(f"Frozen equation ID {eq_id} usunięty z VDROP!")
 
+        for eq_id in FROZEN_IDS["lf_equations"]:
+            if eq_id not in LF_EQUATIONS:
+                raise ValueError(f"Frozen equation ID {eq_id} usunięty z P32!")
+
         for eq_id in FROZEN_IDS["sc1_equations"]:
             if eq_id not in SC1_EQUATIONS:
                 raise ValueError(f"Frozen equation ID {eq_id} usunięty z SC1!")
@@ -2138,6 +2394,7 @@ class EquationRegistry:
 
 EquationRegistry.SC3F_EQUATIONS = SC3F_EQUATIONS
 EquationRegistry.VDROP_EQUATIONS = VDROP_EQUATIONS
+EquationRegistry.LF_EQUATIONS = LF_EQUATIONS
 EquationRegistry.LC_EQUATIONS = LC_EQUATIONS
 EquationRegistry.LE_EQUATIONS = LE_EQUATIONS
 EquationRegistry.PR_EQUATIONS = PR_EQUATIONS
@@ -2146,6 +2403,7 @@ EquationRegistry.QU_EQUATIONS = QU_EQUATIONS
 EquationRegistry.SC1_EQUATIONS = SC1_EQUATIONS
 EquationRegistry.SC3F_PROOF_STEP_ORDER = SC3F_PROOF_STEP_ORDER
 EquationRegistry.VDROP_STEP_ORDER = VDROP_STEP_ORDER
+EquationRegistry.LF_STEP_ORDER = LF_STEP_ORDER
 EquationRegistry.LC_STEP_ORDER = LC_STEP_ORDER
 EquationRegistry.LE_STEP_ORDER = LE_STEP_ORDER
 EquationRegistry.PR_STEP_ORDER = PR_STEP_ORDER

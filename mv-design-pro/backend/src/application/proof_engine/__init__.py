@@ -37,7 +37,12 @@ from application.proof_engine.types import (
 )
 from application.proof_engine.equation_registry import EquationRegistry
 from application.proof_engine.unit_verifier import UnitVerifier
-from application.proof_engine.proof_generator import ProofGenerator
+from application.proof_engine.proof_generator import (
+    LoadFlowBusInput,
+    LoadFlowElementInput,
+    LoadFlowVoltageInput,
+    ProofGenerator,
+)
 from application.proof_engine.latex_renderer import LaTeXRenderer
 from application.proof_engine.proof_pack import (
     ProofPackBuilder,
@@ -78,6 +83,9 @@ __all__ = [
     "EnergyProfilePoint",
     "LoadCurrentsCounterfactualInput",
     "LoadCurrentsInput",
+    "LoadFlowBusInput",
+    "LoadFlowElementInput",
+    "LoadFlowVoltageInput",
     "LoadElementKind",
     "LossesEnergyInput",
     "LossesEnergyTargetKind",
