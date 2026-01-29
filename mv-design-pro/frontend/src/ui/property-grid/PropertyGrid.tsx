@@ -1,5 +1,5 @@
 /**
- * Property Grid Component (PF-style)
+ * Property Grid Component (PF-style) — P12b Enhancement
  *
  * CANONICAL ALIGNMENT:
  * - wizard_screens.md § 2.4, § 3: Siatka Właściwości specification
@@ -9,15 +9,23 @@
  * - Deterministic section and field ordering
  * - type_ref and Type params are READ-ONLY
  * - Mode gating: RESULT_VIEW = all read-only, MODEL_EDIT = instance fields editable
- * - Units displayed with values
- * - Inline validation messages
+ * - Units displayed with values (UnitLabel component)
+ * - Inline validation messages (ValidationBadge component)
+ * - Validation section with all issues
  */
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import { clsx } from 'clsx';
-import type { ElementType, OperatingMode, PropertyField, PropertySection, ValidationMessage } from '../types';
+import type { ElementType, OperatingMode, PropertyField, PropertySection as PropertySectionType, ValidationMessage } from '../types';
 import { getFieldDefinitions, SECTION_LABELS } from './field-definitions';
 import { useSelectionStore, useCanEdit } from '../selection';
+import { ValidationBadge, ValidationSummary, ValidationIcon } from './ValidationBadge';
+import { UnitLabel, ValueWithUnit } from './UnitLabel';
+import { validateField } from './validation';
+
+// =============================================================================
+// Types
+// =============================================================================
 
 interface PropertyGridProps {
   elementId: string;
@@ -26,10 +34,13 @@ interface PropertyGridProps {
   elementData?: Record<string, unknown>;
   validationMessages?: ValidationMessage[];
   onFieldChange?: (fieldKey: string, value: unknown) => void;
-  // P8.2 HOTFIX: Type Library callbacks
   onAssignType?: () => void;
   onClearType?: () => void;
 }
+
+// =============================================================================
+// Main Component
+// =============================================================================
 
 /**
  * Property Grid Component.
@@ -50,34 +61,55 @@ export function PropertyGrid({
   const mode = useSelectionStore((state) => state.mode);
   const canEdit = useCanEdit();
   const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set());
+  const [localValidationErrors, setLocalValidationErrors] = useState<Map<string, ValidationMessage>>(new Map());
 
   // Get field definitions for this element type
   const sections = getFieldDefinitions(elementType);
 
-  // Merge element data into field definitions
-  // P8.2 HOTFIX: Wire type_ref_with_actions callbacks
-  const populatedSections = sections.map((section) => ({
-    ...section,
-    fields: section.fields.map((field) => {
-      const baseField = {
-        ...field,
-        value: elementData[field.key] ?? field.value,
-        validation: validationMessages.find((v) => v.field === field.key),
-      };
-
-      // Wire type library callbacks for type_ref_with_actions fields
-      if (field.type === 'type_ref_with_actions') {
-        return {
-          ...baseField,
-          onAssignType,
-          onClearType,
-          typeRefName: elementData[`${field.key}_name`] as string | null | undefined,
+  // Merge element data into field definitions and wire callbacks
+  const populatedSections = useMemo(() => {
+    return sections.map((section) => ({
+      ...section,
+      fields: section.fields.map((field) => {
+        const baseField = {
+          ...field,
+          value: elementData[field.key] ?? field.value,
+          validation: validationMessages.find((v) => v.field === field.key) ??
+                      localValidationErrors.get(field.key),
         };
-      }
 
-      return baseField;
-    }),
-  }));
+        // Wire type library callbacks for type_ref_with_actions fields
+        if (field.type === 'type_ref_with_actions') {
+          return {
+            ...baseField,
+            onAssignType,
+            onClearType,
+            typeRefName: elementData[`${field.key}_name`] as string | null | undefined,
+          };
+        }
+
+        return baseField;
+      }),
+    }));
+  }, [sections, elementData, validationMessages, localValidationErrors, onAssignType, onClearType]);
+
+  // Combine backend + local validation messages for summary
+  const allValidationMessages = useMemo(() => {
+    const localMessages = Array.from(localValidationErrors.values());
+    const combined = [...validationMessages];
+
+    // Add local messages that don't duplicate backend messages
+    for (const localMsg of localMessages) {
+      const isDuplicate = validationMessages.some(
+        (m) => m.field === localMsg.field && m.code === localMsg.code
+      );
+      if (!isDuplicate) {
+        combined.push(localMsg);
+      }
+    }
+
+    return combined;
+  }, [validationMessages, localValidationErrors]);
 
   // Toggle section collapse
   const toggleSection = useCallback((sectionId: string) => {
@@ -92,14 +124,39 @@ export function PropertyGrid({
     });
   }, []);
 
-  // Handle field value change
+  // Handle field value change with local validation
   const handleFieldChange = useCallback(
     (fieldKey: string, value: unknown) => {
-      if (onFieldChange && canEdit) {
-        onFieldChange(fieldKey, value);
+      if (!onFieldChange || !canEdit) return;
+
+      // Find field definition
+      const field = sections
+        .flatMap((s) => s.fields)
+        .find((f) => f.key === fieldKey);
+
+      if (field) {
+        // Run local validation
+        const result = validateField(elementType, { ...field, value }, value);
+
+        setLocalValidationErrors((prev) => {
+          const newMap = new Map(prev);
+          if (!result.valid && result.message) {
+            newMap.set(fieldKey, {
+              code: result.code ?? 'E-VAL-00',
+              severity: result.severity ?? 'ERROR',
+              message: result.message,
+              field: fieldKey,
+            });
+          } else {
+            newMap.delete(fieldKey);
+          }
+          return newMap;
+        });
       }
+
+      onFieldChange(fieldKey, value);
     },
-    [onFieldChange, canEdit]
+    [onFieldChange, canEdit, sections, elementType]
   );
 
   // Get mode label for header
@@ -153,45 +210,68 @@ export function PropertyGrid({
             onFieldChange={handleFieldChange}
             mode={mode}
             canEdit={canEdit}
+            elementType={elementType}
           />
         ))}
+
+        {/* Validation Summary Section */}
+        <div>
+          <button
+            onClick={() => toggleSection('validation_summary')}
+            className="w-full flex items-center justify-between px-4 py-2 bg-gray-50 hover:bg-gray-100 transition-colors"
+          >
+            <span className="text-xs font-medium text-gray-700 flex items-center gap-2">
+              {collapsedSections.has('validation_summary') ? '▶' : '▼'} {SECTION_LABELS.validation || 'Stan walidacji'}
+              {allValidationMessages.length > 0 && (
+                <span className={clsx(
+                  'px-1.5 py-0.5 rounded text-xs',
+                  allValidationMessages.some((m) => m.severity === 'ERROR')
+                    ? 'bg-red-100 text-red-700'
+                    : 'bg-yellow-100 text-yellow-700'
+                )}>
+                  {allValidationMessages.length}
+                </span>
+              )}
+            </span>
+          </button>
+
+          {!collapsedSections.has('validation_summary') && (
+            <div className="px-4 py-3">
+              <ValidationSummary
+                messages={allValidationMessages}
+                title="Błędy i ostrzeżenia"
+                maxVisible={10}
+              />
+            </div>
+          )}
+        </div>
       </div>
 
-      {/* Validation Summary */}
-      {validationMessages.length > 0 && (
-        <div className="bg-red-50 border-t border-red-200 px-4 py-3">
-          <h3 className="text-xs font-semibold text-red-800 mb-2">
-            Błędy walidacji
-          </h3>
-          <ul className="space-y-1">
-            {validationMessages.map((msg, i) => (
-              <li
-                key={i}
-                className={clsx(
-                  'text-xs',
-                  msg.severity === 'ERROR' ? 'text-red-700' : 'text-yellow-700'
-                )}
-              >
-                [{msg.code}] {msg.message}
-              </li>
-            ))}
-          </ul>
+      {/* Quick Error Indicator (footer) */}
+      {allValidationMessages.some((m) => m.severity === 'ERROR') && (
+        <div className="bg-red-50 border-t border-red-200 px-4 py-2">
+          <div className="flex items-center gap-2 text-xs text-red-700">
+            <ValidationIcon severity="ERROR" />
+            <span>Obiekt zawiera błędy walidacji</span>
+          </div>
         </div>
       )}
     </div>
   );
 }
 
-/**
- * Property Section Component.
- */
+// =============================================================================
+// PropertySection Component
+// =============================================================================
+
 interface PropertySectionProps {
-  section: PropertySection;
+  section: PropertySectionType;
   collapsed: boolean;
   onToggle: () => void;
   onFieldChange: (fieldKey: string, value: unknown) => void;
   mode: OperatingMode;
   canEdit: boolean;
+  elementType: ElementType;
 }
 
 function PropertySection({
@@ -201,7 +281,12 @@ function PropertySection({
   onFieldChange,
   mode,
   canEdit,
+  elementType,
 }: PropertySectionProps) {
+  // Count fields with validation errors in this section
+  const errorCount = section.fields.filter((f) => f.validation?.severity === 'ERROR').length;
+  const warningCount = section.fields.filter((f) => f.validation?.severity === 'WARNING').length;
+
   return (
     <div>
       {/* Section Header */}
@@ -209,8 +294,14 @@ function PropertySection({
         onClick={onToggle}
         className="w-full flex items-center justify-between px-4 py-2 bg-gray-50 hover:bg-gray-100 transition-colors"
       >
-        <span className="text-xs font-medium text-gray-700">
+        <span className="text-xs font-medium text-gray-700 flex items-center gap-2">
           {collapsed ? '▶' : '▼'} {section.label}
+          {errorCount > 0 && (
+            <ValidationIcon severity="ERROR" />
+          )}
+          {warningCount > 0 && errorCount === 0 && (
+            <ValidationIcon severity="WARNING" />
+          )}
         </span>
         <span className="text-xs text-gray-500">
           {section.fields.length} {section.fields.length === 1 ? 'pole' : 'pól'}
@@ -227,6 +318,7 @@ function PropertySection({
               onFieldChange={onFieldChange}
               mode={mode}
               canEdit={canEdit}
+              elementType={elementType}
             />
           ))}
         </div>
@@ -235,14 +327,16 @@ function PropertySection({
   );
 }
 
-/**
- * Property Field Row Component.
- */
+// =============================================================================
+// PropertyFieldRow Component
+// =============================================================================
+
 interface PropertyFieldRowProps {
   field: PropertyField;
   onFieldChange: (fieldKey: string, value: unknown) => void;
   mode: OperatingMode;
   canEdit: boolean;
+  elementType: ElementType;
 }
 
 function PropertyFieldRow({
@@ -250,11 +344,9 @@ function PropertyFieldRow({
   onFieldChange,
   mode,
   canEdit,
+  elementType,
 }: PropertyFieldRowProps) {
   // Determine if field is editable
-  // - type and calculated sources are always read-only
-  // - in RESULT_VIEW, everything is read-only
-  // - in CASE_CONFIG, only case config fields are editable (not implemented here)
   const isReadOnly =
     !field.editable ||
     field.source === 'type' ||
@@ -294,7 +386,7 @@ function PropertyFieldRow({
     return String(value);
   };
 
-  // Special rendering for type_ref_with_actions (P8.2)
+  // Special rendering for type_ref_with_actions
   if (field.type === 'type_ref_with_actions') {
     const hasTypeRef = field.value !== null && field.value !== undefined && field.value !== '';
     const canModifyType = canEdit && mode === 'MODEL_EDIT';
@@ -350,13 +442,8 @@ function PropertyFieldRow({
 
         {/* Validation Message */}
         {field.validation && (
-          <div
-            className={clsx(
-              'text-xs mt-1',
-              field.validation.severity === 'ERROR' ? 'text-red-600' : 'text-yellow-600'
-            )}
-          >
-            {field.validation.message}
+          <div className="mt-2">
+            <ValidationBadge message={field.validation} compact />
           </div>
         )}
       </div>
@@ -385,24 +472,38 @@ function PropertyFieldRow({
       {/* Value */}
       <div className="flex items-center gap-1">
         {isReadOnly ? (
-          <span
-            className={clsx(
-              'text-xs font-mono',
-              field.source === 'calculated' ? 'text-blue-700' : 'text-gray-900'
+          <>
+            {field.type === 'number' && field.unit ? (
+              <ValueWithUnit
+                value={field.value as number | null}
+                unit={field.unit}
+                valueClassName={clsx(
+                  'text-xs',
+                  field.source === 'calculated' ? 'text-blue-700' : 'text-gray-900'
+                )}
+              />
+            ) : (
+              <span
+                className={clsx(
+                  'text-xs font-mono',
+                  field.source === 'calculated' ? 'text-blue-700' : 'text-gray-900'
+                )}
+              >
+                {formatValue(field.value)}
+              </span>
             )}
-          >
-            {formatValue(field.value)}
-          </span>
+          </>
         ) : (
           <FieldInput
             field={field}
             onChange={(value) => onFieldChange(field.key, value)}
+            elementType={elementType}
           />
         )}
 
-        {/* Unit */}
-        {field.unit && (
-          <span className="text-xs text-gray-500 ml-1">{field.unit}</span>
+        {/* Unit (for editable fields without ValueWithUnit) */}
+        {!isReadOnly && field.unit && (
+          <UnitLabel unit={field.unit} compact />
         )}
 
         {/* Read-only indicator */}
@@ -412,26 +513,69 @@ function PropertyFieldRow({
           </span>
         )}
       </div>
+
+      {/* Inline validation error */}
+      {field.validation && (
+        <div className="ml-2">
+          <ValidationIcon severity={field.validation.severity} />
+        </div>
+      )}
     </div>
   );
 }
 
-/**
- * Field Input Component.
- */
+// =============================================================================
+// FieldInput Component
+// =============================================================================
+
 interface FieldInputProps {
   field: PropertyField;
   onChange: (value: unknown) => void;
+  elementType: ElementType;
 }
 
-function FieldInput({ field, onChange }: FieldInputProps) {
+function FieldInput({ field, onChange, elementType }: FieldInputProps) {
+  const [localValue, setLocalValue] = useState<string>(
+    field.value !== null && field.value !== undefined ? String(field.value) : ''
+  );
+  const [hasError, setHasError] = useState(false);
+
+  // Handle blur to validate and commit
+  const handleBlur = useCallback(() => {
+    let parsedValue: unknown = localValue;
+
+    if (field.type === 'number') {
+      if (localValue === '') {
+        parsedValue = null;
+      } else {
+        const num = parseFloat(localValue.replace(',', '.'));
+        if (isNaN(num)) {
+          setHasError(true);
+          return;
+        }
+        parsedValue = num;
+      }
+    }
+
+    setHasError(false);
+    onChange(parsedValue);
+  }, [localValue, field.type, onChange]);
+
+  // Handle immediate change for checkboxes and selects
+  const handleImmediateChange = useCallback(
+    (value: unknown) => {
+      onChange(value);
+    },
+    [onChange]
+  );
+
   switch (field.type) {
     case 'boolean':
       return (
         <input
           type="checkbox"
           checked={Boolean(field.value)}
-          onChange={(e) => onChange(e.target.checked)}
+          onChange={(e) => handleImmediateChange(e.target.checked)}
           className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
         />
       );
@@ -440,7 +584,7 @@ function FieldInput({ field, onChange }: FieldInputProps) {
       return (
         <select
           value={String(field.value ?? '')}
-          onChange={(e) => onChange(e.target.value)}
+          onChange={(e) => handleImmediateChange(e.target.value)}
           className="text-xs border border-gray-300 rounded px-2 py-1 focus:ring-blue-500 focus:border-blue-500"
         >
           {field.enumOptions?.map((option) => (
@@ -454,11 +598,19 @@ function FieldInput({ field, onChange }: FieldInputProps) {
     case 'number':
       return (
         <input
-          type="number"
-          value={field.value !== null ? String(field.value) : ''}
-          onChange={(e) => onChange(e.target.value === '' ? null : parseFloat(e.target.value))}
-          className="text-xs font-mono w-24 border border-gray-300 rounded px-2 py-1 text-right focus:ring-blue-500 focus:border-blue-500"
-          step="any"
+          type="text"
+          inputMode="decimal"
+          value={localValue}
+          onChange={(e) => {
+            setLocalValue(e.target.value);
+            setHasError(false);
+          }}
+          onBlur={handleBlur}
+          className={clsx(
+            'text-xs font-mono w-24 border rounded px-2 py-1 text-right focus:ring-blue-500 focus:border-blue-500',
+            hasError ? 'border-red-500 bg-red-50' : 'border-gray-300'
+          )}
+          placeholder={field.unit ? `(${field.unit})` : undefined}
         />
       );
 
@@ -468,8 +620,9 @@ function FieldInput({ field, onChange }: FieldInputProps) {
       return (
         <input
           type="text"
-          value={String(field.value ?? '')}
-          onChange={(e) => onChange(e.target.value)}
+          value={localValue}
+          onChange={(e) => setLocalValue(e.target.value)}
+          onBlur={handleBlur}
           className="text-xs w-32 border border-gray-300 rounded px-2 py-1 focus:ring-blue-500 focus:border-blue-500"
         />
       );

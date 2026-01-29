@@ -100,13 +100,15 @@ describe('Property Grid Field Definitions', () => {
   describe('LineBranch Field Definitions', () => {
     const sections = getLineBranchFieldDefinitions();
 
-    it('should have type_reference section with read-only type_ref', () => {
+    it('should have type_reference section with type_ref_with_actions field', () => {
       const typeRefSection = sections.find((s) => s.id === 'type_reference');
       expect(typeRefSection).toBeDefined();
 
       const typeRefField = typeRefSection!.fields.find((f) => f.key === 'type_ref');
       expect(typeRefField).toBeDefined();
-      expect(typeRefField!.editable).toBe(false);
+      // type_ref_with_actions has editable: true for button access,
+      // but source: 'type' makes the value read-only
+      expect(typeRefField!.type).toBe('type_ref_with_actions');
       expect(typeRefField!.source).toBe('type');
     });
 
