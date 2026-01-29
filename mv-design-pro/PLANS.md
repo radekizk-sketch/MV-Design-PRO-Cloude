@@ -1449,6 +1449,54 @@ Wdrożenie **deterministycznego raportu PDF P24+** klasy **ETAP+**:
 
 ---
 
+## 12.14. Phase 2.x.9: SENSITIVITY & MARGIN ANALYSIS (P25) — ETAP++
+
+### 12.14.1. Cel fazy
+
+Wdrożenie **deterministycznej analizy wrażliwości i marginesów** (P25) jako wyróżnika ETAP++:
+- ranking driverów wpływu na decyzję końcową,
+- post‑hoc tylko (bez solverów),
+- jawna propagacja NOT COMPUTED,
+- integracja z P24+ PDF.
+
+**INVARIANT:** brak zmian w solverach i Result API.
+
+---
+
+### 12.14.2. Zakres fazy
+
+| W zakresie | Poza zakresem |
+|------------|---------------|
+| DTO + builder + serializer P25 | Recompute fizyki |
+| Perturbacje ±Δ% (P/Q, SC, margins, voltage limits) | Zmiany P20/P21/P22 danych źródłowych |
+| Determinizm i stabilne hashowanie | UI/Frontend |
+| Testy rankingów i marginesów | Solver changes |
+
+---
+
+### 12.14.3. Deliverables
+
+| Plik | Opis | Status |
+|------|------|--------|
+| `backend/src/analysis/sensitivity/` | Modele, builder, serializer P25 | DONE |
+| `backend/tests/analysis/test_sensitivity.py` | Testy P25: determinism, marginesy, NOT COMPUTED | DONE |
+| `docs/analysis/SENSITIVITY_ANALYSIS_ETAP_PLUS.md` | Specyfikacja P25 (ETAP++) | DONE |
+| `backend/src/analysis/reporting/pdf/p24_plus_report.py` | Sekcja P25 w raporcie PDF | DONE |
+| `docs/INDEX.md` | Link do dokumentu P25 | DONE |
+
+---
+
+### 12.14.4. Completed Tasks
+
+- [x] Dodanie pakietu `analysis/sensitivity` (DTO, builder, serializer, determinism).
+- [x] Perturbacje ±Δ% dla P/Q, SC, margins oraz limitów napięć (post‑hoc only).
+- [x] Ranking top driverów i stabilne hashowanie wyników.
+- [x] Jawna propagacja NOT COMPUTED do wyników P25.
+- [x] Integracja z PDF P24+ (sekcja P25, hash uwzględnia dane P25).
+- [x] Testy P25: stabilność rankingu, matematyka marginesów, NOT COMPUTED.
+
+---
+
 ## 19. Proof Packs Roadmap (P15–P20) — CANONICAL
 
 Poniższa roadmapa jest **jedynym kanonicznym planem** rozwoju Proof Packów.

@@ -4,5 +4,6 @@ __all__ = [
     "normative",
     "protection_curves_it",
     "protection_insight",
+    "sensitivity",
     "voltage_profile",
 ]
