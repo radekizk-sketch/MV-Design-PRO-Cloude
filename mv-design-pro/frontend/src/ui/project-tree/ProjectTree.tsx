@@ -28,6 +28,7 @@
 import { useState, useCallback, useMemo } from 'react';
 import { clsx } from 'clsx';
 import type { TreeNode, TreeNodeType, ElementType, OperatingMode } from '../types';
+import type { RunHistoryItem } from '../comparison/types';
 import { useSelectionStore } from '../selection/store';
 import { useTreeSelection } from '../selection/hooks';
 
@@ -53,6 +54,7 @@ const TREE_NODE_ICONS: Record<TreeNodeType, string> = {
   CASES: '📋',
   STUDY_CASE: '◉',  // P10: Study case icon
   RESULTS: '📊',
+  RUN_ITEM: '▸',  // P11c: Analysis run icon
   ELEMENT: '•',
 };
 
@@ -74,6 +76,7 @@ const TREE_NODE_LABELS: Record<TreeNodeType, string> = {
   CASES: 'Przypadki obliczeniowe',
   STUDY_CASE: '',  // P10: Label from case name
   RESULTS: 'Wyniki',
+  RUN_ITEM: '',  // P11c: Label from run metadata
   ELEMENT: '',
 };
 
@@ -130,12 +133,16 @@ interface ProjectTreeProps {
   };
   // P10: Study cases list
   studyCases?: StudyCaseItem[];
+  // P11c: Run history list (for Results Browser)
+  runHistory?: RunHistoryItem[];
   resultsCount?: number;
   onNodeClick?: (node: TreeNode) => void;
   onCategoryClick?: (nodeType: TreeNodeType, elementType?: ElementType) => void;
   // P10: Study case callbacks
   onStudyCaseClick?: (caseId: string) => void;
   onStudyCaseActivate?: (caseId: string) => void;
+  // P11c: Run click callback
+  onRunClick?: (runId: string) => void;
 }
 
 // ============================================================================
@@ -147,11 +154,13 @@ export function ProjectTree({
   elements,
   typeCounts = { lineTypes: 0, cableTypes: 0, transformerTypes: 0, switchEquipmentTypes: 0 },
   studyCases = [],
+  runHistory = [],
   resultsCount = 0,
   onNodeClick,
   onCategoryClick,
   onStudyCaseClick,
   onStudyCaseActivate,
+  onRunClick,
 }: ProjectTreeProps) {
   const { treeExpandedNodes, expandTreeNode, collapseTreeNode } = useSelectionStore();
   const { selectedElement, handleTreeClick } = useTreeSelection();
@@ -196,6 +205,38 @@ export function ProjectTree({
         isActive: caseItem.is_active,
         resultStatus: caseItem.result_status,
       }));
+    };
+
+    // P11c: Build run history nodes
+    const buildRunNodes = (runs: RunHistoryItem[]): TreeNode[] => {
+      // Sort by created_at DESC (newest first) - deterministic
+      const sorted = [...runs].sort((a, b) => {
+        return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+      });
+
+      return sorted.map((run) => {
+        // Format label: "Solver [Case] - Date"
+        const date = new Date(run.created_at).toLocaleDateString('pl-PL', {
+          year: 'numeric',
+          month: '2-digit',
+          day: '2-digit',
+          hour: '2-digit',
+          minute: '2-digit',
+        });
+        const solverLabel = run.solver_kind === 'PF' ? 'Rozpływ' : run.solver_kind === 'short_circuit_sn' ? 'Zwarcie' : run.solver_kind;
+        const label = `${solverLabel} [${run.case_name}] — ${date}`;
+
+        return {
+          id: `run-${run.run_id}`,
+          label,
+          nodeType: 'RUN_ITEM' as TreeNodeType,
+          runId: run.run_id,
+          caseId: run.case_id,
+          solverKind: run.solver_kind,
+          createdAt: run.created_at,
+          resultStatus: run.result_state,
+        };
+      });
     };
 
     return {
@@ -302,11 +343,12 @@ export function ProjectTree({
           id: 'results',
           label: TREE_NODE_LABELS.RESULTS,
           nodeType: 'RESULTS',
-          count: resultsCount,
+          count: runHistory.length,
+          children: buildRunNodes(runHistory),
         },
       ],
     };
-  }, [projectName, elements, typeCounts, studyCases, resultsCount]);
+  }, [projectName, elements, typeCounts, studyCases, runHistory]);
 
   // Handle node toggle
   const handleToggle = useCallback(
@@ -329,6 +371,9 @@ export function ProjectTree({
       } else if (node.nodeType === 'STUDY_CASE' && node.studyCaseId) {
         // P10: Study case click
         onStudyCaseClick?.(node.studyCaseId);
+      } else if (node.nodeType === 'RUN_ITEM' && node.runId) {
+        // P11c: Run click - open Results Inspector
+        onRunClick?.(node.runId);
       } else if (TREE_NODE_TO_ELEMENT_TYPE[node.nodeType]) {
         // Category click - open Data Manager
         onCategoryClick?.(node.nodeType, TREE_NODE_TO_ELEMENT_TYPE[node.nodeType]);
@@ -338,7 +383,7 @@ export function ProjectTree({
         onCategoryClick?.(node.nodeType);
       }
     },
-    [handleTreeClick, onNodeClick, onCategoryClick, onStudyCaseClick]
+    [handleTreeClick, onNodeClick, onCategoryClick, onStudyCaseClick, onRunClick]
   );
 
   // P10: Handle study case double-click (activate)
@@ -418,17 +463,18 @@ function TreeNodeComponent({
   const isSelected = node.elementId === selectedElementId;
   const isElement = node.nodeType === 'ELEMENT';
   const isStudyCase = node.nodeType === 'STUDY_CASE';
+  const isRunItem = node.nodeType === 'RUN_ITEM'; // P11c
 
-  // P10: Get appropriate icon for study case (status-based)
+  // P10/P11c: Get appropriate icon for study case or run item (status-based)
   const getIcon = () => {
-    if (isStudyCase && node.resultStatus) {
-      return RESULT_STATUS_ICONS[node.resultStatus] || TREE_NODE_ICONS.STUDY_CASE;
+    if ((isStudyCase || isRunItem) && node.resultStatus) {
+      return RESULT_STATUS_ICONS[node.resultStatus] || TREE_NODE_ICONS[node.nodeType];
     }
     return node.icon ?? TREE_NODE_ICONS[node.nodeType];
   };
 
   const icon = getIcon();
-  const label = isElement || isStudyCase ? node.label : TREE_NODE_LABELS[node.nodeType];
+  const label = isElement || isStudyCase || isRunItem ? node.label : TREE_NODE_LABELS[node.nodeType];
 
   return (
     <div>
@@ -440,7 +486,7 @@ function TreeNodeComponent({
           isSelected && 'bg-blue-100 hover:bg-blue-100',
           // P10: Active study case highlighting
           isStudyCase && node.isActive && 'bg-blue-50 hover:bg-blue-100',
-          !isElement && !isStudyCase && 'font-medium'
+          !isElement && !isStudyCase && !isRunItem && 'font-medium'
         )}
         style={{ paddingLeft: `${level * 16 + 4}px` }}
         onClick={() => onClick(node)}
@@ -466,13 +512,13 @@ function TreeNodeComponent({
           <span className="text-blue-600 mr-1" title="Aktywny przypadek">▸</span>
         )}
 
-        {/* Icon with status color for study cases */}
+        {/* Icon with status color for study cases and run items */}
         <span
           className={clsx(
             'text-xs mr-2',
-            isStudyCase && node.resultStatus && RESULT_STATUS_COLORS[node.resultStatus]
+            (isStudyCase || isRunItem) && node.resultStatus && RESULT_STATUS_COLORS[node.resultStatus]
           )}
-          title={isStudyCase ? getStatusTooltip(node.resultStatus) : undefined}
+          title={(isStudyCase || isRunItem) ? getStatusTooltip(node.resultStatus) : undefined}
         >
           {icon}
         </span>
@@ -481,7 +527,7 @@ function TreeNodeComponent({
         <span
           className={clsx(
             'text-xs flex-1 truncate',
-            isElement ? 'text-gray-700' : 'text-gray-900',
+            (isElement || isRunItem) ? 'text-gray-700' : 'text-gray-900',
             isStudyCase && node.isActive && 'font-medium'
           )}
         >
