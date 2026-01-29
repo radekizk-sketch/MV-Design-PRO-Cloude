@@ -960,6 +960,29 @@ Wprowadzenie warstwy **interpretacji dowodowej** (Proof Engine), która generuje
 
 ### 14.2 P11.1a (MVP) — SC3F IEC60909 + VDROP
 
+**Status:** DONE | CANONICAL & BINDING
+
+**Cel:**
+Deterministyczny, audytowalny dowód matematyczny (White Box) wyników SC3F IEC 60909 oraz VDROP.
+
+**Zakres (FULL MATH):**
+- SC3F: Thevenin ($$U_{th}, Z_{th}$$), $$I_{k}''$$, $$S_{k}''$$
+- Anti-double-counting współczynnika $$c$$ (wariant A/B, dokładnie raz)
+- VDROP: $$\Delta U$$ z rozbiciem $$R \cdot P$$ oraz $$X \cdot Q$$
+- Format kroku dowodu (BINDING): **wzór → dane → podstawienie → wynik → weryfikacja jednostek**
+
+**Inwarianty:**
+- Solver i Result API IEC 60909 **NIETKNIĘTE**
+- Proof Engine działa POST-HOC na `ShortCircuitResult` + `white_box_trace`
+- Brak PASS/FAIL, brak uproszczeń domyślnych
+
+**Determinism:**
+- Stała kolejność kroków (EquationRegistry)
+- Deterministyczne JSON / LaTeX / PDF / DOCX
+
+**Relacje:**
+- Baza dla: P11.1b, P11.1d, P14, P15, P17
+
 **Definition of Done:**
 - [x] ProofDocument zdefiniowany z wszystkimi polami
 - [x] ProofStep z formatem Wzór→Dane→Podstawienie→Wynik→Jednostki
@@ -976,13 +999,31 @@ Wprowadzenie warstwy **interpretacji dowodowej** (Proof Engine), która generuje
 
 ### 14.3 P11.1b — Dowód regulatora Q(U), cosφ(P)
 
+**Status:** REFERENCE | IN PROGRESS
+
+**Cel:**
+Dowód matematyczny regulatorów mocy biernej i współczynnika mocy.
+
+**Zakres:**
+- Q(U), cosφ(P)
+- Scenariusze A/B (counterfactual)
+- $$\Delta Q$$, $$\Delta k$$, brak klasyfikacji normowej
+
+**Inwarianty:**
+- LaTeX-only (blokowo), pełna weryfikacja jednostek
+- POST-HOC, bez ingerencji w solvery
+
+**Relacje:**
+- Rozszerzenie P11.1a
+- Wejście do P14 (coverage)
+
 **Definition of Done:**
 - [x] Charakterystyka Q(U) zdefiniowana z wszystkimi parametrami
 - [x] Charakterystyka cosφ(P) zdefiniowana z wszystkimi parametrami
 - [x] Równanie wpływu Q na ΔU udokumentowane
 - [x] Counterfactual Proof zdefiniowany
-- [x] Kroki dowodu Q(U) z mapping keys
-- [x] Przykład counterfactual udokumentowany
+- [ ] Kroki dowodu Q(U) z mapping keys (pełne A/B/Δ)
+- [ ] Przykład counterfactual udokumentowany (pełny zestaw danych)
 
 ### 14.4 P11.1c — Zwarcia niesymetryczne (składowe symetryczne)
 
@@ -994,15 +1035,32 @@ Wprowadzenie warstwy **interpretacji dowodowej** (Proof Engine), która generuje
 
 ### 14.5 P11.1d — Proof Inspector UI + Eksport
 
+**Status:** REFERENCE | PARTLY DONE
+
+**Cel:**
+Read-only inspekcja dowodów matematycznych oraz deterministyczny eksport.
+
+**Zakres:**
+- Widoki: Header, Steps, Summary, Unit Check
+- Widoki A/B/Δ tam, gdzie dotyczy
+- Eksport: JSON / LaTeX / PDF / DOCX
+
+**UX (BINDING):**
+- Results → „Ślad obliczeń”
+- UI wyłącznie po polsku
+
+**Relacje:**
+- Konsumuje P11.1a / P11.1b / P15 / P17
+
 **Definition of Done:**
 - [x] Layout Proof Inspector zdefiniowany
 - [x] Sekcje kroku (Wzór/Dane/Podstawienie/Wynik/Weryfikacja) opisane
 - [x] Nawigacja (spis, przyciski, skróty) opisana
 - [x] Widok podsumowania opisany
-- [x] Kontrakty eksportu (LaTeX/PDF/DOCX/Markdown) zdefiniowane
+- [ ] Kontrakty eksportu (LaTeX/PDF/DOCX/Markdown) doprecyzowane deterministycznie
 - [x] Tryb read-only udokumentowany
-- [x] Komponenty UI wyspecyfikowane
-- [x] Wymagania dostępności (a11y) opisane
+- [ ] Komponenty UI wyspecyfikowane (braki w wariantach A/B/Δ)
+- [ ] Wymagania dostępności (a11y) domknięte
 
 ### 14.6 P11.2 — Proof Inspector UX / UI Parity (PowerFactory-style)
 
@@ -1080,6 +1138,20 @@ doboru aparatury na podstawie wyników P11 (bez nowych obliczeń fizycznych).
 Wprowadzenie **kanonicznej warstwy audytu** kompletności i pokrycia Proof Packów
 bez dodawania obliczeń i bez modyfikacji solverów.
 
+**Status:** DONE | CANONICAL & BINDING
+
+**Zakres:**
+- Coverage Matrix: wielkość → Proof Pack
+- Reguła audytu: **brak dowodu = NOT COMPUTED**
+- Wykrywanie luk (bez interpretacji norm)
+
+**Inwarianty:**
+- Warstwa META-only (bez obliczeń)
+- Brak wpływu na solvery i Result API
+
+**Relacje:**
+- Prerequisite dla P15–P20
+
 ### 17.2 Deliverables (DOC ONLY)
 
 | Plik | Opis | Status |
@@ -1092,7 +1164,7 @@ bez dodawania obliczeń i bez modyfikacji solverów.
 
 ### 17.3 Relacje
 
-P14 jest **warstwą meta** i stanowi **prerequisite** dla P15–P19.
+P14 jest **warstwą meta** i stanowi **prerequisite** dla P15–P20.
 
 ---
 
@@ -1107,15 +1179,15 @@ P14 jest **warstwą meta** i stanowi **prerequisite** dla P15–P19.
 | 2026-02 | 2.15 | P11.2 Proof Inspector UX/UI parity (PowerFactory-style, read-only) |
 | 2026-03 | 2.16 | P12 MVP: Equipment Proof Pack (U, Icu, Idyn, Ith) |
 | 2026-04 | 2.17 | P14 Proof Audit & Coverage (doc-only, meta layer) |
-| 2026-05 | 2.18 | P15 Load Currents & Overload Proof Pack implemented (FULL MATH, deterministic) |
-| 2026-01 | 2.19 | Phase 2.x.3: SWITCHING STATE EXPLORER — DOC LOCKED (eksploracja stanów łączeniowych, Islands, pre-solver validation) |
-| 2026-01 | 2.20 | Phase 2.x.4: SHORT-CIRCUIT NODE RESULTS — DOC LOCKED (wyniki zwarciowe BUS-centric, IEC 60909, PF-grade) |
-| 2026-01 | 2.21 | Phase 2.x.5: CATALOG BROWSER (PASSIVE EQUIPMENT) — DOC LOCKED (Type → Instances, pasywne elementy tylko, PF-grade) |
+| 2026-05 | 2.18 | P15 Load Currents & Overload Proof Pack roadmap formalized (FULL MATH, deterministic) |
+| 2026-01 | 2.22.3 | Phase 2.x.3: SWITCHING STATE EXPLORER — DOC LOCKED (eksploracja stanów łączeniowych, Islands, pre-solver validation) |
+| 2026-01 | 2.22.4 | Phase 2.x.4: SHORT-CIRCUIT NODE RESULTS — DOC LOCKED (wyniki zwarciowe BUS-centric, IEC 60909, PF-grade) |
+| 2026-01 | 2.22.5 | Phase 2.x.5: CATALOG BROWSER (PASSIVE EQUIPMENT) — DOC LOCKED (Type → Instances, pasywne elementy tylko, PF-grade) |
 | 2026-06 | 2.22 | Proof Engine: LS registry initialization fix (EquationRegistry merge/freeze + import smoke test) |
 | 2026-06 | 2.22.1 | P16.1 CI stabilization: test harness isolation for FastAPI-only fixtures |
 | 2026-06 | 2.22.2 | P17 Losses Energy Profile Proof Pack implemented (FULL MATH, deterministic) |
 
-_Versioning note: 2026-06 entries are normalized to 2.22.x to avoid duplicate 2.19 across months._
+_Versioning note: entries are normalized to 2.22.x to preserve monotonic versioning and avoid legacy 2.19.x references._
 
 ---
 
@@ -1200,90 +1272,82 @@ Catalog Browser ma umożliwiać:
 
 ---
 
+## 19. Proof Packs Roadmap (P15–P20) — CANONICAL
+
+Poniższa roadmapa jest **jedynym kanonicznym planem** rozwoju Proof Packów.
+Wszystkie pakiety pozostają POST-HOC i nie modyfikują solverów ani Result API.
+
+### P15 — Load Currents & Overload Proof Pack
+
+**Status:** CANONICAL | IN PROGRESS
+
+- Prądy robocze LINE / CABLE / TRANSFORMER
+- Przeciążenia (%In, %Sn), warianty A/B + $$\Delta$$
+- FULL MATH, deterministyczny ProofDocument
+- **Prerequisite:** P11.1a, P14
+
+**DoD (target):**
+- [ ] Prądy obciążenia linii/kabli wyprowadzone z mocy pozornej.
+
+  $$
+  I = \frac{S}{\sqrt{3} \cdot U}
+  $$
+
+- [ ] Przeciążenia linii/kabli (%In) z pełną weryfikacją jednostek.
+- [ ] Transformator: relacja obciążenia do mocy znamionowej i overload %.
+
+  $$
+  \frac{S}{S_n}
+  $$
+
+### P16 — Losses & Power Proof Pack (Physics-based)
+
+**Status:** PLANNED | FUTURE
+
+- Straty mocy (nie energia):
+  - Linie: $$P = I^{2} R$$
+  - Transformatory: $$P = P_{0} + P_{k}$$
+- Dane katalogowe jako źródło prawdy
+- Brak integracji w czasie
+- **Prerequisite:** P11.1a, P14
+- **Relacja:** wejście do P17
+
+### P17 — Losses Energy Profile Proof Pack
+
+**Status:** DONE | CANONICAL & BINDING
+
+- Energia strat (profil czasowy)
+- Suma dyskretna + wariant stały
+- FULL MATH, deterministyczny
+- **Prerequisite:** P14
+
+### P18 — Protection Proof Pack (Overcurrent / Selectivity)
+
+**Status:** PLANNED | FUTURE
+
+- Porównania: $$I_{k}''$$ vs $$I_{cu}$$ / $$I_{dyn}$$ / $$I_{th}$$
+- Selektywność (analityczna, bez EMT)
+- Zabezpieczenia podstawowe i rezerwowe
+- **Prerequisite:** P11.1a, P14, P15
+
+### P19 — Earthing / Ground Fault Proof Pack (SN)
+
+**Status:** PLANNED | FUTURE
+
+- Prądy doziemne (1F-Z, 2F-Z)
+- Impedancja uziemienia
+- Terminologia BINDING: 1F-Z, 2F, 2F-Z oraz **PCC – punkt wspólnego przyłączenia**
+- **Prerequisite:** P11.1a, P14
+
+### P20 — Proof Coverage Completion (ETAP / PowerFactory Parity)
+
+**Status:** PLANNED | META
+
+- Domknięcie pokrycia względem ETAP / PowerFactory
+- Lista FULL / PARTIAL / NOT COVERED
+- META-only, bez obliczeń
+- **Relacja:** konsumuje P14
+
+---
+
 **END OF EXECUTION PLAN**
-
-## TODO — Proof Packs P14–P19 (FUTURE PACKS)
-
-### P14 — Proof Audit & Coverage (DOC ONLY, META)
-
-P14 definiuje **kanoniczną warstwę audytu** kompletności i pokrycia Proof Packów
-i jest **prerequisite** dla P15–P19.
-
-### TODO-P14-001 (PLANNED) — P14: Power Flow Proof Pack (audit wyników PF) [FUTURE PACK]
-- Priority: MUST
-- Inputs: TraceArtifact, PowerFlowResult
-- Output: ProofPack P14 (ProofDocument: Audit rozpływu mocy)
-- DoD:
-  - [ ] Dowód bilansu węzła dla mocy czynnej i biernej z mapowaniem do TraceArtifact.
-
-    $$
-    \sum P = 0,\quad \sum Q = 0
-    $$
-
-  - [ ] Bilans gałęzi dla mocy czynnej i biernej uwzględnia straty oraz spadek napięcia.
-
-    $$
-    P_{in} \rightarrow P_{out} + P_{loss},\quad Q_{in} \rightarrow Q_{out} + \Delta U
-    $$
-
-  - [ ] Straty linii liczone jawnie z prądu i rezystancji.
-
-    $$
-    P_{loss} = I^{2} \cdot R
-    $$
-
-  - [ ] Porównanie counterfactual Case A vs Case B z raportem różnic.
-
-    $$
-    \Delta P,\ \Delta Q,\ \Delta U
-    $$
-
-### P15 — Load Currents & Overload Proof Pack (IMPLEMENTED)
-- Priority: MUST
-- Inputs: TraceArtifact, PowerFlowResult, Catalog
-- Output: ProofPack P15 (ProofDocument: Prądy robocze i przeciążenia)
-- DoD (DONE):
-  - [x] Prądy obciążenia linii/kabli wyprowadzone z mocy pozornej.
-
-    $$
-    I = \frac{S}{\sqrt{3} \cdot U}
-    $$
-
-  - [x] Marginesy procentowe dla prądów i obciążenia transformatora (bez oceny normowej).
-  - [x] Transformator: relacja obciążenia do mocy znamionowej.
-
-    $$
-    \frac{S}{S_n}
-    $$
-
-### TODO-P16-001 (PLANNED) — P16: Losses & Energy Proof Pack [FUTURE PACK]
-- Priority: MUST
-- Inputs: TraceArtifact, PowerFlowResult, Catalog
-- Output: ProofPack P16 (ProofDocument: Straty mocy i energii)
-- DoD:
-  - [ ] Straty linii wyprowadzone z prądu i rezystancji.
-
-    $$
-    P_{loss,line} = I^{2} \cdot R
-    $$
-
-  - [ ] Straty transformatora z danych katalogowych: suma P0 i Pk.
-
-    $$
-    P_{loss,trafo} = P_{0} + P_{k}
-    $$
-
-  - [ ] Energia strat z profilu obciążenia (integracja w czasie).
-
-    $$
-    E_{loss} = \int P_{loss} \, dt
-    $$
-
-### P17 — Losses Energy Profile Proof Pack (IMPLEMENTED)
-- Priority: MUST
-- Inputs: TraceArtifact, PowerFlowResult, Catalog
-- Output: ProofPack P17 (ProofDocument: Energia strat — profil czasowy)
-- DoD (DONE):
-  - [x] Energia strat z profilu obciążenia w postaci sumy dyskretnej.
-  - [x] Wariant stały dla stałej mocy strat i czasu trwania.
-  - [x] Deterministyczny ProofDocument z pełną weryfikacją jednostek.
