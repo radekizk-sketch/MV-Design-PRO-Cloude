@@ -1194,6 +1194,7 @@ P14 jest **warstwą meta** i stanowi **prerequisite** dla P15–P20.
 | 2026-01 | 2.26 | **P11b FRONTEND RESULTS INSPECTOR** — Frontend RESULT_VIEW mode + SLD Overlay rendering (DONE) |
 
 | 2026-01 | 2.27 | **P11c RESULTS BROWSER + A/B COMPARE (UI-ONLY)** — Results history tree + A/B comparison UI + SLD comparison mode (DONE) |
+| 2026-01 | 2.28 | **P12a DATA MANAGER PARITY** — Case Manager + Active Case Bar + MODE_EDIT/CASE_CONFIG/RESULT_VIEW blocks (DONE) |
 _Versioning note: entries are normalized to 2.22.x to preserve monotonic versioning and avoid legacy 2.19.x references._
 
 ---
@@ -2158,6 +2159,121 @@ Response: RunComparisonResult with node_voltages, branch_powers, short_circuit d
 - [x] No model mutations in RESULT_VIEW mode
 - [x] Minimal tests passing
 - [x] PLANS.md updated with P11c as DONE
+
+---
+
+## 24. P12a DATA MANAGER PARITY: CASE MANAGER + ACTIVE CASE + MODE BLOCKS — DONE
+
+### 24.1 Overview
+
+**P12a** introduces **PowerFactory-style case management** with:
+- Explicit Active Case awareness (always visible bar)
+- Case Manager panel (create/clone/delete/rename/activate)
+- Operating mode separation: MODEL_EDIT / CASE_CONFIG / RESULT_VIEW
+- Hard UI blocks based on operating mode
+
+This is **UI + minimal state management** — no solver invocations, no physics calculations.
+
+### 24.2 Implemented Components
+
+| Component | Description | Status |
+|-----------|-------------|--------|
+| **App State Store** | Global state for activeProjectId, activeCaseId, activeCaseKind, activeMode, activeRunId | DONE |
+| **Active Case Bar** | Always-visible bar with Polish labels (Aktywny przypadek, Typ, Stan wyników) | DONE |
+| **Case Manager** | Panel with create/clone/delete/rename/activate actions | DONE |
+| **Mode Gate** | Declarative mode-based UI gating components and hooks | DONE |
+| **Main Layout** | Layout wrapper with Active Case Bar integration | DONE |
+
+### 24.3 Global State Model
+
+```typescript
+interface AppState {
+  activeProjectId: string | null;
+  activeCaseId: string | null;
+  activeCaseKind: 'ShortCircuitCase' | 'PowerFlowCase' | null;
+  activeCaseResultStatus: 'NONE' | 'FRESH' | 'OUTDATED';
+  activeMode: 'MODEL_EDIT' | 'CASE_CONFIG' | 'RESULT_VIEW';
+  activeRunId: string | null;
+  caseManagerOpen: boolean;
+}
+```
+
+### 24.4 Operating Mode Rules
+
+| Mode | Model | Case Config | Calculations | Results |
+|------|-------|-------------|--------------|---------|
+| **MODEL_EDIT** | MUTABLE | EDITABLE | ALLOWED | VIEW-ONLY |
+| **CASE_CONFIG** | READ-ONLY | EDITABLE | BLOCKED | VIEW-ONLY |
+| **RESULT_VIEW** | READ-ONLY | READ-ONLY | BLOCKED | FULL ACCESS |
+
+### 24.5 Active Case Bar (Polish UI)
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ Aktywny przypadek: [SC-001] | Typ: Przypadek zwarciowy | ● Wyniki aktualne │
+│ [Zmień przypadek] [Konfiguruj] [Oblicz] [Wyniki]                 [Edycja modelu] │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+**REGUŁA:** Brak aktywnego przypadku → przycisk [Oblicz] NIEAKTYWNY z komunikatem PL.
+
+### 24.6 Case Manager Actions
+
+| Action | MODEL_EDIT | CASE_CONFIG | RESULT_VIEW |
+|--------|------------|-------------|-------------|
+| Nowy przypadek zwarciowy | ✓ | ✗ | ✗ |
+| Nowy przypadek rozpływowy | ✓ | ✗ | ✗ |
+| Klonuj | ✓ | ✗ | ✗ |
+| Zmień nazwę | ✓ | ✗ | ✗ |
+| Usuń | ✓ | ✗ | ✗ |
+| Ustaw jako aktywny | ✓ | ✗ | ✗ |
+| Edycja konfiguracji | ✓ | ✓ | ✗ |
+
+### 24.7 Files Added
+
+| Layer | Files |
+|-------|-------|
+| **App State** | `frontend/src/ui/app-state/store.ts` — Global state store (Zustand) |
+| **App State** | `frontend/src/ui/app-state/index.ts` — Module exports |
+| **Active Case Bar** | `frontend/src/ui/active-case-bar/ActiveCaseBar.tsx` — Always-visible bar |
+| **Active Case Bar** | `frontend/src/ui/active-case-bar/index.ts` — Module exports |
+| **Case Manager** | `frontend/src/ui/case-manager/CaseManager.tsx` — Case management panel |
+| **Case Manager** | `frontend/src/ui/case-manager/useModeGating.ts` — Mode permission hooks |
+| **Case Manager** | `frontend/src/ui/case-manager/index.ts` — Module exports |
+| **Mode Gate** | `frontend/src/ui/mode-gate/ModeGate.tsx` — Declarative gating components |
+| **Mode Gate** | `frontend/src/ui/mode-gate/useModePermissions.ts` — Permission matrix hooks |
+| **Mode Gate** | `frontend/src/ui/mode-gate/index.ts` — Module exports |
+| **Layout** | `frontend/src/ui/layout/MainLayout.tsx` — Main layout with case bar |
+| **Layout** | `frontend/src/ui/layout/index.ts` — Module exports |
+| **App** | `frontend/src/App.tsx` — Updated with MainLayout integration |
+| **Tests** | `frontend/src/ui/__tests__/app-state-store.test.ts` — State management tests |
+| **Tests** | `frontend/src/ui/__tests__/mode-permissions.test.ts` — Permission matrix tests |
+
+### 24.8 Test Coverage
+
+- Active case state management
+- Mode switching and state transitions
+- Calculation permission rules (no case, mode, result status)
+- Hard block enforcement with Polish messages
+- Deterministic case list sorting (name, then id)
+- Polish labels verification
+
+### 24.9 DoD (Definition of Done)
+
+- [x] Pasek „Aktywny przypadek" zawsze widoczny, 100% PL
+- [x] Case Manager: create/clone/delete/activate działa (UI)
+- [x] Tryby MODEL_EDIT/CASE_CONFIG/RESULT_VIEW działają z twardymi blokadami
+- [x] Determinizm list i testy blokad PASS
+- [x] Jeden PR, brak refaktorów pobocznych
+- [x] PLANS.md zaktualizowany: P12a jako DONE
+
+### 24.10 Exclusions (NOT modified)
+
+- ❌ Solvers (no physics)
+- ❌ Backend Result API (frozen)
+- ❌ white_box_trace
+- ❌ Results Inspector/Overlay contracts (P11a) — only consumed
+- ❌ PROOF / P11.1+
 
 ---
 
