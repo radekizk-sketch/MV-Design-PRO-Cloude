@@ -572,6 +572,7 @@ class NetworkGraph:
 | 2026-01 | 2.12 | Phase 1.z: UI Eksploracji Wyników i Inspekcji Elementów – DOC LOCKED |
 | 2026-01 | 2.13 | Phase 2.x: UI PF++ (PowerFactory++ Parity) – DOC LOCKED |
 | 2026-01 | 2.14 | Phase 2.x.2: TOPOLOGY TREE & SELECTION SYNC – DOC LOCKED |
+| 2026-07 | 2.15 | P20 merge + Proof Engine completion (P11–P20) |
 
 ---
 
@@ -1279,7 +1280,7 @@ Wszystkie pakiety pozostają POST-HOC i nie modyfikują solverów ani Result API
 
 ### P15 — Load Currents & Overload Proof Pack
 
-**Status:** CANONICAL | IN PROGRESS
+**Status:** DONE | CANONICAL & BINDING
 
 - Prądy robocze LINE / CABLE / TRANSFORMER
 - Przeciążenia (%In, %Sn), warianty A/B + $$\Delta$$
@@ -1353,7 +1354,7 @@ Wszystkie pakiety pozostają POST-HOC i nie modyfikują solverów ani Result API
 
 ### P20 — Proof Coverage Completion (ETAP / PowerFactory Parity)
 
-**Status:** IN PROGRESS | META
+**Status:** DONE | CANONICAL & BINDING
 
 - Domknięcie pokrycia względem ETAP / PowerFactory
 - Lista FULL / PARTIAL / NOT COVERED
