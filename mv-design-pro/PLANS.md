@@ -1191,6 +1191,7 @@ P14 jest **warstwą meta** i stanowi **prerequisite** dla P15–P20.
 | 2026-01 | 2.23 | **P10a STATE / LIFECYCLE** — Project → StudyCase → Run → Snapshot model (DONE) |
 | 2026-01 | 2.24 | **P10b RESULT STATE + COMPARISON** — RunResultState + Case A/B Comparison Service (DONE) |
 | 2026-01 | 2.25 | **P11a RESULTS INSPECTOR** — READ-ONLY Results Inspector + Trace View + SLD Overlay API (DONE) |
+| 2026-01 | 2.26 | **P11b FRONTEND RESULTS INSPECTOR** — Frontend RESULT_VIEW mode + SLD Overlay rendering (DONE) |
 
 _Versioning note: entries are normalized to 2.22.x to preserve monotonic versioning and avoid legacy 2.19.x references._
 
@@ -1406,6 +1407,95 @@ This is the **backend-only** layer for RESULT_VIEW mode, not UI implementation.
 - ❌ white_box_trace format/semantics
 - ❌ UI / frontend
 - ❌ Proof Engine (P11.1+)
+
+---
+
+## 22. P11b FRONTEND RESULTS INSPECTOR (RESULT_VIEW) — DONE
+
+### 22.1 Overview
+
+**P11b** introduces the **Frontend Results Inspector** for RESULT_VIEW mode:
+- Full Polish UI (100% PL)
+- READ-ONLY mode with blocked editing actions
+- Deterministic result tables (Bus/Branch/SC)
+- Trace View for white_box_trace inspection
+- SLD result overlay rendering
+
+This is the **frontend-only** implementation consuming P11a backend endpoints.
+
+### 22.2 Implemented Components
+
+| Component | Description | Status |
+|-----------|-------------|--------|
+| **ResultsInspectorPage** | Main UI with tabs (Szyny, Gałęzie, Zwarcia, Ślad obliczeń) | DONE |
+| **useResultsInspectorStore** | Zustand store for results state management | DONE |
+| **BusResultsTable** | Deterministically sorted bus results with filtering | DONE |
+| **BranchResultsTable** | Deterministically sorted branch results with filtering | DONE |
+| **ShortCircuitResultsTable** | SC results table (for SC runs only) | DONE |
+| **TraceView** | White box trace inspection with search and expand/collapse | DONE |
+| **SldOverlay** | SLD result overlay component with loading colors | DONE |
+| **RESULT_VIEW hooks** | Mode-gating hooks (useIsResultViewMode, useCanEnterResultView, etc.) | DONE |
+
+### 22.3 Polish Labels (100% PL)
+
+| Category | Polish Labels |
+|----------|---------------|
+| **Tabs** | Szyny, Gałęzie, Zwarcia, Ślad obliczeń |
+| **Result Status** | Brak wyników, Wyniki aktualne, Wyniki nieaktualne |
+| **Flags** | Węzeł bilansujący, Naruszenie napięcia, Przeciążenie |
+| **Solver Types** | Rozpływ mocy, Zwarcie SN |
+| **UI Elements** | Tylko do odczytu, Przeglądarka wyników, Filtruj..., Pokaż nakładkę wyników |
+
+### 22.4 Mode Gating (RESULT_VIEW)
+
+| Action | MODEL_EDIT | CASE_CONFIG | RESULT_VIEW |
+|--------|------------|-------------|-------------|
+| Add elements | ✓ | ✗ | ✗ |
+| Edit model | ✓ | ✗ | ✗ |
+| Delete elements | ✓ | ✗ | ✗ |
+| View properties | ✓ (editable) | ✓ (read-only) | ✓ (read-only) |
+| View results | ✗ | ✗ | ✓ |
+| SLD overlay | Hidden | Hidden | Visible |
+
+### 22.5 SLD Overlay Features
+
+- Voltage labels on bus symbols (kV, pu)
+- Current/loading labels on branch symbols
+- Loading color-coding:
+  - 0-80%: Green (normal)
+  - 80-100%: Yellow (warning)
+  - >100%: Red (overloaded)
+- OUTDATED status indicator
+- Toggle visibility checkbox
+
+### 22.6 Files Added
+
+| Layer | Files |
+|-------|-------|
+| **Types** | `frontend/src/ui/results-inspector/types.ts` — Frontend types matching P11a DTOs |
+| **API** | `frontend/src/ui/results-inspector/api.ts` — API client for P11a endpoints |
+| **Store** | `frontend/src/ui/results-inspector/store.ts` — Zustand store |
+| **UI** | `frontend/src/ui/results-inspector/ResultsInspectorPage.tsx` — Main component |
+| **UI** | `frontend/src/ui/results-inspector/SldOverlay.tsx` — SLD overlay component |
+| **Tests** | `frontend/src/ui/results-inspector/__tests__/results-inspector.test.ts` — UI tests |
+| **Mode Hooks** | `frontend/src/ui/selection/store.ts` — P11b mode-gating hooks added |
+
+### 22.7 Test Coverage
+
+- RESULT_VIEW mode blocks editing actions
+- Run selection loads tables
+- Tab switching works correctly
+- Search/filter functionality
+- Overlay toggle functionality
+- Deterministic sorting (Polish locale)
+- Polish labels verification
+
+### 22.8 Exclusions (NOT modified)
+
+- ❌ Backend (P11a endpoints unchanged)
+- ❌ Solvers (no physics in UI)
+- ❌ Result API (frozen)
+- ❌ Network model mutations
 
 ---
 
