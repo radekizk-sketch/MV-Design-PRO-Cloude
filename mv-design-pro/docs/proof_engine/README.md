@@ -22,7 +22,7 @@ Ten pakiet zawiera **kanoniczne źródła wiedzy** dla systemu dowodów matematy
 | `P11_1b_REGULATION_Q_U.md` | Dowód regulatora Q(U), cosφ(P) | REFERENCE |
 | `P11_1c_SC_ASYMMETRICAL.md` | Składowe symetryczne, zwarcia niesymetryczne | REFERENCE |
 | `P11_1d_PROOF_UI_EXPORT.md` | Proof Inspector UI, eksport LaTeX/PDF/DOCX | REFERENCE |
-| `P14_PROOF_AUDIT_AND_COVERAGE.md` | Warstwa audytu pokrycia i kompletności Proof Packów | **BINDING** |
+| `P14_PROOF_AUDIT_AND_COVERAGE.md` | Warstwa audytu pokrycia i Coverage Matrix Proof Packów | **BINDING** |
 | `P15_LOAD_CURRENTS_OVERLOAD.md` | P15: Prądy robocze i przeciążenia | **BINDING** |
 | `P17_LOSSES_ENERGY_PROFILE.md` | P17: Energia strat (profil czasowy) | **BINDING** |
 | `P18_PROTECTION_PROOF.md` | P18: Zabezpieczenia nadprądowe i selektywność | **BINDING** |
