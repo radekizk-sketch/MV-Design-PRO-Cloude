@@ -4,9 +4,11 @@
  * CANONICAL ALIGNMENT:
  * - backend/src/application/network_wizard/service.py (NetworkWizardService)
  * - backend/src/network_model/catalog/repository.py
+ * - P13b: backend/src/application/catalog_governance/service.py (CatalogGovernanceService)
  *
  * API endpoints for fetching and assigning catalog types.
  * All endpoints are read-only except assign/clear operations.
+ * P13b adds export/import with governance controls.
  */
 
 import type {
@@ -252,4 +254,60 @@ export async function clearEquipmentTypeFromSwitch(
     method: 'DELETE',
   });
   await handleResponse<void>(response, endpoint);
+}
+
+// ============================================================================
+// Type Library Governance (P13b)
+// ============================================================================
+
+/**
+ * Export type library with deterministic fingerprint (P13b).
+ * GET /api/catalog/export
+ *
+ * Returns canonical JSON export with manifest and all types.
+ * Deterministic ordering ensures identical fingerprint for same content.
+ */
+export async function exportTypeLibrary(params?: {
+  library_name_pl?: string;
+  vendor?: string;
+  series?: string;
+  revision?: string;
+  description_pl?: string;
+}): Promise<any> {
+  const queryParams = new URLSearchParams();
+  if (params?.library_name_pl) queryParams.set('library_name_pl', params.library_name_pl);
+  if (params?.vendor) queryParams.set('vendor', params.vendor);
+  if (params?.series) queryParams.set('series', params.series);
+  if (params?.revision) queryParams.set('revision', params.revision);
+  if (params?.description_pl) queryParams.set('description_pl', params.description_pl);
+
+  const queryString = queryParams.toString();
+  const endpoint = `/api/catalog/export${queryString ? `?${queryString}` : ''}`;
+  const response = await fetch(endpoint);
+  return handleResponse<any>(response, endpoint);
+}
+
+/**
+ * Import type library with conflict detection (P13b).
+ * POST /api/catalog/import?mode=merge|replace
+ *
+ * Modes:
+ * - merge (default): Add new types, skip existing (no overwrites)
+ * - replace: Replace entire library (blocked if types are in use)
+ *
+ * Returns ImportReport with added/skipped/conflicts lists.
+ *
+ * @throws CatalogApiError with status 409 if conflicts detected
+ */
+export async function importTypeLibrary(
+  data: any,
+  mode: 'merge' | 'replace' = 'merge'
+): Promise<any> {
+  const endpoint = `/api/catalog/import?mode=${mode}`;
+  const response = await fetch(endpoint, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+  return handleResponse<any>(response, endpoint);
 }
