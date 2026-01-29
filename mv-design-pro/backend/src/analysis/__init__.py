@@ -2,6 +2,7 @@
 
 __all__ = [
     "normative",
+    "protection_curves_it",
     "protection_insight",
     "voltage_profile",
 ]

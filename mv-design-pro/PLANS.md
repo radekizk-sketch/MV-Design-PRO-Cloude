@@ -1359,6 +1359,47 @@ Warstwa analityczna dla selektywności i rezerwowości zabezpieczeń (P22a), bez
 
 ---
 
+## 12.12.5. Phase 2.x.7b: PROTECTION CURVES I–t (C-P22) — ETAP++
+
+### 12.12.5.1. Cel fazy
+
+Zaimplementowanie deterministycznej prezentacji krzywych I–t (read‑only) z decyzją normatywną,
+statusami PASS/WARNING/FAIL/NOT EVALUATED oraz jawnie pokazanymi marginesami.
+
+### 12.12.5.2. Zakres fazy
+
+**IN SCOPE:**
+- Analysis layer: modele, builder, serializer dla C‑P22.
+- Render SVG/PDF deterministyczny (log–log).
+- Integracja z P24+ (sekcja „Krzywe I–t (jeśli dostępne)”).
+- Testy determinismu, sortowania serii i markerów.
+- Kontrakt UI w docs/ui.
+
+**OUT OF SCOPE:**
+- Nowa fizyka / solver changes.
+- Modyfikacja Result API.
+
+### 12.12.5.3. Deliverables
+
+| Plik | Opis | Status |
+|------|------|--------|
+| `backend/src/analysis/protection_curves_it/` | Modele, builder, serializer, renderery C‑P22 | DONE |
+| `backend/tests/analysis/test_protection_curves_it_cp22.py` | Testy determinismu, sortowania, NOT EVALUATED | DONE |
+| `docs/ui/PROTECTION_CURVES_IT_SUPERIOR_CONTRACT.md` | Kontrakt UI C‑P22 | DONE |
+| `docs/INDEX.md` | Link do kontraktu C‑P22 | DONE |
+| `backend/src/analysis/reporting/pdf/p24_plus_report.py` | Sekcja „Krzywe I–t (jeśli dostępne)” | DONE |
+
+### 12.12.5.4. Completed Tasks
+
+- [x] Dodanie pakietu `analysis/protection_curves_it` (DTO, builder, serializer, renderers).
+- [x] Deterministyczny SVG/PDF (log–log) z WHY, marginesami i statusami.
+- [x] Overlay markerów Ik″/i_p/I_th (jeśli dostępne) z ProofDocument ID.
+- [x] Integracja z P24+ (sekcja „Krzywe I–t” + NOT EVALUATED placeholder).
+- [x] Testy C‑P22: determinism, sortowanie serii i markerów, NOT EVALUATED.
+- [x] Dokumentacja UI: `PROTECTION_CURVES_IT_SUPERIOR_CONTRACT.md`.
+
+---
+
 ## 12.13. Phase 2.x.8: PDF REPORT P24+ (ETAP+ SUPERIOR)
 
 ### 12.13.1. Cel fazy
