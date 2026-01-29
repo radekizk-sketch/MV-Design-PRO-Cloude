@@ -1539,4 +1539,19 @@ Wszystkie pakiety pozostają POST-HOC i nie modyfikują solverów ani Result API
 
 ---
 
+## P23 — Study / Scenario Orchestration (ETAP++)
+
+**Status:** DONE | CANONICAL & BINDING
+
+**Cel:** wprowadzenie warstwy orchestration Study → Scenario → Run bez zmian solverów
+i bez recompute, z deterministycznym śladem audytowym.
+
+**Deliverables (P23):**
+- [x] `backend/src/application/study_scenario/` (models, repository, serializer, orchestration)
+- [x] Testy determinismu i workflow: `backend/tests/application/test_study_scenario_workflow_p23.py`
+- [x] Dokumentacja: `docs/architecture/STUDY_SCENARIO_WORKFLOW_ETAP_PLUS.md`
+- [x] Aktualizacja `docs/INDEX.md`
+
+---
+
 **END OF EXECUTION PLAN**
