@@ -1279,7 +1279,7 @@ Wszystkie pakiety pozostają POST-HOC i nie modyfikują solverów ani Result API
 
 ### P15 — Load Currents & Overload Proof Pack
 
-**Status:** DONE | CANONICAL & BINDING
+**Status:** CANONICAL | IN PROGRESS
 
 - Prądy robocze LINE / CABLE / TRANSFORMER
 - Przeciążenia (%In, %Sn), warianty A/B + $$\Delta$$
