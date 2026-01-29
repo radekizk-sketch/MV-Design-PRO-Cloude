@@ -198,9 +198,18 @@ przed uruchomieniem produkcyjnym systemu MV-DESIGN-PRO.
 
 - [ ] Testy end-to-end dla Power Flow
 - [ ] Testy end-to-end dla Short Circuit
+
+### 8.3 Canonical workflow (backend tests)
+
+**Uwaga:** repo root nie zawiera `pyproject.toml`; uruchamianie `pytest` z root jest **nieautorytatywne**.
+
+```bash
+cd mv-design-pro/backend && poetry install
+cd mv-design-pro/backend && poetry run pytest -q
+```
 - [ ] Testy import/export round-trip
 
-### 8.3 Referencyjne
+### 8.4 Referencyjne
 
 - [ ] Przypadki referencyjne IEC 60909 (z normy)
 - [ ] Przypadki referencyjne Power Flow (IEEE test cases)

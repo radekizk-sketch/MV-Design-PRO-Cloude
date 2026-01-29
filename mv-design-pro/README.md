@@ -115,6 +115,17 @@ npm run dev
 
 ---
 
+## Testy (canonical workflow)
+
+**Uwaga:** repo root nie zawiera `pyproject.toml`; uruchamianie `pytest` z root jest **nieautorytatywne**. Testy backendu uruchamiaj wyłącznie z katalogu `mv-design-pro/backend`.
+
+```bash
+cd mv-design-pro/backend && poetry install
+cd mv-design-pro/backend && poetry run pytest -q
+```
+
+---
+
 ## Struktura projektu
 
 ```
