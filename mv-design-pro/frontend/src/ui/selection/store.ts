@@ -208,3 +208,112 @@ export function useResultStatusLabel(): string {
       return status;
   }
 }
+
+// =============================================================================
+// P11b — RESULT_VIEW Mode Gating Hooks
+// =============================================================================
+
+/**
+ * Hook to check if currently in RESULT_VIEW mode.
+ *
+ * CANONICAL: wizard_screens.md § 1.2 — RESULT_VIEW is READ-ONLY.
+ */
+export function useIsResultViewMode(): boolean {
+  return useSelectionStore((state) => state.mode === 'RESULT_VIEW');
+}
+
+/**
+ * Hook to check if results overlay should be visible.
+ *
+ * CANONICAL: sld_rules.md § C.2 — Overlay visible only in RESULT_VIEW mode.
+ * Results must be FRESH for overlay to display correctly.
+ */
+export function useIsOverlayAllowed(): boolean {
+  return useSelectionStore(
+    (state) => state.mode === 'RESULT_VIEW' && state.resultStatus === 'FRESH'
+  );
+}
+
+/**
+ * Hook to check if entering RESULT_VIEW mode is allowed.
+ *
+ * CANONICAL: powerfactory_ui_parity.md § A.1 — RESULT_VIEW requires FRESH results.
+ */
+export function useCanEnterResultView(): boolean {
+  return useSelectionStore((state) => state.resultStatus === 'FRESH');
+}
+
+/**
+ * Hook to get blocked action message for RESULT_VIEW mode.
+ *
+ * Returns null if action is allowed, otherwise returns Polish message.
+ */
+export function useBlockedActionMessage(): string | null {
+  const mode = useSelectionStore((state) => state.mode);
+  if (mode === 'RESULT_VIEW') {
+    return 'Edycja zablokowana w trybie wyników. Przejdź do trybu edycji modelu.';
+  }
+  if (mode === 'CASE_CONFIG') {
+    return 'Edycja modelu zablokowana. Przejdź do trybu edycji modelu.';
+  }
+  return null;
+}
+
+/**
+ * Hook to get context menu mode config.
+ *
+ * Returns object with flags for what actions are available.
+ */
+export function useContextMenuConfig(): {
+  canAdd: boolean;
+  canEdit: boolean;
+  canDelete: boolean;
+  canViewProperties: boolean;
+  canViewResults: boolean;
+} {
+  const mode = useSelectionStore((state) => state.mode);
+
+  switch (mode) {
+    case 'MODEL_EDIT':
+      return {
+        canAdd: true,
+        canEdit: true,
+        canDelete: true,
+        canViewProperties: true,
+        canViewResults: false,
+      };
+    case 'CASE_CONFIG':
+      return {
+        canAdd: false,
+        canEdit: false,
+        canDelete: false,
+        canViewProperties: true, // Read-only
+        canViewResults: false,
+      };
+    case 'RESULT_VIEW':
+      return {
+        canAdd: false,
+        canEdit: false,
+        canDelete: false,
+        canViewProperties: true, // Read-only
+        canViewResults: true,
+      };
+    default:
+      return {
+        canAdd: false,
+        canEdit: false,
+        canDelete: false,
+        canViewProperties: true,
+        canViewResults: false,
+      };
+  }
+}
+
+/**
+ * Hook to get property grid editability based on mode.
+ *
+ * CANONICAL: wizard_screens.md § 2.4 — Property Grid is read-only in RESULT_VIEW.
+ */
+export function usePropertyGridEditable(): boolean {
+  return useSelectionStore((state) => state.mode === 'MODEL_EDIT');
+}
