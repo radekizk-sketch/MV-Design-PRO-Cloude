@@ -1404,6 +1404,7 @@ Wdrożenie **deterministycznego raportu PDF P24+** klasy **ETAP+**:
 - [x] Ranking Top 5 krytycznych BUS (P21).
 - [x] Sekcja śladu dowodowego (ProofDocument ID + hash).
 - [x] Testy determinism i kompletności sekcji.
+- [x] Dodanie `reportlab` do zależności dev/test, aby testy PDF P24+ nie były pomijane w CI.
 
 ---
 

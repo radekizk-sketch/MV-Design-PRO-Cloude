@@ -12,6 +12,8 @@ poetry install
 poetry run pytest -q
 ```
 
+PDF report tests require `reportlab` (included in dev dependencies).
+
 ## Run API
 
 ```bash
