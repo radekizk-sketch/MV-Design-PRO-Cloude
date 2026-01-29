@@ -1497,6 +1497,129 @@ Wdrożenie **deterministycznej analizy wrażliwości i marginesów** (P25) jako 
 
 ---
 
+## 12.15. Phase 2.x.10: AUTO RECOMMENDATIONS (P26) — ETAP+++
+
+### 12.15.1. Cel fazy
+
+Wdrożenie **automatycznych rekomendacji post‑hoc** (P26) jako wyróżnika ETAP+++:
+- rekomendacja główna (minimalny Δ),
+- alternatywy (ranked),
+- jawna propagacja NOT COMPUTED,
+- integracja z P24+ PDF.
+
+**INVARIANT:** brak zmian w solverach i Result API.
+
+### 12.15.2. Zakres fazy
+
+| W zakresie | Poza zakresem |
+|------------|---------------|
+| DTO + builder + serializer P26 | Recompute fizyki |
+| Estymacja Δ na bazie P25 | Zmiany P20/P21/P22 danych źródłowych |
+| Determinizm i stabilne hashowanie | UI/Frontend |
+| Testy rekomendacji | Solver changes |
+
+### 12.15.3. Deliverables
+
+| Plik | Opis | Status |
+|------|------|--------|
+| `backend/src/analysis/recommendations/` | Modele, builder, serializer P26 | DONE |
+| `backend/tests/analysis/test_recommendations.py` | Testy P26: determinism, minimal Δ, NOT COMPUTED | DONE |
+| `docs/analysis/P26_AUTO_RECOMMENDATIONS_ETAP_PLUS.md` | Specyfikacja P26 (ETAP+++) | DONE |
+| `backend/src/analysis/reporting/pdf/p24_plus_report.py` | Sekcja P26 w raporcie PDF | DONE |
+| `docs/INDEX.md` | Link do dokumentu P26 | DONE |
+
+### 12.15.4. Completed Tasks
+
+- [x] Dodanie pakietu `analysis/recommendations` (DTO, builder, serializer, determinism).
+- [x] Estymacja minimalnych zmian Δ na bazie P25 (post‑hoc only).
+- [x] Rekomendacja główna + alternatywy (ranked, deterministic).
+- [x] Jawna propagacja NOT COMPUTED do wyników P26.
+- [x] Integracja z PDF P24+ (sekcja P26, hash uwzględnia dane P26).
+- [x] Testy P26: determinism, minimal Δ, NOT COMPUTED.
+
+---
+
+## 12.16. Phase 2.x.11: SCENARIO COMPARISON (P27) — ETAP+++
+
+### 12.16.1. Cel fazy
+
+Wdrożenie **deterministycznego porównania scenariuszy A/B/C** (P27):
+- stabilny ranking ryzyka,
+- jawne WHY (dlaczego lepszy/gorszy),
+- integracja z P24+ PDF.
+
+**INVARIANT:** brak zmian w solverach i Result API.
+
+### 12.16.2. Zakres fazy
+
+| W zakresie | Poza zakresem |
+|------------|---------------|
+| DTO + builder + serializer P27 | Recompute fizyki |
+| Porównanie P20/P25/P26 | Zmiany P23 |
+| Determinizm i stabilne hashowanie | UI/Frontend |
+| Testy porównań | Solver changes |
+
+### 12.16.3. Deliverables
+
+| Plik | Opis | Status |
+|------|------|--------|
+| `backend/src/analysis/scenario_comparison/` | Modele, builder, serializer P27 | DONE |
+| `backend/tests/analysis/test_scenario_comparison.py` | Testy P27: ordering stability, winner, NOT COMPUTED | DONE |
+| `docs/analysis/P27_SCENARIO_COMPARISON_ETAP_PLUS.md` | Specyfikacja P27 (ETAP+++) | DONE |
+| `backend/src/analysis/reporting/pdf/p24_plus_report.py` | Sekcja P27 w raporcie PDF | DONE |
+| `docs/INDEX.md` | Link do dokumentu P27 | DONE |
+
+### 12.16.4. Completed Tasks
+
+- [x] Dodanie pakietu `analysis/scenario_comparison` (DTO, builder, serializer, determinism).
+- [x] Stabilny ranking ryzyka i jawne WHY dla scenariuszy.
+- [x] Jawna propagacja NOT COMPUTED do wyników P27.
+- [x] Integracja z PDF P24+ (sekcja P27, hash uwzględnia dane P27).
+- [x] Testy P27: stabilny winner, ordering, NOT COMPUTED.
+
+---
+
+## 12.17. Phase 2.x.12: COVERAGE COMPLETENESS SCORE (P28) — ETAP+++
+
+### 12.17.1. Cel fazy
+
+Wdrożenie **liczbowego audytu kompletności analizy** (P28):
+- score 0–100,
+- lista braków i krytycznych luk,
+- jawne kary za NOT COMPUTED,
+- integracja z P24+ PDF.
+
+**INVARIANT:** brak zmian w solverach i Result API.
+
+### 12.17.2. Zakres fazy
+
+| W zakresie | Poza zakresem |
+|------------|---------------|
+| DTO + builder + serializer P28 | Recompute fizyki |
+| Skoring oparty o P14/P11–P19/P20/P21/P22/P25/P26 | UI/Frontend |
+| Determinizm i stabilne hashowanie | Solver changes |
+| Testy audytu | Zmiany w Proof Engine |
+
+### 12.17.3. Deliverables
+
+| Plik | Opis | Status |
+|------|------|--------|
+| `backend/src/analysis/coverage_score/` | Modele, builder, serializer P28 | DONE |
+| `backend/tests/analysis/test_coverage_score.py` | Testy P28: score, gap detection, determinism | DONE |
+| `docs/analysis/P28_COVERAGE_COMPLETENESS_SCORE.md` | Specyfikacja P28 (ETAP+++) | DONE |
+| `backend/src/analysis/reporting/pdf/p24_plus_report.py` | Sekcja P28 w raporcie PDF | DONE |
+| `docs/INDEX.md` | Link do dokumentu P28 | DONE |
+
+### 12.17.4. Completed Tasks
+
+- [x] Dodanie pakietu `analysis/coverage_score` (DTO, builder, serializer, determinism).
+- [x] Skoring kompletności 0–100 z karami za NOT COMPUTED i brakujące proof packi.
+- [x] Jawna lista braków i krytycznych luk (P14 GAPs).
+- [x] Integracja z PDF P24+ (sekcja P28, hash uwzględnia dane P28).
+- [x] Testy P28: score determinism, gap detection, stabilny ordering.
+
+---
+
 ## 19. Proof Packs Roadmap (P15–P20) — CANONICAL
 
 Poniższa roadmapa jest **jedynym kanonicznym planem** rozwoju Proof Packów.
