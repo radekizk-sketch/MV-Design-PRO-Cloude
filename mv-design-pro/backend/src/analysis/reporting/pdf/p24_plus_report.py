@@ -4,6 +4,7 @@ Deterministic PDF renderer for the P24+ audit-grade report.
 Input sources (read-only):
 - VoltageProfileView (P21)
 - ProtectionInsightView (P22a)
+- SensitivityView (P25)
 - NormativeReport (P20)
 - ProofDocument metadata (P11–P19)
 """
@@ -25,6 +26,12 @@ from analysis.protection_insight.models import (
     ProtectionInsightSummary,
     ProtectionInsightView,
     ProtectionSelectivityStatus,
+)
+from analysis.sensitivity.models import (
+    SensitivityDecision,
+    SensitivityDriver,
+    SensitivityEntry,
+    SensitivityView,
 )
 from analysis.voltage_profile.models import VoltageProfileRow, VoltageProfileView
 from analysis.voltage_profile.serializer import STATUS_ORDER
@@ -54,6 +61,7 @@ def export_p24_plus_report_pdf(
     voltage_profile: VoltageProfileView | None,
     protection_insight: ProtectionInsightView | None,
     protection_curves_it: ProtectionCurvesITView | None,
+    sensitivity: SensitivityView | None = None,
     normative_report: NormativeReport | None,
     proof_documents: Sequence[ProofDocument],
 ) -> bytes:
@@ -130,12 +138,14 @@ def export_p24_plus_report_pdf(
         voltage_profile,
         protection_insight,
         protection_curves_it,
+        sensitivity,
         normative_report,
     )
     report_hash = _report_hash(
         voltage_profile=voltage_profile,
         protection_insight=protection_insight,
         protection_curves_it=protection_curves_it,
+        sensitivity=sensitivity,
         normative_report=normative_report,
         proof_documents=proof_documents,
     )
@@ -150,7 +160,7 @@ def export_p24_plus_report_pdf(
     draw_text(f"Run timestamp: {_format_timestamp(context.run_timestamp)}")
     draw_text(f"Snapshot ID: {context.snapshot_id or '—'}")
     draw_text(f"Trace ID: {context.trace_id or '—'}")
-    draw_text("Zakres: P11–P22, P24+")
+    draw_text("Zakres: P11–P25, P24+")
     y -= section_spacing
 
     draw_heading("2. Executive Summary (1 strona)")
@@ -158,6 +168,7 @@ def export_p24_plus_report_pdf(
         voltage_profile=voltage_profile,
         protection_insight=protection_insight,
         protection_curves_it=protection_curves_it,
+        sensitivity=sensitivity,
         normative_report=normative_report,
     )
     for line in summary_lines:
@@ -223,11 +234,27 @@ def export_p24_plus_report_pdf(
             draw_wrapped(_format_normative_item(item))
     y -= section_spacing
 
-    draw_heading("7. Jawne braki danych (NOT COMPUTED)")
+    draw_heading("7. Analiza wrażliwości i marginesów (P25)")
+    if sensitivity is None:
+        draw_text("Brak analizy P25.")
+    else:
+        draw_text("Top 5 driverów wrażliwości:", bold=True)
+        for driver in sensitivity.top_drivers:
+            draw_wrapped(_format_sensitivity_driver(driver))
+        if not sensitivity.entries:
+            draw_text("Brak wpisów w P25.")
+        else:
+            draw_text("Lista wejściowa (parametr → margines):", bold=True)
+            for entry in sensitivity.entries:
+                draw_wrapped(_format_sensitivity_entry(entry))
+    y -= section_spacing
+
+    draw_heading("8. Jawne braki danych (NOT COMPUTED)")
     missing_lines = _build_missing_data_lines(
         voltage_profile=voltage_profile,
         protection_insight=protection_insight,
         protection_curves_it=protection_curves_it,
+        sensitivity=sensitivity,
         normative_report=normative_report,
     )
     if not missing_lines:
@@ -237,7 +264,7 @@ def export_p24_plus_report_pdf(
             draw_wrapped(line)
     y -= section_spacing
 
-    draw_heading("8. Ślad dowodowy (ProofDocument)")
+    draw_heading("9. Ślad dowodowy (ProofDocument)")
     if not proof_documents:
         draw_text("Brak ProofDocument.")
     else:
@@ -245,12 +272,12 @@ def export_p24_plus_report_pdf(
             draw_wrapped(_format_proof_reference(doc))
     y -= section_spacing
 
-    draw_heading("9. Ograniczenia i zastrzeżenia")
+    draw_heading("10. Ograniczenia i zastrzeżenia")
     for line in _LIMITATIONS:
         draw_wrapped(line)
     y -= section_spacing
 
-    draw_heading("10. Stopka deterministyczna")
+    draw_heading("11. Stopka deterministyczna")
     draw_text("Deterministic Report: TAK")
     draw_text(f"MV-DESIGN-PRO version: {resolve_mv_design_pro_version() or '—'}")
     draw_text(f"Report hash (SHA-256): {report_hash}")
@@ -263,12 +290,14 @@ def _resolve_context(
     voltage_profile: VoltageProfileView | None,
     protection_insight: ProtectionInsightView | None,
     protection_curves_it: ProtectionCurvesITView | None,
+    sensitivity: SensitivityView | None,
     normative_report: NormativeReport | None,
 ) -> ReportContext:
     for ctx in (
         voltage_profile.context if voltage_profile else None,
         protection_insight.context if protection_insight else None,
         protection_curves_it.context if protection_curves_it else None,
+        sensitivity.context if sensitivity else None,
         normative_report.context if normative_report else None,
     ):
         if ctx is not None:
@@ -293,6 +322,7 @@ def _report_hash(
     voltage_profile: VoltageProfileView | None,
     protection_insight: ProtectionInsightView | None,
     protection_curves_it: ProtectionCurvesITView | None,
+    sensitivity: SensitivityView | None,
     normative_report: NormativeReport | None,
     proof_documents: Sequence[ProofDocument],
 ) -> str:
@@ -304,6 +334,7 @@ def _report_hash(
         "protection_curves_it": (
             protection_curves_it.to_dict() if protection_curves_it else None
         ),
+        "sensitivity": sensitivity.to_dict() if sensitivity else None,
         "normative_report": normative_report.to_dict() if normative_report else None,
         "proof_metadata": [
             _proof_metadata(doc) for doc in _sorted_proof_documents(proof_documents)
@@ -355,6 +386,7 @@ def _build_summary_lines(
     voltage_profile: VoltageProfileView | None,
     protection_insight: ProtectionInsightView | None,
     protection_curves_it: ProtectionCurvesITView | None,
+    sensitivity: SensitivityView | None,
     normative_report: NormativeReport | None,
 ) -> list[str]:
     lines: list[str] = []
@@ -397,6 +429,16 @@ def _build_summary_lines(
         lines.append(
             f"P22: status={protection_curves_it.normative_status.value} | "
             f"missing_data={len(protection_curves_it.missing_data)}"
+        )
+    if sensitivity is None:
+        lines.append("P25: brak analizy wrażliwości.")
+    else:
+        lines.append(
+            "P25: entries={entries}, top_drivers={drivers}, not_computed={nc}".format(
+                entries=len(sensitivity.entries),
+                drivers=len(sensitivity.top_drivers),
+                nc=sensitivity.summary.not_computed_count,
+            )
         )
     return lines
 
@@ -484,6 +526,24 @@ def _format_protection_item(item: ProtectionInsightItem) -> str:
     )
 
 
+def _format_sensitivity_entry(entry: SensitivityEntry) -> str:
+    base_margin = _format_percent(entry.base_margin)
+    minus_delta = _format_percent(entry.minus.delta_margin)
+    plus_delta = _format_percent(entry.plus.delta_margin)
+    return (
+        f"P25 {entry.parameter_id} {entry.target_id} | Base={base_margin} | "
+        f"Δ-={minus_delta} | Δ+={plus_delta} | "
+        f"Decision={entry.base_decision.value}"
+    )
+
+
+def _format_sensitivity_driver(driver: SensitivityDriver) -> str:
+    return (
+        f"{driver.parameter_id} {driver.target_id} | "
+        f"Score={driver.score:.2f} | Direction={driver.direction}"
+    )
+
+
 def _selectivity_decision(status: ProtectionSelectivityStatus) -> str:
     if status == ProtectionSelectivityStatus.OK:
         return "PASS"
@@ -527,6 +587,7 @@ def _build_missing_data_lines(
     voltage_profile: VoltageProfileView | None,
     protection_insight: ProtectionInsightView | None,
     protection_curves_it: ProtectionCurvesITView | None,
+    sensitivity: SensitivityView | None,
     normative_report: NormativeReport | None,
 ) -> list[str]:
     lines: list[str] = []
@@ -552,6 +613,12 @@ def _build_missing_data_lines(
     if protection_curves_it is not None and protection_curves_it.missing_data:
         for entry in protection_curves_it.missing_data:
             lines.append(f"P22 {protection_curves_it.primary_device_id}: {entry}.")
+    if sensitivity is not None:
+        for entry in sensitivity.entries:
+            if entry.base_decision == SensitivityDecision.NOT_COMPUTED:
+                lines.append(
+                    f"P25 {entry.parameter_id} {entry.target_id}: brak danych wejściowych."
+                )
     return lines
 
 
@@ -581,5 +648,6 @@ _LIMITATIONS = (
     "Raport nie zawiera nowych obliczeń fizycznych (prezentacja tylko).",
     "Krzywe I–t są prezentacją danych wejściowych i normatywnych (read-only).",
     "Decyzje PASS/WARNING/FAIL pochodzą z P20 i P22a (bez modyfikacji solverów).",
+    "Analiza P25 jest post-hoc (perturbacje bez recompute fizyki).",
     "NOT COMPUTED oznacza brak danych wejściowych, a nie negatywny wynik.",
 )
