@@ -30,6 +30,7 @@
 - [docs/ui/RESULTS_BROWSER_CONTRACT.md](./ui/RESULTS_BROWSER_CONTRACT.md) — **Results Browser: drzewo wyników, tabele, porównania Case/Snapshot, eksport (CANONICAL)**
 - [docs/ui/VOLTAGE_PROFILE_BUS_CONTRACT.md](./ui/VOLTAGE_PROFILE_BUS_CONTRACT.md) — **Profil napięciowy (BUS-centric): tabela napięć per BUS, progi PASS/WARNING/FAIL, determinism (CANONICAL)**
 - [docs/ui/PROTECTION_INSIGHT_CONTRACT.md](./ui/PROTECTION_INSIGHT_CONTRACT.md) — **Zabezpieczenia: analiza selektywności i rezerwowości (P22a) — bez krzywych I–t (CANONICAL)**
+- [docs/ui/PROTECTION_CURVES_IT_SUPERIOR_CONTRACT.md](./ui/PROTECTION_CURVES_IT_SUPERIOR_CONTRACT.md) — **Krzywe czasowo-prądowe I–t (C-P22) — ETAP++ (CANONICAL)**
 - [docs/ui/PDF_REPORT_SUPERIOR_CONTRACT.md](./ui/PDF_REPORT_SUPERIOR_CONTRACT.md) — **Raport PDF P24+ (ETAP+): determinism, jawna ścieżka decyzyjna (CANONICAL)**
 - [docs/ui/ELEMENT_INSPECTOR_CONTRACT.md](./ui/ELEMENT_INSPECTOR_CONTRACT.md) — **Element Inspector: zakładki (Overview, Parameters, Results, Contributions, Limits, Proof P11), multi-case view (CANONICAL)**
 - [docs/ui/EXPERT_MODES_CONTRACT.md](./ui/EXPERT_MODES_CONTRACT.md) — **Expert Modes: Operator, Designer, Analyst, Auditor — NO SIMPLIFICATION RULE (CANONICAL)**

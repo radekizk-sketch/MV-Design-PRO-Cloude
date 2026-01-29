@@ -19,6 +19,7 @@ from importlib.util import find_spec
 from typing import Iterable, Sequence
 
 from analysis.normative.models import NormativeItem, NormativeReport, NormativeStatus
+from analysis.protection_curves_it.models import ProtectionCurvesITView
 from analysis.protection_insight.models import (
     ProtectionInsightItem,
     ProtectionInsightSummary,
@@ -52,6 +53,7 @@ def export_p24_plus_report_pdf(
     *,
     voltage_profile: VoltageProfileView | None,
     protection_insight: ProtectionInsightView | None,
+    protection_curves_it: ProtectionCurvesITView | None,
     normative_report: NormativeReport | None,
     proof_documents: Sequence[ProofDocument],
 ) -> bytes:
@@ -124,10 +126,16 @@ def export_p24_plus_report_pdf(
             c.drawString(left_margin, y, line)
             y -= line_height
 
-    context = _resolve_context(voltage_profile, protection_insight, normative_report)
+    context = _resolve_context(
+        voltage_profile,
+        protection_insight,
+        protection_curves_it,
+        normative_report,
+    )
     report_hash = _report_hash(
         voltage_profile=voltage_profile,
         protection_insight=protection_insight,
+        protection_curves_it=protection_curves_it,
         normative_report=normative_report,
         proof_documents=proof_documents,
     )
@@ -142,13 +150,14 @@ def export_p24_plus_report_pdf(
     draw_text(f"Run timestamp: {_format_timestamp(context.run_timestamp)}")
     draw_text(f"Snapshot ID: {context.snapshot_id or '—'}")
     draw_text(f"Trace ID: {context.trace_id or '—'}")
-    draw_text("Zakres: P11–P21, P22 skipped, P24+")
+    draw_text("Zakres: P11–P22, P24+")
     y -= section_spacing
 
     draw_heading("2. Executive Summary (1 strona)")
     summary_lines = _build_summary_lines(
         voltage_profile=voltage_profile,
         protection_insight=protection_insight,
+        protection_curves_it=protection_curves_it,
         normative_report=normative_report,
     )
     for line in summary_lines:
@@ -191,7 +200,22 @@ def export_p24_plus_report_pdf(
             draw_wrapped(_format_protection_item(item))
     y -= section_spacing
 
-    draw_heading("5. Ocena normatywna (P20)")
+    draw_heading("5. Krzywe I–t (jeśli dostępne)")
+    if protection_curves_it is None:
+        draw_text("Brak danych P22 (NOT EVALUATED).")
+    else:
+        draw_text(
+            f"Status: {protection_curves_it.normative_status.value} | "
+            f"BUS={protection_curves_it.bus_id}"
+        )
+        draw_wrapped(protection_curves_it.why_pl)
+        if protection_curves_it.missing_data:
+            draw_text("missing_data:", bold=True)
+            for entry in protection_curves_it.missing_data:
+                draw_wrapped(f"- {entry}")
+    y -= section_spacing
+
+    draw_heading("6. Ocena normatywna (P20)")
     if normative_report is None:
         draw_text("Brak raportu P20.")
     else:
@@ -199,10 +223,11 @@ def export_p24_plus_report_pdf(
             draw_wrapped(_format_normative_item(item))
     y -= section_spacing
 
-    draw_heading("6. Jawne braki danych (NOT COMPUTED)")
+    draw_heading("7. Jawne braki danych (NOT COMPUTED)")
     missing_lines = _build_missing_data_lines(
         voltage_profile=voltage_profile,
         protection_insight=protection_insight,
+        protection_curves_it=protection_curves_it,
         normative_report=normative_report,
     )
     if not missing_lines:
@@ -212,7 +237,7 @@ def export_p24_plus_report_pdf(
             draw_wrapped(line)
     y -= section_spacing
 
-    draw_heading("7. Ślad dowodowy (ProofDocument)")
+    draw_heading("8. Ślad dowodowy (ProofDocument)")
     if not proof_documents:
         draw_text("Brak ProofDocument.")
     else:
@@ -220,12 +245,12 @@ def export_p24_plus_report_pdf(
             draw_wrapped(_format_proof_reference(doc))
     y -= section_spacing
 
-    draw_heading("8. Ograniczenia i zastrzeżenia")
+    draw_heading("9. Ograniczenia i zastrzeżenia")
     for line in _LIMITATIONS:
         draw_wrapped(line)
     y -= section_spacing
 
-    draw_heading("9. Stopka deterministyczna")
+    draw_heading("10. Stopka deterministyczna")
     draw_text("Deterministic Report: TAK")
     draw_text(f"MV-DESIGN-PRO version: {resolve_mv_design_pro_version() or '—'}")
     draw_text(f"Report hash (SHA-256): {report_hash}")
@@ -237,11 +262,13 @@ def export_p24_plus_report_pdf(
 def _resolve_context(
     voltage_profile: VoltageProfileView | None,
     protection_insight: ProtectionInsightView | None,
+    protection_curves_it: ProtectionCurvesITView | None,
     normative_report: NormativeReport | None,
 ) -> ReportContext:
     for ctx in (
         voltage_profile.context if voltage_profile else None,
         protection_insight.context if protection_insight else None,
+        protection_curves_it.context if protection_curves_it else None,
         normative_report.context if normative_report else None,
     ):
         if ctx is not None:
@@ -265,6 +292,7 @@ def _report_hash(
     *,
     voltage_profile: VoltageProfileView | None,
     protection_insight: ProtectionInsightView | None,
+    protection_curves_it: ProtectionCurvesITView | None,
     normative_report: NormativeReport | None,
     proof_documents: Sequence[ProofDocument],
 ) -> str:
@@ -272,6 +300,9 @@ def _report_hash(
         "voltage_profile": voltage_profile.to_dict() if voltage_profile else None,
         "protection_insight": (
             protection_insight.to_dict() if protection_insight else None
+        ),
+        "protection_curves_it": (
+            protection_curves_it.to_dict() if protection_curves_it else None
         ),
         "normative_report": normative_report.to_dict() if normative_report else None,
         "proof_metadata": [
@@ -323,6 +354,7 @@ def _build_summary_lines(
     *,
     voltage_profile: VoltageProfileView | None,
     protection_insight: ProtectionInsightView | None,
+    protection_curves_it: ProtectionCurvesITView | None,
     normative_report: NormativeReport | None,
 ) -> list[str]:
     lines: list[str] = []
@@ -358,6 +390,13 @@ def _build_summary_lines(
                 warn=summary.count_warning,
                 ne=summary.count_not_evaluated,
             )
+        )
+    if protection_curves_it is None:
+        lines.append("P22: brak krzywych I–t.")
+    else:
+        lines.append(
+            f"P22: status={protection_curves_it.normative_status.value} | "
+            f"missing_data={len(protection_curves_it.missing_data)}"
         )
     return lines
 
@@ -487,6 +526,7 @@ def _build_missing_data_lines(
     *,
     voltage_profile: VoltageProfileView | None,
     protection_insight: ProtectionInsightView | None,
+    protection_curves_it: ProtectionCurvesITView | None,
     normative_report: NormativeReport | None,
 ) -> list[str]:
     lines: list[str] = []
@@ -509,6 +549,9 @@ def _build_missing_data_lines(
                 lines.append(
                     f"P22a {item.primary_device_id}: brak oceny selektywności."
                 )
+    if protection_curves_it is not None and protection_curves_it.missing_data:
+        for entry in protection_curves_it.missing_data:
+            lines.append(f"P22 {protection_curves_it.primary_device_id}: {entry}.")
     return lines
 
 
@@ -536,8 +579,7 @@ def _format_proof_reference(doc: ProofDocument) -> str:
 
 _LIMITATIONS = (
     "Raport nie zawiera nowych obliczeń fizycznych (prezentacja tylko).",
-    "Nie generuje krzywych I–t ani wykresów czasowo-prądowych.",
+    "Krzywe I–t są prezentacją danych wejściowych i normatywnych (read-only).",
     "Decyzje PASS/WARNING/FAIL pochodzą z P20 i P22a (bez modyfikacji solverów).",
     "NOT COMPUTED oznacza brak danych wejściowych, a nie negatywny wynik.",
 )
-

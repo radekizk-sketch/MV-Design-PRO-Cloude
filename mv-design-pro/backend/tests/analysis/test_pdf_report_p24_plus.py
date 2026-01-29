@@ -20,6 +20,17 @@ from analysis.protection_insight.models import (
     ProtectionInsightView,
     ProtectionSelectivityStatus,
 )
+from analysis.protection_curves_it.models import (
+    ITCurveRole,
+    ITCurveSeries,
+    ITCurveSource,
+    ITCurveType,
+    ITMarker,
+    ITMarkerKind,
+    ITCurvePoint,
+    ProtectionCurvesITContext,
+    ProtectionCurvesITView,
+)
 from analysis.reporting.pdf import export_p24_plus_report_pdf
 from analysis.voltage_profile.models import (
     VoltageProfileContext,
@@ -218,6 +229,41 @@ def _sample_normative_report() -> NormativeReport:
     return NormativeReport(report_id="report-001", context=context, items=items)
 
 
+def _sample_protection_curves() -> ProtectionCurvesITView:
+    context = ProtectionCurvesITContext(
+        project_name="Projekt A",
+        case_name="Case 1",
+        run_timestamp=datetime(2024, 1, 1, 12, 0, 0),
+        snapshot_id="snap-001",
+        trace_id="trace-001",
+    )
+    series = (
+        ITCurveSeries(
+            series_id="SER-PRIMARY",
+            device_id="CB-01",
+            role=ITCurveRole.PRIMARY,
+            curve_type=ITCurveType.INVERSE,
+            points=(ITCurvePoint(i_a=100.0, t_s=1.0), ITCurvePoint(i_a=500.0, t_s=0.2)),
+            source=ITCurveSource.CATALOG,
+        ),
+    )
+    markers = (
+        ITMarker(kind=ITMarkerKind.IKSS, i_a=12000.0, t_s=None, source_proof_id="p1"),
+    )
+    return ProtectionCurvesITView(
+        context=context,
+        bus_id="BUS-1",
+        primary_device_id="CB-01",
+        backup_device_id=None,
+        series=series,
+        markers=markers,
+        normative_status=NormativeStatus.WARNING,
+        margins_pct={"NR_P18_001": 10.0},
+        why_pl="Reguły: NR_P18_001. Status: WARNING. WHY: Brak selektywności.",
+        missing_data=("marker_ip",),
+    )
+
+
 def _sample_proof_documents() -> tuple[ProofDocument, ...]:
     header = ProofHeader(
         project_name="Projekt A",
@@ -249,12 +295,14 @@ def test_pdf_report_deterministic() -> None:
     pdf_a = export_p24_plus_report_pdf(
         voltage_profile=_sample_voltage_profile(),
         protection_insight=_sample_protection_insight(),
+        protection_curves_it=_sample_protection_curves(),
         normative_report=_sample_normative_report(),
         proof_documents=_sample_proof_documents(),
     )
     pdf_b = export_p24_plus_report_pdf(
         voltage_profile=_sample_voltage_profile(),
         protection_insight=_sample_protection_insight(),
+        protection_curves_it=_sample_protection_curves(),
         normative_report=_sample_normative_report(),
         proof_documents=_sample_proof_documents(),
     )
@@ -266,6 +314,7 @@ def test_pdf_report_includes_not_computed_section() -> None:
     pdf_bytes = export_p24_plus_report_pdf(
         voltage_profile=_sample_voltage_profile(),
         protection_insight=_sample_protection_insight(),
+        protection_curves_it=_sample_protection_curves(),
         normative_report=_sample_normative_report(),
         proof_documents=_sample_proof_documents(),
     )
@@ -278,6 +327,7 @@ def test_pdf_report_includes_why_and_ranking_sort() -> None:
     pdf_bytes = export_p24_plus_report_pdf(
         voltage_profile=_sample_voltage_profile(),
         protection_insight=_sample_protection_insight(),
+        protection_curves_it=_sample_protection_curves(),
         normative_report=_sample_normative_report(),
         proof_documents=_sample_proof_documents(),
     )
@@ -289,4 +339,3 @@ def test_pdf_report_includes_why_and_ranking_sort() -> None:
     assert rank_b2 != -1
     assert rank_b1 != -1
     assert rank_b3 < rank_b2 < rank_b1
-
