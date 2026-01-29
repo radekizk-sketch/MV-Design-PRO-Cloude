@@ -1353,7 +1353,7 @@ Wszystkie pakiety pozostają POST-HOC i nie modyfikują solverów ani Result API
 
 ### P20 — Proof Coverage Completion (ETAP / PowerFactory Parity)
 
-**Status:** PLANNED | META
+**Status:** IN PROGRESS | META
 
 - Domknięcie pokrycia względem ETAP / PowerFactory
 - Lista FULL / PARTIAL / NOT COVERED
