@@ -28,6 +28,7 @@ Ten pakiet zawiera **kanoniczne źródła wiedzy** dla systemu dowodów matematy
 | `P18_PROTECTION_PROOF.md` | P18: Zabezpieczenia nadprądowe i selektywność | **BINDING** |
 | `P19_EARTHING_GROUND_FAULT_SN.md` | P19: Doziemienia / uziemienia SN | **BINDING** |
 | `P20_NORMATIVE_COMPLETION.md` | P20: Normative Completion (PASS/FAIL) | **BINDING** |
+| `P32_LOAD_FLOW_VOLTAGE_PROOF.md` | P32: Load Flow i spadki napięć | **BINDING** |
 | `PROOF_SCHEMAS.md` | Kanoniczne schematy JSON (ProofDocument, ProofStep) | **BINDING** |
 | `EQUATIONS_IEC60909_SC3F.md` | Rejestr równań SC3F z mapping keys | **BINDING** |
 | `EQUATIONS_VDROP.md` | Rejestr równań VDROP z mapping keys | **BINDING** |

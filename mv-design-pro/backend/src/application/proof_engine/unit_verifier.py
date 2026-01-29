@@ -209,6 +209,42 @@ class UnitVerifier:
             "inputs": {"U_{source}": "kV", "ΔU_{total}": "%"},
             "output": "kV",
         },
+        # P32: Load Flow & Voltage
+        "EQ_LF_001": {
+            "rule": "MW² + Mvar² = MVA² → MVA",
+            "inputs": {"P": "MW", "Q": "Mvar"},
+            "output": "MVA",
+        },
+        "EQ_LF_002": {
+            "rule": "MVA / kV = kA",
+            "inputs": {"S": "MVA", "U_{LL}": "kV"},
+            "output": "kA",
+        },
+        "EQ_LF_003": {
+            "rule": "Ω · MW / kV = kV",
+            "inputs": {"R": "Ω", "P": "MW", "U_n": "kV"},
+            "output": "kV",
+        },
+        "EQ_LF_004": {
+            "rule": "Ω · Mvar / kV = kV",
+            "inputs": {"X": "Ω", "Q": "Mvar", "U_n": "kV"},
+            "output": "kV",
+        },
+        "EQ_LF_005": {
+            "rule": "kV + kV = kV",
+            "inputs": {"ΔU_R": "kV", "ΔU_X": "kV"},
+            "output": "kV",
+        },
+        "EQ_LF_006": {
+            "rule": "kV / kV = p.u.",
+            "inputs": {"U": "kV", "U_n": "kV"},
+            "output": "p.u.",
+        },
+        "EQ_LF_007": {
+            "rule": "kV / kV = %",
+            "inputs": {"U": "kV", "U_n": "kV"},
+            "output": "%",
+        },
         # P15: Load Currents & Overload
         "EQ_LC_001": {
             "rule": "MW² + Mvar² = MVA² → MVA",

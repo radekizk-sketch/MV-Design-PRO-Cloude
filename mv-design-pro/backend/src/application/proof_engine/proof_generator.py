@@ -15,12 +15,19 @@ from __future__ import annotations
 import math
 from dataclasses import dataclass, fields, is_dataclass
 from datetime import datetime
-from typing import Any
+from typing import TYPE_CHECKING, Any
 from uuid import UUID, uuid4
 
 from application.proof_engine.equation_registry import (
     AntiDoubleCountingAudit,
     EquationRegistry,
+    EQ_LF_001,
+    EQ_LF_002,
+    EQ_LF_003,
+    EQ_LF_004,
+    EQ_LF_005,
+    EQ_LF_006,
+    EQ_LF_007,
     EQ_SC3F_003,
     EQ_SC3F_004,
     EQ_SC3F_005,
@@ -85,6 +92,9 @@ from application.proof_engine.types import (
     UnitCheckResult,
 )
 from application.proof_engine.unit_verifier import UnitVerifier
+
+if TYPE_CHECKING:
+    from network_model.catalog import CatalogRepository
 
 
 @dataclass
@@ -193,6 +203,46 @@ class VDROPInput:
 
 
 @dataclass
+class LoadFlowBusInput:
+    """Dane wejściowe dla BUS w dowodzie P32."""
+
+    bus_id: str
+    u_ll_kv: float | None
+    u_nom_kv: float | None
+
+
+@dataclass
+class LoadFlowElementInput:
+    """Dane wejściowe dla elementu w dowodzie P32."""
+
+    element_id: str
+    element_kind: LoadElementKind
+    from_bus_id: str | None
+    to_bus_id: str | None
+    length_km: float | None = None
+    type_ref: str | None = None
+    r_ohm: float | None = None
+    x_ohm: float | None = None
+    p_mw: float | None = None
+    q_mvar: float | None = None
+    u_nom_kv: float | None = None
+    u_ll_kv: float | None = None
+
+
+@dataclass
+class LoadFlowVoltageInput:
+    """Dane wejściowe dla generatora dowodu P32."""
+
+    project_name: str
+    case_name: str
+    run_timestamp: datetime
+    solver_version: str
+    buses: list[LoadFlowBusInput]
+    elements: list[LoadFlowElementInput]
+    catalog: CatalogRepository | None = None
+
+
+@dataclass
 class SC1Input:
     """Dane wejściowe dla generatora dowodu SC1 (P11.1c FULL)."""
 
@@ -231,6 +281,196 @@ class ProofGenerator:
     - Kompletność (wszystkie kroki z rejestru)
     - Weryfikację jednostek (automatyczna)
     """
+
+    # =========================================================================
+    # P32: Load Flow & Voltage Drop (post-hoc)
+    # =========================================================================
+
+    @classmethod
+    def generate_load_flow_voltage_proof(
+        cls,
+        data: LoadFlowVoltageInput,
+        artifact_id: UUID | None = None,
+    ) -> ProofDocument:
+        """
+        Generuje dowód P32: Load Flow i spadki napięć.
+
+        Braki danych → ostrzeżenia + NOT COMPUTED (BINDING).
+        """
+        if artifact_id is None:
+            artifact_id = uuid4()
+
+        warnings: list[str] = []
+        steps: list[ProofStep] = []
+        step_number = 0
+
+        element_count = 0
+        bus_count = 0
+        missing_sections = 0
+
+        for element in sorted(data.elements, key=lambda item: item.element_id):
+            element_count += 1
+            resolved = cls._resolve_lf_element_params(element, data.catalog)
+            missing = cls._missing_lf_element_inputs(resolved)
+            if missing:
+                missing_sections += 1
+                warnings.append(
+                    cls._format_missing_warning(
+                        scope=f"ELEMENT {element.element_id}",
+                        missing=missing,
+                    )
+                )
+
+            s_mva = None
+            if resolved.p_mw is not None and resolved.q_mvar is not None:
+                s_mva = math.sqrt(resolved.p_mw ** 2 + resolved.q_mvar ** 2)
+
+            i_ka = None
+            u_ll_kv = resolved.u_ll_kv or resolved.u_nom_kv
+            if s_mva is not None and u_ll_kv:
+                i_ka = s_mva / (math.sqrt(3.0) * u_ll_kv)
+
+            delta_u_r = None
+            if resolved.r_ohm is not None and resolved.p_mw is not None and resolved.u_nom_kv:
+                delta_u_r = (resolved.r_ohm * resolved.p_mw) / resolved.u_nom_kv
+
+            delta_u_x = None
+            if resolved.x_ohm is not None and resolved.q_mvar is not None and resolved.u_nom_kv:
+                delta_u_x = (resolved.x_ohm * resolved.q_mvar) / resolved.u_nom_kv
+
+            delta_u = None
+            if delta_u_r is not None and delta_u_x is not None:
+                delta_u = delta_u_r + delta_u_x
+
+            step_number += 1
+            steps.append(
+                cls._create_lf_apparent_power_step(
+                    step_number=step_number,
+                    element=resolved,
+                    s_mva=s_mva,
+                )
+            )
+
+            step_number += 1
+            steps.append(
+                cls._create_lf_current_step(
+                    step_number=step_number,
+                    element=resolved,
+                    s_mva=s_mva,
+                    u_ll_kv=u_ll_kv,
+                    i_ka=i_ka,
+                )
+            )
+
+            step_number += 1
+            steps.append(
+                cls._create_lf_delta_u_r_step(
+                    step_number=step_number,
+                    element=resolved,
+                    delta_u_r=delta_u_r,
+                )
+            )
+
+            step_number += 1
+            steps.append(
+                cls._create_lf_delta_u_x_step(
+                    step_number=step_number,
+                    element=resolved,
+                    delta_u_x=delta_u_x,
+                )
+            )
+
+            step_number += 1
+            steps.append(
+                cls._create_lf_delta_u_step(
+                    step_number=step_number,
+                    element=resolved,
+                    delta_u_r=delta_u_r,
+                    delta_u_x=delta_u_x,
+                    delta_u=delta_u,
+                )
+            )
+
+        for bus in sorted(data.buses, key=lambda item: item.bus_id):
+            bus_count += 1
+            missing = cls._missing_lf_bus_inputs(bus)
+            if missing:
+                missing_sections += 1
+                warnings.append(
+                    cls._format_missing_warning(
+                        scope=f"BUS {bus.bus_id}",
+                        missing=missing,
+                    )
+                )
+
+            u_pu = None
+            if bus.u_ll_kv is not None and bus.u_nom_kv:
+                u_pu = bus.u_ll_kv / bus.u_nom_kv
+
+            delta_pct = None
+            if bus.u_ll_kv is not None and bus.u_nom_kv:
+                delta_pct = 100.0 * (bus.u_ll_kv - bus.u_nom_kv) / bus.u_nom_kv
+
+            step_number += 1
+            steps.append(
+                cls._create_lf_bus_pu_step(
+                    step_number=step_number,
+                    bus=bus,
+                    u_pu=u_pu,
+                )
+            )
+
+            step_number += 1
+            steps.append(
+                cls._create_lf_bus_delta_step(
+                    step_number=step_number,
+                    bus=bus,
+                    delta_pct=delta_pct,
+                )
+            )
+
+        unit_checks_passed = all(step.unit_check.passed for step in steps)
+        total_sections = element_count + bus_count
+        if missing_sections == 0:
+            computed_status = "COMPUTED"
+        elif missing_sections >= total_sections and total_sections > 0:
+            computed_status = "NOT COMPUTED"
+        else:
+            computed_status = "PARTIAL"
+
+        key_results = {
+            "bus_count": ProofValue.create("N_{bus}", bus_count, "—", "bus_count"),
+            "element_count": ProofValue.create("N_{el}", element_count, "—", "element_count"),
+            "computed_status": cls._status_value(
+                r"\text{status obliczeń}",
+                computed_status,
+                "computed_status",
+            ),
+        }
+
+        summary = ProofSummary(
+            key_results=key_results,
+            unit_check_passed=unit_checks_passed,
+            total_steps=len(steps),
+            warnings=tuple(warnings),
+        )
+
+        header = ProofHeader(
+            project_name=data.project_name,
+            case_name=data.case_name,
+            run_timestamp=data.run_timestamp,
+            solver_version=data.solver_version,
+            element_kind="LOAD_FLOW_VOLTAGE",
+        )
+
+        return ProofDocument.create(
+            artifact_id=artifact_id,
+            proof_type=ProofType.LOAD_FLOW_VOLTAGE,
+            title_pl="Dowód: Load Flow i spadki napięć (P32)",
+            header=header,
+            steps=steps,
+            summary=summary,
+        )
 
     # =========================================================================
     # SC3F Generator
@@ -3235,6 +3475,446 @@ class ProofGenerator:
         if isinstance(value_a, (int, float)) and isinstance(value_b, (int, float)):
             return ProofValue.create(symbol, value_b - value_a, unit, source_key)
         return None
+
+    @staticmethod
+    def _format_missing_warning(scope: str, missing: list[str]) -> str:
+        missing_sorted = ", ".join(sorted(missing))
+        return (
+            f"{scope}: NOT COMPUTED — brak danych: {missing_sorted} | "
+            f"missing_data: [{missing_sorted}]"
+        )
+
+    @staticmethod
+    def _missing_lf_bus_inputs(bus: LoadFlowBusInput) -> list[str]:
+        missing: list[str] = []
+        if bus.u_ll_kv is None:
+            missing.append("u_ll_kv")
+        if bus.u_nom_kv is None:
+            missing.append("u_nom_kv")
+        return missing
+
+    @staticmethod
+    def _missing_lf_element_inputs(element: LoadFlowElementInput) -> list[str]:
+        missing: list[str] = []
+        if element.r_ohm is None:
+            missing.append("r_ohm")
+        if element.x_ohm is None:
+            missing.append("x_ohm")
+        if element.p_mw is None:
+            missing.append("p_mw")
+        if element.q_mvar is None:
+            missing.append("q_mvar")
+        if element.u_nom_kv is None:
+            missing.append("u_nom_kv")
+        if element.u_ll_kv is None:
+            missing.append("u_ll_kv")
+        return missing
+
+    @staticmethod
+    def _resolve_lf_element_params(
+        element: LoadFlowElementInput,
+        catalog: CatalogRepository | None,
+    ) -> LoadFlowElementInput:
+        r_ohm = element.r_ohm
+        x_ohm = element.x_ohm
+        if (
+            (r_ohm is None or x_ohm is None)
+            and catalog is not None
+            and element.length_km is not None
+            and element.type_ref
+        ):
+            if element.element_kind == LoadElementKind.LINE:
+                line_type = catalog.get_line_type(element.type_ref)
+                if line_type:
+                    r_ohm = line_type.r_ohm_per_km * element.length_km
+                    x_ohm = line_type.x_ohm_per_km * element.length_km
+            elif element.element_kind == LoadElementKind.CABLE:
+                cable_type = catalog.get_cable_type(element.type_ref)
+                if cable_type:
+                    r_ohm = cable_type.r_ohm_per_km * element.length_km
+                    x_ohm = cable_type.x_ohm_per_km * element.length_km
+        return LoadFlowElementInput(
+            element_id=element.element_id,
+            element_kind=element.element_kind,
+            from_bus_id=element.from_bus_id,
+            to_bus_id=element.to_bus_id,
+            length_km=element.length_km,
+            type_ref=element.type_ref,
+            r_ohm=r_ohm,
+            x_ohm=x_ohm,
+            p_mw=element.p_mw,
+            q_mvar=element.q_mvar,
+            u_nom_kv=element.u_nom_kv,
+            u_ll_kv=element.u_ll_kv,
+        )
+
+    @classmethod
+    def _create_lf_apparent_power_step(
+        cls,
+        *,
+        step_number: int,
+        element: LoadFlowElementInput,
+        s_mva: float | None,
+    ) -> ProofStep:
+        equation = EQ_LF_001
+        input_values = (
+            cls._value_or_missing("P", element.p_mw, "MW", "p_mw"),
+            cls._value_or_missing("Q", element.q_mvar, "Mvar", "q_mvar"),
+        )
+
+        if element.p_mw is None or element.q_mvar is None:
+            substitution = r"S = \sqrt{P^{2} + Q^{2}}\quad\text{(brak danych)}"
+            result = cls._value_or_missing("S", None, "MVA", "s_mva")
+        else:
+            substitution = (
+                f"S = \\sqrt{{{element.p_mw:.4f}^{2} + {element.q_mvar:.4f}^{2}}}"
+                f" = {s_mva:.4f}\\,\\text{{MVA}}"
+            )
+            result = ProofValue.create("S", s_mva, "MVA", "s_mva")
+
+        unit_check = UnitVerifier.verify_step(
+            equation.equation_id,
+            [("P", "MW"), ("Q", "Mvar")],
+            "MVA",
+        )
+
+        return ProofStep(
+            step_id=ProofStep.generate_step_id(
+                ProofType.LOAD_FLOW_VOLTAGE.value, step_number
+            ),
+            step_number=step_number,
+            title_pl=f"{equation.name_pl} (element {element.element_id})",
+            equation=equation,
+            input_values=input_values,
+            substitution_latex=substitution,
+            result=result,
+            unit_check=unit_check,
+            source_keys={
+                "P": "p_mw",
+                "Q": "q_mvar",
+                "S": "s_mva",
+                "element_id": element.element_id,
+                "element_kind": element.element_kind.value,
+                "from_bus_id": element.from_bus_id or "—",
+                "to_bus_id": element.to_bus_id or "—",
+            },
+        )
+
+    @classmethod
+    def _create_lf_current_step(
+        cls,
+        *,
+        step_number: int,
+        element: LoadFlowElementInput,
+        s_mva: float | None,
+        u_ll_kv: float | None,
+        i_ka: float | None,
+    ) -> ProofStep:
+        equation = EQ_LF_002
+        input_values = (
+            cls._value_or_missing("S", s_mva, "MVA", "s_mva"),
+            cls._value_or_missing("U_{LL}", u_ll_kv, "kV", "u_ll_kv"),
+        )
+
+        if s_mva is None or u_ll_kv is None or u_ll_kv == 0:
+            substitution = r"I = \frac{S}{\sqrt{3}\,U_{LL}}\quad\text{(brak danych)}"
+            result = cls._value_or_missing("I", None, "kA", "i_ka")
+        else:
+            substitution = (
+                f"I = \\frac{{{s_mva:.4f}}}{{\\sqrt{{3}}\\cdot {u_ll_kv:.4f}}}"
+                f" = {i_ka:.4f}\\,\\text{{kA}}"
+            )
+            result = ProofValue.create("I", i_ka, "kA", "i_ka")
+
+        unit_check = UnitVerifier.verify_step(
+            equation.equation_id,
+            [("S", "MVA"), ("U_{LL}", "kV")],
+            "kA",
+        )
+
+        return ProofStep(
+            step_id=ProofStep.generate_step_id(
+                ProofType.LOAD_FLOW_VOLTAGE.value, step_number
+            ),
+            step_number=step_number,
+            title_pl=f"{equation.name_pl} (element {element.element_id})",
+            equation=equation,
+            input_values=input_values,
+            substitution_latex=substitution,
+            result=result,
+            unit_check=unit_check,
+            source_keys={
+                "S": "s_mva",
+                "U_{LL}": "u_ll_kv",
+                "I": "i_ka",
+                "element_id": element.element_id,
+                "element_kind": element.element_kind.value,
+                "from_bus_id": element.from_bus_id or "—",
+                "to_bus_id": element.to_bus_id or "—",
+            },
+        )
+
+    @classmethod
+    def _create_lf_delta_u_r_step(
+        cls,
+        *,
+        step_number: int,
+        element: LoadFlowElementInput,
+        delta_u_r: float | None,
+    ) -> ProofStep:
+        equation = EQ_LF_003
+        input_values = (
+            cls._value_or_missing("R", element.r_ohm, "Ω", "r_ohm"),
+            cls._value_or_missing("P", element.p_mw, "MW", "p_mw"),
+            cls._value_or_missing("U_{n}", element.u_nom_kv, "kV", "u_nom_kv"),
+        )
+
+        if element.r_ohm is None or element.p_mw is None or not element.u_nom_kv:
+            substitution = r"\Delta U_{R} = \frac{R\cdot P}{U_{n}}\quad\text{(brak danych)}"
+            result = cls._value_or_missing("\\Delta U_{R}", None, "kV", "delta_u_r_kv")
+        else:
+            substitution = (
+                f"\\Delta U_{{R}} = \\frac{{{element.r_ohm:.4f}\\cdot {element.p_mw:.4f}}}"
+                f"{{{element.u_nom_kv:.4f}}} = {delta_u_r:.4f}\\,\\text{{kV}}"
+            )
+            result = ProofValue.create("\\Delta U_{R}", delta_u_r, "kV", "delta_u_r_kv")
+
+        unit_check = UnitVerifier.verify_step(
+            equation.equation_id,
+            [("R", "Ω"), ("P", "MW"), ("U_n", "kV")],
+            "kV",
+        )
+
+        return ProofStep(
+            step_id=ProofStep.generate_step_id(
+                ProofType.LOAD_FLOW_VOLTAGE.value, step_number
+            ),
+            step_number=step_number,
+            title_pl=f"{equation.name_pl} (element {element.element_id})",
+            equation=equation,
+            input_values=input_values,
+            substitution_latex=substitution,
+            result=result,
+            unit_check=unit_check,
+            source_keys={
+                "R": "r_ohm",
+                "P": "p_mw",
+                "U_n": "u_nom_kv",
+                "ΔU_R": "delta_u_r_kv",
+                "element_id": element.element_id,
+                "element_kind": element.element_kind.value,
+                "from_bus_id": element.from_bus_id or "—",
+                "to_bus_id": element.to_bus_id or "—",
+            },
+        )
+
+    @classmethod
+    def _create_lf_delta_u_x_step(
+        cls,
+        *,
+        step_number: int,
+        element: LoadFlowElementInput,
+        delta_u_x: float | None,
+    ) -> ProofStep:
+        equation = EQ_LF_004
+        input_values = (
+            cls._value_or_missing("X", element.x_ohm, "Ω", "x_ohm"),
+            cls._value_or_missing("Q", element.q_mvar, "Mvar", "q_mvar"),
+            cls._value_or_missing("U_{n}", element.u_nom_kv, "kV", "u_nom_kv"),
+        )
+
+        if element.x_ohm is None or element.q_mvar is None or not element.u_nom_kv:
+            substitution = r"\Delta U_{X} = \frac{X\cdot Q}{U_{n}}\quad\text{(brak danych)}"
+            result = cls._value_or_missing("\\Delta U_{X}", None, "kV", "delta_u_x_kv")
+        else:
+            substitution = (
+                f"\\Delta U_{{X}} = \\frac{{{element.x_ohm:.4f}\\cdot {element.q_mvar:.4f}}}"
+                f"{{{element.u_nom_kv:.4f}}} = {delta_u_x:.4f}\\,\\text{{kV}}"
+            )
+            result = ProofValue.create("\\Delta U_{X}", delta_u_x, "kV", "delta_u_x_kv")
+
+        unit_check = UnitVerifier.verify_step(
+            equation.equation_id,
+            [("X", "Ω"), ("Q", "Mvar"), ("U_n", "kV")],
+            "kV",
+        )
+
+        return ProofStep(
+            step_id=ProofStep.generate_step_id(
+                ProofType.LOAD_FLOW_VOLTAGE.value, step_number
+            ),
+            step_number=step_number,
+            title_pl=f"{equation.name_pl} (element {element.element_id})",
+            equation=equation,
+            input_values=input_values,
+            substitution_latex=substitution,
+            result=result,
+            unit_check=unit_check,
+            source_keys={
+                "X": "x_ohm",
+                "Q": "q_mvar",
+                "U_n": "u_nom_kv",
+                "ΔU_X": "delta_u_x_kv",
+                "element_id": element.element_id,
+                "element_kind": element.element_kind.value,
+                "from_bus_id": element.from_bus_id or "—",
+                "to_bus_id": element.to_bus_id or "—",
+            },
+        )
+
+    @classmethod
+    def _create_lf_delta_u_step(
+        cls,
+        *,
+        step_number: int,
+        element: LoadFlowElementInput,
+        delta_u_r: float | None,
+        delta_u_x: float | None,
+        delta_u: float | None,
+    ) -> ProofStep:
+        equation = EQ_LF_005
+        input_values = (
+            cls._value_or_missing("\\Delta U_{R}", delta_u_r, "kV", "delta_u_r_kv"),
+            cls._value_or_missing("\\Delta U_{X}", delta_u_x, "kV", "delta_u_x_kv"),
+        )
+
+        if delta_u is None or delta_u_r is None or delta_u_x is None:
+            substitution = r"\Delta U = \Delta U_{R} + \Delta U_{X}\quad\text{(brak danych)}"
+            result = cls._value_or_missing("\\Delta U", None, "kV", "delta_u_kv")
+        else:
+            substitution = (
+                f"\\Delta U = {delta_u_r:.4f} + {delta_u_x:.4f}"
+                f" = {delta_u:.4f}\\,\\text{{kV}}"
+            )
+            result = ProofValue.create("\\Delta U", delta_u, "kV", "delta_u_kv")
+
+        unit_check = UnitVerifier.verify_step(
+            equation.equation_id,
+            [("ΔU_R", "kV"), ("ΔU_X", "kV")],
+            "kV",
+        )
+
+        return ProofStep(
+            step_id=ProofStep.generate_step_id(
+                ProofType.LOAD_FLOW_VOLTAGE.value, step_number
+            ),
+            step_number=step_number,
+            title_pl=f"{equation.name_pl} (element {element.element_id})",
+            equation=equation,
+            input_values=input_values,
+            substitution_latex=substitution,
+            result=result,
+            unit_check=unit_check,
+            source_keys={
+                "ΔU": "delta_u_kv",
+                "ΔU_R": "delta_u_r_kv",
+                "ΔU_X": "delta_u_x_kv",
+                "element_id": element.element_id,
+                "element_kind": element.element_kind.value,
+                "from_bus_id": element.from_bus_id or "—",
+                "to_bus_id": element.to_bus_id or "—",
+            },
+        )
+
+    @classmethod
+    def _create_lf_bus_pu_step(
+        cls,
+        *,
+        step_number: int,
+        bus: LoadFlowBusInput,
+        u_pu: float | None,
+    ) -> ProofStep:
+        equation = EQ_LF_006
+        input_values = (
+            cls._value_or_missing("U", bus.u_ll_kv, "kV", "u_ll_kv"),
+            cls._value_or_missing("U_{n}", bus.u_nom_kv, "kV", "u_nom_kv"),
+        )
+
+        if bus.u_ll_kv is None or not bus.u_nom_kv:
+            substitution = r"U_{pu} = \frac{U}{U_{n}}\quad\text{(brak danych)}"
+            result = cls._value_or_missing("U_{pu}", None, "p.u.", "u_pu")
+        else:
+            substitution = (
+                f"U_{{pu}} = \\frac{{{bus.u_ll_kv:.4f}}}{{{bus.u_nom_kv:.4f}}}"
+                f" = {u_pu:.4f}\\,\\text{{p.u.}}"
+            )
+            result = ProofValue.create("U_{pu}", u_pu, "p.u.", "u_pu")
+
+        unit_check = UnitVerifier.verify_step(
+            equation.equation_id,
+            [("U", "kV"), ("U_n", "kV")],
+            "p.u.",
+        )
+
+        return ProofStep(
+            step_id=ProofStep.generate_step_id(
+                ProofType.LOAD_FLOW_VOLTAGE.value, step_number
+            ),
+            step_number=step_number,
+            title_pl=f"{equation.name_pl} (BUS {bus.bus_id})",
+            equation=equation,
+            input_values=input_values,
+            substitution_latex=substitution,
+            result=result,
+            unit_check=unit_check,
+            source_keys={
+                "U": "u_ll_kv",
+                "U_n": "u_nom_kv",
+                "U_pu": "u_pu",
+                "bus_id": bus.bus_id,
+            },
+        )
+
+    @classmethod
+    def _create_lf_bus_delta_step(
+        cls,
+        *,
+        step_number: int,
+        bus: LoadFlowBusInput,
+        delta_pct: float | None,
+    ) -> ProofStep:
+        equation = EQ_LF_007
+        input_values = (
+            cls._value_or_missing("U", bus.u_ll_kv, "kV", "u_ll_kv"),
+            cls._value_or_missing("U_{n}", bus.u_nom_kv, "kV", "u_nom_kv"),
+        )
+
+        if bus.u_ll_kv is None or not bus.u_nom_kv:
+            substitution = (
+                r"\delta_{U} = 100\cdot\frac{U - U_{n}}{U_{n}}\quad\text{(brak danych)}"
+            )
+            result = cls._value_or_missing("\\delta_{U}", None, "%", "delta_pct")
+        else:
+            substitution = (
+                f"\\delta_{{U}} = 100\\cdot\\frac{{{bus.u_ll_kv:.4f} - {bus.u_nom_kv:.4f}}}"
+                f"{{{bus.u_nom_kv:.4f}}} = {delta_pct:.4f}\\%"
+            )
+            result = ProofValue.create("\\delta_{U}", delta_pct, "%", "delta_pct")
+
+        unit_check = UnitVerifier.verify_step(
+            equation.equation_id,
+            [("U", "kV"), ("U_n", "kV")],
+            "%",
+        )
+
+        return ProofStep(
+            step_id=ProofStep.generate_step_id(
+                ProofType.LOAD_FLOW_VOLTAGE.value, step_number
+            ),
+            step_number=step_number,
+            title_pl=f"{equation.name_pl} (BUS {bus.bus_id})",
+            equation=equation,
+            input_values=input_values,
+            substitution_latex=substitution,
+            result=result,
+            unit_check=unit_check,
+            source_keys={
+                "U": "u_ll_kv",
+                "U_n": "u_nom_kv",
+                "δU": "delta_pct",
+                "bus_id": bus.bus_id,
+            },
+        )
 
     @staticmethod
     def _status_value(symbol: str, status: str, source_key: str) -> ProofValue:

@@ -77,6 +77,7 @@ class LaTeXRenderer:
             r"\tableofcontents",
             r"\newpage",
             cls._render_header(doc),
+            cls._render_load_flow_voltage_section(doc),
             cls._render_losses_energy_section(doc),
             cls._render_steps(doc),
             cls._render_summary(doc),
@@ -378,6 +379,137 @@ class LaTeXRenderer:
         lines.append(r"\end{itemize}")
 
         return lines
+
+    @classmethod
+    def _render_load_flow_voltage_section(cls, doc: ProofDocument) -> str:
+        """Renderuje sekcję P32: Load Flow i spadki napięć."""
+        from application.proof_engine.types import ProofType
+
+        if doc.proof_type != ProofType.LOAD_FLOW_VOLTAGE:
+            return ""
+
+        bus_rows: dict[str, dict[str, float | str | None]] = {}
+        element_rows: dict[str, dict[str, float | str | None]] = {}
+
+        for step in doc.steps:
+            bus_id = step.source_keys.get("bus_id")
+            element_id = step.source_keys.get("element_id")
+            eq_id = step.equation.equation_id
+
+            if bus_id:
+                entry = bus_rows.setdefault(bus_id, {})
+                values = {val.symbol: val.value for val in step.input_values}
+                if "U" in values:
+                    entry["u_ll_kv"] = values.get("U")
+                if "U_{n}" in values:
+                    entry["u_nom_kv"] = values.get("U_{n}")
+                if eq_id == "EQ_LF_006":
+                    entry["u_pu"] = step.result.value
+                if eq_id == "EQ_LF_007":
+                    entry["delta_pct"] = step.result.value
+
+            if element_id:
+                entry = element_rows.setdefault(element_id, {})
+                entry["element_kind"] = step.source_keys.get("element_kind")
+                values = {val.symbol: val.value for val in step.input_values}
+                if "R" in values:
+                    entry["r_ohm"] = values.get("R")
+                if "X" in values:
+                    entry["x_ohm"] = values.get("X")
+                if "P" in values:
+                    entry["p_mw"] = values.get("P")
+                if "Q" in values:
+                    entry["q_mvar"] = values.get("Q")
+                if eq_id == "EQ_LF_003":
+                    entry["delta_u_r_kv"] = step.result.value
+                if eq_id == "EQ_LF_004":
+                    entry["delta_u_x_kv"] = step.result.value
+                if eq_id == "EQ_LF_005":
+                    entry["delta_u_kv"] = step.result.value
+
+        def _cell(value: float | str | None, unit: str) -> str:
+            formatted = "—" if value is None else cls._format_numeric_value(value)
+            return rf"$$ {formatted}\,\text{{{unit}}} $$"
+
+        lines = [
+            r"\section{Load Flow i spadki napięć}",
+            "",
+            r"\textbf{Tabela BUS:}",
+            "",
+            r"\begin{center}",
+            r"\begin{tabular}{lcccc}",
+            r"\toprule",
+            r"$$\text{BUS}$$ & $$U_{n}$$ & $$U$$ & $$U_{pu}$$ & $$\delta_{U}$$ \\",
+            r"\midrule",
+        ]
+
+        for bus_id in sorted(bus_rows.keys()):
+            entry = bus_rows[bus_id]
+            lines.append(
+                rf"$$\text{{{cls._escape(bus_id)}}}$$ & "
+                rf"{_cell(entry.get('u_nom_kv'), 'kV')} & "
+                rf"{_cell(entry.get('u_ll_kv'), 'kV')} & "
+                rf"{_cell(entry.get('u_pu'), 'p.u.')} & "
+                rf"{_cell(entry.get('delta_pct'), r'\\%')} \\"
+            )
+
+        lines.extend([
+            r"\bottomrule",
+            r"\end{tabular}",
+            r"\end{center}",
+            "",
+            r"\textbf{Tabela elementów:}",
+            "",
+            r"\begin{center}",
+            r"\begin{tabular}{lccccccc}",
+            r"\toprule",
+            r"$$\text{Element}$$ & $$\text{Typ}$$ & $$R$$ & $$X$$ & $$P$$ & $$Q$$ & $$\Delta U_{R}$$ & $$\Delta U_{X}$$ \\",
+            r"\midrule",
+        ])
+
+        for element_id in sorted(element_rows.keys()):
+            entry = element_rows[element_id]
+            lines.append(
+                rf"$$\text{{{cls._escape(element_id)}}}$$ & "
+                rf"$$\text{{{cls._escape(str(entry.get('element_kind') or '—'))}}}$$ & "
+                rf"{_cell(entry.get('r_ohm'), 'Ω')} & "
+                rf"{_cell(entry.get('x_ohm'), 'Ω')} & "
+                rf"{_cell(entry.get('p_mw'), 'MW')} & "
+                rf"{_cell(entry.get('q_mvar'), 'Mvar')} & "
+                rf"{_cell(entry.get('delta_u_r_kv'), 'kV')} & "
+                rf"{_cell(entry.get('delta_u_x_kv'), 'kV')} \\"
+            )
+
+        lines.extend([
+            r"\bottomrule",
+            r"\end{tabular}",
+            r"\end{center}",
+        ])
+
+        if element_rows:
+            lines.extend([
+                "",
+                r"\textbf{Spadek całkowity elementów:}",
+                "",
+                r"\begin{center}",
+                r"\begin{tabular}{lc}",
+                r"\toprule",
+                r"$$\text{Element}$$ & $$\Delta U$$ \\",
+                r"\midrule",
+            ])
+            for element_id in sorted(element_rows.keys()):
+                entry = element_rows[element_id]
+                lines.append(
+                    rf"$$\text{{{cls._escape(element_id)}}}$$ & "
+                    rf"{_cell(entry.get('delta_u_kv'), 'kV')} \\"
+                )
+            lines.extend([
+                r"\bottomrule",
+                r"\end{tabular}",
+                r"\end{center}",
+            ])
+
+        return "\n".join(lines)
 
     @classmethod
     def _render_load_currents_counterfactual_table(cls, doc: ProofDocument) -> list[str]:
