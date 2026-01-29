@@ -51,6 +51,7 @@
 - [docs/proof_engine/P14_PROOF_AUDIT_AND_COVERAGE.md](./proof_engine/P14_PROOF_AUDIT_AND_COVERAGE.md) — **P14: Proof Audit & Coverage (CANONICAL, META)**
 - [docs/proof_engine/P15_LOAD_CURRENTS_OVERLOAD.md](./proof_engine/P15_LOAD_CURRENTS_OVERLOAD.md) — **P15: Prądy robocze i przeciążenia (CANONICAL)**
 - [docs/proof_engine/P17_LOSSES_ENERGY_PROFILE.md](./proof_engine/P17_LOSSES_ENERGY_PROFILE.md) — **P17: Energia strat (profil czasowy) (CANONICAL)**
+- [docs/proof_engine/P18_PROTECTION_PROOF.md](./proof_engine/P18_PROTECTION_PROOF.md) — **P18: Zabezpieczenia nadprądowe i selektywność (CANONICAL)**
 - [docs/proof_engine/P11_SC_CASE_MAPPING.md](./proof_engine/P11_SC_CASE_MAPPING.md) — **Mapowanie Case zwarciowych (MAX/MIN/N-1) na ProofDocument: trace_id, snapshot, anti-double-counting (CANONICAL)**
 - [docs/proof_engine/PROOF_SCHEMAS.md](./proof_engine/PROOF_SCHEMAS.md) — Schematy JSON (BINDING)
 - [docs/proof_engine/EQUATIONS_IEC60909_SC3F.md](./proof_engine/EQUATIONS_IEC60909_SC3F.md) — Rejestr równań SC3F (BINDING)
