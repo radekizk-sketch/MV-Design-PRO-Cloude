@@ -1322,6 +1322,43 @@ Zdefiniowanie i wdrożenie **widoku profilu napięciowego (BUS-centric)** w styl
 
 ---
 
+## 12.12. Phase 2.x.7: PROTECTION INSIGHT (P22a) — SELECTIVITY EXPLAINER
+
+### 12.12.1. Cel fazy
+
+Warstwa analityczna dla selektywności i rezerwowości zabezpieczeń (P22a), bez krzywych I–t.
+
+### 12.12.2. Zakres fazy
+
+**IN SCOPE:**
+- DTO, builder i serializer dla Protection Insight (read-only).
+- Deterministyczne sortowanie i podsumowanie statusów.
+- UI Contract dla Results → Zabezpieczenia → Analiza selektywności.
+
+**OUT OF SCOPE:**
+- Krzywe I–t, rendering, solver changes.
+- Modyfikacja P18/P20.
+
+### 12.12.3. Deliverables
+
+| Plik | Opis | Status |
+|------|------|--------|
+| `backend/src/analysis/protection_insight/` | Modele, builder, serializer P22a | DONE |
+| `backend/tests/analysis/test_protection_insight_p22a.py` | Testy determinism, marginesów, sortowania, NOT_EVALUATED | DONE |
+| `docs/ui/PROTECTION_INSIGHT_CONTRACT.md` | Kontrakt UI P22a (bez krzywych I–t) | DONE |
+| `docs/INDEX.md` | Link do kontraktu P22a | DONE |
+
+### 12.12.4. Completed Tasks
+
+- [x] Dodanie `analysis/protection_insight` (DTO, builder, serializer, determinism).
+- [x] Integracja P18 (dane) + P20 (statusy selektywności) bez nowych obliczeń.
+- [x] Deterministyczne sortowanie (FAIL → WARNING → NOT_EVALUATED → OK, device_id asc).
+- [x] Testy P22a: determinism, marginesy %, NOT_EVALUATED, sortowanie.
+- [x] Kontrakt UI: `PROTECTION_INSIGHT_CONTRACT.md`.
+- [x] Aktualizacja `docs/INDEX.md`.
+
+---
+
 ## 19. Proof Packs Roadmap (P15–P20) — CANONICAL
 
 Poniższa roadmapa jest **jedynym kanonicznym planem** rozwoju Proof Packów.
