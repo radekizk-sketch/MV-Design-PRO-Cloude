@@ -6,6 +6,21 @@ from .dtos import (
     ResultItemDTO,
     TraceDTO,
     TraceSummaryDTO,
+    # P11a — Results Inspector DTOs
+    RunHeaderDTO,
+    ResultColumnDTO,
+    ResultTableMetaDTO,
+    ResultsIndexDTO,
+    BusResultsRowDTO,
+    BusResultsDTO,
+    BranchResultsRowDTO,
+    BranchResultsDTO,
+    ShortCircuitRowDTO,
+    ShortCircuitResultsDTO,
+    ExtendedTraceDTO,
+    SldOverlayNodeDTO,
+    SldOverlayBranchDTO,
+    SldResultOverlayDTO,
 )
 from .read_model import (
     build_deterministic_id,
@@ -17,17 +32,35 @@ from .read_model import (
 )
 from .service import AnalysisRunService
 from .export_service import AnalysisRunExportService
+from .results_inspector import ResultsInspectorService
 
 __all__ = [
     "AnalysisRunDetailDTO",
     "AnalysisRunExportService",
     "AnalysisRunService",
+    "ResultsInspectorService",
     "AnalysisRunSummaryDTO",
     "OverlayDTO",
     "ResultItemDTO",
     "ResultListDTO",
     "TraceDTO",
     "TraceSummaryDTO",
+    # P11a — Results Inspector DTOs
+    "RunHeaderDTO",
+    "ResultColumnDTO",
+    "ResultTableMetaDTO",
+    "ResultsIndexDTO",
+    "BusResultsRowDTO",
+    "BusResultsDTO",
+    "BranchResultsRowDTO",
+    "BranchResultsDTO",
+    "ShortCircuitRowDTO",
+    "ShortCircuitResultsDTO",
+    "ExtendedTraceDTO",
+    "SldOverlayNodeDTO",
+    "SldOverlayBranchDTO",
+    "SldResultOverlayDTO",
+    # Functions
     "build_deterministic_id",
     "build_input_metadata",
     "build_trace_summary",

@@ -17,6 +17,8 @@ from application.analysis_run import (
     ResultListDTO,
     TraceDTO,
     TraceSummaryDTO,
+    # P11a — Results Inspector
+    ResultsInspectorService,
     build_deterministic_id,
     build_input_metadata,
     build_trace_summary,
@@ -36,6 +38,10 @@ def _build_service(uow_factory: Any) -> AnalysisRunService:
 
 def _build_export_service(uow_factory: Any) -> AnalysisRunExportService:
     return AnalysisRunExportService(uow_factory)
+
+
+def _build_inspector_service(uow_factory: Any) -> ResultsInspectorService:
+    return ResultsInspectorService(uow_factory)
 
 
 @router.get("/projects/{project_id}/analysis-runs")
@@ -270,3 +276,116 @@ def export_analysis_run_pdf(
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(exc)) from exc
     headers = {"Content-Disposition": f'attachment; filename="analysis_run_{run_id}.pdf"'}
     return Response(content=payload, media_type="application/pdf", headers=headers)
+
+
+# =============================================================================
+# P11a — Results Inspector (READ-ONLY) Endpoints
+#
+# CANONICAL ALIGNMENT:
+# - SYSTEM_SPEC.md: NOT-A-SOLVER, WHITE BOX, layer boundaries
+# - AGENTS.md: READ-ONLY, no physics, no mutations
+# - wizard_screens.md: RESULT_VIEW mode
+#
+# DETERMINISM: All endpoints return deterministically sorted results.
+# =============================================================================
+
+
+@router.get("/analysis-runs/{run_id}/results/index")
+def get_results_index(
+    run_id: UUID,
+    uow_factory=Depends(get_uow_factory),
+) -> dict[str, Any]:
+    """
+    P11a: Get results index for a run.
+
+    Returns available result tables with column metadata and units.
+    """
+    service = _build_inspector_service(uow_factory)
+    try:
+        dto = service.get_results_index(run_id)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)
+        ) from exc
+    return canonicalize_json(dto.to_dict())
+
+
+@router.get("/analysis-runs/{run_id}/results/buses")
+def get_bus_results(
+    run_id: UUID,
+    uow_factory=Depends(get_uow_factory),
+) -> dict[str, Any]:
+    """
+    P11a: Get bus/node results for a run.
+
+    Returns deterministically sorted bus results (by name, then id).
+    """
+    service = _build_inspector_service(uow_factory)
+    try:
+        dto = service.get_bus_results(run_id)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)
+        ) from exc
+    return canonicalize_json(dto.to_dict())
+
+
+@router.get("/analysis-runs/{run_id}/results/branches")
+def get_branch_results(
+    run_id: UUID,
+    uow_factory=Depends(get_uow_factory),
+) -> dict[str, Any]:
+    """
+    P11a: Get branch results for a run.
+
+    Returns deterministically sorted branch results (by name, then id).
+    """
+    service = _build_inspector_service(uow_factory)
+    try:
+        dto = service.get_branch_results(run_id)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)
+        ) from exc
+    return canonicalize_json(dto.to_dict())
+
+
+@router.get("/analysis-runs/{run_id}/results/short-circuit")
+def get_short_circuit_results(
+    run_id: UUID,
+    uow_factory=Depends(get_uow_factory),
+) -> dict[str, Any]:
+    """
+    P11a: Get short-circuit results for a run.
+
+    Only available for short_circuit_sn analysis type.
+    Returns deterministically sorted results (by target_id).
+    """
+    service = _build_inspector_service(uow_factory)
+    try:
+        dto = service.get_short_circuit_results(run_id)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)
+        ) from exc
+    return canonicalize_json(dto.to_dict())
+
+
+@router.get("/analysis-runs/{run_id}/results/trace")
+def get_extended_trace(
+    run_id: UUID,
+    uow_factory=Depends(get_uow_factory),
+) -> dict[str, Any]:
+    """
+    P11a: Get extended trace with run context for audit.
+
+    Returns white_box_trace + run metadata (snapshot_id, input_hash).
+    """
+    service = _build_inspector_service(uow_factory)
+    try:
+        dto = service.get_extended_trace(run_id)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)
+        ) from exc
+    return canonicalize_json(dto.to_dict())
