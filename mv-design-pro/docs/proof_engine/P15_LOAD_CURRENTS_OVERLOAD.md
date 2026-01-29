@@ -95,7 +95,24 @@ Uwaga deterministyczna:
 
 ---
 
-## 4. Mapping Keys (BINDING)
+## 4. Jednostki (BINDING)
+
+Jednostki i derywacje:
+
+$$
+\begin{aligned}
+&P \; \text{MW}, \quad Q \; \text{Mvar}, \quad S \; \text{MVA} \\
+&U_{LL} \; \text{kV}, \quad I \; \text{kA}, \quad I_n \; \text{A} \\
+&k_I \; \%, \quad m_I \; \% \\
+&S_n \; \text{MVA}, \quad k_S \; \%, \quad m_S \; \%
+\end{aligned}
+$$
+
+Uwaga:
+- Prąd znamionowy jest wejściowo w A i przeliczany na kA dla spójności
+  w równaniach procentowych.
+
+## 5. Mapping Keys (BINDING)
 
 Lista kluczy mapowania używanych w P15:
 
@@ -120,7 +137,7 @@ m_s_percent
 
 ---
 
-## 5. Zakazy interpretacji (BINDING)
+## 6. Zakazy interpretacji (BINDING)
 
 - Brak oceny normowej i brak statusów PASS/FAIL.
 - Brak modyfikacji solverów lub Result API.
@@ -128,7 +145,7 @@ m_s_percent
 
 ---
 
-## 6. Determinizm
+## 7. Determinizm
 
 Ten sam zestaw danych wejściowych musi generować identyczny rezultat w formatach
 `proof.json` oraz `proof.tex`.
