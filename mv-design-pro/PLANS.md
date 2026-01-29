@@ -1112,6 +1112,7 @@ P14 jest **warstwą meta** i stanowi **prerequisite** dla P15–P17.
 | 2026-01 | 2.20 | Phase 2.x.4: SHORT-CIRCUIT NODE RESULTS — DOC LOCKED (wyniki zwarciowe BUS-centric, IEC 60909, PF-grade) |
 | 2026-01 | 2.21 | Phase 2.x.5: CATALOG BROWSER (PASSIVE EQUIPMENT) — DOC LOCKED (Type → Instances, pasywne elementy tylko, PF-grade) |
 | 2026-06 | 2.19 | Proof Engine: LS registry initialization fix (EquationRegistry merge/freeze + import smoke test) |
+| 2026-06 | 2.19.1 | P16.1 CI stabilization: test harness isolation for FastAPI-only fixtures |
 
 ---
 
