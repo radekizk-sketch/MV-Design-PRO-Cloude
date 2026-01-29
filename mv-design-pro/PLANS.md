@@ -1092,7 +1092,7 @@ bez dodawania obliczeń i bez modyfikacji solverów.
 
 ### 17.3 Relacje
 
-P14 jest **warstwą meta** i stanowi **prerequisite** dla P15–P17.
+P14 jest **warstwą meta** i stanowi **prerequisite** dla P15–P19.
 
 ---
 
@@ -1111,9 +1111,9 @@ P14 jest **warstwą meta** i stanowi **prerequisite** dla P15–P17.
 | 2026-01 | 2.19 | Phase 2.x.3: SWITCHING STATE EXPLORER — DOC LOCKED (eksploracja stanów łączeniowych, Islands, pre-solver validation) |
 | 2026-01 | 2.20 | Phase 2.x.4: SHORT-CIRCUIT NODE RESULTS — DOC LOCKED (wyniki zwarciowe BUS-centric, IEC 60909, PF-grade) |
 | 2026-01 | 2.21 | Phase 2.x.5: CATALOG BROWSER (PASSIVE EQUIPMENT) — DOC LOCKED (Type → Instances, pasywne elementy tylko, PF-grade) |
-| 2026-06 | 2.19 | Proof Engine: LS registry initialization fix (EquationRegistry merge/freeze + import smoke test) |
-| 2026-06 | 2.19.1 | P16.1 CI stabilization: test harness isolation for FastAPI-only fixtures |
-| 2026-06 | 2.19.2 | P17 Losses Energy Profile Proof Pack implemented (FULL MATH, deterministic) |
+| 2026-06 | 2.22 | Proof Engine: LS registry initialization fix (EquationRegistry merge/freeze + import smoke test) |
+| 2026-06 | 2.22.1 | P16.1 CI stabilization: test harness isolation for FastAPI-only fixtures |
+| 2026-06 | 2.22.2 | P17 Losses Energy Profile Proof Pack implemented (FULL MATH, deterministic) |
 
 ---
 
@@ -1200,12 +1200,12 @@ Catalog Browser ma umożliwiać:
 
 **END OF EXECUTION PLAN**
 
-## TODO — Proof Packs P14–P17 (FUTURE PACKS)
+## TODO — Proof Packs P14–P19 (FUTURE PACKS)
 
 ### P14 — Proof Audit & Coverage (DOC ONLY, META)
 
 P14 definiuje **kanoniczną warstwę audytu** kompletności i pokrycia Proof Packów
-i jest **prerequisite** dla P15–P17.
+i jest **prerequisite** dla P15–P19.
 
 ### TODO-P14-001 (PLANNED) — P14: Power Flow Proof Pack (audit wyników PF) [FUTURE PACK]
 - Priority: MUST

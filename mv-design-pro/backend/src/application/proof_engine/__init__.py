@@ -1,5 +1,5 @@
 """
-Proof Engine P11.1a — Mathematical Proof Engine (MVP)
+Proof Engine — Mathematical Proof Engine (P11–P19)
 
 Kanoniczny silnik dowodowy kompilujący pełne dowody matematyczne
 na podstawie ShortCircuitResult i white_box_trace.

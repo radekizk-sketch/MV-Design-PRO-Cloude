@@ -299,12 +299,12 @@ def test_mapping_keys_stable():
 
 ---
 
-## TODO — Proof Packs P14–P17 (FUTURE PACKS)
+## TODO — Proof Packs P14–P19 (FUTURE PACKS)
 
 ### P14 — Proof Audit & Coverage (DOC ONLY, META)
 
 P14 definiuje **kanoniczną warstwę audytu** kompletności i pokrycia Proof Packów
-oraz stanowi **prerequisite** dla P15–P17. Dokument P14 nie dodaje obliczeń
+oraz stanowi **prerequisite** dla P15–P19. Dokument P14 nie dodaje obliczeń
 i nie zmienia solverów ani Proof Engine.
 
 ### TODO-P14-001 (PLANNED) — P14: Power Flow Proof Pack (audit wyników PF) [FUTURE PACK]
@@ -377,10 +377,10 @@ i nie zmienia solverów ani Proof Engine.
     E_{loss} = \int P_{loss} \, dt
     $$
 
-### TODO-P17-001 (PLANNED) — P17: Earthing / Ground Fault Proof Pack (SN) [FUTURE PACK]
+### TODO-P19-001 (PLANNED) — P19: Earthing / Ground Fault Proof Pack (SN) [FUTURE PACK]
 - Priority: MUST
 - Inputs: TraceArtifact, Catalog
-- Output: ProofPack P17 (ProofDocument: Doziemienia / uziemienia SN)
+- Output: ProofPack P19 (ProofDocument: Doziemienia / uziemienia SN)
 - DoD:
   - [ ] Jeśli SN: prądy doziemne z uwzględnieniem impedancji uziemienia i rozdziału prądu.
   - [ ] Tryb uproszczonych napięć dotykowych z wyraźnymi zastrzeżeniami.

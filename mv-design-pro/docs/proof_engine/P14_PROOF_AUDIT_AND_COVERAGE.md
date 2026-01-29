@@ -9,7 +9,7 @@
 
 Warstwa P14 definiuje **kanoniczny audyt kompletności i pokrycia** Proof Packów.
 P14 **nie wykonuje żadnych obliczeń**, **nie zmienia solverów** ani **Proof Engine**.
-Jest to **warstwa meta**, stanowiąca źródło prawdy dla planowania pakietów P15–P17.
+Jest to **warstwa meta**, stanowiąca źródło prawdy dla planowania pakietów P15–P19.
 
 ---
 
@@ -24,7 +24,7 @@ Coverage nie wprowadza nowych obliczeń ani kryteriów normatywnych.
 ### 2.2 Calculation Pack
 
 **Calculation Pack** to kanoniczny, nazwany zakres obliczeń lub dowodu
-przypisany do konkretnego pakietu P11–P17, z jednoznaczną referencją
+przypisany do konkretnego pakietu P11–P19, z jednoznaczną referencją
 do specyfikacji i dokumentów Proof Engine.
 
 ---
@@ -48,7 +48,7 @@ do specyfikacji i dokumentów Proof Engine.
 | SC asym (1F, 2F, 2F-G) (P11.1c) | DONE | TAK | TAK | Proof Pack P11.1c (SKELETON) |
 | Load Currents (P15) | TODO | NIE | NIEOKREŚLONE | Prerequisite: P14 coverage |
 | Losses (P16) | TODO | NIE | NIEOKREŚLONE | Prerequisite: P14 coverage |
-| Grounding / Earthing (P17) | TODO | NIE | NIEOKREŚLONE | Prerequisite: P14 coverage |
+| Grounding / Earthing (P19) | TODO | NIE | NIEOKREŚLONE | Prerequisite: P14 coverage |
 | PF Audit (local) | TODO | NIE | NIEOKREŚLONE | Audit lokalny wyników PF |
 
 ---
@@ -70,7 +70,7 @@ $$
 ## 6. Relacje i zależności (BINDING)
 
 1. P14 jest **warstwą audytu** dla wszystkich Proof Packów.
-2. P15–P17 **wymagają** obecności P14 jako kanonicznego źródła coverage.
+2. P15–P19 **wymagają** obecności P14 jako kanonicznego źródła coverage.
 3. P14 nie zmienia istniejących pakietów P11–P12.
 
 ---

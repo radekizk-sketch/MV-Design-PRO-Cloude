@@ -56,19 +56,19 @@
 - [docs/proof_engine/EQUATIONS_IEC60909_SC3F.md](./proof_engine/EQUATIONS_IEC60909_SC3F.md) — Rejestr równań SC3F (BINDING)
 - [docs/proof_engine/EQUATIONS_VDROP.md](./proof_engine/EQUATIONS_VDROP.md) — Rejestr równań VDROP (BINDING)
 
-## Proof Packs P14–P17 (FUTURE) — Canonical Sources (doc-only)
-- [PLANS.md](../PLANS.md) — TODO backlog P14–P17 (CANONICAL SOURCES)
-- [SYSTEM_SPEC.md](../SYSTEM_SPEC.md) — sekcje TODO P14–P17 (CANONICAL SOURCES)
-- [ARCHITECTURE.md](../ARCHITECTURE.md) — sekcje TODO P14–P17 (CANONICAL SOURCES)
-- [POWERFACTORY_COMPLIANCE.md](../POWERFACTORY_COMPLIANCE.md) — checklisty P14–P17 (CANONICAL SOURCES)
-- [AGENTS.md](../AGENTS.md) — reguły + TODO P14–P17 (CANONICAL SOURCES)
-- [docs/proof_engine/README.md](./proof_engine/README.md) — reguły Proof Engine + TODO P14–P17 (CANONICAL SOURCES)
-- [docs/proof_engine/P11_OVERVIEW.md](./proof_engine/P11_OVERVIEW.md) — TODO P14–P17 (CANONICAL SOURCES)
-- [docs/proof_engine/P11_1a_MVP_SC3F_AND_VDROP.md](./proof_engine/P11_1a_MVP_SC3F_AND_VDROP.md) — TODO P14–P17 (CANONICAL SOURCES)
-- [docs/proof_engine/P11_1b_REGULATION_Q_U.md](./proof_engine/P11_1b_REGULATION_Q_U.md) — TODO P14–P17 (CANONICAL SOURCES)
-- [docs/proof_engine/P11_1c_SC_ASYMMETRICAL.md](./proof_engine/P11_1c_SC_ASYMMETRICAL.md) — TODO P14–P17 (CANONICAL SOURCES)
-- [docs/proof_engine/P11_1d_PROOF_UI_EXPORT.md](./proof_engine/P11_1d_PROOF_UI_EXPORT.md) — TODO P14–P17 (CANONICAL SOURCES)
-- [docs/proof_engine/PROOF_SCHEMAS.md](./proof_engine/PROOF_SCHEMAS.md) — TODO P14–P17 (CANONICAL SOURCES)
+## Proof Packs P14–P19 (FUTURE) — Canonical Sources (doc-only)
+- [PLANS.md](../PLANS.md) — TODO backlog P14–P19 (CANONICAL SOURCES)
+- [SYSTEM_SPEC.md](../SYSTEM_SPEC.md) — sekcje TODO P14–P19 (CANONICAL SOURCES)
+- [ARCHITECTURE.md](../ARCHITECTURE.md) — sekcje TODO P14–P19 (CANONICAL SOURCES)
+- [POWERFACTORY_COMPLIANCE.md](../POWERFACTORY_COMPLIANCE.md) — checklisty P14–P19 (CANONICAL SOURCES)
+- [AGENTS.md](../AGENTS.md) — reguły + TODO P14–P19 (CANONICAL SOURCES)
+- [docs/proof_engine/README.md](./proof_engine/README.md) — reguły Proof Engine + TODO P14–P19 (CANONICAL SOURCES)
+- [docs/proof_engine/P11_OVERVIEW.md](./proof_engine/P11_OVERVIEW.md) — TODO P14–P19 (CANONICAL SOURCES)
+- [docs/proof_engine/P11_1a_MVP_SC3F_AND_VDROP.md](./proof_engine/P11_1a_MVP_SC3F_AND_VDROP.md) — TODO P14–P19 (CANONICAL SOURCES)
+- [docs/proof_engine/P11_1b_REGULATION_Q_U.md](./proof_engine/P11_1b_REGULATION_Q_U.md) — TODO P14–P19 (CANONICAL SOURCES)
+- [docs/proof_engine/P11_1c_SC_ASYMMETRICAL.md](./proof_engine/P11_1c_SC_ASYMMETRICAL.md) — TODO P14–P19 (CANONICAL SOURCES)
+- [docs/proof_engine/P11_1d_PROOF_UI_EXPORT.md](./proof_engine/P11_1d_PROOF_UI_EXPORT.md) — TODO P14–P19 (CANONICAL SOURCES)
+- [docs/proof_engine/PROOF_SCHEMAS.md](./proof_engine/PROOF_SCHEMAS.md) — TODO P14–P19 (CANONICAL SOURCES)
 
 ## Audit Reports
 - [docs/audit/spec_vs_code_gap_report.md](./audit/spec_vs_code_gap_report.md)
@@ -76,7 +76,7 @@
 ## Historical (Non-Canonical)
 - [docs/audit/historical_execplans/](./audit/historical_execplans/) — legacy ExecPlans
 
-## TODO — Proof Packs P14–P17 (FUTURE PACKS)
+## TODO — Proof Packs P14–P19 (FUTURE PACKS)
 
 ### TODO-P14-001 (PLANNED) — P14: Power Flow Proof Pack (audit wyników PF) [FUTURE PACK]
 - Priority: MUST
