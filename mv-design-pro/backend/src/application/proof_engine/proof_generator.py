@@ -13,7 +13,7 @@ Generuje ProofDocument na podstawie:
 from __future__ import annotations
 
 import math
-from dataclasses import dataclass
+from dataclasses import dataclass, fields, is_dataclass
 from datetime import datetime
 from typing import Any
 from uuid import UUID, uuid4
@@ -53,12 +53,17 @@ from application.proof_engine.equation_registry import (
     EQ_LC_004,
     EQ_LC_005,
     EQ_LC_006,
+    EQ_LE_001,
+    EQ_LE_002,
+    EQ_LE_003,
+    EQ_LE_004,
 )
 from application.proof_engine.types import (
     EquationDefinition,
     LoadCurrentsCounterfactualInput,
     LoadCurrentsInput,
     LoadElementKind,
+    LossesEnergyInput,
     ProofDocument,
     ProofHeader,
     ProofStep,
@@ -1995,6 +2000,314 @@ class ProofGenerator:
                 "U_meas": "u_meas_kv",
                 "U_ref": "u_ref_kv",
                 "ΔU": "delta_u_kv",
+            },
+        )
+
+    # =========================================================================
+    # P17: Losses Energy Profile
+    # =========================================================================
+
+    @classmethod
+    def generate_losses_energy_proof(
+        cls,
+        data: LossesEnergyInput,
+        artifact_id: UUID | None = None,
+    ) -> ProofDocument:
+        """
+        Generuje dowód P17: Energia strat (profil czasowy).
+
+        Tryby:
+        - A) Profil dyskretny (points)
+        - B) Wariant stały (p_loss_const_kw + duration_h)
+        """
+        if artifact_id is None:
+            artifact_id = uuid4()
+
+        cls._validate_losses_energy_input(data)
+
+        steps: list[ProofStep] = []
+        step_number = 0
+
+        if data.points:
+            sorted_points = sorted(data.points, key=lambda p: p.t_h)
+            if len(sorted_points) < 2:
+                raise ValueError("Profil strat wymaga co najmniej 2 punktów.")
+
+            for idx in range(1, len(sorted_points)):
+                t_prev = sorted_points[idx - 1].t_h
+                t_curr = sorted_points[idx].t_h
+                if t_curr <= t_prev:
+                    raise ValueError("Czasy t_h muszą być ściśle rosnące bez duplikatów.")
+
+                delta_t = t_curr - t_prev
+                p_loss = sorted_points[idx].p_loss_kw
+                e_i = p_loss * delta_t
+
+                step_number += 1
+                steps.append(
+                    cls._create_le_step_delta_t(
+                        step_number=step_number,
+                        t_prev=t_prev,
+                        t_curr=t_curr,
+                        delta_t=delta_t,
+                    )
+                )
+
+                step_number += 1
+                steps.append(
+                    cls._create_le_step_energy(
+                        step_number=step_number,
+                        p_loss=p_loss,
+                        delta_t=delta_t,
+                        e_i=e_i,
+                    )
+                )
+
+            e_loss = sum(step.result.value for step in steps if step.equation.equation_id == "EQ_LE_002")
+            step_number += 1
+            steps.append(
+                cls._create_le_step_sum(
+                    step_number=step_number,
+                    e_values=[
+                        step.result.value
+                        for step in steps
+                        if step.equation.equation_id == "EQ_LE_002"
+                    ],
+                    e_loss=e_loss,
+                )
+            )
+        else:
+            if data.p_loss_const_kw is None or data.duration_h is None:
+                raise ValueError("Brak danych profilu: podaj points lub wariant stały.")
+
+            e_loss = data.p_loss_const_kw * data.duration_h
+            step_number += 1
+            steps.append(
+                cls._create_le_step_constant(
+                    step_number=step_number,
+                    p_loss=data.p_loss_const_kw,
+                    duration_h=data.duration_h,
+                    e_loss=e_loss,
+                )
+            )
+
+        unit_checks_passed = all(step.unit_check.passed for step in steps)
+
+        key_results = {
+            "e_loss_kwh": ProofValue.create("E_{loss}", e_loss, "kWh", "e_loss_kwh"),
+        }
+
+        summary = ProofSummary(
+            key_results=key_results,
+            unit_check_passed=unit_checks_passed,
+            total_steps=len(steps),
+            warnings=(),
+        )
+
+        header = ProofHeader(
+            project_name=data.project_name,
+            case_name=data.case_name,
+            run_timestamp=data.run_timestamp,
+            solver_version=data.solver_version,
+        )
+
+        return ProofDocument.create(
+            artifact_id=artifact_id,
+            proof_type=ProofType.LOSSES_ENERGY,
+            title_pl="Energia strat (profil czasowy)",
+            header=header,
+            steps=steps,
+            summary=summary,
+        )
+
+    @classmethod
+    def _validate_losses_energy_input(cls, data: LossesEnergyInput) -> None:
+        cls._ensure_mapping_keys(data)
+
+    @classmethod
+    def _ensure_mapping_keys(cls, obj: Any, path: str = "") -> None:
+        if not is_dataclass(obj):
+            return
+        for f in fields(obj):
+            mapping_key = f.metadata.get("mapping_key")
+            if not mapping_key:
+                raise ValueError(f"Brak mapping_key dla pola {path}{f.name}.")
+            value = getattr(obj, f.name)
+            if value is None:
+                continue
+            if isinstance(value, list):
+                for idx, item in enumerate(value):
+                    cls._ensure_mapping_keys(item, f"{path}{f.name}[{idx}].")
+            elif is_dataclass(value):
+                cls._ensure_mapping_keys(value, f"{path}{f.name}.")
+
+    @classmethod
+    def _create_le_step_delta_t(
+        cls,
+        step_number: int,
+        t_prev: float,
+        t_curr: float,
+        delta_t: float,
+    ) -> ProofStep:
+        equation = EQ_LE_001
+
+        input_values = (
+            ProofValue.create("t_i", t_curr, "h", "t_h"),
+            ProofValue.create("t_{i-1}", t_prev, "h", "t_h"),
+        )
+
+        substitution = (
+            f"\\Delta t_i = {t_curr:.4f} - {t_prev:.4f} = {delta_t:.4f}\\,\\text{{h}}"
+        )
+
+        result = ProofValue.create("\\Delta t_i", delta_t, "h", "delta_t_h")
+
+        unit_check = UnitVerifier.verify_step(
+            equation_id=equation.equation_id,
+            inputs=[("t_i", "h"), ("t_{i-1}", "h")],
+            result_unit="h",
+        )
+
+        return ProofStep(
+            step_id=ProofStep.generate_step_id("LE", step_number),
+            step_number=step_number,
+            title_pl=equation.name_pl,
+            equation=equation,
+            input_values=input_values,
+            substitution_latex=substitution,
+            result=result,
+            unit_check=unit_check,
+            source_keys={
+                "t_i": "t_h",
+                "t_{i-1}": "t_h",
+                "Δt_i": "delta_t_h",
+            },
+        )
+
+    @classmethod
+    def _create_le_step_energy(
+        cls,
+        step_number: int,
+        p_loss: float,
+        delta_t: float,
+        e_i: float,
+    ) -> ProofStep:
+        equation = EQ_LE_002
+
+        input_values = (
+            ProofValue.create("P_{loss,i}", p_loss, "kW", "p_loss_kw"),
+            ProofValue.create("\\Delta t_i", delta_t, "h", "delta_t_h"),
+        )
+
+        substitution = (
+            f"E_i = {p_loss:.4f}\\cdot {delta_t:.4f} = {e_i:.4f}\\,\\text{{kWh}}"
+        )
+
+        result = ProofValue.create("E_i", e_i, "kWh", "e_i_kwh")
+
+        unit_check = UnitVerifier.verify_step(
+            equation_id=equation.equation_id,
+            inputs=[("P_{loss,i}", "kW"), ("Δt_i", "h")],
+            result_unit="kWh",
+        )
+
+        return ProofStep(
+            step_id=ProofStep.generate_step_id("LE", step_number),
+            step_number=step_number,
+            title_pl=equation.name_pl,
+            equation=equation,
+            input_values=input_values,
+            substitution_latex=substitution,
+            result=result,
+            unit_check=unit_check,
+            source_keys={
+                "P_{loss,i}": "p_loss_kw",
+                "Δt_i": "delta_t_h",
+                "E_i": "e_i_kwh",
+            },
+        )
+
+    @classmethod
+    def _create_le_step_sum(
+        cls,
+        step_number: int,
+        e_values: list[float],
+        e_loss: float,
+    ) -> ProofStep:
+        equation = EQ_LE_003
+
+        input_values = tuple(
+            ProofValue.create("E_i", value, "kWh", "e_i_kwh") for value in e_values
+        )
+
+        sum_terms = " + ".join(f"{value:.4f}" for value in e_values)
+        substitution = (
+            f"E_{{loss}} = \\sum_i E_i = {sum_terms} = {e_loss:.4f}\\,\\text{{kWh}}"
+        )
+
+        result = ProofValue.create("E_{loss}", e_loss, "kWh", "e_loss_kwh")
+
+        unit_check = UnitVerifier.verify_step(
+            equation_id=equation.equation_id,
+            inputs=[("E_i", "kWh")],
+            result_unit="kWh",
+        )
+
+        return ProofStep(
+            step_id=ProofStep.generate_step_id("LE", step_number),
+            step_number=step_number,
+            title_pl=equation.name_pl,
+            equation=equation,
+            input_values=input_values,
+            substitution_latex=substitution,
+            result=result,
+            unit_check=unit_check,
+            source_keys={
+                "E_i": "e_i_kwh",
+                "E_{loss}": "e_loss_kwh",
+            },
+        )
+
+    @classmethod
+    def _create_le_step_constant(
+        cls,
+        step_number: int,
+        p_loss: float,
+        duration_h: float,
+        e_loss: float,
+    ) -> ProofStep:
+        equation = EQ_LE_004
+
+        input_values = (
+            ProofValue.create("P_{loss}", p_loss, "kW", "p_loss_kw"),
+            ProofValue.create("t", duration_h, "h", "t_h"),
+        )
+
+        substitution = (
+            f"E_{{loss}} = {p_loss:.4f}\\cdot {duration_h:.4f} = {e_loss:.4f}\\,\\text{{kWh}}"
+        )
+
+        result = ProofValue.create("E_{loss}", e_loss, "kWh", "e_loss_kwh")
+
+        unit_check = UnitVerifier.verify_step(
+            equation_id=equation.equation_id,
+            inputs=[("P_{loss}", "kW"), ("t", "h")],
+            result_unit="kWh",
+        )
+
+        return ProofStep(
+            step_id=ProofStep.generate_step_id("LE", step_number),
+            step_number=step_number,
+            title_pl=equation.name_pl,
+            equation=equation,
+            input_values=input_values,
+            substitution_latex=substitution,
+            result=result,
+            unit_check=unit_check,
+            source_keys={
+                "P_{loss}": "p_loss_kw",
+                "t": "t_h",
+                "E_{loss}": "e_loss_kwh",
             },
         )
 

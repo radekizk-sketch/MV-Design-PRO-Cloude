@@ -28,6 +28,7 @@ class ProofType(str, Enum):
     Q_U_REGULATION = "Q_U_REGULATION"
     EQUIPMENT_PROOF = "EQUIPMENT_PROOF"
     LOAD_CURRENTS_OVERLOAD = "LOAD_CURRENTS_OVERLOAD"
+    LOSSES_ENERGY = "LOSSES_ENERGY"
 
 
 class LoadElementKind(str, Enum):
@@ -36,6 +37,15 @@ class LoadElementKind(str, Enum):
     LINE = "LINE"
     CABLE = "CABLE"
     TRANSFORMER = "TRANSFORMER"
+
+
+class LossesEnergyTargetKind(str, Enum):
+    """Rodzaj elementu dla P17: LINE, CABLE, TRANSFORMER, AGGREGATE."""
+
+    LINE = "LINE"
+    CABLE = "CABLE"
+    TRANSFORMER = "TRANSFORMER"
+    AGGREGATE = "AGGREGATE"
 
 
 # =============================================================================
@@ -616,3 +626,50 @@ class LoadCurrentsCounterfactualInput:
 
     a: LoadCurrentsInput
     b: LoadCurrentsInput
+
+
+# =============================================================================
+# Losses Energy Profile Input Types — P17
+# =============================================================================
+
+
+@dataclass
+class EnergyProfilePoint:
+    """
+    Punkt profilu energii strat.
+
+    Attributes:
+        t_h: Czas w godzinach od startu (mapping_key: t_h)
+        p_loss_kw: Moc strat w kW (mapping_key: p_loss_kw)
+    """
+
+    t_h: float = field(metadata={"mapping_key": "t_h"})
+    p_loss_kw: float = field(metadata={"mapping_key": "p_loss_kw"})
+
+
+@dataclass
+class LossesEnergyInput:
+    """
+    Dane wejściowe dla dowodu P17: Energia strat (profil czasowy).
+
+    Attributes:
+        project_name: Nazwa projektu (mapping_key: project_name)
+        case_name: Nazwa przypadku obliczeniowego (mapping_key: case_name)
+        run_timestamp: Czas uruchomienia (mapping_key: run_timestamp)
+        solver_version: Wersja solvera (mapping_key: solver_version)
+        target_kind: LINE | CABLE | TRANSFORMER | AGGREGATE (mapping_key: target_kind)
+        target_id: Identyfikator elementu (mapping_key: target_id)
+        points: Punkty profilu (mapping_key: points)
+        p_loss_const_kw: Moc strat stała (mapping_key: p_loss_kw)
+        duration_h: Czas trwania (mapping_key: t_h)
+    """
+
+    project_name: str = field(metadata={"mapping_key": "project_name"})
+    case_name: str = field(metadata={"mapping_key": "case_name"})
+    run_timestamp: datetime = field(metadata={"mapping_key": "run_timestamp"})
+    solver_version: str = field(metadata={"mapping_key": "solver_version"})
+    target_kind: LossesEnergyTargetKind = field(metadata={"mapping_key": "target_kind"})
+    target_id: str = field(metadata={"mapping_key": "target_id"})
+    points: list[EnergyProfilePoint] = field(default_factory=list, metadata={"mapping_key": "points"})
+    p_loss_const_kw: float | None = field(default=None, metadata={"mapping_key": "p_loss_kw"})
+    duration_h: float | None = field(default=None, metadata={"mapping_key": "t_h"})

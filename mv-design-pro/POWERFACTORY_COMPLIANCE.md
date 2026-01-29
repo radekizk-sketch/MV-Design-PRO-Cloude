@@ -973,16 +973,16 @@ grep -r "frozen=True" backend/src/network_model/solvers/
 
 **END OF COMPLIANCE CHECKLIST**
 
-## 7. Proof Packs Compliance (P14–P17) — FUTURE PACKS
+## 7. Proof Packs Compliance (P14–P19) — FUTURE PACKS
 
 ### 7.1 Checklist
 
 - [ ] TODO-P14-001 — P14: Power Flow Proof Pack (audit wyników PF)
 - [ ] TODO-P15-001 — P15: Load Currents & Overload Proof Pack
 - [ ] TODO-P16-001 — P16: Losses & Energy Proof Pack
-- [ ] TODO-P17-001 — P17: Earthing / Ground Fault Proof Pack (SN)
+- [ ] TODO-P19-001 — P19: Earthing / Ground Fault Proof Pack (SN)
 
-## TODO — Proof Packs P14–P17 (FUTURE PACKS)
+## TODO — Proof Packs P14–P19 (FUTURE PACKS)
 
 ### TODO-P14-001 (PLANNED) — P14: Power Flow Proof Pack (audit wyników PF) [FUTURE PACK]
 - Priority: MUST
@@ -1054,10 +1054,10 @@ grep -r "frozen=True" backend/src/network_model/solvers/
     E_{loss} = \int P_{loss} \, dt
     $$
 
-### TODO-P17-001 (PLANNED) — P17: Earthing / Ground Fault Proof Pack (SN) [FUTURE PACK]
+### TODO-P19-001 (PLANNED) — P19: Earthing / Ground Fault Proof Pack (SN) [FUTURE PACK]
 - Priority: MUST
 - Inputs: TraceArtifact, Catalog
-- Output: ProofPack P17 (ProofDocument: Doziemienia / uziemienia SN)
+- Output: ProofPack P19 (ProofDocument: Doziemienia / uziemienia SN)
 - DoD:
   - [ ] Jeśli SN: prądy doziemne z uwzględnieniem impedancji uziemienia i rozdziału prądu.
   - [ ] Tryb uproszczonych napięć dotykowych z wyraźnymi zastrzeżeniami.

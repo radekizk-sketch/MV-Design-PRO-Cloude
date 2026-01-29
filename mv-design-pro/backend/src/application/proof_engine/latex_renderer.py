@@ -77,6 +77,7 @@ class LaTeXRenderer:
             r"\tableofcontents",
             r"\newpage",
             cls._render_header(doc),
+            cls._render_losses_energy_section(doc),
             cls._render_steps(doc),
             cls._render_summary(doc),
             r"\end{document}",
@@ -242,6 +243,66 @@ class LaTeXRenderer:
             for warning in doc.summary.warnings:
                 lines.append(rf"  \item {cls._escape(warning)}")
             lines.append(r"\end{itemize}")
+
+        return "\n".join(lines)
+
+    @classmethod
+    def _render_losses_energy_section(cls, doc: ProofDocument) -> str:
+        """Renderuje sekcję profilu energii strat dla P17."""
+        from application.proof_engine.types import ProofType
+
+        if doc.proof_type != ProofType.LOSSES_ENERGY:
+            return ""
+
+        rows: list[tuple[float, float, float, float]] = []
+        current_t_i: float | None = None
+        current_delta_t: float | None = None
+
+        for step in sorted(doc.steps, key=lambda s: s.step_number):
+            eq_id = step.equation.equation_id
+            if eq_id == "EQ_LE_001":
+                values = {val.symbol: val.value for val in step.input_values}
+                current_t_i = float(values.get("t_i", 0.0))
+                current_delta_t = float(step.result.value)
+            elif eq_id == "EQ_LE_002":
+                values = {val.symbol: val.value for val in step.input_values}
+                p_loss = float(values.get("P_{loss,i}", 0.0))
+                delta_t = float(values.get("\\Delta t_i", current_delta_t or 0.0))
+                e_i = float(step.result.value)
+                t_i = float(current_t_i or 0.0)
+                rows.append((t_i, p_loss, delta_t, e_i))
+            elif eq_id == "EQ_LE_004":
+                values = {val.symbol: val.value for val in step.input_values}
+                p_loss = float(values.get("P_{loss}", 0.0))
+                duration_h = float(values.get("t", 0.0))
+                e_i = float(step.result.value)
+                rows.append((duration_h, p_loss, duration_h, e_i))
+
+        lines = [
+            r"\section{Energia strat}",
+            "",
+            r"\textbf{Profil czasowy:}",
+            "",
+            r"\begin{center}",
+            r"\begin{tabular}{cccc}",
+            r"\toprule",
+            r"$$t_i$$ & $$P_{loss,i}$$ & $$\Delta t_i$$ & $$E_i$$ \\",
+            r"\midrule",
+        ]
+
+        for t_i, p_loss, delta_t, e_i in rows:
+            lines.append(
+                rf"$$ {t_i:.4f}\,\text{{h}} $$ & "
+                rf"$$ {p_loss:.4f}\,\text{{kW}} $$ & "
+                rf"$$ {delta_t:.4f}\,\text{{h}} $$ & "
+                rf"$$ {e_i:.4f}\,\text{{kWh}} $$ \\"
+            )
+
+        lines.extend([
+            r"\bottomrule",
+            r"\end{tabular}",
+            r"\end{center}",
+        ])
 
         return "\n".join(lines)
 

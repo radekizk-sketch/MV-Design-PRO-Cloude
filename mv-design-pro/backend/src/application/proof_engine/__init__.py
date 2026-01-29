@@ -1,5 +1,5 @@
 """
-Proof Engine P11.1a — Mathematical Proof Engine (MVP)
+Proof Engine — Mathematical Proof Engine (P11–P19)
 
 Kanoniczny silnik dowodowy kompilujący pełne dowody matematyczne
 na podstawie ShortCircuitResult i white_box_trace.
@@ -17,9 +17,12 @@ Moduły:
 
 from application.proof_engine.types import (
     EquationDefinition,
+    EnergyProfilePoint,
     LoadCurrentsCounterfactualInput,
     LoadCurrentsInput,
     LoadElementKind,
+    LossesEnergyInput,
+    LossesEnergyTargetKind,
     ProofDocument,
     ProofHeader,
     ProofStep,
@@ -66,9 +69,12 @@ from application.proof_engine.proof_inspector import (
 __all__ = [
     # Types
     "EquationDefinition",
+    "EnergyProfilePoint",
     "LoadCurrentsCounterfactualInput",
     "LoadCurrentsInput",
     "LoadElementKind",
+    "LossesEnergyInput",
+    "LossesEnergyTargetKind",
     "ProofDocument",
     "ProofHeader",
     "ProofStep",

@@ -50,24 +50,25 @@
 - [docs/proof_engine/P11_1d_PROOF_UI_EXPORT.md](./proof_engine/P11_1d_PROOF_UI_EXPORT.md) — **Proof Inspector (CANONICAL): read-only viewer, eksport JSON/LaTeX/PDF/DOCX**
 - [docs/proof_engine/P14_PROOF_AUDIT_AND_COVERAGE.md](./proof_engine/P14_PROOF_AUDIT_AND_COVERAGE.md) — **P14: Proof Audit & Coverage (CANONICAL, META)**
 - [docs/proof_engine/P15_LOAD_CURRENTS_OVERLOAD.md](./proof_engine/P15_LOAD_CURRENTS_OVERLOAD.md) — **P15: Prądy robocze i przeciążenia (CANONICAL)**
+- [docs/proof_engine/P17_LOSSES_ENERGY_PROFILE.md](./proof_engine/P17_LOSSES_ENERGY_PROFILE.md) — **P17: Energia strat (profil czasowy) (CANONICAL)**
 - [docs/proof_engine/P11_SC_CASE_MAPPING.md](./proof_engine/P11_SC_CASE_MAPPING.md) — **Mapowanie Case zwarciowych (MAX/MIN/N-1) na ProofDocument: trace_id, snapshot, anti-double-counting (CANONICAL)**
 - [docs/proof_engine/PROOF_SCHEMAS.md](./proof_engine/PROOF_SCHEMAS.md) — Schematy JSON (BINDING)
 - [docs/proof_engine/EQUATIONS_IEC60909_SC3F.md](./proof_engine/EQUATIONS_IEC60909_SC3F.md) — Rejestr równań SC3F (BINDING)
 - [docs/proof_engine/EQUATIONS_VDROP.md](./proof_engine/EQUATIONS_VDROP.md) — Rejestr równań VDROP (BINDING)
 
-## Proof Packs P14–P17 (FUTURE) — Canonical Sources (doc-only)
-- [PLANS.md](../PLANS.md) — TODO backlog P14–P17 (CANONICAL SOURCES)
-- [SYSTEM_SPEC.md](../SYSTEM_SPEC.md) — sekcje TODO P14–P17 (CANONICAL SOURCES)
-- [ARCHITECTURE.md](../ARCHITECTURE.md) — sekcje TODO P14–P17 (CANONICAL SOURCES)
-- [POWERFACTORY_COMPLIANCE.md](../POWERFACTORY_COMPLIANCE.md) — checklisty P14–P17 (CANONICAL SOURCES)
-- [AGENTS.md](../AGENTS.md) — reguły + TODO P14–P17 (CANONICAL SOURCES)
-- [docs/proof_engine/README.md](./proof_engine/README.md) — reguły Proof Engine + TODO P14–P17 (CANONICAL SOURCES)
-- [docs/proof_engine/P11_OVERVIEW.md](./proof_engine/P11_OVERVIEW.md) — TODO P14–P17 (CANONICAL SOURCES)
-- [docs/proof_engine/P11_1a_MVP_SC3F_AND_VDROP.md](./proof_engine/P11_1a_MVP_SC3F_AND_VDROP.md) — TODO P14–P17 (CANONICAL SOURCES)
-- [docs/proof_engine/P11_1b_REGULATION_Q_U.md](./proof_engine/P11_1b_REGULATION_Q_U.md) — TODO P14–P17 (CANONICAL SOURCES)
-- [docs/proof_engine/P11_1c_SC_ASYMMETRICAL.md](./proof_engine/P11_1c_SC_ASYMMETRICAL.md) — TODO P14–P17 (CANONICAL SOURCES)
-- [docs/proof_engine/P11_1d_PROOF_UI_EXPORT.md](./proof_engine/P11_1d_PROOF_UI_EXPORT.md) — TODO P14–P17 (CANONICAL SOURCES)
-- [docs/proof_engine/PROOF_SCHEMAS.md](./proof_engine/PROOF_SCHEMAS.md) — TODO P14–P17 (CANONICAL SOURCES)
+## Proof Packs P14–P19 (FUTURE) — Canonical Sources (doc-only)
+- [PLANS.md](../PLANS.md) — TODO backlog P14–P19 (CANONICAL SOURCES)
+- [SYSTEM_SPEC.md](../SYSTEM_SPEC.md) — sekcje TODO P14–P19 (CANONICAL SOURCES)
+- [ARCHITECTURE.md](../ARCHITECTURE.md) — sekcje TODO P14–P19 (CANONICAL SOURCES)
+- [POWERFACTORY_COMPLIANCE.md](../POWERFACTORY_COMPLIANCE.md) — checklisty P14–P19 (CANONICAL SOURCES)
+- [AGENTS.md](../AGENTS.md) — reguły + TODO P14–P19 (CANONICAL SOURCES)
+- [docs/proof_engine/README.md](./proof_engine/README.md) — reguły Proof Engine + TODO P14–P19 (CANONICAL SOURCES)
+- [docs/proof_engine/P11_OVERVIEW.md](./proof_engine/P11_OVERVIEW.md) — TODO P14–P19 (CANONICAL SOURCES)
+- [docs/proof_engine/P11_1a_MVP_SC3F_AND_VDROP.md](./proof_engine/P11_1a_MVP_SC3F_AND_VDROP.md) — TODO P14–P19 (CANONICAL SOURCES)
+- [docs/proof_engine/P11_1b_REGULATION_Q_U.md](./proof_engine/P11_1b_REGULATION_Q_U.md) — TODO P14–P19 (CANONICAL SOURCES)
+- [docs/proof_engine/P11_1c_SC_ASYMMETRICAL.md](./proof_engine/P11_1c_SC_ASYMMETRICAL.md) — TODO P14–P19 (CANONICAL SOURCES)
+- [docs/proof_engine/P11_1d_PROOF_UI_EXPORT.md](./proof_engine/P11_1d_PROOF_UI_EXPORT.md) — TODO P14–P19 (CANONICAL SOURCES)
+- [docs/proof_engine/PROOF_SCHEMAS.md](./proof_engine/PROOF_SCHEMAS.md) — TODO P14–P19 (CANONICAL SOURCES)
 
 ## Audit Reports
 - [docs/audit/spec_vs_code_gap_report.md](./audit/spec_vs_code_gap_report.md)
@@ -75,7 +76,7 @@
 ## Historical (Non-Canonical)
 - [docs/audit/historical_execplans/](./audit/historical_execplans/) — legacy ExecPlans
 
-## TODO — Proof Packs P14–P17 (FUTURE PACKS)
+## TODO — Proof Packs P14–P19 (FUTURE PACKS)
 
 ### TODO-P14-001 (PLANNED) — P14: Power Flow Proof Pack (audit wyników PF) [FUTURE PACK]
 - Priority: MUST
@@ -129,11 +130,11 @@
     E_{loss} = \int P_{loss} \, dt
     $$
 
-### TODO-P17-001 (PLANNED) — P17: Earthing / Ground Fault Proof Pack (SN) [FUTURE PACK]
+### P17 — Losses Energy Profile Proof Pack (IMPLEMENTED)
 - Priority: MUST
-- Inputs: TraceArtifact, Catalog
-- Output: ProofPack P17 (ProofDocument: Doziemienia / uziemienia SN)
-- DoD:
-  - [ ] Jeśli SN: prądy doziemne z uwzględnieniem impedancji uziemienia i rozdziału prądu.
-  - [ ] Tryb uproszczonych napięć dotykowych z wyraźnymi zastrzeżeniami.
-  - [ ] Terminologia w ProofDocument: 1F-Z, 2F, 2F-Z oraz PCC – punkt wspólnego przyłączenia.
+- Inputs: TraceArtifact, PowerFlowResult, Catalog
+- Output: ProofPack P17 (ProofDocument: Energia strat — profil czasowy)
+- DoD (DONE):
+  - [x] Energia strat z profilu obciążenia w postaci sumy dyskretnej.
+  - [x] Wariant stały dla stałej mocy strat i czasu trwania.
+  - [x] Deterministyczny ProofDocument z pełną weryfikacją jednostek.

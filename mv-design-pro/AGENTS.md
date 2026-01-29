@@ -333,25 +333,25 @@ If any rule conflict is detected:
 
 **END OF AGENT GOVERNANCE**
 
-## 12. Źródła kanoniczne — P14–P17 (doc-only)
+## 12. Źródła kanoniczne — P14–P19 (doc-only)
 
-Poniższe dokumenty zawierają **CANONICAL SOURCES** dla pakietów P14–P17
+Poniższe dokumenty zawierają **CANONICAL SOURCES** dla pakietów P14–P19
 (doc-only, FUTURE PACKS):
 
-- `PLANS.md` — TODO backlog P14–P17 (CANONICAL SOURCES)
-- `SYSTEM_SPEC.md` — sekcje TODO P14–P17 (CANONICAL SOURCES)
-- `ARCHITECTURE.md` — sekcje TODO P14–P17 (CANONICAL SOURCES)
-- `POWERFACTORY_COMPLIANCE.md` — checklisty P14–P17 (CANONICAL SOURCES)
-- `docs/INDEX.md` — indeks źródeł P14–P17 (CANONICAL SOURCES)
-- `docs/proof_engine/README.md` — reguły Proof Engine + TODO P14–P17 (CANONICAL SOURCES)
-- `docs/proof_engine/P11_OVERVIEW.md` — TODO P14–P17 (CANONICAL SOURCES)
-- `docs/proof_engine/P11_1a_MVP_SC3F_AND_VDROP.md` — TODO P14–P17 (CANONICAL SOURCES)
-- `docs/proof_engine/P11_1b_REGULATION_Q_U.md` — TODO P14–P17 (CANONICAL SOURCES)
-- `docs/proof_engine/P11_1c_SC_ASYMMETRICAL.md` — TODO P14–P17 (CANONICAL SOURCES)
-- `docs/proof_engine/P11_1d_PROOF_UI_EXPORT.md` — TODO P14–P17 (CANONICAL SOURCES)
-- `docs/proof_engine/PROOF_SCHEMAS.md` — TODO P14–P17 (CANONICAL SOURCES)
+- `PLANS.md` — TODO backlog P14–P19 (CANONICAL SOURCES)
+- `SYSTEM_SPEC.md` — sekcje TODO P14–P19 (CANONICAL SOURCES)
+- `ARCHITECTURE.md` — sekcje TODO P14–P19 (CANONICAL SOURCES)
+- `POWERFACTORY_COMPLIANCE.md` — checklisty P14–P19 (CANONICAL SOURCES)
+- `docs/INDEX.md` — indeks źródeł P14–P19 (CANONICAL SOURCES)
+- `docs/proof_engine/README.md` — reguły Proof Engine + TODO P14–P19 (CANONICAL SOURCES)
+- `docs/proof_engine/P11_OVERVIEW.md` — TODO P14–P19 (CANONICAL SOURCES)
+- `docs/proof_engine/P11_1a_MVP_SC3F_AND_VDROP.md` — TODO P14–P19 (CANONICAL SOURCES)
+- `docs/proof_engine/P11_1b_REGULATION_Q_U.md` — TODO P14–P19 (CANONICAL SOURCES)
+- `docs/proof_engine/P11_1c_SC_ASYMMETRICAL.md` — TODO P14–P19 (CANONICAL SOURCES)
+- `docs/proof_engine/P11_1d_PROOF_UI_EXPORT.md` — TODO P14–P19 (CANONICAL SOURCES)
+- `docs/proof_engine/PROOF_SCHEMAS.md` — TODO P14–P19 (CANONICAL SOURCES)
 
-## TODO — Proof Packs P14–P17 (FUTURE PACKS)
+## TODO — Proof Packs P14–P19 (FUTURE PACKS)
 
 ### TODO-P14-001 (PLANNED) — P14: Power Flow Proof Pack (audit wyników PF) [FUTURE PACK]
 - Priority: MUST
@@ -423,10 +423,10 @@ Poniższe dokumenty zawierają **CANONICAL SOURCES** dla pakietów P14–P17
     E_{loss} = \int P_{loss} \, dt
     $$
 
-### TODO-P17-001 (PLANNED) — P17: Earthing / Ground Fault Proof Pack (SN) [FUTURE PACK]
+### TODO-P19-001 (PLANNED) — P19: Earthing / Ground Fault Proof Pack (SN) [FUTURE PACK]
 - Priority: MUST
 - Inputs: TraceArtifact, Catalog
-- Output: ProofPack P17 (ProofDocument: Doziemienia / uziemienia SN)
+- Output: ProofPack P19 (ProofDocument: Doziemienia / uziemienia SN)
 - DoD:
   - [ ] Jeśli SN: prądy doziemne z uwzględnieniem impedancji uziemienia i rozdziału prądu.
   - [ ] Tryb uproszczonych napięć dotykowych z wyraźnymi zastrzeżeniami.

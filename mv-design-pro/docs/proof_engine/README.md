@@ -24,6 +24,7 @@ Ten pakiet zawiera **kanoniczne źródła wiedzy** dla systemu dowodów matematy
 | `P11_1d_PROOF_UI_EXPORT.md` | Proof Inspector UI, eksport LaTeX/PDF/DOCX | REFERENCE |
 | `P14_PROOF_AUDIT_AND_COVERAGE.md` | Warstwa audytu pokrycia i kompletności Proof Packów | **BINDING** |
 | `P15_LOAD_CURRENTS_OVERLOAD.md` | P15: Prądy robocze i przeciążenia | **BINDING** |
+| `P17_LOSSES_ENERGY_PROFILE.md` | P17: Energia strat (profil czasowy) | **BINDING** |
 | `PROOF_SCHEMAS.md` | Kanoniczne schematy JSON (ProofDocument, ProofStep) | **BINDING** |
 | `EQUATIONS_IEC60909_SC3F.md` | Rejestr równań SC3F z mapping keys | **BINDING** |
 | `EQUATIONS_VDROP.md` | Rejestr równań VDROP z mapping keys | **BINDING** |
@@ -120,12 +121,12 @@ $$
 
 ---
 
-## TODO — Proof Packs P14–P17 (FUTURE PACKS)
+## TODO — Proof Packs P14–P19 (FUTURE PACKS)
 
 ### P14 — Proof Audit & Coverage (DOC ONLY, META)
 
 P14 definiuje **kanoniczną warstwę audytu** kompletności i pokrycia Proof Packów
-oraz stanowi **prerequisite** dla P15–P17.
+oraz stanowi **prerequisite** dla P15–P19.
 
 ### TODO-P14-001 (PLANNED) — P14: Power Flow Proof Pack (audit wyników PF) [FUTURE PACK]
 - Priority: MUST
@@ -179,13 +180,13 @@ oraz stanowi **prerequisite** dla P15–P17.
     E_{loss} = \int P_{loss} \, dt
     $$
 
-### TODO-P17-001 (PLANNED) — P17: Earthing / Ground Fault Proof Pack (SN) [FUTURE PACK]
+### P17 — Losses Energy Profile Proof Pack (IMPLEMENTED)
 - Priority: MUST
-- Inputs: TraceArtifact, Catalog
-- Output: ProofPack P17 (ProofDocument: Doziemienia / uziemienia SN)
-- DoD:
-  - [ ] Jeśli SN: prądy doziemne z uwzględnieniem impedancji uziemienia i rozdziału prądu.
-  - [ ] Tryb uproszczonych napięć dotykowych z wyraźnymi zastrzeżeniami.
-  - [ ] Terminologia w ProofDocument: 1F-Z, 2F, 2F-Z oraz PCC – punkt wspólnego przyłączenia.
+- Inputs: TraceArtifact, PowerFlowResult, Catalog
+- Output: ProofPack P17 (ProofDocument: Energia strat — profil czasowy)
+- DoD (DONE):
+  - [x] Energia strat z profilu obciążenia w postaci sumy dyskretnej.
+  - [x] Wariant stały dla stałej mocy strat i czasu trwania.
+  - [x] Deterministyczny ProofDocument z pełną weryfikacją jednostek.
 
 **END OF README**
