@@ -197,9 +197,9 @@ class CatalogGovernanceService:
                         # Skip existing (no overwrites in MERGE mode)
                         report.skipped.append(type_id)
                     else:
-                        # Add new type (stub - need persistence method)
+                        # Add new type
+                        uow.wizard.upsert_line_type(type_data, commit=False)
                         report.added.append(type_id)
-                        # TODO: uow.wizard.add_line_type(type_data)
 
                 # Process cable types
                 for type_data in export.cable_types:
@@ -207,8 +207,8 @@ class CatalogGovernanceService:
                     if type_id in existing_cable_types:
                         report.skipped.append(type_id)
                     else:
+                        uow.wizard.upsert_cable_type(type_data, commit=False)
                         report.added.append(type_id)
-                        # TODO: uow.wizard.add_cable_type(type_data)
 
                 # Process transformer types
                 for type_data in export.transformer_types:
@@ -216,8 +216,8 @@ class CatalogGovernanceService:
                     if type_id in existing_transformer_types:
                         report.skipped.append(type_id)
                     else:
+                        uow.wizard.upsert_transformer_type(type_data, commit=False)
                         report.added.append(type_id)
-                        # TODO: uow.wizard.add_transformer_type(type_data)
 
                 # Process switch types
                 for type_data in export.switch_types:
@@ -225,8 +225,8 @@ class CatalogGovernanceService:
                     if type_id in existing_switch_types:
                         report.skipped.append(type_id)
                     else:
+                        uow.wizard.upsert_switch_equipment_type(type_data, commit=False)
                         report.added.append(type_id)
-                        # TODO: uow.wizard.add_switch_equipment_type(type_data)
 
             uow.commit()
 

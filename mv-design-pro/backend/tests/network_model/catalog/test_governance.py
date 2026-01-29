@@ -277,5 +277,208 @@ def test_import_mode_enum():
     assert ImportMode("replace") == ImportMode.REPLACE
 
 
-# Integration tests (require full service + UOW) are skipped for now.
-# These will be added when persistence methods (add_*_type) are implemented.
+### Integration Tests (require database)
+# These tests verify full export/import cycle with persistence
+
+
+@pytest.mark.integration
+def test_export_import_round_trip(test_db_session):
+    """Export → Import → Export should yield same data (deterministic)."""
+    from application.catalog_governance.service import CatalogGovernanceService
+    from infrastructure.persistence.repositories.unit_of_work import UnitOfWorkFactory
+
+    uow_factory = UnitOfWorkFactory(lambda: test_db_session)
+    service = CatalogGovernanceService(uow_factory)
+
+    # Add initial types
+    with uow_factory() as uow:
+        uow.wizard.upsert_line_type(
+            {"id": "line1", "name": "Line A", "params": {"r_ohm_per_km": 0.1}},
+            commit=False,
+        )
+        uow.wizard.upsert_cable_type(
+            {"id": "cable1", "name": "Cable A", "params": {"r_ohm_per_km": 0.2}},
+            commit=False,
+        )
+        uow.commit()
+
+    # Export
+    export1 = service.export_type_library(
+        library_name_pl="Test Library",
+        vendor="Test Vendor",
+        series="Standard",
+        revision="1.0",
+    )
+
+    # Clear catalog
+    with uow_factory() as uow:
+        from infrastructure.persistence.models import LineTypeORM, CableTypeORM
+        test_db_session.query(LineTypeORM).delete()
+        test_db_session.query(CableTypeORM).delete()
+        uow.commit()
+
+    # Import
+    report = service.import_type_library(export1, mode=ImportMode.MERGE)
+
+    assert report["success"] is True
+    assert len(report["added"]) == 2
+    assert len(report["skipped"]) == 0
+    assert len(report["conflicts"]) == 0
+
+    # Export again
+    export2 = service.export_type_library(
+        library_name_pl="Test Library",
+        vendor="Test Vendor",
+        series="Standard",
+        revision="1.0",
+    )
+
+    # Compare (excluding timestamps and fingerprints)
+    assert len(export1["line_types"]) == len(export2["line_types"])
+    assert len(export1["cable_types"]) == len(export2["cable_types"])
+    assert export1["line_types"][0]["id"] == export2["line_types"][0]["id"]
+    assert export1["cable_types"][0]["id"] == export2["cable_types"][0]["id"]
+
+
+@pytest.mark.integration
+def test_import_merge_skips_existing(test_db_session):
+    """MERGE mode skips existing types (no overwrites)."""
+    from application.catalog_governance.service import CatalogGovernanceService
+    from infrastructure.persistence.repositories.unit_of_work import UnitOfWorkFactory
+
+    uow_factory = UnitOfWorkFactory(lambda: test_db_session)
+    service = CatalogGovernanceService(uow_factory)
+
+    # Add initial type
+    with uow_factory() as uow:
+        uow.wizard.upsert_line_type(
+            {"id": "line1", "name": "Original Name", "params": {"r_ohm_per_km": 0.1}},
+            commit=False,
+        )
+        uow.commit()
+
+    # Import with same ID but different name
+    export_data = {
+        "manifest": {
+            "library_id": "lib1",
+            "name_pl": "Test",
+            "vendor": "Vendor",
+            "series": "Series",
+            "revision": "1.0",
+            "schema_version": "1.0",
+            "created_at": "2026-01-01T00:00:00",
+            "fingerprint": "abc",
+        },
+        "line_types": [
+            {"id": "line1", "name": "Modified Name", "params": {"r_ohm_per_km": 0.2}},
+            {"id": "line2", "name": "New Type", "params": {"r_ohm_per_km": 0.3}},
+        ],
+        "cable_types": [],
+        "transformer_types": [],
+        "switch_types": [],
+    }
+
+    report = service.import_type_library(export_data, mode=ImportMode.MERGE)
+
+    assert report["success"] is True
+    assert "line1" in report["skipped"]  # Existing type skipped
+    assert "line2" in report["added"]    # New type added
+
+    # Verify original name preserved (not modified)
+    with uow_factory() as uow:
+        types = uow.wizard.list_line_types()
+        line1 = next(t for t in types if t["id"] == "line1")
+        assert line1["name"] == "Original Name"  # Not modified
+
+
+@pytest.mark.integration
+def test_import_replace_blocked_when_types_in_use(test_db_session):
+    """REPLACE mode blocked when types are referenced by instances."""
+    from application.catalog_governance.service import CatalogGovernanceService
+    from infrastructure.persistence.repositories.unit_of_work import UnitOfWorkFactory
+    from infrastructure.persistence.models import ProjectORM
+    from uuid import uuid4
+
+    uow_factory = UnitOfWorkFactory(lambda: test_db_session)
+    service = CatalogGovernanceService(uow_factory)
+
+    type_id = str(uuid4())
+    project_id = uuid4()
+
+    # Add type
+    with uow_factory() as uow:
+        uow.wizard.upsert_line_type(
+            {"id": type_id, "name": "In-Use Type", "params": {"r_ohm_per_km": 0.1}},
+            commit=False,
+        )
+
+        # Add project with instance using this type
+        project = ProjectORM(
+            id=project_id,
+            name="Test Project",
+            data={
+                "network": {
+                    "branches": [
+                        {"id": str(uuid4()), "type_ref": type_id, "name": "Branch 1"}
+                    ]
+                }
+            },
+        )
+        test_db_session.add(project)
+        uow.commit()
+
+    # Try to REPLACE
+    export_data = {
+        "manifest": {
+            "library_id": "lib1",
+            "name_pl": "Test",
+            "vendor": "Vendor",
+            "series": "Series",
+            "revision": "1.0",
+            "schema_version": "1.0",
+            "created_at": "2026-01-01T00:00:00",
+            "fingerprint": "abc",
+        },
+        "line_types": [
+            {"id": "new_type", "name": "Replacement Type", "params": {"r_ohm_per_km": 0.2}}
+        ],
+        "cable_types": [],
+        "transformer_types": [],
+        "switch_types": [],
+    }
+
+    with pytest.raises(ValueError, match="REPLACE blocked"):
+        service.import_type_library(export_data, mode=ImportMode.REPLACE)
+
+
+@pytest.mark.integration
+def test_export_determinism_with_real_data(test_db_session):
+    """Same catalog state → identical export (deterministic)."""
+    from application.catalog_governance.service import CatalogGovernanceService
+    from infrastructure.persistence.repositories.unit_of_work import UnitOfWorkFactory
+
+    uow_factory = UnitOfWorkFactory(lambda: test_db_session)
+    service = CatalogGovernanceService(uow_factory)
+
+    # Add types
+    with uow_factory() as uow:
+        uow.wizard.upsert_line_type(
+            {"id": "line2", "name": "Line B", "params": {"r_ohm_per_km": 0.2}},
+            commit=False,
+        )
+        uow.wizard.upsert_line_type(
+            {"id": "line1", "name": "Line A", "params": {"r_ohm_per_km": 0.1}},
+            commit=False,
+        )
+        uow.commit()
+
+    # Export twice
+    export1 = service.export_type_library()
+    export2 = service.export_type_library()
+
+    # Fingerprints should match
+    assert export1["manifest"]["fingerprint"] == export2["manifest"]["fingerprint"]
+
+    # Types should be sorted (line1 before line2)
+    assert export1["line_types"][0]["id"] == "line1"
+    assert export1["line_types"][1]["id"] == "line2"

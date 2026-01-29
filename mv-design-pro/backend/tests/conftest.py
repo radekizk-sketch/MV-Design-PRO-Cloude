@@ -54,3 +54,12 @@ def uow_factory(db_session_factory):
     from infrastructure.persistence.unit_of_work import build_uow_factory
 
     return build_uow_factory(db_session_factory)
+
+
+@pytest.fixture()
+def test_db_session(db_session_factory):
+    """Provide a test database session for integration tests."""
+    session = db_session_factory()
+    yield session
+    session.rollback()
+    session.close()
