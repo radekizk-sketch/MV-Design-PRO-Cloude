@@ -13,6 +13,7 @@
 - [02-Solvers.md](./02-Solvers.md)
 - [03-Analyses.md](./03-Analyses.md)
 - [04-Application.md](./04-Application.md)
+- [docs/architecture/STUDY_SCENARIO_WORKFLOW_ETAP_PLUS.md](./architecture/STUDY_SCENARIO_WORKFLOW_ETAP_PLUS.md) — **P23: Study/Scenario/Run workflow (ETAP++)**
 - [GO-LIVE-CHECKLIST.md](./GO-LIVE-CHECKLIST.md)
 - [REPOSITORY-HYGIENE.md](./REPOSITORY-HYGIENE.md)
 - [ROADMAP.md](./ROADMAP.md)
