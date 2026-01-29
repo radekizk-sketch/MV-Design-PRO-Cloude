@@ -1,11 +1,12 @@
-"""Type Catalog API endpoints (P8.2 HOTFIX)
+"""Type Catalog API endpoints (P8.2 + P13b)
 
 Provides REST API for Type Library operations:
 - Fetch catalog types (line, cable, transformer, switch equipment)
 - Assign type_ref to elements (branches, transformers, switches)
 - Clear type_ref from elements
+- Export/Import type library with governance (P13b)
 
-All endpoints return 204 No Content for assign/clear operations.
+All assign/clear endpoints return 204 No Content.
 """
 
 from __future__ import annotations
@@ -17,8 +18,10 @@ from fastapi import APIRouter, Depends, HTTPException, Response, status
 from pydantic import BaseModel
 
 from api.dependencies import get_uow_factory
+from application.catalog_governance import CatalogGovernanceService
 from application.network_wizard import NetworkWizardService
 from application.network_wizard.service import NotFound
+from network_model.catalog.governance import ImportMode
 
 router = APIRouter(prefix="/catalog", tags=["Type Catalog"])
 
@@ -27,10 +30,105 @@ def _build_service(uow_factory: Any) -> NetworkWizardService:
     return NetworkWizardService(uow_factory)
 
 
+def _build_governance_service(uow_factory: Any) -> CatalogGovernanceService:
+    return CatalogGovernanceService(uow_factory)
+
+
 class AssignTypePayload(BaseModel):
     """Payload for assigning type_ref to element"""
 
     type_id: str  # UUID as string
+
+
+class ImportTypeLibraryPayload(BaseModel):
+    """Payload for importing type library"""
+
+    manifest: dict[str, Any]
+    line_types: list[dict[str, Any]]
+    cable_types: list[dict[str, Any]]
+    transformer_types: list[dict[str, Any]]
+    switch_types: list[dict[str, Any]]
+
+
+# ============================================================================
+# Type Library Governance (P13b)
+# ============================================================================
+
+
+@router.get("/export")
+def export_type_library(
+    library_name_pl: str = "Biblioteka typów",
+    vendor: str = "MV-DESIGN-PRO",
+    series: str = "Standard",
+    revision: str = "1.0",
+    description_pl: str = "",
+    uow_factory=Depends(get_uow_factory),
+) -> dict[str, Any]:
+    """
+    Export type library with deterministic fingerprint (P13b).
+
+    Returns canonical JSON export with manifest and all types.
+    Deterministic ordering ensures identical fingerprint for same content.
+
+    Query Parameters:
+        library_name_pl: Polish name of the library
+        vendor: Vendor/manufacturer name
+        series: Product series/line
+        revision: Revision string
+        description_pl: Optional Polish description
+    """
+    service = _build_governance_service(uow_factory)
+    return service.export_type_library(
+        library_name_pl=library_name_pl,
+        vendor=vendor,
+        series=series,
+        revision=revision,
+        description_pl=description_pl,
+    )
+
+
+@router.post("/import")
+def import_type_library(
+    payload: ImportTypeLibraryPayload,
+    mode: str = "merge",
+    uow_factory=Depends(get_uow_factory),
+) -> dict[str, Any]:
+    """
+    Import type library with conflict detection (P13b).
+
+    Modes:
+    - merge (default): Add new types, skip existing (no overwrites)
+    - replace: Replace entire library (blocked if types are in use)
+
+    Conflict rules:
+    - Existing type_id with different parameters → 409 Conflict
+    - REPLACE mode with types in use → 409 Conflict
+
+    Returns ImportReport with added/skipped/conflicts lists.
+    """
+    # Validate mode
+    try:
+        import_mode = ImportMode(mode.lower())
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid mode: {mode}. Must be 'merge' or 'replace'.",
+        ) from exc
+
+    service = _build_governance_service(uow_factory)
+
+    try:
+        report = service.import_type_library(
+            data=payload.model_dump(),
+            mode=import_mode,
+        )
+        return report
+    except ValueError as exc:
+        # Conflicts detected
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=str(exc),
+        ) from exc
 
 
 # ============================================================================
