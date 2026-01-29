@@ -1338,12 +1338,18 @@ Wszystkie pakiety pozostają POST-HOC i nie modyfikują solverów ani Result API
 
 ### P19 — Earthing / Ground Fault Proof Pack (SN)
 
-**Status:** PLANNED | FUTURE
+**Status:** DONE | CANONICAL & BINDING
 
 - Prądy doziemne (1F-Z, 2F-Z)
 - Impedancja uziemienia
 - Terminologia BINDING: 1F-Z, 2F, 2F-Z oraz **PCC – punkt wspólnego przyłączenia**
 - **Prerequisite:** P11.1a, P14
+- Deliverables:
+   - [x] Generator dowodu P19 (Proof Engine)
+   - [x] Rejestr równań i weryfikacja jednostek
+   - [x] Widok Proof Inspector: prąd doziemny + opcjonalne napięcie dotykowe
+   - [x] Testy determinism + NOT COMPUTED
+   - [x] Dokumentacja `docs/proof_engine/P19_EARTHING_GROUND_FAULT_SN.md`
 
 ### P20 — Proof Coverage Completion (ETAP / PowerFactory Parity)
 

@@ -26,6 +26,7 @@ Ten pakiet zawiera **kanoniczne źródła wiedzy** dla systemu dowodów matematy
 | `P15_LOAD_CURRENTS_OVERLOAD.md` | P15: Prądy robocze i przeciążenia | **BINDING** |
 | `P17_LOSSES_ENERGY_PROFILE.md` | P17: Energia strat (profil czasowy) | **BINDING** |
 | `P18_PROTECTION_PROOF.md` | P18: Zabezpieczenia nadprądowe i selektywność | **BINDING** |
+| `P19_EARTHING_GROUND_FAULT_SN.md` | P19: Doziemienia / uziemienia SN | **BINDING** |
 | `PROOF_SCHEMAS.md` | Kanoniczne schematy JSON (ProofDocument, ProofStep) | **BINDING** |
 | `EQUATIONS_IEC60909_SC3F.md` | Rejestr równań SC3F z mapping keys | **BINDING** |
 | `EQUATIONS_VDROP.md` | Rejestr równań VDROP z mapping keys | **BINDING** |

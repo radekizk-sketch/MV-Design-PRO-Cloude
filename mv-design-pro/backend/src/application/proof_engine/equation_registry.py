@@ -1057,6 +1057,96 @@ EQ_PR_004 = EquationDefinition(
 
 
 # =============================================================================
+# P19: Earthing / Ground Fault (SN) — Kanoniczne równania (BINDING)
+# =============================================================================
+
+EQ_EARTH_001 = EquationDefinition(
+    equation_id="EQ_EARTH_001",
+    name_pl="Prąd doziemny",
+    standard_ref="IEC 60909 (1F-Z) / praktyka inżynierska",
+    latex=r"I_{E} = \frac{U_{0}}{Z_{E}}",
+    symbols=(
+        SymbolDefinition(
+            symbol="I_{E}",
+            unit="A",
+            description_pl="Prąd doziemny",
+            mapping_key="i_earth_a",
+        ),
+        SymbolDefinition(
+            symbol="U_{0}",
+            unit="V",
+            description_pl="Napięcie zerowe",
+            mapping_key="u0_v",
+        ),
+        SymbolDefinition(
+            symbol="Z_{E}",
+            unit="Ω",
+            description_pl="Impedancja uziemienia",
+            mapping_key="z_e_ohm",
+        ),
+    ),
+    unit_derivation="V / Ω = A",
+)
+
+EQ_EARTH_002 = EquationDefinition(
+    equation_id="EQ_EARTH_002",
+    name_pl="Rozdział prądu doziemnego",
+    standard_ref="praktyka inżynierska",
+    latex=r"I_{E} = I_{u} + I_{p}",
+    symbols=(
+        SymbolDefinition(
+            symbol="I_{E}",
+            unit="A",
+            description_pl="Prąd doziemny",
+            mapping_key="i_earth_a",
+        ),
+        SymbolDefinition(
+            symbol="I_{u}",
+            unit="A",
+            description_pl="Prąd przez uziom",
+            mapping_key="i_u_a",
+        ),
+        SymbolDefinition(
+            symbol="I_{p}",
+            unit="A",
+            description_pl="Prąd przez pozostałe ścieżki",
+            mapping_key="i_p_a",
+        ),
+    ),
+    unit_derivation="A + A = A",
+)
+
+EQ_EARTH_003 = EquationDefinition(
+    equation_id="EQ_EARTH_003",
+    name_pl="Napięcie dotykowe (UPROSZCZONE)",
+    standard_ref="UPROSZCZONE",
+    latex=r"U_{d} = I_{u} \cdot R_{u}",
+    symbols=(
+        SymbolDefinition(
+            symbol="U_{d}",
+            unit="V",
+            description_pl="Napięcie dotykowe (uproszczone)",
+            mapping_key="u_touch_v",
+        ),
+        SymbolDefinition(
+            symbol="I_{u}",
+            unit="A",
+            description_pl="Prąd przez uziom",
+            mapping_key="i_u_a",
+        ),
+        SymbolDefinition(
+            symbol="R_{u}",
+            unit="Ω",
+            description_pl="Rezystancja uziemienia stanowiska",
+            mapping_key="r_u_ohm",
+        ),
+    ),
+    unit_derivation="A · Ω = V",
+    notes="Krok wyłącznie informacyjny (UPROSZCZONE).",
+)
+
+
+# =============================================================================
 # Q(U) Regulation — Kanoniczne równania (BINDING) P11.1b
 # =============================================================================
 
@@ -1719,6 +1809,13 @@ PR_EQUATIONS: dict[str, EquationDefinition] = {
     "EQ_PR_004": EQ_PR_004,
 }
 
+# P19: Earthing / Ground Fault equations registry
+EARTH_EQUATIONS: dict[str, EquationDefinition] = {
+    "EQ_EARTH_001": EQ_EARTH_001,
+    "EQ_EARTH_002": EQ_EARTH_002,
+    "EQ_EARTH_003": EQ_EARTH_003,
+}
+
 # Q(U) equations registry (P11.1b + P11.1c)
 QU_EQUATIONS: dict[str, EquationDefinition] = {
     "EQ_QU_001": EQ_QU_001,
@@ -1787,6 +1884,13 @@ PR_STEP_ORDER: list[str] = [
     "EQ_PR_004",  # Selektywność
 ]
 
+# Step order for P19 (BINDING)
+EARTH_STEP_ORDER: list[str] = [
+    "EQ_EARTH_001",  # Prąd doziemny
+    "EQ_EARTH_002",  # Rozdział prądu doziemnego
+    "EQ_EARTH_003",  # Napięcie dotykowe (uproszczone)
+]
+
 # Step order for Q(U) proof (BINDING) — P11.1b + P11.1c
 QU_STEP_ORDER: list[str] = [
     "EQ_QU_001",  # ΔU = U_meas - U_ref
@@ -1829,6 +1933,7 @@ FROZEN_IDS: dict[str, list[str]] = {
     "lc_equations": list(LC_EQUATIONS.keys()),
     "le_equations": list(LE_EQUATIONS.keys()),
     "pr_equations": list(PR_EQUATIONS.keys()),
+    "earth_equations": list(EARTH_EQUATIONS.keys()),
     "mapping_keys": [
         # SC3F
         "ikss_ka", "ip_ka", "ith_ka", "idyn_ka", "sk_mva",
@@ -1854,6 +1959,8 @@ FROZEN_IDS: dict[str, list[str]] = {
         "icu_ka", "idyn_ka", "i2t_ka2s", "ith_limit_ka2s",
         "selectivity_downstream_max_s", "selectivity_upstream_min_s",
         "selectivity_margin_setting_s",
+        # P19
+        "u0_v", "z_e_ohm", "i_earth_a", "i_u_a", "i_p_a", "r_u_ohm", "u_touch_v",
     ],
 }
 
@@ -1863,6 +1970,7 @@ registry.merge(VDROP_EQUATIONS)
 registry.merge(LC_EQUATIONS)
 registry.merge(LE_EQUATIONS)
 registry.merge(PR_EQUATIONS)
+registry.merge(EARTH_EQUATIONS)
 registry.merge(QU_EQUATIONS)
 registry.merge(SC1_EQUATIONS)
 registry.merge(LS_EQUATIONS)
@@ -1933,6 +2041,16 @@ class EquationRegistry:
         return PR_STEP_ORDER.copy()
 
     @classmethod
+    def get_earth_equations(cls) -> dict[str, EquationDefinition]:
+        """Zwraca wszystkie równania P19 (Earthing / Ground Fault)."""
+        return EARTH_EQUATIONS.copy()
+
+    @classmethod
+    def get_earth_step_order(cls) -> list[str]:
+        """Zwraca kolejność kroków dla dowodu P19."""
+        return EARTH_STEP_ORDER.copy()
+
+    @classmethod
     def get_qu_equations(cls) -> dict[str, EquationDefinition]:
         """Zwraca wszystkie równania Q(U)."""
         return QU_EQUATIONS.copy()
@@ -2001,6 +2119,9 @@ class EquationRegistry:
         for eq_id in FROZEN_IDS["pr_equations"]:
             if eq_id not in PR_EQUATIONS:
                 raise ValueError(f"Frozen equation ID {eq_id} usunięty z P18!")
+        for eq_id in FROZEN_IDS["earth_equations"]:
+            if eq_id not in EARTH_EQUATIONS:
+                raise ValueError(f"Frozen equation ID {eq_id} usunięty z P19!")
 
         current_keys = cls.get_all_mapping_keys()
         for key in FROZEN_IDS["mapping_keys"]:
@@ -2020,6 +2141,7 @@ EquationRegistry.VDROP_EQUATIONS = VDROP_EQUATIONS
 EquationRegistry.LC_EQUATIONS = LC_EQUATIONS
 EquationRegistry.LE_EQUATIONS = LE_EQUATIONS
 EquationRegistry.PR_EQUATIONS = PR_EQUATIONS
+EquationRegistry.EARTH_EQUATIONS = EARTH_EQUATIONS
 EquationRegistry.QU_EQUATIONS = QU_EQUATIONS
 EquationRegistry.SC1_EQUATIONS = SC1_EQUATIONS
 EquationRegistry.SC3F_PROOF_STEP_ORDER = SC3F_PROOF_STEP_ORDER
@@ -2027,6 +2149,7 @@ EquationRegistry.VDROP_STEP_ORDER = VDROP_STEP_ORDER
 EquationRegistry.LC_STEP_ORDER = LC_STEP_ORDER
 EquationRegistry.LE_STEP_ORDER = LE_STEP_ORDER
 EquationRegistry.PR_STEP_ORDER = PR_STEP_ORDER
+EquationRegistry.EARTH_STEP_ORDER = EARTH_STEP_ORDER
 EquationRegistry.QU_STEP_ORDER = QU_STEP_ORDER
 EquationRegistry.SC1FZ_STEP_ORDER = SC1FZ_STEP_ORDER
 EquationRegistry.SC2F_STEP_ORDER = SC2F_STEP_ORDER
