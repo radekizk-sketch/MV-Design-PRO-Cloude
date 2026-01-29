@@ -28,6 +28,7 @@
 
 ### UI Eksploracji Wyników i Inspekcji Elementów (ETAP / PowerFactory Grade)
 - [docs/ui/RESULTS_BROWSER_CONTRACT.md](./ui/RESULTS_BROWSER_CONTRACT.md) — **Results Browser: drzewo wyników, tabele, porównania Case/Snapshot, eksport (CANONICAL)**
+- [docs/ui/VOLTAGE_PROFILE_BUS_CONTRACT.md](./ui/VOLTAGE_PROFILE_BUS_CONTRACT.md) — **Profil napięciowy (BUS-centric): tabela napięć per BUS, progi PASS/WARNING/FAIL, determinism (CANONICAL)**
 - [docs/ui/ELEMENT_INSPECTOR_CONTRACT.md](./ui/ELEMENT_INSPECTOR_CONTRACT.md) — **Element Inspector: zakładki (Overview, Parameters, Results, Contributions, Limits, Proof P11), multi-case view (CANONICAL)**
 - [docs/ui/EXPERT_MODES_CONTRACT.md](./ui/EXPERT_MODES_CONTRACT.md) — **Expert Modes: Operator, Designer, Analyst, Auditor — NO SIMPLIFICATION RULE (CANONICAL)**
 - [docs/ui/GLOBAL_CONTEXT_BAR.md](./ui/GLOBAL_CONTEXT_BAR.md) — **Global Context Bar: sticky top bar, drukowany w nagłówku PDF (CANONICAL)**

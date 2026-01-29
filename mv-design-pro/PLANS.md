@@ -573,6 +573,7 @@ class NetworkGraph:
 | 2026-01 | 2.13 | Phase 2.x: UI PF++ (PowerFactory++ Parity) – DOC LOCKED |
 | 2026-01 | 2.14 | Phase 2.x.2: TOPOLOGY TREE & SELECTION SYNC – DOC LOCKED |
 | 2026-07 | 2.15 | P20 merge + Proof Engine completion (P11–P20) |
+| 2026-08 | 2.23 | P21: Voltage Profile (BUS-centric) view + contract |
 
 ---
 
@@ -1270,6 +1271,54 @@ Catalog Browser ma umożliwiać:
 - **FORBIDDEN**: Source Types, Load Types, Protection Types,
 - **Paradygmat Type-centric** wzmocniony (TYPE jako źródło prawdy, INSTANCES jako użycia),
 - **PowerFactory Parity** rozszerzona (propagacja zmian TYPE → INSTANCES, audyt użycia typu).
+
+---
+
+## 12.11. Phase 2.x.6: VOLTAGE PROFILE (BUS-CENTRIC) — P21
+
+### 12.11.1. Cel fazy
+
+Zdefiniowanie i wdrożenie **widoku profilu napięciowego (BUS-centric)** w stylu ETAP / PowerFactory:
+- tabela napięć per BUS,
+- statusy wg progów (PASS/WARNING/FAIL),
+- ranking „najgorszych węzłów”,
+- deterministyczne sortowanie i serializacja.
+
+**INVARIANT:** Solver i Domain Layer pozostają **NIETKNIĘTE**. To wyłącznie agregacja wyników PF.
+
+---
+
+### 12.11.2. Zakres fazy
+
+| W zakresie | Poza zakresem |
+|------------|---------------|
+| Analiza P21 (Voltage Profile View) | Implementacja solvera |
+| Kontrakt UI „Profil napięć (węzły)” | Nowe obliczenia fizyczne |
+| Deterministyczne DTO / serializer | Zmiany Result API IEC 60909 |
+| Testy determinism i statusów | Frontend |
+
+---
+
+### 12.11.3. Deliverables
+
+| Plik | Opis | Status |
+|------|------|--------|
+| `backend/src/analysis/voltage_profile/` | Modele, builder, serializer P21 | DONE |
+| `backend/tests/analysis/test_voltage_profile_p21.py` | Testy determinism, sortowania, statusów, NOT_COMPUTED | DONE |
+| `docs/ui/VOLTAGE_PROFILE_BUS_CONTRACT.md` | Kontrakt UI profilu napięciowego (BUS-centric) | DONE |
+| `docs/INDEX.md` | Link do kontraktu P21 | DONE |
+| `docs/ui/RESULTS_BROWSER_CONTRACT.md` | Pozycja Results → Profil napięć (węzły) | DONE |
+
+---
+
+### 12.11.4. Completed Tasks
+
+- [x] Dodanie `analysis/voltage_profile` (DTO, builder, serializer, determinism).
+- [x] Implementacja progów napięciowych i statusów PASS/WARNING/FAIL/NOT_COMPUTED.
+- [x] Sortowanie deterministyczne (FAIL → WARNING → PASS → NOT_COMPUTED, |Δ%| desc, bus_id asc).
+- [x] Testy P21: determinism, progi, sortowanie, brak danych.
+- [x] Kontrakt UI: `VOLTAGE_PROFILE_BUS_CONTRACT.md`.
+- [x] Aktualizacja `docs/INDEX.md` i `RESULTS_BROWSER_CONTRACT.md`.
 
 ---
 

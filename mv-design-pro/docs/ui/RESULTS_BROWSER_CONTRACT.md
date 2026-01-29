@@ -39,6 +39,7 @@ PROJECT
               └── SNAPSHOT
                     └── ANALYSIS RUN
                           ├── BUSES (node results)
+                          ├── VOLTAGE PROFILE (BUS-centric)
                           ├── LINES (branch results)
                           ├── TRANSFORMERS (branch results)
                           ├── SOURCES (source results)
