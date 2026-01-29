@@ -443,6 +443,7 @@ class LaTeXRenderer:
             r"\midrule",
         ]
 
+        percent_unit = r"\%"
         for bus_id in sorted(bus_rows.keys()):
             entry = bus_rows[bus_id]
             lines.append(
@@ -450,7 +451,7 @@ class LaTeXRenderer:
                 rf"{_cell(entry.get('u_nom_kv'), 'kV')} & "
                 rf"{_cell(entry.get('u_ll_kv'), 'kV')} & "
                 rf"{_cell(entry.get('u_pu'), 'p.u.')} & "
-                rf"{_cell(entry.get('delta_pct'), r'\\%')} \\"
+                rf"{_cell(entry.get('delta_pct'), percent_unit)} \\"
             )
 
         lines.extend([
