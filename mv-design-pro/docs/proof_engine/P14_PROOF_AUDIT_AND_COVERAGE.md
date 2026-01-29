@@ -5,73 +5,97 @@
 
 ---
 
-## 1. Cel P14 (audit, nie obliczenia)
+## 1. Definicja P14 (META-only, BINDING)
 
-Warstwa P14 definiuje **kanoniczny audyt kompletności i pokrycia** Proof Packów.
-P14 **nie wykonuje żadnych obliczeń**, **nie zmienia solverów** ani **Proof Engine**.
-Jest to **warstwa meta**, stanowiąca źródło prawdy dla planowania pakietów P15–P19.
-
----
-
-## 2. Definicje (BINDING)
-
-### 2.1 Proof Coverage
-
-**Proof Coverage** to formalny opis tego, **które obszary obliczeń posiadają dowód**,
-które mają tylko solver, a które pozostają luką w dokumentacji dowodowej.
-Coverage nie wprowadza nowych obliczeń ani kryteriów normatywnych.
-
-### 2.2 Calculation Pack
-
-**Calculation Pack** to kanoniczny, nazwany zakres obliczeń lub dowodu
-przypisany do konkretnego pakietu P11–P19, z jednoznaczną referencją
-do specyfikacji i dokumentów Proof Engine.
+P14 definiuje **kanoniczny audyt kompletności i pokrycia Proof Packów**.
+Jest to **warstwa meta (doc-only)**: nie wykonuje obliczeń, nie zmienia solverów
+ani Proof Engine. P14 jest źródłem prawdy dla stanu pokrycia P11/P15/P17/P18
+oraz mapowania braków względem oczekiwań PF/ETAP-grade.
 
 ---
 
-## 3. Zasady P14 (BINDING)
+## 2. Inwarianty (POST-HOC, no solver changes, determinism)
 
-1. **registry-first** — rejestry i dokumenty kanoniczne są źródłem prawdy.
-2. **doc-only** — P14 to wyłącznie dokumentacja (brak kodu).
-3. **brak heurystyk** — żadnych domysłów ani uzupełnień poza źródłami kanonicznymi.
-4. **brak interpretacji norm** — P14 nie interpretuje IEC ani PN-EN.
-
----
-
-## 4. Kanoniczna tabela pokrycia (CORE)
-
-| Calculation Pack | Status | Proof Exists | Solver Exists | Notes |
-|------------------|--------|--------------|---------------|-------|
-| SC3F (P11.1a) | DONE | TAK | TAK | Proof Pack P11.1a (SC3F) |
-| VDROP (P11.1a) | DONE | TAK | TAK | Proof Pack P11.1a (VDROP) |
-| Q(U) (P11.1b) | DONE | TAK | TAK | Proof Pack P11.1b |
-| SC asym (1F, 2F, 2F-G) (P11.1c) | DONE | TAK | TAK | Proof Pack P11.1c (SKELETON) |
-| Load Currents (P15) | TODO | NIE | NIEOKREŚLONE | Prerequisite: P14 coverage |
-| Losses (P16) | TODO | NIE | NIEOKREŚLONE | Prerequisite: P14 coverage |
-| Grounding / Earthing (P19) | TODO | NIE | NIEOKREŚLONE | Prerequisite: P14 coverage |
-| PF Audit (local) | TODO | NIE | NIEOKREŚLONE | Audit lokalny wyników PF |
+1. **POST-HOC** — audyt P14 jest wykonywany po fakcie na danych wynikowych.
+2. **No solver changes** — P14 nie zmienia solverów ani Result API.
+3. **Determinism** — identyczne wejścia i referencje → identyczny raport audytu.
+4. **Doc-only** — brak kodu, brak heurystyk, brak interpretacji norm.
 
 ---
 
-## 5. Checklist audytowy (BINDING)
+## 3. Coverage Matrix (BINDING)
 
-1. **determinism** — identyczne wejścia dają identyczny ProofDocument.
-2. **unit-check** — weryfikacja jednostek dla każdego kroku dowodu.
-3. **anti-double-counting** — brak podwójnego zliczania współczynników i korekt.
-4. **mapping keys present** — obecność kluczy mapowania w trace i wynikach.
-5. **proof vs solver tolerance** — jawnie określona tolerancja porównania.
-
-$$
-\varepsilon
-$$
+| Wielkość / Obiekt | Jednostka | Źródło danych | Proof Pack | Status | Uwagi |
+|---|---|---|---|---|---|
+| SC3F: napięcie Thevenina $$U_{th}$$ | $$\\text{kV}$$ | SolverResult + Trace | P11 | FULL | Obowiązkowe mapowanie trace/result. |
+| SC3F: impedancja Thevenina $$Z_{th}$$ | $$\\Omega$$ | SolverResult + Trace | P11 | FULL | Obowiązkowe mapowanie trace/result. |
+| SC3F: prąd zwarciowy początkowy $$I_{k}^{\\prime\\prime}$$ | $$\\text{kA}$$ | SolverResult + Trace | P11 | FULL | Wymagane pełne kroki dowodu. |
+| SC3F: moc zwarciowa $$S_{k}^{\\prime\\prime}$$ | $$\\text{MVA}$$ | SolverResult + Trace | P11 | FULL | Wymagane pełne kroki dowodu. |
+| SC3F: prąd dynamiczny $$i_{p}$$ | $$\\text{kA}$$ | SolverResult + Trace | P11 | PARTIAL | Wymagany w P11, audyt zależny od kompletności trace. |
+| VDROP: spadek napięcia $$\\Delta U$$ | $$\\%$$ | SolverResult + Trace | P11 | FULL | Składowe $$R \\cdot P$$ oraz $$X \\cdot Q$$ w trace. |
+| P15: moc pozorna $$S$$ | $$\\text{kVA}$$ | SolverResult + Trace | P15 | PARTIAL | Brak pełnego Proof Pack; wartości z PF. |
+| P15: prąd roboczy $$I$$ | $$\\text{A}$$ | SolverResult + Trace | P15 | PARTIAL | Brak pełnego Proof Pack; wartości z PF. |
+| P15: procent prądu znamionowego $$\\%I_{n}$$ | $$\\%$$ | Catalog + SolverResult | P15 | PARTIAL | Tylko gdy $$I_{n}$$ dostępne w katalogu. |
+| P15: procent mocy znamionowej $$\\%S_{n}$$ | $$\\%$$ | Catalog + SolverResult | P15 | PARTIAL | Tylko gdy $$S_{n}$$ dostępne w katalogu. |
+| P15: porównanie A/B/$$\\Delta$$ | - | UserInput + SolverResult | P15 | PARTIAL | Wymaga porównań Case; brak pełnego dowodu. |
+| P17: energia strat profilu $$E_{loss}$$ | $$\\text{kWh}$$ | SolverResult + Trace | P17 | FULL | Profil dyskretny (suma kroków). |
+| P17: wariant stały $$E_{loss}$$ | $$\\text{kWh}$$ | UserInput + SolverResult | P17 | FULL | Stała moc strat i czas trwania. |
+| P18: breaking $$I_{k}^{\\prime\\prime}$$ vs $$I_{cu}$$ | $$\\text{kA}$$ | SolverResult + Catalog | P18 | PARTIAL | Porównanie bez klasyfikacji normowej PASS/FAIL. |
+| P18: dynamic $$i_{p}$$ vs $$I_{dyn}$$ | $$\\text{kA}$$ | SolverResult + Catalog | P18 | PARTIAL | Dane katalogowe wymagane. |
+| P18: thermal $$I^{2} t$$ vs $$I_{th}$$ | $$\\text{A}^{2}\\text{s}$$ | SolverResult + Catalog | P18 | PARTIAL | Brak pełnych krzywych czasowo-prądowych. |
+| P18: selectivity OK/NOT_EVALUATED | - | UserInput + Catalog | P18 | NOT COVERED | Bez pełnych krzywych selektywności. |
 
 ---
 
-## 6. Relacje i zależności (BINDING)
+## 4. Status pokrycia (FULL / PARTIAL / NOT COVERED)
 
-1. P14 jest **warstwą audytu** dla wszystkich Proof Packów.
-2. P15–P19 **wymagają** obecności P14 jako kanonicznego źródła coverage.
-3. P14 nie zmienia istniejących pakietów P11–P12.
+- **FULL** — istnieje kompletny Proof Pack z pełnym mapowaniem trace/result.
+- **PARTIAL** — istnieją wyniki i/lub porównania, brak pełnego dowodu.
+- **NOT COVERED** — brak danych lub brak podstaw do oceny w Proof Pack.
+
+Podsumowanie statusu względem PF/ETAP-grade:
+- **P11** — FULL (SC3F, VDROP). 
+- **P15** — PARTIAL (wyniki dostępne, brak kompletnego dowodu).
+- **P17** — FULL (profil dyskretny + wariant stały).
+- **P18** — PARTIAL (porównania dostępne, selektywność bez krzywych → NOT COVERED).
+
+---
+
+## 5. GAPS (jawne braki, BINDING)
+
+- **P14-GAP-001** — brak earthing/doziemień (P19).  
+  Wpływ: brak audytu doziemień SN i powiązanych ograniczeń ochrony.  
+  Planowany pack/faza: P19.  
+  Status: PLANNED.
+
+- **P14-GAP-002** — selektywność bez pełnych krzywych czasowo-prądowych.  
+  Wpływ: selektywność oznaczana jako NOT_EVALUATED.  
+  Planowany pack/faza: P18 rozszerzenie po dostarczeniu krzywych.  
+  Status: PLANNED.
+
+- **P14-GAP-003** — brak klasyfikacji normowej PASS/FAIL.  
+  Wpływ: użytkownik otrzymuje porównania liczbowe bez normatywnej kwalifikacji.  
+  Planowany pack/faza: P20 completion (normative layer).  
+  Status: OUT OF SCOPE.
+
+---
+
+## 6. Reguła prezentacji w UI/Inspector
+
+Jeżeli brak dowodu dla danej wielkości, UI/Inspector **musi** prezentować status:
+**NOT COMPUTED**. Brak danych nie może być prezentowany jako wartość domyślna
+ani ukryty brak.
+
+---
+
+## 7. Mapping do ETAP/PowerFactory (terminologia, bez claimów)
+
+| MV-DESIGN-PRO (Proof) | ETAP / PowerFactory (termin) | Oczekiwanie audytowe |
+|---|---|---|
+| Proof Pack P11 — SC3F/VDROP | Short-Circuit / Voltage Drop | Jawne mapowanie wartości i jednostek. |
+| Proof Pack P15 — prądy robocze i przeciążenia | Load Flow Results / Loading | Porównanie do danych katalogowych. |
+| Proof Pack P17 — energia strat | Energy/Losses | Profil dyskretny lub wariant stały. |
+| Proof Pack P18 — ochrona i selektywność | Protection / Selectivity | Porównania liczbowe bez normatywnego PASS/FAIL. |
 
 ---
 

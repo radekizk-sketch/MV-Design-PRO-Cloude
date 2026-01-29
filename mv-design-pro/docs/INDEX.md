@@ -48,7 +48,7 @@
 - [docs/proof_engine/P11_1b_REGULATION_Q_U.md](./proof_engine/P11_1b_REGULATION_Q_U.md) — Regulatory Q(U), cosφ(P)
 - [docs/proof_engine/P11_1c_SC_ASYMMETRICAL.md](./proof_engine/P11_1c_SC_ASYMMETRICAL.md) — Składowe symetryczne (SKELETON)
 - [docs/proof_engine/P11_1d_PROOF_UI_EXPORT.md](./proof_engine/P11_1d_PROOF_UI_EXPORT.md) — **Proof Inspector (CANONICAL): read-only viewer, eksport JSON/LaTeX/PDF/DOCX**
-- [docs/proof_engine/P14_PROOF_AUDIT_AND_COVERAGE.md](./proof_engine/P14_PROOF_AUDIT_AND_COVERAGE.md) — **P14: Proof Audit & Coverage (CANONICAL, META)**
+- [docs/proof_engine/P14_PROOF_AUDIT_AND_COVERAGE.md](./proof_engine/P14_PROOF_AUDIT_AND_COVERAGE.md) — **P14: Proof Audit, Coverage Matrix (CANONICAL, META)**
 - [docs/proof_engine/P15_LOAD_CURRENTS_OVERLOAD.md](./proof_engine/P15_LOAD_CURRENTS_OVERLOAD.md) — **P15: Prądy robocze i przeciążenia (CANONICAL)**
 - [docs/proof_engine/P17_LOSSES_ENERGY_PROFILE.md](./proof_engine/P17_LOSSES_ENERGY_PROFILE.md) — **P17: Energia strat (profil czasowy) (CANONICAL)**
 - [docs/proof_engine/P18_PROTECTION_PROOF.md](./proof_engine/P18_PROTECTION_PROOF.md) — **P18: Zabezpieczenia nadprądowe i selektywność (CANONICAL)**
