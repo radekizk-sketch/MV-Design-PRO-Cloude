@@ -14,10 +14,12 @@
  * Wszystkie etykiety w języku polskim zgodnie z wizard_screens.md.
  */
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { clsx } from 'clsx';
 import {
   fetchTypesByCategory,
+  exportTypeLibrary,
+  importTypeLibrary,
   type LineType,
   type CableType,
   type TransformerType,
@@ -53,6 +55,14 @@ interface TypeLibraryBrowserProps {
  * Wyświetla katalog typów w 4 zakładkach z listą i filtrowaniem.
  * Wszystkie typy są read-only (przeglądanie tylko).
  */
+interface ImportReport {
+  mode: string;
+  added: string[];
+  skipped: string[];
+  conflicts: Array<{ type_id: string; type_category: string; reason: string }>;
+  success: boolean;
+}
+
 export function TypeLibraryBrowser({
   onSelectType,
   initialTab = 'LINE',
@@ -63,6 +73,9 @@ export function TypeLibraryBrowser({
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedTypeId, setSelectedTypeId] = useState<string | null>(null);
+  const [importReport, setImportReport] = useState<ImportReport | null>(null);
+  const [showImportDialog, setShowImportDialog] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Fetch types when active tab changes
   useEffect(() => {
@@ -108,16 +121,108 @@ export function TypeLibraryBrowser({
     return types.find((t) => t.id === selectedTypeId);
   }, [types, selectedTypeId]);
 
+  // Handle export
+  const handleExport = async () => {
+    try {
+      setLoading(true);
+      const exportData = await exportTypeLibrary();
+
+      // Download as JSON file
+      const blob = new Blob([JSON.stringify(exportData, null, 2)], {
+        type: 'application/json',
+      });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `type_library_export_${new Date().toISOString().split('T')[0]}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      setLoading(false);
+    } catch (err: any) {
+      setError(err.message ?? 'Błąd eksportu biblioteki');
+      setLoading(false);
+    }
+  };
+
+  // Handle import button click
+  const handleImportClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  // Handle file selection
+  const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    try {
+      setLoading(true);
+      setError(null);
+
+      // Read file
+      const fileText = await file.text();
+      const importData = JSON.parse(fileText);
+
+      // Import (default mode: merge)
+      const report = await importTypeLibrary(importData, 'merge');
+
+      // Show report dialog
+      setImportReport(report);
+      setShowImportDialog(true);
+
+      // Refresh types
+      const fetchedTypes = await fetchTypesByCategory(activeTab);
+      setTypes(fetchedTypes);
+
+      setLoading(false);
+    } catch (err: any) {
+      setError(err.message ?? 'Błąd importu biblioteki');
+      setLoading(false);
+    } finally {
+      // Reset file input
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
+  };
+
   return (
     <div className="flex flex-col h-full bg-gray-50">
       {/* Header */}
-      <div className="bg-white border-b border-gray-200 px-6 py-4">
-        <h1 className="text-2xl font-semibold text-gray-800">
-          Biblioteka typów
-        </h1>
-        <p className="text-sm text-gray-600 mt-1">
-          Przeglądanie katalogów typów elementów sieci (read-only)
-        </p>
+      <div className="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-semibold text-gray-800">
+            Biblioteka typów
+          </h1>
+          <p className="text-sm text-gray-600 mt-1">
+            Przeglądanie katalogów typów elementów sieci (read-only)
+          </p>
+        </div>
+        <div className="flex gap-3">
+          <button
+            onClick={handleExport}
+            disabled={loading}
+            className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
+          >
+            Eksportuj bibliotekę typów
+          </button>
+          <button
+            onClick={handleImportClick}
+            disabled={loading}
+            className="px-4 py-2 bg-green-600 text-white text-sm font-medium rounded-md hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
+          >
+            Importuj bibliotekę typów
+          </button>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".json"
+            onChange={handleFileChange}
+            className="hidden"
+          />
+        </div>
       </div>
 
       {/* Tabs */}
@@ -237,6 +342,128 @@ export function TypeLibraryBrowser({
           {selectedType && (
             <TypeDetailsPanel type={selectedType} category={activeTab} />
           )}
+        </div>
+      </div>
+
+      {/* Import Report Dialog */}
+      {showImportDialog && importReport && (
+        <ImportReportDialog
+          report={importReport}
+          onClose={() => {
+            setShowImportDialog(false);
+            setImportReport(null);
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+/**
+ * Import Report Dialog Component.
+ *
+ * Wyświetla raport z importu (added/skipped/conflicts).
+ */
+function ImportReportDialog({
+  report,
+  onClose,
+}: {
+  report: ImportReport;
+  onClose: () => void;
+}) {
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[80vh] overflow-hidden flex flex-col">
+        {/* Header */}
+        <div className="px-6 py-4 border-b border-gray-200">
+          <h2 className="text-xl font-semibold text-gray-800">
+            Raport importu biblioteki typów
+          </h2>
+          <p className="text-sm text-gray-600 mt-1">
+            Tryb: {report.mode === 'merge' ? 'MERGE (dodaj nowe)' : 'REPLACE (zamień)'}
+          </p>
+        </div>
+
+        {/* Content */}
+        <div className="flex-1 overflow-y-auto px-6 py-4 space-y-6">
+          {/* Success/Failure Banner */}
+          {report.success ? (
+            <div className="bg-green-50 border border-green-200 rounded-md px-4 py-3">
+              <p className="text-green-800 font-medium">
+                ✓ Import zakończony sukcesem
+              </p>
+            </div>
+          ) : (
+            <div className="bg-red-50 border border-red-200 rounded-md px-4 py-3">
+              <p className="text-red-800 font-medium">
+                ✗ Import zakończony błędami
+              </p>
+            </div>
+          )}
+
+          {/* Added Types */}
+          {report.added.length > 0 && (
+            <div>
+              <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wider mb-2">
+                Dodano ({report.added.length})
+              </h3>
+              <ul className="space-y-1">
+                {report.added.map((typeId) => (
+                  <li key={typeId} className="text-sm text-gray-600 font-mono">
+                    + {typeId}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {/* Skipped Types */}
+          {report.skipped.length > 0 && (
+            <div>
+              <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wider mb-2">
+                Pominięto (istniejące) ({report.skipped.length})
+              </h3>
+              <ul className="space-y-1">
+                {report.skipped.map((typeId) => (
+                  <li key={typeId} className="text-sm text-gray-500 font-mono">
+                    — {typeId}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {/* Conflicts */}
+          {report.conflicts.length > 0 && (
+            <div>
+              <h3 className="text-sm font-semibold text-red-700 uppercase tracking-wider mb-2">
+                Konflikty ({report.conflicts.length})
+              </h3>
+              <ul className="space-y-2">
+                {report.conflicts.map((conflict, idx) => (
+                  <li
+                    key={idx}
+                    className="bg-red-50 border border-red-200 rounded-md px-3 py-2"
+                  >
+                    <p className="text-sm font-mono text-red-800">{conflict.type_id}</p>
+                    <p className="text-xs text-red-600 mt-1">
+                      {conflict.type_category}: {conflict.reason}
+                    </p>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="px-6 py-4 border-t border-gray-200 flex justify-end">
+          <button
+            onClick={onClose}
+            className="px-4 py-2 bg-gray-600 text-white text-sm font-medium rounded-md hover:bg-gray-700 transition-colors"
+          >
+            Zamknij
+          </button>
         </div>
       </div>
     </div>

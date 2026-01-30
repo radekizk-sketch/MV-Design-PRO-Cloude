@@ -136,6 +136,36 @@ class TypeLibraryExport:
         """
         return json.dumps(self.to_dict(), sort_keys=True, separators=(",", ":"))
 
+    def to_fingerprint_payload_dict(self) -> dict[str, Any]:
+        """
+        Export to fingerprint payload (excludes runtime fields).
+
+        Deterministic payload for fingerprint computation:
+        - Excludes runtime fields: created_at, fingerprint, library_id
+        - Includes stable metadata: vendor, series, revision, schema_version
+        - Includes all type lists (already sorted deterministically)
+
+        This ensures that two exports with the same catalog content
+        produce identical fingerprints, regardless of export timestamp.
+
+        Returns:
+            Dictionary suitable for deterministic fingerprint computation.
+        """
+        return {
+            "manifest": {
+                "name_pl": self.manifest.name_pl,
+                "vendor": self.manifest.vendor,
+                "series": self.manifest.series,
+                "revision": self.manifest.revision,
+                "schema_version": self.manifest.schema_version,
+                "description_pl": self.manifest.description_pl,
+            },
+            "line_types": self.line_types,
+            "cable_types": self.cable_types,
+            "transformer_types": self.transformer_types,
+            "switch_types": self.switch_types,
+        }
+
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> TypeLibraryExport:
         """Create from dictionary."""
@@ -199,9 +229,13 @@ class ImportReport:
 
 def compute_fingerprint(export: TypeLibraryExport) -> str:
     """
-    Compute SHA-256 fingerprint of canonical JSON export.
+    Compute SHA-256 fingerprint of deterministic export payload.
 
-    Deterministic hash based on canonical JSON serialization.
+    Deterministic hash based on canonical JSON serialization of payload
+    WITHOUT runtime fields (created_at, fingerprint, library_id).
+
+    This ensures that two exports with identical catalog content
+    produce the same fingerprint, regardless of export timestamp or library_id.
 
     Args:
         export: Type library export to fingerprint.
@@ -209,7 +243,8 @@ def compute_fingerprint(export: TypeLibraryExport) -> str:
     Returns:
         SHA-256 hex digest (64 characters).
     """
-    canonical_json = export.to_canonical_json()
+    payload = export.to_fingerprint_payload_dict()
+    canonical_json = json.dumps(payload, sort_keys=True, separators=(",", ":"))
     return hashlib.sha256(canonical_json.encode("utf-8")).hexdigest()
 
 

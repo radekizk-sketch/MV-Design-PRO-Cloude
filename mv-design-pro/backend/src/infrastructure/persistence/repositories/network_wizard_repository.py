@@ -254,35 +254,35 @@ class NetworkWizardRepository:
         rows = self._session.execute(stmt).scalars().all()
         return [{"id": row.id, "name": row.name, "params": row.params_jsonb} for row in rows]
 
-    def get_line_type(self, type_id: UUID) -> dict | None:
+    def get_line_type(self, type_id: str) -> dict | None:
         stmt = select(LineTypeORM).where(LineTypeORM.id == type_id)
         row = self._session.execute(stmt).scalar_one_or_none()
         if row is None:
             return None
         return {"id": row.id, "name": row.name, "params": row.params_jsonb}
 
-    def get_cable_type(self, type_id: UUID) -> dict | None:
+    def get_cable_type(self, type_id: str) -> dict | None:
         stmt = select(CableTypeORM).where(CableTypeORM.id == type_id)
         row = self._session.execute(stmt).scalar_one_or_none()
         if row is None:
             return None
         return {"id": row.id, "name": row.name, "params": row.params_jsonb}
 
-    def get_transformer_type(self, type_id: UUID) -> dict | None:
+    def get_transformer_type(self, type_id: str) -> dict | None:
         stmt = select(TransformerTypeORM).where(TransformerTypeORM.id == type_id)
         row = self._session.execute(stmt).scalar_one_or_none()
         if row is None:
             return None
         return {"id": row.id, "name": row.name, "params": row.params_jsonb}
 
-    def get_switch_equipment_type(self, type_id: UUID) -> dict | None:
+    def get_switch_equipment_type(self, type_id: str) -> dict | None:
         stmt = select(SwitchEquipmentTypeORM).where(SwitchEquipmentTypeORM.id == type_id)
         row = self._session.execute(stmt).scalar_one_or_none()
         if row is None:
             return None
         return {"id": row.id, "name": row.name, "params": row.params_jsonb}
 
-    def get_inverter_type(self, type_id: UUID) -> dict | None:
+    def get_inverter_type(self, type_id: str) -> dict | None:
         stmt = select(InverterTypeORM).where(InverterTypeORM.id == type_id)
         row = self._session.execute(stmt).scalar_one_or_none()
         if row is None:
@@ -366,7 +366,7 @@ class NetworkWizardRepository:
         self,
         project_id: UUID,
         switch_id: UUID,
-        equipment_type_id: UUID,
+        equipment_type_id: str,
         *,
         commit: bool = True,
     ) -> None:

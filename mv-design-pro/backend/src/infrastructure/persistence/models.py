@@ -203,7 +203,7 @@ class NetworkLoadORM(Base):
 class LineTypeORM(Base):
     __tablename__ = "line_types"
 
-    id: Mapped[UUID] = mapped_column(GUID(), primary_key=True)
+    id: Mapped[str] = mapped_column(String(255), primary_key=True)
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     params_jsonb: Mapped[dict[str, Any]] = mapped_column(DeterministicJSON(), nullable=False)
 
@@ -211,7 +211,7 @@ class LineTypeORM(Base):
 class CableTypeORM(Base):
     __tablename__ = "cable_types"
 
-    id: Mapped[UUID] = mapped_column(GUID(), primary_key=True)
+    id: Mapped[str] = mapped_column(String(255), primary_key=True)
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     params_jsonb: Mapped[dict[str, Any]] = mapped_column(DeterministicJSON(), nullable=False)
 
@@ -219,7 +219,7 @@ class CableTypeORM(Base):
 class TransformerTypeORM(Base):
     __tablename__ = "transformer_types"
 
-    id: Mapped[UUID] = mapped_column(GUID(), primary_key=True)
+    id: Mapped[str] = mapped_column(String(255), primary_key=True)
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     params_jsonb: Mapped[dict[str, Any]] = mapped_column(DeterministicJSON(), nullable=False)
 
@@ -227,7 +227,7 @@ class TransformerTypeORM(Base):
 class SwitchEquipmentTypeORM(Base):
     __tablename__ = "switch_equipment_types"
 
-    id: Mapped[UUID] = mapped_column(GUID(), primary_key=True)
+    id: Mapped[str] = mapped_column(String(255), primary_key=True)
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     params_jsonb: Mapped[dict[str, Any]] = mapped_column(DeterministicJSON(), nullable=False)
 
@@ -235,7 +235,7 @@ class SwitchEquipmentTypeORM(Base):
 class InverterTypeORM(Base):
     __tablename__ = "inverter_types"
 
-    id: Mapped[UUID] = mapped_column(GUID(), primary_key=True)
+    id: Mapped[str] = mapped_column(String(255), primary_key=True)
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     params_jsonb: Mapped[dict[str, Any]] = mapped_column(DeterministicJSON(), nullable=False)
 
@@ -246,7 +246,7 @@ class SwitchEquipmentAssignmentORM(Base):
     id: Mapped[UUID] = mapped_column(GUID(), primary_key=True)
     project_id: Mapped[UUID] = mapped_column(GUID(), ForeignKey("projects.id"), nullable=False)
     switch_id: Mapped[UUID] = mapped_column(GUID(), nullable=False)
-    equipment_type_id: Mapped[UUID] = mapped_column(GUID(), nullable=False)
+    equipment_type_id: Mapped[str] = mapped_column(String(255), nullable=False)
 
 
 class SwitchingStateORM(Base):
