@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Iterable
 
 from .types import (
@@ -31,9 +31,9 @@ class CatalogRepository:
     switch_equipment_types: dict[str, SwitchEquipmentType]
     converter_types: dict[str, ConverterType]
     inverter_types: dict[str, InverterType]
-    protection_device_types: dict[str, ProtectionDeviceType]
-    protection_curves: dict[str, ProtectionCurve]
-    protection_setting_templates: dict[str, ProtectionSettingTemplate]
+    protection_device_types: dict[str, ProtectionDeviceType] = field(default_factory=dict)
+    protection_curves: dict[str, ProtectionCurve] = field(default_factory=dict)
+    protection_setting_templates: dict[str, ProtectionSettingTemplate] = field(default_factory=dict)
 
     @classmethod
     def from_records(
