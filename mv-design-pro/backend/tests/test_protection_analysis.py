@@ -1159,3 +1159,413 @@ class TestProtectionTraceAudit:
 
         assert dict1 == dict2, "Trace serialization must be deterministic"
 
+
+# =============================================================================
+# VENDOR CURVE TESTS (P15a-EXT-VENDORS)
+# =============================================================================
+
+
+class TestVendorCurveRegistry:
+    """Tests for vendor curve registry."""
+
+    def test_iec_curves_registered(self):
+        """IEC standard curves should be in registry."""
+        from domain.protection_vendors import VENDOR_CURVE_REGISTRY
+
+        assert "IEC_SI" in VENDOR_CURVE_REGISTRY
+        assert "IEC_VI" in VENDOR_CURVE_REGISTRY
+        assert "IEC_EI" in VENDOR_CURVE_REGISTRY
+        assert "IEC_LTI" in VENDOR_CURVE_REGISTRY
+
+    def test_vendor_curves_registered(self):
+        """Major vendor curves should be in registry."""
+        from domain.protection_vendors import VENDOR_CURVE_REGISTRY
+
+        # ABB
+        assert "ABB_SI" in VENDOR_CURVE_REGISTRY
+        assert "ABB_VI" in VENDOR_CURVE_REGISTRY
+        assert "ABB_EI" in VENDOR_CURVE_REGISTRY
+        # Siemens
+        assert "SIEMENS_SI" in VENDOR_CURVE_REGISTRY
+        assert "SIEMENS_VI" in VENDOR_CURVE_REGISTRY
+        assert "SIEMENS_EI" in VENDOR_CURVE_REGISTRY
+        # Schneider
+        assert "SCHNEIDER_SI" in VENDOR_CURVE_REGISTRY
+        assert "SCHNEIDER_VI" in VENDOR_CURVE_REGISTRY
+        assert "SCHNEIDER_EI" in VENDOR_CURVE_REGISTRY
+        # Etango
+        assert "ETANGO_SI" in VENDOR_CURVE_REGISTRY
+        assert "ETANGO_VI" in VENDOR_CURVE_REGISTRY
+        assert "ETANGO_EI" in VENDOR_CURVE_REGISTRY
+
+    def test_vendor_curve_has_required_fields(self):
+        """Each vendor curve must have all required fields."""
+        from domain.protection_vendors import VENDOR_CURVE_REGISTRY
+
+        for code, curve in VENDOR_CURVE_REGISTRY.items():
+            assert curve.curve_code == code
+            assert curve.manufacturer is not None
+            assert curve.display_name is not None
+            assert curve.origin is not None
+            assert curve.formula_kind is not None
+            assert curve.parameters is not None
+            assert curve.verification_status is not None
+            assert curve.source_reference is not None
+
+
+class TestVendorIecParity:
+    """
+    Vendor → IEC parity tests.
+
+    Vendor curves that map to IEC must produce identical trip times.
+    """
+
+    def test_abb_si_matches_iec_si(self):
+        """ABB_SI must produce same result as IEC_SI."""
+        from domain.protection_vendors import (
+            VENDOR_CURVE_REGISTRY,
+            resolve_vendor_to_iec_params,
+            IecVariant,
+            IEC_CURVE_CONSTANTS,
+        )
+
+        abb_curve = VENDOR_CURVE_REGISTRY["ABB_SI"]
+        abb_params = resolve_vendor_to_iec_params(abb_curve)
+        iec_params = IEC_CURVE_CONSTANTS[IecVariant.SI]
+
+        # Parameters must match exactly
+        assert abb_params["A"] == iec_params["A"]
+        assert abb_params["B"] == iec_params["B"]
+
+        # Trip times must match
+        t_abb = compute_iec_inverse_time(
+            i_fault_a=500.0, i_pickup_a=100.0, tms=1.0,
+            a=abb_params["A"], b=abb_params["B"],
+        )
+        t_iec = compute_iec_inverse_time(
+            i_fault_a=500.0, i_pickup_a=100.0, tms=1.0,
+            a=iec_params["A"], b=iec_params["B"],
+        )
+
+        assert t_abb == t_iec, "ABB_SI must match IEC_SI"
+
+    def test_siemens_vi_matches_iec_vi(self):
+        """SIEMENS_VI must produce same result as IEC_VI."""
+        from domain.protection_vendors import (
+            VENDOR_CURVE_REGISTRY,
+            resolve_vendor_to_iec_params,
+            IecVariant,
+            IEC_CURVE_CONSTANTS,
+        )
+
+        siemens_curve = VENDOR_CURVE_REGISTRY["SIEMENS_VI"]
+        siemens_params = resolve_vendor_to_iec_params(siemens_curve)
+        iec_params = IEC_CURVE_CONSTANTS[IecVariant.VI]
+
+        assert siemens_params["A"] == iec_params["A"]
+        assert siemens_params["B"] == iec_params["B"]
+
+        t_siemens = compute_iec_inverse_time(
+            i_fault_a=500.0, i_pickup_a=100.0, tms=1.0,
+            a=siemens_params["A"], b=siemens_params["B"],
+        )
+        t_iec = compute_iec_inverse_time(
+            i_fault_a=500.0, i_pickup_a=100.0, tms=1.0,
+            a=iec_params["A"], b=iec_params["B"],
+        )
+
+        assert t_siemens == t_iec, "SIEMENS_VI must match IEC_VI"
+
+    def test_etango_ei_matches_iec_ei(self):
+        """ETANGO_EI must produce same result as IEC_EI."""
+        from domain.protection_vendors import (
+            VENDOR_CURVE_REGISTRY,
+            resolve_vendor_to_iec_params,
+            IecVariant,
+            IEC_CURVE_CONSTANTS,
+        )
+
+        etango_curve = VENDOR_CURVE_REGISTRY["ETANGO_EI"]
+        etango_params = resolve_vendor_to_iec_params(etango_curve)
+        iec_params = IEC_CURVE_CONSTANTS[IecVariant.EI]
+
+        assert etango_params["A"] == iec_params["A"]
+        assert etango_params["B"] == iec_params["B"]
+
+        t_etango = compute_iec_inverse_time(
+            i_fault_a=1000.0, i_pickup_a=100.0, tms=1.0,
+            a=etango_params["A"], b=etango_params["B"],
+        )
+        t_iec = compute_iec_inverse_time(
+            i_fault_a=1000.0, i_pickup_a=100.0, tms=1.0,
+            a=iec_params["A"], b=iec_params["B"],
+        )
+
+        assert t_etango == t_iec, "ETANGO_EI must match IEC_EI"
+
+    def test_all_derived_vendor_curves_match_iec(self):
+        """All DERIVED_VENDOR curves must match their IEC variant."""
+        from domain.protection_vendors import (
+            VENDOR_CURVE_REGISTRY,
+            CurveOrigin,
+            resolve_vendor_to_iec_params,
+            IEC_CURVE_CONSTANTS,
+        )
+
+        for code, curve in VENDOR_CURVE_REGISTRY.items():
+            if curve.origin == CurveOrigin.DERIVED_VENDOR:
+                assert curve.maps_to_iec, f"{code} is DERIVED_VENDOR but maps_to_iec=False"
+                assert curve.iec_variant is not None, f"{code} has no iec_variant"
+
+                vendor_params = resolve_vendor_to_iec_params(curve)
+                iec_params = IEC_CURVE_CONSTANTS[curve.iec_variant]
+
+                assert vendor_params["A"] == iec_params["A"], f"{code} A mismatch"
+                assert vendor_params["B"] == iec_params["B"], f"{code} B mismatch"
+
+
+class TestBuildDeviceFromVendorCurve:
+    """Tests for build_device_from_vendor_curve helper."""
+
+    def test_build_abb_si_device(self):
+        """Build device from ABB_SI curve."""
+        from application.protection_analysis.engine import build_device_from_vendor_curve
+
+        device = build_device_from_vendor_curve(
+            device_id="relay-001",
+            protected_element_ref="bus-001",
+            i_pickup_a=100.0,
+            tms=0.3,
+            vendor_curve_code="ABB_SI",
+        )
+
+        assert device.device_id == "relay-001"
+        assert device.i_pickup_a == 100.0
+        assert device.tms == 0.3
+        assert device.manufacturer == "ABB"
+        assert device.vendor_curve_code == "ABB_SI"
+        assert device.curve_origin == "DERIVED_VENDOR"
+        assert device.iec_variant == "SI"
+        assert device.verification_status == "VERIFIED"
+        assert device.curve_parameters["A"] == 0.14
+        assert device.curve_parameters["B"] == 0.02
+
+    def test_build_siemens_ei_device(self):
+        """Build device from SIEMENS_EI curve."""
+        from application.protection_analysis.engine import build_device_from_vendor_curve
+
+        device = build_device_from_vendor_curve(
+            device_id="relay-002",
+            protected_element_ref="bus-002",
+            i_pickup_a=200.0,
+            tms=0.5,
+            vendor_curve_code="SIEMENS_EI",
+        )
+
+        assert device.manufacturer == "SIEMENS"
+        assert device.vendor_curve_code == "SIEMENS_EI"
+        assert device.iec_variant == "EI"
+        assert device.curve_parameters["A"] == 80.0
+        assert device.curve_parameters["B"] == 2.0
+
+    def test_build_unknown_vendor_curve_raises(self):
+        """Unknown vendor curve code should raise ValueError."""
+        from application.protection_analysis.engine import build_device_from_vendor_curve
+
+        with pytest.raises(ValueError, match="Vendor curve not found"):
+            build_device_from_vendor_curve(
+                device_id="relay-001",
+                protected_element_ref="bus-001",
+                i_pickup_a=100.0,
+                tms=0.3,
+                vendor_curve_code="UNKNOWN_CURVE",
+            )
+
+
+class TestVendorCurveDeterminism:
+    """Determinism tests for vendor curves."""
+
+    @pytest.fixture
+    def engine(self):
+        return ProtectionEvaluationEngine()
+
+    def test_vendor_device_determinism(self, engine):
+        """Vendor device evaluation must be deterministic."""
+        from application.protection_analysis.engine import build_device_from_vendor_curve
+
+        device = build_device_from_vendor_curve(
+            device_id="relay-001",
+            protected_element_ref="bus-001",
+            i_pickup_a=100.0,
+            tms=0.3,
+            vendor_curve_code="ABB_SI",
+        )
+
+        fault = FaultPoint(
+            fault_id="bus-001",
+            i_fault_a=500.0,
+            fault_type="3F",
+        )
+
+        input_data = ProtectionEvaluationInput(
+            run_id="run-001",
+            sc_run_id="sc-001",
+            protection_case_id="case-001",
+            template_ref=None,
+            template_fingerprint=None,
+            library_manifest_ref=None,
+            devices=(device,),
+            faults=(fault,),
+        )
+
+        # Execute twice
+        result1, trace1 = engine.evaluate(input_data)
+        result2, trace2 = engine.evaluate(input_data)
+
+        # Results must be identical
+        assert result1.evaluations[0].t_trip_s == result2.evaluations[0].t_trip_s
+
+        # Traces must be identical (except created_at)
+        dict1 = trace1.to_dict()
+        dict2 = trace2.to_dict()
+        del dict1["created_at"]
+        del dict2["created_at"]
+        assert dict1 == dict2
+
+
+class TestVendorTraceAudit:
+    """Tests for vendor audit fields in trace."""
+
+    @pytest.fixture
+    def engine(self):
+        return ProtectionEvaluationEngine()
+
+    def test_trace_contains_vendor_audit_fields(self, engine):
+        """Trace must contain all vendor audit fields."""
+        from application.protection_analysis.engine import build_device_from_vendor_curve
+
+        device = build_device_from_vendor_curve(
+            device_id="relay-001",
+            protected_element_ref="bus-001",
+            i_pickup_a=100.0,
+            tms=0.3,
+            vendor_curve_code="SCHNEIDER_VI",
+        )
+
+        fault = FaultPoint(
+            fault_id="bus-001",
+            i_fault_a=500.0,
+            fault_type="3F",
+        )
+
+        input_data = ProtectionEvaluationInput(
+            run_id="run-001",
+            sc_run_id="sc-001",
+            protection_case_id="case-001",
+            template_ref=None,
+            template_fingerprint=None,
+            library_manifest_ref=None,
+            devices=(device,),
+            faults=(fault,),
+        )
+
+        _, trace = engine.evaluate(input_data)
+
+        # Find device evaluation step
+        eval_steps = [s for s in trace.steps if s.step == "device_evaluation"]
+        assert len(eval_steps) == 1
+
+        step = eval_steps[0]
+
+        # Verify vendor audit fields
+        assert step.inputs["manufacturer"] == "SCHNEIDER"
+        assert step.inputs["vendor_curve_code"] == "SCHNEIDER_VI"
+        assert step.inputs["curve_origin"] == "DERIVED_VENDOR"
+        assert step.inputs["iec_variant"] == "VI"
+        assert step.inputs["verification_status"] == "VERIFIED"
+        assert "source_reference" in step.inputs
+
+    def test_device_to_dict_includes_vendor_fields(self):
+        """ProtectionDevice.to_dict() must include vendor fields."""
+        from application.protection_analysis.engine import build_device_from_vendor_curve
+
+        device = build_device_from_vendor_curve(
+            device_id="relay-001",
+            protected_element_ref="bus-001",
+            i_pickup_a=100.0,
+            tms=0.3,
+            vendor_curve_code="ETANGO_EI",
+        )
+
+        d = device.to_dict()
+
+        assert d["manufacturer"] == "ETANGO"
+        assert d["vendor_curve_code"] == "ETANGO_EI"
+        assert d["curve_origin"] == "DERIVED_VENDOR"
+        assert d["iec_variant"] == "EI"
+        assert d["verification_status"] == "VERIFIED"
+        assert d["source_reference"] == "Etango EOP-2 User Manual"
+
+
+class TestVendorBoundaryConditions:
+    """Boundary condition tests for vendor curves."""
+
+    def test_vendor_curve_at_10x_pickup(self):
+        """Vendor curve at I = 10 × Ipickup, TMS = 1."""
+        from domain.protection_vendors import (
+            VENDOR_CURVE_REGISTRY,
+            resolve_vendor_to_iec_params,
+        )
+
+        # Test ABB_VI at M=10
+        abb_vi = VENDOR_CURVE_REGISTRY["ABB_VI"]
+        params = resolve_vendor_to_iec_params(abb_vi)
+
+        t = compute_iec_inverse_time(
+            i_fault_a=1000.0,  # 10 × 100A
+            i_pickup_a=100.0,
+            tms=1.0,
+            a=params["A"],
+            b=params["B"],
+        )
+
+        # VI at M=10: t = 13.5 / (10-1) = 1.5s
+        assert t is not None
+        assert abs(t - 1.5) < 1e-5
+
+    def test_vendor_curve_no_trip_below_pickup(self):
+        """Vendor curve should not trip below pickup."""
+        from domain.protection_vendors import (
+            VENDOR_CURVE_REGISTRY,
+            resolve_vendor_to_iec_params,
+        )
+
+        for code in ["ABB_SI", "SIEMENS_VI", "ETANGO_EI", "GE_SI", "SEL_EI"]:
+            curve = VENDOR_CURVE_REGISTRY[code]
+            params = resolve_vendor_to_iec_params(curve)
+
+            t = compute_iec_inverse_time(
+                i_fault_a=50.0,  # Below pickup
+                i_pickup_a=100.0,
+                tms=1.0,
+                a=params["A"],
+                b=params["B"],
+            )
+
+            assert t is None, f"{code} should not trip below pickup"
+
+
+class TestListSupportedVendorCurves:
+    """Tests for list_supported_vendor_curves helper."""
+
+    def test_list_contains_all_registered_curves(self):
+        """list_supported_vendor_curves must return all registered curves."""
+        from application.protection_analysis.engine import list_supported_vendor_curves
+        from domain.protection_vendors import VENDOR_CURVE_REGISTRY
+
+        supported = list_supported_vendor_curves()
+
+        assert len(supported) == len(VENDOR_CURVE_REGISTRY)
+        for code in VENDOR_CURVE_REGISTRY:
+            assert code in supported
+

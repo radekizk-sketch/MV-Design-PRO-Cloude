@@ -79,6 +79,14 @@ class ProtectionDevice:
     Protection device instance for evaluation.
 
     Represents a single protection device protecting an element.
+
+    Vendor Curve Extension (P15a-EXT-VENDORS):
+    - manufacturer: Device manufacturer (ABB, SIEMENS, etc.)
+    - vendor_curve_code: Vendor-specific curve code (e.g., "ABB_SI")
+    - curve_origin: IEC_STANDARD, DERIVED_VENDOR, VENDOR_NATIVE
+    - iec_variant: IEC variant if maps_to_iec (SI, VI, EI, LTI)
+    - source_reference: Datasheet/catalog reference
+    - verification_status: VERIFIED, UNVERIFIED, DEPRECATED
     """
     device_id: str
     device_type_ref: str | None
@@ -88,9 +96,16 @@ class ProtectionDevice:
     curve_ref: str | None
     curve_kind: str | None
     curve_parameters: dict[str, Any] = field(default_factory=dict)
+    # Vendor extension fields (P15a-EXT-VENDORS)
+    manufacturer: str | None = None
+    vendor_curve_code: str | None = None
+    curve_origin: str | None = None  # IEC_STANDARD, DERIVED_VENDOR, VENDOR_NATIVE
+    iec_variant: str | None = None   # SI, VI, EI, LTI
+    source_reference: str | None = None
+    verification_status: str | None = None  # VERIFIED, UNVERIFIED, DEPRECATED
 
     def to_dict(self) -> dict[str, Any]:
-        return {
+        result = {
             "device_id": self.device_id,
             "device_type_ref": self.device_type_ref,
             "protected_element_ref": self.protected_element_ref,
@@ -100,6 +115,20 @@ class ProtectionDevice:
             "curve_kind": self.curve_kind,
             "curve_parameters": self.curve_parameters,
         }
+        # Add vendor fields only if present
+        if self.manufacturer is not None:
+            result["manufacturer"] = self.manufacturer
+        if self.vendor_curve_code is not None:
+            result["vendor_curve_code"] = self.vendor_curve_code
+        if self.curve_origin is not None:
+            result["curve_origin"] = self.curve_origin
+        if self.iec_variant is not None:
+            result["iec_variant"] = self.iec_variant
+        if self.source_reference is not None:
+            result["source_reference"] = self.source_reference
+        if self.verification_status is not None:
+            result["verification_status"] = self.verification_status
+        return result
 
 
 @dataclass(frozen=True)
@@ -394,18 +423,34 @@ class ProtectionEvaluationEngine:
             notes_pl=notes_pl,
         )
 
+        # Build trace inputs with vendor audit fields (P15a-EXT-VENDORS)
+        trace_inputs: dict[str, Any] = {
+            "device_id": device.device_id,
+            "fault_id": fault.fault_id,
+            "i_fault_a": i_fault_a,
+            "i_pickup_a": i_pickup_a,
+            "curve_kind": curve_kind,
+            "tms": device.tms,
+            "curve_parameters": device.curve_parameters,
+        }
+        # Add vendor audit fields if present
+        if device.manufacturer is not None:
+            trace_inputs["manufacturer"] = device.manufacturer
+        if device.vendor_curve_code is not None:
+            trace_inputs["vendor_curve_code"] = device.vendor_curve_code
+        if device.curve_origin is not None:
+            trace_inputs["curve_origin"] = device.curve_origin
+        if device.iec_variant is not None:
+            trace_inputs["iec_variant"] = device.iec_variant
+        if device.source_reference is not None:
+            trace_inputs["source_reference"] = device.source_reference
+        if device.verification_status is not None:
+            trace_inputs["verification_status"] = device.verification_status
+
         trace_step = ProtectionTraceStep(
             step="device_evaluation",
             description_pl=f"Ocena urządzenia {device.device_id} dla zwarcia w {fault.fault_id}",
-            inputs={
-                "device_id": device.device_id,
-                "fault_id": fault.fault_id,
-                "i_fault_a": i_fault_a,
-                "i_pickup_a": i_pickup_a,
-                "curve_kind": curve_kind,
-                "tms": device.tms,
-                "curve_parameters": device.curve_parameters,
-            },
+            inputs=trace_inputs,
             outputs={
                 "trip_state": trip_state.value,
                 "t_trip_s": t_trip_s,
@@ -620,3 +665,106 @@ def _extract_setting_value(
             except (TypeError, ValueError):
                 continue
     return default
+
+
+# =============================================================================
+# VENDOR CURVE HELPERS (P15a-EXT-VENDORS)
+# =============================================================================
+
+
+def build_device_from_vendor_curve(
+    *,
+    device_id: str,
+    protected_element_ref: str,
+    i_pickup_a: float,
+    tms: float,
+    vendor_curve_code: str,
+    device_type_ref: str | None = None,
+) -> ProtectionDevice:
+    """
+    Build a ProtectionDevice from a vendor curve code.
+
+    This function looks up the vendor curve in the registry and builds
+    a device with all vendor audit fields populated.
+
+    Args:
+        device_id: Unique device identifier
+        protected_element_ref: Element being protected (bus/branch ID)
+        i_pickup_a: Pickup current [A]
+        tms: Time multiplier setting
+        vendor_curve_code: Vendor curve code (e.g., "ABB_SI", "SIEMENS_VI")
+        device_type_ref: Optional device type reference
+
+    Returns:
+        ProtectionDevice with vendor curve parameters
+
+    Raises:
+        ValueError: If vendor curve code is not found in registry
+    """
+    from domain.protection_vendors import (
+        VENDOR_CURVE_REGISTRY,
+        VendorCurveDefinition,
+        resolve_vendor_to_iec_params,
+    )
+
+    vendor_curve = VENDOR_CURVE_REGISTRY.get(vendor_curve_code)
+    if vendor_curve is None:
+        raise ValueError(f"Vendor curve not found: {vendor_curve_code}")
+
+    # Resolve curve parameters (IEC or vendor-native)
+    params = resolve_vendor_to_iec_params(vendor_curve)
+
+    # Map vendor curve to curve_kind for engine dispatch
+    curve_kind = _vendor_to_curve_kind(vendor_curve)
+
+    return ProtectionDevice(
+        device_id=device_id,
+        device_type_ref=device_type_ref,
+        protected_element_ref=protected_element_ref,
+        i_pickup_a=float(i_pickup_a),
+        tms=float(tms),
+        curve_ref=vendor_curve.curve_code,
+        curve_kind=curve_kind,
+        curve_parameters=params,
+        # Vendor audit fields
+        manufacturer=vendor_curve.manufacturer.value,
+        vendor_curve_code=vendor_curve.curve_code,
+        curve_origin=vendor_curve.origin.value,
+        iec_variant=vendor_curve.iec_variant.value if vendor_curve.iec_variant else None,
+        source_reference=vendor_curve.source_reference,
+        verification_status=vendor_curve.verification_status.value,
+    )
+
+
+def _vendor_to_curve_kind(vendor_curve) -> str:
+    """
+    Map vendor curve to engine curve_kind.
+
+    If vendor curve maps to IEC, use IEC variant mapping.
+    If vendor-native, use "inverse" with custom parameters.
+    """
+    from domain.protection_vendors import IecVariant
+
+    if vendor_curve.maps_to_iec and vendor_curve.iec_variant:
+        # Map IEC variant to curve_kind
+        iec_to_kind = {
+            IecVariant.SI: "inverse",
+            IecVariant.VI: "very_inverse",
+            IecVariant.EI: "extremely_inverse",
+            IecVariant.LTI: "inverse",  # LTI uses same formula, different params
+        }
+        return iec_to_kind.get(vendor_curve.iec_variant, "inverse")
+    else:
+        # Vendor-native curves use inverse formula with custom params
+        return "inverse"
+
+
+def list_supported_vendor_curves() -> list[str]:
+    """
+    List all supported vendor curve codes.
+
+    Returns:
+        List of vendor curve codes (e.g., ["ABB_SI", "ABB_VI", ...])
+    """
+    from domain.protection_vendors import VENDOR_CURVE_REGISTRY
+    return list(VENDOR_CURVE_REGISTRY.keys())
