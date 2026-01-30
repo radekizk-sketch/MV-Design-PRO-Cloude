@@ -16,7 +16,7 @@ from __future__ import annotations
 from typing import Any
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel
 
 from api.dependencies import get_uow_factory
@@ -291,6 +291,94 @@ def get_protection_run_trace(
 # =============================================================================
 # HELPERS
 # =============================================================================
+
+
+@router.get(
+    "/projects/{project_id}/sld/{diagram_id}/protection-overlay",
+)
+def get_protection_sld_overlay(
+    project_id: UUID,
+    diagram_id: UUID,
+    run_id: UUID = Query(..., description="Protection run ID for overlay"),
+    uow_factory=Depends(get_uow_factory),
+) -> dict[str, Any]:
+    """
+    P15c: Get SLD overlay for protection analysis results.
+
+    Maps protection evaluation states to SLD symbols for visualization.
+    This is READ-ONLY - does not mutate model or diagram.
+
+    Args:
+        project_id: Project UUID
+        diagram_id: SLD diagram UUID
+        run_id: Protection run UUID to get results from
+
+    Returns:
+        Protection overlay with element states mapped to SLD symbols.
+
+    Overlay contains:
+    - elements: List of protection elements with trip_state, t_trip_s, margin_percent
+    - result_status: FRESH/OUTDATED/NONE to indicate result validity
+    """
+    service = _build_service(uow_factory)
+
+    # First check run exists and is FINISHED
+    try:
+        run = service.get_run(run_id)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(exc),
+        ) from exc
+
+    if run.status != ProtectionRunStatus.FINISHED:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Run is not finished (status: {run.status.value})",
+        )
+
+    # Verify project ID matches
+    if run.project_id != project_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Run does not belong to this project",
+        )
+
+    # Get protection results
+    result = service.get_result(run_id)
+    if result is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Protection result not found",
+        )
+
+    # Build overlay (simple version - maps evaluations to elements)
+    # TODO: In full implementation, map protected_element_ref to SLD symbol_id
+    # For now, return evaluations directly with element_id = protected_element_ref
+    elements = []
+    for evaluation in result.evaluations:
+        elements.append({
+            "symbol_id": evaluation.protected_element_ref,  # TODO: Map to actual symbol
+            "element_id": evaluation.protected_element_ref,
+            "trip_state": evaluation.trip_state.value,
+            "t_trip_s": evaluation.t_trip_s,
+            "margin_percent": evaluation.margin_percent,
+        })
+
+    # Sort deterministically by element_id
+    elements.sort(key=lambda x: x["element_id"])
+
+    # Determine result status (FRESH/OUTDATED/NONE)
+    # For now, assume FRESH if run is FINISHED
+    # TODO: Check if snapshot changed since run
+    result_status = "FRESH"
+
+    return {
+        "diagram_id": str(diagram_id),
+        "run_id": str(run_id),
+        "result_status": result_status,
+        "elements": elements,
+    }
 
 
 def _run_to_response(run) -> dict[str, Any]:

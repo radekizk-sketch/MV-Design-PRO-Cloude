@@ -166,6 +166,9 @@ export type TreeNodeType =
   | 'STUDY_CASE'  // P10: Individual study case node
   | 'RESULTS'
   | 'RUN_ITEM'    // P11c: Individual analysis run in results history
+  | 'PROTECTION_RESULTS'  // P15c: Protection results category
+  | 'PROTECTION_RUNS'     // P15c: Protection runs subcategory
+  | 'PROTECTION_COMPARISONS'  // P15c: Protection comparisons subcategory
   | 'ELEMENT'; // Individual element node
 
 /**

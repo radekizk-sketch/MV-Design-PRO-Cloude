@@ -30,6 +30,8 @@ from domain.results import (
     NumericDelta,
     PowerFlowComparison,
     ProjectMismatchError,
+    ProtectionComparison,
+    ProtectionEvaluationComparison,
     ResultNotFoundError,
     RunComparisonResult,
     RunNotFoundError,
@@ -109,6 +111,7 @@ class ComparisonService:
             # 5. Build comparison based on analysis type
             short_circuit_comp = None
             power_flow_comp = None
+            protection_comp = None
 
             if run_a.analysis_type in ("short_circuit", "sc", "iec60909"):
                 short_circuit_comp = self._compare_short_circuit(
@@ -116,6 +119,10 @@ class ComparisonService:
                 )
             elif run_a.analysis_type in ("power_flow", "pf", "load_flow"):
                 power_flow_comp = self._compare_power_flow(
+                    results_a, results_b, run_a_id, run_b_id
+                )
+            elif run_a.analysis_type in ("protection", "protection_analysis"):
+                protection_comp = self._compare_protection(
                     results_a, results_b, run_a_id, run_b_id
                 )
 
@@ -126,6 +133,7 @@ class ComparisonService:
                 analysis_type=run_a.analysis_type,
                 short_circuit=short_circuit_comp,
                 power_flow=power_flow_comp,
+                protection=protection_comp,
             )
 
     def _compare_short_circuit(
@@ -264,6 +272,94 @@ class ComparisonService:
 
         return comparisons
 
+    def _compare_protection(
+        self,
+        results_a: list[dict],
+        results_b: list[dict],
+        run_a_id: UUID,
+        run_b_id: UUID,
+    ) -> ProtectionComparison:
+        """
+        Compare Protection Analysis results.
+
+        P15c: Compares trip states, trip times, margins between two runs.
+
+        INVARIANT: No normative interpretation, just arithmetic deltas.
+        """
+        payload_a = self._find_result_payload(results_a, "protection", run_a_id)
+        payload_b = self._find_result_payload(results_b, "protection", run_b_id)
+
+        # Extract evaluations (list of evaluation dicts)
+        evaluations_a = payload_a.get("evaluations", [])
+        evaluations_b = payload_b.get("evaluations", [])
+
+        # Build mapping by protected_element_ref for deterministic comparison
+        eval_map_a = {ev.get("protected_element_ref"): ev for ev in evaluations_a}
+        eval_map_b = {ev.get("protected_element_ref"): ev for ev in evaluations_b}
+
+        # Get all element IDs (union of both sets)
+        all_elements = sorted(set(eval_map_a.keys()) | set(eval_map_b.keys()))
+
+        # Compare each element
+        eval_comparisons = []
+        for element_id in all_elements:
+            ev_a = eval_map_a.get(element_id, {})
+            ev_b = eval_map_b.get(element_id, {})
+
+            trip_state_a = ev_a.get("trip_state", "UNKNOWN")
+            trip_state_b = ev_b.get("trip_state", "UNKNOWN")
+
+            # Determine state change (PL)
+            if trip_state_a == trip_state_b:
+                state_change = "BRAK ZMIANY"
+            else:
+                state_change = f"{trip_state_a}→{trip_state_b}"
+
+            # Trip time delta (only if both TRIPS)
+            t_trip_delta = None
+            if trip_state_a == "TRIPS" and trip_state_b == "TRIPS":
+                t_a = float(ev_a.get("t_trip_s", 0.0))
+                t_b = float(ev_b.get("t_trip_s", 0.0))
+                t_trip_delta = NumericDelta.compute(t_a, t_b)
+
+            # Margin delta (if both have margin)
+            margin_delta = None
+            margin_a = ev_a.get("margin_percent")
+            margin_b = ev_b.get("margin_percent")
+            if margin_a is not None and margin_b is not None:
+                margin_delta = NumericDelta.compute(float(margin_a), float(margin_b))
+
+            eval_comparisons.append(
+                ProtectionEvaluationComparison(
+                    element_id=element_id,
+                    trip_state_a=trip_state_a,
+                    trip_state_b=trip_state_b,
+                    state_change=state_change,
+                    t_trip_delta=t_trip_delta,
+                    margin_delta=margin_delta,
+                )
+            )
+
+        # Extract summary counts
+        summary_a = payload_a.get("summary", {})
+        summary_b = payload_b.get("summary", {})
+
+        trip_count_a = float(summary_a.get("trips_count", 0))
+        trip_count_b = float(summary_b.get("trips_count", 0))
+
+        no_trip_count_a = float(summary_a.get("no_trip_count", 0))
+        no_trip_count_b = float(summary_b.get("no_trip_count", 0))
+
+        invalid_count_a = float(summary_a.get("invalid_count", 0))
+        invalid_count_b = float(summary_b.get("invalid_count", 0))
+
+        return ProtectionComparison(
+            evaluations=tuple(eval_comparisons),
+            trip_count_delta=NumericDelta.compute(trip_count_a, trip_count_b),
+            no_trip_count_delta=NumericDelta.compute(no_trip_count_a, no_trip_count_b),
+            invalid_count_delta=NumericDelta.compute(invalid_count_a, invalid_count_b),
+        )
+
     def _find_result_payload(
         self,
         results: list[dict],
@@ -292,6 +388,12 @@ class ComparisonService:
             for result in results:
                 payload = result.get("payload", {})
                 if "converged" in payload or "node_voltage_pu" in payload:
+                    return payload
+
+        if result_type == "protection":
+            for result in results:
+                payload = result.get("payload", {})
+                if "evaluations" in payload or "summary" in payload:
                     return payload
 
         # If we have any results, return the first payload

@@ -15,6 +15,7 @@ import { useEffect, useState, useCallback } from 'react';
 
 import { DesignerPage } from './designer/DesignerPage';
 import { ProofInspectorPage } from './proof-inspector';
+import { ProtectionResultsInspectorPage } from './ui/protection-results';
 import { MainLayout } from './ui/layout';
 import { useAppStateStore } from './ui/app-state';
 
@@ -30,7 +31,7 @@ function App() {
 
   // Sync mode with route
   useEffect(() => {
-    if (route === '#proof') {
+    if (route === '#proof' || route === '#protection-results') {
       setActiveMode('RESULT_VIEW');
     } else if (route === '#case-config') {
       setActiveMode('CASE_CONFIG');
@@ -56,6 +57,18 @@ function App() {
         onViewResults={handleViewResults}
       >
         <ProofInspectorPage />
+      </MainLayout>
+    );
+  }
+
+  // Protection Results Inspector
+  if (route === '#protection-results') {
+    return (
+      <MainLayout
+        onCalculate={handleCalculate}
+        onViewResults={handleViewResults}
+      >
+        <ProtectionResultsInspectorPage />
       </MainLayout>
     );
   }

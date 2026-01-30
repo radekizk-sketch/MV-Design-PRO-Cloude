@@ -55,6 +55,9 @@ const TREE_NODE_ICONS: Record<TreeNodeType, string> = {
   STUDY_CASE: '◉',  // P10: Study case icon
   RESULTS: '📊',
   RUN_ITEM: '▸',  // P11c: Analysis run icon
+  PROTECTION_RESULTS: '🛡️',  // P15c: Protection results category
+  PROTECTION_RUNS: '▸',      // P15c: Protection runs
+  PROTECTION_COMPARISONS: '⚖️',  // P15c: Protection comparisons
   ELEMENT: '•',
 };
 
@@ -77,6 +80,9 @@ const TREE_NODE_LABELS: Record<TreeNodeType, string> = {
   STUDY_CASE: '',  // P10: Label from case name
   RESULTS: 'Wyniki',
   RUN_ITEM: '',  // P11c: Label from run metadata
+  PROTECTION_RESULTS: 'Zabezpieczenia',  // P15c: Protection results
+  PROTECTION_RUNS: 'Runy zabezpieczeń',  // P15c: Protection runs
+  PROTECTION_COMPARISONS: 'Porównania A/B',  // P15c: Protection comparisons
   ELEMENT: '',
 };
 
@@ -344,7 +350,32 @@ export function ProjectTree({
           label: TREE_NODE_LABELS.RESULTS,
           nodeType: 'RESULTS',
           count: runHistory.length,
-          children: buildRunNodes(runHistory),
+          children: [
+            // P15c: Protection results subcategory
+            {
+              id: 'protection-results',
+              label: TREE_NODE_LABELS.PROTECTION_RESULTS,
+              nodeType: 'PROTECTION_RESULTS',
+              children: [
+                {
+                  id: 'protection-runs',
+                  label: TREE_NODE_LABELS.PROTECTION_RUNS,
+                  nodeType: 'PROTECTION_RUNS',
+                  count: runHistory.filter(r => r.solver_kind === 'protection' || r.solver_kind === 'protection_analysis').length,
+                  children: buildRunNodes(runHistory.filter(r => r.solver_kind === 'protection' || r.solver_kind === 'protection_analysis')),
+                },
+                {
+                  id: 'protection-comparisons',
+                  label: TREE_NODE_LABELS.PROTECTION_COMPARISONS,
+                  nodeType: 'PROTECTION_COMPARISONS',
+                  count: 0, // TODO: Add comparison history
+                  children: [],
+                },
+              ],
+            },
+            // Other runs (SC, PF, etc.) at top level
+            ...buildRunNodes(runHistory.filter(r => r.solver_kind !== 'protection' && r.solver_kind !== 'protection_analysis')),
+          ],
         },
       ],
     };
@@ -372,8 +403,15 @@ export function ProjectTree({
         // P10: Study case click
         onStudyCaseClick?.(node.studyCaseId);
       } else if (node.nodeType === 'RUN_ITEM' && node.runId) {
-        // P11c: Run click - open Results Inspector
-        onRunClick?.(node.runId);
+        // P11c/P15c: Run click - open appropriate Results Inspector
+        if (node.solverKind === 'protection' || node.solverKind === 'protection_analysis') {
+          // P15c: Protection run - navigate to protection results
+          window.location.hash = '#protection-results';
+          onRunClick?.(node.runId);
+        } else {
+          // P11c: Other runs - use existing handler
+          onRunClick?.(node.runId);
+        }
       } else if (TREE_NODE_TO_ELEMENT_TYPE[node.nodeType]) {
         // Category click - open Data Manager
         onCategoryClick?.(node.nodeType, TREE_NODE_TO_ELEMENT_TYPE[node.nodeType]);
