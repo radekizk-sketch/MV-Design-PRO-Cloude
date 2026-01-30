@@ -16,6 +16,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { DesignerPage } from './designer/DesignerPage';
 import { ProofInspectorPage } from './proof-inspector';
 import { ProtectionResultsInspectorPage } from './ui/protection-results';
+import { PowerFlowResultsInspectorPage } from './ui/power-flow-results';
 import { MainLayout } from './ui/layout';
 import { useAppStateStore } from './ui/app-state';
 
@@ -31,7 +32,7 @@ function App() {
 
   // Sync mode with route
   useEffect(() => {
-    if (route === '#proof' || route === '#protection-results') {
+    if (route === '#proof' || route === '#protection-results' || route === '#power-flow-results') {
       setActiveMode('RESULT_VIEW');
     } else if (route === '#case-config') {
       setActiveMode('CASE_CONFIG');
@@ -69,6 +70,18 @@ function App() {
         onViewResults={handleViewResults}
       >
         <ProtectionResultsInspectorPage />
+      </MainLayout>
+    );
+  }
+
+  // P20b: Power Flow Results Inspector
+  if (route === '#power-flow-results') {
+    return (
+      <MainLayout
+        onCalculate={handleCalculate}
+        onViewResults={handleViewResults}
+      >
+        <PowerFlowResultsInspectorPage />
       </MainLayout>
     );
   }

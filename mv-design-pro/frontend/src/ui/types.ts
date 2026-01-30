@@ -169,6 +169,8 @@ export type TreeNodeType =
   | 'PROTECTION_RESULTS'  // P15c: Protection results category
   | 'PROTECTION_RUNS'     // P15c: Protection runs subcategory
   | 'PROTECTION_COMPARISONS'  // P15c: Protection comparisons subcategory
+  | 'POWER_FLOW_RESULTS'  // P20b: Power flow results category
+  | 'POWER_FLOW_RUNS'     // P20b: Power flow runs subcategory
   | 'ELEMENT'; // Individual element node
 
 /**

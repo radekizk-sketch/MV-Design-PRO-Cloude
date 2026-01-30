@@ -58,6 +58,8 @@ const TREE_NODE_ICONS: Record<TreeNodeType, string> = {
   PROTECTION_RESULTS: '🛡️',  // P15c: Protection results category
   PROTECTION_RUNS: '▸',      // P15c: Protection runs
   PROTECTION_COMPARISONS: '⚖️',  // P15c: Protection comparisons
+  POWER_FLOW_RESULTS: '⚡',  // P20b: Power flow results category
+  POWER_FLOW_RUNS: '▸',      // P20b: Power flow runs
   ELEMENT: '•',
 };
 
@@ -83,6 +85,8 @@ const TREE_NODE_LABELS: Record<TreeNodeType, string> = {
   PROTECTION_RESULTS: 'Zabezpieczenia',  // P15c: Protection results
   PROTECTION_RUNS: 'Runy zabezpieczeń',  // P15c: Protection runs
   PROTECTION_COMPARISONS: 'Porównania A/B',  // P15c: Protection comparisons
+  POWER_FLOW_RESULTS: 'Rozpływ mocy',  // P20b: Power flow results
+  POWER_FLOW_RUNS: 'Rozpływy',  // P20b: Power flow runs
   ELEMENT: '',
 };
 
@@ -351,6 +355,14 @@ export function ProjectTree({
           nodeType: 'RESULTS',
           count: runHistory.length,
           children: [
+            // P20b: Power flow results subcategory
+            {
+              id: 'power-flow-results',
+              label: TREE_NODE_LABELS.POWER_FLOW_RESULTS,
+              nodeType: 'POWER_FLOW_RESULTS',
+              count: runHistory.filter(r => r.solver_kind === 'PF' || r.solver_kind === 'power_flow').length,
+              children: buildRunNodes(runHistory.filter(r => r.solver_kind === 'PF' || r.solver_kind === 'power_flow')),
+            },
             // P15c: Protection results subcategory
             {
               id: 'protection-results',
@@ -373,8 +385,13 @@ export function ProjectTree({
                 },
               ],
             },
-            // Other runs (SC, PF, etc.) at top level
-            ...buildRunNodes(runHistory.filter(r => r.solver_kind !== 'protection' && r.solver_kind !== 'protection_analysis')),
+            // Other runs (SC, etc.) at top level - excluding PF and protection
+            ...buildRunNodes(runHistory.filter(r =>
+              r.solver_kind !== 'protection' &&
+              r.solver_kind !== 'protection_analysis' &&
+              r.solver_kind !== 'PF' &&
+              r.solver_kind !== 'power_flow'
+            )),
           ],
         },
       ],
@@ -403,10 +420,14 @@ export function ProjectTree({
         // P10: Study case click
         onStudyCaseClick?.(node.studyCaseId);
       } else if (node.nodeType === 'RUN_ITEM' && node.runId) {
-        // P11c/P15c: Run click - open appropriate Results Inspector
+        // P11c/P15c/P20b: Run click - open appropriate Results Inspector
         if (node.solverKind === 'protection' || node.solverKind === 'protection_analysis') {
           // P15c: Protection run - navigate to protection results
           window.location.hash = '#protection-results';
+          onRunClick?.(node.runId);
+        } else if (node.solverKind === 'PF' || node.solverKind === 'power_flow') {
+          // P20b: Power flow run - navigate to power flow results
+          window.location.hash = '#power-flow-results';
           onRunClick?.(node.runId);
         } else {
           // P11c: Other runs - use existing handler
