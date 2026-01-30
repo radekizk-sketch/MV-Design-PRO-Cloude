@@ -240,6 +240,36 @@ class InverterTypeORM(Base):
     params_jsonb: Mapped[dict[str, Any]] = mapped_column(DeterministicJSON(), nullable=False)
 
 
+class ProtectionDeviceTypeORM(Base):
+    """Protection device type (relay, fuse, etc.) - P14a READ-ONLY"""
+
+    __tablename__ = "protection_device_types"
+
+    id: Mapped[str] = mapped_column(String(255), primary_key=True)
+    name_pl: Mapped[str] = mapped_column(String(255), nullable=False)
+    params_jsonb: Mapped[dict[str, Any]] = mapped_column(DeterministicJSON(), nullable=False)
+
+
+class ProtectionCurveORM(Base):
+    """Protection curve (time-current characteristic) - P14a READ-ONLY"""
+
+    __tablename__ = "protection_curves"
+
+    id: Mapped[str] = mapped_column(String(255), primary_key=True)
+    name_pl: Mapped[str] = mapped_column(String(255), nullable=False)
+    params_jsonb: Mapped[dict[str, Any]] = mapped_column(DeterministicJSON(), nullable=False)
+
+
+class ProtectionSettingTemplateORM(Base):
+    """Protection setting template - P14a READ-ONLY"""
+
+    __tablename__ = "protection_setting_templates"
+
+    id: Mapped[str] = mapped_column(String(255), primary_key=True)
+    name_pl: Mapped[str] = mapped_column(String(255), nullable=False)
+    params_jsonb: Mapped[dict[str, Any]] = mapped_column(DeterministicJSON(), nullable=False)
+
+
 class SwitchEquipmentAssignmentORM(Base):
     __tablename__ = "switch_equipment_assignments"
 

@@ -1958,10 +1958,60 @@ Wdrożenie **liczbowego audytu kompletności analizy** (P28):
 
 ---
 
+## 18. Phase P14a: Protection Library (FOUNDATION, READ-ONLY) — DONE
+
+### 18.1 Cel fazy
+
+Wprowadzenie **podstawowej biblioteki referencyjnej** dla urządzeń zabezpieczeniowych (przekaźniki, bezpieczniki, etc.),
+krzywych czasowo-prądowych oraz szablonów nastaw.
+
+**KRYTYCZNE OGRANICZENIA:**
+- **READ-ONLY FOUNDATION** — tylko modele danych i przeglądarka
+- **NIE** solver / koordynacja / selektywność
+- **NIE** fizyka / obliczenia / dobór nastaw
+- **NIE** import/export (roadmap: P14b)
+- **100% PL** w UI (zgodnie z wizard_screens.md)
+
+### 18.2 Deliverables
+
+| Plik | Opis | Status |
+|------|------|--------|
+| `backend/src/network_model/catalog/types.py` | Domain models: ProtectionDeviceType, ProtectionCurve, ProtectionSettingTemplate | DONE |
+| `backend/src/network_model/catalog/repository.py` | Repository: list/get protection methods | DONE |
+| `backend/src/infrastructure/persistence/models.py` | ORM models: ProtectionDeviceTypeORM, ProtectionCurveORM, ProtectionSettingTemplateORM | DONE |
+| `backend/src/infrastructure/persistence/repositories/network_wizard_repository.py` | Persistence: list/get protection methods | DONE |
+| `backend/src/application/network_wizard/service.py` | Service: list/get protection methods | DONE |
+| `backend/src/api/catalog.py` | API endpoints READ-ONLY: `/protection/device-types`, `/protection/curves`, `/protection/templates` | DONE |
+| `frontend/src/ui/protection/ProtectionLibraryBrowser.tsx` | UI: Przeglądarka biblioteki zabezpieczeń (100% PL, 3 zakładki) | DONE |
+| `frontend/src/ui/protection/types.ts` | TypeScript interfaces | DONE |
+| `frontend/src/ui/protection/api.ts` | API client | DONE |
+| `backend/tests/test_protection_library.py` | Testy backend: determinism, immutability, get/list | DONE |
+| `frontend/src/ui/protection/__tests__/ProtectionLibraryBrowser.test.ts` | Testy frontend: smoke render, filter/sort | DONE |
+| `PLANS.md` | Aktualizacja planu | DONE |
+
+### 18.3 Relacje
+
+P14a jest **warstwą foundation** dla przyszłych faz protection:
+- **P14b:** Import/Export protection library (governance)
+- **P18:** Protection Proof Pack (overcurrent / selectivity) — korzysta z P14a device types
+
+### 18.4 Definition of Done
+
+- [x] Domain models frozen dataclasses z to_dict/from_dict
+- [x] Repository z deterministycznym sortowaniem (name_pl → id)
+- [x] Persistence (ORM + NetworkWizardRepository) READ-ONLY
+- [x] API endpoints READ-ONLY (/protection/device-types, /protection/curves, /protection/templates)
+- [x] UI ProtectionLibraryBrowser w 100% PL (Urządzenia, Krzywe, Szablony nastaw)
+- [x] Testy backend (immutability, determinism, get/list)
+- [x] Testy frontend (smoke render, filter/sort)
+- [x] PLANS.md zaktualizowany
+
+---
+
 ## 19. Proof Packs Roadmap (P15–P20) — CANONICAL
 
 Poniższa roadmapa jest **jedynym kanonicznym planem** rozwoju Proof Packów.
-Wszystkie pakiety pozostają POST-HOC i nie modyfikują solverów ani Result API.
+Wszystkie pakiety pozostają POST-HOC i nie modyfikują solwerów ani Result API.
 
 ### P15 — Load Currents & Overload Proof Pack
 

@@ -172,6 +172,81 @@ def list_switch_equipment_types(
     return service.list_switch_equipment_types()
 
 
+@router.get("/protection/device-types")
+def list_protection_device_types(
+    uow_factory=Depends(get_uow_factory),
+) -> list[dict[str, Any]]:
+    """List all protection device types from catalog (P14a - READ-ONLY)"""
+    service = _build_service(uow_factory)
+    return service.list_protection_device_types()
+
+
+@router.get("/protection/curves")
+def list_protection_curves(
+    uow_factory=Depends(get_uow_factory),
+) -> list[dict[str, Any]]:
+    """List all protection curves from catalog (P14a - READ-ONLY)"""
+    service = _build_service(uow_factory)
+    return service.list_protection_curves()
+
+
+@router.get("/protection/templates")
+def list_protection_setting_templates(
+    uow_factory=Depends(get_uow_factory),
+) -> list[dict[str, Any]]:
+    """List all protection setting templates from catalog (P14a - READ-ONLY)"""
+    service = _build_service(uow_factory)
+    return service.list_protection_setting_templates()
+
+
+@router.get("/protection/device-types/{device_type_id}")
+def get_protection_device_type(
+    device_type_id: str,
+    uow_factory=Depends(get_uow_factory),
+) -> dict[str, Any]:
+    """Get single protection device type by ID (P14a - READ-ONLY)"""
+    service = _build_service(uow_factory)
+    result = service.get_protection_device_type(device_type_id)
+    if result is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Protection device type not found: {device_type_id}",
+        )
+    return result
+
+
+@router.get("/protection/curves/{curve_id}")
+def get_protection_curve(
+    curve_id: str,
+    uow_factory=Depends(get_uow_factory),
+) -> dict[str, Any]:
+    """Get single protection curve by ID (P14a - READ-ONLY)"""
+    service = _build_service(uow_factory)
+    result = service.get_protection_curve(curve_id)
+    if result is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Protection curve not found: {curve_id}",
+        )
+    return result
+
+
+@router.get("/protection/templates/{template_id}")
+def get_protection_setting_template(
+    template_id: str,
+    uow_factory=Depends(get_uow_factory),
+) -> dict[str, Any]:
+    """Get single protection setting template by ID (P14a - READ-ONLY)"""
+    service = _build_service(uow_factory)
+    result = service.get_protection_setting_template(template_id)
+    if result is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Protection setting template not found: {template_id}",
+        )
+    return result
+
+
 # ============================================================================
 # Assign type_ref (POST endpoints)
 # ============================================================================

@@ -509,3 +509,163 @@ class InverterType:
             manufacturer=data.get("manufacturer"),
             model=data.get("model"),
         )
+
+
+# =============================================================================
+# PROTECTION LIBRARY TYPES
+# =============================================================================
+
+
+@dataclass(frozen=True)
+class ProtectionDeviceType:
+    """
+    Immutable protection device type definition.
+
+    This is a reference library entry for protection devices (relays, fuses, etc.).
+    NO physics, NO calculations - just metadata for later reference.
+
+    Attributes:
+        id: Unique identifier.
+        name_pl: Device name in Polish (e.g., "Przekaźnik nadprądowy Sepam 20").
+        vendor: Manufacturer/vendor name (e.g., "Schneider Electric").
+        series: Product series (e.g., "Sepam 20").
+        revision: Hardware/firmware revision (optional).
+        rated_current_a: Rated current [A] (if applicable).
+        notes_pl: Additional notes in Polish (optional).
+    """
+
+    id: str
+    name_pl: str
+    vendor: Optional[str] = None
+    series: Optional[str] = None
+    revision: Optional[str] = None
+    rated_current_a: Optional[float] = None
+    notes_pl: Optional[str] = None
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert to dictionary."""
+        return {
+            "id": self.id,
+            "name_pl": self.name_pl,
+            "vendor": self.vendor,
+            "series": self.series,
+            "revision": self.revision,
+            "rated_current_a": self.rated_current_a,
+            "notes_pl": self.notes_pl,
+        }
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "ProtectionDeviceType":
+        """Create from dictionary."""
+        return cls(
+            id=str(data.get("id", str(uuid4()))),
+            name_pl=str(data.get("name_pl", "")),
+            vendor=data.get("vendor"),
+            series=data.get("series"),
+            revision=data.get("revision"),
+            rated_current_a=(
+                float(data.get("rated_current_a"))
+                if data.get("rated_current_a") is not None
+                else None
+            ),
+            notes_pl=data.get("notes_pl"),
+        )
+
+
+@dataclass(frozen=True)
+class ProtectionCurve:
+    """
+    Immutable protection curve definition (time-current characteristic).
+
+    This is a reference library entry for protection curves.
+    NO actual calculations - just metadata and parameters.
+
+    Attributes:
+        id: Unique identifier.
+        name_pl: Curve name in Polish (e.g., "IEC Normalna Inwersyjna").
+        standard: Standard designation (e.g., "IEC", "IEEE") - NO normative logic.
+        curve_kind: Curve type (e.g., "inverse", "very_inverse", "extremely_inverse", "definite_time").
+        parameters: JSON-safe dict with curve parameters (NO calculations).
+    """
+
+    id: str
+    name_pl: str
+    standard: Optional[str] = None
+    curve_kind: Optional[str] = None
+    parameters: Dict[str, Any] = None
+
+    def __post_init__(self):
+        """Ensure parameters is a dict (frozen dataclass workaround)."""
+        if self.parameters is None:
+            object.__setattr__(self, "parameters", {})
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert to dictionary."""
+        return {
+            "id": self.id,
+            "name_pl": self.name_pl,
+            "standard": self.standard,
+            "curve_kind": self.curve_kind,
+            "parameters": self.parameters or {},
+        }
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "ProtectionCurve":
+        """Create from dictionary."""
+        return cls(
+            id=str(data.get("id", str(uuid4()))),
+            name_pl=str(data.get("name_pl", "")),
+            standard=data.get("standard"),
+            curve_kind=data.get("curve_kind"),
+            parameters=data.get("parameters") or {},
+        )
+
+
+@dataclass(frozen=True)
+class ProtectionSettingTemplate:
+    """
+    Immutable protection setting template definition.
+
+    This is a reference library entry for protection setting templates.
+    NO calculations, NO setting derivation - just metadata.
+
+    Attributes:
+        id: Unique identifier.
+        name_pl: Template name in Polish (e.g., "Szablon Sepam 20 - Nadprądowy").
+        device_type_ref: Reference to ProtectionDeviceType.id (optional).
+        curve_ref: Reference to ProtectionCurve.id (optional).
+        setting_fields: List of setting field descriptors (name, unit, min, max).
+                       Example: [{"name": "I>", "unit": "A", "min": 0.1, "max": 10.0}]
+    """
+
+    id: str
+    name_pl: str
+    device_type_ref: Optional[str] = None
+    curve_ref: Optional[str] = None
+    setting_fields: list[Dict[str, Any]] = None
+
+    def __post_init__(self):
+        """Ensure setting_fields is a list (frozen dataclass workaround)."""
+        if self.setting_fields is None:
+            object.__setattr__(self, "setting_fields", [])
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert to dictionary."""
+        return {
+            "id": self.id,
+            "name_pl": self.name_pl,
+            "device_type_ref": self.device_type_ref,
+            "curve_ref": self.curve_ref,
+            "setting_fields": self.setting_fields or [],
+        }
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "ProtectionSettingTemplate":
+        """Create from dictionary."""
+        return cls(
+            id=str(data.get("id", str(uuid4()))),
+            name_pl=str(data.get("name_pl", "")),
+            device_type_ref=data.get("device_type_ref"),
+            curve_ref=data.get("curve_ref"),
+            setting_fields=data.get("setting_fields") or [],
+        )
