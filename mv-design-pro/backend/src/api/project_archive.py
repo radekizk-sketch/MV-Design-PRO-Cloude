@@ -8,16 +8,15 @@ POST /projects/import/preview - Podgląd zawartości archiwum
 
 from __future__ import annotations
 
-from typing import Annotated
+from typing import Any
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Response, UploadFile
 from pydantic import BaseModel
-from sqlalchemy.orm import Session
 
-from api.dependencies import get_session
+from api.dependencies import get_uow_factory
 from application.project_archive.service import ProjectArchiveService
-from domain.project_archive import ArchiveError, ArchiveImportStatus
+from domain.project_archive import ArchiveError
 
 router = APIRouter(prefix="/projects", tags=["project-archive"])
 
@@ -83,9 +82,9 @@ class PreviewResponse(BaseModel):
 
 
 @router.post("/{project_id}/export")
-async def export_project(
+def export_project(
     project_id: UUID,
-    session: Annotated[Session, Depends(get_session)],
+    uow_factory: Any = Depends(get_uow_factory),
 ) -> Response:
     """
     Eksportuj projekt do archiwum ZIP.
@@ -96,12 +95,13 @@ async def export_project(
     Returns:
         Plik ZIP z archiwum projektu
     """
-    service = ProjectArchiveService(session)
+    with uow_factory() as uow:
+        service = ProjectArchiveService(uow.session)
 
-    try:
-        archive_bytes = service.export_project(project_id)
-    except ArchiveError as e:
-        raise HTTPException(status_code=404, detail=str(e))
+        try:
+            archive_bytes = service.export_project(project_id)
+        except ArchiveError as e:
+            raise HTTPException(status_code=404, detail=str(e))
 
     # Zwróć jako plik do pobrania
     return Response(
@@ -115,10 +115,10 @@ async def export_project(
 
 @router.post("/import", response_model=ImportResponse)
 async def import_project(
-    file: Annotated[UploadFile, File(description="Archiwum projektu (ZIP)")],
-    session: Annotated[Session, Depends(get_session)],
-    new_name: Annotated[str | None, Form(description="Nowa nazwa projektu (opcjonalna)")] = None,
-    verify_integrity: Annotated[bool, Form(description="Weryfikuj integralność")] = True,
+    file: UploadFile = File(description="Archiwum projektu (ZIP)"),
+    new_name: str | None = Form(None, description="Nowa nazwa projektu (opcjonalna)"),
+    verify_integrity: bool = Form(True, description="Weryfikuj integralność"),
+    uow_factory: Any = Depends(get_uow_factory),
 ) -> ImportResponse:
     """
     Importuj projekt z archiwum ZIP.
@@ -146,12 +146,13 @@ async def import_project(
     # Odczytaj zawartość pliku
     archive_bytes = await file.read()
 
-    service = ProjectArchiveService(session)
-    result = service.import_project(
-        archive_bytes=archive_bytes,
-        new_project_name=new_name,
-        verify_integrity=verify_integrity,
-    )
+    with uow_factory() as uow:
+        service = ProjectArchiveService(uow.session)
+        result = service.import_project(
+            archive_bytes=archive_bytes,
+            new_project_name=new_name,
+            verify_integrity=verify_integrity,
+        )
 
     return ImportResponse(
         status=result.status.value,
@@ -164,8 +165,8 @@ async def import_project(
 
 @router.post("/import/preview", response_model=PreviewResponse)
 async def preview_archive(
-    file: Annotated[UploadFile, File(description="Archiwum projektu (ZIP)")],
-    session: Annotated[Session, Depends(get_session)],
+    file: UploadFile = File(description="Archiwum projektu (ZIP)"),
+    uow_factory: Any = Depends(get_uow_factory),
 ) -> PreviewResponse:
     """
     Podgląd zawartości archiwum bez importu.
@@ -178,8 +179,9 @@ async def preview_archive(
     """
     archive_bytes = await file.read()
 
-    service = ProjectArchiveService(session)
-    preview = service.preview_archive(archive_bytes)
+    with uow_factory() as uow:
+        service = ProjectArchiveService(uow.session)
+        preview = service.preview_archive(archive_bytes)
 
     if not preview.get("valid"):
         return PreviewResponse(

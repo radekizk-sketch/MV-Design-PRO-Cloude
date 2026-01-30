@@ -1245,7 +1245,8 @@ class ProjectArchiveService:
             )
             self._session.add(evid_orm)
 
-        self._session.commit()
+        # flush to ensure IDs are available; commit handled by UnitOfWork
+        self._session.flush()
 
         return new_project_id
 
