@@ -403,10 +403,12 @@ class PowerFlowInterpretationBuilder:
                     description_pl=f.description_pl,
                 ))
 
-        # Sort by severity, then by magnitude (descending), then by ID
+        # Sort by severity, then by magnitude (descending), then by element_type, then by ID
+        # P22b: Full deterministic tie-breaker for ranking
         ranked_items.sort(key=lambda item: (
             SEVERITY_ORDER[item.severity],
             -item.magnitude,
+            item.element_type,
             item.element_id,
         ))
 

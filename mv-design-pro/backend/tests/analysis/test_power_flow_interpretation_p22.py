@@ -358,3 +358,162 @@ def test_empty_power_flow_result() -> None:
     assert result.summary.high_count == 0
     assert result.summary.warn_count == 0
     assert result.summary.info_count == 0
+
+
+# =============================================================================
+# P22b: Deterministic Tie-Breaker Tests
+# =============================================================================
+
+
+def test_ranking_tie_breaker_by_element_type() -> None:
+    """P22b: Test deterministic ranking when severity and magnitude are equal.
+
+    When two items have the same severity and magnitude, the tie-breaker
+    should be: element_type first, then element_id.
+
+    This ensures: branch_loading < voltage (alphabetically).
+    """
+    # Create PowerFlowResult with two findings that have same severity but different types
+    # bus_x: 3% deviation (WARN) -> magnitude = 3.0
+    # branch_y: losses such that magnitude = 3.0 kW (0.003 MW * 1000)
+    pf_result = PowerFlowResult(
+        converged=True,
+        iterations=1,
+        tolerance=1e-8,
+        max_mismatch_pu=0.0,
+        base_mva=100.0,
+        slack_node_id="slack",
+        node_u_mag_pu={
+            "bus_x": 1.03,  # 3% deviation -> WARN, magnitude = 3.0
+            "slack": 1.0,
+        },
+        node_angle_rad={
+            "bus_x": 0.0,
+            "slack": 0.0,
+        },
+        branch_s_from_mva={
+            # Branch with losses = 3.0 kW (0.003 MW), so magnitude after *1000 = 3.0
+            "branch_y": {"re": 0.0015, "im": 0.0},
+        },
+        branch_s_to_mva={
+            "branch_y": {"re": 0.0015, "im": 0.0},  # Total losses = 0.003 MW = 3 kW
+        },
+    )
+
+    builder = PowerFlowInterpretationBuilder(context=None)
+    result = builder.build(pf_result, "run-tie-breaker")
+
+    # Both should be WARN with magnitude = 3.0
+    top_issues = result.summary.top_issues
+
+    # Filter to only WARN items with magnitude ~3.0
+    relevant_items = [item for item in top_issues if item.severity == FindingSeverity.WARN]
+
+    # Should have at least 2 items (voltage and branch)
+    assert len(relevant_items) >= 2
+
+    # Find the two items with same magnitude
+    voltage_item = next((item for item in relevant_items if item.element_type == "voltage"), None)
+    branch_item = next((item for item in relevant_items if item.element_type == "branch_loading"), None)
+
+    assert voltage_item is not None, "Should have voltage finding"
+    assert branch_item is not None, "Should have branch finding"
+
+    # branch_loading < voltage alphabetically, so branch should come first
+    assert branch_item.rank < voltage_item.rank, (
+        f"branch_loading (rank={branch_item.rank}) should come before voltage (rank={voltage_item.rank}) "
+        "because 'branch_loading' < 'voltage' alphabetically"
+    )
+
+
+def test_ranking_tie_breaker_by_element_id() -> None:
+    """P22b: Test deterministic ranking when severity, magnitude, and element_type are equal.
+
+    When all above are equal, the final tie-breaker is element_id (ascending).
+    """
+    # Create two voltage findings with same deviation (same severity, same magnitude)
+    pf_result = PowerFlowResult(
+        converged=True,
+        iterations=1,
+        tolerance=1e-8,
+        max_mismatch_pu=0.0,
+        base_mva=100.0,
+        slack_node_id="slack",
+        node_u_mag_pu={
+            "bus_b": 1.03,  # 3% deviation -> WARN
+            "bus_a": 1.03,  # 3% deviation -> WARN (same magnitude)
+            "slack": 1.0,
+        },
+        node_angle_rad={
+            "bus_a": 0.0,
+            "bus_b": 0.0,
+            "slack": 0.0,
+        },
+        branch_s_from_mva={},
+        branch_s_to_mva={},
+    )
+
+    builder = PowerFlowInterpretationBuilder(context=None)
+    result = builder.build(pf_result, "run-tie-breaker-id")
+
+    top_issues = result.summary.top_issues
+
+    # Find bus_a and bus_b
+    bus_a_item = next((item for item in top_issues if item.element_id == "bus_a"), None)
+    bus_b_item = next((item for item in top_issues if item.element_id == "bus_b"), None)
+
+    assert bus_a_item is not None, "Should have bus_a finding"
+    assert bus_b_item is not None, "Should have bus_b finding"
+
+    # bus_a < bus_b alphabetically, so bus_a should come first
+    assert bus_a_item.rank < bus_b_item.rank, (
+        f"bus_a (rank={bus_a_item.rank}) should come before bus_b (rank={bus_b_item.rank}) "
+        "because 'bus_a' < 'bus_b' alphabetically"
+    )
+
+
+def test_ranking_tie_breaker_determinism_multiple_runs() -> None:
+    """P22b: Test that tie-breaking is deterministic across multiple runs."""
+    pf_result = PowerFlowResult(
+        converged=True,
+        iterations=1,
+        tolerance=1e-8,
+        max_mismatch_pu=0.0,
+        base_mva=100.0,
+        slack_node_id="slack",
+        node_u_mag_pu={
+            "bus_z": 1.03,  # 3% deviation
+            "bus_a": 1.03,  # Same
+            "bus_m": 1.03,  # Same
+            "slack": 1.0,
+        },
+        node_angle_rad={
+            "bus_z": 0.0,
+            "bus_a": 0.0,
+            "bus_m": 0.0,
+            "slack": 0.0,
+        },
+        branch_s_from_mva={
+            "branch_x": {"re": 0.0015, "im": 0.0},
+            "branch_b": {"re": 0.0015, "im": 0.0},
+        },
+        branch_s_to_mva={
+            "branch_x": {"re": 0.0015, "im": 0.0},
+            "branch_b": {"re": 0.0015, "im": 0.0},
+        },
+    )
+
+    builder = PowerFlowInterpretationBuilder(context=None)
+
+    # Run multiple times
+    results = [builder.build(pf_result, "run-multi") for _ in range(5)]
+
+    # Extract ranking order from each run
+    rankings = []
+    for result in results:
+        order = [(item.rank, item.element_type, item.element_id) for item in result.summary.top_issues]
+        rankings.append(order)
+
+    # All rankings should be identical
+    for i in range(1, len(rankings)):
+        assert rankings[0] == rankings[i], f"Ranking should be deterministic across runs (run 0 vs run {i})"
