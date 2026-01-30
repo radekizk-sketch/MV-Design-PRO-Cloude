@@ -2118,6 +2118,112 @@ Umożliwienie przypięcia **ProtectionSettingTemplate** do **StudyCase** z UI ko
 
 ---
 
+## 18.7 Phase P15a: Protection Analysis FOUNDATION (backend-only) — DONE
+
+**Status:** DONE | CANONICAL & BINDING
+
+### 18.7.1. Cel fazy
+
+Wdrożenie **warstwy analizy zabezpieczeń nadprądowych** jako **interpretation layer** (NIE solver):
+- Konsumuje: SC results + ProtectionCase config (P14c) + Protection Library (P14a/b)
+- Produkuje: ProtectionResult + ProtectionTrace (deterministyczne, audytowalne)
+- Zero fizyki poza solverami — tylko interpretacja wyników
+
+**KRYTYCZNE OGRANICZENIA:**
+- **NIE** modyfikuje NetworkModel
+- **NIE** liczy fizyki (tylko interpretuje SC result)
+- **NIE** koordynacja selektywności (roadmap: P15b)
+- **NIE** UI/Frontend (backend-only)
+
+### 18.7.2. Zakres fazy
+
+**IN SCOPE:**
+- ProtectionEvaluationEngine: deterministyczna ocena krzywych I-t
+- ProtectionResult: evaluations[], summary (trips/no_trip/invalid)
+- ProtectionTrace: audit trail (steps, inputs, outputs)
+- ProtectionAnalysisRun: orchestration (CREATE → RUNNING → FINISHED/FAILED)
+- API endpoints: POST /protection-runs, POST /execute, GET /results, GET /trace
+- Testy: determinism (2x execute → identical JSON), walidacje, smoke
+
+**OUT OF SCOPE:**
+- Solvery (IEC 60909 / Power Flow)
+- Koordynacja selektywności (P15b+)
+- UI/Frontend
+- P11 proof engine / LaTeX
+
+### 18.7.3. Deliverables
+
+| Plik | Opis | Status |
+|------|------|--------|
+| `backend/src/domain/protection_analysis.py` | Domain: ProtectionResult, ProtectionTrace, ProtectionEvaluation, ProtectionAnalysisRun | DONE |
+| `backend/src/application/protection_analysis/engine.py` | ProtectionEvaluationEngine: IEC curves (inverse, definite_time) | DONE |
+| `backend/src/application/protection_analysis/service.py` | ProtectionAnalysisService: create/execute/get | DONE |
+| `backend/src/api/protection_runs.py` | API endpoints: POST /protection-runs, /execute, GET /results, /trace | DONE |
+| `backend/tests/test_protection_analysis.py` | Testy: determinism, curve calculations, domain models | DONE |
+| `PLANS.md` | Aktualizacja planu (P15a DONE) | DONE |
+
+### 18.7.4. Supported Curve Types (P15a Foundation)
+
+| Curve Kind | Standard | Parameters | Formula |
+|------------|----------|------------|---------|
+| `inverse` | IEC 60255-151 | A=0.14, B=0.02 | t = TMS × A / ((I/Ip)^B - 1) |
+| `very_inverse` | IEC 60255-151 | A=13.5, B=1.0 | t = TMS × A / ((I/Ip)^B - 1) |
+| `extremely_inverse` | IEC 60255-151 | A=80.0, B=2.0 | t = TMS × A / ((I/Ip)^B - 1) |
+| `definite_time` | - | delay_s | t = delay_s (fixed) |
+
+### 18.7.5. API Endpoints
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/projects/{project_id}/protection-runs` | Create new protection analysis run |
+| POST | `/protection-runs/{run_id}/execute` | Execute protection analysis |
+| GET | `/protection-runs/{run_id}` | Get run metadata |
+| GET | `/protection-runs/{run_id}/results` | Get ProtectionResult |
+| GET | `/protection-runs/{run_id}/trace` | Get ProtectionTrace |
+
+### 18.7.6. Relacje
+
+P15a jest **warstwą analysis** nad P14a/b/c:
+- **P14a (library):** ProtectionDeviceType, ProtectionCurve, ProtectionSettingTemplate
+- **P14b (governance):** Manifest, fingerprint, import/export
+- **P14c (config):** ProtectionConfig w StudyCase (template_ref, overrides)
+- **P15a (analysis):** Evaluation engine, results, trace
+- **P15b (future):** Selectivity coordination
+
+### 18.7.7. Definition of Done
+
+**Domain:**
+- [x] ProtectionEvaluation: device_id, i_fault_a, i_pickup_a, t_trip_s, trip_state (TRIPS/NO_TRIP/INVALID)
+- [x] ProtectionResult: evaluations[], summary (trips_count, no_trip_count, invalid_count)
+- [x] ProtectionTrace: run_id, sc_run_id, template_ref, overrides, steps[]
+- [x] ProtectionAnalysisRun: lifecycle (CREATED → RUNNING → FINISHED/FAILED)
+
+**Engine:**
+- [x] IEC inverse curves (SI, VI, EI) with A, B parameters
+- [x] Definite-time curve with fixed delay
+- [x] Margin calculation: (i_fault / i_pickup - 1) × 100%
+- [x] Deterministic: 6 decimal places, no floating-point instability
+
+**Service:**
+- [x] create_run(): validate SC run FINISHED, template exists
+- [x] execute_run(): run engine, store results + trace
+- [x] get_result() / get_trace(): retrieve from storage
+
+**API:**
+- [x] POST /protection-runs → 201 Created
+- [x] POST /execute → 200 OK with updated status
+- [x] GET /results → ProtectionResult JSON
+- [x] GET /trace → ProtectionTrace JSON
+
+**Tests:**
+- [x] Determinism: 2x execute → identical result + trace JSON
+- [x] IEC SI curve: t ≈ 10s at 2x pickup (TMS=1)
+- [x] TMS scaling: linear
+- [x] No trip below pickup
+- [x] Domain serialization roundtrip
+
+---
+
 ## 19. Proof Packs Roadmap (P15–P20) — CANONICAL
 
 Poniższa roadmapa jest **jedynym kanonicznym planem** rozwoju Proof Packów.
