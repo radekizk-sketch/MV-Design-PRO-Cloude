@@ -1004,7 +1004,12 @@ def export_power_flow_proof_json(
     run_id: UUID,
     uow_factory=Depends(get_uow_factory),
 ):
-    """P21: Eksportuj dowod power flow do JSON (strukturalny, audytowy)."""
+    """P21: Eksportuj dowod power flow do JSON (strukturalny, audytowy).
+
+    DETERMINISTIC: Ten sam run → identyczny JSON (byte-for-byte).
+    - document_id = sha256(run_id:input_hash:snapshot_id)
+    - created_at = run.created_at (z persistence)
+    """
     from fastapi.responses import Response
     import json
     from network_model.proof import build_power_flow_proof
@@ -1018,6 +1023,9 @@ def export_power_flow_proof_json(
             detail=str(exc),
         ) from exc
 
+    # P21 DETERMINISTIC: run_timestamp z persistence (NIE datetime.now())
+    run_timestamp = run.created_at.isoformat() if run.created_at else "1970-01-01T00:00:00+00:00"
+
     # Build proof document
     proof = build_power_flow_proof(
         trace=trace_v1,
@@ -1025,6 +1033,7 @@ def export_power_flow_proof_json(
         project_name=f"Projekt {run.project_id}",
         case_name=f"Przypadek {run.operating_case_id}",
         artifact_id=str(run.id),
+        run_timestamp=run_timestamp,  # DETERMINISTIC: z persistence
     )
 
     # Serialize to JSON
@@ -1048,7 +1057,10 @@ def export_power_flow_proof_latex(
     run_id: UUID,
     uow_factory=Depends(get_uow_factory),
 ):
-    """P21: Eksportuj dowod power flow do LaTeX (.tex)."""
+    """P21: Eksportuj dowod power flow do LaTeX (.tex).
+
+    DETERMINISTIC: Ten sam run → identyczny LaTeX (byte-for-byte).
+    """
     from fastapi.responses import Response
     from network_model.proof import build_power_flow_proof, export_proof_to_latex
     import tempfile
@@ -1062,6 +1074,9 @@ def export_power_flow_proof_latex(
             detail=str(exc),
         ) from exc
 
+    # P21 DETERMINISTIC: run_timestamp z persistence (NIE datetime.now())
+    run_timestamp = run.created_at.isoformat() if run.created_at else "1970-01-01T00:00:00+00:00"
+
     # Build proof document
     proof = build_power_flow_proof(
         trace=trace_v1,
@@ -1069,6 +1084,7 @@ def export_power_flow_proof_latex(
         project_name=f"Projekt {run.project_id}",
         case_name=f"Przypadek {run.operating_case_id}",
         artifact_id=str(run.id),
+        run_timestamp=run_timestamp,  # DETERMINISTIC: z persistence
     )
 
     # Export to LaTeX
@@ -1089,7 +1105,11 @@ def export_power_flow_proof_pdf(
     run_id: UUID,
     uow_factory=Depends(get_uow_factory),
 ):
-    """P21: Eksportuj dowod power flow do PDF (via ReportLab lub LaTeX)."""
+    """P21: Eksportuj dowod power flow do PDF (via ReportLab lub LaTeX).
+
+    DETERMINISTIC: Ten sam run → identyczny dowód (PDF struktura może się różnić
+    ze względu na generatory PDF, ale dokument źródłowy jest deterministyczny).
+    """
     from fastapi.responses import Response
     from network_model.proof import build_power_flow_proof, export_proof_to_pdf_simple
     import tempfile
@@ -1104,6 +1124,9 @@ def export_power_flow_proof_pdf(
             detail=str(exc),
         ) from exc
 
+    # P21 DETERMINISTIC: run_timestamp z persistence (NIE datetime.now())
+    run_timestamp = run.created_at.isoformat() if run.created_at else "1970-01-01T00:00:00+00:00"
+
     # Build proof document
     proof = build_power_flow_proof(
         trace=trace_v1,
@@ -1111,6 +1134,7 @@ def export_power_flow_proof_pdf(
         project_name=f"Projekt {run.project_id}",
         case_name=f"Przypadek {run.operating_case_id}",
         artifact_id=str(run.id),
+        run_timestamp=run_timestamp,  # DETERMINISTIC: z persistence
     )
 
     # Export to PDF (using ReportLab fallback for simplicity)

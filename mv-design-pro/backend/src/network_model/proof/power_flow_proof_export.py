@@ -275,7 +275,7 @@ Gdzie:
 
 \\begin{{itemize}}
 \\item Tolerancja zbieżności: $\\varepsilon = {_format_float_latex(proof.header.tolerance)}$ p.u.
-\\item Maksymalna liczba iteracji: $k_{{max}} = {proof.header.base_mva:.0f}$
+\\item Maksymalna liczba iteracji: $k_{{max}} = {proof.header.max_iterations}$
 \\end{{itemize}}
 """
 

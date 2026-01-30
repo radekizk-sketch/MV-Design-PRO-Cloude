@@ -6,14 +6,13 @@ generując formalny dowód matematyczny przebiegu obliczeń NR.
 
 CANONICAL ALIGNMENT:
 - READ-ONLY: Interpretacja trace, ZERO obliczeń wtórnych
-- DETERMINISTIC: Ten sam trace → identyczny proof
+- DETERMINISTIC: Ten sam trace → identyczny proof (BEZ uuid4(), BEZ datetime.now())
 - WHITE-BOX: Dane wprost z trace
 - NOT-A-SOLVER: Żadnych uproszczeń Jacobiego
 """
 from __future__ import annotations
 
 import math
-from datetime import datetime, timezone
 from typing import TYPE_CHECKING, Any
 
 from network_model.proof.power_flow_equations import (
@@ -110,6 +109,11 @@ class PowerFlowProofBuilder:
 
     Konwertuje PowerFlowTrace na pełny dokument dowodowy
     bez wykonywania jakichkolwiek obliczeń wtórnych.
+
+    DETERMINISTIC: Ten sam trace → identyczny proof.
+    - Brak uuid4(), brak datetime.now()
+    - document_id = sha256(run_id:input_hash:snapshot_id)
+    - run_timestamp z persistence (parametr), nie z datetime.now()
     """
 
     def __init__(
@@ -120,6 +124,7 @@ class PowerFlowProofBuilder:
         project_name: str = "Projekt MV-Design",
         case_name: str = "Przypadek studyjny",
         artifact_id: str | None = None,
+        run_timestamp: str | None = None,
     ) -> None:
         """Inicjalizuje builder.
 
@@ -128,19 +133,39 @@ class PowerFlowProofBuilder:
             result: PowerFlowResultV1 z wynikami.
             project_name: Nazwa projektu.
             case_name: Nazwa przypadku studyjnego.
-            artifact_id: ID artefaktu (opcjonalne).
+            artifact_id: ID artefaktu (opcjonalne, deterministyczny z trace).
+            run_timestamp: Timestamp uruchomienia z persistence (ISO format).
+                           NIE datetime.now() - musi być przekazany z zewnątrz.
         """
         self._trace = trace
         self._result = result
         self._project_name = project_name
         self._case_name = case_name
-        self._artifact_id = artifact_id or trace.run_id or generate_document_id()
+        # Deterministyczny artifact_id z trace
+        self._artifact_id = artifact_id or generate_document_id(
+            run_id=trace.run_id,
+            input_hash=trace.input_hash,
+            snapshot_id=trace.snapshot_id,
+        )
+        # run_timestamp z persistence - NIE datetime.now()
+        self._run_timestamp = run_timestamp or "1970-01-01T00:00:00+00:00"
         self._step_counter = 0
 
     def build(self) -> PowerFlowProofDocument:
-        """Buduje kompletny dokument dowodowy."""
-        document_id = generate_document_id()
-        created_at = datetime.now(timezone.utc).isoformat()
+        """Buduje kompletny dokument dowodowy.
+
+        DETERMINISTIC: Ten sam trace → identyczny document.
+        - document_id = sha256(run_id:input_hash:snapshot_id)
+        - created_at = run_timestamp z persistence
+        """
+        # Deterministyczny document_id z trace
+        document_id = generate_document_id(
+            run_id=self._trace.run_id,
+            input_hash=self._trace.input_hash,
+            snapshot_id=self._trace.snapshot_id,
+        )
+        # created_at = run_timestamp z persistence (NIE datetime.now())
+        created_at = self._run_timestamp
 
         header = self._build_header()
         network_def = self._build_network_definition()
@@ -178,22 +203,29 @@ class PowerFlowProofBuilder:
         return self._step_counter
 
     def _build_header(self) -> ProofHeader:
-        """Buduje nagłówek dokumentu."""
+        """Buduje nagłówek dokumentu.
+
+        DETERMINISTIC: run_timestamp z persistence, nie datetime.now().
+        """
         return ProofHeader(
             project_name=self._project_name,
             case_name=self._case_name,
-            run_timestamp=datetime.now(timezone.utc).isoformat(),
+            run_timestamp=self._run_timestamp,  # Z persistence, NIE datetime.now()
             solver_version=self._trace.solver_version,
             run_id=self._trace.run_id,
             snapshot_id=self._trace.snapshot_id,
             input_hash=self._trace.input_hash,
             base_mva=self._trace.base_mva,
             tolerance=self._trace.tolerance,
+            max_iterations=self._trace.max_iterations,
             slack_bus_id=self._trace.slack_bus_id,
         )
 
     def _build_network_definition(self) -> NetworkDefinitionSection:
-        """Buduje sekcję definicji sieci."""
+        """Buduje sekcję definicji sieci.
+
+        DETERMINISTIC: Listy bus_ids są sortowane dla stabilności.
+        """
         all_bus_ids = set(self._trace.pq_bus_ids) | set(self._trace.pv_bus_ids)
         all_bus_ids.add(self._trace.slack_bus_id)
 
@@ -201,8 +233,8 @@ class PowerFlowProofBuilder:
             title_pl="Definicja problemu",
             base_mva=self._trace.base_mva,
             slack_bus_id=self._trace.slack_bus_id,
-            pq_bus_ids=self._trace.pq_bus_ids,
-            pv_bus_ids=self._trace.pv_bus_ids,
+            pq_bus_ids=tuple(sorted(self._trace.pq_bus_ids)),  # DETERMINISTIC: sorted
+            pv_bus_ids=tuple(sorted(self._trace.pv_bus_ids)),  # DETERMINISTIC: sorted
             bus_count=len(all_bus_ids),
             ybus_description=self._format_ybus_description(),
         )
@@ -602,15 +634,25 @@ Metoda iteracyjna rozwiązywania równań rozpływu mocy:
         )
 
     def _build_iteration_convergence_check(self, it: PowerFlowIterationTrace) -> ProofStep:
-        """Buduje krok sprawdzenia zbieżności dla iteracji."""
+        """Buduje krok sprawdzenia zbieżności dla iteracji.
+
+        NOT-A-SOLVER: NIE obliczamy zbieżności!
+        Sprawdzamy czy to ostatnia iteracja I trace.converged = True.
+        """
         k = it.k
         step_num = self._next_step_number()
 
         tolerance = self._trace.tolerance
         max_mismatch = it.max_mismatch_pu
-        converged = max_mismatch < tolerance
 
-        if converged:
+        # NOT-A-SOLVER: NIE obliczamy converged = max_mismatch < tolerance
+        # Zamiast tego sprawdzamy:
+        # 1. Czy to ostatnia iteracja?
+        # 2. Czy trace.converged = True?
+        is_last_iteration = (k == self._trace.final_iterations_count)
+        converged_at_this_iteration = is_last_iteration and self._trace.converged
+
+        if converged_at_this_iteration:
             result_text = "ZBIEŻNE"
             check_latex = f"{_format_float(max_mismatch)} < {_format_float(tolerance)} \\quad \\checkmark"
         else:
@@ -665,8 +707,8 @@ Metoda iteracyjna rozwiązywania równań rozpływu mocy:
             ),
             substitution_latex=(
                 f"\\|\\mathbf{{f}}\\|_\\infty = {_format_float(final_mismatch)} "
-                f"{'<' if converged else '\\geq'} "
-                f"\\varepsilon = {_format_float(self._trace.tolerance)} \\quad "
+                + ("<" if converged else "\\geq") + " "
+                + f"\\varepsilon = {_format_float(self._trace.tolerance)} \\quad "
                 f"\\text{{({iterations} iteracji)}}"
             ),
             result=_build_proof_value(
@@ -826,15 +868,22 @@ def build_power_flow_proof(
     project_name: str = "Projekt MV-Design",
     case_name: str = "Przypadek studyjny",
     artifact_id: str | None = None,
+    run_timestamp: str | None = None,
 ) -> PowerFlowProofDocument:
     """Buduje PowerFlowProofDocument z trace i result.
+
+    DETERMINISTIC: Ten sam trace → identyczny proof.
+    - document_id = sha256(run_id:input_hash:snapshot_id)
+    - created_at = run_timestamp z persistence
 
     Args:
         trace: PowerFlowTrace z obliczeń NR.
         result: PowerFlowResultV1 z wynikami.
         project_name: Nazwa projektu.
         case_name: Nazwa przypadku studyjnego.
-        artifact_id: ID artefaktu (opcjonalne).
+        artifact_id: ID artefaktu (opcjonalne, deterministyczny z trace).
+        run_timestamp: Timestamp uruchomienia z persistence (ISO format).
+                       NIE datetime.now() - musi być przekazany z zewnątrz.
 
     Returns:
         Kompletny PowerFlowProofDocument.
@@ -845,5 +894,6 @@ def build_power_flow_proof(
         project_name=project_name,
         case_name=case_name,
         artifact_id=artifact_id,
+        run_timestamp=run_timestamp,
     )
     return builder.build()

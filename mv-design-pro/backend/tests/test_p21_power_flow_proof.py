@@ -194,14 +194,71 @@ def create_mock_result():
 
 
 class TestProofDeterminism:
-    """Testy determinizmu generowania dowodu."""
+    """Testy determinizmu generowania dowodu.
 
-    def test_same_trace_produces_identical_proof_json(self):
-        """Ten sam trace → identyczny JSON proof."""
+    P21 DETERMINISTIC wymaga:
+    - Ten sam trace + run_timestamp → identyczny document_id (sha256)
+    - Ten sam trace + run_timestamp → identyczny created_at
+    - Ten sam trace + run_timestamp → identyczny JSON (byte-for-byte)
+    - Ten sam trace + run_timestamp → identyczny LaTeX (byte-for-byte)
+    """
+
+    def test_document_id_is_deterministic(self):
+        """document_id = sha256(run_id:input_hash:snapshot_id) - deterministyczne."""
         from network_model.proof import build_power_flow_proof
 
         trace = create_mock_trace()
         result = create_mock_result()
+        run_timestamp = "2024-01-15T10:30:00+00:00"
+
+        # Generate proof twice with same inputs
+        proof_1 = build_power_flow_proof(
+            trace=trace,
+            result=result,
+            project_name="Test Project",
+            case_name="Test Case",
+            run_timestamp=run_timestamp,
+        )
+        proof_2 = build_power_flow_proof(
+            trace=trace,
+            result=result,
+            project_name="Test Project",
+            case_name="Test Case",
+            run_timestamp=run_timestamp,
+        )
+
+        # document_id should be identical (sha256 deterministic)
+        assert proof_1.document_id == proof_2.document_id, \
+            "document_id must be deterministic (same trace → same ID)"
+
+        # Verify it's not empty/default
+        assert len(proof_1.document_id) == 32, "document_id should be 32-char hex"
+
+    def test_created_at_uses_run_timestamp(self):
+        """created_at = run_timestamp z persistence, nie datetime.now()."""
+        from network_model.proof import build_power_flow_proof
+
+        trace = create_mock_trace()
+        result = create_mock_result()
+        run_timestamp = "2024-01-15T10:30:00+00:00"
+
+        proof = build_power_flow_proof(
+            trace=trace,
+            result=result,
+            run_timestamp=run_timestamp,
+        )
+
+        # created_at should match run_timestamp
+        assert proof.created_at == run_timestamp, \
+            "created_at must use run_timestamp from persistence, not datetime.now()"
+
+    def test_same_trace_produces_byte_identical_json(self):
+        """Ten sam trace + run_timestamp → identyczny JSON (byte-for-byte)."""
+        from network_model.proof import build_power_flow_proof
+
+        trace = create_mock_trace()
+        result = create_mock_result()
+        run_timestamp = "2024-01-15T10:30:00+00:00"
 
         # Generate proof twice
         proof_1 = build_power_flow_proof(
@@ -209,56 +266,83 @@ class TestProofDeterminism:
             result=result,
             project_name="Test Project",
             case_name="Test Case",
-            artifact_id="fixed-artifact-id",
+            run_timestamp=run_timestamp,
         )
         proof_2 = build_power_flow_proof(
             trace=trace,
             result=result,
             project_name="Test Project",
             case_name="Test Case",
-            artifact_id="fixed-artifact-id",
+            run_timestamp=run_timestamp,
         )
 
-        # Compare JSON serialization (excluding document_id and created_at)
-        dict_1 = proof_1.to_dict()
-        dict_2 = proof_2.to_dict()
+        # Full JSON should be byte-identical (including document_id, created_at)
+        json_1 = json.dumps(proof_1.to_dict(), sort_keys=True, indent=2)
+        json_2 = json.dumps(proof_2.to_dict(), sort_keys=True, indent=2)
 
-        # Remove non-deterministic fields
-        for d in [dict_1, dict_2]:
-            d.pop("document_id", None)
-            d.pop("created_at", None)
-
-        json_1 = json.dumps(dict_1, sort_keys=True, indent=2)
-        json_2 = json.dumps(dict_2, sort_keys=True, indent=2)
-
-        assert json_1 == json_2, "Proof JSON should be identical for same input"
+        assert json_1 == json_2, "Proof JSON must be byte-identical for same input"
 
     def test_same_trace_produces_identical_latex(self):
-        """Ten sam trace → identyczny LaTeX (excluding timestamps)."""
+        """Ten sam trace + run_timestamp → identyczny LaTeX (byte-for-byte)."""
         from network_model.proof import build_power_flow_proof, export_proof_to_latex
 
         trace = create_mock_trace()
         result = create_mock_result()
+        run_timestamp = "2024-01-15T10:30:00+00:00"
 
-        proof = build_power_flow_proof(
+        # Generate proof twice
+        proof_1 = build_power_flow_proof(
             trace=trace,
             result=result,
             project_name="Test Project",
             case_name="Test Case",
-            artifact_id="fixed-artifact-id",
+            run_timestamp=run_timestamp,
+        )
+        proof_2 = build_power_flow_proof(
+            trace=trace,
+            result=result,
+            project_name="Test Project",
+            case_name="Test Case",
+            run_timestamp=run_timestamp,
         )
 
         with tempfile.TemporaryDirectory() as tmpdir:
             path_1 = Path(tmpdir) / "proof_1.tex"
             path_2 = Path(tmpdir) / "proof_2.tex"
 
-            export_proof_to_latex(proof, path_1)
-            export_proof_to_latex(proof, path_2)
+            export_proof_to_latex(proof_1, path_1)
+            export_proof_to_latex(proof_2, path_2)
 
             content_1 = path_1.read_text(encoding="utf-8")
             content_2 = path_2.read_text(encoding="utf-8")
 
-            assert content_1 == content_2, "LaTeX should be identical for same proof"
+            assert content_1 == content_2, "LaTeX must be byte-identical for same input"
+
+    def test_different_run_timestamp_produces_different_created_at(self):
+        """Różny run_timestamp → różny created_at (ale ten sam document_id)."""
+        from network_model.proof import build_power_flow_proof
+
+        trace = create_mock_trace()
+        result = create_mock_result()
+
+        proof_1 = build_power_flow_proof(
+            trace=trace,
+            result=result,
+            run_timestamp="2024-01-15T10:30:00+00:00",
+        )
+        proof_2 = build_power_flow_proof(
+            trace=trace,
+            result=result,
+            run_timestamp="2024-01-16T11:45:00+00:00",
+        )
+
+        # document_id should still be identical (based on trace IDs only)
+        assert proof_1.document_id == proof_2.document_id, \
+            "document_id depends only on trace IDs, not timestamp"
+
+        # But created_at should differ
+        assert proof_1.created_at != proof_2.created_at, \
+            "Different run_timestamp should produce different created_at"
 
     def test_bus_order_independence(self):
         """Proof jest niezależny od kolejności busów w trace."""
@@ -267,6 +351,8 @@ class TestProofDeterminism:
             PowerFlowIterationTrace,
             PowerFlowTrace,
         )
+
+        run_timestamp = "2024-01-15T10:30:00+00:00"
 
         # Create trace with buses in different order
         iter_trace = PowerFlowIterationTrace(
@@ -332,11 +418,13 @@ class TestProofDeterminism:
             trace=trace_1,
             result=result,
             artifact_id="fixed-id",
+            run_timestamp=run_timestamp,
         )
         proof_2 = build_power_flow_proof(
             trace=trace_2,
             result=result,
             artifact_id="fixed-id",
+            run_timestamp=run_timestamp,
         )
 
         # Network definitions should be sorted and thus identical

@@ -13,10 +13,9 @@ CANONICAL ALIGNMENT:
 """
 from __future__ import annotations
 
+import hashlib
 from dataclasses import dataclass, field
-from datetime import datetime
 from typing import Any
-from uuid import uuid4
 
 # P21: Proof version for compatibility
 POWER_FLOW_PROOF_VERSION = "1.0.0"
@@ -207,13 +206,14 @@ class ProofHeader:
     Attributes:
         project_name: Nazwa projektu.
         case_name: Nazwa przypadku studyjnego.
-        run_timestamp: Czas uruchomienia.
+        run_timestamp: Czas uruchomienia (z persistence, NIE datetime.now()).
         solver_version: Wersja solvera.
         run_id: ID uruchomienia.
         snapshot_id: ID snapshotu sieci.
         input_hash: Hash danych wejściowych.
         base_mva: Moc bazowa [MVA].
         tolerance: Tolerancja zbieżności.
+        max_iterations: Maksymalna liczba iteracji.
         slack_bus_id: ID węzła bilansującego.
     """
     project_name: str
@@ -225,6 +225,7 @@ class ProofHeader:
     input_hash: str | None = None
     base_mva: float = 100.0
     tolerance: float = 1e-6
+    max_iterations: int = 100
     slack_bus_id: str = ""
 
     def to_dict(self) -> dict[str, Any]:
@@ -238,6 +239,7 @@ class ProofHeader:
             "input_hash": self.input_hash,
             "base_mva": self.base_mva,
             "tolerance": self.tolerance,
+            "max_iterations": self.max_iterations,
             "slack_bus_id": self.slack_bus_id,
         }
 
@@ -447,9 +449,31 @@ class PowerFlowProofDocument:
         return steps
 
 
-def generate_document_id() -> str:
-    """Generuje unikalny ID dokumentu."""
-    return str(uuid4())
+def generate_document_id(
+    run_id: str | None = None,
+    input_hash: str | None = None,
+    snapshot_id: str | None = None,
+) -> str:
+    """Generuje deterministyczny ID dokumentu.
+
+    ID jest obliczane jako SHA256 z konkatenacji run_id, input_hash i snapshot_id.
+    Ten sam Run → identyczny document_id (DETERMINISTIC).
+
+    Args:
+        run_id: ID uruchomienia.
+        input_hash: Hash danych wejściowych.
+        snapshot_id: ID snapshotu sieci.
+
+    Returns:
+        Deterministyczny 32-znakowy hex ID.
+    """
+    components = [
+        run_id or "no_run_id",
+        input_hash or "no_input_hash",
+        snapshot_id or "no_snapshot_id",
+    ]
+    combined = ":".join(components)
+    return hashlib.sha256(combined.encode("utf-8")).hexdigest()[:32]
 
 
 def generate_step_id(proof_type: str, section: str, step_number: int) -> str:
