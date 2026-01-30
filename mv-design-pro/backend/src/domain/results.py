@@ -283,11 +283,80 @@ class PowerFlowComparison:
 
 
 @dataclass(frozen=True)
+class ProtectionEvaluationComparison:
+    """
+    Protection evaluation comparison for a single device/element.
+
+    P15c: Compares trip state, trip time, margin between two runs.
+
+    CANONICAL FIELDS:
+    - element_id: Protected element identifier
+    - trip_state_a: Trip state from Run A (TRIPS/NO_TRIP/INVALID)
+    - trip_state_b: Trip state from Run B (TRIPS/NO_TRIP/INVALID)
+    - state_change: State change description (PL)
+    - t_trip_delta: Trip time delta (if both TRIPS)
+    - margin_delta: Margin delta (if available)
+
+    INVARIANT: No normative interpretation, just state/value comparison.
+    """
+    element_id: str
+    trip_state_a: str
+    trip_state_b: str
+    state_change: str  # e.g., "TRIPS→NO_TRIP", "NO_TRIP→TRIPS", "BRAK ZMIANY"
+    t_trip_delta: NumericDelta | None = None
+    margin_delta: NumericDelta | None = None
+
+    def to_dict(self) -> dict[str, Any]:
+        """Serialize to dictionary."""
+        result = {
+            "element_id": self.element_id,
+            "trip_state_a": self.trip_state_a,
+            "trip_state_b": self.trip_state_b,
+            "state_change": self.state_change,
+        }
+        if self.t_trip_delta is not None:
+            result["t_trip_delta"] = self.t_trip_delta.to_dict()
+        if self.margin_delta is not None:
+            result["margin_delta"] = self.margin_delta.to_dict()
+        return result
+
+
+@dataclass(frozen=True)
+class ProtectionComparison:
+    """
+    Protection analysis result comparison.
+
+    P15c: Compares protection evaluations between two runs.
+
+    CANONICAL FIELDS:
+    - evaluations: Per-element comparison (deterministically sorted)
+    - trip_count_delta: Change in number of trips
+    - no_trip_count_delta: Change in number of no-trips
+    - invalid_count_delta: Change in number of invalid evaluations
+
+    INVARIANT: No normative interpretation, no limits/thresholds.
+    """
+    evaluations: tuple[ProtectionEvaluationComparison, ...]
+    trip_count_delta: NumericDelta
+    no_trip_count_delta: NumericDelta
+    invalid_count_delta: NumericDelta
+
+    def to_dict(self) -> dict[str, Any]:
+        """Serialize to dictionary."""
+        return {
+            "evaluations": [ev.to_dict() for ev in self.evaluations],
+            "trip_count_delta": self.trip_count_delta.to_dict(),
+            "no_trip_count_delta": self.no_trip_count_delta.to_dict(),
+            "invalid_count_delta": self.invalid_count_delta.to_dict(),
+        }
+
+
+@dataclass(frozen=True)
 class RunComparisonResult:
     """
     Full comparison result between two Study Runs.
 
-    P10b: Top-level comparison DTO combining all analysis types.
+    P10b/P15c: Top-level comparison DTO combining all analysis types.
 
     CANONICAL FIELDS:
     - run_a_id: UUID of first Run
@@ -297,6 +366,7 @@ class RunComparisonResult:
     - compared_at: Timestamp of comparison
     - short_circuit: SC comparison (if applicable)
     - power_flow: PF comparison (if applicable)
+    - protection: Protection comparison (if applicable)
 
     INVARIANT: 100% read-only, no mutations, no physics.
     """
@@ -307,6 +377,7 @@ class RunComparisonResult:
     compared_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
     short_circuit: ShortCircuitComparison | None = None
     power_flow: PowerFlowComparison | None = None
+    protection: ProtectionComparison | None = None
 
     def to_dict(self) -> dict[str, Any]:
         """Serialize to dictionary for API responses."""
@@ -321,6 +392,8 @@ class RunComparisonResult:
             result["short_circuit"] = self.short_circuit.to_dict()
         if self.power_flow is not None:
             result["power_flow"] = self.power_flow.to_dict()
+        if self.protection is not None:
+            result["protection"] = self.protection.to_dict()
         return result
 
 

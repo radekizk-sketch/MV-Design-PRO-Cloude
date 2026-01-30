@@ -97,11 +97,29 @@ class PowerFlowComparisonResponse(BaseModel):
     branch_powers: list[BranchPowerComparisonResponse]
 
 
+class ProtectionEvaluationComparisonResponse(BaseModel):
+    """Protection evaluation comparison response."""
+    element_id: str
+    trip_state_a: str
+    trip_state_b: str
+    state_change: str
+    t_trip_delta: NumericDeltaResponse | None = None
+    margin_delta: NumericDeltaResponse | None = None
+
+
+class ProtectionComparisonResponse(BaseModel):
+    """Protection comparison response."""
+    evaluations: list[ProtectionEvaluationComparisonResponse]
+    trip_count_delta: NumericDeltaResponse
+    no_trip_count_delta: NumericDeltaResponse
+    invalid_count_delta: NumericDeltaResponse
+
+
 class RunComparisonResponse(BaseModel):
     """
     Full run comparison response.
 
-    P10b: Top-level comparison result combining all analysis types.
+    P10b/P15c: Top-level comparison result combining all analysis types.
     """
     run_a_id: str
     run_b_id: str
@@ -110,6 +128,7 @@ class RunComparisonResponse(BaseModel):
     compared_at: str
     short_circuit: ShortCircuitComparisonResponse | None = None
     power_flow: PowerFlowComparisonResponse | None = None
+    protection: ProtectionComparisonResponse | None = None
 
 
 # =============================================================================
