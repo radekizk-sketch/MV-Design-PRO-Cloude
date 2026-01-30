@@ -29,6 +29,7 @@ import {
   useCanCalculate,
 } from '../app-state';
 import type { ResultStatus } from '../types';
+import { UndoRedoButtons } from '../history/UndoRedoButtons';
 
 // =============================================================================
 // Status Styling
@@ -231,6 +232,11 @@ export function ActiveCaseBar({
         >
           Wyniki
         </button>
+
+        {/* UNDO/REDO Buttons — P30a */}
+        <div className="ml-2 pl-2 border-l border-gray-200">
+          <UndoRedoButtons />
+        </div>
 
         {/* Mode Indicator */}
         <div className="ml-2 pl-2 border-l border-gray-200">
