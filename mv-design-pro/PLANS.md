@@ -2473,8 +2473,57 @@ klasy **wyższej niż PowerFactory**, opartą o:
 
 **Kolejne kroki (FUTURE):**
 - P16: Losses & Power Proof Pack (DEFERRED)
-- P21: Voltage Profile view
+- P22: Voltage Profile view
 - Regulatory/OLTC (FUTURE)
+
+### P21 — Power Flow Proof Pack (Newton-Raphson Academic Proof)
+
+**Status:** DONE | CANONICAL & BINDING
+
+**Data ukończenia:** 2026-01
+
+**Cel:** Akademicka warstwa dowodowa dla Power Flow NR:
+- Formalny dowód matematyczny przebiegu iteracji Newton-Raphson
+- Pełna możliwość ręcznej weryfikacji (White Box)
+- Eksport do LaTeX, PDF, JSON
+
+**Zakres:**
+1. **PowerFlowProofDocument** — immutable, READ-ONLY struktura dowodowa
+2. **Trace → Proof mapping** — deterministyczne mapowanie PowerFlowTrace → ProofStep[]
+3. **Equation Registry** — kanoniczny rejestr równań (P(θ,V), Q(θ,V), Jacobian J₁-J₄)
+4. **Eksport LaTeX** — kanoniczny format akademicki
+5. **Eksport PDF** — via LaTeX lub ReportLab
+6. **Eksport JSON** — strukturalny, audytowy
+
+**Sekcje ProofDocument:**
+1. Definicja problemu (sieć, baza mocy, typy węzłów)
+2. Równania rozpływu mocy: P(θ,V), Q(θ,V)
+3. Metoda Newton–Raphson (postać Jacobiego)
+4. Stan początkowy (V₀, θ₀ — z trace)
+5. Iteracje (DLA KAŻDEJ iteracji k): ΔP, ΔQ, norma, Jacobian, Δθ, ΔV
+6. Kryterium zbieżności
+7. Stan końcowy (V, θ, bilans mocy)
+8. Weryfikacja (spójność jednostek, brak sprzeczności energetycznych)
+
+**Czego NIE modyfikuje:**
+- ❌ Solver NR (zamrożony)
+- ❌ PowerFlowResult (zamrożony)
+- ❌ Rankingi/interpretacje
+- ❌ Normy (to NIE P16)
+
+**Deliverables:**
+- [x] `backend/src/network_model/proof/power_flow_proof_document.py` — struktury danych
+- [x] `backend/src/network_model/proof/power_flow_equations.py` — rejestr równań
+- [x] `backend/src/network_model/proof/power_flow_proof_builder.py` — mapper Trace → Proof
+- [x] `backend/src/network_model/proof/power_flow_proof_export.py` — eksport LaTeX/PDF/JSON
+- [x] `backend/src/api/power_flow_runs.py` — endpointy /export/proof/{json,latex,pdf}
+- [x] `backend/tests/test_p21_power_flow_proof.py` — testy determinizmu
+
+**DoD:**
+- [x] PowerFlowProofDocument istnieje
+- [x] Trace → Proof mapping kompletny
+- [x] Eksport LaTeX + PDF + JSON działa
+- [x] Determinizm potwierdzony testami
 
 ---
 

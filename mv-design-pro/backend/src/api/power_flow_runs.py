@@ -834,3 +834,320 @@ def export_power_flow_run_pdf(
         media_type="application/pdf",
         headers={"Content-Disposition": f'attachment; filename="power_flow_run_{run_id}.pdf"'},
     )
+
+
+# =============================================================================
+# P21: Proof Export Endpoints
+# =============================================================================
+
+
+def _build_proof_objects(run_id: UUID, service: AnalysisRunService):
+    """P21: Build PowerFlowTrace and PowerFlowResultV1 objects for proof generation."""
+    import math
+    from network_model.solvers.power_flow_result import (
+        PowerFlowBranchResult,
+        PowerFlowBusResult,
+        PowerFlowResultV1,
+        PowerFlowSummary,
+    )
+    from network_model.solvers.power_flow_trace import (
+        PowerFlowIterationTrace,
+        PowerFlowTrace,
+    )
+
+    run = service.get_run(run_id)
+
+    if run.analysis_type != "PF":
+        raise ValueError(f"Run {run_id} is not a power flow run")
+
+    if run.status != "FINISHED":
+        raise ValueError(f"Run {run_id} is not finished (status={run.status})")
+
+    # Get results
+    results = service.get_results(run_id)
+    pf_result = None
+    for result in results:
+        if result.get("result_type") == "power_flow":
+            pf_result = result.get("payload")
+            break
+
+    if pf_result is None:
+        raise ValueError(f"Power flow results not found for run {run_id}")
+
+    # Build PowerFlowResultV1
+    result_summary = run.result_summary or {}
+    base_mva = pf_result.get("base_mva", 100.0)
+    slack_node_id = pf_result.get("slack_node_id", "")
+
+    node_u_mag = pf_result.get("node_u_mag_pu", {})
+    node_angle_rad = pf_result.get("node_angle_rad", {})
+
+    bus_results = []
+    for bus_id in sorted(node_u_mag.keys()):
+        v_pu = node_u_mag.get(bus_id, 0.0)
+        angle_rad = node_angle_rad.get(bus_id, 0.0)
+        angle_deg = math.degrees(angle_rad)
+        bus_results.append(PowerFlowBusResult(
+            bus_id=bus_id,
+            v_pu=v_pu,
+            angle_deg=angle_deg,
+            p_injected_mw=0.0,
+            q_injected_mvar=0.0,
+        ))
+
+    branch_s_from = pf_result.get("branch_s_from_mva", {})
+    branch_s_to = pf_result.get("branch_s_to_mva", {})
+    branch_results = []
+    for branch_id in sorted(branch_s_from.keys()):
+        s_from = branch_s_from.get(branch_id, {"re": 0.0, "im": 0.0})
+        s_to = branch_s_to.get(branch_id, {"re": 0.0, "im": 0.0})
+        p_from = s_from.get("re", 0.0) if isinstance(s_from, dict) else s_from.real
+        q_from = s_from.get("im", 0.0) if isinstance(s_from, dict) else s_from.imag
+        p_to = s_to.get("re", 0.0) if isinstance(s_to, dict) else s_to.real
+        q_to = s_to.get("im", 0.0) if isinstance(s_to, dict) else s_to.imag
+        branch_results.append(PowerFlowBranchResult(
+            branch_id=branch_id,
+            p_from_mw=p_from,
+            q_from_mvar=q_from,
+            p_to_mw=p_to,
+            q_to_mvar=q_to,
+            losses_p_mw=p_from + p_to,
+            losses_q_mvar=q_from + q_to,
+        ))
+
+    losses_total = pf_result.get("losses_total_pu", {"re": 0.0, "im": 0.0})
+    slack_power = pf_result.get("slack_power_pu", {"re": 0.0, "im": 0.0})
+    v_values = list(node_u_mag.values())
+    min_v = min(v_values) if v_values else 0.0
+    max_v = max(v_values) if v_values else 0.0
+
+    summary = PowerFlowSummary(
+        total_losses_p_mw=(losses_total.get("re", 0.0) if isinstance(losses_total, dict) else losses_total.real) * base_mva,
+        total_losses_q_mvar=(losses_total.get("im", 0.0) if isinstance(losses_total, dict) else losses_total.imag) * base_mva,
+        min_v_pu=min_v,
+        max_v_pu=max_v,
+        slack_p_mw=(slack_power.get("re", 0.0) if isinstance(slack_power, dict) else slack_power.real) * base_mva,
+        slack_q_mvar=(slack_power.get("im", 0.0) if isinstance(slack_power, dict) else slack_power.imag) * base_mva,
+    )
+
+    result_v1 = PowerFlowResultV1(
+        result_version="1.0.0",
+        converged=result_summary.get("converged", False),
+        iterations_count=result_summary.get("iterations", 0),
+        tolerance_used=pf_result.get("tolerance", 1e-8),
+        base_mva=base_mva,
+        slack_bus_id=slack_node_id,
+        bus_results=tuple(bus_results),
+        branch_results=tuple(branch_results),
+        summary=summary,
+    )
+
+    # Build PowerFlowTrace
+    trace_payload = get_run_trace(run)
+    white_box_trace = pf_result.get("white_box_trace", {}) if pf_result else {}
+    nr_trace = white_box_trace.get("nr_trace", []) if isinstance(white_box_trace, dict) else []
+    ybus_trace = white_box_trace.get("ybus_trace", {}) if isinstance(white_box_trace, dict) else {}
+    init_state = white_box_trace.get("init_state", {}) if isinstance(white_box_trace, dict) else {}
+
+    if trace_payload and isinstance(trace_payload, dict):
+        nr_trace = trace_payload.get("nr_trace", nr_trace)
+        ybus_trace = trace_payload.get("ybus_trace", ybus_trace)
+        init_state = trace_payload.get("init_state", init_state)
+
+    snapshot = run.input_snapshot or {}
+
+    # Build iteration traces
+    iteration_traces = []
+    for entry in nr_trace:
+        iteration_traces.append(PowerFlowIterationTrace(
+            k=entry.get("iter", entry.get("k", 0)),
+            mismatch_per_bus=entry.get("mismatch_per_bus", {}),
+            norm_mismatch=entry.get("mismatch_norm", entry.get("norm_mismatch", 0.0)),
+            max_mismatch_pu=entry.get("max_mismatch_pu", 0.0),
+            jacobian=entry.get("jacobian"),
+            delta_state=entry.get("delta_state"),
+            state_next=entry.get("state_next"),
+            damping_used=entry.get("damping_used", 1.0),
+            step_norm=entry.get("step_norm", 0.0),
+            pv_to_pq_switches=entry.get("pv_to_pq_optional"),
+            cause_if_failed=entry.get("cause_if_failed_optional"),
+        ))
+
+    pq_bus_ids = [spec.get("node_id", "") for spec in snapshot.get("pq", [])]
+    pv_bus_ids = [spec.get("node_id", "") for spec in snapshot.get("pv", [])]
+
+    trace_v1 = PowerFlowTrace(
+        solver_version="1.0.0",
+        input_hash=run.input_hash,
+        snapshot_id=snapshot.get("snapshot_id"),
+        case_id=str(run.operating_case_id) if run.operating_case_id else None,
+        run_id=str(run.id),
+        init_state=init_state,
+        init_method="flat" if snapshot.get("options", {}).get("flat_start", True) else "last_solution",
+        tolerance=snapshot.get("options", {}).get("tolerance", 1e-8),
+        max_iterations=snapshot.get("options", {}).get("max_iter", 30),
+        base_mva=snapshot.get("base_mva", 100.0),
+        slack_bus_id=snapshot.get("slack", {}).get("node_id", ""),
+        pq_bus_ids=tuple(sorted(pq_bus_ids)),
+        pv_bus_ids=tuple(sorted(pv_bus_ids)),
+        ybus_trace=ybus_trace,
+        iterations=tuple(iteration_traces),
+        converged=result_summary.get("converged", False),
+        final_iterations_count=result_summary.get("iterations", 0),
+    )
+
+    return result_v1, trace_v1, run
+
+
+@router.get("/power-flow-runs/{run_id}/export/proof/json")
+def export_power_flow_proof_json(
+    run_id: UUID,
+    uow_factory=Depends(get_uow_factory),
+):
+    """P21: Eksportuj dowod power flow do JSON (strukturalny, audytowy).
+
+    DETERMINISTIC: Ten sam run → identyczny JSON (byte-for-byte).
+    - document_id = sha256(run_id:input_hash:snapshot_id)
+    - created_at = run.created_at (z persistence)
+    """
+    from fastapi.responses import Response
+    import json
+    from network_model.proof import build_power_flow_proof
+
+    service = _build_service(uow_factory)
+    try:
+        result_v1, trace_v1, run = _build_proof_objects(run_id, service)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(exc),
+        ) from exc
+
+    # P21 DETERMINISTIC: run_timestamp z persistence (NIE datetime.now())
+    run_timestamp = run.created_at.isoformat() if run.created_at else "1970-01-01T00:00:00+00:00"
+
+    # Build proof document
+    proof = build_power_flow_proof(
+        trace=trace_v1,
+        result=result_v1,
+        project_name=f"Projekt {run.project_id}",
+        case_name=f"Przypadek {run.operating_case_id}",
+        artifact_id=str(run.id),
+        run_timestamp=run_timestamp,  # DETERMINISTIC: z persistence
+    )
+
+    # Serialize to JSON
+    export_payload = {
+        "report_type": "power_flow_proof",
+        "report_version": proof.proof_version,
+        "proof_document": proof.to_dict(),
+    }
+
+    json_content = json.dumps(export_payload, indent=2, ensure_ascii=False, sort_keys=True)
+
+    return Response(
+        content=json_content,
+        media_type="application/json",
+        headers={"Content-Disposition": f'attachment; filename="power_flow_proof_{run_id}.json"'},
+    )
+
+
+@router.get("/power-flow-runs/{run_id}/export/proof/latex")
+def export_power_flow_proof_latex(
+    run_id: UUID,
+    uow_factory=Depends(get_uow_factory),
+):
+    """P21: Eksportuj dowod power flow do LaTeX (.tex).
+
+    DETERMINISTIC: Ten sam run → identyczny LaTeX (byte-for-byte).
+    """
+    from fastapi.responses import Response
+    from network_model.proof import build_power_flow_proof, export_proof_to_latex
+    import tempfile
+
+    service = _build_service(uow_factory)
+    try:
+        result_v1, trace_v1, run = _build_proof_objects(run_id, service)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(exc),
+        ) from exc
+
+    # P21 DETERMINISTIC: run_timestamp z persistence (NIE datetime.now())
+    run_timestamp = run.created_at.isoformat() if run.created_at else "1970-01-01T00:00:00+00:00"
+
+    # Build proof document
+    proof = build_power_flow_proof(
+        trace=trace_v1,
+        result=result_v1,
+        project_name=f"Projekt {run.project_id}",
+        case_name=f"Przypadek {run.operating_case_id}",
+        artifact_id=str(run.id),
+        run_timestamp=run_timestamp,  # DETERMINISTIC: z persistence
+    )
+
+    # Export to LaTeX
+    with tempfile.NamedTemporaryFile(suffix=".tex", delete=False) as tmp:
+        export_proof_to_latex(proof, tmp.name)
+        tmp.seek(0)
+        latex_content = open(tmp.name, "r", encoding="utf-8").read()
+
+    return Response(
+        content=latex_content,
+        media_type="application/x-tex",
+        headers={"Content-Disposition": f'attachment; filename="power_flow_proof_{run_id}.tex"'},
+    )
+
+
+@router.get("/power-flow-runs/{run_id}/export/proof/pdf")
+def export_power_flow_proof_pdf(
+    run_id: UUID,
+    uow_factory=Depends(get_uow_factory),
+):
+    """P21: Eksportuj dowod power flow do PDF (via ReportLab lub LaTeX).
+
+    DETERMINISTIC: Ten sam run → identyczny dowód (PDF struktura może się różnić
+    ze względu na generatory PDF, ale dokument źródłowy jest deterministyczny).
+    """
+    from fastapi.responses import Response
+    from network_model.proof import build_power_flow_proof, export_proof_to_pdf_simple
+    import tempfile
+    import os
+
+    service = _build_service(uow_factory)
+    try:
+        result_v1, trace_v1, run = _build_proof_objects(run_id, service)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(exc),
+        ) from exc
+
+    # P21 DETERMINISTIC: run_timestamp z persistence (NIE datetime.now())
+    run_timestamp = run.created_at.isoformat() if run.created_at else "1970-01-01T00:00:00+00:00"
+
+    # Build proof document
+    proof = build_power_flow_proof(
+        trace=trace_v1,
+        result=result_v1,
+        project_name=f"Projekt {run.project_id}",
+        case_name=f"Przypadek {run.operating_case_id}",
+        artifact_id=str(run.id),
+        run_timestamp=run_timestamp,  # DETERMINISTIC: z persistence
+    )
+
+    # Export to PDF (using ReportLab fallback for simplicity)
+    with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as tmp:
+        try:
+            export_proof_to_pdf_simple(proof, tmp.name)
+            with open(tmp.name, "rb") as f:
+                pdf_content = f.read()
+        finally:
+            os.unlink(tmp.name)
+
+    return Response(
+        content=pdf_content,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="power_flow_proof_{run_id}.pdf"'},
+    )
