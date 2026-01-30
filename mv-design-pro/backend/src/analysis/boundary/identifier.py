@@ -12,7 +12,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Mapping, Optional
 
-from network_model.core.snapshot import NetworkSnapshot
+from network_model.core.snapshot import NetworkSnapshot, snapshot_read_only_guard
 
 
 EXTERNAL_GRID_SOURCE_TYPES = {"GRID", "EXTERNAL_GRID"}
@@ -48,6 +48,14 @@ class BoundaryIdentifier:
     """
 
     def identify(
+        self,
+        snapshot: NetworkSnapshot,
+        case_params: Mapping | None = None,
+    ) -> BoundaryResult:
+        with snapshot_read_only_guard(snapshot, operation="BoundaryIdentifier.identify"):
+            return self._identify(snapshot, case_params)
+
+    def _identify(
         self,
         snapshot: NetworkSnapshot,
         case_params: Mapping | None = None,
