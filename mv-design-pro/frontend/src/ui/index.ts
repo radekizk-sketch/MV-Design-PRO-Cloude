@@ -115,3 +115,7 @@ export type {
   ClipboardData,
   ToolbarAction,
 } from './sld-editor';
+
+// Issue Panel (P30d - Validation Browser)
+export { IssuePanel, IssuePanelContainer } from './issue-panel';
+export type { IssuePanelProps, IssuePanelContainerProps } from './issue-panel';

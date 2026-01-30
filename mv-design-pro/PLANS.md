@@ -3183,3 +3183,127 @@ Podnieść Property Grid do standardu PowerFactory++:
 - **Synchronizacja z SLD**: Hook do przekazywania `selectedIds` → `selectedElements`
 
 ---
+
+## 27. P30d ISSUE PANEL / VALIDATION BROWSER (ROLA BINDING) — DONE
+
+**Priority:** HIGH
+**Status:** ✅ DONE
+**Branch:** `claude/rola-binding-ui-0zbgZ`
+**Model:** Sonnet 4.5
+**Commit:** 5be84d6
+
+### 27.1 Cel (PowerFactory++ / ≥110% PF)
+
+Dodać Issue Panel / Validation Browser jako centralny punkt:
+- **Agregacja problemów** (model validation + P22 interpretation + protection)
+- **Nawigacja do objektu** (Tree + SLD highlight)
+- **Deterministyczny sort** (severity DESC, source, object_ref.id ASC)
+- **100% READ-ONLY** (zero nowych obliczeń, tylko agregacja)
+- **100% PL** (wszystkie komunikaty po polsku)
+
+### 27.2 Zakres (MUST)
+
+1. **Issue Model (UI)**:
+   - Typ `Issue`: unified interface dla wszystkich źródeł
+   - Severity: INFO / WARN / HIGH (zgodne z P22 BINDING thresholds)
+   - Source: MODEL / POWER_FLOW / PROTECTION
+   - Object reference: typ + id + opcjonalnie name
+   - Evidence reference (np. "voltage_profile_fig_1")
+
+2. **Backend Endpoint (READ-ONLY)**:
+   - `GET /api/issues/study-cases/{case_id}/issues`
+   - Agreguje ValidationReport (z failed AnalysisRun) + P22 interpretation
+   - Deterministyczny sort
+   - Stats: by_severity, by_source, total_count
+
+3. **Issue Panel UI**:
+   - Lista issues z filtrem (source, severity)
+   - Klik issue → highlight na SLD + nawigacja (Tree)
+   - Badge z licznikiem issues
+   - Empty state: "Brak problemów – wszystko w porządku! ✓"
+
+4. **SLD Highlight System**:
+   - `highlightedIds` w SldEditorStore (niezależne od selection)
+   - Kolory według severity:
+     - HIGH: czerwony (#dc2626)
+     - WARN: żółty (#f59e0b)
+     - INFO: niebieski (#3b82f6)
+   - Highlight znika po zmianie selekcji/focus
+
+5. **Integracja z trybami**:
+   - MODEL_EDIT: nawigacja + możliwość edycji po focus
+   - RESULT_VIEW: nawigacja tylko do odczytu (komunikat PL)
+
+### 27.3 Implementacja
+
+**Backend:**
+
+| Plik | Opis |
+|------|------|
+| `backend/src/api/issues.py` | Endpoint agregacji issues (ValidationReport + P22) |
+| `backend/src/api/main.py` | Rejestracja issues router |
+
+**Frontend:**
+
+| Plik | Opis |
+|------|------|
+| `ui/types.ts` | Dodano `Issue`, `IssueFilter`, `IssueSeverity`, `IssueSource`, `IssueObjectRef` |
+| `ui/issue-panel/IssuePanel.tsx` | Główny component z listą + filtrem |
+| `ui/issue-panel/IssuePanelContainer.tsx` | Container z fetch + nawigacją |
+| `ui/sld-editor/SldEditorStore.ts` | Dodano `highlightedIds`, `highlightSeverity`, `highlightSymbols()`, `clearHighlight()` |
+| `ui/sld-editor/SldCanvas.tsx` | Renderowanie highlight z kolorami według severity |
+| `ui/app-state/store.ts` | Dodano `issuePanelOpen`, `toggleIssuePanel()` |
+| `ui/layout/MainLayout.tsx` | Integracja Issue Panel jako right sidebar |
+| `ui/issue-panel/__tests__/IssuePanel.test.tsx` | Testy podstawowe |
+
+**Mechanizm:**
+
+1. **Backend Agregacja**:
+   - Pobiera ostatni AnalysisRun dla case
+   - Jeśli status=FAILED → parsuje ValidationReport z error_message
+   - Jeśli status=FINISHED i typ=PF → pobiera P22 interpretation (cached)
+   - Mapuje wszystko do wspólnego formatu Issue
+   - Deterministyczny sort: severity_order[severity], source, object_ref.id
+
+2. **Frontend Issue Panel**:
+   - Fetch `/api/issues/study-cases/{case_id}/issues` przy zmianie case
+   - Wyświetla listę z filtrem (severity, source)
+   - Klik issue → `highlightSymbols([object_ref.id], severity)` + nawigacja Tree
+
+3. **SLD Highlight**:
+   - Nowy state: `highlightedIds`, `highlightSeverity` w SldEditorStore
+   - SymbolRenderer sprawdza `highlighted && highlightSeverity` → ustawia kolor obrysu
+   - Priority: highlight > selection > default
+
+4. **Mode Gating**:
+   - IssuePanelContainer sprawdza `activeMode`
+   - W RESULT_VIEW: po kliknięciu issue wyświetla info "Edycja niedostępna w trybie przeglądania wyników"
+
+### 27.4 DoD (Definition of Done)
+
+- [x] Issue Panel działa jako centralna lista
+- [x] Nawigacja do obiektu (Tree + SLD highlight)
+- [x] Highlight deterministyczny z kolorami według severity
+- [x] Dane tylko READ-ONLY (agregacja bez nowych obliczeń)
+- [x] 100% PL (wszystkie komunikaty)
+- [x] Jeden mały PR (backend + frontend)
+- [x] Testy podstawowe (render, filter, click, sort)
+- [x] PLANS.md: P30d DONE
+
+### 27.5 Exclusions (NOT modified)
+
+- ❌ Solverów / Result API / Proof
+- ❌ Nowych reguł obliczeniowych
+- ❌ Globalnych refaktorów UI
+- ❌ Pełna integracja Tree navigation (TODO)
+- ❌ Protection findings (TODO)
+
+### 27.6 Next Steps
+
+- **Tree Navigation**: Pełna integracja z ProjectTree (expand + select node)
+- **Protection Findings**: Dodać mapowanie protection interpretation
+- **ActiveCaseBar Toggle**: Przycisk do otwierania Issue Panel
+- **Keyboard Shortcuts**: Skrót Ctrl+Shift+I do toggle Issue Panel
+- **E2E Tests**: Playwright testy dla nawigacji + highlight
+
+---

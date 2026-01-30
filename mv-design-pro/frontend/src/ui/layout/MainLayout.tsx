@@ -11,11 +11,12 @@
  * - Case Manager panel (slide-in)
  */
 
-import { type ReactNode, useCallback, useState } from 'react';
+import { type ReactNode, useCallback } from 'react';
 import { clsx } from 'clsx';
 import { ActiveCaseBar } from '../active-case-bar';
 import { CaseManager } from '../case-manager';
-import { useAppStateStore, useCaseManagerOpen } from '../app-state';
+import { IssuePanelContainer } from '../issue-panel';
+import { useAppStateStore, useCaseManagerOpen, useIssuePanelOpen, useActiveCaseId } from '../app-state';
 
 // =============================================================================
 // Types
@@ -39,7 +40,10 @@ export function MainLayout({
   showCaseBar = true,
 }: MainLayoutProps) {
   const caseManagerOpen = useCaseManagerOpen();
+  const issuePanelOpen = useIssuePanelOpen();
+  const activeCaseId = useActiveCaseId();
   const toggleCaseManager = useAppStateStore((state) => state.toggleCaseManager);
+  const toggleIssuePanel = useAppStateStore((state) => state.toggleIssuePanel);
   const setActiveMode = useAppStateStore((state) => state.setActiveMode);
 
   const handleChangeCaseClick = useCallback(() => {
@@ -68,6 +72,10 @@ export function MainLayout({
     toggleCaseManager(false);
   }, [toggleCaseManager]);
 
+  const handleIssuePanelToggle = useCallback(() => {
+    toggleIssuePanel();
+  }, [toggleIssuePanel]);
+
   return (
     <div className="flex flex-col h-screen bg-gray-100">
       {/* Active Case Bar (always visible) */}
@@ -81,9 +89,16 @@ export function MainLayout({
       )}
 
       {/* Main Content */}
-      <div className="flex-1 relative overflow-hidden">
+      <div className="flex-1 relative overflow-hidden flex">
         {/* Content */}
-        <div className="h-full overflow-auto">{children}</div>
+        <div className="flex-1 overflow-auto">{children}</div>
+
+        {/* P30d: Issue Panel (right sidebar) */}
+        {issuePanelOpen && (
+          <div className="w-80 border-l border-gray-200 bg-white overflow-hidden">
+            <IssuePanelContainer caseId={activeCaseId} />
+          </div>
+        )}
 
         {/* Case Manager Panel (slide-in from right) */}
         <CaseManagerPanel

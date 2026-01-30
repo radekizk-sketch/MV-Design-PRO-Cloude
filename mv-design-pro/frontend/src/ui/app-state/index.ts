@@ -17,6 +17,7 @@ export {
   useHasActiveCase,
   useCanCalculate,
   useCaseManagerOpen,
+  useIssuePanelOpen, // P30d
 } from './store';
 
 export type { CaseKind } from './store';

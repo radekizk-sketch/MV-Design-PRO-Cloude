@@ -18,6 +18,7 @@ import React, { useCallback, useRef } from 'react';
 import { useSldEditorStore } from './SldEditorStore';
 import { useSldDrag } from './hooks/useSldDrag';
 import type { AnySldSymbol, Position } from './types';
+import type { IssueSeverity } from '../types';
 import { useIsMutationBlocked } from '../selection/store';
 
 /**
@@ -26,11 +27,20 @@ import { useIsMutationBlocked } from '../selection/store';
 interface SymbolRendererProps {
   symbol: AnySldSymbol;
   selected: boolean;
+  highlighted: boolean;
+  highlightSeverity: IssueSeverity | null;
   onMouseDown: (symbolId: string, position: Position) => void;
   onClick: (symbolId: string, mode: 'single' | 'add' | 'toggle') => void;
 }
 
-const SymbolRenderer: React.FC<SymbolRendererProps> = ({ symbol, selected, onMouseDown, onClick }) => {
+const SymbolRenderer: React.FC<SymbolRendererProps> = ({
+  symbol,
+  selected,
+  highlighted,
+  highlightSeverity,
+  onMouseDown,
+  onClick
+}) => {
   const handleMouseDown = (e: React.MouseEvent) => {
     e.stopPropagation();
     const rect = (e.currentTarget as SVGElement).ownerSVGElement!.getBoundingClientRect();
@@ -50,8 +60,38 @@ const SymbolRenderer: React.FC<SymbolRendererProps> = ({ symbol, selected, onMou
   // Render symbol based on type
   const renderSymbol = () => {
     const { position, inService, elementType } = symbol;
-    const stroke = selected ? '#3b82f6' : inService ? '#1f2937' : '#9ca3af';
-    const strokeWidth = selected ? 2 : 1;
+
+    // P30d: Determine stroke color (priority: highlight > selection > default)
+    let stroke: string;
+    let strokeWidth: number;
+
+    if (highlighted && highlightSeverity) {
+      // Highlight takes priority
+      switch (highlightSeverity) {
+        case 'HIGH':
+          stroke = '#dc2626'; // red-600
+          strokeWidth = 3;
+          break;
+        case 'WARN':
+          stroke = '#f59e0b'; // amber-500
+          strokeWidth = 3;
+          break;
+        case 'INFO':
+          stroke = '#3b82f6'; // blue-500
+          strokeWidth = 2;
+          break;
+        default:
+          stroke = selected ? '#3b82f6' : inService ? '#1f2937' : '#9ca3af';
+          strokeWidth = selected ? 2 : 1;
+      }
+    } else if (selected) {
+      stroke = '#3b82f6'; // blue-500
+      strokeWidth = 2;
+    } else {
+      stroke = inService ? '#1f2937' : '#9ca3af';
+      strokeWidth = 1;
+    }
+
     const opacity = inService ? 1 : 0.5;
     const strokeDasharray = inService ? undefined : '4,4';
 
@@ -301,6 +341,8 @@ export const SldCanvas: React.FC = () => {
 
   const symbols = Array.from(sldStore.symbols.values());
   const selectedIds = sldStore.selectedIds;
+  const highlightedIds = sldStore.highlightedIds;
+  const highlightSeverity = sldStore.highlightSeverity;
   const gridConfig = sldStore.gridConfig;
   const lassoState = sldStore.lassoState;
 
@@ -416,6 +458,8 @@ export const SldCanvas: React.FC = () => {
           key={symbol.id}
           symbol={symbol}
           selected={selectedIds.includes(symbol.id)}
+          highlighted={highlightedIds.includes(symbol.id)}
+          highlightSeverity={highlightSeverity}
           onMouseDown={handleSymbolMouseDown}
           onClick={handleSymbolClick}
         />
