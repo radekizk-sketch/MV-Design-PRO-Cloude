@@ -2224,6 +2224,23 @@ P15a jest **warstwą analysis** nad P14a/b/c:
 
 ---
 
+#### Protection v1 — COMPLETE
+
+**Zakres zrealizowany:**
+- biblioteka zabezpieczeń jako SYSTEM (governance, fingerprint, import/export)
+- konfiguracja zabezpieczeń w StudyCase
+- analiza zabezpieczeń (czasy zadziałania, stany)
+- porównanie wariantów A/B + deterministyczny ranking
+- Results Inspector + SLD overlay (read-only)
+- pełna deterministyka, trace audytowy, lifecycle Run
+
+**Zakres świadomie NIEZAIMPLEMENTOWANY:**
+- normowa koordynacja selektywności (P16 — DEFERRED)
+
+**Status:** **PRODUKT GOTOWY (PowerFactory++)**
+
+---
+
 ## 18.8 P16 — Normowa koordynacja selektywności (DEFERRED)
 
 **Status:** DEFERRED (świadomie nieimplementowane)
@@ -2247,6 +2264,58 @@ P15a jest **warstwą analysis** nad P14a/b/c:
 **Uwaga strategiczna:**
 Ten etap wprowadza normatywny osąd inżynierski i wymaga
 osobnej decyzji projektowej przed implementacją.
+
+---
+
+### Power Flow PF++ — NOWY FILAR
+
+**Cel filaru:**
+Zbudować deterministyczną, audytowalną analizę rozpływu mocy
+klasy **wyższej niż PowerFactory**, opartą o:
+- Project → Case → Run → Snapshot
+- immutable Result API
+- pełny white-box trace obliczeń
+- A/B comparison jako byt pierwszej klasy
+
+**Twarde założenia (NIE DO ZŁAMANIA):**
+- brak uproszczeń względem klasycznego AC Power Flow
+- determinism > performance
+- fizyka wyłącznie w solverze
+- UI i analizy = NOT-A-SOLVER
+- brak „magii" i heurystyk bez śladu w trace
+
+---
+
+### P20 — Power Flow v1 (FOUNDATION)
+
+**Zakres (KANONICZNY):**
+- solver AC Newton–Raphson
+- napięcia w węzłach (V, θ)
+- rozpływy P/Q w gałęziach
+- straty mocy
+- status zbieżności
+- pełny trace iteracji
+
+**Integracja:**
+- Run / Snapshot
+- Results Inspector (tabele)
+- SLD overlay (napięcia, obciążenia)
+- A/B comparison wariantów Case
+
+**Wykluczenia (NA TEN ETAP):**
+- regulatory napięcia (OLTC)
+- automatyki
+- stany dynamiczne
+- harmoniczne
+
+**Status:** PLANNED
+
+---
+
+**Kolejność dalszych prac (kanoniczna):**
+1. P20a — Power Flow Solver + Trace (backend-only)
+2. P20b — Results Inspector + SLD Overlay
+3. P20c — A/B Comparison + Ranking
 
 ---
 
