@@ -2617,6 +2617,50 @@ Wszystkie pakiety pozostają POST-HOC i nie modyfikują solwerów ani Result API
 
 ---
 
+### P22 — Power Flow Interpretation Layer
+
+**Status:** DONE | CANONICAL & BINDING
+
+**Cel:** Dodać warstwę interpretacji wyników rozpływu mocy - czytelną inżyniersko, audytowalną, deterministyczną, gotową do A/B porównań.
+
+**KANON (BINDING):**
+- Analysis ≠ Solver (ZERO nowych obliczeń fizycznych)
+- Interpretacja WYŁĄCZNIE na podstawie `PowerFlowResult`
+- Determinizm absolutny
+- 100% język polski
+- Brak norm, brak „OK / VIOLATION" - tylko severity (INFO / WARN / HIGH)
+
+**Reguły severity (stałe):**
+- Voltage: |V - 1.0| < 2% → INFO, 2-5% → WARN, >5% → HIGH
+- Branch loading: na podstawie strat (heurystyka)
+
+**Deliverables (P22):**
+- [x] `backend/src/analysis/power_flow_interpretation/models.py` - frozen dataclasses
+- [x] `backend/src/analysis/power_flow_interpretation/builder.py` - PowerFlowInterpretationBuilder
+- [x] `backend/src/analysis/power_flow_interpretation/serializer.py` - deterministic JSON
+- [x] API endpoints: GET/POST `/power-flow-runs/{run_id}/interpretation`
+- [x] Frontend: zakładka "Interpretacja" w Results Inspector
+- [x] Testy determinizmu: `backend/tests/analysis/test_power_flow_interpretation_p22.py`
+
+**Struktura wyniku:**
+- `voltage_findings` - obserwacje napięciowe dla każdej szyny
+- `branch_findings` - obserwacje obciążenia gałęzi
+- `summary` - podsumowanie + ranking top N issues
+- `trace` - ślad interpretacji (progi, reguły, źródła danych)
+
+**API:**
+- `GET /power-flow-runs/{run_id}/interpretation` - pobiera interpretację (cached)
+- `POST /power-flow-runs/{run_id}/interpretation` - tworzy/pobiera interpretację (idempotent)
+
+**UI:**
+- Nowa zakładka "Interpretacja" w Power Flow Results Inspector
+- Podsumowanie z licznikami HIGH/WARN/INFO
+- Ranking najistotniejszych problemów
+- Tabele obserwacji napięciowych i gałęziowych
+- Ślad interpretacji (audit trail)
+
+---
+
 ## P23 — Study / Scenario Orchestration (ETAP++)
 
 **Status:** DONE | CANONICAL & BINDING

@@ -1,5 +1,5 @@
 /**
- * P20b — Power Flow Results Inspector Page
+ * P20b/P22 — Power Flow Results Inspector Page
  *
  * CANONICAL ALIGNMENT:
  * - 100% Polish UI
@@ -7,7 +7,7 @@
  * - RESULT_VIEW mode
  *
  * Main page for viewing power flow analysis results (single run).
- * Tabs: Szyny, Galezie, Podsumowanie, Slad obliczen
+ * Tabs: Szyny, Galezie, Podsumowanie, Slad obliczen, Interpretacja (P22)
  */
 
 import { useEffect, useMemo } from 'react';
@@ -17,11 +17,21 @@ import {
   useFilteredBranchResults,
   useIsAnyLoading,
 } from './store';
-import type { PowerFlowBusResult, PowerFlowBranchResult, PowerFlowIterationTrace } from './types';
+import type {
+  PowerFlowBusResult,
+  PowerFlowBranchResult,
+  PowerFlowIterationTrace,
+  VoltageFinding,
+  BranchLoadingFinding,
+  InterpretationRankedItem,
+  FindingSeverity,
+} from './types';
 import {
   POWER_FLOW_TAB_LABELS,
   RESULT_STATUS_LABELS,
   RESULT_STATUS_SEVERITY,
+  SEVERITY_LABELS,
+  SEVERITY_COLORS,
 } from './types';
 import { useState } from 'react';
 
@@ -601,6 +611,226 @@ function TraceTab() {
 }
 
 // =============================================================================
+// P22: Interpretation Tab (Interpretacja)
+// =============================================================================
+
+/**
+ * Get CSS class for severity badge.
+ */
+function getSeverityBadgeClass(severity: FindingSeverity): string {
+  return SEVERITY_COLORS[severity] ?? 'text-slate-600 bg-slate-100';
+}
+
+/**
+ * P22: Interpretation Tab - READ-ONLY display of power flow interpretation.
+ * Shows voltage findings, branch findings, and top issues ranking.
+ */
+function InterpretationTab() {
+  const { interpretation, isLoadingInterpretation, loadInterpretation } = usePowerFlowResultsStore();
+
+  useEffect(() => {
+    if (!interpretation) {
+      loadInterpretation();
+    }
+  }, [interpretation, loadInterpretation]);
+
+  if (isLoadingInterpretation) return <LoadingSpinner />;
+  if (!interpretation) {
+    return <EmptyState message="Brak interpretacji dla tego obliczenia." />;
+  }
+
+  const { summary, voltage_findings, branch_findings, trace } = interpretation;
+
+  return (
+    <div className="space-y-6">
+      {/* Summary section */}
+      <div className="rounded border border-slate-200 bg-white p-4">
+        <h3 className="mb-4 text-sm font-semibold text-slate-700">Podsumowanie interpretacji</h3>
+        <div className="grid grid-cols-2 gap-4 md:grid-cols-5">
+          <div className="rounded border border-slate-200 p-3 text-center">
+            <div className="text-2xl font-bold text-slate-900">{summary.total_voltage_findings}</div>
+            <div className="text-xs text-slate-500">Obserwacji napieciowych</div>
+          </div>
+          <div className="rounded border border-slate-200 p-3 text-center">
+            <div className="text-2xl font-bold text-slate-900">{summary.total_branch_findings}</div>
+            <div className="text-xs text-slate-500">Obserwacji galeziowych</div>
+          </div>
+          <div className="rounded border border-rose-200 bg-rose-50 p-3 text-center">
+            <div className="text-2xl font-bold text-rose-700">{summary.high_count}</div>
+            <div className="text-xs text-rose-600">Istotnych problemow</div>
+          </div>
+          <div className="rounded border border-amber-200 bg-amber-50 p-3 text-center">
+            <div className="text-2xl font-bold text-amber-700">{summary.warn_count}</div>
+            <div className="text-xs text-amber-600">Ostrzezen</div>
+          </div>
+          <div className="rounded border border-slate-200 bg-slate-50 p-3 text-center">
+            <div className="text-2xl font-bold text-slate-600">{summary.info_count}</div>
+            <div className="text-xs text-slate-500">Informacji</div>
+          </div>
+        </div>
+      </div>
+
+      {/* Top Issues Ranking */}
+      {summary.top_issues.length > 0 && (
+        <div className="rounded border border-slate-200 bg-white">
+          <h4 className="border-b border-slate-200 bg-slate-50 px-4 py-2 text-sm font-semibold text-slate-700">
+            Ranking najistotniejszych problemow (Top {summary.top_issues.length})
+          </h4>
+          <div className="divide-y divide-slate-100">
+            {summary.top_issues.map((item: InterpretationRankedItem) => (
+              <div key={`${item.element_type}-${item.element_id}`} className="flex items-center gap-4 px-4 py-3">
+                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 text-sm font-bold text-slate-700">
+                  {item.rank}
+                </div>
+                <span className={`rounded px-2 py-1 text-xs font-semibold ${getSeverityBadgeClass(item.severity)}`}>
+                  {SEVERITY_LABELS[item.severity]}
+                </span>
+                <span className="flex-1 text-sm text-slate-700">{item.description_pl}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Voltage Findings */}
+      <div className="rounded border border-slate-200 bg-white">
+        <h4 className="border-b border-slate-200 bg-slate-50 px-4 py-2 text-sm font-semibold text-slate-700">
+          Obserwacje napieciowe ({voltage_findings.length})
+        </h4>
+        {voltage_findings.length === 0 ? (
+          <div className="p-4 text-sm text-slate-500">Brak obserwacji napieciowych.</div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="min-w-full text-sm">
+              <thead className="bg-slate-50">
+                <tr>
+                  <th className="px-3 py-2 text-left font-semibold text-slate-700">ID szyny</th>
+                  <th className="px-3 py-2 text-right font-semibold text-slate-700">V [pu]</th>
+                  <th className="px-3 py-2 text-right font-semibold text-slate-700">Odchylenie [%]</th>
+                  <th className="px-3 py-2 text-center font-semibold text-slate-700">Poziom</th>
+                  <th className="px-3 py-2 text-left font-semibold text-slate-700">Opis</th>
+                </tr>
+              </thead>
+              <tbody>
+                {voltage_findings.slice(0, 50).map((finding: VoltageFinding) => (
+                  <tr key={finding.bus_id} className="border-t border-slate-100 hover:bg-slate-50">
+                    <td className="px-3 py-2 font-mono text-xs text-slate-700">
+                      {finding.bus_id.substring(0, 12)}...
+                    </td>
+                    <td className="px-3 py-2 text-right font-mono text-slate-600">
+                      {formatNumber(finding.v_pu, 4)}
+                    </td>
+                    <td className="px-3 py-2 text-right font-mono text-slate-600">
+                      {formatNumber(finding.deviation_pct, 2)}
+                    </td>
+                    <td className="px-3 py-2 text-center">
+                      <span className={`rounded px-2 py-0.5 text-xs font-semibold ${getSeverityBadgeClass(finding.severity)}`}>
+                        {SEVERITY_LABELS[finding.severity]}
+                      </span>
+                    </td>
+                    <td className="max-w-xs truncate px-3 py-2 text-xs text-slate-600" title={finding.description_pl}>
+                      {finding.description_pl}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            {voltage_findings.length > 50 && (
+              <p className="border-t border-slate-100 px-4 py-2 text-xs text-slate-500">
+                Wyswietlono 50 z {voltage_findings.length} obserwacji
+              </p>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Branch Findings */}
+      <div className="rounded border border-slate-200 bg-white">
+        <h4 className="border-b border-slate-200 bg-slate-50 px-4 py-2 text-sm font-semibold text-slate-700">
+          Obserwacje galeziowe ({branch_findings.length})
+        </h4>
+        {branch_findings.length === 0 ? (
+          <div className="p-4 text-sm text-slate-500">Brak obserwacji galeziowych.</div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="min-w-full text-sm">
+              <thead className="bg-slate-50">
+                <tr>
+                  <th className="px-3 py-2 text-left font-semibold text-slate-700">ID galezi</th>
+                  <th className="px-3 py-2 text-right font-semibold text-slate-700">Straty P [kW]</th>
+                  <th className="px-3 py-2 text-right font-semibold text-slate-700">Straty Q [kvar]</th>
+                  <th className="px-3 py-2 text-center font-semibold text-slate-700">Poziom</th>
+                  <th className="px-3 py-2 text-left font-semibold text-slate-700">Opis</th>
+                </tr>
+              </thead>
+              <tbody>
+                {branch_findings.slice(0, 50).map((finding: BranchLoadingFinding) => (
+                  <tr key={finding.branch_id} className="border-t border-slate-100 hover:bg-slate-50">
+                    <td className="px-3 py-2 font-mono text-xs text-slate-700">
+                      {finding.branch_id.substring(0, 12)}...
+                    </td>
+                    <td className="px-3 py-2 text-right font-mono text-slate-600">
+                      {formatNumber(finding.losses_p_mw * 1000, 2)}
+                    </td>
+                    <td className="px-3 py-2 text-right font-mono text-slate-600">
+                      {formatNumber(finding.losses_q_mvar * 1000, 2)}
+                    </td>
+                    <td className="px-3 py-2 text-center">
+                      <span className={`rounded px-2 py-0.5 text-xs font-semibold ${getSeverityBadgeClass(finding.severity)}`}>
+                        {SEVERITY_LABELS[finding.severity]}
+                      </span>
+                    </td>
+                    <td className="max-w-xs truncate px-3 py-2 text-xs text-slate-600" title={finding.description_pl}>
+                      {finding.description_pl}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            {branch_findings.length > 50 && (
+              <p className="border-t border-slate-100 px-4 py-2 text-xs text-slate-500">
+                Wyswietlono 50 z {branch_findings.length} obserwacji
+              </p>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Trace Info */}
+      <div className="rounded border border-slate-200 bg-slate-50 p-4">
+        <h4 className="mb-3 text-sm font-semibold text-slate-700">Slad interpretacji (audit trail)</h4>
+        <div className="grid gap-2 text-xs md:grid-cols-2">
+          <div>
+            <span className="font-medium text-slate-600">ID interpretacji:</span>{' '}
+            <span className="font-mono text-slate-500">{trace.interpretation_id}</span>
+          </div>
+          <div>
+            <span className="font-medium text-slate-600">Wersja:</span>{' '}
+            <span className="text-slate-500">{trace.interpretation_version}</span>
+          </div>
+          <div>
+            <span className="font-medium text-slate-600">Prog INFO (napiecie):</span>{' '}
+            <span className="text-slate-500">&lt;{trace.thresholds.voltage_info_max_pct}%</span>
+          </div>
+          <div>
+            <span className="font-medium text-slate-600">Prog WARN (napiecie):</span>{' '}
+            <span className="text-slate-500">{trace.thresholds.voltage_info_max_pct}-{trace.thresholds.voltage_warn_max_pct}%</span>
+          </div>
+        </div>
+        <div className="mt-3">
+          <span className="text-xs font-medium text-slate-600">Zastosowane reguly:</span>
+          <ul className="mt-1 list-inside list-disc text-xs text-slate-500">
+            {trace.rules_applied.map((rule, index) => (
+              <li key={index}>{rule}</li>
+            ))}
+          </ul>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// =============================================================================
 // Main Page Component
 // =============================================================================
 
@@ -654,6 +884,7 @@ export function PowerFlowResultsInspectorPage() {
         {!isLoading && activeTab === 'BRANCHES' && <BranchResultsTable />}
         {!isLoading && activeTab === 'SUMMARY' && <SummaryTab />}
         {!isLoading && activeTab === 'TRACE' && <TraceTab />}
+        {!isLoading && activeTab === 'INTERPRETATION' && <InterpretationTab />}
       </div>
     </div>
   );

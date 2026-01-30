@@ -18,6 +18,7 @@ import type {
   PowerFlowRunHeader,
   PowerFlowResultV1,
   PowerFlowTrace,
+  PowerFlowInterpretation,
 } from './types';
 
 const API_BASE = '/api';
@@ -91,6 +92,21 @@ export async function fetchPowerFlowTrace(runId: string): Promise<PowerFlowTrace
   const response = await fetch(`${API_BASE}/power-flow-runs/${runId}/trace`);
   if (!response.ok) {
     throw new Error(`Blad pobierania sladu obliczen: ${response.statusText}`);
+  }
+  return response.json();
+}
+
+/**
+ * P22: Fetch power flow interpretation.
+ *
+ * Returns interpretation with voltage/branch findings, summary, and trace.
+ * DETERMINISTIC: Same run -> identical interpretation.
+ * CACHED: Backend caches 1 run -> 1 interpretation.
+ */
+export async function fetchPowerFlowInterpretation(runId: string): Promise<PowerFlowInterpretation> {
+  const response = await fetch(`${API_BASE}/power-flow-runs/${runId}/interpretation`);
+  if (!response.ok) {
+    throw new Error(`Blad pobierania interpretacji: ${response.statusText}`);
   }
   return response.json();
 }

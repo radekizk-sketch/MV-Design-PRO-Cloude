@@ -154,17 +154,20 @@ export interface PowerFlowTrace {
 
 /**
  * Active tab in Power Flow Results Inspector.
+ * P22: Added INTERPRETATION tab.
  */
-export type PowerFlowResultsTab = 'BUSES' | 'BRANCHES' | 'SUMMARY' | 'TRACE';
+export type PowerFlowResultsTab = 'BUSES' | 'BRANCHES' | 'SUMMARY' | 'TRACE' | 'INTERPRETATION';
 
 /**
  * Polish tab labels.
+ * P22: Added Interpretacja tab.
  */
 export const POWER_FLOW_TAB_LABELS: Record<PowerFlowResultsTab, string> = {
   BUSES: 'Szyny',
   BRANCHES: 'Galezie',
   SUMMARY: 'Podsumowanie',
   TRACE: 'Slad obliczen',
+  INTERPRETATION: 'Interpretacja',
 };
 
 /**
@@ -193,4 +196,127 @@ export const RESULT_STATUS_SEVERITY: Record<string, 'info' | 'success' | 'warnin
 export const CONVERGENCE_LABELS: Record<string, string> = {
   true: 'Zbiezny',
   false: 'Niezbiezny',
+};
+
+// =============================================================================
+// P22: Power Flow Interpretation Types
+// =============================================================================
+
+/**
+ * Finding severity level.
+ * INFO: |V - 1.0| < 2%
+ * WARN: 2-5%
+ * HIGH: >5%
+ */
+export type FindingSeverity = 'INFO' | 'WARN' | 'HIGH';
+
+/**
+ * Voltage finding for a single bus.
+ */
+export interface VoltageFinding {
+  bus_id: string;
+  v_pu: number;
+  deviation_pct: number;
+  severity: FindingSeverity;
+  description_pl: string;
+  evidence_ref: string;
+}
+
+/**
+ * Branch loading finding for a single branch.
+ */
+export interface BranchLoadingFinding {
+  branch_id: string;
+  loading_pct: number | null;
+  losses_p_mw: number;
+  losses_q_mvar: number;
+  severity: FindingSeverity;
+  description_pl: string;
+  evidence_ref: string;
+}
+
+/**
+ * Ranked item in interpretation summary.
+ */
+export interface InterpretationRankedItem {
+  rank: number;
+  element_type: 'voltage' | 'branch_loading';
+  element_id: string;
+  severity: FindingSeverity;
+  magnitude: number;
+  description_pl: string;
+}
+
+/**
+ * Interpretation summary with ranking.
+ */
+export interface InterpretationSummary {
+  total_voltage_findings: number;
+  total_branch_findings: number;
+  high_count: number;
+  warn_count: number;
+  info_count: number;
+  top_issues: InterpretationRankedItem[];
+}
+
+/**
+ * Interpretation thresholds (BINDING).
+ */
+export interface InterpretationThresholds {
+  voltage_info_max_pct: number;
+  voltage_warn_max_pct: number;
+  branch_loading_info_max_pct: number | null;
+  branch_loading_warn_max_pct: number | null;
+}
+
+/**
+ * Interpretation trace for auditability.
+ */
+export interface InterpretationTrace {
+  interpretation_id: string;
+  power_flow_run_id: string;
+  created_at: string;
+  thresholds: InterpretationThresholds;
+  rules_applied: string[];
+  data_sources: string[];
+  interpretation_version: string;
+}
+
+/**
+ * Interpretation context.
+ */
+export interface InterpretationContext {
+  project_name: string | null;
+  case_name: string | null;
+  run_timestamp: string | null;
+  snapshot_id: string | null;
+}
+
+/**
+ * Complete power flow interpretation result.
+ */
+export interface PowerFlowInterpretation {
+  context: InterpretationContext | null;
+  voltage_findings: VoltageFinding[];
+  branch_findings: BranchLoadingFinding[];
+  summary: InterpretationSummary;
+  trace: InterpretationTrace;
+}
+
+/**
+ * Severity labels (Polish).
+ */
+export const SEVERITY_LABELS: Record<FindingSeverity, string> = {
+  INFO: 'Informacja',
+  WARN: 'Ostrzezenie',
+  HIGH: 'Istotny problem',
+};
+
+/**
+ * Severity colors for UI.
+ */
+export const SEVERITY_COLORS: Record<FindingSeverity, string> = {
+  INFO: 'text-slate-600 bg-slate-100',
+  WARN: 'text-amber-700 bg-amber-100',
+  HIGH: 'text-rose-700 bg-rose-100',
 };
