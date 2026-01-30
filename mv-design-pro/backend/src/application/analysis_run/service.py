@@ -78,10 +78,28 @@ class AnalysisRunService:
         operating_case_id: UUID | None = None,
         options: dict | None = None,
     ) -> AnalysisRun:
+        """P20a: Create power flow run with result deduplication.
+
+        PF-style semantics:
+        - Run = event (ALWAYS new UUID)
+        - Result = can be reused from previous run with same input_hash
+
+        If a FINISHED run with identical input_hash exists, creates a new run
+        with copied results (immediate finish). Otherwise creates CREATED run.
+        """
         operating_case_id = self._resolve_operating_case_id(project_id, operating_case_id)
         snapshot = self._build_power_flow_snapshot(project_id, operating_case_id, options)
         input_hash = compute_input_hash(snapshot)
         with self._uow_factory() as uow:
+            # P20a: Check for existing FINISHED run with same input_hash
+            existing = uow.analysis_runs.get_by_deterministic_key(
+                project_id=project_id,
+                operating_case_id=operating_case_id,
+                analysis_type="PF",
+                input_hash=input_hash,
+            )
+
+            # ALWAYS create new run (Run = event, new UUID)
             run = new_analysis_run(
                 project_id=project_id,
                 operating_case_id=operating_case_id,
@@ -90,6 +108,32 @@ class AnalysisRunService:
                 input_hash=input_hash,
             )
             uow.analysis_runs.create(run)
+
+            # If existing FINISHED run found, copy results (result dedup)
+            if existing is not None and existing.status == "FINISHED":
+                from datetime import datetime, timezone
+                now = datetime.now(timezone.utc)
+                # Build dedup trace info
+                dedup_trace = {
+                    "dedup_source_run_id": str(existing.id),
+                    "dedup_reason": "identical_input_hash",
+                }
+                trace_json = existing.trace_json
+                if isinstance(trace_json, dict):
+                    trace_json = {**trace_json, "_dedup": dedup_trace}
+                elif trace_json is None:
+                    trace_json = {"_dedup": dedup_trace}
+
+                run = uow.analysis_runs.update_status(
+                    run.id,
+                    status="FINISHED",
+                    started_at=now,
+                    finished_at=now,
+                    result_summary=existing.result_summary,
+                    trace_json=trace_json,
+                    white_box_trace=existing.white_box_trace,
+                )
+
         return run
 
     def create_short_circuit_run(

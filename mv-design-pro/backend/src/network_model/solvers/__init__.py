@@ -14,6 +14,20 @@ from .short_circuit_contributions import (
     SourceType,
 )
 from .power_flow_newton import PowerFlowNewtonSolver, PowerFlowNewtonSolution
+from .power_flow_trace import (
+    POWER_FLOW_SOLVER_VERSION,
+    PowerFlowIterationTrace,
+    PowerFlowTrace,
+    build_power_flow_trace,
+)
+from .power_flow_result import (
+    POWER_FLOW_RESULT_VERSION,
+    PowerFlowBusResult,
+    PowerFlowBranchResult,
+    PowerFlowSummary,
+    PowerFlowResultV1,
+    build_power_flow_result_v1,
+)
 
 __all__ = [
     "C_MAX",
@@ -27,4 +41,14 @@ __all__ = [
     "SourceType",
     "PowerFlowNewtonSolver",
     "PowerFlowNewtonSolution",
+    "POWER_FLOW_SOLVER_VERSION",
+    "PowerFlowIterationTrace",
+    "PowerFlowTrace",
+    "build_power_flow_trace",
+    "POWER_FLOW_RESULT_VERSION",
+    "PowerFlowBusResult",
+    "PowerFlowBranchResult",
+    "PowerFlowSummary",
+    "PowerFlowResultV1",
+    "build_power_flow_result_v1",
 ]
