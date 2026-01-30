@@ -2188,7 +2188,7 @@ P15a jest **warstwą analysis** nad P14a/b/c:
 - **P14b (governance):** Manifest, fingerprint, import/export
 - **P14c (config):** ProtectionConfig w StudyCase (template_ref, overrides)
 - **P15a (analysis):** Evaluation engine, results, trace
-- **P15b (future):** Selectivity coordination
+- **P15b (comparison):** Selectivity A/B comparison
 
 ### 18.7.7. Definition of Done
 
@@ -2221,6 +2221,106 @@ P15a jest **warstwą analysis** nad P14a/b/c:
 - [x] TMS scaling: linear
 - [x] No trip below pickup
 - [x] Domain serialization roundtrip
+
+---
+
+## 18.8 Phase P15b: Protection Selectivity (A/B) Comparison — DONE
+
+**Status:** DONE | CANONICAL & BINDING
+
+### 18.8.1. Cel fazy
+
+Implementacja **porównania dwóch ProtectionAnalysisRun** z deterministycznym rankingiem problemów:
+- Porównanie per (protected_element_ref, fault_target_id)
+- Klasyfikacja zmian stanów (TRIP_TO_NO_TRIP, NO_TRIP_TO_TRIP, etc.)
+- Ranking problemów z severity (1-5)
+- UI read-only w języku polskim
+
+### 18.8.2. Zakres fazy
+
+**IN SCOPE:**
+- ProtectionComparisonService — porównanie dwóch runów
+- ProtectionComparisonResult — wynik porównania (rows, ranking, summary)
+- ProtectionComparisonTrace — ślad audytu porównania
+- API: POST/GET /protection-comparisons
+- Frontend: Porównanie zabezpieczeń (PL, read-only)
+- Testy determinizmu
+
+**OUT OF SCOPE:**
+- Koordynacja selektywności IEC 60255
+- Strefy, grading, time discrimination
+- Normowa interpretacja (tylko faktyczne porównanie)
+- Edycja nastaw (read-only)
+
+### 18.8.3. Deliverables
+
+| Plik | Opis | Status |
+|------|------|--------|
+| `backend/src/domain/protection_comparison.py` | Domain models: Row, Issue, Trace, Summary, Result | DONE |
+| `backend/src/application/protection_comparison/service.py` | ComparisonService: compare(), get_comparison(), get_trace() | DONE |
+| `backend/src/api/protection_comparisons.py` | API endpoints: POST, GET /{id}, GET /{id}/results, GET /{id}/trace | DONE |
+| `frontend/src/ui/protection-comparison/` | UI: ProtectionComparisonPage, types, api | DONE |
+| `backend/tests/test_protection_comparison.py` | Testy: determinism, validation, severity | DONE |
+| `PLANS.md` | Aktualizacja planu (P15b DONE) | DONE |
+
+### 18.8.4. State Change Classification
+
+| Zmiana | Kod | Severity | Opis |
+|--------|-----|----------|------|
+| TRIPS → NO_TRIP | TRIP_LOST | 5 (CRITICAL) | Utrata zadziałania zabezpieczenia |
+| NO_TRIP → TRIPS | TRIP_GAINED | 2 (MINOR) | Pojawienie się zadziałania |
+| Same state, Δt > 50ms | DELAY_INCREASED/DECREASED | 3 (MODERATE) | Zmiana czasu zadziałania |
+| INVALID in A or B | INVALID_STATE | 4 (MAJOR) | Nieprawidłowy stan ewaluacji |
+| Margin change > 5% | MARGIN_DECREASED/INCREASED | 3/1 | Zmiana marginesu |
+
+### 18.8.5. API Endpoints
+
+| Method | Endpoint | Opis |
+|--------|----------|------|
+| POST | `/protection-comparisons` | Utwórz porównanie (run_a_id, run_b_id) |
+| GET | `/protection-comparisons/{id}` | Pobierz metadane porównania |
+| GET | `/protection-comparisons/{id}/results` | Pobierz pełne wyniki (rows, ranking) |
+| GET | `/protection-comparisons/{id}/trace` | Pobierz ślad audytu |
+
+### 18.8.6. Frontend UI
+
+| Zakładka | Opis |
+|----------|------|
+| **Różnice** | Tabela porównań per (element, fault) z Δt, ΔI, state_change |
+| **Ranking problemów** | Lista issues posortowana wg severity (5→1) |
+| **Ślad porównania** | Kroki: MATCH_EVALUATIONS, COMPUTE_DELTAS, CLASSIFY_CHANGES, RANK_ISSUES |
+
+### 18.8.7. Definition of Done
+
+**Domain:**
+- [x] ProtectionComparisonRow: per (element, fault) z A/B values, delta_t, state_change
+- [x] RankingIssue: issue_code, severity (1-5), element_ref, description_pl
+- [x] ProtectionComparisonResult: rows[], ranking[], summary, input_hash
+- [x] ProtectionComparisonTrace: steps[] z inputs/outputs
+
+**Service:**
+- [x] compare(): validate runs FINISHED, same project, return deterministic result
+- [x] Caching: same (A, B) → same comparison_id via input_hash
+- [x] Ranking sort: severity DESC, issue_code, element_ref
+
+**API:**
+- [x] POST /protection-comparisons → 201 Created
+- [x] GET /results → ProtectionComparisonResult JSON
+- [x] GET /trace → ProtectionComparisonTrace JSON
+- [x] Validation errors: 404 (not found), 400 (not FINISHED, project mismatch)
+
+**Frontend:**
+- [x] ProtectionComparisonPage z 3 zakładkami (PL)
+- [x] RunSelector dla protection runs
+- [x] Filter tekstowy, "Pokaż tylko zmiany"
+- [x] Read-only (brak edycji nastaw)
+
+**Tests:**
+- [x] Determinism: 2x compare(A, B) → identical JSON
+- [x] State change classification
+- [x] Severity mapping
+- [x] Domain serialization roundtrip
+- [x] Frontend smoke test
 
 ---
 
