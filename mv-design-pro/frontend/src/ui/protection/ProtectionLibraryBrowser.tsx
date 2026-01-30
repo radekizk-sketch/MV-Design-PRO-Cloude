@@ -2,25 +2,34 @@
  * Protection Library Browser (Biblioteka zabezpieczeń)
  *
  * P14a: Protection Library (FOUNDATION, READ-ONLY)
+ * P14b: Protection Library Governance (manifest+fingerprint, export/import, UI controls)
  *
  * Przeglądarka biblioteki zabezpieczeń w stylu PowerFactory z 3 zakładkami:
  * - Urządzenia (Device Types)
  * - Krzywe (Curves)
  * - Szablony nastaw (Setting Templates)
  *
+ * P14b adds:
+ * - Export/Import buttons with manifest+fingerprint
+ * - Manifest panel (vendor/series/revision/fingerprint)
+ * - Import report dialog (added/skipped/conflicts/blocked)
+ *
  * Wszystkie etykiety w języku polskim (100% PL).
- * READ-ONLY: brak create/update/delete, brak import/export w tym PR.
  */
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { clsx } from 'clsx';
 import {
   fetchProtectionTypesByCategory,
+  exportProtectionLibrary,
+  importProtectionLibrary,
   type ProtectionCategory,
   type ProtectionDeviceType,
   type ProtectionCurve,
   type ProtectionSettingTemplate,
   type ProtectionTypeUnion,
+  type ProtectionImportReport,
+  type ProtectionLibraryManifest,
 } from './';
 
 interface Tab {
@@ -58,6 +67,11 @@ export function ProtectionLibraryBrowser({
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedTypeId, setSelectedTypeId] = useState<string | null>(null);
+  const [importReport, setImportReport] = useState<ProtectionImportReport | null>(null);
+  const [showImportDialog, setShowImportDialog] = useState(false);
+  const [manifest, setManifest] = useState<ProtectionLibraryManifest | null>(null);
+  const [showManifestPanel, setShowManifestPanel] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Fetch types when active tab changes
   useEffect(() => {
@@ -104,15 +118,139 @@ export function ProtectionLibraryBrowser({
     return types.find((t) => t.id === selectedTypeId);
   }, [types, selectedTypeId]);
 
+  // Handle export (P14b)
+  const handleExport = async () => {
+    try {
+      setLoading(true);
+      const exportData = await exportProtectionLibrary();
+
+      // Save manifest for display
+      setManifest(exportData.manifest);
+
+      // Download as JSON file
+      const blob = new Blob([JSON.stringify(exportData, null, 2)], {
+        type: 'application/json',
+      });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `protection_library_export_${new Date().toISOString().split('T')[0]}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      setLoading(false);
+    } catch (err: any) {
+      setError(err.message ?? 'Błąd eksportu biblioteki zabezpieczeń');
+      setLoading(false);
+    }
+  };
+
+  // Handle import button click (P14b)
+  const handleImportClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  // Handle file selection (P14b)
+  const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    try {
+      setLoading(true);
+      setError(null);
+
+      // Read file
+      const fileText = await file.text();
+      const importData = JSON.parse(fileText);
+
+      // Save manifest from import
+      if (importData.manifest) {
+        setManifest(importData.manifest);
+      }
+
+      // Import (default mode: merge)
+      const report = await importProtectionLibrary(importData, 'merge');
+
+      // Show report dialog
+      setImportReport(report);
+      setShowImportDialog(true);
+
+      // Refresh types
+      const fetchedTypes = await fetchProtectionTypesByCategory(activeTab);
+      setTypes(fetchedTypes);
+
+      setLoading(false);
+    } catch (err: any) {
+      setError(err.message ?? 'Błąd importu biblioteki zabezpieczeń');
+      setLoading(false);
+    } finally {
+      // Reset file input
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
+  };
+
   return (
     <div className="protection-library-browser flex h-full flex-col bg-gray-50">
       {/* Header */}
       <div className="border-b border-gray-200 bg-white px-4 py-3">
-        <h2 className="text-lg font-semibold text-gray-800">Biblioteka zabezpieczeń</h2>
-        <p className="text-sm text-gray-500">
-          Przeglądaj urządzenia, krzywe i szablony nastaw (read-only)
-        </p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-lg font-semibold text-gray-800">Biblioteka zabezpieczeń</h2>
+            <p className="text-sm text-gray-500">
+              Przeglądaj urządzenia, krzywe i szablony nastaw
+            </p>
+          </div>
+
+          {/* Export/Import/Manifest Buttons (P14b) */}
+          <div className="flex space-x-2">
+            <button
+              onClick={handleExport}
+              disabled={loading}
+              className="rounded bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+            >
+              📤 Eksportuj
+            </button>
+            <button
+              onClick={handleImportClick}
+              disabled={loading}
+              className="rounded bg-green-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-50"
+            >
+              📥 Importuj
+            </button>
+            <button
+              onClick={() => setShowManifestPanel(!showManifestPanel)}
+              className="rounded bg-gray-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-gray-700"
+            >
+              📋 Manifest
+            </button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".json"
+              onChange={handleFileChange}
+              className="hidden"
+            />
+          </div>
+        </div>
       </div>
+
+      {/* Manifest Panel (P14b) */}
+      {showManifestPanel && manifest && (
+        <div className="border-b border-gray-200 bg-blue-50 px-4 py-3">
+          <div className="text-sm space-y-1">
+            <div><strong>Biblioteka:</strong> {manifest.name_pl}</div>
+            <div><strong>Producent:</strong> {manifest.vendor}</div>
+            <div><strong>Seria:</strong> {manifest.series}</div>
+            <div><strong>Rewizja:</strong> {manifest.revision}</div>
+            <div><strong>Wersja schematu:</strong> {manifest.schema_version}</div>
+            <div className="font-mono text-xs"><strong>Fingerprint:</strong> {manifest.fingerprint}</div>
+          </div>
+        </div>
+      )}
 
       {/* Tabs */}
       <div className="border-b border-gray-200 bg-white">
@@ -218,6 +356,17 @@ export function ProtectionLibraryBrowser({
           )}
         </div>
       </div>
+
+      {/* Import Report Dialog (P14b) */}
+      {showImportDialog && importReport && (
+        <ProtectionImportReportDialog
+          report={importReport}
+          onClose={() => {
+            setShowImportDialog(false);
+            setImportReport(null);
+          }}
+        />
+      )}
     </div>
   );
 }
@@ -350,6 +499,141 @@ function DetailField({
       <span className={clsx('text-gray-800', multiline && 'text-left')}>
         {displayValue}
       </span>
+    </div>
+  );
+}
+
+/**
+ * Protection Import Report Dialog Component (P14b).
+ *
+ * Wyświetla raport z importu biblioteki zabezpieczeń (added/skipped/conflicts/blocked).
+ */
+function ProtectionImportReportDialog({
+  report,
+  onClose,
+}: {
+  report: ProtectionImportReport;
+  onClose: () => void;
+}) {
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div className="bg-white rounded-lg shadow-xl max-w-3xl w-full max-h-[80vh] overflow-hidden flex flex-col">
+        {/* Header */}
+        <div className="px-6 py-4 border-b border-gray-200">
+          <h2 className="text-xl font-semibold text-gray-800">
+            Raport importu biblioteki zabezpieczeń
+          </h2>
+          <p className="text-sm text-gray-600 mt-1">
+            Tryb: {report.mode === 'merge' ? 'MERGE (dodaj nowe)' : 'REPLACE (zamień)'}
+          </p>
+        </div>
+
+        {/* Content */}
+        <div className="flex-1 overflow-y-auto px-6 py-4 space-y-6">
+          {/* Success/Failure Banner */}
+          {report.success ? (
+            <div className="bg-green-50 border border-green-200 rounded-md px-4 py-3">
+              <p className="text-green-800 font-medium">
+                ✓ Import zakończony sukcesem
+              </p>
+            </div>
+          ) : (
+            <div className="bg-red-50 border border-red-200 rounded-md px-4 py-3">
+              <p className="text-red-800 font-medium">
+                ✗ Import zakończony błędami
+              </p>
+            </div>
+          )}
+
+          {/* Added Items */}
+          {report.added.length > 0 && (
+            <div>
+              <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wider mb-2">
+                Dodano ({report.added.length})
+              </h3>
+              <ul className="space-y-1">
+                {report.added.map((item) => (
+                  <li key={item.id} className="text-sm text-gray-600">
+                    <span className="font-mono">+ {item.id}</span>
+                    <span className="text-gray-500 ml-2">({item.kind}: {item.name_pl})</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {/* Skipped Items */}
+          {report.skipped.length > 0 && (
+            <div>
+              <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wider mb-2">
+                Pominięto (istniejące) ({report.skipped.length})
+              </h3>
+              <ul className="space-y-1">
+                {report.skipped.map((item) => (
+                  <li key={item.id} className="text-sm text-gray-500">
+                    <span className="font-mono">— {item.id}</span>
+                    <span className="ml-2">({item.kind}: {item.name_pl})</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {/* Conflicts */}
+          {report.conflicts.length > 0 && (
+            <div>
+              <h3 className="text-sm font-semibold text-red-700 uppercase tracking-wider mb-2">
+                Konflikty ({report.conflicts.length})
+              </h3>
+              <ul className="space-y-2">
+                {report.conflicts.map((item) => (
+                  <li
+                    key={item.id}
+                    className="bg-red-50 border border-red-200 rounded-md px-3 py-2"
+                  >
+                    <p className="text-sm font-mono text-red-800">{item.id}</p>
+                    <p className="text-xs text-red-600 mt-1">
+                      {item.kind}: {item.name_pl} - {item.reason_code}
+                    </p>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {/* Blocked Items (REPLACE mode) */}
+          {report.blocked.length > 0 && (
+            <div>
+              <h3 className="text-sm font-semibold text-orange-700 uppercase tracking-wider mb-2">
+                Zablokowane (w użyciu) ({report.blocked.length})
+              </h3>
+              <ul className="space-y-2">
+                {report.blocked.map((item) => (
+                  <li
+                    key={item.id}
+                    className="bg-orange-50 border border-orange-200 rounded-md px-3 py-2"
+                  >
+                    <p className="text-sm font-mono text-orange-800">{item.id}</p>
+                    <p className="text-xs text-orange-600 mt-1">
+                      {item.kind}: {item.name_pl} - {item.reason_code}
+                    </p>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="px-6 py-4 border-t border-gray-200 flex justify-end">
+          <button
+            onClick={onClose}
+            className="rounded bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+          >
+            Zamknij
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

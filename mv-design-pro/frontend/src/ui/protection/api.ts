@@ -1,8 +1,9 @@
 /**
- * Protection Library API Client (P14a - READ-ONLY)
+ * Protection Library API Client (P14a - READ-ONLY, P14b - GOVERNANCE)
  *
  * Provides functions to fetch protection library types from backend.
- * All endpoints are READ-ONLY (no create/update/delete).
+ * P14a: READ-ONLY endpoints (list/get)
+ * P14b: GOVERNANCE endpoints (export/import with manifest+fingerprint)
  */
 
 import type {
@@ -120,4 +121,102 @@ export async function fetchProtectionSettingTemplate(
     name_pl: data.name_pl,
     ...data.params,
   };
+}
+
+// ============================================================================
+// Protection Library Governance (P14b)
+// ============================================================================
+
+export interface ProtectionLibraryManifest {
+  library_id: string;
+  name_pl: string;
+  vendor: string;
+  series: string;
+  revision: string;
+  schema_version: string;
+  created_at: string;
+  fingerprint: string;
+  description_pl?: string;
+}
+
+export interface ProtectionLibraryExport {
+  manifest: ProtectionLibraryManifest;
+  device_types: any[];
+  curves: any[];
+  templates: any[];
+}
+
+export interface ProtectionImportReportItem {
+  kind: string;
+  id: string;
+  name_pl: string;
+  reason_code: string;
+}
+
+export interface ProtectionImportReport {
+  mode: string;
+  added: ProtectionImportReportItem[];
+  skipped: ProtectionImportReportItem[];
+  conflicts: ProtectionImportReportItem[];
+  blocked: ProtectionImportReportItem[];
+  success: boolean;
+}
+
+/**
+ * Export protection library with manifest and fingerprint (P14b)
+ */
+export async function exportProtectionLibrary(params?: {
+  library_name_pl?: string;
+  vendor?: string;
+  series?: string;
+  revision?: string;
+  description_pl?: string;
+}): Promise<ProtectionLibraryExport> {
+  const queryParams = new URLSearchParams();
+  if (params?.library_name_pl) queryParams.set('library_name_pl', params.library_name_pl);
+  if (params?.vendor) queryParams.set('vendor', params.vendor);
+  if (params?.series) queryParams.set('series', params.series);
+  if (params?.revision) queryParams.set('revision', params.revision);
+  if (params?.description_pl) queryParams.set('description_pl', params.description_pl);
+
+  const url = `${API_BASE}/export?${queryParams.toString()}`;
+  const response = await fetch(url);
+
+  if (!response.ok) {
+    throw new Error(`Failed to export protection library: ${response.statusText}`);
+  }
+
+  return await response.json();
+}
+
+/**
+ * Import protection library with conflict detection (P14b)
+ */
+export async function importProtectionLibrary(
+  data: ProtectionLibraryExport,
+  mode: 'merge' | 'replace' = 'merge'
+): Promise<ProtectionImportReport> {
+  const response = await fetch(`${API_BASE}/import?mode=${mode}`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(data),
+  });
+
+  if (!response.ok) {
+    // Try to parse error details
+    let errorMessage = `Import failed: ${response.statusText}`;
+    try {
+      const errorData = await response.json();
+      if (errorData.detail) {
+        errorMessage = errorData.detail;
+      }
+    } catch {
+      // Ignore JSON parse error
+    }
+    throw new Error(errorMessage);
+  }
+
+  return await response.json();
 }
