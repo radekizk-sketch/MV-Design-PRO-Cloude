@@ -2308,14 +2308,14 @@ klasy **wyższej niż PowerFactory**, opartą o:
 - stany dynamiczne
 - harmoniczne
 
-**Status:** IN PROGRESS
+**Status:** DONE
 
 ---
 
 **Kolejność dalszych prac (kanoniczna):**
 1. P20a — Power Flow Solver + Trace (backend-only) ✅ **DONE**
-2. P20b — Results Inspector + SLD Overlay
-3. P20c — A/B Comparison + Ranking
+2. P20b — Results Inspector + SLD Overlay ✅ **DONE**
+3. P20c — A/B Comparison + Ranking ✅ **DONE**
 
 ---
 
@@ -2359,6 +2359,54 @@ klasy **wyższej niż PowerFactory**, opartą o:
 - `api/power_flow_runs.py` (NEW)
 - `application/analysis_run/service.py` (cache deduplication)
 - `tests/test_p20a_power_flow_determinism.py` (NEW)
+
+---
+
+### P20c — Power Flow A/B Comparison + Ranking
+
+**Status:** DONE | CANONICAL & BINDING
+
+**Zakres zrealizowany:**
+- Deterministyczne porównanie dwóch PowerFlowRun (A vs B)
+- Walidacje: oba runy FINISHED, ten sam project_id
+- Bus diffs: delta V, delta angle, posortowane po bus_id
+- Branch diffs: delta losses, delta power, posortowane po branch_id
+- Ranking problemów z jawnymi regułami:
+  1. `NON_CONVERGENCE_CHANGE` (severity 5) — zmiana zbieżności
+  2. `VOLTAGE_DELTA_HIGH` (severity 4) — top N największych |delta_v_pu|
+  3. `ANGLE_SHIFT_HIGH` (severity 3) — top N największych |delta_angle|
+  4. `LOSSES_INCREASED/DECREASED` (severity 2-3) — zmiana strat
+  5. `SLACK_POWER_CHANGED` (severity 2) — zmiana mocy bilansowej
+- Pełny trace z:
+  - `snapshot_id_a/b`, `input_hash_a/b`
+  - Jawne progi rankingowe (VOLTAGE_DELTA_THRESHOLD_PU=0.02 etc.)
+  - Kroki: MATCH_BUSES → MATCH_BRANCHES → RANK_ISSUES
+- Cache: identyczna para (A,B) → ten sam comparison
+- A→B != B→A (kierunkowe)
+
+**API Endpoints:**
+- POST `/power-flow-comparisons` — create comparison
+- GET `/power-flow-comparisons/{id}` — metadata
+- GET `/power-flow-comparisons/{id}/results` — full results
+- GET `/power-flow-comparisons/{id}/trace` — audit trace
+
+**Frontend:**
+- UI read-only (PL), NOT-A-SOLVER
+- Zakładki: Szyny – różnice, Gałęzie – różnice, Ranking problemów, Ślad porównania
+- Filtrowanie tekstowe
+- Sort domyślny = backend (deterministyczny)
+
+**Testy:**
+- [x] Determinism: 2× porównanie tej samej pary → identyczny JSON results+trace
+- [x] Walidacje błędów 4xx deterministyczne
+- [x] Frontend smoke: typy, etykiety PL, stałe
+
+**Pliki:**
+- `domain/power_flow_comparison.py` (NEW)
+- `application/power_flow_comparison/service.py` (NEW)
+- `api/power_flow_comparisons.py` (NEW)
+- `frontend/src/ui/power-flow-comparison/` (NEW)
+- `tests/domain/test_power_flow_comparison.py` (NEW)
 
 ---
 
