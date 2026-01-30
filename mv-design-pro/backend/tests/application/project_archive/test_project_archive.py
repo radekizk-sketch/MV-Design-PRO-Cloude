@@ -66,7 +66,6 @@ def sample_project_meta() -> ProjectMeta:
         sources=[{"type": "GRID", "ssc_mva": 100.0}],
         created_at=datetime(2024, 1, 15, 10, 30, 0, tzinfo=timezone.utc).isoformat(),
         updated_at=datetime(2024, 1, 15, 12, 0, 0, tzinfo=timezone.utc).isoformat(),
-        exported_at=datetime.now(timezone.utc).isoformat(),
     )
 
 
@@ -197,7 +196,6 @@ def sample_archive(
         "sources": sample_project_meta.sources,
         "created_at": sample_project_meta.created_at,
         "updated_at": sample_project_meta.updated_at,
-        "exported_at": sample_project_meta.exported_at,
     }
 
     network_model_dict = {
@@ -454,7 +452,6 @@ class TestIntegrity:
             sources=sample_archive.project_meta.sources,
             created_at=sample_archive.project_meta.created_at,
             updated_at=sample_archive.project_meta.updated_at,
-            exported_at=sample_archive.project_meta.exported_at,
         )
 
         tampered_archive = ProjectArchive(
@@ -579,7 +576,6 @@ class TestEdgeCases:
             sources=[],
             created_at=datetime.now(timezone.utc).isoformat(),
             updated_at=datetime.now(timezone.utc).isoformat(),
-            exported_at=datetime.now(timezone.utc).isoformat(),
         )
 
         empty_network = NetworkModelSection(
@@ -632,7 +628,6 @@ class TestEdgeCases:
             sources=[],
             created_at=datetime.now(timezone.utc).isoformat(),
             updated_at=datetime.now(timezone.utc).isoformat(),
-            exported_at=datetime.now(timezone.utc).isoformat(),
         )
 
         fingerprints = compute_archive_fingerprints(
@@ -725,7 +720,6 @@ class TestEdgeCases:
                 sources=[],
                 created_at=datetime.now(timezone.utc).isoformat(),
                 updated_at=datetime.now(timezone.utc).isoformat(),
-                exported_at=datetime.now(timezone.utc).isoformat(),
             ),
             network_model=network,
             sld_diagrams=SldSection([], [], [], []),

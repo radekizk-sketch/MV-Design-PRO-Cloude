@@ -141,9 +141,8 @@ class ProjectArchiveService:
     def _collect_project_data(self, project: ProjectORM) -> ProjectArchive:
         """Zbierz wszystkie dane projektu."""
         project_id = project.id
-        now = datetime.now(timezone.utc).isoformat()
 
-        # Metadane projektu
+        # Metadane projektu (bez exported_at - dla determinizmu)
         project_meta_dict = {
             "id": str(project.id),
             "name": project.name,
@@ -154,7 +153,6 @@ class ProjectArchiveService:
             "sources": project.sources_jsonb,
             "created_at": project.created_at.isoformat(),
             "updated_at": project.updated_at.isoformat(),
-            "exported_at": now,
         }
 
         # Model sieci
@@ -208,7 +206,6 @@ class ProjectArchiveService:
                 sources=project.sources_jsonb,
                 created_at=project.created_at.isoformat(),
                 updated_at=project.updated_at.isoformat(),
-                exported_at=now,
             ),
             network_model=NetworkModelSection(
                 nodes=network_model_dict["nodes"],
@@ -1298,6 +1295,12 @@ class ProjectArchiveService:
                 archive_dict = json.loads(project_json)
                 archive = dict_to_archive(archive_dict)
 
+                # Get exported_at from manifest (not in project.json for determinism)
+                exported_at = None
+                if "manifest.json" in zf.namelist():
+                    manifest_data = json.loads(zf.read("manifest.json").decode("utf-8"))
+                    exported_at = manifest_data.get("exported_at")
+
             # Zbuduj podsumowanie
             return {
                 "valid": True,
@@ -1305,7 +1308,7 @@ class ProjectArchiveService:
                 "schema_version": archive.schema_version,
                 "project_name": archive.project_meta.name,
                 "project_description": archive.project_meta.description,
-                "exported_at": archive.project_meta.exported_at,
+                "exported_at": exported_at,
                 "archive_hash": archive.fingerprints.archive_hash,
                 "summary": {
                     "nodes_count": len(archive.network_model.nodes),
