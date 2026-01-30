@@ -125,8 +125,14 @@ class TestIecInverseTime:
         assert 2.0 < t < 5.0  # Different from SI
 
     def test_extremely_inverse_curve(self):
-        """IEC Extremely Inverse should have different timing."""
-        # IEC EI: A=80.0, B=2.0
+        """IEC Extremely Inverse curve calculation.
+
+        At M=5 (500A/100A):
+        t = TMS * A / (M^B - 1) = 1 * 80 / (5^2 - 1) = 80/24 = 3.333...s
+
+        EI shows "faster at high currents" property at very high multiples (M>>5).
+        """
+        # IEC EI: A=80.0, B=2.0, M=5
         t = compute_iec_inverse_time(
             i_fault_a=500.0,
             i_pickup_a=100.0,
@@ -135,7 +141,30 @@ class TestIecInverseTime:
             b=2.0,
         )
         assert t is not None
-        assert 0.01 < t < 0.1  # Much faster at high currents
+        # t = 80 / (25 - 1) = 3.333...
+        expected = 80.0 / (5.0**2 - 1.0)
+        assert abs(t - expected) < 1e-5
+
+    def test_extremely_inverse_faster_at_high_multiples(self):
+        """EI is faster than VI at high current multiples (M=20)."""
+        # At M=20: EI = 80/(400-1) ≈ 0.2s, VI = 13.5/(20-1) ≈ 0.71s
+        t_ei = compute_iec_inverse_time(
+            i_fault_a=2000.0,
+            i_pickup_a=100.0,
+            tms=1.0,
+            a=80.0,
+            b=2.0,
+        )
+        t_vi = compute_iec_inverse_time(
+            i_fault_a=2000.0,
+            i_pickup_a=100.0,
+            tms=1.0,
+            a=13.5,
+            b=1.0,
+        )
+        assert t_ei is not None and t_vi is not None
+        assert t_ei < t_vi  # EI is faster at M=20
+        assert t_ei < 0.25  # EI ≈ 0.2s at M=20
 
 
 class TestDefiniteTime:
