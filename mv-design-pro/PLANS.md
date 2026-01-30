@@ -401,12 +401,12 @@ class NetworkGraph:
 
 ## 6. Phase 4: Case Layer (DONE)
 
-### 6.1 Task 4.1: Case Immutability (DEFERRED)
+### 6.1 Task 4.1: Case Immutability (DONE)
 
-**Actions:**
-- [ ] Verify Case uses NetworkSnapshot
-- [ ] Add immutability enforcement
-- [ ] Document case-model relationship
+**Actions (DONE - 2025-03):**
+- [x] Verify Case uses NetworkSnapshot bindings
+- [x] Add immutability enforcement (read-only guard on snapshot access)
+- [x] Add regression tests for immutability and snapshot actions
 
 ### 6.2 Task 4.2: Result Invalidation (DONE - 2025-02)
 
@@ -505,7 +505,7 @@ class NetworkGraph:
 | Bus terminology | Phase 2 | DONE |
 | Switch without impedance | Phase 2 | DONE |
 | Station = logical only | N/A | DONE |
-| Case immutability | Phase 4 | PENDING |
+| Case immutability | Phase 4 | DONE |
 | Catalog layer | Phase 3 | PENDING |
 | PCC not in model | Phase 2 | DONE |
 

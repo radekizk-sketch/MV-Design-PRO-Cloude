@@ -16,6 +16,7 @@ All tests use Polish error messages per P10 requirements.
 
 from __future__ import annotations
 
+from datetime import datetime, timezone
 from uuid import uuid4
 
 import pytest
@@ -28,6 +29,18 @@ from domain.study_case import (
     compare_study_cases,
     new_study_case,
 )
+from network_model.core.action_apply import apply_action_to_snapshot
+from network_model.core.action_envelope import ActionEnvelope
+from network_model.core.branch import Branch, BranchType
+from network_model.core.graph import NetworkGraph
+from network_model.core.node import Node, NodeType
+from network_model.core.snapshot import (
+    NetworkSnapshot,
+    SnapshotMeta,
+    SnapshotMutationError,
+    snapshot_read_only_guard,
+)
+from network_model.sld_projection import project_snapshot_to_sld
 
 
 # =============================================================================
@@ -218,6 +231,71 @@ class TestStudyCaseClone:
         cloned = original.clone()
 
         assert cloned.name == "Original (kopia)"
+
+
+def _build_sample_snapshot() -> NetworkSnapshot:
+    graph = NetworkGraph(network_model_id="model-1")
+    slack_node = Node(
+        id="node-a",
+        name="Slack",
+        node_type=NodeType.SLACK,
+        voltage_level=15.0,
+        voltage_magnitude=1.0,
+        voltage_angle=0.0,
+    )
+    pq_node = Node(
+        id="node-b",
+        name="Load",
+        node_type=NodeType.PQ,
+        voltage_level=15.0,
+        active_power=0.0,
+        reactive_power=0.0,
+    )
+    graph.add_node(slack_node)
+    graph.add_node(pq_node)
+    branch = Branch.from_dict(
+        {
+            "id": "branch-1",
+            "name": "Line-1",
+            "branch_type": BranchType.LINE,
+            "from_node_id": "node-a",
+            "to_node_id": "node-b",
+            "length_km": 1.0,
+        }
+    )
+    graph.add_branch(branch)
+    meta = SnapshotMeta.create(network_model_id="model-1")
+    return NetworkSnapshot(meta=meta, graph=graph)
+
+
+class TestStudyCaseImmutability:
+    """Immutability checks for case-related snapshot usage."""
+
+    def test_case_does_not_mutate_snapshot_in_place(self):
+        snapshot = _build_sample_snapshot()
+        with snapshot_read_only_guard(snapshot, operation="test_case_does_not_mutate"):
+            diagram = project_snapshot_to_sld(snapshot)
+        assert diagram.snapshot_id == snapshot.meta.snapshot_id
+
+    def test_case_actions_produce_new_snapshot_id(self):
+        snapshot = _build_sample_snapshot()
+        action = ActionEnvelope(
+            action_id="action-1",
+            parent_snapshot_id=snapshot.meta.snapshot_id,
+            action_type="set_in_service",
+            payload={"entity_id": "branch-1", "in_service": False},
+            created_at=datetime.now(timezone.utc).isoformat(),
+            status="accepted",
+        )
+        new_snapshot = apply_action_to_snapshot(snapshot, action)
+        assert new_snapshot.meta.snapshot_id != snapshot.meta.snapshot_id
+        assert new_snapshot.meta.parent_snapshot_id == snapshot.meta.snapshot_id
+
+    def test_case_read_only_guard_raises_on_mutation(self):
+        snapshot = _build_sample_snapshot()
+        with pytest.raises(SnapshotMutationError):
+            with snapshot_read_only_guard(snapshot, operation="test_case_mutation_guard"):
+                snapshot.graph.nodes["node-a"].name = "Zmieniony"
 
 
 class TestStudyCaseCompare:
