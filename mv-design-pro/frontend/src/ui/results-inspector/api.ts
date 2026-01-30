@@ -111,3 +111,76 @@ export async function fetchSldOverlay(
   }
   return response.json();
 }
+
+// =============================================================================
+// P20b: Power Flow API Functions
+// =============================================================================
+
+import type {
+  PowerFlowRunsListResponse,
+  PowerFlowResultV1,
+  PowerFlowTrace,
+} from './types';
+
+/**
+ * P20b: Fetch Power Flow runs list for project.
+ *
+ * Returns paginated, deterministically sorted list (created_at DESC).
+ */
+export async function fetchPowerFlowRuns(
+  projectId: string,
+  limit = 50,
+  offset = 0
+): Promise<PowerFlowRunsListResponse> {
+  const response = await fetch(
+    `${API_BASE}/projects/${projectId}/power-flow-runs?limit=${limit}&offset=${offset}`
+  );
+  if (!response.ok) {
+    throw new Error(`Błąd pobierania historii rozpływów mocy: ${response.statusText}`);
+  }
+  return response.json();
+}
+
+/**
+ * P20b: Fetch Power Flow results for a specific run.
+ *
+ * Returns PowerFlowResultV1 with bus/branch results and summary.
+ */
+export async function fetchPowerFlowResults(runId: string): Promise<PowerFlowResultV1> {
+  const response = await fetch(`${API_BASE}/power-flow-runs/${runId}/results`);
+  if (!response.ok) {
+    throw new Error(`Błąd pobierania wyników rozpływu mocy: ${response.statusText}`);
+  }
+  return response.json();
+}
+
+/**
+ * P20b: Fetch Power Flow trace (Newton-Raphson iterations).
+ *
+ * Returns full white-box trace for audit.
+ */
+export async function fetchPowerFlowTrace(runId: string): Promise<PowerFlowTrace> {
+  const response = await fetch(`${API_BASE}/power-flow-runs/${runId}/trace`);
+  if (!response.ok) {
+    throw new Error(`Błąd pobierania śladu obliczeń rozpływu mocy: ${response.statusText}`);
+  }
+  return response.json();
+}
+
+/**
+ * P20b: Fetch Power Flow run metadata.
+ */
+export async function fetchPowerFlowRunMeta(runId: string): Promise<{
+  id: string;
+  status: string;
+  converged: boolean | null;
+  iterations: number | null;
+  created_at: string;
+  finished_at: string | null;
+}> {
+  const response = await fetch(`${API_BASE}/power-flow-runs/${runId}`);
+  if (!response.ok) {
+    throw new Error(`Błąd pobierania metadanych rozpływu mocy: ${response.statusText}`);
+  }
+  return response.json();
+}

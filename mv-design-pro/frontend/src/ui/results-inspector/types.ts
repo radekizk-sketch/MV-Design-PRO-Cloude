@@ -268,3 +268,143 @@ export const SOLVER_KIND_LABELS: Record<string, string> = {
   short_circuit_sn: 'Zwarcie SN',
   power_flow: 'Rozpływ mocy',
 };
+
+// =============================================================================
+// P20b: Power Flow Types
+// =============================================================================
+
+/**
+ * Power Flow run item in history list.
+ */
+export interface PowerFlowRunItem {
+  id: string;
+  deterministic_id: string;
+  project_id: string;
+  operating_case_id: string | null;
+  case_name: string | null;
+  analysis_type: string;
+  status: string;
+  result_status: string;
+  created_at: string;
+  finished_at: string | null;
+  input_hash: string;
+  converged: boolean | null;
+  iterations: number | null;
+}
+
+/**
+ * Power Flow runs list response.
+ */
+export interface PowerFlowRunsListResponse {
+  project_id: string;
+  total: number;
+  limit: number;
+  offset: number;
+  items: PowerFlowRunItem[];
+}
+
+/**
+ * P20b: Power Flow bus result (single row).
+ */
+export interface PowerFlowBusResult {
+  bus_id: string;
+  v_pu: number;
+  angle_deg: number;
+  p_injected_mw: number;
+  q_injected_mvar: number;
+}
+
+/**
+ * P20b: Power Flow branch result (single row).
+ */
+export interface PowerFlowBranchResult {
+  branch_id: string;
+  p_from_mw: number;
+  q_from_mvar: number;
+  p_to_mw: number;
+  q_to_mvar: number;
+  losses_p_mw: number;
+  losses_q_mvar: number;
+  loading_pct?: number;
+}
+
+/**
+ * P20b: Power Flow summary.
+ */
+export interface PowerFlowSummary {
+  total_losses_p_mw: number;
+  total_losses_q_mvar: number;
+  min_v_pu: number;
+  max_v_pu: number;
+  slack_p_mw: number;
+  slack_q_mvar: number;
+}
+
+/**
+ * P20b: Power Flow result v1 response.
+ */
+export interface PowerFlowResultV1 {
+  result_version: string;
+  converged: boolean;
+  iterations_count: number;
+  tolerance_used: number;
+  base_mva: number;
+  slack_bus_id: string;
+  bus_results: PowerFlowBusResult[];
+  branch_results: PowerFlowBranchResult[];
+  summary: PowerFlowSummary;
+}
+
+/**
+ * P20b: Power Flow trace iteration (Newton-Raphson).
+ */
+export interface PowerFlowTraceIteration {
+  iteration: number;
+  state?: Record<string, number>;
+  mismatch?: Record<string, number>;
+  norm_mismatch?: number;
+  delta_state?: Record<string, number>;
+  jacobian_summary?: {
+    size: number;
+    sparsity?: number;
+  };
+  converged?: boolean;
+}
+
+/**
+ * P20b: Power Flow trace response.
+ */
+export interface PowerFlowTrace {
+  solver_version: string;
+  input_hash: string;
+  snapshot_id: string | null;
+  case_id: string | null;
+  run_id: string;
+  init_state: Record<string, number>;
+  init_method: string;
+  tolerance: number;
+  max_iterations: number;
+  base_mva: number;
+  slack_bus_id: string;
+  pq_bus_ids: string[];
+  pv_bus_ids: string[];
+  ybus_trace: Record<string, unknown>;
+  iterations: PowerFlowTraceIteration[];
+  converged: boolean;
+  final_iterations_count: number;
+}
+
+/**
+ * P20b: Power Flow Results Inspector tab.
+ */
+export type PowerFlowResultsTab = 'PF_BUSES' | 'PF_BRANCHES' | 'PF_SUMMARY' | 'PF_TRACE';
+
+/**
+ * P20b: Polish labels for Power Flow tabs.
+ */
+export const POWER_FLOW_TAB_LABELS: Record<PowerFlowResultsTab, string> = {
+  PF_BUSES: 'Szyny',
+  PF_BRANCHES: 'Gałęzie',
+  PF_SUMMARY: 'Podsumowanie',
+  PF_TRACE: 'Ślad obliczeń',
+};

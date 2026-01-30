@@ -56,6 +56,8 @@ const TREE_NODE_ICONS: Record<TreeNodeType, string> = {
   RESULTS: '📊',
   RUN_ITEM: '▸',  // P11c: Analysis run icon
   ELEMENT: '•',
+  POWER_FLOW_RESULTS: '⚡',  // P20b: Power Flow results category
+  POWER_FLOW_RUN: '●',  // P20b: Power Flow run item
 };
 
 const TREE_NODE_LABELS: Record<TreeNodeType, string> = {
@@ -78,6 +80,8 @@ const TREE_NODE_LABELS: Record<TreeNodeType, string> = {
   RESULTS: 'Wyniki',
   RUN_ITEM: '',  // P11c: Label from run metadata
   ELEMENT: '',
+  POWER_FLOW_RESULTS: 'Rozpływ mocy',  // P20b: Power Flow category
+  POWER_FLOW_RUN: '',  // P20b: Label from run metadata
 };
 
 // ============================================================================
@@ -114,6 +118,16 @@ interface StudyCaseItem {
   is_active: boolean;
 }
 
+// P20b: Power Flow run item for tree
+interface PowerFlowRunItem {
+  id: string;
+  case_name: string | null;
+  created_at: string;
+  converged: boolean | null;
+  iterations: number | null;
+  result_status: string;
+}
+
 interface ProjectTreeProps {
   projectName?: string;
   elements: {
@@ -136,6 +150,8 @@ interface ProjectTreeProps {
   // P11c: Run history list (for Results Browser)
   runHistory?: RunHistoryItem[];
   resultsCount?: number;
+  // P20b: Power Flow runs history
+  powerFlowRuns?: PowerFlowRunItem[];
   onNodeClick?: (node: TreeNode) => void;
   onCategoryClick?: (nodeType: TreeNodeType, elementType?: ElementType) => void;
   // P10: Study case callbacks
@@ -143,6 +159,8 @@ interface ProjectTreeProps {
   onStudyCaseActivate?: (caseId: string) => void;
   // P11c: Run click callback
   onRunClick?: (runId: string) => void;
+  // P20b: Power Flow run click callback
+  onPowerFlowRunClick?: (runId: string) => void;
 }
 
 // ============================================================================
@@ -156,11 +174,13 @@ export function ProjectTree({
   studyCases = [],
   runHistory = [],
   resultsCount = 0,
+  powerFlowRuns = [],
   onNodeClick,
   onCategoryClick,
   onStudyCaseClick,
   onStudyCaseActivate,
   onRunClick,
+  onPowerFlowRunClick,
 }: ProjectTreeProps) {
   const { treeExpandedNodes, expandTreeNode, collapseTreeNode } = useSelectionStore();
   const { selectedElement, handleTreeClick } = useTreeSelection();
@@ -235,6 +255,38 @@ export function ProjectTree({
           solverKind: run.solver_kind,
           createdAt: run.created_at,
           resultStatus: run.result_state,
+        };
+      });
+    };
+
+    // P20b: Build Power Flow run nodes
+    const buildPowerFlowRunNodes = (runs: PowerFlowRunItem[]): TreeNode[] => {
+      // Sort by created_at DESC (newest first) - deterministic
+      const sorted = [...runs].sort((a, b) => {
+        return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+      });
+
+      return sorted.map((run) => {
+        const date = new Date(run.created_at).toLocaleDateString('pl-PL', {
+          year: 'numeric',
+          month: '2-digit',
+          day: '2-digit',
+          hour: '2-digit',
+          minute: '2-digit',
+        });
+        const caseName = run.case_name || 'Przypadek';
+        const statusLabel = run.converged === true ? 'OK' : run.converged === false ? 'Błąd' : '—';
+        const label = `${caseName} — ${date} [${statusLabel}]`;
+
+        return {
+          id: `pf-run-${run.id}`,
+          label,
+          nodeType: 'POWER_FLOW_RUN' as TreeNodeType,
+          powerFlowRunId: run.id,
+          createdAt: run.created_at,
+          resultStatus: run.result_status,
+          converged: run.converged,
+          iterations: run.iterations,
         };
       });
     };
@@ -343,12 +395,23 @@ export function ProjectTree({
           id: 'results',
           label: TREE_NODE_LABELS.RESULTS,
           nodeType: 'RESULTS',
-          count: runHistory.length,
-          children: buildRunNodes(runHistory),
+          count: runHistory.length + powerFlowRuns.length,
+          children: [
+            // P20b: Power Flow results category
+            {
+              id: 'power-flow-results',
+              label: TREE_NODE_LABELS.POWER_FLOW_RESULTS,
+              nodeType: 'POWER_FLOW_RESULTS' as TreeNodeType,
+              count: powerFlowRuns.length,
+              children: buildPowerFlowRunNodes(powerFlowRuns),
+            },
+            // Legacy run history (short-circuit, etc.)
+            ...buildRunNodes(runHistory),
+          ],
         },
       ],
     };
-  }, [projectName, elements, typeCounts, studyCases, runHistory]);
+  }, [projectName, elements, typeCounts, studyCases, runHistory, powerFlowRuns]);
 
   // Handle node toggle
   const handleToggle = useCallback(
@@ -374,6 +437,9 @@ export function ProjectTree({
       } else if (node.nodeType === 'RUN_ITEM' && node.runId) {
         // P11c: Run click - open Results Inspector
         onRunClick?.(node.runId);
+      } else if (node.nodeType === 'POWER_FLOW_RUN' && node.powerFlowRunId) {
+        // P20b: Power Flow run click - open Power Flow Results Inspector
+        onPowerFlowRunClick?.(node.powerFlowRunId);
       } else if (TREE_NODE_TO_ELEMENT_TYPE[node.nodeType]) {
         // Category click - open Data Manager
         onCategoryClick?.(node.nodeType, TREE_NODE_TO_ELEMENT_TYPE[node.nodeType]);
@@ -383,7 +449,7 @@ export function ProjectTree({
         onCategoryClick?.(node.nodeType);
       }
     },
-    [handleTreeClick, onNodeClick, onCategoryClick, onStudyCaseClick, onRunClick]
+    [handleTreeClick, onNodeClick, onCategoryClick, onStudyCaseClick, onRunClick, onPowerFlowRunClick]
   );
 
   // P10: Handle study case double-click (activate)
@@ -464,17 +530,38 @@ function TreeNodeComponent({
   const isElement = node.nodeType === 'ELEMENT';
   const isStudyCase = node.nodeType === 'STUDY_CASE';
   const isRunItem = node.nodeType === 'RUN_ITEM'; // P11c
+  const isPowerFlowRun = node.nodeType === 'POWER_FLOW_RUN'; // P20b
 
-  // P10/P11c: Get appropriate icon for study case or run item (status-based)
+  // P10/P11c/P20b: Get appropriate icon for study case, run item, or power flow run (status-based)
   const getIcon = () => {
+    if (isPowerFlowRun && node.converged !== undefined) {
+      // P20b: Use convergence status for Power Flow runs
+      return node.converged === true ? '●' : node.converged === false ? '○' : '◐';
+    }
     if ((isStudyCase || isRunItem) && node.resultStatus) {
       return RESULT_STATUS_ICONS[node.resultStatus] || TREE_NODE_ICONS[node.nodeType];
     }
     return node.icon ?? TREE_NODE_ICONS[node.nodeType];
   };
 
+  // P20b: Get convergence color for Power Flow runs
+  const getIconColor = () => {
+    if (isPowerFlowRun && node.converged !== undefined) {
+      return node.converged === true
+        ? 'text-emerald-500'
+        : node.converged === false
+          ? 'text-rose-500'
+          : 'text-amber-500';
+    }
+    if ((isStudyCase || isRunItem) && node.resultStatus) {
+      return RESULT_STATUS_COLORS[node.resultStatus] || '';
+    }
+    return '';
+  };
+
   const icon = getIcon();
-  const label = isElement || isStudyCase || isRunItem ? node.label : TREE_NODE_LABELS[node.nodeType];
+  const iconColor = getIconColor();
+  const label = isElement || isStudyCase || isRunItem || isPowerFlowRun ? node.label : TREE_NODE_LABELS[node.nodeType];
 
   return (
     <div>
@@ -486,7 +573,7 @@ function TreeNodeComponent({
           isSelected && 'bg-blue-100 hover:bg-blue-100',
           // P10: Active study case highlighting
           isStudyCase && node.isActive && 'bg-blue-50 hover:bg-blue-100',
-          !isElement && !isStudyCase && !isRunItem && 'font-medium'
+          !isElement && !isStudyCase && !isRunItem && !isPowerFlowRun && 'font-medium'
         )}
         style={{ paddingLeft: `${level * 16 + 4}px` }}
         onClick={() => onClick(node)}
@@ -512,13 +599,16 @@ function TreeNodeComponent({
           <span className="text-blue-600 mr-1" title="Aktywny przypadek">▸</span>
         )}
 
-        {/* Icon with status color for study cases and run items */}
+        {/* Icon with status color for study cases, run items, and power flow runs */}
         <span
-          className={clsx(
-            'text-xs mr-2',
-            (isStudyCase || isRunItem) && node.resultStatus && RESULT_STATUS_COLORS[node.resultStatus]
-          )}
-          title={(isStudyCase || isRunItem) ? getStatusTooltip(node.resultStatus) : undefined}
+          className={clsx('text-xs mr-2', iconColor)}
+          title={
+            isPowerFlowRun
+              ? getPowerFlowTooltip(node.converged, node.iterations)
+              : (isStudyCase || isRunItem)
+                ? getStatusTooltip(node.resultStatus)
+                : undefined
+          }
         >
           {icon}
         </span>
@@ -527,7 +617,7 @@ function TreeNodeComponent({
         <span
           className={clsx(
             'text-xs flex-1 truncate',
-            (isElement || isRunItem) ? 'text-gray-700' : 'text-gray-900',
+            (isElement || isRunItem || isPowerFlowRun) ? 'text-gray-700' : 'text-gray-900',
             isStudyCase && node.isActive && 'font-medium'
           )}
         >
@@ -579,6 +669,17 @@ function getStatusTooltip(status: string | undefined): string {
     default:
       return 'Brak wyników';
   }
+}
+
+// P20b: Get tooltip for Power Flow convergence status
+function getPowerFlowTooltip(converged: boolean | null | undefined, iterations: number | null | undefined): string {
+  if (converged === true) {
+    return `Zbieżność osiągnięta${iterations !== null ? ` (${iterations} iteracji)` : ''}`;
+  }
+  if (converged === false) {
+    return `Brak zbieżności${iterations !== null ? ` po ${iterations} iteracjach` : ''}`;
+  }
+  return 'Status nieznany';
 }
 
 // ============================================================================

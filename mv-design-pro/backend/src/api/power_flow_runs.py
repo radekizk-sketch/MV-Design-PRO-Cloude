@@ -1,6 +1,7 @@
-"""P20a: Dedykowane API endpoints dla Power Flow v1 (FOUNDATION).
+"""P20a/P20b: Dedykowane API endpoints dla Power Flow v1 (FOUNDATION).
 
 Endpoints:
+- GET /projects/{project_id}/power-flow-runs (list) [P20b]
 - POST /projects/{project_id}/power-flow-runs (create)
 - POST /power-flow-runs/{run_id}/execute (execute)
 - GET /power-flow-runs/{run_id} (meta)
@@ -85,6 +86,61 @@ def _build_service(uow_factory: Any) -> AnalysisRunService:
 # =============================================================================
 # Endpoints
 # =============================================================================
+
+
+@router.get("/projects/{project_id}/power-flow-runs")
+def list_power_flow_runs(
+    project_id: UUID,
+    limit: int = Query(default=50, ge=1, le=200),
+    offset: int = Query(default=0, ge=0),
+    uow_factory=Depends(get_uow_factory),
+) -> dict[str, Any]:
+    """P20b: Listuje power flow runs dla projektu.
+
+    Zwraca listę posortowaną po created_at DESC (najnowsze pierwsze).
+    Deterministic: te same parametry → identyczna kolejność.
+    """
+    service = _build_service(uow_factory)
+    try:
+        runs = service.list_runs_by_project(
+            project_id=project_id,
+            analysis_type="PF",
+            limit=limit,
+            offset=offset,
+        )
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(exc),
+        ) from exc
+
+    # P20b: Buduj deterministyczną listę
+    items = []
+    for run in runs:
+        result_summary = run.result_summary or {}
+        items.append({
+            "id": str(run.id),
+            "deterministic_id": build_deterministic_id(run),
+            "project_id": str(run.project_id),
+            "operating_case_id": str(run.operating_case_id) if run.operating_case_id else None,
+            "case_name": run.case_name if hasattr(run, "case_name") else None,
+            "analysis_type": run.analysis_type,
+            "status": run.status,
+            "result_status": run.result_status,
+            "created_at": run.created_at.isoformat() if run.created_at else None,
+            "finished_at": run.finished_at.isoformat() if run.finished_at else None,
+            "input_hash": run.input_hash,
+            "converged": result_summary.get("converged"),
+            "iterations": result_summary.get("iterations"),
+        })
+
+    return canonicalize_json({
+        "project_id": str(project_id),
+        "total": len(items),
+        "limit": limit,
+        "offset": offset,
+        "items": items,
+    })
 
 
 @router.post("/projects/{project_id}/power-flow-runs")

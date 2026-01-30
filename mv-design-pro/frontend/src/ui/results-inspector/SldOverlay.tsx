@@ -351,3 +351,183 @@ export function StaticSldOverlay({ data, visible = true, isOutdated = false }: S
     </div>
   );
 }
+
+// =============================================================================
+// P20b: Power Flow SLD Overlay
+// =============================================================================
+
+import type { PowerFlowBusResult, PowerFlowBranchResult } from './types';
+
+interface PowerFlowOverlayBusLabelProps {
+  bus: PowerFlowBusResult;
+  position: { x: number; y: number };
+}
+
+/**
+ * P20b: Bus voltage label for Power Flow overlay.
+ */
+function PowerFlowOverlayBusLabel({ bus, position }: PowerFlowOverlayBusLabelProps) {
+  // Color based on voltage deviation from 1.0 pu
+  const voltageClass =
+    bus.v_pu < 0.95 || bus.v_pu > 1.05
+      ? 'text-rose-700 font-semibold'
+      : bus.v_pu < 0.97 || bus.v_pu > 1.03
+        ? 'text-amber-700'
+        : 'text-emerald-700';
+
+  const bgClass =
+    bus.v_pu < 0.95 || bus.v_pu > 1.05
+      ? 'border-rose-200 bg-rose-50'
+      : bus.v_pu < 0.97 || bus.v_pu > 1.03
+        ? 'border-amber-200 bg-amber-50'
+        : 'border-emerald-200 bg-emerald-50';
+
+  return (
+    <div
+      className={`pointer-events-none absolute z-10 rounded border px-1.5 py-0.5 text-xs shadow-sm ${bgClass}`}
+      style={{
+        left: `${position.x}px`,
+        top: `${position.y - 24}px`,
+        transform: 'translateX(-50%)',
+      }}
+      title={`Napięcie: ${bus.v_pu.toFixed(4)} pu, Kąt: ${bus.angle_deg.toFixed(2)}°`}
+    >
+      <span className={voltageClass}>{bus.v_pu.toFixed(4)} pu</span>
+    </div>
+  );
+}
+
+interface PowerFlowOverlayBranchLabelProps {
+  branch: PowerFlowBranchResult;
+  position: { x: number; y: number };
+}
+
+/**
+ * P20b: Branch power flow label for Power Flow overlay.
+ */
+function PowerFlowOverlayBranchLabel({ branch, position }: PowerFlowOverlayBranchLabelProps) {
+  const hasLoading = branch.loading_pct !== undefined;
+  const loadingColorClass = getLoadingColorClass(branch.loading_pct);
+  const loadingBgClass = getLoadingBgClass(branch.loading_pct);
+
+  return (
+    <div
+      className={`pointer-events-none absolute z-10 rounded border px-1.5 py-0.5 text-xs shadow-sm ${loadingBgClass}`}
+      style={{
+        left: `${position.x}px`,
+        top: `${position.y}px`,
+        transform: 'translate(-50%, -50%)',
+      }}
+      title={`P: ${branch.p_from_mw.toFixed(3)} MW, Q: ${branch.q_from_mvar.toFixed(3)} Mvar, Straty: ${branch.losses_p_mw.toFixed(4)} MW`}
+    >
+      <div className="flex items-center gap-2">
+        <span className="text-slate-700">{branch.p_from_mw.toFixed(2)} MW</span>
+        {hasLoading && (
+          <span className={loadingColorClass}>{formatLoading(branch.loading_pct)}</span>
+        )}
+      </div>
+    </div>
+  );
+}
+
+interface PowerFlowSldOverlayProps {
+  /**
+   * Map of bus_id to position on canvas.
+   */
+  busPositions: Map<string, { x: number; y: number }>;
+
+  /**
+   * Map of branch_id to position on canvas (typically midpoint).
+   */
+  branchPositions: Map<string, { x: number; y: number }>;
+
+  /**
+   * Power Flow bus results.
+   */
+  busResults?: PowerFlowBusResult[];
+
+  /**
+   * Power Flow branch results.
+   */
+  branchResults?: PowerFlowBranchResult[];
+
+  /**
+   * Visibility toggle.
+   */
+  visible?: boolean;
+
+  /**
+   * Whether the results are outdated.
+   */
+  isOutdated?: boolean;
+}
+
+/**
+ * P20b: SLD Overlay for Power Flow results.
+ *
+ * Renders:
+ * - Bus labels: voltage (V_pu) with color coding
+ * - Branch labels: power flow (P_MW) and loading (%)
+ *
+ * READ-ONLY: No model mutations, mapping-only.
+ */
+export function PowerFlowSldOverlay({
+  busPositions,
+  branchPositions,
+  busResults = [],
+  branchResults = [],
+  visible = true,
+  isOutdated = false,
+}: PowerFlowSldOverlayProps) {
+  // Build positioned bus labels
+  const busLabels = useMemo(() => {
+    if (!visible) return [];
+    return busResults
+      .map((bus) => {
+        const position = busPositions.get(bus.bus_id);
+        if (!position) return null;
+        return { bus, position };
+      })
+      .filter((item): item is NonNullable<typeof item> => item !== null);
+  }, [busResults, busPositions, visible]);
+
+  // Build positioned branch labels
+  const branchLabels = useMemo(() => {
+    if (!visible) return [];
+    return branchResults
+      .map((branch) => {
+        const position = branchPositions.get(branch.branch_id);
+        if (!position) return null;
+        return { branch, position };
+      })
+      .filter((item): item is NonNullable<typeof item> => item !== null);
+  }, [branchResults, branchPositions, visible]);
+
+  if (!visible) return null;
+
+  return (
+    <div className="pointer-events-none absolute inset-0 overflow-hidden" data-testid="sld-overlay-power-flow">
+      {/* Outdated warning */}
+      {isOutdated && (
+        <div className="absolute left-2 top-2 z-20 rounded border border-amber-300 bg-amber-100 px-2 py-1 text-xs text-amber-800">
+          Wyniki rozpływu mocy nieaktualne
+        </div>
+      )}
+
+      {/* Power Flow label */}
+      <div className="absolute right-2 top-2 z-20 rounded border border-blue-200 bg-blue-50 px-2 py-1 text-xs text-blue-800">
+        Nakładka: Rozpływ mocy
+      </div>
+
+      {/* Bus labels */}
+      {busLabels.map(({ bus, position }) => (
+        <PowerFlowOverlayBusLabel key={bus.bus_id} bus={bus} position={position} />
+      ))}
+
+      {/* Branch labels */}
+      {branchLabels.map(({ branch, position }) => (
+        <PowerFlowOverlayBranchLabel key={branch.branch_id} branch={branch} position={position} />
+      ))}
+    </div>
+  );
+}

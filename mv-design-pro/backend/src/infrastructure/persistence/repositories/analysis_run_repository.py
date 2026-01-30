@@ -58,6 +58,11 @@ class AnalysisRunRepository:
             stmt = stmt.where(AnalysisRunORM.status == status)
         if operating_case_id := filters.get("operating_case_id"):
             stmt = stmt.where(AnalysisRunORM.operating_case_id == operating_case_id)
+        # P20b: Pagination support
+        if (limit := filters.get("limit")) is not None:
+            stmt = stmt.limit(limit)
+        if (offset := filters.get("offset")) is not None:
+            stmt = stmt.offset(offset)
         rows = self._session.execute(stmt).scalars().all()
         return [self._to_domain(row) for row in rows]
 

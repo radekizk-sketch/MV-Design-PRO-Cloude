@@ -215,6 +215,25 @@ class AnalysisRunService:
         with self._uow_factory() as uow:
             return uow.analysis_runs.list_by_project(project_id, filters)
 
+    def list_runs_by_project(
+        self,
+        project_id: UUID,
+        analysis_type: str,
+        limit: int = 50,
+        offset: int = 0,
+    ) -> list[AnalysisRun]:
+        """P20b: Lista runs dla projektu z filtrem analysis_type i paginacją.
+
+        Zwraca deterministycznie posortowaną listę (created_at DESC, id DESC).
+        """
+        filters = {
+            "analysis_type": analysis_type,
+            "limit": limit,
+            "offset": offset,
+        }
+        with self._uow_factory() as uow:
+            return uow.analysis_runs.list_by_project(project_id, filters)
+
     def get_results(self, run_id: UUID) -> list[dict]:
         with self._uow_factory() as uow:
             return uow.results.list_results(run_id)

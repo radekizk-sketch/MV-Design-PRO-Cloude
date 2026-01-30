@@ -28,6 +28,10 @@ import type {
   ResultsInspectorTab,
   ShortCircuitResults,
   SldResultOverlay,
+  PowerFlowRunItem,
+  PowerFlowResultV1,
+  PowerFlowTrace,
+  PowerFlowResultsTab,
 } from './types';
 import * as api from './api';
 
@@ -68,6 +72,17 @@ interface ResultsInspectorState {
   // Error state
   error: string | null;
 
+  // P20b: Power Flow state
+  powerFlowRuns: PowerFlowRunItem[];
+  selectedPowerFlowRunId: string | null;
+  powerFlowResults: PowerFlowResultV1 | null;
+  powerFlowTrace: PowerFlowTrace | null;
+  activePowerFlowTab: PowerFlowResultsTab;
+  isLoadingPowerFlowRuns: boolean;
+  isLoadingPowerFlowResults: boolean;
+  isLoadingPowerFlowTrace: boolean;
+  powerFlowSearchQuery: string;
+
   // Actions
   selectRun: (runId: string) => Promise<void>;
   clearRun: () => void;
@@ -80,6 +95,15 @@ interface ResultsInspectorState {
   loadExtendedTrace: () => Promise<void>;
   loadSldOverlay: (projectId: string, diagramId: string) => Promise<void>;
   reset: () => void;
+
+  // P20b: Power Flow actions
+  loadPowerFlowRuns: (projectId: string) => Promise<void>;
+  selectPowerFlowRun: (runId: string) => Promise<void>;
+  clearPowerFlowRun: () => void;
+  setActivePowerFlowTab: (tab: PowerFlowResultsTab) => void;
+  setPowerFlowSearchQuery: (query: string) => void;
+  loadPowerFlowResults: () => Promise<void>;
+  loadPowerFlowTrace: () => Promise<void>;
 }
 
 /**
@@ -103,6 +127,16 @@ const initialState = {
   isLoadingTrace: false,
   isLoadingOverlay: false,
   error: null,
+  // P20b: Power Flow initial state
+  powerFlowRuns: [] as PowerFlowRunItem[],
+  selectedPowerFlowRunId: null,
+  powerFlowResults: null,
+  powerFlowTrace: null,
+  activePowerFlowTab: 'PF_BUSES' as PowerFlowResultsTab,
+  isLoadingPowerFlowRuns: false,
+  isLoadingPowerFlowResults: false,
+  isLoadingPowerFlowTrace: false,
+  powerFlowSearchQuery: '',
 };
 
 /**
@@ -263,6 +297,110 @@ export const useResultsInspectorStore = create<ResultsInspectorState>((set, get)
     }
   },
 
+  // ==========================================================================
+  // P20b: Power Flow Actions
+  // ==========================================================================
+
+  /**
+   * P20b: Load Power Flow runs list for project.
+   */
+  loadPowerFlowRuns: async (projectId) => {
+    set({ isLoadingPowerFlowRuns: true, error: null });
+    try {
+      const response = await api.fetchPowerFlowRuns(projectId);
+      set({ powerFlowRuns: response.items, isLoadingPowerFlowRuns: false });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Błąd ładowania historii rozpływów mocy';
+      set({ error: message, isLoadingPowerFlowRuns: false });
+    }
+  },
+
+  /**
+   * P20b: Select a Power Flow run and load its results.
+   */
+  selectPowerFlowRun: async (runId) => {
+    set({
+      selectedPowerFlowRunId: runId,
+      isLoadingPowerFlowResults: true,
+      error: null,
+      // Clear previous results
+      powerFlowResults: null,
+      powerFlowTrace: null,
+    });
+
+    try {
+      const results = await api.fetchPowerFlowResults(runId);
+      set({
+        powerFlowResults: results,
+        isLoadingPowerFlowResults: false,
+      });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Błąd ładowania wyników rozpływu mocy';
+      set({ error: message, isLoadingPowerFlowResults: false });
+    }
+  },
+
+  /**
+   * P20b: Clear selected Power Flow run.
+   */
+  clearPowerFlowRun: () => {
+    set({
+      selectedPowerFlowRunId: null,
+      powerFlowResults: null,
+      powerFlowTrace: null,
+      activePowerFlowTab: 'PF_BUSES',
+      powerFlowSearchQuery: '',
+    });
+  },
+
+  /**
+   * P20b: Set active Power Flow tab.
+   */
+  setActivePowerFlowTab: (tab) => {
+    set({ activePowerFlowTab: tab });
+  },
+
+  /**
+   * P20b: Set Power Flow search query.
+   */
+  setPowerFlowSearchQuery: (query) => {
+    set({ powerFlowSearchQuery: query });
+  },
+
+  /**
+   * P20b: Load Power Flow results (if not already loaded).
+   */
+  loadPowerFlowResults: async () => {
+    const { selectedPowerFlowRunId, powerFlowResults } = get();
+    if (!selectedPowerFlowRunId || powerFlowResults) return;
+
+    set({ isLoadingPowerFlowResults: true, error: null });
+    try {
+      const results = await api.fetchPowerFlowResults(selectedPowerFlowRunId);
+      set({ powerFlowResults: results, isLoadingPowerFlowResults: false });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Błąd ładowania wyników rozpływu mocy';
+      set({ error: message, isLoadingPowerFlowResults: false });
+    }
+  },
+
+  /**
+   * P20b: Load Power Flow trace (Newton-Raphson iterations).
+   */
+  loadPowerFlowTrace: async () => {
+    const { selectedPowerFlowRunId, powerFlowTrace } = get();
+    if (!selectedPowerFlowRunId || powerFlowTrace) return;
+
+    set({ isLoadingPowerFlowTrace: true, error: null });
+    try {
+      const trace = await api.fetchPowerFlowTrace(selectedPowerFlowRunId);
+      set({ powerFlowTrace: trace, isLoadingPowerFlowTrace: false });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Błąd ładowania śladu obliczeń';
+      set({ error: message, isLoadingPowerFlowTrace: false });
+    }
+  },
+
   /**
    * Reset store to initial state.
    */
@@ -364,6 +502,55 @@ export function useIsAnyLoading(): boolean {
       state.isLoadingBranches ||
       state.isLoadingShortCircuit ||
       state.isLoadingTrace ||
-      state.isLoadingOverlay
+      state.isLoadingOverlay ||
+      state.isLoadingPowerFlowRuns ||
+      state.isLoadingPowerFlowResults ||
+      state.isLoadingPowerFlowTrace
   );
+}
+
+// =============================================================================
+// P20b: Power Flow Derived Hooks
+// =============================================================================
+
+/**
+ * P20b: Hook: Get filtered Power Flow bus results.
+ */
+export function useFilteredPowerFlowBusResults(): import('./types').PowerFlowBusResult[] {
+  return useResultsInspectorStore((state) => {
+    const results = state.powerFlowResults?.bus_results ?? [];
+    const query = state.powerFlowSearchQuery.toLowerCase().trim();
+    if (!query) return results;
+    return results.filter((row) => row.bus_id.toLowerCase().includes(query));
+  });
+}
+
+/**
+ * P20b: Hook: Get filtered Power Flow branch results.
+ */
+export function useFilteredPowerFlowBranchResults(): import('./types').PowerFlowBranchResult[] {
+  return useResultsInspectorStore((state) => {
+    const results = state.powerFlowResults?.branch_results ?? [];
+    const query = state.powerFlowSearchQuery.toLowerCase().trim();
+    if (!query) return results;
+    return results.filter((row) => row.branch_id.toLowerCase().includes(query));
+  });
+}
+
+/**
+ * P20b: Hook: Check if Power Flow run is selected.
+ */
+export function useHasPowerFlowRun(): boolean {
+  return useResultsInspectorStore((state) => state.selectedPowerFlowRunId !== null);
+}
+
+/**
+ * P20b: Hook: Get Power Flow convergence status label.
+ */
+export function usePowerFlowConvergenceLabel(): string {
+  return useResultsInspectorStore((state) => {
+    const results = state.powerFlowResults;
+    if (!results) return 'Brak wyników';
+    return results.converged ? 'Zbieżność osiągnięta' : 'Brak zbieżności';
+  });
 }

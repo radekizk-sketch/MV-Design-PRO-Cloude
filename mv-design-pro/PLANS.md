@@ -2314,7 +2314,7 @@ klasy **wyższej niż PowerFactory**, opartą o:
 
 **Kolejność dalszych prac (kanoniczna):**
 1. P20a — Power Flow Solver + Trace (backend-only) ✅ **DONE**
-2. P20b — Results Inspector + SLD Overlay
+2. P20b — Results Inspector + SLD Overlay ✅ **DONE**
 3. P20c — A/B Comparison + Ranking
 
 ---
@@ -2359,6 +2359,64 @@ klasy **wyższej niż PowerFactory**, opartą o:
 - `api/power_flow_runs.py` (NEW)
 - `application/analysis_run/service.py` (cache deduplication)
 - `tests/test_p20a_power_flow_determinism.py` (NEW)
+
+---
+
+### P20b — Power Flow Results Inspector + SLD Overlay
+
+**Status:** DONE | CANONICAL & BINDING
+
+**Zakres zrealizowany:**
+
+1. **Backend (minimal):**
+   - GET `/projects/{project_id}/power-flow-runs` — lista historii Power Flow runs
+   - Paginacja (limit/offset) i filtrowanie po analysis_type
+   - Deterministyczny sort: created_at DESC, id DESC
+
+2. **Frontend — Results Browser → „Rozpływ mocy":**
+   - Gałąź `POWER_FLOW_RESULTS` w drzewie wyników
+   - Lista `POWER_FLOW_RUN` z historią runs
+   - Status zbieżności (converged) i liczba iteracji
+   - Filtr tekstowy po ID/nazwie przypadku
+
+3. **Frontend — Power Flow Results Inspector (READ-ONLY):**
+   - `PowerFlowResultsPage.tsx` — główny komponent
+   - Zakładki: Szyny, Gałęzie, Podsumowanie, Ślad obliczeń
+   - Tabele z deterministycznym sortowaniem
+   - Jednostki jawne: V [pu], P [MW], Q [Mvar], Straty [MW]
+   - Filtrowanie tekstowe
+   - Zero edycji w RESULT_VIEW
+
+4. **Frontend — SLD Overlay (READ-ONLY, mapping-only):**
+   - `PowerFlowSldOverlay` — nakładka napięć i przepływów
+   - Na szynach: V_pu z kolorowaniem (zielony/żółty/czerwony)
+   - Na gałęziach: P [MW] i loading [%]
+   - Przełącznik ON/OFF
+   - Osobna warstwa, nie modyfikuje symboli modelu
+
+5. **Trace View (READ-ONLY):**
+   - Zakładka „Ślad obliczeń" w PowerFlowResultsPage
+   - Lista iteracji Newton-Raphson
+   - norm_mismatch, converged per iteration
+   - Wyszukiwarka tekstowa w JSON
+
+**Testy:**
+- [x] list_by_project — deterministic order
+- [x] pagination — limit/offset
+- [x] filter — analysis_type
+- [x] result_summary — convergence info
+
+**Pliki:**
+- `backend/src/api/power_flow_runs.py` (rozszerzony o list endpoint)
+- `backend/src/infrastructure/persistence/repositories/analysis_run_repository.py` (pagination)
+- `frontend/src/ui/results-inspector/types.ts` (PowerFlow types)
+- `frontend/src/ui/results-inspector/api.ts` (PowerFlow API)
+- `frontend/src/ui/results-inspector/store.ts` (PowerFlow state)
+- `frontend/src/ui/results-inspector/PowerFlowResultsPage.tsx` (NEW)
+- `frontend/src/ui/results-inspector/SldOverlay.tsx` (PowerFlowSldOverlay)
+- `frontend/src/ui/project-tree/ProjectTree.tsx` (POWER_FLOW nodes)
+- `frontend/src/ui/types.ts` (POWER_FLOW_RUN, POWER_FLOW_RESULTS)
+- `tests/test_p20b_power_flow_list.py` (NEW)
 
 ---
 
