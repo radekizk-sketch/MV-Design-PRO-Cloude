@@ -2008,6 +2008,71 @@ P14a jest **warstwą foundation** dla przyszłych faz protection:
 
 ---
 
+## 18.5 Phase P14b: Protection Library Governance (manifest+fingerprint, export/import, UI) — DONE
+
+### 18.5.1 Cel fazy
+
+**PowerFactory-grade governance dla Protection Library:**
+- Manifest biblioteki (vendor/series/revision/schema_version/fingerprint)
+- Deterministyczny eksport JSON z kanonicznym fingerprint (SHA-256)
+- Safe import z MERGE/REPLACE modes i gate'ami
+- Walidacja referencji (template→device_type, template→curve)
+- UI: Export/Import buttons + Manifest panel + Import Report dialog
+
+**SYSTEM LIBRARY:**
+- **NIE** koordynacja / solver / fizyka
+- **NIE** instancje / Case-dependent data
+- **NIE** masowe migracje
+- Import/Export działa na **library level** (oddzielenie od Case)
+
+### 18.5.2 Deliverables
+
+| Plik | Opis | Status |
+|------|------|--------|
+| `backend/src/network_model/catalog/governance.py` | ProtectionLibraryManifest, ProtectionLibraryExport, ProtectionImportReport, fingerprint functions | DONE |
+| `backend/src/application/catalog_governance/service.py` | export_protection_library(), import_protection_library() with gates | DONE |
+| `backend/src/api/catalog.py` | API endpoints: GET /protection/export, POST /protection/import | DONE |
+| `backend/tests/test_protection_library.py` | Tests: determinism, fingerprint, merge/replace gates, ref validation | DONE |
+| `frontend/src/ui/protection/api.ts` | exportProtectionLibrary(), importProtectionLibrary() | DONE |
+| `frontend/src/ui/protection/ProtectionLibraryBrowser.tsx` | Export/Import buttons, Manifest panel, Import Report dialog | DONE |
+| `PLANS.md` | Aktualizacja planu (sekcja 18.5) | DONE |
+
+### 18.5.3 Relacje
+
+P14b jest **governance layer** nad P14a:
+- **P14a (foundation):** Domain models, repository, API READ-ONLY
+- **P14b (governance):** Manifest+fingerprint, export/import, UI controls
+- **P18:** Protection Proof Pack will use P14a+P14b library data
+
+### 18.5.4 Definition of Done
+
+**Backend:**
+- [x] ProtectionLibraryManifest with library_id/vendor/series/revision/fingerprint
+- [x] Deterministic fingerprint: SHA-256 of canonical JSON (sort_keys, stable ordering)
+- [x] Deterministic export: sort_protection_types_deterministically (name_pl → id)
+- [x] Safe import MERGE: adds new, checks immutability (same ID must have same data)
+- [x] Safe import REPLACE: validates no usage, clears and replaces (safe for P14b)
+- [x] Reference validation: template→device_type, template→curve (422 if missing)
+- [x] ProtectionImportReport with added/skipped/conflicts/blocked (deterministic order)
+- [x] API endpoints: GET /protection/export, POST /protection/import?mode=merge|replace
+- [x] Tests: determinism (2x export → same fingerprint), conflict detection, ref validation
+
+**Frontend:**
+- [x] Export button: downloads JSON with manifest+fingerprint
+- [x] Import button: file upload, MERGE mode default
+- [x] Manifest panel: vendor/series/revision/schema_version/fingerprint display
+- [x] Import Report dialog: added/skipped/conflicts/blocked sections (100% PL)
+- [x] Manifest saved after export/import for display
+- [x] READ-ONLY principle: no inline editing, only import/export
+
+**Governance:**
+- [x] Manifest tracks library version/vendor/series/revision
+- [x] Fingerprint enables audit trail and version tracking
+- [x] Import gates prevent data corruption (immutability check)
+- [x] Reference validation prevents orphaned templates
+
+---
+
 ## 19. Proof Packs Roadmap (P15–P20) — CANONICAL
 
 Poniższa roadmapa jest **jedynym kanonicznym planem** rozwoju Proof Packów.
