@@ -3307,3 +3307,171 @@ Dodać Issue Panel / Validation Browser jako centralny punkt:
 - **E2E Tests**: Playwright testy dla nawigacji + highlight
 
 ---
+
+## 28. P31 PROJECT IMPORT / EXPORT (ROLA BINDING) — DONE
+
+### 28.1 Context
+
+**Role**: Project Archiving & Transfer
+
+Funkcja pierwszej klasy dla eksportu i importu projektów MV-DESIGN PRO.
+Pełny projekt (model + SLD + cases + runs + results + proof + interpretation)
+w deterministycznym formacie gotowym do archiwizacji i przenoszenia.
+
+**KANON**:
+- Import/Export = NOT-A-SOLVER
+- Zero nowych obliczeń
+- Determinizm absolutny
+- 100% PL
+- Kompatybilność wsteczna (versioned format)
+
+### 28.2 Format ProjectArchive
+
+```
+ProjectArchive {
+  schema_version: "1.0.0"
+  format_id: "MV-DESIGN-PRO-ARCHIVE"
+  project_meta: {
+    id, name, description, schema_version,
+    active_network_snapshot_id, pcc_node_id,
+    sources, created_at, updated_at, exported_at
+  }
+  network_model: {
+    nodes[], branches[], sources[], loads[], snapshots[]
+  }
+  sld_diagrams: {
+    diagrams[], node_symbols[], branch_symbols[], annotations[]
+  }
+  cases: {
+    study_cases[], operating_cases[], switching_states[], settings
+  }
+  runs: {
+    analysis_runs[], analysis_runs_index[], study_runs[]
+  }
+  results: {
+    study_results[]
+  }
+  proofs: {
+    design_specs[], design_proposals[], design_evidence[]
+  }
+  interpretations: { cached[] }
+  issues: { snapshot[] }
+  fingerprints: {
+    archive_hash, project_meta_hash, network_model_hash,
+    sld_hash, cases_hash, runs_hash, results_hash,
+    proofs_hash, interpretations_hash, issues_hash
+  }
+}
+```
+
+**Format fizyczny**: JSON + ZIP (.mvdp.zip)
+- `project.json` — pełne archiwum
+- `manifest.json` — metadane + hash
+
+### 28.3 Backend API
+
+```
+POST /projects/{project_id}/export
+  → Response: application/zip (archiwum ZIP)
+
+POST /projects/import
+  → Request: multipart/form-data (file, new_name?, verify_integrity?)
+  → Response: { status, project_id, warnings, errors, migrated_from_version }
+
+POST /projects/import/preview
+  → Request: multipart/form-data (file)
+  → Response: { valid, format_id, schema_version, project_name,
+               project_description, exported_at, archive_hash, summary }
+```
+
+**Walidacje**:
+- Wersja schematu (kompatybilność wsteczna w ramach major)
+- Integralność hashy (SHA-256)
+- Read-only restore (bez przeliczania)
+
+### 28.4 Frontend UI
+
+**Komponenty**:
+- `ProjectArchiveDialog` — główny dialog eksportu/importu
+- Tryby: export | import | preview
+- Drag & drop dla plików ZIP
+- Podgląd zawartości archiwum przed importem
+
+**Komunikaty PL**:
+- "Eksportuj projekt" / "Importuj projekt"
+- "Przeciągnij archiwum tutaj lub wybierz plik"
+- "Import zakończony pomyślnie"
+- "Błąd integralności sekcji..."
+- "Zmigrowano z wersji X do Y"
+
+### 28.5 Testy
+
+**Domain Tests** (`test_project_archive.py`):
+- Roundtrip: archive_to_dict → dict_to_archive → identical
+- Determinism: 2× export = identical hash
+- Integrity: tampered data detected
+- Version compatibility: older version accepted, future rejected
+- Edge cases: empty archive, unicode, large networks
+
+**Service Integration Tests** (`test_project_archive_service.py`):
+- Export creates valid ZIP with project.json + manifest.json
+- Export contains all sections (network, cases, runs, results, proofs)
+- Export is deterministic (2× export = identical content)
+- Import creates new project with new IDs
+- Import preserves network structure
+- Roundtrip preserves data
+- Preview shows content summary
+- Error handling (invalid ZIP, missing project.json, nonexistent project)
+
+### 28.6 Files Created
+
+**Backend Domain**:
+- `backend/src/domain/project_archive.py`
+
+**Backend Application**:
+- `backend/src/application/project_archive/__init__.py`
+- `backend/src/application/project_archive/service.py`
+
+**Backend API**:
+- `backend/src/api/project_archive.py`
+- Modified: `backend/src/api/main.py` (router registration)
+
+**Frontend**:
+- `frontend/src/ui/project-archive/types.ts`
+- `frontend/src/ui/project-archive/api.ts`
+- `frontend/src/ui/project-archive/ProjectArchiveDialog.tsx`
+- `frontend/src/ui/project-archive/index.ts`
+
+**Tests**:
+- `backend/tests/application/project_archive/__init__.py`
+- `backend/tests/application/project_archive/test_project_archive.py`
+- `backend/tests/application/project_archive/test_project_archive_service.py`
+
+### 28.7 DoD (Definition of Done)
+
+- [x] Pełny projekt eksportowalny (wszystkie sekcje)
+- [x] Import przywraca identyczny stan (z nowymi ID)
+- [x] Determinizm potwierdzony testami (2× export = identical)
+- [x] Integralność weryfikowana (SHA-256 fingerprints)
+- [x] Kompatybilność wsteczna (versioned schema)
+- [x] UI działa (PL) — dialog export/import/preview
+- [x] Jeden PR
+- [x] PLANS.md: P31 DONE
+
+### 28.8 Exclusions (NOT modified)
+
+- ❌ Solverów / obliczenia
+- ❌ Wyników (tylko przechowywanie)
+- ❌ Proof/trace (tylko przechowywanie)
+- ❌ Norm / interpretacji (tylko przechowywanie)
+- ❌ Catalog types (READ-ONLY, nie eksportowane)
+
+### 28.9 Next Steps
+
+- **UI Integration**: Dodać przycisk "Eksportuj/Importuj" do MainLayout lub toolbar
+- **Catalog Export**: Opcjonalny eksport/import typów biblioteki
+- **Incremental Archive**: Eksport tylko zmian od ostatniego archiwum
+- **Cloud Backup**: Integracja z cloud storage (S3, GCS)
+- **Archive Diff**: Porównanie dwóch archiwów
+
+---
