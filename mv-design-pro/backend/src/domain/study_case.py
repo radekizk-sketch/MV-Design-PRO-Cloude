@@ -23,7 +23,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
-from typing import Any, Literal
+from typing import Any, Literal, Optional
 from uuid import UUID, uuid4
 
 
@@ -121,6 +121,56 @@ class StudyCaseResult:
 
 
 @dataclass(frozen=True)
+class ProtectionConfig:
+    """
+    Protection configuration for study case (P14c).
+
+    Contains reference to ProtectionSettingTemplate and optional overrides.
+    NO calculations, NO solver logic - just configuration data.
+
+    INVARIANTS:
+    - Case stores reference (template_ref + fingerprint), NOT copied data
+    - Overrides are optional (values + units)
+    - library_manifest_ref tracks source library for auditability
+    - bound_at is timestamp when template was bound to case
+
+    Attributes:
+        template_ref: ID of ProtectionSettingTemplate from catalog.
+        template_fingerprint: Fingerprint of the template at bind time (for audit).
+        library_manifest_ref: Reference to library manifest (library_id + revision).
+        overrides: Optional overrides for setting fields (dict[field_name, value]).
+        bound_at: Timestamp when template was bound to this case.
+    """
+
+    template_ref: Optional[str] = None
+    template_fingerprint: Optional[str] = None
+    library_manifest_ref: Optional[dict[str, Any]] = None
+    overrides: dict[str, Any] = field(default_factory=dict)
+    bound_at: Optional[datetime] = None
+
+    def to_dict(self) -> dict[str, Any]:
+        """Serialize to dictionary for storage."""
+        return {
+            "template_ref": self.template_ref,
+            "template_fingerprint": self.template_fingerprint,
+            "library_manifest_ref": self.library_manifest_ref,
+            "overrides": self.overrides or {},
+            "bound_at": self.bound_at.isoformat() if self.bound_at else None,
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> ProtectionConfig:
+        """Deserialize from dictionary."""
+        return cls(
+            template_ref=data.get("template_ref"),
+            template_fingerprint=data.get("template_fingerprint"),
+            library_manifest_ref=data.get("library_manifest_ref"),
+            overrides=data.get("overrides") or {},
+            bound_at=datetime.fromisoformat(data["bound_at"]) if data.get("bound_at") else None,
+        )
+
+
+@dataclass(frozen=True)
 class StudyCase:
     """
     Study Case entity — configuration for calculations (P10a).
@@ -147,6 +197,9 @@ class StudyCase:
 
     # Configuration (calculation parameters only)
     config: StudyCaseConfig = field(default_factory=StudyCaseConfig)
+
+    # P14c: Protection configuration (reference to template + overrides)
+    protection_config: ProtectionConfig = field(default_factory=ProtectionConfig)
 
     # Result status lifecycle
     result_status: StudyCaseResultStatus = StudyCaseResultStatus.NONE
@@ -177,6 +230,7 @@ class StudyCase:
             description=self.description,
             network_snapshot_id=self.network_snapshot_id,
             config=config,
+            protection_config=self.protection_config,
             result_status=StudyCaseResultStatus.OUTDATED if self.result_status == StudyCaseResultStatus.FRESH else self.result_status,
             is_active=self.is_active,
             result_refs=self.result_refs,
@@ -184,6 +238,28 @@ class StudyCase:
             created_at=self.created_at,
             updated_at=datetime.now(timezone.utc),
             study_payload=config.to_dict(),
+        )
+
+    def with_protection_config(self, protection_config: ProtectionConfig) -> StudyCase:
+        """
+        Create a new StudyCase with updated protection config (P14c).
+        Marks result_status as OUTDATED if config changed (since protection may affect results).
+        """
+        return StudyCase(
+            id=self.id,
+            project_id=self.project_id,
+            name=self.name,
+            description=self.description,
+            network_snapshot_id=self.network_snapshot_id,
+            config=self.config,
+            protection_config=protection_config,
+            result_status=StudyCaseResultStatus.OUTDATED if self.result_status == StudyCaseResultStatus.FRESH else self.result_status,
+            is_active=self.is_active,
+            result_refs=self.result_refs,
+            revision=self.revision + 1,
+            created_at=self.created_at,
+            updated_at=datetime.now(timezone.utc),
+            study_payload=self.study_payload,
         )
 
     def with_name(self, name: str) -> StudyCase:
@@ -195,6 +271,7 @@ class StudyCase:
             description=self.description,
             network_snapshot_id=self.network_snapshot_id,
             config=self.config,
+            protection_config=self.protection_config,
             result_status=self.result_status,
             is_active=self.is_active,
             result_refs=self.result_refs,
@@ -213,6 +290,7 @@ class StudyCase:
             description=description,
             network_snapshot_id=self.network_snapshot_id,
             config=self.config,
+            protection_config=self.protection_config,
             result_status=self.result_status,
             is_active=self.is_active,
             result_refs=self.result_refs,
@@ -231,6 +309,7 @@ class StudyCase:
             description=self.description,
             network_snapshot_id=self.network_snapshot_id,
             config=self.config,
+            protection_config=self.protection_config,
             result_status=self.result_status,
             is_active=True,
             result_refs=self.result_refs,
@@ -249,6 +328,7 @@ class StudyCase:
             description=self.description,
             network_snapshot_id=self.network_snapshot_id,
             config=self.config,
+            protection_config=self.protection_config,
             result_status=self.result_status,
             is_active=False,
             result_refs=self.result_refs,
@@ -272,6 +352,7 @@ class StudyCase:
             description=self.description,
             network_snapshot_id=self.network_snapshot_id,
             config=self.config,
+            protection_config=self.protection_config,
             result_status=StudyCaseResultStatus.OUTDATED,
             is_active=self.is_active,
             result_refs=self.result_refs,
@@ -293,6 +374,7 @@ class StudyCase:
             description=self.description,
             network_snapshot_id=self.network_snapshot_id,
             config=self.config,
+            protection_config=self.protection_config,
             result_status=StudyCaseResultStatus.FRESH,
             is_active=self.is_active,
             result_refs=(*self.result_refs, result_ref),
@@ -323,6 +405,7 @@ class StudyCase:
             description=self.description,
             network_snapshot_id=network_snapshot_id,
             config=self.config,
+            protection_config=self.protection_config,
             result_status=new_status,
             is_active=self.is_active,
             result_refs=self.result_refs,
@@ -337,7 +420,7 @@ class StudyCase:
         Clone this case with new ID.
 
         CLONING RULES (PowerFactory-style):
-        - Configuration is copied
+        - Configuration is copied (including protection_config)
         - network_snapshot_id is copied (same snapshot binding)
         - Results are NOT copied (status = NONE)
         - New case is NOT active
@@ -350,6 +433,7 @@ class StudyCase:
             description=self.description,
             network_snapshot_id=self.network_snapshot_id,  # P10a: Copy snapshot binding
             config=self.config,
+            protection_config=self.protection_config,  # P14c: Copy protection config
             result_status=StudyCaseResultStatus.NONE,  # No results for clone
             is_active=False,  # Clone is not active
             result_refs=(),  # No results for clone
@@ -368,6 +452,7 @@ class StudyCase:
             "description": self.description,
             "network_snapshot_id": self.network_snapshot_id,  # P10a
             "config": self.config.to_dict(),
+            "protection_config": self.protection_config.to_dict(),  # P14c
             "result_status": self.result_status.value,
             "is_active": self.is_active,
             "result_refs": [ref.to_dict() for ref in self.result_refs],
@@ -380,6 +465,7 @@ class StudyCase:
     def from_dict(cls, data: dict[str, Any]) -> StudyCase:
         """Deserialize from dictionary."""
         config = StudyCaseConfig.from_dict(data.get("config", {}))
+        protection_config = ProtectionConfig.from_dict(data.get("protection_config", {}))  # P14c
         result_refs = tuple(
             StudyCaseResult.from_dict(ref)
             for ref in data.get("result_refs", [])
@@ -391,6 +477,7 @@ class StudyCase:
             description=data.get("description", ""),
             network_snapshot_id=data.get("network_snapshot_id"),  # P10a
             config=config,
+            protection_config=protection_config,  # P14c
             result_status=StudyCaseResultStatus(data.get("result_status", "NONE")),
             is_active=data.get("is_active", False),
             result_refs=result_refs,
@@ -410,7 +497,7 @@ def new_study_case(
     network_snapshot_id: str | None = None,
 ) -> StudyCase:
     """
-    Factory function to create a new StudyCase (P10a).
+    Factory function to create a new StudyCase (P10a + P14c).
 
     Args:
         project_id: ID of the project this case belongs to
@@ -432,6 +519,7 @@ def new_study_case(
         description=description,
         network_snapshot_id=network_snapshot_id,
         config=cfg,
+        protection_config=ProtectionConfig(),  # P14c: Empty protection config by default
         result_status=StudyCaseResultStatus.NONE,
         is_active=is_active,
         result_refs=(),
