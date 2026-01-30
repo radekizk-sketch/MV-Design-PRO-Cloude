@@ -78,10 +78,25 @@ class AnalysisRunService:
         operating_case_id: UUID | None = None,
         options: dict | None = None,
     ) -> AnalysisRun:
+        """P20a: Create power flow run with cache deduplication.
+
+        If a run with identical input_hash already exists for the same
+        project/case/type combination, returns the existing run instead
+        of creating a duplicate (deterministic cache).
+        """
         operating_case_id = self._resolve_operating_case_id(project_id, operating_case_id)
         snapshot = self._build_power_flow_snapshot(project_id, operating_case_id, options)
         input_hash = compute_input_hash(snapshot)
         with self._uow_factory() as uow:
+            # P20a: Check cache - return existing run if input_hash matches
+            existing = uow.analysis_runs.get_by_deterministic_key(
+                project_id=project_id,
+                operating_case_id=operating_case_id,
+                analysis_type="PF",
+                input_hash=input_hash,
+            )
+            if existing is not None:
+                return existing
             run = new_analysis_run(
                 project_id=project_id,
                 operating_case_id=operating_case_id,
