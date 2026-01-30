@@ -5,7 +5,7 @@
 ```
 backend/src/network_model/core/
 ├── __init__.py
-├── bus.py           # Bus (alias for Node)
+├── bus.py           # Bus (alias dla Node)
 ├── node.py          # Node, NodeType (legacy implementation)
 ├── branch.py        # Branch, LineBranch, TransformerBranch, BranchType
 ├── graph.py         # NetworkGraph
@@ -31,12 +31,12 @@ backend/src/network_model/core/
 - **Brak regulacji** - NetworkGraph nie wie o OSD ani kodeksach
 - **Brak analiz** - Core nie wykonuje obliczeń rozpływu ani zwarć
 - **Brak persystencji** - Core nie zna bazy danych
-- **Brak PCC w modelu** - PCC (punkt wspólnego przyłączenia) NIE występuje w NetworkGraph; jest identyfikowane w warstwie analysis przez BoundaryIdentifier
+- **Brak PCC w modelu** - PCC – punkt wspólnego przyłączenia NIE występuje w NetworkGraph; jest identyfikowany w warstwie analysis przez BoundaryIdentifier
 
 ### 2.3 Snapshot Store (Persistence)
 
 - **Co zapisujemy:** pełny `NetworkSnapshot` (meta + graph) w formie deterministycznego JSON, wraz z `snapshot_id`, `parent_snapshot_id`, `created_at`, `schema_version`.
-- **Jak odczytujemy:** snapshot jest odtwarzany read-only z `snapshot_json` i metadanych w bazie; brak mutacji in-place.
+- **Jak odczytujemy:** snapshot jest odtwarzany tylko do odczytu z `snapshot_json` i metadanych w bazie; brak mutacji in-place.
 - **Lineage i audyt:** `parent_snapshot_id` buduje łańcuch pochodzenia snapshotów, który można listować dla potrzeb audytu i historii zmian.
 
 ### 2.4 Read-Only Snapshot API + Submit Actions
@@ -62,9 +62,9 @@ Minimalne API backendu wspiera pełny przepływ:
 }
 ```
 
-> **Note:** PCC (punkt wspólnego przyłączenia) is NOT stored in NetworkGraph.
-> PCC is identified in the interpretation/analysis layer via BoundaryIdentifier.
-> See SYSTEM_SPEC.md Section 18.3.4.
+> **Uwaga:** PCC – punkt wspólnego przyłączenia nie jest przechowywany w NetworkGraph.
+> PCC – punkt wspólnego przyłączenia jest identyfikowany w warstwie interpretacji/analysis przez BoundaryIdentifier.
+> Zobacz SYSTEM_SPEC.md § 18.3.4.
 
 **POST /snapshots/{snapshot_id}/actions** przyjmuje `ActionEnvelope`, waliduje go i zwraca
 `ActionResult` wraz z `new_snapshot_id` tylko dla akcji zaakceptowanych:
@@ -120,7 +120,7 @@ Zasada dostępu CASE-aware:
 
 **Case → active_snapshot_id → SLD**
 
-SLD jest read-only, w pełni odtwarzalny dla identycznych wejść, a elementy `in_service=false` są wykluczane z projekcji (bez placeholderów).
+SLD jest tylko do odczytu, w pełni odtwarzalny dla identycznych wejść, a elementy `in_service=false` są wykluczane z projekcji (bez placeholderów).
 
 Odpowiedź zawiera wynik batcha i listę wyników dla każdej akcji:
 
@@ -145,15 +145,15 @@ Odpowiedź zawiera wynik batcha i listę wyników dla każdej akcji:
 W przypadku błędu cały batch jest odrzucony, a akcje oznaczane są jako `rejected`
 z kodem `batch_aborted`, natomiast akcja błędna zawiera własne kody i ścieżki błędów.
 
-### 2.6 DesignSynth (Project Designer) — case-level artifacts
+### 2.6 DesignSynth (Projektant) — artefakty poziomu przypadku
 
-DesignSynth przechowuje artefakty case-level (bez mutacji domeny Core): **DesignSpec**, **DesignProposal** oraz **DesignEvidence**. Są one zapisywane w tabelach `design_specs`, `design_proposals`, `design_evidence` i służą jako audytowalne, deterministycznie serializowane (JSON-safe) wejścia/wyjścia dla procesu projektowania na poziomie OperatingCase (case_id + snapshot_id). W Core nie ma logiki solverów ani fizyki powiązanej z tymi artefaktami.
+DesignSynth przechowuje artefakty poziomu przypadku (bez mutacji domeny Core): **DesignSpec**, **DesignProposal** oraz **DesignEvidence**. Są one zapisywane w tabelach `design_specs`, `design_proposals`, `design_evidence` i służą jako audytowalne, deterministycznie serializowane (JSON-safe) wejścia/wyjścia dla procesu projektowania na poziomie OperatingCase (case_id + snapshot_id). W Core nie ma logiki solverów ani fizyki powiązanej z tymi artefaktami.
 
-DesignSynth M2 rozszerza to o deterministyczny pipeline „connection study” (spec → proposal → evidence → report). Pipeline działa w warstwie application jako orkiestracja (bez solverów), zapisuje artefakty case-level oraz generuje raport JSON z sekcją **„PCC – punkt wspólnego przyłączenia”**, założeniami i ograniczeniami. Raport zawiera fingerprint wyliczony z kanonicznego JSON, co zapewnia powtarzalność i audytowalność.
+DesignSynth M2 rozszerza to o deterministyczny pipeline „connection study” (spec → proposal → evidence → report). Pipeline działa w warstwie application jako orkiestracja (bez solverów), zapisuje artefakty poziomu przypadku oraz generuje raport JSON z sekcją **„PCC – punkt wspólnego przyłączenia”**, założeniami i ograniczeniami. Raport zawiera fingerprint wyliczony z kanonicznego JSON, co zapewnia powtarzalność i audytowalność.
 
 ## 3. Komponenty
 
-### 3.1 Bus (`bus.py`, alias for Node)
+### 3.1 Bus (`bus.py`, alias dla Node)
 
 Reprezentacja węzła sieci elektroenergetycznej (PowerFactory: Bus).
 `Node` pozostaje implementacją legacy, a `Bus` jest aliasem zgodnym z PF.
@@ -344,10 +344,10 @@ Brak tu fizyki i norm — tylko struktura oraz referencje do encji snapshotu.
 - `create_branch` — `from_node_id`, `to_node_id`, `branch_kind`
 - `set_in_service` — `entity_id`, `in_service` (bool)
 
-> **Note:** `set_pcc` action was removed from Core layer in Phase 2 Task 2.1.
-> PCC hint is managed in the application/wizard settings layer, NOT in NetworkGraph.
+> **Uwaga:** Akcja `set_pcc` została usunięta z warstwy Core w ramach Phase 2 Task 2.1.
+> Hint PCC – punktu wspólnego przyłączenia jest zarządzany w warstwie ustawień application/wizard, a nie w NetworkGraph.
 
-### 5.3 ActionResult (accept/reject)
+### 5.3 ActionResult (zaakceptuj/odrzuć)
 
 Walidator zwraca `ActionResult`:
 - `status`: `"accepted"` lub `"rejected"`
@@ -358,25 +358,25 @@ Walidator zwraca `ActionResult`:
 Przykładowe kody błędów: `missing_field`, `invalid_type`, `unknown_action_type`,
 `missing_payload_key`, `unknown_node`, `unknown_entity`.
 
-### 5.4 Action → Snapshot Application Flow
+### 5.4 Przepływ Action → Snapshot
 
 Przepływ aplikacji akcji do nowego snapshotu:
 
 1. **Wizard** generuje `ActionEnvelope` (intencja zmiany).
-2. **Validation** wykonuje deterministyczną walidację strukturalną i zwraca `ActionResult`.
-3. Dla `ActionResult.status == "accepted"` następuje **Apply Action** w backend core.
-4. **Apply Action** tworzy **NOWY** `NetworkSnapshot` z:
+2. **Walidacja** wykonuje deterministyczną walidację strukturalną i zwraca `ActionResult`.
+3. Dla `ActionResult.status == "accepted"` następuje **zastosowanie akcji** w backend core.
+4. **Zastosowanie akcji** tworzy **NOWY** `NetworkSnapshot` z:
    - nowym `snapshot_id` (deterministycznym, powiązanym z akcją),
    - `parent_snapshot_id` wskazującym snapshot wejściowy,
    - stabilną, deterministyczną serializacją (sortowanie encji po `id`).
 
-Flow summary: **Wizard → ActionEnvelope → Validation → Apply Action → New Snapshot**.
+Podsumowanie przepływu: **Wizard → ActionEnvelope → Walidacja → Zastosowanie akcji → Nowy Snapshot**.
 
 ### 4.2 Snapshot Pattern
 
 Dla obliczeń stosujemy wzorzec snapshot:
 1. `NetworkWizardService` buduje `NetworkGraph` z persystencji
-2. `NetworkGraph` jest przekazywany do solvera jako read-only snapshot
+2. `NetworkGraph` jest przekazywany do solvera jako snapshot tylko do odczytu
 3. Solver nie modyfikuje grafu, tylko go czyta
 4. Snapshot ma backendowe metadane (`snapshot_id`, opcjonalny `parent_snapshot_id`,
    `created_at`, opcjonalny `schema_version`) dla jednoznacznej identyfikacji i linii czasu
