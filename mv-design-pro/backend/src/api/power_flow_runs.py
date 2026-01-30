@@ -1,4 +1,4 @@
-"""P20a/P20b: Dedykowane API endpoints dla Power Flow v1.
+"""P20a/P20b/P20d: Dedykowane API endpoints dla Power Flow v1.
 
 Endpoints:
 - GET /projects/{project_id}/power-flow-runs (list - P20b)
@@ -7,6 +7,9 @@ Endpoints:
 - GET /power-flow-runs/{run_id} (meta)
 - GET /power-flow-runs/{run_id}/results (PowerFlowResultV1)
 - GET /power-flow-runs/{run_id}/trace (PowerFlowTrace)
+- GET /power-flow-runs/{run_id}/export/json (P20d)
+- GET /power-flow-runs/{run_id}/export/docx (P20d)
+- GET /power-flow-runs/{run_id}/export/pdf (P20d)
 """
 from __future__ import annotations
 
@@ -434,3 +437,400 @@ def get_power_flow_trace(
         "converged": result_summary.get("converged", False),
         "final_iterations_count": result_summary.get("iterations", 0),
     })
+
+
+# =============================================================================
+# P20d: Export Endpoints
+# =============================================================================
+
+
+def _build_export_bundle(run_id: UUID, service: AnalysisRunService) -> dict[str, Any]:
+    """P20d: Build export bundle from run data (NOT-A-SOLVER)."""
+    run = service.get_run(run_id)
+
+    if run.analysis_type != "PF":
+        raise ValueError(f"Run {run_id} is not a power flow run")
+
+    if run.status != "FINISHED":
+        raise ValueError(f"Run {run_id} is not finished (status={run.status})")
+
+    # Get results
+    results = service.get_results(run_id)
+    pf_result = None
+    for result in results:
+        if result.get("result_type") == "power_flow":
+            pf_result = result.get("payload")
+            break
+
+    if pf_result is None:
+        raise ValueError(f"Power flow results not found for run {run_id}")
+
+    # Build result dict (analogous to get_power_flow_results)
+    result_summary = run.result_summary or {}
+    base_mva = pf_result.get("base_mva", 100.0)
+    slack_node_id = pf_result.get("slack_node_id", "")
+
+    node_u_mag = pf_result.get("node_u_mag_pu", {})
+    node_angle_rad = pf_result.get("node_angle_rad", {})
+
+    import math
+    bus_results = []
+    for bus_id in sorted(node_u_mag.keys()):
+        v_pu = node_u_mag.get(bus_id, 0.0)
+        angle_rad = node_angle_rad.get(bus_id, 0.0)
+        angle_deg = math.degrees(angle_rad)
+        bus_results.append({
+            "bus_id": bus_id,
+            "v_pu": v_pu,
+            "angle_deg": angle_deg,
+            "p_injected_mw": 0.0,
+            "q_injected_mvar": 0.0,
+        })
+
+    branch_s_from = pf_result.get("branch_s_from_mva", {})
+    branch_s_to = pf_result.get("branch_s_to_mva", {})
+    branch_results = []
+    for branch_id in sorted(branch_s_from.keys()):
+        s_from = branch_s_from.get(branch_id, {"re": 0.0, "im": 0.0})
+        s_to = branch_s_to.get(branch_id, {"re": 0.0, "im": 0.0})
+        p_from = s_from.get("re", 0.0) if isinstance(s_from, dict) else s_from.real
+        q_from = s_from.get("im", 0.0) if isinstance(s_from, dict) else s_from.imag
+        p_to = s_to.get("re", 0.0) if isinstance(s_to, dict) else s_to.real
+        q_to = s_to.get("im", 0.0) if isinstance(s_to, dict) else s_to.imag
+        losses_p = p_from + p_to
+        losses_q = q_from + q_to
+        branch_results.append({
+            "branch_id": branch_id,
+            "p_from_mw": p_from,
+            "q_from_mvar": q_from,
+            "p_to_mw": p_to,
+            "q_to_mvar": q_to,
+            "losses_p_mw": losses_p,
+            "losses_q_mvar": losses_q,
+        })
+
+    losses_total = pf_result.get("losses_total_pu", {"re": 0.0, "im": 0.0})
+    slack_power = pf_result.get("slack_power_pu", {"re": 0.0, "im": 0.0})
+    v_values = list(node_u_mag.values())
+    min_v = min(v_values) if v_values else 0.0
+    max_v = max(v_values) if v_values else 0.0
+
+    summary = {
+        "total_losses_p_mw": (losses_total.get("re", 0.0) if isinstance(losses_total, dict) else losses_total.real) * base_mva,
+        "total_losses_q_mvar": (losses_total.get("im", 0.0) if isinstance(losses_total, dict) else losses_total.imag) * base_mva,
+        "min_v_pu": min_v,
+        "max_v_pu": max_v,
+        "slack_p_mw": (slack_power.get("re", 0.0) if isinstance(slack_power, dict) else slack_power.real) * base_mva,
+        "slack_q_mvar": (slack_power.get("im", 0.0) if isinstance(slack_power, dict) else slack_power.imag) * base_mva,
+    }
+
+    result_data = {
+        "result_version": "1.0.0",
+        "converged": result_summary.get("converged", False),
+        "iterations_count": result_summary.get("iterations", 0),
+        "tolerance_used": pf_result.get("tolerance", 1e-8),
+        "base_mva": base_mva,
+        "slack_bus_id": slack_node_id,
+        "bus_results": bus_results,
+        "branch_results": branch_results,
+        "summary": summary,
+    }
+
+    # Build trace data
+    trace_payload = get_run_trace(run)
+    white_box_trace = pf_result.get("white_box_trace", {}) if pf_result else {}
+    nr_trace = white_box_trace.get("nr_trace", []) if isinstance(white_box_trace, dict) else []
+
+    if trace_payload and isinstance(trace_payload, dict):
+        nr_trace = trace_payload.get("nr_trace", nr_trace)
+
+    snapshot = run.input_snapshot or {}
+
+    trace_data = {
+        "solver_version": "1.0.0",
+        "input_hash": run.input_hash,
+        "init_method": "flat" if snapshot.get("options", {}).get("flat_start", True) else "last_solution",
+        "tolerance": snapshot.get("options", {}).get("tolerance", 1e-8),
+        "max_iterations": snapshot.get("options", {}).get("max_iter", 30),
+        "converged": result_summary.get("converged", False),
+        "final_iterations_count": result_summary.get("iterations", 0),
+        "iterations": nr_trace,
+    }
+
+    # Build metadata
+    metadata = {
+        "run_id": str(run.id),
+        "project_id": str(run.project_id),
+        "operating_case_id": str(run.operating_case_id),
+        "created_at": run.created_at.isoformat() if run.created_at else None,
+        "input_hash": run.input_hash,
+    }
+
+    return {
+        "result": result_data,
+        "trace": trace_data,
+        "metadata": metadata,
+    }
+
+
+@router.get("/power-flow-runs/{run_id}/export/json")
+def export_power_flow_run_json(
+    run_id: UUID,
+    uow_factory=Depends(get_uow_factory),
+):
+    """P20d: Eksportuj wyniki power flow do JSON."""
+    from fastapi.responses import Response
+    import json
+
+    service = _build_service(uow_factory)
+    try:
+        bundle = _build_export_bundle(run_id, service)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(exc),
+        ) from exc
+
+    # Build export payload
+    export_payload = {
+        "report_type": "power_flow_result",
+        "report_version": "1.0.0",
+        "metadata": bundle["metadata"],
+        "result": bundle["result"],
+        "trace_summary": {
+            "solver_version": bundle["trace"].get("solver_version"),
+            "input_hash": bundle["trace"].get("input_hash"),
+            "converged": bundle["trace"].get("converged"),
+            "final_iterations_count": bundle["trace"].get("final_iterations_count"),
+        },
+    }
+
+    json_content = json.dumps(export_payload, indent=2, ensure_ascii=False, sort_keys=True)
+
+    return Response(
+        content=json_content,
+        media_type="application/json",
+        headers={"Content-Disposition": f'attachment; filename="power_flow_run_{run_id}.json"'},
+    )
+
+
+@router.get("/power-flow-runs/{run_id}/export/docx")
+def export_power_flow_run_docx(
+    run_id: UUID,
+    uow_factory=Depends(get_uow_factory),
+):
+    """P20d: Eksportuj raport power flow do DOCX."""
+    from fastapi.responses import Response
+    import io
+
+    try:
+        from docx import Document
+        from docx.shared import Pt
+        from docx.enum.text import WD_ALIGN_PARAGRAPH
+    except ImportError:
+        raise HTTPException(
+            status_code=status.HTTP_501_NOT_IMPLEMENTED,
+            detail="DOCX export requires python-docx. Install with: pip install python-docx",
+        )
+
+    service = _build_service(uow_factory)
+    try:
+        bundle = _build_export_bundle(run_id, service)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(exc),
+        ) from exc
+
+    result = bundle["result"]
+    trace = bundle["trace"]
+    metadata = bundle["metadata"]
+
+    # Create DOCX document
+    doc = Document()
+    style = doc.styles["Normal"]
+    style.font.name = "Calibri"
+    style.font.size = Pt(11)
+
+    # Title
+    heading = doc.add_heading("Raport rozplywu mocy", level=0)
+    heading.alignment = WD_ALIGN_PARAGRAPH.CENTER
+
+    # Status line
+    status_parts = [
+        f"Status: {'Zbiezny' if result.get('converged') else 'Niezbiezny'}",
+        f"Iteracje: {result.get('iterations_count', '—')}",
+        f"Run: {metadata.get('run_id', '—')[:8]}...",
+    ]
+    subtitle = doc.add_paragraph(" | ".join(status_parts))
+    subtitle.alignment = WD_ALIGN_PARAGRAPH.CENTER
+
+    doc.add_paragraph()
+
+    # Summary section
+    doc.add_heading("Podsumowanie", level=1)
+    summary = result.get("summary", {})
+    summary_table = doc.add_table(rows=1, cols=2)
+    summary_table.style = "Table Grid"
+
+    hdr = summary_table.rows[0].cells
+    hdr[0].text = "Parametr"
+    hdr[1].text = "Wartosc"
+    for cell in hdr:
+        for p in cell.paragraphs:
+            for r in p.runs:
+                r.bold = True
+
+    def add_row(table, label, value):
+        row = table.add_row().cells
+        row[0].text = label
+        row[1].text = str(value) if value is not None else "—"
+
+    add_row(summary_table, "Status zbieznosci", "Zbiezny" if result.get("converged") else "Niezbiezny")
+    add_row(summary_table, "Liczba iteracji", result.get("iterations_count"))
+    add_row(summary_table, "Wezel bilansujacy", result.get("slack_bus_id"))
+    add_row(summary_table, "Calkowite straty P [MW]", f"{summary.get('total_losses_p_mw', 0):.4g}")
+    add_row(summary_table, "Calkowite straty Q [Mvar]", f"{summary.get('total_losses_q_mvar', 0):.4g}")
+    add_row(summary_table, "Min. napiecie [pu]", f"{summary.get('min_v_pu', 0):.4g}")
+    add_row(summary_table, "Max. napiecie [pu]", f"{summary.get('max_v_pu', 0):.4g}")
+
+    doc.add_paragraph()
+
+    # Bus results (limited)
+    doc.add_heading("Wyniki wezlowe (szyny)", level=1)
+    bus_results = result.get("bus_results", [])
+    if bus_results:
+        bus_table = doc.add_table(rows=1, cols=5)
+        bus_table.style = "Table Grid"
+        bhdr = bus_table.rows[0].cells
+        bhdr[0].text = "ID szyny"
+        bhdr[1].text = "V [pu]"
+        bhdr[2].text = "Kat [deg]"
+        bhdr[3].text = "P_inj [MW]"
+        bhdr[4].text = "Q_inj [Mvar]"
+        for cell in bhdr:
+            for p in cell.paragraphs:
+                for r in p.runs:
+                    r.bold = True
+
+        for bus in bus_results[:30]:
+            row = bus_table.add_row().cells
+            row[0].text = str(bus.get("bus_id", "—"))[:16]
+            row[1].text = f"{bus.get('v_pu', 0):.4g}"
+            row[2].text = f"{bus.get('angle_deg', 0):.2f}"
+            row[3].text = f"{bus.get('p_injected_mw', 0):.3g}"
+            row[4].text = f"{bus.get('q_injected_mvar', 0):.3g}"
+
+        if len(bus_results) > 30:
+            doc.add_paragraph(f"... oraz {len(bus_results) - 30} dodatkowych wezlow")
+    else:
+        doc.add_paragraph("Brak wynikow wezlowych.")
+
+    # Save to BytesIO
+    buffer = io.BytesIO()
+    doc.save(buffer)
+    buffer.seek(0)
+
+    return Response(
+        content=buffer.getvalue(),
+        media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        headers={"Content-Disposition": f'attachment; filename="power_flow_run_{run_id}.docx"'},
+    )
+
+
+@router.get("/power-flow-runs/{run_id}/export/pdf")
+def export_power_flow_run_pdf(
+    run_id: UUID,
+    uow_factory=Depends(get_uow_factory),
+):
+    """P20d: Eksportuj raport power flow do PDF."""
+    from fastapi.responses import Response
+    import io
+
+    try:
+        from reportlab.pdfgen import canvas
+        from reportlab.lib.pagesizes import A4
+        from reportlab.lib.units import mm
+    except ImportError:
+        raise HTTPException(
+            status_code=status.HTTP_501_NOT_IMPLEMENTED,
+            detail="PDF export requires reportlab. Install with: pip install reportlab",
+        )
+
+    service = _build_service(uow_factory)
+    try:
+        bundle = _build_export_bundle(run_id, service)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(exc),
+        ) from exc
+
+    result = bundle["result"]
+    metadata = bundle["metadata"]
+
+    # Create PDF in memory
+    buffer = io.BytesIO()
+    c = canvas.Canvas(buffer, pagesize=A4)
+    page_width, page_height = A4
+
+    left_margin = 25 * mm
+    top_margin = page_height - 25 * mm
+    y = top_margin
+    line_height = 5 * mm
+
+    # Title
+    c.setFont("Helvetica-Bold", 16)
+    title = "Raport rozplywu mocy"
+    c.drawString((page_width - c.stringWidth(title, "Helvetica-Bold", 16)) / 2, y, title)
+    y -= 10 * mm
+
+    # Status line
+    c.setFont("Helvetica", 10)
+    status_text = f"Status: {'Zbiezny' if result.get('converged') else 'Niezbiezny'} | Iteracje: {result.get('iterations_count', '—')} | Run: {metadata.get('run_id', '—')[:8]}..."
+    c.drawString(left_margin, y, status_text)
+    y -= 8 * mm
+
+    # Summary
+    c.setFont("Helvetica-Bold", 14)
+    c.drawString(left_margin, y, "Podsumowanie")
+    y -= 6 * mm
+
+    c.setFont("Helvetica", 10)
+    summary = result.get("summary", {})
+    summary_lines = [
+        f"Wezel bilansujacy: {result.get('slack_bus_id', '—')}",
+        f"Calkowite straty P: {summary.get('total_losses_p_mw', 0):.4g} MW",
+        f"Calkowite straty Q: {summary.get('total_losses_q_mvar', 0):.4g} Mvar",
+        f"Min. napiecie: {summary.get('min_v_pu', 0):.4g} pu",
+        f"Max. napiecie: {summary.get('max_v_pu', 0):.4g} pu",
+    ]
+    for line in summary_lines:
+        c.drawString(left_margin, y, line)
+        y -= line_height
+
+    y -= 5 * mm
+
+    # Bus results (limited)
+    c.setFont("Helvetica-Bold", 12)
+    c.drawString(left_margin, y, "Wyniki wezlowe (top 20)")
+    y -= 5 * mm
+
+    c.setFont("Helvetica", 9)
+    bus_results = result.get("bus_results", [])
+    for bus in bus_results[:20]:
+        text = f"{str(bus.get('bus_id', '—'))[:12]}: V={bus.get('v_pu', 0):.4g} pu, kat={bus.get('angle_deg', 0):.2f} deg"
+        c.drawString(left_margin, y, text)
+        y -= line_height
+        if y < 30 * mm:
+            c.showPage()
+            y = top_margin
+
+    c.save()
+    buffer.seek(0)
+
+    return Response(
+        content=buffer.getvalue(),
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="power_flow_run_{run_id}.pdf"'},
+    )

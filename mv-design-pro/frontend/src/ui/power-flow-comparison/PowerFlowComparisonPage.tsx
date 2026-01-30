@@ -40,6 +40,96 @@ import {
 } from './types';
 
 // =============================================================================
+// P20d: Export Types and Component
+// =============================================================================
+
+type ExportFormat = 'json' | 'docx' | 'pdf';
+
+const EXPORT_FORMAT_LABELS: Record<ExportFormat, string> = {
+  json: 'JSON',
+  docx: 'DOCX',
+  pdf: 'PDF',
+};
+
+interface ComparisonExportButtonProps {
+  comparisonId: string | null;
+  disabled?: boolean;
+}
+
+/**
+ * P20d: Export dropdown button for Power Flow comparison.
+ * Polish labels, minimal footprint.
+ */
+function ComparisonExportButton({ comparisonId, disabled }: ComparisonExportButtonProps) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
+
+  const handleExport = async (format: ExportFormat) => {
+    if (!comparisonId) return;
+
+    setIsExporting(true);
+    setIsOpen(false);
+
+    try {
+      // Build export URL
+      const baseUrl = `/api/power-flow-comparisons/${comparisonId}/export/${format}`;
+
+      // Trigger download via fetch + blob
+      const response = await fetch(baseUrl);
+      if (!response.ok) {
+        throw new Error(`Export failed: ${response.statusText}`);
+      }
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `power_flow_comparison_${comparisonId.substring(0, 8)}.${format}`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+    } catch (error) {
+      console.error('Export error:', error);
+      alert(`Blad eksportu: ${error instanceof Error ? error.message : 'Nieznany blad'}`);
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  return (
+    <div className="relative">
+      <button
+        type="button"
+        onClick={() => setIsOpen(!isOpen)}
+        disabled={disabled || isExporting || !comparisonId}
+        className="flex items-center gap-2 rounded bg-slate-600 px-4 py-2 text-sm font-medium text-white hover:bg-slate-700 disabled:cursor-not-allowed disabled:bg-slate-300"
+      >
+        {isExporting ? 'Eksportuje...' : 'Eksportuj raport'}
+        <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+        </svg>
+      </button>
+
+      {isOpen && (
+        <div className="absolute right-0 top-full z-10 mt-1 w-40 rounded border border-slate-200 bg-white shadow-lg">
+          {(Object.keys(EXPORT_FORMAT_LABELS) as ExportFormat[]).map((format) => (
+            <button
+              key={format}
+              type="button"
+              onClick={() => handleExport(format)}
+              className="block w-full px-4 py-2 text-left text-sm text-slate-700 hover:bg-slate-100"
+            >
+              {EXPORT_FORMAT_LABELS[format]}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// =============================================================================
 // Helper Functions
 // =============================================================================
 
@@ -638,6 +728,9 @@ export function PowerFlowComparisonPage({
               </h1>
             </div>
             <div className="flex items-center gap-3">
+              {comparison && (
+                <ComparisonExportButton comparisonId={comparison.comparison_id} />
+              )}
               <div className="rounded border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-700">
                 Tylko do odczytu
               </div>

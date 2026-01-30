@@ -56,13 +56,54 @@ przed uruchomieniem produkcyjnym systemu MV-DESIGN-PRO.
 - [ ] White-box trace jest kompletny
 - [ ] Testy referencyjne przechodzą
 
-### 2.3 Determinizm
+### 2.3 P20: Power Flow v1 (Complete)
+
+#### 2.3.1 Determinizm wynikow
+
+- [ ] Te same dane wejściowe → identyczny PowerFlowResultV1
+- [ ] Te same dane wejściowe → identyczny PowerFlowTrace
+- [ ] Input hash (SHA-256) jest deterministyczny
+- [ ] Result fingerprint jest deterministyczny
+
+#### 2.3.2 Zbieznosc i bledy
+
+- [ ] Test case: siec zbiezna (< max_iterations)
+- [ ] Test case: siec niezbiezna (brak zbieznosci w max_iterations)
+- [ ] Solver raportuje cause_if_failed przy braku zbieznosci
+- [ ] Trace zawiera wszystkie iteracje z norm_mismatch
+
+#### 2.3.3 NOT-A-SOLVER (UI/Export)
+
+- [ ] UI Results Inspector NIE wykonuje obliczen fizycznych
+- [ ] UI Comparison NIE wykonuje obliczen fizycznych
+- [ ] Export JSON NIE wykonuje obliczen (tylko formatowanie)
+- [ ] Export DOCX NIE wykonuje obliczen (tylko formatowanie)
+- [ ] Export PDF NIE wykonuje obliczen (tylko formatowanie)
+
+#### 2.3.4 API Result kompletnosc
+
+- [ ] GET /power-flow-runs/{id}/results zwraca pelny PowerFlowResultV1
+- [ ] GET /power-flow-runs/{id}/trace zwraca pelny PowerFlowTrace
+- [ ] GET /power-flow-runs/{id}/export/json dziala
+- [ ] GET /power-flow-runs/{id}/export/docx dziala
+- [ ] GET /power-flow-runs/{id}/export/pdf dziala
+- [ ] GET /power-flow-comparisons/{id}/export/json dziala
+- [ ] GET /power-flow-comparisons/{id}/export/docx dziala
+- [ ] GET /power-flow-comparisons/{id}/export/pdf dziala
+
+#### 2.3.5 Polskie etykiety
+
+- [ ] UI Results Inspector: 100% polskie etykiety
+- [ ] UI Comparison: 100% polskie etykiety
+- [ ] Raporty DOCX/PDF: 100% polskie etykiety
+
+### 2.4 Determinizm ogolny
 
 - [ ] Te same dane wejściowe → te same wyniki (IEC 60909)
 - [ ] Te same dane wejściowe → te same wyniki (Power Flow)
 - [ ] Input hash jest deterministyczny
 
-### 2.4 Granice
+### 2.5 Granice
 
 - [ ] Solvery NIE zawierają logiki OSD/regulacji
 - [ ] Solvery NIE zawierają logiki persystencji

@@ -1,5 +1,5 @@
 """
-Power Flow Comparison API — P20c (A/B)
+Power Flow Comparison API — P20c/P20d (A/B)
 
 REST API endpoints for comparing two power flow analysis runs.
 100% read-only — no physics calculations, no state mutations.
@@ -9,9 +9,13 @@ Endpoints:
 - GET /power-flow-comparisons/{id} — Get comparison metadata
 - GET /power-flow-comparisons/{id}/results — Get comparison results
 - GET /power-flow-comparisons/{id}/trace — Get comparison trace
+- GET /power-flow-comparisons/{id}/export/json — Export to JSON (P20d)
+- GET /power-flow-comparisons/{id}/export/docx — Export to DOCX (P20d)
+- GET /power-flow-comparisons/{id}/export/pdf — Export to PDF (P20d)
 
 CANONICAL ALIGNMENT:
 - P20c: Power Flow A/B Comparison
+- P20d: Export endpoints
 - Read-only comparison endpoint
 - Deterministic response
 """
@@ -349,3 +353,281 @@ def get_power_flow_comparison_trace(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Power flow comparison nie znalezione: {e.comparison_id}",
         ) from e
+
+
+# =============================================================================
+# P20d: Export Endpoints
+# =============================================================================
+
+
+@router.get(
+    "/{comparison_id}/export/json",
+    summary="Eksportuj porownanie do JSON",
+)
+def export_power_flow_comparison_json(
+    comparison_id: str,
+    uow_factory=Depends(get_uow_factory),
+):
+    """P20d: Export power flow comparison to JSON file."""
+    from fastapi.responses import Response
+    import json
+
+    service = _build_service(uow_factory)
+
+    try:
+        result = service.get_comparison(comparison_id)
+        comparison_dict = result.to_dict()
+    except PowerFlowComparisonNotFoundError as e:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Power flow comparison nie znalezione: {e.comparison_id}",
+        ) from e
+
+    # Build export payload
+    export_payload = {
+        "report_type": "power_flow_comparison",
+        "report_version": "1.0.0",
+        "comparison": comparison_dict,
+    }
+
+    json_content = json.dumps(export_payload, indent=2, ensure_ascii=False, sort_keys=True)
+
+    return Response(
+        content=json_content,
+        media_type="application/json",
+        headers={"Content-Disposition": f'attachment; filename="power_flow_comparison_{comparison_id}.json"'},
+    )
+
+
+@router.get(
+    "/{comparison_id}/export/docx",
+    summary="Eksportuj porownanie do DOCX",
+)
+def export_power_flow_comparison_docx(
+    comparison_id: str,
+    uow_factory=Depends(get_uow_factory),
+):
+    """P20d: Export power flow comparison to DOCX file."""
+    from fastapi.responses import Response
+    import io
+
+    try:
+        from docx import Document
+        from docx.shared import Pt
+        from docx.enum.text import WD_ALIGN_PARAGRAPH
+    except ImportError:
+        raise HTTPException(
+            status_code=status.HTTP_501_NOT_IMPLEMENTED,
+            detail="DOCX export requires python-docx. Install with: pip install python-docx",
+        )
+
+    service = _build_service(uow_factory)
+
+    try:
+        result = service.get_comparison(comparison_id)
+        comparison = result.to_dict()
+    except PowerFlowComparisonNotFoundError as e:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Power flow comparison nie znalezione: {e.comparison_id}",
+        ) from e
+
+    # Create DOCX document
+    doc = Document()
+    style = doc.styles["Normal"]
+    style.font.name = "Calibri"
+    style.font.size = Pt(11)
+
+    # Title
+    heading = doc.add_heading("Raport porownania rozplywu mocy", level=0)
+    heading.alignment = WD_ALIGN_PARAGRAPH.CENTER
+
+    # Subtitle
+    subtitle_parts = [
+        f"Run A: {comparison.get('run_a_id', '—')[:8]}...",
+        f"Run B: {comparison.get('run_b_id', '—')[:8]}...",
+    ]
+    subtitle = doc.add_paragraph(" | ".join(subtitle_parts))
+    subtitle.alignment = WD_ALIGN_PARAGRAPH.CENTER
+
+    doc.add_paragraph()
+
+    # Summary section
+    doc.add_heading("Podsumowanie", level=1)
+    summary = comparison.get("summary", {})
+    summary_table = doc.add_table(rows=1, cols=2)
+    summary_table.style = "Table Grid"
+
+    hdr = summary_table.rows[0].cells
+    hdr[0].text = "Parametr"
+    hdr[1].text = "Wartosc"
+    for cell in hdr:
+        for p in cell.paragraphs:
+            for r in p.runs:
+                r.bold = True
+
+    def add_row(table, label, value):
+        row = table.add_row().cells
+        row[0].text = label
+        row[1].text = str(value) if value is not None else "—"
+
+    add_row(summary_table, "Liczba szyn", summary.get("total_buses"))
+    add_row(summary_table, "Liczba galezi", summary.get("total_branches"))
+    add_row(summary_table, "Zbieznosc A", "Tak" if summary.get("converged_a") else "Nie")
+    add_row(summary_table, "Zbieznosc B", "Tak" if summary.get("converged_b") else "Nie")
+    add_row(summary_table, "Delta strat P [MW]", f"{summary.get('delta_total_losses_p_mw', 0):.4g}")
+    add_row(summary_table, "Max delta V [pu]", f"{summary.get('max_delta_v_pu', 0):.4g}")
+    add_row(summary_table, "Liczba problemow", summary.get("total_issues"))
+    add_row(summary_table, "Krytyczne", summary.get("critical_issues"))
+    add_row(summary_table, "Powazne", summary.get("major_issues"))
+
+    doc.add_paragraph()
+
+    # Ranking section
+    doc.add_heading("Ranking problemow", level=1)
+    ranking = comparison.get("ranking", [])
+    severity_labels = {5: "Krytyczny", 4: "Powazny", 3: "Sredni", 2: "Drobny", 1: "Info"}
+
+    if ranking:
+        rank_table = doc.add_table(rows=1, cols=4)
+        rank_table.style = "Table Grid"
+        rhdr = rank_table.rows[0].cells
+        rhdr[0].text = "Priorytet"
+        rhdr[1].text = "Kod"
+        rhdr[2].text = "Element"
+        rhdr[3].text = "Opis"
+        for cell in rhdr:
+            for p in cell.paragraphs:
+                for r in p.runs:
+                    r.bold = True
+
+        for issue in ranking[:30]:
+            row = rank_table.add_row().cells
+            row[0].text = severity_labels.get(issue.get("severity", 1), "?")
+            row[1].text = issue.get("issue_code", "—")
+            row[2].text = str(issue.get("element_ref", "—"))[:16]
+            row[3].text = issue.get("description_pl", "—")[:50]
+
+        if len(ranking) > 30:
+            doc.add_paragraph(f"... oraz {len(ranking) - 30} dodatkowych problemow")
+    else:
+        doc.add_paragraph("Brak wykrytych problemow.")
+
+    # Save to BytesIO
+    buffer = io.BytesIO()
+    doc.save(buffer)
+    buffer.seek(0)
+
+    return Response(
+        content=buffer.getvalue(),
+        media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        headers={"Content-Disposition": f'attachment; filename="power_flow_comparison_{comparison_id}.docx"'},
+    )
+
+
+@router.get(
+    "/{comparison_id}/export/pdf",
+    summary="Eksportuj porownanie do PDF",
+)
+def export_power_flow_comparison_pdf(
+    comparison_id: str,
+    uow_factory=Depends(get_uow_factory),
+):
+    """P20d: Export power flow comparison to PDF file."""
+    from fastapi.responses import Response
+    import io
+
+    try:
+        from reportlab.pdfgen import canvas
+        from reportlab.lib.pagesizes import A4
+        from reportlab.lib.units import mm
+    except ImportError:
+        raise HTTPException(
+            status_code=status.HTTP_501_NOT_IMPLEMENTED,
+            detail="PDF export requires reportlab. Install with: pip install reportlab",
+        )
+
+    service = _build_service(uow_factory)
+
+    try:
+        result = service.get_comparison(comparison_id)
+        comparison = result.to_dict()
+    except PowerFlowComparisonNotFoundError as e:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Power flow comparison nie znalezione: {e.comparison_id}",
+        ) from e
+
+    # Create PDF in memory
+    buffer = io.BytesIO()
+    c = canvas.Canvas(buffer, pagesize=A4)
+    page_width, page_height = A4
+
+    left_margin = 25 * mm
+    top_margin = page_height - 25 * mm
+    y = top_margin
+    line_height = 5 * mm
+
+    # Title
+    c.setFont("Helvetica-Bold", 16)
+    title = "Raport porownania rozplywu mocy"
+    c.drawString((page_width - c.stringWidth(title, "Helvetica-Bold", 16)) / 2, y, title)
+    y -= 10 * mm
+
+    # Subtitle
+    c.setFont("Helvetica", 10)
+    subtitle = f"Run A: {comparison.get('run_a_id', '—')[:8]}... | Run B: {comparison.get('run_b_id', '—')[:8]}..."
+    c.drawString(left_margin, y, subtitle)
+    y -= 8 * mm
+
+    # Summary
+    c.setFont("Helvetica-Bold", 14)
+    c.drawString(left_margin, y, "Podsumowanie")
+    y -= 6 * mm
+
+    c.setFont("Helvetica", 10)
+    summary = comparison.get("summary", {})
+    summary_lines = [
+        f"Liczba szyn: {summary.get('total_buses', '—')}",
+        f"Liczba galezi: {summary.get('total_branches', '—')}",
+        f"Zbieznosc A: {'Tak' if summary.get('converged_a') else 'Nie'}",
+        f"Zbieznosc B: {'Tak' if summary.get('converged_b') else 'Nie'}",
+        f"Delta strat P: {summary.get('delta_total_losses_p_mw', 0):.4g} MW",
+        f"Liczba problemow: {summary.get('total_issues', 0)}",
+    ]
+    for line in summary_lines:
+        c.drawString(left_margin, y, line)
+        y -= line_height
+
+    y -= 5 * mm
+
+    # Ranking
+    c.setFont("Helvetica-Bold", 12)
+    c.drawString(left_margin, y, "Ranking problemow (top 15)")
+    y -= 5 * mm
+
+    ranking = comparison.get("ranking", [])
+    severity_labels = {5: "Krytyczny", 4: "Powazny", 3: "Sredni", 2: "Drobny", 1: "Info"}
+
+    c.setFont("Helvetica", 9)
+    for issue in ranking[:15]:
+        severity = severity_labels.get(issue.get("severity", 1), "?")
+        text = f"[{severity}] {issue.get('issue_code', '—')}: {issue.get('description_pl', '—')[:50]}"
+        c.drawString(left_margin, y, text)
+        y -= line_height
+        if y < 30 * mm:
+            c.showPage()
+            y = top_margin
+
+    if not ranking:
+        c.drawString(left_margin, y, "Brak wykrytych problemow.")
+        y -= line_height
+
+    c.save()
+    buffer.seek(0)
+
+    return Response(
+        content=buffer.getvalue(),
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="power_flow_comparison_{comparison_id}.pdf"'},
+    )

@@ -2316,6 +2316,9 @@ klasy **wyższej niż PowerFactory**, opartą o:
 1. P20a — Power Flow Solver + Trace (backend-only) ✅ **DONE**
 2. P20b — Results Inspector + SLD Overlay ✅ **DONE**
 3. P20c — A/B Comparison + Ranking ✅ **DONE**
+4. P20d — Export + Go-Live ✅ **DONE**
+
+**Power Flow v1 — COMPLETE** ✅
 
 ---
 
@@ -2407,6 +2410,71 @@ klasy **wyższej niż PowerFactory**, opartą o:
 - `api/power_flow_comparisons.py` (NEW)
 - `frontend/src/ui/power-flow-comparison/` (NEW)
 - `tests/domain/test_power_flow_comparison.py` (NEW)
+
+---
+
+### P20d — Power Flow Export + Go-Live (v1 COMPLETE)
+
+**Status:** DONE | CANONICAL & BINDING
+
+**Zakres zrealizowany:**
+- Export raportów Power Flow (NOT-A-SOLVER):
+  - Single Run: JSON, DOCX, PDF
+  - Comparison: JSON, DOCX, PDF
+- API Endpoints:
+  - GET `/power-flow-runs/{id}/export/json`
+  - GET `/power-flow-runs/{id}/export/docx`
+  - GET `/power-flow-runs/{id}/export/pdf`
+  - GET `/power-flow-comparisons/{id}/export/json`
+  - GET `/power-flow-comparisons/{id}/export/docx`
+  - GET `/power-flow-comparisons/{id}/export/pdf`
+- UI export button (PL): "Eksportuj raport" dropdown
+- GO-LIVE checklist: sekcja Power Flow v1 (determinism, trace, NOT-A-SOLVER)
+- 100% polskie etykiety w raportach
+
+**NOT-A-SOLVER Compliance:**
+- Export używa WYŁĄCZNIE danych z PowerFlowResultV1.to_dict() i PowerFlowTrace.to_dict()
+- Brak jakichkolwiek przeliczeń w warstwie export/UI
+- Deterministyczny JSON (sort_keys=True)
+- UTF-8 encoding mandatory
+
+**Testy:**
+- [x] Export JSON: deterministyczny (identyczny dla tego samego run)
+- [x] Export comparison JSON: deterministyczny
+- [x] UI smoke: przycisk wywołuje eksport
+
+**Pliki:**
+- `network_model/reporting/power_flow_export.py` (NEW)
+- `network_model/reporting/power_flow_report_docx.py` (NEW)
+- `network_model/reporting/power_flow_report_pdf.py` (NEW)
+- `api/power_flow_runs.py` (extended: export endpoints)
+- `api/power_flow_comparisons.py` (extended: export endpoints)
+- `frontend/src/ui/power-flow-results/PowerFlowResultsInspectorPage.tsx` (extended: export button)
+- `frontend/src/ui/power-flow-comparison/PowerFlowComparisonPage.tsx` (extended: export button)
+- `docs/GO-LIVE-CHECKLIST.md` (extended: Power Flow v1 section)
+
+---
+
+### Power Flow v1 — COMPLETE ✅
+
+**Data ukończenia:** 2026-01
+
+**Zakres Power Flow v1:**
+1. **P20a** — Solver + Trace (backend) ✅
+2. **P20b** — Results Inspector + SLD Overlay ✅
+3. **P20c** — A/B Comparison + Ranking ✅
+4. **P20d** — Export + Go-Live ✅
+
+**Analogia do Protection v1:**
+- Pełny cykl: solver → results view → comparison → export → checklist
+- NOT-A-SOLVER w UI/export
+- Determinizm w każdej warstwie
+- 100% polskie etykiety
+
+**Kolejne kroki (FUTURE):**
+- P16: Losses & Power Proof Pack (DEFERRED)
+- P21: Voltage Profile view
+- Regulatory/OLTC (FUTURE)
 
 ---
 
