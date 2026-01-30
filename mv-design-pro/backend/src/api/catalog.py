@@ -50,6 +50,15 @@ class ImportTypeLibraryPayload(BaseModel):
     switch_types: list[dict[str, Any]]
 
 
+class ImportProtectionLibraryPayload(BaseModel):
+    """Payload for importing protection library (P14b)"""
+
+    manifest: dict[str, Any]
+    device_types: list[dict[str, Any]]
+    curves: list[dict[str, Any]]
+    templates: list[dict[str, Any]]
+
+
 # ============================================================================
 # Type Library Governance (P13b)
 # ============================================================================
@@ -245,6 +254,87 @@ def get_protection_setting_template(
             detail=f"Protection setting template not found: {template_id}",
         )
     return result
+
+
+# ============================================================================
+# Protection Library Governance (P14b)
+# ============================================================================
+
+
+@router.get("/protection/export")
+def export_protection_library(
+    library_name_pl: str = "Biblioteka zabezpieczeń",
+    vendor: str = "MV-DESIGN-PRO",
+    series: str = "Standard",
+    revision: str = "1.0",
+    description_pl: str = "",
+    uow_factory=Depends(get_uow_factory),
+) -> dict[str, Any]:
+    """
+    Export protection library with deterministic fingerprint (P14b).
+
+    Returns canonical JSON export with manifest and all protection types.
+    Deterministic ordering ensures identical fingerprint for same content.
+
+    Query Parameters:
+        library_name_pl: Polish name of the library
+        vendor: Vendor/manufacturer name
+        series: Product series/line
+        revision: Revision string
+        description_pl: Optional Polish description
+    """
+    service = _build_governance_service(uow_factory)
+    return service.export_protection_library(
+        library_name_pl=library_name_pl,
+        vendor=vendor,
+        series=series,
+        revision=revision,
+        description_pl=description_pl,
+    )
+
+
+@router.post("/protection/import")
+def import_protection_library(
+    payload: ImportProtectionLibraryPayload,
+    mode: str = "merge",
+    uow_factory=Depends(get_uow_factory),
+) -> dict[str, Any]:
+    """
+    Import protection library with conflict detection and reference validation (P14b).
+
+    Modes:
+    - merge (default): Add new types, check immutability (no overwrites)
+    - replace: Replace entire library (safe for P14b as no bindings yet)
+
+    Conflict rules:
+    - Existing type_id with different parameters → 409 Conflict
+    - Template references non-existent device_type/curve → 422 Validation Error
+
+    Returns ProtectionImportReport with added/skipped/conflicts/blocked lists.
+    """
+    # Validate mode
+    try:
+        import_mode = ImportMode(mode.lower())
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid mode: {mode}. Must be 'merge' or 'replace'.",
+        ) from exc
+
+    service = _build_governance_service(uow_factory)
+
+    try:
+        report = service.import_protection_library(
+            data=payload.model_dump(),
+            mode=import_mode,
+        )
+        return report
+    except ValueError as exc:
+        # Conflicts or validation errors detected
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=str(exc),
+        ) from exc
 
 
 # ============================================================================
