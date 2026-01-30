@@ -13,6 +13,7 @@ from api.design_synth import router as design_synth_router
 from api.equipment_proof_pack import router as equipment_proof_pack_router
 from api.power_flow_runs import router as power_flow_runs_router  # P20a
 from api.proof_pack import router as proof_pack_router
+from api.protection_comparisons import router as protection_comparisons_router  # P15b
 from api.protection_runs import router as protection_runs_router  # P15a
 from api.sld import router as sld_router  # P11a
 from api.snapshots import router as snapshots_router
@@ -45,6 +46,7 @@ app.include_router(design_synth_router)
 app.include_router(equipment_proof_pack_router)
 app.include_router(power_flow_runs_router)  # P20a
 app.include_router(proof_pack_router)
+app.include_router(protection_comparisons_router)  # P15b
 app.include_router(protection_runs_router)  # P15a
 app.include_router(sld_router)  # P11a
 app.include_router(snapshots_router)

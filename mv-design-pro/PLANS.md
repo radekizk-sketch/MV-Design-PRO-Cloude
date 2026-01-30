@@ -2188,7 +2188,7 @@ P15a jest **warstwą analysis** nad P14a/b/c:
 - **P14b (governance):** Manifest, fingerprint, import/export
 - **P14c (config):** ProtectionConfig w StudyCase (template_ref, overrides)
 - **P15a (analysis):** Evaluation engine, results, trace
-- **P15b (future):** Selectivity coordination
+- **P15b (comparison):** Selectivity A/B comparison
 
 ### 18.7.7. Definition of Done
 
