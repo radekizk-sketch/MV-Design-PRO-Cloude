@@ -1,6 +1,7 @@
-"""P20a: Dedykowane API endpoints dla Power Flow v1 (FOUNDATION).
+"""P20a/P20b: Dedykowane API endpoints dla Power Flow v1.
 
 Endpoints:
+- GET /projects/{project_id}/power-flow-runs (list - P20b)
 - POST /projects/{project_id}/power-flow-runs (create)
 - POST /power-flow-runs/{run_id}/execute (execute)
 - GET /power-flow-runs/{run_id} (meta)
@@ -85,6 +86,44 @@ def _build_service(uow_factory: Any) -> AnalysisRunService:
 # =============================================================================
 # Endpoints
 # =============================================================================
+
+
+@router.get("/projects/{project_id}/power-flow-runs")
+def list_power_flow_runs(
+    project_id: UUID,
+    status: str | None = Query(default=None, description="Filtruj po statusie (CREATED, RUNNING, FINISHED, FAILED)"),
+    uow_factory=Depends(get_uow_factory),
+) -> dict[str, Any]:
+    """P20b: Pobiera listę power flow runs dla projektu.
+
+    Zwraca runs posortowane po created_at DESC (najnowsze pierwsze),
+    z deduplication po id dla determinizmu.
+    """
+    service = _build_service(uow_factory)
+    filters = {"analysis_type": "PF"}
+    if status:
+        filters["status"] = status
+
+    runs = service.list_runs(project_id, filters)
+
+    return canonicalize_json({
+        "runs": [
+            {
+                "id": str(run.id),
+                "project_id": str(run.project_id),
+                "operating_case_id": str(run.operating_case_id),
+                "status": run.status,
+                "result_status": run.result_status,
+                "created_at": run.created_at.isoformat() if run.created_at else None,
+                "finished_at": run.finished_at.isoformat() if run.finished_at else None,
+                "input_hash": run.input_hash,
+                "converged": (run.result_summary or {}).get("converged"),
+                "iterations": (run.result_summary or {}).get("iterations"),
+            }
+            for run in runs
+        ],
+        "total": len(runs),
+    })
 
 
 @router.post("/projects/{project_id}/power-flow-runs")
