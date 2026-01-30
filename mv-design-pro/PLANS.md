@@ -2224,6 +2224,32 @@ P15a jest **warstwą analysis** nad P14a/b/c:
 
 ---
 
+## 18.8 P16 — Normowa koordynacja selektywności (DEFERRED)
+
+**Status:** DEFERRED (świadomie nieimplementowane)
+
+**Zakres (PLANOWANY):**
+- definicja stref zabezpieczeń (Protection Zones)
+- relacje primary / backup (grading czasowy i/lub prądowy)
+- raport selektywności (OK / WARNING / VIOLATION)
+
+**Twarde założenia (NIE DO ZŁAMANIA):**
+- brak jakiejkolwiek fizyki sieci (NO solver physics)
+- brak modyfikacji wyników zwarć
+- analiza oparta wyłącznie na wynikach Protection Analysis (P15)
+
+**Wymagania audytowe:**
+- pełna deterministyka wyników
+- jawne reguły selektywności (trace decyzji)
+- możliwość A/B porównania wariantów selektywności
+- raportowalność (UI + eksport)
+
+**Uwaga strategiczna:**
+Ten etap wprowadza normatywny osąd inżynierski i wymaga
+osobnej decyzji projektowej przed implementacją.
+
+---
+
 ## 19. Proof Packs Roadmap (P15–P20) — CANONICAL
 
 Poniższa roadmapa jest **jedynym kanonicznym planem** rozwoju Proof Packów.
