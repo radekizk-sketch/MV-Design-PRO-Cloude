@@ -1,18 +1,18 @@
-# SLD (Single Line Diagram) Rules
+# Zasady SLD (schemat jednokreskowy)
 
-**Reference:** SYSTEM_SPEC.md Section 9, Section 18, **wizard_screens.md (KANONICZNY)**
-**Status:** CANONICAL
+**Referencja:** SYSTEM_SPEC.md § 9 i § 18, **wizard_screens.md (KANONICZNY)**
+**Status:** KANONICZNY
 
 > **UWAGA:** Niniejszy dokument jest spójny z `wizard_screens.md` (wersja 2.0) i `powerfactory_ui_parity.md`.
 > Tryby pracy SLD są 1:1 zmapowane na tryby systemowe opisane w Wizard.
 
 ---
 
-## A. Zasady SLD (SLD Principles)
+## A. Zasady SLD
 
-### A.1 Bijection: Symbol ↔ Model Object
+### A.1 Bijekcja: symbol ↔ obiekt modelu
 
-**INVARIANT:** Each SLD symbol corresponds to exactly ONE NetworkModel object.
+**INWARIANT:** Każdy symbol SLD odpowiada dokładnie JEDNEMU obiektowi NetworkModel.
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
@@ -29,58 +29,58 @@
 └─────────────────────────────────────────────────────────────┘
 ```
 
-### A.2 Symbol Types
+### A.2 Typy symboli
 
-| Model Object | SLD Symbol | Visual Representation |
-|--------------|------------|----------------------|
-| Bus | BusSymbol | Horizontal bar (busbar) |
-| LineBranch | LineSymbol | Single line with markers |
-| TransformerBranch | TransformerSymbol | Circle(s) with windings |
-| Switch | SwitchSymbol | Break symbol (open/closed) |
-| Source | SourceSymbol | Circle with arrow (grid) |
-| Load | LoadSymbol | Triangle (consumption) |
+| Obiekt modelu | Symbol SLD | Reprezentacja wizualna |
+|--------------|------------|------------------------|
+| Bus | BusSymbol | Pozioma szyna (busbar) |
+| LineBranch | LineSymbol | Pojedyncza linia ze znacznikami |
+| TransformerBranch | TransformerSymbol | Okrąg(i) z uzwojeniami |
+| Switch | SwitchSymbol | Symbol rozłącznika (otwarty/zamknięty) |
+| Source | SourceSymbol | Okrąg ze strzałką (sieć) |
+| Load | LoadSymbol | Trójkąt (pobór) |
 
-### A.3 No Helper Objects
+### A.3 Brak obiektów pomocniczych
 
-**FORBIDDEN:**
-- Junction points not backed by Bus
-- Connection lines not backed by Branch
-- Annotation symbols with implicit meaning
-- Grouping frames with electrical meaning
+**ZAKAZANE:**
+- Punkty połączeń bez odpowiadającej im szyny (Bus)
+- Linie połączeń bez odpowiadającej im gałęzi (Branch)
+- Symbole adnotacyjne z ukrytym znaczeniem elektrycznym
+- Ramki grupujące z znaczeniem elektrycznym
 
-**ALLOWED:**
-- Text labels (pure annotation, no semantics)
-- Position coordinates (layout only)
-- Layer/grouping for visual organization (no electrical meaning)
+**DOZWOLONE:**
+- Etykiety tekstowe (czysta adnotacja, bez semantyki)
+- Współrzędne położenia (tylko layout)
+- Warstwy/grupowanie dla porządku wizualnego (bez znaczenia elektrycznego)
 
-### A.4 No Virtual Symbols
+### A.4 Brak symboli wirtualnych
 
-**FORBIDDEN:**
+**ZAKAZANE:**
 
-| Virtual Symbol | Why Forbidden | Correct Approach |
-|----------------|---------------|------------------|
-| "Virtual Bus" | No model object | Add real Bus to model |
-| "PCC Marker" | PCC is interpretation | Analysis overlay |
-| "Boundary Line" | No physical meaning | Analysis overlay |
-| "Aggregated Feeder" | Hides topology | Show individual elements |
+| Symbol wirtualny | Dlaczego zakazany | Poprawne podejście |
+|------------------|------------------|-------------------|
+| "Virtual Bus" | Brak obiektu modelu | Dodaj rzeczywisty Bus do modelu |
+| "PCC Marker" | PCC – punkt wspólnego przyłączenia jest interpretacją | Nakładka z warstwy Analysis |
+| "Boundary Line" | Brak znaczenia fizycznego | Nakładka z warstwy Analysis |
+| "Aggregated Feeder" | Ukrywa topologię | Pokazuj elementy indywidualnie |
 
 ---
 
-## B. Wyniki (Results Display)
+## B. Wyniki (prezentacja)
 
-### B.1 Results as Overlay
+### B.1 Wyniki jako nakładka
 
-Solver results MUST be displayed as overlay on SLD, NOT as modifications to symbols:
+Wyniki solvera MUSZĄ być prezentowane jako nakładka na SLD, a NIE jako modyfikacje symboli:
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │                                                             │
-│   Base Layer (SLD Symbols):                                 │
+│   Warstwa bazowa (symbole SLD):                             │
 │                                                             │
 │   ════╦════════════════════╦════                           │
 │       ║                    ║                                │
 │                                                             │
-│   Overlay Layer (Results):                                  │
+│   Warstwa nakładki (wyniki):                                │
 │                                                             │
 │      [I=125A]           [I=98A]                            │
 │      [U=14.8kV]         [U=15.1kV]                         │
@@ -88,29 +88,29 @@ Solver results MUST be displayed as overlay on SLD, NOT as modifications to symb
 └─────────────────────────────────────────────────────────────┘
 ```
 
-### B.2 Overlay = Analysis Layer
+### B.2 Nakładka = warstwa Analysis
 
-Result overlays are generated by Analysis layer, not by Solver:
+Nakładki wyników są generowane przez warstwę Analysis, nie przez Solver:
 
-| Data Source | Overlay Type | Content |
-|-------------|--------------|---------|
-| PowerFlowResult | Current annotations | I values at branches |
-| PowerFlowResult | Voltage annotations | U values at buses |
-| ThermalAnalysis | Loading colors | Red/yellow/green |
-| VoltageAnalysis | Violation markers | Over/under voltage |
-| BoundaryIdentifier | PCC marker | Boundary indicator |
+| Źródło danych | Typ nakładki | Zawartość |
+|---------------|--------------|-----------|
+| PowerFlowResult | Adnotacje prądów | Wartości I na gałęziach |
+| PowerFlowResult | Adnotacje napięć | Wartości U na szynach |
+| ThermalAnalysis | Kolory obciążenia | Czerwony/żółty/zielony |
+| VoltageAnalysis | Markery przekroczeń | Przekroczenie/obniżenie napięcia |
+| BoundaryIdentifier | Znak PCC | Wskaźnik granicy |
 
-### B.3 No Results in Model
+### B.3 Brak wyników w modelu
 
-**BINDING:** Solver results MUST NOT be written to NetworkModel:
+**BINDING:** Wyniki solvera NIE MOGĄ być zapisywane do NetworkModel:
 
-| Forbidden | Correct Approach |
-|-----------|------------------|
-| `Bus.calculated_voltage = 14.8` | Store in PowerFlowResult |
-| `Branch.calculated_current = 125` | Store in PowerFlowResult |
-| `Bus.is_pcc = True` | BoundaryIdentifier overlay |
+| Zabronione | Poprawne podejście |
+|-----------|--------------------|
+| `Bus.calculated_voltage = 14.8` | Zapisz w PowerFlowResult |
+| `Branch.calculated_current = 125` | Zapisz w PowerFlowResult |
+| `Bus.is_pcc = True` | Nakładka BoundaryIdentifier |
 
-**Rationale:** NetworkModel is physical topology. Results are transient calculation outputs.
+**Uzasadnienie:** NetworkModel opisuje topologię fizyczną. Wyniki są ulotnymi rezultatami obliczeń.
 
 ---
 
@@ -180,81 +180,81 @@ MODEL_EDIT ◄─────────► CASE_CONFIG ◄──────�
 
 ---
 
-## D. Visual State Encoding
+## D. Kodowanie stanu wizualnego
 
-### D.1 Element States
+### D.1 Stany elementów
 
-| State | Visual Encoding |
-|-------|-----------------|
-| Normal (in_service=True) | Standard colors, solid lines |
-| Out of service (in_service=False) | Gray, dashed lines |
-| Selected | Highlight border, handles visible |
-| Hover | Subtle highlight |
-| Error (validation) | Red border/highlight |
+| Stan | Kodowanie wizualne |
+|------|---------------------|
+| Normalny (`in_service=True`) | Standardowe kolory, linie ciągłe |
+| Wyłączony (`in_service=False`) | Szary, linie przerywane |
+| Zaznaczony | Podświetlona ramka, widoczne uchwyty |
+| Hover | Delikatne podświetlenie |
+| Błąd (walidacja) | Czerwona ramka/podświetlenie |
 
-### D.2 Switch States
+### D.2 Stany łączników
 
-| State | Symbol |
-|-------|--------|
-| CLOSED | Connected symbol (──●──) |
-| OPEN | Disconnected symbol (── ──) |
+| Stan | Symbol |
+|------|--------|
+| CLOSED | Symbol połączenia (──●──) |
+| OPEN | Symbol rozłączenia (── ──) |
 
-### D.3 Result Overlays
+### D.3 Nakładki wyników
 
-| Analysis Result | Visual Encoding |
-|-----------------|-----------------|
-| Loading 0-80% | Green |
-| Loading 80-100% | Yellow |
-| Loading >100% | Red |
-| Voltage normal | No marker |
-| Voltage violation | Red marker |
-| PCC boundary | Dashed boundary line (overlay) |
-
----
-
-## E. Interaction Patterns
-
-### E.1 Selection
-
-| Action | Result |
-|--------|--------|
-| Single click | Select single element |
-| Ctrl+click | Add to selection |
-| Click empty area | Deselect all |
-| Drag rectangle | Select enclosed elements |
-
-### E.2 Context Menu (Edit Mode)
-
-```
-┌─────────────────────┐
-│ Add Bus             │
-│ Add Line            │
-│ Add Transformer     │
-│ ─────────────────── │
-│ Properties...       │
-│ ─────────────────── │
-│ In Service     [✓]  │
-│ ─────────────────── │
-│ Delete              │
-└─────────────────────┘
-```
-
-### E.3 Context Menu (Result Mode)
-
-```
-┌─────────────────────┐
-│ View Properties...  │
-│ ─────────────────── │
-│ Show Results Detail │
-│ Export Results...   │
-└─────────────────────┘
-```
+| Wynik analizy | Kodowanie wizualne |
+|---------------|---------------------|
+| Obciążenie 0-80% | Zielony |
+| Obciążenie 80-100% | Żółty |
+| Obciążenie >100% | Czerwony |
+| Napięcie w normie | Brak markera |
+| Przekroczenie napięcia | Czerwony marker |
+| Granica PCC – punktu wspólnego przyłączenia | Linia przerywana (nakładka) |
 
 ---
 
-## F. Converter-Based Sources (PV/WIND/BESS) — SLD Rules
+## E. Wzorce interakcji
 
-### F.1 Symbolika i mapowanie (Symbol Mapping)
+### E.1 Zaznaczanie
+
+| Akcja | Rezultat |
+|-------|----------|
+| Pojedyncze kliknięcie | Zaznacz pojedynczy element |
+| Ctrl+klik | Dodaj do zaznaczenia |
+| Klik w pusty obszar | Odznacz wszystko |
+| Przeciągnięcie prostokąta | Zaznacz elementy w obszarze |
+
+### E.2 Menu kontekstowe (tryb edycji)
+
+```
+┌─────────────────────┐
+│ Dodaj szynę         │
+│ Dodaj linię         │
+│ Dodaj transformator │
+│ ─────────────────── │
+│ Właściwości...      │
+│ ─────────────────── │
+│ W eksploatacji [✓]  │
+│ ─────────────────── │
+│ Usuń                │
+└─────────────────────┘
+```
+
+### E.3 Menu kontekstowe (tryb wyników)
+
+```
+┌─────────────────────┐
+│ Pokaż właściwości...│
+│ ─────────────────── │
+│ Pokaż szczegóły...  │
+│ Eksportuj wyniki... │
+└─────────────────────┘
+```
+
+---
+
+## F. Źródła konwerterowe (PV/WIND/BESS) — zasady SLD
+
+### F.1 Symbolika i mapowanie
 
 Źródła konwerterowe (PV, WIND, BESS) są reprezentowane jako warianty symbolu Source:
 
@@ -264,7 +264,7 @@ MODEL_EDIT ◄─────────► CASE_CONFIG ◄──────�
 | **WIND** | SourceSymbol (wariant WIND) | Source (converter_kind=WIND) | Elektrownia wiatrowa |
 | **BESS** | SourceSymbol (wariant BESS) | Source (converter_kind=BESS) | Magazyn energii |
 
-**INVARIANT (1:1 Mapping):** Każdy symbol źródła konwerterowego odpowiada dokładnie jednemu obiektowi Source w NetworkModel. Brak helper objects.
+**INWARIANT (mapowanie 1:1):** Każdy symbol źródła konwerterowego odpowiada dokładnie jednemu obiektowi Source w NetworkModel. Brak obiektów pomocniczych.
 
 ### F.2 Etykieta symbolu (Symbol Label)
 
@@ -287,7 +287,7 @@ Etykieta źródła konwerterowego MUSI zawierać:
 
 **Determinizm:** Kolejność elementów etykiety jest stała. Kolejność legend i list źródeł MUSI być deterministyczna (np. alfabetycznie po nazwie).
 
-### F.3 Stany i widoczność (States and Visibility)
+### F.3 Stany i widoczność
 
 #### F.3.1 Stan `in_service`
 
@@ -302,7 +302,7 @@ Etykieta źródła konwerterowego MUSI zawierać:
 
 Symbol źródła konwerterowego NIE zawiera impedancji. Parametry pracy (P, Q, cosφ) nie zmieniają topologii sieci — wpływają wyłącznie na bilans mocy.
 
-### F.4 Result Overlays (RESULT_VIEW)
+### F.4 Nakładki wyników (RESULT_VIEW)
 
 W trybie RESULT_VIEW overlay dla źródła konwerterowego pokazuje:
 
@@ -320,16 +320,16 @@ W trybie RESULT_VIEW overlay dla źródła konwerterowego pokazuje:
 | P > 0 | → (strzałka od BESS) | Rozładowanie — eksport do sieci |
 | P < 0 | ← (strzałka do BESS) | Ładowanie — pobór z sieci |
 
-#### F.4.2 Status wyników (Result Freshness)
+#### F.4.2 Status wyników (aktualność)
 
-Overlay MUSI wskazywać status wyników:
+Nakładka MUSI wskazywać status wyników:
 
 | Status | Oznaczenie UX | Opis |
 |--------|---------------|------|
 | **VALID** | Normalny kolor | Wyniki aktualne względem modelu |
 | **OUTDATED** | Wyszarzenie / ostrzeżenie | Model zmieniony od ostatniego obliczenia |
 
-### F.5 Zakazy (Prohibitions)
+### F.5 Zakazy
 
 #### F.5.1 PCC – punkt wspólnego przyłączenia
 
@@ -351,16 +351,16 @@ PCC może być wyświetlony wyłącznie jako overlay pochodzący z warstwy Analy
 - Regulatory napięcia/mocy biernej
 - Parametry inercji i stałych czasowych
 
-### F.6 Deterministyczna prezentacja (Deterministic Display)
+### F.6 Deterministyczna prezentacja
 
 | Element | Reguła sortowania |
 |---------|-------------------|
 | Lista źródeł w panelu | Alfabetycznie po nazwie |
 | Legenda typów | Kolejność: PV → WIND → BESS |
 | Etykiety na diagramie | Stała pozycja względem symbolu |
-| Overlay wyników | Stała kolejność: P, Q, I |
+| Nakładka wyników | Stała kolejność: P, Q, I |
 
-**INVARIANT:** Identyczny model MUSI generować identyczny widok SLD przy każdym renderowaniu.
+**INWARIANT:** Identyczny model MUSI generować identyczny widok SLD przy każdym renderowaniu.
 
 ---
 
@@ -384,7 +384,7 @@ PCC może być wyświetlony wyłącznie jako overlay pochodzący z warstwy Analy
 | CASE_CONFIG | Właściwości... (read-only) |
 | RESULT_VIEW | Pokaż właściwości..., Pokaż szczegóły wyników, Eksportuj wyniki... |
 
-### G.3 Zakaz wirtualnych symboli
+### G.3 Zakaz symboli wirtualnych
 
 **BINDING (zgodnie z wizard_screens.md § 6.8.6):**
 
@@ -395,7 +395,7 @@ PCC może być wyświetlony wyłącznie jako overlay pochodzący z warstwy Analy
 | PCC – punkt wspólnego przyłączenia | **ZABRONIONY** | **ZABRONIONY** — wyłącznie overlay z Analysis |
 | Granica sieci (Boundary) | **ZABRONIONY** | **ZABRONIONY** — wyłącznie overlay |
 
-**INVARIANT:** PCC może być wyświetlony wyłącznie jako **nakładka wyników** (overlay) pochodząca z warstwy Analysis (np. BoundaryIdentifier), nigdy jako obiekt NetworkModel ani symbol bazowy SLD.
+**INWARIANT:** PCC – punkt wspólnego przyłączenia może być wyświetlony wyłącznie jako **nakładka wyników** pochodząca z warstwy Analysis (np. BoundaryIdentifier), nigdy jako obiekt NetworkModel ani symbol bazowy SLD.
 
 ---
 

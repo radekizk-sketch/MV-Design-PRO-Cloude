@@ -123,6 +123,7 @@ This plan describes the complete refactoring of MV-DESIGN-PRO to align with DIgS
 - [x] Create PLANS.md with execution roadmap
 - [x] Update README.md with architecture overview
 - [x] Docs consolidation & audit report (`docs/audit/spec_vs_code_gap_report.md`)
+- [x] Audyt PF + indeks dokumentacji + plan czyszczenia docs (`docs/audit/STATE_OF_PROJECT.md`, `docs/audit/ROADMAP.md`, `docs/DOCS_INDEX.md`, `docs/audit/DOC_CLEANUP_PLAN.md`)
 
 ---
 
@@ -3073,4 +3074,3 @@ Global keyboard listener in `UndoRedoButtons.tsx` component.
 - **P30f**: E2E tests (Playwright)
 
 ---
-

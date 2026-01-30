@@ -16,7 +16,7 @@ backend/src/application/
 │
 └── sld/
     ├── layout.py               # Auto-layout SLD
-    └── overlay.py              # Result overlay builder
+    └── overlay.py              # Budowanie nakładek wyników
 ```
 
 ## 2. Zasady Warstwy Application
@@ -103,11 +103,12 @@ set_limits(project_id, payload) -> None
 get_limits(project_id) -> LimitsPayload
 ```
 
-> **IMPORTANT (PowerFactory Alignment):** `set_pcc()` and `get_pcc()` manage a user **hint**
-> stored in application/project settings. PCC (punkt wspólnego przyłączenia) is **NOT**
-> stored in NetworkModel/NetworkGraph. The actual PCC identification is performed by
-> BoundaryIdentifier in the analysis layer, which may use this hint as input.
-> See SYSTEM_SPEC.md Section 18.3.4.
+> **WAŻNE (PowerFactory Alignment):** `set_pcc()` i `get_pcc()` obsługują **hint użytkownika**
+> przechowywany w ustawieniach aplikacji/projektu. PCC – punkt wspólnego przyłączenia **NIE**
+> jest przechowywany w NetworkModel/NetworkGraph. Faktyczna identyfikacja PCC – punktu wspólnego
+> przyłączenia jest wykonywana przez BoundaryIdentifier w warstwie analysis, która może użyć
+> tego hintu jako wejścia.
+> Zobacz SYSTEM_SPEC.md § 18.3.4.
 
 ### 3.3 Walidacja
 
@@ -135,7 +136,7 @@ Metody te:
 1. Walidują sieć
 2. Pobierają dane z persystencji
 3. Tworzą obiekty core (NetworkGraph)
-4. Stosują overlay specs (switching states, limits)
+4. Stosują specyfikacje nakładek (stany łączeniowe, limity)
 
 ### 3.5 Import/Export
 
@@ -259,9 +260,9 @@ class ShortCircuitInput:
     options: dict
 ```
 
-> **Note:** `pcc_node_id` in ShortCircuitInput is an application-layer parameter
-> (user hint from project settings), NOT a field from NetworkGraph.
-> NetworkGraph does NOT contain PCC - see SYSTEM_SPEC.md Section 18.3.4.
+> **Uwaga:** `pcc_node_id` w ShortCircuitInput to parametr warstwy application
+> (hint użytkownika z ustawień projektu), a nie pole z NetworkGraph.
+> NetworkGraph NIE zawiera PCC – punktu wspólnego przyłączenia (zobacz SYSTEM_SPEC.md § 18.3.4).
 
 > **Terminology:** Bus to kanoniczny termin PowerFactory. `NodePayload` pozostaje
 > kompatybilnym aliasem wewnętrznym, a API akceptuje zarówno `bus_type`, jak i `node_type`.
@@ -315,7 +316,7 @@ line = service.add_branch(project.id, BranchPayload(
     params={"r_ohm_per_km": 0.05, "x_ohm_per_km": 0.4, "length_km": 50}
 ))
 
-# 4. Ustaw PCC hint (application-layer, NOT in NetworkModel)
+# 4. Ustaw hint PCC – punktu wspólnego przyłączenia (warstwa application, NIE w NetworkModel)
 service.set_pcc(project.id, slack["id"])  # Stores hint in project settings
 
 # 5. Dodaj source
