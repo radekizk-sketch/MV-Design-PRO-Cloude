@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Iterable
 
 from .types import (
@@ -9,6 +9,9 @@ from .types import (
     ConverterType,
     InverterType,
     LineType,
+    ProtectionCurve,
+    ProtectionDeviceType,
+    ProtectionSettingTemplate,
     SwitchEquipmentType,
     TransformerType,
 )
@@ -28,6 +31,9 @@ class CatalogRepository:
     switch_equipment_types: dict[str, SwitchEquipmentType]
     converter_types: dict[str, ConverterType]
     inverter_types: dict[str, InverterType]
+    protection_device_types: dict[str, ProtectionDeviceType] = field(default_factory=dict)
+    protection_curves: dict[str, ProtectionCurve] = field(default_factory=dict)
+    protection_setting_templates: dict[str, ProtectionSettingTemplate] = field(default_factory=dict)
 
     @classmethod
     def from_records(
@@ -39,6 +45,9 @@ class CatalogRepository:
         switch_equipment_types: Iterable[dict] | None = None,
         converter_types: Iterable[dict] | None = None,
         inverter_types: Iterable[dict] | None = None,
+        protection_device_types: Iterable[dict] | None = None,
+        protection_curves: Iterable[dict] | None = None,
+        protection_setting_templates: Iterable[dict] | None = None,
     ) -> "CatalogRepository":
         def _build_line_type(record: dict) -> LineType:
             data = {"id": record.get("id"), "name": record.get("name")}
@@ -70,9 +79,27 @@ class CatalogRepository:
             data.update(record.get("params") or {})
             return ConverterType.from_dict(data)
 
+        def _build_protection_device_type(record: dict) -> ProtectionDeviceType:
+            data = {"id": record.get("id"), "name_pl": record.get("name_pl")}
+            data.update(record.get("params") or {})
+            return ProtectionDeviceType.from_dict(data)
+
+        def _build_protection_curve(record: dict) -> ProtectionCurve:
+            data = {"id": record.get("id"), "name_pl": record.get("name_pl")}
+            data.update(record.get("params") or {})
+            return ProtectionCurve.from_dict(data)
+
+        def _build_protection_setting_template(record: dict) -> ProtectionSettingTemplate:
+            data = {"id": record.get("id"), "name_pl": record.get("name_pl")}
+            data.update(record.get("params") or {})
+            return ProtectionSettingTemplate.from_dict(data)
+
         switch_records = list(switch_equipment_types or [])
         converter_records = list(converter_types or [])
         inverter_records = list(inverter_types or [])
+        protection_device_records = list(protection_device_types or [])
+        protection_curve_records = list(protection_curves or [])
+        protection_setting_template_records = list(protection_setting_templates or [])
         if not converter_records and inverter_records:
             converter_records = inverter_records
         return cls(
@@ -89,6 +116,20 @@ class CatalogRepository:
             },
             inverter_types={
                 str(item.id): item for item in map(_build_inverter_type, inverter_records)
+            },
+            protection_device_types={
+                str(item.id): item
+                for item in map(_build_protection_device_type, protection_device_records)
+            },
+            protection_curves={
+                str(item.id): item
+                for item in map(_build_protection_curve, protection_curve_records)
+            },
+            protection_setting_templates={
+                str(item.id): item
+                for item in map(
+                    _build_protection_setting_template, protection_setting_template_records
+                )
             },
         )
 
@@ -131,6 +172,29 @@ class CatalogRepository:
     def get_inverter_type(self, type_id: str) -> InverterType | None:
         return self.inverter_types.get(str(type_id))
 
+    def list_protection_device_types(self) -> list[ProtectionDeviceType]:
+        return self._sorted_pl(self.protection_device_types.values())
+
+    def list_protection_curves(self) -> list[ProtectionCurve]:
+        return self._sorted_pl(self.protection_curves.values())
+
+    def list_protection_setting_templates(self) -> list[ProtectionSettingTemplate]:
+        return self._sorted_pl(self.protection_setting_templates.values())
+
+    def get_protection_device_type(self, type_id: str) -> ProtectionDeviceType | None:
+        return self.protection_device_types.get(str(type_id))
+
+    def get_protection_curve(self, type_id: str) -> ProtectionCurve | None:
+        return self.protection_curves.get(str(type_id))
+
+    def get_protection_setting_template(self, type_id: str) -> ProtectionSettingTemplate | None:
+        return self.protection_setting_templates.get(str(type_id))
+
     @staticmethod
     def _sorted(values: Iterable) -> list:
         return sorted(values, key=lambda item: (str(item.name), str(item.id)))
+
+    @staticmethod
+    def _sorted_pl(values: Iterable) -> list:
+        """Sort protection types by name_pl, then id (deterministic)."""
+        return sorted(values, key=lambda item: (str(item.name_pl), str(item.id)))

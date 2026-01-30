@@ -507,6 +507,36 @@ class NetworkWizardService:
             raise NotFound(f"SwitchEquipmentType {type_id} not found")
         return record
 
+    def list_protection_device_types(self) -> list[dict]:
+        """List all protection device types (P14a)"""
+        with self._uow_factory() as uow:
+            return uow.wizard.list_protection_device_types()
+
+    def list_protection_curves(self) -> list[dict]:
+        """List all protection curves (P14a)"""
+        with self._uow_factory() as uow:
+            return uow.wizard.list_protection_curves()
+
+    def list_protection_setting_templates(self) -> list[dict]:
+        """List all protection setting templates (P14a)"""
+        with self._uow_factory() as uow:
+            return uow.wizard.list_protection_setting_templates()
+
+    def get_protection_device_type(self, type_id: str) -> dict | None:
+        """Get protection device type by ID (P14a)"""
+        with self._uow_factory() as uow:
+            return uow.wizard.get_protection_device_type(type_id)
+
+    def get_protection_curve(self, curve_id: str) -> dict | None:
+        """Get protection curve by ID (P14a)"""
+        with self._uow_factory() as uow:
+            return uow.wizard.get_protection_curve(curve_id)
+
+    def get_protection_setting_template(self, template_id: str) -> dict | None:
+        """Get protection setting template by ID (P14a)"""
+        with self._uow_factory() as uow:
+            return uow.wizard.get_protection_setting_template(template_id)
+
     def assign_type_ref_to_branch(self, project_id: UUID, branch_id: UUID, type_id: UUID) -> dict:
         with self._uow_factory() as uow:
             self._ensure_project(uow, project_id)

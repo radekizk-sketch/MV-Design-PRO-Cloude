@@ -64,3 +64,13 @@ export type {
   TypeCategory,
   TypeReference,
 } from './catalog';
+
+// Protection Library (P14a - READ-ONLY)
+export { ProtectionLibraryBrowser } from './protection';
+export type {
+  ProtectionCategory,
+  ProtectionDeviceType,
+  ProtectionCurve,
+  ProtectionSettingTemplate,
+  ProtectionTypeUnion,
+} from './protection';

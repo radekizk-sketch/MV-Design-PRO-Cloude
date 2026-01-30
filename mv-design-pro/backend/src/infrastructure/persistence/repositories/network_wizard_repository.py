@@ -13,6 +13,9 @@ from infrastructure.persistence.models import (
     NetworkSourceORM,
     OperatingCaseORM,
     ProjectSettingsORM,
+    ProtectionCurveORM,
+    ProtectionDeviceTypeORM,
+    ProtectionSettingTemplateORM,
     SwitchEquipmentAssignmentORM,
     SwitchEquipmentTypeORM,
     SwitchingStateORM,
@@ -288,6 +291,56 @@ class NetworkWizardRepository:
         if row is None:
             return None
         return {"id": row.id, "name": row.name, "params": row.params_jsonb}
+
+    def list_protection_device_types(self) -> list[dict]:
+        """List all protection device types (P14a)"""
+        stmt = select(ProtectionDeviceTypeORM).order_by(
+            ProtectionDeviceTypeORM.name_pl, ProtectionDeviceTypeORM.id
+        )
+        rows = self._session.execute(stmt).scalars().all()
+        return [{"id": row.id, "name_pl": row.name_pl, "params": row.params_jsonb} for row in rows]
+
+    def list_protection_curves(self) -> list[dict]:
+        """List all protection curves (P14a)"""
+        stmt = select(ProtectionCurveORM).order_by(
+            ProtectionCurveORM.name_pl, ProtectionCurveORM.id
+        )
+        rows = self._session.execute(stmt).scalars().all()
+        return [{"id": row.id, "name_pl": row.name_pl, "params": row.params_jsonb} for row in rows]
+
+    def list_protection_setting_templates(self) -> list[dict]:
+        """List all protection setting templates (P14a)"""
+        stmt = select(ProtectionSettingTemplateORM).order_by(
+            ProtectionSettingTemplateORM.name_pl, ProtectionSettingTemplateORM.id
+        )
+        rows = self._session.execute(stmt).scalars().all()
+        return [{"id": row.id, "name_pl": row.name_pl, "params": row.params_jsonb} for row in rows]
+
+    def get_protection_device_type(self, type_id: str) -> dict | None:
+        """Get single protection device type by ID (P14a)"""
+        stmt = select(ProtectionDeviceTypeORM).where(ProtectionDeviceTypeORM.id == type_id)
+        row = self._session.execute(stmt).scalar_one_or_none()
+        if row is None:
+            return None
+        return {"id": row.id, "name_pl": row.name_pl, "params": row.params_jsonb}
+
+    def get_protection_curve(self, curve_id: str) -> dict | None:
+        """Get single protection curve by ID (P14a)"""
+        stmt = select(ProtectionCurveORM).where(ProtectionCurveORM.id == curve_id)
+        row = self._session.execute(stmt).scalar_one_or_none()
+        if row is None:
+            return None
+        return {"id": row.id, "name_pl": row.name_pl, "params": row.params_jsonb}
+
+    def get_protection_setting_template(self, template_id: str) -> dict | None:
+        """Get single protection setting template by ID (P14a)"""
+        stmt = select(ProtectionSettingTemplateORM).where(
+            ProtectionSettingTemplateORM.id == template_id
+        )
+        row = self._session.execute(stmt).scalar_one_or_none()
+        if row is None:
+            return None
+        return {"id": row.id, "name_pl": row.name_pl, "params": row.params_jsonb}
 
     def upsert_line_type(self, payload: dict, *, commit: bool = True) -> None:
         stmt = select(LineTypeORM).where(LineTypeORM.id == payload["id"])
