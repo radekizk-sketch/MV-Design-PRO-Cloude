@@ -368,3 +368,65 @@ export interface BatchEditPreview {
   changes: BatchEditChange[];
   hasErrors: boolean;
 }
+
+// ============================================================================
+// P30d: Issue Panel / Validation Browser Types
+// ============================================================================
+
+/**
+ * Issue severity (P22 BINDING thresholds).
+ * INFO: |V - 1.0| < 2%, losses < 2 kW
+ * WARN: 2-5%
+ * HIGH: >5%
+ */
+export type IssueSeverity = 'INFO' | 'WARN' | 'HIGH';
+
+/**
+ * Issue source (origin of the issue).
+ */
+export type IssueSource = 'MODEL' | 'POWER_FLOW' | 'PROTECTION';
+
+/**
+ * Reference to a network object.
+ */
+export interface IssueObjectRef {
+  type: ElementType;
+  id: string;
+  name?: string;
+}
+
+/**
+ * Single issue/finding in the project.
+ * Aggregates model validation + power flow interpretation + protection findings.
+ * DETERMINISTIC: Sorted by severity DESC, source, object_ref.id ASC.
+ */
+export interface Issue {
+  /** Unique issue identifier (derived from source + object + finding type) */
+  issue_id: string;
+  /** Source of the issue */
+  source: IssueSource;
+  /** Severity level (INFO/WARN/HIGH) */
+  severity: IssueSeverity;
+  /** Polish title (short summary) */
+  title_pl: string;
+  /** Polish description (detailed explanation) */
+  description_pl: string;
+  /** Reference to affected object */
+  object_ref: IssueObjectRef;
+  /** Optional evidence reference (e.g., "voltage_profile_fig_1") */
+  evidence_ref?: string;
+  /** Optional field name (for model validation issues) */
+  field?: string;
+}
+
+/**
+ * Issue filter configuration.
+ */
+export interface IssueFilter {
+  /** Filter by source (empty = all) */
+  sources: IssueSource[];
+  /** Filter by severity (empty = all) */
+  severities: IssueSeverity[];
+  /** Show only issues for currently selected element */
+  selectedOnly: boolean;
+}

@@ -28,6 +28,7 @@ import type {
   Position,
   SelectionMode,
 } from './types';
+import type { IssueSeverity } from '../types';
 
 /**
  * Default grid configuration.
@@ -49,6 +50,12 @@ interface SldEditorState {
   // ===== SELECTION (MULTI-SELECT) =====
   /** Selected symbol IDs (ALWAYS SORTED for determinism) */
   selectedIds: string[];
+
+  // ===== HIGHLIGHT (P30d: Issue Panel) =====
+  /** Highlighted symbol IDs (for Issue Panel navigation) */
+  highlightedIds: string[];
+  /** Highlight severity (determines color: HIGH=red, WARN=yellow, INFO=blue) */
+  highlightSeverity: IssueSeverity | null;
 
   // ===== DRAG =====
   /** Active drag state (null if no drag) */
@@ -79,6 +86,10 @@ interface SldEditorState {
   clearSelection: () => void;
   selectAll: () => void;
   getSelectedSymbols: () => AnySldSymbol[];
+
+  // ===== ACTIONS: HIGHLIGHT (P30d) =====
+  highlightSymbols: (symbolIds: string[], severity: IssueSeverity) => void;
+  clearHighlight: () => void;
 
   // ===== ACTIONS: DRAG =====
   startDrag: (symbolIds: string[], startPosition: Position) => void;
@@ -116,6 +127,8 @@ export const useSldEditorStore = create<SldEditorState>()((set, get) => ({
   // Initial state
   symbols: new Map(),
   selectedIds: [],
+  highlightedIds: [],
+  highlightSeverity: null,
   dragState: null,
   lassoState: null,
   clipboard: null,
@@ -229,6 +242,16 @@ export const useSldEditorStore = create<SldEditorState>()((set, get) => ({
     return state.selectedIds
       .map((id) => state.symbols.get(id))
       .filter((s): s is AnySldSymbol => s !== undefined);
+  },
+
+  // ===== HIGHLIGHT (P30d) =====
+
+  highlightSymbols: (symbolIds: string[], severity: IssueSeverity) => {
+    set({ highlightedIds: [...symbolIds].sort(), highlightSeverity: severity });
+  },
+
+  clearHighlight: () => {
+    set({ highlightedIds: [], highlightSeverity: null });
   },
 
   // ===== DRAG =====

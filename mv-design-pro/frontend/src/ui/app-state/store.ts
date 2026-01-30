@@ -51,6 +51,7 @@ interface AppState {
 
   // UI state
   caseManagerOpen: boolean;
+  issuePanelOpen: boolean; // P30d: Issue Panel toggle
 
   // Actions
   setActiveProject: (projectId: string | null, projectName?: string | null) => void;
@@ -64,6 +65,7 @@ interface AppState {
   setActiveMode: (mode: OperatingMode) => void;
   setActiveRun: (runId: string | null) => void;
   toggleCaseManager: (open?: boolean) => void;
+  toggleIssuePanel: (open?: boolean) => void; // P30d
 
   // Computed helpers
   hasActiveCase: () => boolean;
@@ -89,6 +91,7 @@ const initialState = {
   activeMode: 'MODEL_EDIT' as OperatingMode,
   activeRunId: null,
   caseManagerOpen: false,
+  issuePanelOpen: false, // P30d
 };
 
 /**
@@ -169,6 +172,15 @@ export const useAppStateStore = create<AppState>()(
       toggleCaseManager: (open) => {
         set((state) => ({
           caseManagerOpen: open !== undefined ? open : !state.caseManagerOpen,
+        }));
+      },
+
+      /**
+       * P30d: Toggle Issue Panel visibility.
+       */
+      toggleIssuePanel: (open) => {
+        set((state) => ({
+          issuePanelOpen: open !== undefined ? open : !state.issuePanelOpen,
         }));
       },
 
