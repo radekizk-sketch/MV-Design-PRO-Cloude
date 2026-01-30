@@ -2890,3 +2890,187 @@ interface AppState {
 
 ---
 
+## 25. P30a UNDO/REDO INFRASTRUCTURE (ROLA BINDING) — DONE
+
+**Typ:** UI-first infrastructure
+**Status:** DONE
+**Branch:** `claude/rola-binding-ui-MfIO6`
+**Cel:** Globalny system UNDO/REDO dla edycji modelu i SLD w standardzie PowerFactory++
+
+### 25.1 Zakres (PILOT)
+
+Zaimplementować **minimalną infrastrukturę UNDO/REDO**:
+- Command Pattern (Command interface + HistoryStore)
+- Transakcje (grupowanie komend)
+- UI (przyciski Cofnij/Ponów + skróty Ctrl+Z/Y)
+- Mode gating (aktywne tylko w MODEL_EDIT)
+- Testy jednostkowe
+
+**PILOT:** Infrastruktura + UI + przykładowe komendy (PropertyEdit, SymbolMove). Pełna integracja z Property Grid/SLD w P30b+.
+
+### 25.2 Command Pattern Architecture
+
+```
+ui/history/
+├── Command.ts              # Interface Command, Transaction
+├── HistoryStore.ts         # Zustand store (undo/redo stacks)
+├── hooks.ts                # React hooks (useUndo, useRedo, etc.)
+├── UndoRedoButtons.tsx     # UI components (100% PL)
+├── commands/               # Command implementations
+│   ├── PropertyEditCommand.ts
+│   └── SymbolMoveCommand.ts
+├── __tests__/
+│   └── HistoryStore.test.ts
+├── README.md               # Module documentation
+└── index.ts                # Public API
+```
+
+### 25.3 Core Features
+
+| Feature | Implementation | Status |
+|---------|---------------|--------|
+| **Command interface** | `id`, `name_pl`, `timestamp`, `apply()`, `revert()` | ✓ |
+| **HistoryStore** | Zustand store z `undoStack[]`, `redoStack[]`, `activeTransaction` | ✓ |
+| **Transactions** | `beginTransaction()`, `commitTransaction()`, `rollbackTransaction()` | ✓ |
+| **Mode gating** | Blocked in CASE_CONFIG & RESULT_VIEW, active in MODEL_EDIT | ✓ |
+| **UI buttons** | Cofnij/Ponów z tooltips (nazwa ostatniej komendy) | ✓ |
+| **Keyboard shortcuts** | Ctrl+Z (Undo), Ctrl+Y / Cmd+Shift+Z (Redo) | ✓ |
+| **Stack limits** | Max 100 commands (prevent memory leaks) | ✓ |
+| **Polish UI** | 100% PL (etykiety, tooltips, komunikaty) | ✓ |
+
+### 25.4 Command Examples
+
+#### PropertyEditCommand
+```typescript
+PropertyEditCommand.create({
+  elementId: 'bus-1',
+  elementName: 'Bus 1',
+  fieldKey: 'name',
+  fieldLabel: 'Nazwa',
+  oldValue: 'Old Name',
+  newValue: 'New Name',
+  applyFn: async (value) => {
+    await updateElement('bus-1', { name: value });
+  },
+});
+```
+
+#### SymbolMoveCommand (with Transaction)
+```typescript
+beginTransaction('Przesunięcie symboli (3)');
+
+for (const element of selectedElements) {
+  const command = SymbolMoveCommand.create({
+    elementId: element.id,
+    elementName: element.name,
+    oldPosition: element.position,
+    newPosition: element.newPosition,
+    applyFn: async (pos) => {
+      await updateSymbolPosition(element.id, pos);
+    },
+  });
+  await executeCommand(command);
+}
+
+await commitTransaction(); // All commands = 1 undo operation
+```
+
+### 25.5 UI Integration
+
+**Location:** Active Case Bar (po przycisku „Wyniki", przed Mode Indicator)
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ Aktywny przypadek: [SC-001] | Typ: Przypadek zwarciowy | ● Wyniki aktualne │
+│ [Zmień przypadek] [Konfiguruj] [Oblicz] [Wyniki] | [↶ Cofnij] [↷ Ponów] | [Edycja modelu] │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+**Tooltip examples:**
+- Cofnij: „Cofnij: Edycja Bus 1.Nazwa"
+- Ponów: „Ponów: Przesunięcie symbolu"
+
+### 25.6 Mode Gating Rules
+
+| Mode | UNDO/REDO | Buttons State | Reason |
+|------|-----------|---------------|--------|
+| **MODEL_EDIT** | ENABLED | Active (if stack not empty) | Editable mode |
+| **CASE_CONFIG** | BLOCKED | Disabled | Model read-only |
+| **RESULT_VIEW** | BLOCKED | Disabled | Everything read-only |
+
+**Implementation:** Hooks `useUndo()`, `useRedo()` return `isEnabled: false` when mode ≠ MODEL_EDIT.
+
+### 25.7 Transaction Examples
+
+**Single action:** Edit field → 1 command → 1 undo
+**Multi-select move:** Move 5 symbols → 1 transaction → 1 undo (all 5 revert)
+**Complex edit:** Edit multiple fields → 1 transaction → 1 undo (all fields revert)
+
+### 25.8 Files Added
+
+| Layer | Files |
+|-------|-------|
+| **History Core** | `frontend/src/ui/history/Command.ts` |
+| **History Core** | `frontend/src/ui/history/HistoryStore.ts` |
+| **History Core** | `frontend/src/ui/history/hooks.ts` |
+| **History UI** | `frontend/src/ui/history/UndoRedoButtons.tsx` |
+| **Commands** | `frontend/src/ui/history/commands/PropertyEditCommand.ts` |
+| **Commands** | `frontend/src/ui/history/commands/SymbolMoveCommand.ts` |
+| **Tests** | `frontend/src/ui/history/__tests__/HistoryStore.test.ts` |
+| **Docs** | `frontend/src/ui/history/README.md` |
+| **Exports** | `frontend/src/ui/history/index.ts` |
+| **Integration** | `frontend/src/ui/active-case-bar/ActiveCaseBar.tsx` (updated) |
+
+### 25.9 Test Coverage
+
+- Command push → apply → undo stack
+- Undo → revert → redo stack
+- Redo → re-apply → undo stack
+- Transaction grouping (multiple commands = 1 undo)
+- Clear redo stack on new command (linear history)
+- Stack limit enforcement (max 100 commands)
+- Empty stack handling (canUndo, canRedo return false)
+- Transaction commit/rollback
+- Label generation (Polish command names)
+
+### 25.10 Keyboard Shortcuts
+
+| Platform | Undo | Redo |
+|----------|------|------|
+| Windows/Linux | `Ctrl+Z` | `Ctrl+Y` |
+| macOS | `Cmd+Z` | `Cmd+Shift+Z` |
+
+Global keyboard listener in `UndoRedoButtons.tsx` component.
+
+### 25.11 DoD (Definition of Done)
+
+- [x] Command Pattern zaimplementowany (Command interface, HistoryStore)
+- [x] Transakcje działają (beginTransaction, commitTransaction)
+- [x] UI dodane (przyciski Cofnij/Ponów w Active Case Bar)
+- [x] Skróty klawiszowe działają (Ctrl+Z, Ctrl+Y)
+- [x] Mode gating działa (blocked w CASE_CONFIG/RESULT_VIEW)
+- [x] Testy jednostkowe PASS
+- [x] 100% Polish UI (etykiety, tooltips)
+- [x] README.md z dokumentacją modułu
+- [x] Jeden mały PR (tylko infrastruktura)
+- [x] PLANS.md zaktualizowany: P30a jako DONE
+
+### 25.12 Exclusions (NOT modified)
+
+- ❌ Property Grid integration (P30b)
+- ❌ SLD integration (P30c)
+- ❌ Add/Delete element commands (P30d)
+- ❌ Backend persistence (P30e)
+- ❌ E2E tests (P30f)
+- ❌ Solvers, Result API, Proof/Trace
+
+### 25.13 Next Steps (Roadmap)
+
+- **P30b**: Property Grid integration (edycja pól → pushCommand)
+- **P30c**: SLD integration (przesunięcie symboli → transaction)
+- **P30d**: Add/Delete element commands
+- **P30e**: Backend persistence (undo across sessions)
+- **P30f**: E2E tests (Playwright)
+
+---
+
