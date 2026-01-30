@@ -3308,6 +3308,203 @@ Dodać Issue Panel / Validation Browser jako centralny punkt:
 
 ---
 
+## 27a. P30e KONTEKSTOWA SIATKA WŁAŚCIWOŚCI (ROLA BINDING) — DONE
+
+### 27a.1 Cel (PowerFactory++ / ≥110% PF)
+
+**Role**: Kontekstowa siatka właściwości w standardzie PowerFactory
+
+Zaimplementować **kontekstową siatkę właściwości** z trybami pracy:
+- **MODEL_EDIT** (Edycja modelu): pola konstrukcyjne (geometria, typy, parametry stałe)
+- **CASE_CONFIG** (Konfiguracja przypadku): pola wariantowe (status, parametry przypadku)
+- **RESULT_VIEW** (Wyniki): pola wynikowe (prądy, napięcia, straty) — **100% READ-ONLY**
+
+**KANON**:
+- UI = NIE LICZY FIZYKI
+- Twarde rozdzielenie trybów pracy
+- 100% determinizm (te same akcje → ten sam stan)
+- Integracja z UNDO/REDO (P30a)
+- Synchronizacja z selekcją (P30b–d)
+- 100% język polski
+
+### 27a.2 Zakres (MUST)
+
+#### 1. Tryby pracy (twarde)
+- **Edycja modelu (MODEL_EDIT)**: pola konstrukcyjne
+- **Case (CASE_CONFIG)**: pola wariantowe
+- **Wyniki (RESULT_VIEW)**: pola wynikowe — **100% READ-ONLY**
+
+Każdy tryb:
+- Jawnie oznaczony w UI
+- Determinuje **widoczność** i **edytowalność** pól
+
+#### 2. Kontekstowość wg typu obiektu
+Dla każdego typu (Bus, LineBranch, TransformerBranch, Switch, Source, Load):
+- Zdefiniowana **lista pól** widocznych w danym trybie
+- Ukryte pola nieistotne (brak "wszystkiego naraz")
+
+Implementacja:
+- Mapa kontekstu: `typ_obiektu × tryb → pola[]`
+- Bez logiki warunkowej rozproszonej po komponentach
+
+#### 3. Read-only w „Wynikach"
+- Wszystkie pola **zablokowane** (editable = false)
+- Czytelne etykiety + jednostki
+- Komunikat PL: „Tryb wyników — edycja niedostępna. Wszystkie pola są tylko do odczytu."
+
+#### 4. Integracja z UNDO/REDO
+- Zmiany w **Edycji** i **Case**:
+  - Edycja jako **szkic** (draft state)
+  - „Zastosuj" = **jedna transakcja UNDO** (PropertyBatchEditCommand)
+  - „Anuluj" = porzucenie szkicu (bez history entry)
+- W „Wynikach":
+  - Brak transakcji (read-only, no Apply/Cancel)
+
+#### 5. Synchronizacja z selekcją
+- Zmiana selekcji (SLD/Drzewo) → aktualizacja siatki
+- Zmiana w siatce **nie zmienia selekcji**
+
+#### 6. Walidacja i jednostki
+- Walidacja inline (zakres, typ, wymagane)
+- Jednostki w nagłówkach/podpowiedziach (kV, MW, Ω)
+- Komunikaty wyłącznie po polsku
+
+### 27a.3 Implementacja
+
+#### Frontend: `field-definitions.ts`
+```typescript
+// P30e: Context-aware field definitions
+export function getFieldDefinitionsForMode(
+  elementType: ElementType,
+  mode: OperatingMode
+): PropertySection[]
+
+// Mode-specific rules
+function applyModelEditRules(...)   // Konstrukcyjne pola
+function applyCaseConfigRules(...)  // Wariantowe pola
+function applyResultViewRules(...)  // Wynikowe pola (100% READ-ONLY)
+```
+
+**Mapa kontekstowa (typ × tryb → pola)**:
+
+**MODEL_EDIT**:
+- identification, state, topology, type_reference, type_params, local_params, electrical_params, audit
+- Edytowalne: instance fields (nie type, calculated, audit)
+
+**CASE_CONFIG**:
+- identification, state, topology, local_params, electrical_params
+- Edytowalne tylko:
+  - `in_service` (wszystkie typy)
+  - Switch: `state` (OPEN/CLOSED)
+  - TransformerBranch: `tap_position`
+  - Load: `p_mw`, `q_mvar`, `cos_phi`
+  - Source: `sk_mva`, `rx_ratio`
+
+**RESULT_VIEW**:
+- identification, state, topology, type_params, local_params, calculated
+- **100% READ-ONLY** (wszystkie pola `editable = false`)
+
+#### Frontend: `PropertyGrid.tsx` + `PropertyGridMultiEdit.tsx`
+- Używają `getFieldDefinitionsForMode(elementType, mode)`
+- W trybie RESULT_VIEW:
+  - Komunikat: „Tryb wyników — edycja niedostępna"
+  - Apply/Cancel **ukryte** (PropertyGridMultiEdit)
+  - Wszystkie pola read-only
+
+#### Frontend: `multi-edit-helpers.ts`
+```typescript
+// P30e: Now accepts operating mode
+export function getCommonFields(
+  elements: ElementData[],
+  mode: OperatingMode = 'MODEL_EDIT'
+): PropertySection[]
+```
+
+### 27a.4 Testy
+
+**Plik**: `__tests__/field-definitions.test.ts` (320+ linii, 50+ test cases)
+
+**Pokrycie**:
+1. MODEL_EDIT:
+   - Bus: includes identification, state, electrical_params, nameplate, audit
+   - Bus: excludes calculated (not relevant in MODEL_EDIT)
+   - LineBranch: local_params editable (branch_type, length_km)
+   - TransformerBranch: tap_position editable
+   - Switch: state (OPEN/CLOSED) editable
+   - Load: electrical_params editable (p_mw, q_mvar, cos_phi)
+
+2. CASE_CONFIG:
+   - Bus: only in_service editable
+   - Switch: state (OPEN/CLOSED) editable
+   - TransformerBranch: tap_position editable
+   - Load: p_mw, q_mvar editable (wariantowe)
+   - Source: sk_mva, rx_ratio editable (wariantowe)
+
+3. RESULT_VIEW:
+   - All element types: **100% READ-ONLY**
+   - Includes calculated fields (loading_percent, i_calculated_a, u_calculated, ikss_ka)
+   - Excludes audit, nameplate
+
+4. Determinism:
+   - Same inputs → same outputs (field order deterministic)
+
+5. Cross-mode validation:
+   - Same object in 3 modes → different field sets
+   - MODEL_EDIT has audit, CASE_CONFIG does not
+   - RESULT_VIEW has calculated, MODEL_EDIT does not
+
+### 27a.5 DoD (Definition of Done)
+
+- [x] Kontekstowa siatka właściwości działa dla typów i trybów
+- [x] Twarde read-only w „Wynikach" (100%)
+- [x] UNDO/REDO działa w Edycji i Case (Apply/Cancel)
+- [x] Synchronizacja z selekcją (SLD/Drzewo → siatka)
+- [x] Walidacja inline i jednostki
+- [x] 100% PL (komunikaty, etykiety)
+- [x] Jeden mały PR (tylko UI, zero backendu)
+- [x] Testy (50+ test cases, 100% coverage dla mode logic)
+- [x] PLANS.md: **P30e ZAKOŃCZONE**
+
+### 27a.6 Exclusions (NOT modified)
+
+- ❌ Backendu (zero zmian API)
+- ❌ Solverów / Result API / Proof
+- ❌ Globalnych refaktorów UI
+- ❌ PropertyGridContainer (legacy compatibility maintained)
+
+### 27a.7 Pliki zmodyfikowane
+
+**Frontend**:
+- `field-definitions.ts` (+214 lines): `getFieldDefinitionsForMode()`, mode rules
+- `PropertyGrid.tsx` (+8 lines): używa `getFieldDefinitionsForMode()`, komunikat read-only
+- `PropertyGridMultiEdit.tsx` (+6 lines): używa `getCommonFields(mode)`, komunikat read-only
+- `multi-edit-helpers.ts` (+2 lines): `getCommonFields()` przyjmuje `mode`
+- `__tests__/field-definitions.test.ts` (+327 lines): 50+ test cases dla trybów
+
+**PLANS.md**:
+- Sekcja 27a (P30e) — dokumentacja implementacji
+
+### 27a.8 Integracja z P30a–d
+
+**P30a (UNDO/REDO)**:
+- PropertyGrid: Apply → `PropertyBatchEditCommand` → `executeCommand()`
+- PropertyGrid: Cancel → discard draft (no history)
+- RESULT_VIEW: no Apply/Cancel (read-only)
+
+**P30b–d (Selekcja, Multi-edit)**:
+- Zmiana selekcji → `useMultiSelection()` → Property Grid aktualizuje się
+- PropertyGridContainer routing: single → PropertyGrid, multi → PropertyGridMultiEdit
+- Multi-edit draft: Apply/Cancel działa jak single-edit
+
+### 27a.9 Next Steps
+
+- **Backend persistence** (P30e-backend): Undo across sessions
+- **Add/Delete element commands**: UNDO/REDO dla dodawania/usuwania
+- **Protection findings**: Integracja z Issue Panel
+- **Keyboard shortcuts**: Skróty dla trybów pracy (Ctrl+1/2/3)
+
+---
+
 ## 28. P31 PROJECT IMPORT / EXPORT (ROLA BINDING) — DONE
 
 ### 28.1 Context

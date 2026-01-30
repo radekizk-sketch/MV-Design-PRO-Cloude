@@ -17,7 +17,7 @@
  * 9. Metadane audytowe — READ-ONLY
  */
 
-import type { ElementType, PropertySection } from '../types';
+import type { ElementType, OperatingMode, PropertySection } from '../types';
 
 /**
  * Section order (canonical, deterministic).
@@ -520,22 +520,215 @@ export function getLoadFieldDefinitions(): PropertySection[] {
 
 /**
  * Get field definitions for an element type.
+ * Legacy compatibility wrapper.
  */
 export function getFieldDefinitions(elementType: ElementType): PropertySection[] {
+  // Default to MODEL_EDIT mode for backward compatibility
+  return getFieldDefinitionsForMode(elementType, 'MODEL_EDIT');
+}
+
+/**
+ * P30e: Get field definitions for an element type and operating mode.
+ *
+ * CANONICAL CONTEXT-AWARE PROPERTY GRID:
+ * - MODEL_EDIT: konstrukcyjne pola (geometria, typy, parametry stałe)
+ * - CASE_CONFIG: wariantowe pola (status, parametry przypadku)
+ * - RESULT_VIEW: wynikowe pola (prądy, napięcia, straty) — 100% READ-ONLY
+ *
+ * @param elementType - Typ obiektu
+ * @param mode - Tryb pracy (MODEL_EDIT | CASE_CONFIG | RESULT_VIEW)
+ * @returns Lista sekcji i pól kontekstowych dla danego trybu
+ */
+export function getFieldDefinitionsForMode(
+  elementType: ElementType,
+  mode: OperatingMode
+): PropertySection[] {
+  // Get base field definitions
+  let baseSections: PropertySection[];
+
   switch (elementType) {
     case 'Bus':
-      return getBusFieldDefinitions();
+      baseSections = getBusFieldDefinitions();
+      break;
     case 'LineBranch':
-      return getLineBranchFieldDefinitions();
+      baseSections = getLineBranchFieldDefinitions();
+      break;
     case 'TransformerBranch':
-      return getTransformerBranchFieldDefinitions();
+      baseSections = getTransformerBranchFieldDefinitions();
+      break;
     case 'Switch':
-      return getSwitchFieldDefinitions();
+      baseSections = getSwitchFieldDefinitions();
+      break;
     case 'Source':
-      return getSourceFieldDefinitions();
+      baseSections = getSourceFieldDefinitions();
+      break;
     case 'Load':
-      return getLoadFieldDefinitions();
+      baseSections = getLoadFieldDefinitions();
+      break;
     default:
       return [];
   }
+
+  // Apply mode-specific filtering and editability rules
+  return applyModeRules(elementType, mode, baseSections);
+}
+
+/**
+ * Apply mode-specific rules to field definitions.
+ * Filters sections and marks fields as editable/read-only based on operating mode.
+ */
+function applyModeRules(
+  elementType: ElementType,
+  mode: OperatingMode,
+  sections: PropertySection[]
+): PropertySection[] {
+  switch (mode) {
+    case 'MODEL_EDIT':
+      return applyModelEditRules(elementType, sections);
+    case 'CASE_CONFIG':
+      return applyCaseConfigRules(elementType, sections);
+    case 'RESULT_VIEW':
+      return applyResultViewRules(elementType, sections);
+    default:
+      return sections;
+  }
+}
+
+/**
+ * MODEL_EDIT mode: konstrukcyjne pola (geometria, topologia, typy, parametry).
+ * - identification, state, topology, type_reference, type_params, local_params, audit
+ * - Edytowalne: instance fields (nie type, calculated, audit)
+ */
+function applyModelEditRules(
+  elementType: ElementType,
+  sections: PropertySection[]
+): PropertySection[] {
+  // Include: identification, state, topology, type_reference, type_params, local_params, electrical_params (for some), nameplate, short_circuit, power_flow, oltc, audit
+  // Exclude: calculated (not relevant in MODEL_EDIT, shown only in RESULT_VIEW)
+
+  const allowedSections = [
+    'identification',
+    'state',
+    'topology',
+    'type_reference',
+    'type_params',
+    'local_params',
+    'electrical_params',
+    'nameplate',
+    'short_circuit',
+    'power_flow',
+    'oltc',
+    'audit',
+  ];
+
+  return sections
+    .filter((section) => allowedSections.includes(section.id))
+    .map((section) => ({
+      ...section,
+      fields: section.fields.map((field) => {
+        // Mark fields as editable based on source
+        // Read-only: type, calculated, audit
+        // Editable: instance fields (with some exceptions)
+        const isReadOnly =
+          field.source === 'type' ||
+          field.source === 'calculated' ||
+          field.source === 'audit' ||
+          !field.editable;
+
+        return {
+          ...field,
+          editable: !isReadOnly,
+        };
+      }),
+    }));
+}
+
+/**
+ * CASE_CONFIG mode: wariantowe pola (status, parametry przypadku).
+ * - identification (READ-ONLY)
+ * - state: in_service (EDITABLE), lifecycle_state (READ-ONLY)
+ * - For Switch: state (OPEN/CLOSED) EDITABLE
+ * - For Load/Source: p_mw, q_mvar EDITABLE
+ * - For TransformerBranch: tap_position EDITABLE
+ */
+function applyCaseConfigRules(
+  elementType: ElementType,
+  sections: PropertySection[]
+): PropertySection[] {
+  const allowedSections = ['identification', 'state', 'topology', 'local_params', 'electrical_params', 'short_circuit'];
+
+  // Define editable fields per element type in CASE_CONFIG mode
+  const editableFields = new Set<string>([
+    'in_service', // All types
+  ]);
+
+  // Element-specific editable fields
+  switch (elementType) {
+    case 'Switch':
+      editableFields.add('state'); // OPEN/CLOSED position
+      break;
+    case 'TransformerBranch':
+      editableFields.add('tap_position'); // Zaczep transformatora
+      break;
+    case 'Load':
+      editableFields.add('p_mw');
+      editableFields.add('q_mvar');
+      editableFields.add('cos_phi');
+      break;
+    case 'Source':
+      editableFields.add('sk_mva');
+      editableFields.add('rx_ratio');
+      break;
+  }
+
+  return sections
+    .filter((section) => allowedSections.includes(section.id))
+    .map((section) => ({
+      ...section,
+      fields: section.fields.map((field) => {
+        // Only specific fields are editable in CASE_CONFIG
+        const isEditable = editableFields.has(field.key);
+
+        return {
+          ...field,
+          editable: isEditable,
+        };
+      }),
+    }));
+}
+
+/**
+ * RESULT_VIEW mode: wynikowe pola (prądy, napięcia, straty) — 100% READ-ONLY.
+ * - identification (READ-ONLY)
+ * - state (READ-ONLY)
+ * - topology (READ-ONLY)
+ * - type_params (READ-ONLY, for context)
+ * - local_params (READ-ONLY, for context)
+ * - calculated (READ-ONLY, main focus)
+ * - All fields are READ-ONLY
+ */
+function applyResultViewRules(
+  elementType: ElementType,
+  sections: PropertySection[]
+): PropertySection[] {
+  const allowedSections = [
+    'identification',
+    'state',
+    'topology',
+    'type_params',
+    'local_params',
+    'electrical_params',
+    'short_circuit',
+    'calculated',
+  ];
+
+  return sections
+    .filter((section) => allowedSections.includes(section.id))
+    .map((section) => ({
+      ...section,
+      fields: section.fields.map((field) => ({
+        ...field,
+        editable: false, // 100% READ-ONLY in RESULT_VIEW
+      })),
+    }));
 }

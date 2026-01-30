@@ -72,10 +72,10 @@ export function PropertyGridMultiEdit({
   // Check if draft has changes
   const isDirty = draftChanges.size > 0;
 
-  // Get common fields across all elements
+  // P30e: Get common fields across all elements for the current operating mode
   const commonSections = useMemo(() => {
-    return getCommonFields(elements);
-  }, [elements]);
+    return getCommonFields(elements, mode);
+  }, [elements, mode]);
 
   // Apply draft changes to field values
   const sectionsWithDraft = useMemo(() => {
@@ -271,8 +271,18 @@ export function PropertyGridMultiEdit({
         </div>
       </div>
 
-      {/* Blocked message (CASE_CONFIG / RESULT_VIEW) */}
-      {blockedMessage && (
+      {/* P30e: Read-only message for RESULT_VIEW mode */}
+      {mode === 'RESULT_VIEW' && (
+        <div className="bg-green-50 border-b border-green-200 px-4 py-3">
+          <div className="flex items-center gap-2 text-xs text-green-800">
+            <span>🔒</span>
+            <span>Tryb wyników — edycja niedostępna. Wszystkie pola są tylko do odczytu.</span>
+          </div>
+        </div>
+      )}
+
+      {/* Blocked message (CASE_CONFIG) */}
+      {blockedMessage && mode !== 'RESULT_VIEW' && (
         <div className="bg-yellow-50 border-b border-yellow-200 px-4 py-3">
           <div className="flex items-center gap-2 text-xs text-yellow-800">
             <span>⚠️</span>
@@ -281,8 +291,8 @@ export function PropertyGridMultiEdit({
         </div>
       )}
 
-      {/* Draft indicator */}
-      {isDirty && (
+      {/* Draft indicator (hidden in RESULT_VIEW) */}
+      {isDirty && mode !== 'RESULT_VIEW' && (
         <div className="bg-blue-50 border-b border-blue-200 px-4 py-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2 text-xs text-blue-800">

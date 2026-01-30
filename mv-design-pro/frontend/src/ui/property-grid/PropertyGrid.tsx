@@ -17,7 +17,7 @@
 import { useState, useCallback, useMemo } from 'react';
 import { clsx } from 'clsx';
 import type { ElementType, OperatingMode, PropertyField, PropertySection as PropertySectionType, ValidationMessage } from '../types';
-import { getFieldDefinitions, SECTION_LABELS } from './field-definitions';
+import { getFieldDefinitionsForMode, SECTION_LABELS } from './field-definitions';
 import { useSelectionStore, useCanEdit } from '../selection';
 import { ValidationBadge, ValidationSummary, ValidationIcon } from './ValidationBadge';
 import { UnitLabel, ValueWithUnit } from './UnitLabel';
@@ -63,8 +63,8 @@ export function PropertyGrid({
   const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set());
   const [localValidationErrors, setLocalValidationErrors] = useState<Map<string, ValidationMessage>>(new Map());
 
-  // Get field definitions for this element type
-  const sections = getFieldDefinitions(elementType);
+  // P30e: Get field definitions for this element type and operating mode
+  const sections = getFieldDefinitionsForMode(elementType, mode);
 
   // Merge element data into field definitions and wire callbacks
   const populatedSections = useMemo(() => {
@@ -198,6 +198,16 @@ export function PropertyGrid({
           </span>
         </div>
       </div>
+
+      {/* P30e: Read-only message for RESULT_VIEW mode */}
+      {mode === 'RESULT_VIEW' && (
+        <div className="bg-green-50 border-b border-green-200 px-4 py-3">
+          <div className="flex items-center gap-2 text-xs text-green-800">
+            <span>🔒</span>
+            <span>Tryb wyników — edycja niedostępna. Wszystkie pola są tylko do odczytu.</span>
+          </div>
+        </div>
+      )}
 
       {/* Sections */}
       <div className="divide-y divide-gray-100">
