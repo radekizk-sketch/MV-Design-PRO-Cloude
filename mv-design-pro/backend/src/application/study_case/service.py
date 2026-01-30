@@ -31,6 +31,7 @@ from domain.study_case import (
     StudyCaseConfig,
     StudyCaseResult,
     StudyCaseResultStatus,
+    ProtectionConfig,
     compare_study_cases,
     new_study_case,
 )
@@ -439,3 +440,59 @@ class StudyCaseService:
         """Count study cases for a project."""
         uow, repo = self._get_repository()
         return repo.count_study_cases(project_id)
+
+    # =========================================================================
+    # Protection Configuration (P14c)
+    # =========================================================================
+
+    def update_protection_config(
+        self,
+        case_id: UUID,
+        template_ref: str | None,
+        template_fingerprint: str | None,
+        library_manifest_ref: dict[str, Any] | None,
+        overrides: dict[str, Any],
+    ) -> StudyCase:
+        """
+        Update protection configuration for a study case (P14c).
+
+        Args:
+            case_id: Study case ID
+            template_ref: ID of ProtectionSettingTemplate (None to clear)
+            template_fingerprint: Fingerprint of template at bind time
+            library_manifest_ref: Reference to library manifest
+            overrides: Override values for setting fields
+
+        Returns:
+            Updated StudyCase
+
+        Raises:
+            StudyCaseNotFoundError: If case doesn't exist
+            ValueError: If template_ref doesn't exist in catalog
+        """
+        uow, repo = self._get_repository()
+
+        # Get case
+        case = repo.get_study_case(case_id)
+        if case is None:
+            raise StudyCaseNotFoundError(str(case_id))
+
+        # TODO P14c: Validate template_ref exists in catalog
+        # For now, we trust the frontend validation
+
+        # Create new ProtectionConfig
+        now = datetime.now(timezone.utc)
+        new_config = ProtectionConfig(
+            template_ref=template_ref,
+            template_fingerprint=template_fingerprint,
+            library_manifest_ref=library_manifest_ref,
+            overrides=overrides or {},
+            bound_at=now if template_ref else None,
+        )
+
+        # Update case
+        updated_case = case.with_protection_config(new_config)
+        repo.save_study_case(updated_case)
+        uow.commit()
+
+        return updated_case

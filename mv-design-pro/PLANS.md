@@ -2073,6 +2073,51 @@ P14b jest **governance layer** nad P14a:
 
 ---
 
+## 18.6 Phase P14c: Protection Case Config (CONFIG ONLY) — DONE
+
+**Status:** DONE | CANONICAL & BINDING
+
+### 18.6.1. Cel fazy
+
+Umożliwienie przypięcia **ProtectionSettingTemplate** do **StudyCase** z UI konfiguracją nastaw bez fizyki i obliczeń.
+
+### 18.6.2. Zakres fazy
+
+**IN SCOPE:**
+- Domain: ProtectionConfig w StudyCase (template_ref, template_fingerprint, overrides, bound_at, library_manifest_ref)
+- API: GET/PUT `/api/study-cases/{case_id}/protection-config`
+- UI: Panel "Zabezpieczenia" w CASE_CONFIG (wybór szablonu, formularz nastaw, manifest, status zgodności)
+- Testy: deterministyka backend + smoke frontend
+
+**OUT OF SCOPE:**
+- Solvery / koordynacja / dobór nastaw
+- Result API / trace / proof
+- Automatyczne migracje Case przy zmianie biblioteki
+- PCC w NetworkModel
+
+### 18.6.3. Deliverables
+
+| Plik | Opis | Status |
+|------|------|--------|
+| `backend/src/domain/study_case.py` | ProtectionConfig w StudyCase | DONE |
+| `backend/src/api/study_cases.py` | GET/PUT protection-config endpoints | DONE |
+| `backend/src/application/study_case/service.py` | update_protection_config method | DONE |
+| `frontend/src/ui/study-cases/ProtectionCaseConfigPanel.tsx` | Panel UI Zabezpieczenia (PL) | DONE |
+| `frontend/src/ui/study-cases/api.ts` | API functions dla protection-config | DONE |
+| `backend/tests/domain/test_protection_config.py` | Testy deterministyki i walidacji | DONE |
+| `frontend/src/ui/study-cases/__tests__/ProtectionCaseConfigPanel.test.ts` | Smoke tests | DONE |
+
+### 18.6.4. Completed Tasks
+
+- [x] Rozszerzenie StudyCase o ProtectionConfig (domain)
+- [x] Dodanie API endpoints GET/PUT protection-config
+- [x] Implementacja UI panelu Zabezpieczenia w CASE_CONFIG
+- [x] Testy backend (deterministyka, serializacja)
+- [x] Testy frontend (smoke)
+- [x] Aktualizacja PLANS.md (P14c DONE)
+
+---
+
 ## 19. Proof Packs Roadmap (P15–P20) — CANONICAL
 
 Poniższa roadmapa jest **jedynym kanonicznym planem** rozwoju Proof Packów.

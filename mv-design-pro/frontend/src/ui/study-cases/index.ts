@@ -40,3 +40,4 @@ export * as studyCasesApi from './api';
 export { StudyCaseList } from './StudyCaseList';
 export { CaseCompareView } from './CaseCompareView';
 export { CreateCaseDialog } from './CreateCaseDialog';
+export { ProtectionCaseConfigPanel } from './ProtectionCaseConfigPanel';
