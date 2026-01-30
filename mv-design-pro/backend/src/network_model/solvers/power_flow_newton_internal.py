@@ -399,11 +399,22 @@ def newton_raphson_solve(
     q_spec: np.ndarray,
     v0: np.ndarray,
     options: PowerFlowOptions,
+    node_index_to_id: dict[int, str] | None = None,
 ) -> tuple[np.ndarray, bool, int, float, list[dict[str, Any]]]:
+    """Newton-Raphson power flow solver with optional white-box trace.
+
+    P20a: When options.trace_level == "full", generates complete white-box trace
+    including per-bus mismatch, Jacobian, delta_state, and state_next.
+    """
     v = v0.copy()
     trace: list[dict[str, Any]] = []
     converged = False
     max_mismatch = 0.0
+    full_trace = options.trace_level == "full"
+
+    # P20a: Build index mapping for deterministic trace output
+    if node_index_to_id is None:
+        node_index_to_id = {i: str(i) for i in range(len(v0))}
 
     for iteration in range(1, options.max_iter + 1):
         p_calc, q_calc = compute_power_injections(ybus, v)
@@ -413,50 +424,80 @@ def newton_raphson_solve(
         max_mismatch = float(np.max(np.abs(np.concatenate([d_p, d_q]))))
         mismatch_norm = float(np.linalg.norm(np.concatenate([d_p, d_q])))
 
-        if not np.isfinite(max_mismatch) or not np.isfinite(mismatch_norm):
-            trace.append(
-                {
-                    "iter": iteration,
-                    "max_mismatch_pu": max_mismatch,
-                    "mismatch_norm": mismatch_norm,
-                    "step_norm": 0.0,
-                    "damping_used": float(options.damping),
-                    "cause_if_failed_optional": "numerical_issue",
+        # P20a: Build per-bus mismatch dict (deterministic order)
+        mismatch_per_bus: dict[str, dict[str, float]] | None = None
+        if full_trace:
+            mismatch_per_bus = {}
+            for i, idx in enumerate(sorted(pq_indices)):
+                node_id = node_index_to_id.get(idx, str(idx))
+                mismatch_per_bus[node_id] = {
+                    "delta_p_pu": float(d_p[pq_indices.index(idx)]) if idx in pq_indices else 0.0,
+                    "delta_q_pu": float(d_q[pq_indices.index(idx)]) if idx in pq_indices else 0.0,
                 }
-            )
+
+        if not np.isfinite(max_mismatch) or not np.isfinite(mismatch_norm):
+            trace_entry: dict[str, Any] = {
+                "iter": iteration,
+                "max_mismatch_pu": max_mismatch,
+                "mismatch_norm": mismatch_norm,
+                "step_norm": 0.0,
+                "damping_used": float(options.damping),
+                "cause_if_failed_optional": "numerical_issue",
+            }
+            if full_trace and mismatch_per_bus:
+                trace_entry["mismatch_per_bus"] = mismatch_per_bus
+            trace.append(trace_entry)
             break
 
         if max_mismatch < options.tolerance:
             converged = True
-            trace.append(
-                {
-                    "iter": iteration,
-                    "max_mismatch_pu": max_mismatch,
-                    "mismatch_norm": mismatch_norm,
-                    "step_norm": 0.0,
-                    "damping_used": float(options.damping),
-                }
-            )
+            trace_entry = {
+                "iter": iteration,
+                "max_mismatch_pu": max_mismatch,
+                "mismatch_norm": mismatch_norm,
+                "step_norm": 0.0,
+                "damping_used": float(options.damping),
+            }
+            if full_trace:
+                if mismatch_per_bus:
+                    trace_entry["mismatch_per_bus"] = mismatch_per_bus
+                # P20a: Final state
+                trace_entry["state_next"] = _build_state_dict(v, node_index_to_id)
+            trace.append(trace_entry)
             break
 
         jacobian = build_jacobian(ybus, v, pq_indices, p_calc, q_calc)
         try:
             step = np.linalg.solve(jacobian, np.concatenate([d_p, d_q]))
         except np.linalg.LinAlgError:
-            trace.append(
-                {
-                    "iter": iteration,
-                    "max_mismatch_pu": max_mismatch,
-                    "mismatch_norm": mismatch_norm,
-                    "step_norm": 0.0,
-                    "damping_used": float(options.damping),
-                    "cause_if_failed_optional": "singular_jacobian",
-                }
-            )
+            trace_entry = {
+                "iter": iteration,
+                "max_mismatch_pu": max_mismatch,
+                "mismatch_norm": mismatch_norm,
+                "step_norm": 0.0,
+                "damping_used": float(options.damping),
+                "cause_if_failed_optional": "singular_jacobian",
+            }
+            if full_trace and mismatch_per_bus:
+                trace_entry["mismatch_per_bus"] = mismatch_per_bus
+            trace.append(trace_entry)
             break
 
         step *= options.damping
         step_norm = float(np.linalg.norm(step))
+
+        # P20a: Build delta_state before update
+        delta_state: dict[str, dict[str, float]] | None = None
+        if full_trace:
+            delta_state = {}
+            n_pq = len(pq_indices)
+            for i, idx in enumerate(sorted(pq_indices)):
+                node_id = node_index_to_id.get(idx, str(idx))
+                pq_pos = pq_indices.index(idx)
+                delta_state[node_id] = {
+                    "delta_theta_rad": float(step[pq_pos]),
+                    "delta_v_pu": float(step[n_pq + pq_pos]),
+                }
 
         v_mag = np.abs(v)
         v_ang = np.angle(v)
@@ -468,17 +509,56 @@ def newton_raphson_solve(
             v[idx] = v_mag[idx] * np.exp(1j * v_ang[idx])
         v[slack_index] = v0[slack_index]
 
-        trace.append(
-            {
-                "iter": iteration,
-                "max_mismatch_pu": max_mismatch,
-                "mismatch_norm": mismatch_norm,
-                "step_norm": step_norm,
-                "damping_used": float(options.damping),
-            }
-        )
+        trace_entry = {
+            "iter": iteration,
+            "max_mismatch_pu": max_mismatch,
+            "mismatch_norm": mismatch_norm,
+            "step_norm": step_norm,
+            "damping_used": float(options.damping),
+        }
+
+        # P20a: Add full trace data
+        if full_trace:
+            if mismatch_per_bus:
+                trace_entry["mismatch_per_bus"] = mismatch_per_bus
+            if delta_state:
+                trace_entry["delta_state"] = delta_state
+            trace_entry["state_next"] = _build_state_dict(v, node_index_to_id)
+            # P20a: Jacobian blocks (J1=dP/dθ, J2=dP/dV, J3=dQ/dθ, J4=dQ/dV)
+            trace_entry["jacobian"] = _serialize_jacobian_blocks(jacobian, n_pq)
+
+        trace.append(trace_entry)
 
     return v, converged, iteration, max_mismatch, trace
+
+
+def _build_state_dict(v: np.ndarray, node_index_to_id: dict[int, str]) -> dict[str, dict[str, float]]:
+    """P20a: Build deterministic state dict from voltage vector."""
+    state = {}
+    for idx in sorted(node_index_to_id.keys()):
+        if idx < len(v):
+            node_id = node_index_to_id[idx]
+            state[node_id] = {
+                "v_pu": float(np.abs(v[idx])),
+                "theta_rad": float(np.angle(v[idx])),
+            }
+    return state
+
+
+def _serialize_jacobian_blocks(jacobian: np.ndarray, n_pq: int) -> dict[str, list[list[float]]]:
+    """P20a: Serialize Jacobian blocks for white-box trace (deterministic)."""
+    # Jacobian structure: [[J1, J2], [J3, J4]]
+    # J1 = dP/dθ, J2 = dP/dV, J3 = dQ/dθ, J4 = dQ/dV
+    j1 = jacobian[:n_pq, :n_pq]
+    j2 = jacobian[:n_pq, n_pq:]
+    j3 = jacobian[n_pq:, :n_pq]
+    j4 = jacobian[n_pq:, n_pq:]
+    return {
+        "J1_dP_dTheta": [[float(x) for x in row] for row in j1],
+        "J2_dP_dV": [[float(x) for x in row] for row in j2],
+        "J3_dQ_dTheta": [[float(x) for x in row] for row in j3],
+        "J4_dQ_dV": [[float(x) for x in row] for row in j4],
+    }
 
 
 def newton_raphson_solve_v2(
@@ -502,11 +582,17 @@ def newton_raphson_solve_v2(
     list[dict[str, Any]],
     list[dict[str, Any]],
 ]:
+    """Newton-Raphson power flow solver v2 (with PV buses) with optional white-box trace.
+
+    P20a: When options.trace_level == "full", generates complete white-box trace
+    including per-bus mismatch, Jacobian, delta_state, and state_next.
+    """
     v = v0.copy()
     trace: list[dict[str, Any]] = []
     pv_to_pq_switches: list[dict[str, Any]] = []
     converged = False
     max_mismatch = 0.0
+    full_trace = options.trace_level == "full"
 
     active_pq = sorted(pq_indices)
     active_pv = sorted(pv_indices)
@@ -554,53 +640,91 @@ def newton_raphson_solve_v2(
         max_mismatch = float(np.max(np.abs(mismatch))) if mismatch.size else 0.0
         mismatch_norm = float(np.linalg.norm(mismatch)) if mismatch.size else 0.0
 
+        # P20a: Build per-bus mismatch dict (deterministic order)
+        mismatch_per_bus: dict[str, dict[str, float]] | None = None
+        if full_trace:
+            mismatch_per_bus = {}
+            # P mismatch for all non-slack nodes
+            for i, idx in enumerate(non_slack_indices):
+                node_id = node_index_to_id.get(idx, str(idx))
+                mismatch_per_bus[node_id] = {"delta_p_pu": float(d_p[i])}
+            # Q mismatch for PQ nodes only
+            for i, idx in enumerate(active_pq):
+                node_id = node_index_to_id.get(idx, str(idx))
+                if node_id in mismatch_per_bus:
+                    mismatch_per_bus[node_id]["delta_q_pu"] = float(d_q[i])
+                else:
+                    mismatch_per_bus[node_id] = {"delta_p_pu": 0.0, "delta_q_pu": float(d_q[i])}
+
         if mismatch.size and (not np.isfinite(max_mismatch) or not np.isfinite(mismatch_norm)):
-            trace.append(
-                {
-                    "iter": iteration,
-                    "max_mismatch_pu": max_mismatch,
-                    "mismatch_norm": mismatch_norm,
-                    "step_norm": 0.0,
-                    "damping_used": float(options.damping),
-                    "pv_to_pq_optional": switched_this_iter,
-                    "cause_if_failed_optional": "numerical_issue",
-                }
-            )
+            trace_entry: dict[str, Any] = {
+                "iter": iteration,
+                "max_mismatch_pu": max_mismatch,
+                "mismatch_norm": mismatch_norm,
+                "step_norm": 0.0,
+                "damping_used": float(options.damping),
+                "pv_to_pq_optional": switched_this_iter,
+                "cause_if_failed_optional": "numerical_issue",
+            }
+            if full_trace and mismatch_per_bus:
+                trace_entry["mismatch_per_bus"] = mismatch_per_bus
+            trace.append(trace_entry)
             break
 
         if max_mismatch < options.tolerance:
             converged = True
-            trace.append(
-                {
-                    "iter": iteration,
-                    "max_mismatch_pu": max_mismatch,
-                    "mismatch_norm": mismatch_norm,
-                    "step_norm": 0.0,
-                    "damping_used": float(options.damping),
-                    "pv_to_pq_optional": switched_this_iter,
-                }
-            )
+            trace_entry = {
+                "iter": iteration,
+                "max_mismatch_pu": max_mismatch,
+                "mismatch_norm": mismatch_norm,
+                "step_norm": 0.0,
+                "damping_used": float(options.damping),
+                "pv_to_pq_optional": switched_this_iter,
+            }
+            if full_trace:
+                if mismatch_per_bus:
+                    trace_entry["mismatch_per_bus"] = mismatch_per_bus
+                trace_entry["state_next"] = _build_state_dict(v, node_index_to_id)
+            trace.append(trace_entry)
             break
 
         jacobian = build_jacobian_v2(ybus, v, non_slack_indices, active_pq, p_calc, q_calc)
         try:
             step = np.linalg.solve(jacobian, mismatch)
         except np.linalg.LinAlgError:
-            trace.append(
-                {
-                    "iter": iteration,
-                    "max_mismatch_pu": max_mismatch,
-                    "mismatch_norm": mismatch_norm,
-                    "step_norm": 0.0,
-                    "damping_used": float(options.damping),
-                    "pv_to_pq_optional": switched_this_iter,
-                    "cause_if_failed_optional": "singular_jacobian",
-                }
-            )
+            trace_entry = {
+                "iter": iteration,
+                "max_mismatch_pu": max_mismatch,
+                "mismatch_norm": mismatch_norm,
+                "step_norm": 0.0,
+                "damping_used": float(options.damping),
+                "pv_to_pq_optional": switched_this_iter,
+                "cause_if_failed_optional": "singular_jacobian",
+            }
+            if full_trace and mismatch_per_bus:
+                trace_entry["mismatch_per_bus"] = mismatch_per_bus
+            trace.append(trace_entry)
             break
 
         step *= options.damping
         step_norm = float(np.linalg.norm(step)) if step.size else 0.0
+
+        # P20a: Build delta_state before update
+        delta_state: dict[str, dict[str, float]] | None = None
+        if full_trace:
+            delta_state = {}
+            n_p = len(non_slack_indices)
+            # Theta changes for all non-slack
+            for i, idx in enumerate(non_slack_indices):
+                node_id = node_index_to_id.get(idx, str(idx))
+                delta_state[node_id] = {"delta_theta_rad": float(step[i])}
+            # V magnitude changes for PQ only
+            for i, idx in enumerate(active_pq):
+                node_id = node_index_to_id.get(idx, str(idx))
+                if node_id in delta_state:
+                    delta_state[node_id]["delta_v_pu"] = float(step[n_p + i])
+                else:
+                    delta_state[node_id] = {"delta_theta_rad": 0.0, "delta_v_pu": float(step[n_p + i])}
 
         v_mag = np.abs(v)
         v_ang = np.angle(v)
@@ -613,18 +737,47 @@ def newton_raphson_solve_v2(
             v[idx] = v_mag[idx] * np.exp(1j * v_ang[idx])
         v[slack_index] = v0[slack_index]
 
-        trace.append(
-            {
-                "iter": iteration,
-                "max_mismatch_pu": max_mismatch,
-                "mismatch_norm": mismatch_norm,
-                "step_norm": step_norm,
-                "damping_used": float(options.damping),
-                "pv_to_pq_optional": switched_this_iter,
-            }
-        )
+        trace_entry = {
+            "iter": iteration,
+            "max_mismatch_pu": max_mismatch,
+            "mismatch_norm": mismatch_norm,
+            "step_norm": step_norm,
+            "damping_used": float(options.damping),
+            "pv_to_pq_optional": switched_this_iter,
+        }
+
+        # P20a: Add full trace data
+        if full_trace:
+            if mismatch_per_bus:
+                trace_entry["mismatch_per_bus"] = mismatch_per_bus
+            if delta_state:
+                trace_entry["delta_state"] = delta_state
+            trace_entry["state_next"] = _build_state_dict(v, node_index_to_id)
+            # P20a: Jacobian blocks for v2 (different structure - n_p x n_p for J1, n_p x n_q for J2, etc.)
+            n_q = len(active_pq)
+            trace_entry["jacobian"] = _serialize_jacobian_blocks_v2(jacobian, n_p, n_q)
+
+        trace.append(trace_entry)
 
     return v, converged, iteration, max_mismatch, trace, pv_to_pq_switches
+
+
+def _serialize_jacobian_blocks_v2(jacobian: np.ndarray, n_p: int, n_q: int) -> dict[str, list[list[float]]]:
+    """P20a: Serialize Jacobian blocks for v2 solver (with PV buses).
+
+    Structure: [[J1 (n_p x n_p), J2 (n_p x n_q)], [J3 (n_q x n_p), J4 (n_q x n_q)]]
+    J1 = dP/dθ, J2 = dP/dV, J3 = dQ/dθ, J4 = dQ/dV
+    """
+    j1 = jacobian[:n_p, :n_p]
+    j2 = jacobian[:n_p, n_p:] if n_q > 0 else np.array([]).reshape(n_p, 0)
+    j3 = jacobian[n_p:, :n_p] if n_q > 0 else np.array([]).reshape(0, n_p)
+    j4 = jacobian[n_p:, n_p:] if n_q > 0 else np.array([]).reshape(0, 0)
+    return {
+        "J1_dP_dTheta": [[float(x) for x in row] for row in j1],
+        "J2_dP_dV": [[float(x) for x in row] for row in j2],
+        "J3_dQ_dTheta": [[float(x) for x in row] for row in j3],
+        "J4_dQ_dV": [[float(x) for x in row] for row in j4],
+    }
 
 
 def compute_branch_flows(

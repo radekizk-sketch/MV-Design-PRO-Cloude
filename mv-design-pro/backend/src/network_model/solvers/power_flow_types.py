@@ -14,6 +14,10 @@ class PowerFlowOptions:
     damping: float = 1.0
     flat_start: bool = True
     validate: bool = True
+    # P20a: trace_level controls white-box trace detail
+    # "summary" - basic info (iter, max_mismatch, norms) - default
+    # "full" - complete white-box (Jacobian, per-bus mismatch, delta_state, state_next)
+    trace_level: str = "summary"
 
 
 @dataclass

@@ -22,6 +22,7 @@ from network_model.solvers.power_flow_types import PowerFlowInput
 
 @dataclass(frozen=True)
 class PowerFlowNewtonSolution:
+    """P20a: Power flow solution with full white-box trace support."""
     converged: bool
     iterations: int
     max_mismatch: float
@@ -49,6 +50,8 @@ class PowerFlowNewtonSolution:
     applied_taps: list[dict[str, object]]
     applied_shunts: list[dict[str, object]]
     pv_to_pq_switches: list[dict[str, object]]
+    # P20a: Initial state for white-box trace (V0, θ0)
+    init_state: dict[str, dict[str, float]] | None = None
 
 
 class PowerFlowNewtonSolver:
@@ -101,6 +104,17 @@ class PowerFlowNewtonSolver:
             graph,
         )
 
+        # P20a: Build init_state for white-box trace (before solver modifies v0)
+        init_state: dict[str, dict[str, float]] | None = None
+        if options.trace_level == "full":
+            init_state = {}
+            for node_id in sorted(slack_island_nodes):
+                idx = node_index_map[node_id]
+                init_state[node_id] = {
+                    "v_pu": float(np.abs(v0[idx])),
+                    "theta_rad": float(np.angle(v0[idx])),
+                }
+
         if pv_indices:
             p_spec, q_spec, pv_setpoints, pv_q_limits = build_power_spec_v2(
                 slack_island_nodes, pf_input.base_mva, pf_input.pq, pf_input.pv
@@ -142,6 +156,7 @@ class PowerFlowNewtonSolver:
                     q_spec,
                     v0,
                     options,
+                    node_index_to_id,
                 )
             else:
                 v = v0
@@ -250,6 +265,7 @@ class PowerFlowNewtonSolver:
             applied_taps=applied_taps,
             applied_shunts=applied_shunts,
             pv_to_pq_switches=pv_to_pq_switches,
+            init_state=init_state,
         )
 
 

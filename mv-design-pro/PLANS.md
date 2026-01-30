@@ -2308,14 +2308,57 @@ klasy **wyższej niż PowerFactory**, opartą o:
 - stany dynamiczne
 - harmoniczne
 
-**Status:** PLANNED
+**Status:** IN PROGRESS
 
 ---
 
 **Kolejność dalszych prac (kanoniczna):**
-1. P20a — Power Flow Solver + Trace (backend-only)
+1. P20a — Power Flow Solver + Trace (backend-only) ✅ **DONE**
 2. P20b — Results Inspector + SLD Overlay
 3. P20c — A/B Comparison + Ranking
+
+---
+
+### P20a — Power Flow v1 Solver + Trace (backend-only)
+
+**Status:** DONE | CANONICAL & BINDING
+
+**Zakres zrealizowany:**
+- Deterministyczny AC Newton–Raphson (SLACK/PV/PQ)
+- Pełny white-box trace iteracji:
+  - `init_state` (V0, θ0)
+  - `mismatch_per_bus` (ΔP, ΔQ per bus)
+  - `jacobian` (J1..J4 bloki)
+  - `delta_state` (Δθ, ΔV)
+  - `state_next` (V, θ po aktualizacji)
+- `PowerFlowTrace` DTO z pełną strukturą
+- `PowerFlowResultV1` (immutable, zamrożone):
+  - `bus_results[]`: bus_id, v_pu, angle_deg, p_injected_mw, q_injected_mvar
+  - `branch_results[]`: branch_id, p_from_mw, q_from_mvar, p_to_mw, q_to_mvar, losses_p_mw, losses_q_mvar
+  - `summary`: total_losses_p_mw, min_v_pu, max_v_pu
+- Run lifecycle + cache po `input_hash`
+- Dedykowane API endpoints:
+  - POST `/projects/{project_id}/power-flow-runs`
+  - POST `/power-flow-runs/{run_id}/execute`
+  - GET `/power-flow-runs/{run_id}`
+  - GET `/power-flow-runs/{run_id}/results`
+  - GET `/power-flow-runs/{run_id}/trace`
+
+**Testy:**
+- [x] Determinism: 2× execute → identyczny JSON results i trace
+- [x] Zbieżność: prosta sieć SLACK+PQ → converged=true
+- [x] Failure: brak zbieżności → converged=false, trace kompletny
+- [x] Permutacje: zmiana kolejności elementów → identyczny wynik
+
+**Pliki:**
+- `network_model/solvers/power_flow_newton.py` (rozszerzony o init_state)
+- `network_model/solvers/power_flow_newton_internal.py` (full trace)
+- `network_model/solvers/power_flow_trace.py` (NEW)
+- `network_model/solvers/power_flow_result.py` (NEW)
+- `network_model/solvers/power_flow_types.py` (trace_level option)
+- `api/power_flow_runs.py` (NEW)
+- `application/analysis_run/service.py` (cache deduplication)
+- `tests/test_p20a_power_flow_determinism.py` (NEW)
 
 ---
 
