@@ -1151,3 +1151,145 @@ def export_power_flow_proof_pdf(
         media_type="application/pdf",
         headers={"Content-Disposition": f'attachment; filename="power_flow_proof_{run_id}.pdf"'},
     )
+
+
+# =============================================================================
+# P22: Power Flow Interpretation Endpoints
+# =============================================================================
+
+
+# Cache: run_id -> interpretation (1 run -> 1 interpretation)
+_interpretation_cache: dict[str, dict[str, Any]] = {}
+
+
+@router.get("/power-flow-runs/{run_id}/interpretation")
+def get_power_flow_interpretation(
+    run_id: UUID,
+    uow_factory=Depends(get_uow_factory),
+) -> dict[str, Any]:
+    """P22: Pobiera interpretacje wynikow rozplywu mocy.
+
+    DETERMINISTIC: Ten sam run -> identyczna interpretacja.
+    CACHED: 1 run -> 1 interpretation (cache in-memory).
+
+    Interpretacja zawiera:
+    - voltage_findings: obserwacje napieciowe z severity (INFO/WARN/HIGH)
+    - branch_findings: obserwacje obciazenia galezi
+    - summary: podsumowanie z rankingiem top issues
+    - trace: slad interpretacji dla audytowalnosci
+    """
+    from datetime import datetime
+    from analysis.power_flow.result import PowerFlowResult
+    from analysis.power_flow_interpretation import (
+        InterpretationContext,
+        PowerFlowInterpretationBuilder,
+    )
+
+    # Check cache first
+    run_id_str = str(run_id)
+    if run_id_str in _interpretation_cache:
+        return canonicalize_json(_interpretation_cache[run_id_str])
+
+    service = _build_service(uow_factory)
+    try:
+        run = service.get_run(run_id)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(exc),
+        ) from exc
+
+    if run.analysis_type != "PF":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Run {run_id} is not a power flow run (type={run.analysis_type})",
+        )
+
+    if run.status != "FINISHED":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Run {run_id} is not finished (status={run.status})",
+        )
+
+    # Get power flow results
+    results = service.get_results(run_id)
+    pf_result_payload = None
+    for result in results:
+        if result.get("result_type") == "power_flow":
+            pf_result_payload = result.get("payload")
+            break
+
+    if pf_result_payload is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Power flow results not found for run {run_id}",
+        )
+
+    # Build PowerFlowResult from payload
+    pf_result = PowerFlowResult(
+        converged=pf_result_payload.get("converged", False),
+        iterations=pf_result_payload.get("iterations", 0),
+        tolerance=pf_result_payload.get("tolerance", 1e-8),
+        max_mismatch_pu=pf_result_payload.get("max_mismatch_pu", 0.0),
+        base_mva=pf_result_payload.get("base_mva", 100.0),
+        slack_node_id=pf_result_payload.get("slack_node_id", ""),
+        node_u_mag_pu=_parse_float_dict(pf_result_payload.get("node_u_mag_pu", {})),
+        node_angle_rad=_parse_float_dict(pf_result_payload.get("node_angle_rad", {})),
+        branch_s_from_mva=pf_result_payload.get("branch_s_from_mva", {}),
+        branch_s_to_mva=pf_result_payload.get("branch_s_to_mva", {}),
+    )
+
+    # Build context
+    snapshot = run.input_snapshot or {}
+    run_timestamp = run.created_at if run.created_at else datetime(1970, 1, 1)
+
+    context = InterpretationContext(
+        project_name=f"Projekt {run.project_id}",
+        case_name=f"Przypadek {run.operating_case_id}",
+        run_timestamp=run_timestamp,
+        snapshot_id=snapshot.get("snapshot_id"),
+    )
+
+    # Build interpretation
+    builder = PowerFlowInterpretationBuilder(context=context)
+    interpretation = builder.build(
+        power_flow_result=pf_result,
+        run_id=run_id_str,
+        run_timestamp=run_timestamp,
+    )
+
+    # Serialize and cache
+    result_dict = interpretation.to_dict()
+    _interpretation_cache[run_id_str] = result_dict
+
+    return canonicalize_json(result_dict)
+
+
+@router.post("/power-flow-runs/{run_id}/interpretation")
+def create_power_flow_interpretation(
+    run_id: UUID,
+    uow_factory=Depends(get_uow_factory),
+) -> dict[str, Any]:
+    """P22: Tworzy (lub pobiera z cache) interpretacje wynikow rozplywu mocy.
+
+    IDEMPOTENT: Wielokrotne wywolanie zwraca ten sam wynik.
+    DETERMINISTIC: Ten sam run -> identyczna interpretacja.
+
+    Identyczne do GET, ale jako POST dla semantyki "create".
+    """
+    # Delegate to GET - interpretation is idempotent
+    return get_power_flow_interpretation(run_id, uow_factory)
+
+
+def _parse_float_dict(data: dict[str, Any]) -> dict[str, float]:
+    """Parse dict values to float, handling various input formats."""
+    result = {}
+    for key, value in data.items():
+        if isinstance(value, (int, float)):
+            result[key] = float(value)
+        elif isinstance(value, dict):
+            # Complex number stored as {"re": x, "im": y}
+            result[key] = float(value.get("re", value.get("real", 0.0)))
+        else:
+            result[key] = 0.0
+    return result

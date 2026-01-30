@@ -25,6 +25,7 @@ import type {
   PowerFlowResultV1,
   PowerFlowTrace,
   PowerFlowResultsTab,
+  PowerFlowInterpretation,
 } from './types';
 import * as api from './api';
 
@@ -41,6 +42,7 @@ interface PowerFlowResultsState {
   // Cached results
   results: PowerFlowResultV1 | null;
   trace: PowerFlowTrace | null;
+  interpretation: PowerFlowInterpretation | null;  // P22
 
   // SLD overlay
   overlayVisible: boolean;
@@ -55,6 +57,7 @@ interface PowerFlowResultsState {
   isLoadingHeader: boolean;
   isLoadingResults: boolean;
   isLoadingTrace: boolean;
+  isLoadingInterpretation: boolean;  // P22
 
   // Error state
   error: string | null;
@@ -67,6 +70,7 @@ interface PowerFlowResultsState {
   toggleOverlay: (visible?: boolean) => void;
   loadResults: () => Promise<void>;
   loadTrace: () => Promise<void>;
+  loadInterpretation: () => Promise<void>;  // P22
   reset: () => void;
 }
 
@@ -78,12 +82,14 @@ const initialState = {
   runHeader: null,
   results: null,
   trace: null,
+  interpretation: null,  // P22
   overlayVisible: true,
   activeTab: 'BUSES' as PowerFlowResultsTab,
   searchQuery: '',
   isLoadingHeader: false,
   isLoadingResults: false,
   isLoadingTrace: false,
+  isLoadingInterpretation: false,  // P22
   error: null,
 };
 
@@ -104,6 +110,7 @@ export const usePowerFlowResultsStore = create<PowerFlowResultsState>((set, get)
       // Clear cached results when switching runs
       results: null,
       trace: null,
+      interpretation: null,  // P22
     });
 
     try {
@@ -183,6 +190,23 @@ export const usePowerFlowResultsStore = create<PowerFlowResultsState>((set, get)
   },
 
   /**
+   * P22: Load power flow interpretation for selected run.
+   */
+  loadInterpretation: async () => {
+    const { selectedRunId } = get();
+    if (!selectedRunId) return;
+
+    set({ isLoadingInterpretation: true, error: null });
+    try {
+      const interpretation = await api.fetchPowerFlowInterpretation(selectedRunId);
+      set({ interpretation, isLoadingInterpretation: false });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Blad ladowania interpretacji';
+      set({ error: message, isLoadingInterpretation: false });
+    }
+  },
+
+  /**
    * Reset store to initial state.
    */
   reset: () => {
@@ -231,7 +255,7 @@ export function useFilteredBranchResults(): PowerFlowResultV1['branch_results'] 
 export function useIsAnyLoading(): boolean {
   return usePowerFlowResultsStore(
     (state) =>
-      state.isLoadingHeader || state.isLoadingResults || state.isLoadingTrace
+      state.isLoadingHeader || state.isLoadingResults || state.isLoadingTrace || state.isLoadingInterpretation
   );
 }
 
