@@ -53,6 +53,10 @@ VOLTAGE_WARN_MAX_PCT = 5.0   # 2-5% -> WARN, >5% -> HIGH
 BRANCH_LOADING_INFO_MAX_PCT = 70.0   # <70% -> INFO
 BRANCH_LOADING_WARN_MAX_PCT = 90.0   # 70-90% -> WARN, >90% -> HIGH
 
+# P22b BINDING: Progi strat galeziowych (kW) - uzywane gdy brak danych o obciazeniu
+BRANCH_LOSSES_INFO_MAX_KW = 2.0   # < 2 kW -> INFO
+BRANCH_LOSSES_WARN_MAX_KW = 5.0   # 2-5 kW -> WARN, >5 kW -> HIGH
+
 # Liczba elementow w rankingu top issues
 TOP_ISSUES_COUNT = 10
 
@@ -304,19 +308,19 @@ class PowerFlowInterpretationBuilder:
     def _classify_branch_severity_by_losses(self, losses_p_mw: float) -> FindingSeverity:
         """Classify branch by losses magnitude.
 
-        Heurystyka (brak danych o obciazeniu wzglednym):
-        - Niskie straty -> INFO
-        - Srednie straty -> WARN
-        - Wysokie straty -> HIGH
+        P22b BINDING - Progi severity dla strat galeziowych:
+        - INFO: < BRANCH_LOSSES_INFO_MAX_KW (2 kW)
+        - WARN: BRANCH_LOSSES_INFO_MAX_KW - BRANCH_LOSSES_WARN_MAX_KW (2-5 kW)
+        - HIGH: > BRANCH_LOSSES_WARN_MAX_KW (5 kW)
 
-        Progi bazuja na typowych wartosciach dla sieci SN.
+        Deterministyczne: losses_kw = losses_mw * 1000, round(6).
         """
-        abs_losses = abs(losses_p_mw)
-        if abs_losses < 0.01:  # < 10 kW
+        losses_kw = round(abs(losses_p_mw) * 1000.0, 6)
+        if losses_kw < BRANCH_LOSSES_INFO_MAX_KW:
             return FindingSeverity.INFO
-        elif abs_losses < 0.1:  # 10-100 kW
+        elif losses_kw <= BRANCH_LOSSES_WARN_MAX_KW:
             return FindingSeverity.WARN
-        else:  # > 100 kW
+        else:
             return FindingSeverity.HIGH
 
     def _build_branch_description_pl(
@@ -405,9 +409,10 @@ class PowerFlowInterpretationBuilder:
 
         # Sort by severity, then by magnitude (descending), then by element_type, then by ID
         # P22b: Full deterministic tie-breaker for ranking
+        # P22b-fix: Round magnitude to 6 decimal places to avoid floating point precision issues
         ranked_items.sort(key=lambda item: (
             SEVERITY_ORDER[item.severity],
-            -item.magnitude,
+            -round(item.magnitude, 6),
             item.element_type,
             item.element_id,
         ))
@@ -450,8 +455,8 @@ class PowerFlowInterpretationBuilder:
 
         rules_applied = (
             "VOLTAGE_DEVIATION: |V - 1.0| < 2% -> INFO, 2-5% -> WARN, >5% -> HIGH",
-            "BRANCH_LOSSES: <10kW -> INFO, 10-100kW -> WARN, >100kW -> HIGH",
-            "RANKING: severity DESC, magnitude DESC, element_id ASC",
+            f"BRANCH_LOSSES: <{BRANCH_LOSSES_INFO_MAX_KW}kW -> INFO, {BRANCH_LOSSES_INFO_MAX_KW}-{BRANCH_LOSSES_WARN_MAX_KW}kW -> WARN, >{BRANCH_LOSSES_WARN_MAX_KW}kW -> HIGH",
+            "RANKING: severity DESC, magnitude DESC, element_type ASC, element_id ASC",
         )
 
         data_sources = (
