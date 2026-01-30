@@ -267,6 +267,15 @@ def compute_hash(data: Any) -> str:
     return hashlib.sha256(json_str.encode("utf-8")).hexdigest()
 
 
+# Pola runtime wyłączone z hashowania (zmieniają się przy każdym eksporcie)
+RUNTIME_FIELDS_EXCLUDED_FROM_HASH = frozenset({"exported_at"})
+
+
+def _exclude_runtime_fields(data: dict[str, Any]) -> dict[str, Any]:
+    """Usuń pola runtime z danych przed hashowaniem."""
+    return {k: v for k, v in data.items() if k not in RUNTIME_FIELDS_EXCLUDED_FROM_HASH}
+
+
 def compute_archive_fingerprints(
     project_meta: dict[str, Any],
     network_model: dict[str, Any],
@@ -279,7 +288,9 @@ def compute_archive_fingerprints(
     issues: dict[str, Any],
 ) -> ArchiveFingerprints:
     """Oblicz fingerprints dla wszystkich sekcji archiwum."""
-    project_meta_hash = compute_hash(project_meta)
+    # Exclude runtime fields from project_meta before hashing
+    project_meta_for_hash = _exclude_runtime_fields(project_meta)
+    project_meta_hash = compute_hash(project_meta_for_hash)
     network_model_hash = compute_hash(network_model)
     sld_hash = compute_hash(sld)
     cases_hash = compute_hash(cases)
