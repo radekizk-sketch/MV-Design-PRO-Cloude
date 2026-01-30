@@ -754,3 +754,408 @@ class TestMultipleDevicesAndFaults:
         # Fault at bus-002 (50A) should NOT cause trip
         eval2 = next(e for e in result.evaluations if e.fault_target_id == "bus-002")
         assert eval2.trip_state == TripState.NO_TRIP
+
+
+# =============================================================================
+# GOLDEN POINT TESTS (IEC 60255-151 BINDING)
+# =============================================================================
+
+
+class TestIecInverseTimeGoldenPoints:
+    """
+    Golden point tests per IEC_IDMT_CANON.md (BINDING).
+
+    Formula: t = TMS * A / (M^B - 1), where M = I/Ip
+    All tests use TMS=1.0, Ip=100A
+
+    Reference: IEC 60255-151:2009, Table 1
+    """
+
+    # IEC curve constants (BINDING)
+    SI_A, SI_B = 0.14, 0.02
+    VI_A, VI_B = 13.5, 1.0
+    EI_A, EI_B = 80.0, 2.0
+
+    def _expected_time(self, a: float, b: float, m: float) -> float:
+        """Calculate expected time per canonical formula."""
+        return a / (m ** b - 1.0)
+
+    # =========================================================================
+    # Standard Inverse (SI) Golden Points
+    # =========================================================================
+
+    def test_si_golden_m2(self):
+        """SI at M=2: t = 0.14 / (2^0.02 - 1)"""
+        t = compute_iec_inverse_time(
+            i_fault_a=200.0, i_pickup_a=100.0, tms=1.0,
+            a=self.SI_A, b=self.SI_B,
+        )
+        expected = self._expected_time(self.SI_A, self.SI_B, 2.0)
+        assert t is not None
+        assert abs(t - expected) < 1e-5, f"SI M=2: expected {expected:.6f}, got {t:.6f}"
+
+    def test_si_golden_m5(self):
+        """SI at M=5: t = 0.14 / (5^0.02 - 1)"""
+        t = compute_iec_inverse_time(
+            i_fault_a=500.0, i_pickup_a=100.0, tms=1.0,
+            a=self.SI_A, b=self.SI_B,
+        )
+        expected = self._expected_time(self.SI_A, self.SI_B, 5.0)
+        assert t is not None
+        assert abs(t - expected) < 1e-5, f"SI M=5: expected {expected:.6f}, got {t:.6f}"
+
+    def test_si_golden_m10(self):
+        """SI at M=10: t = 0.14 / (10^0.02 - 1)"""
+        t = compute_iec_inverse_time(
+            i_fault_a=1000.0, i_pickup_a=100.0, tms=1.0,
+            a=self.SI_A, b=self.SI_B,
+        )
+        expected = self._expected_time(self.SI_A, self.SI_B, 10.0)
+        assert t is not None
+        assert abs(t - expected) < 1e-5, f"SI M=10: expected {expected:.6f}, got {t:.6f}"
+
+    # =========================================================================
+    # Very Inverse (VI) Golden Points
+    # =========================================================================
+
+    def test_vi_golden_m2(self):
+        """VI at M=2: t = 13.5 / (2^1 - 1) = 13.5"""
+        t = compute_iec_inverse_time(
+            i_fault_a=200.0, i_pickup_a=100.0, tms=1.0,
+            a=self.VI_A, b=self.VI_B,
+        )
+        expected = self._expected_time(self.VI_A, self.VI_B, 2.0)
+        assert t is not None
+        assert abs(t - expected) < 1e-5, f"VI M=2: expected {expected:.6f}, got {t:.6f}"
+        assert abs(t - 13.5) < 1e-5  # Exact: 13.5 / 1 = 13.5
+
+    def test_vi_golden_m5(self):
+        """VI at M=5: t = 13.5 / (5^1 - 1) = 3.375"""
+        t = compute_iec_inverse_time(
+            i_fault_a=500.0, i_pickup_a=100.0, tms=1.0,
+            a=self.VI_A, b=self.VI_B,
+        )
+        expected = self._expected_time(self.VI_A, self.VI_B, 5.0)
+        assert t is not None
+        assert abs(t - expected) < 1e-5, f"VI M=5: expected {expected:.6f}, got {t:.6f}"
+        assert abs(t - 3.375) < 1e-5  # Exact: 13.5 / 4 = 3.375
+
+    def test_vi_golden_m10(self):
+        """VI at M=10: t = 13.5 / (10^1 - 1) = 1.5"""
+        t = compute_iec_inverse_time(
+            i_fault_a=1000.0, i_pickup_a=100.0, tms=1.0,
+            a=self.VI_A, b=self.VI_B,
+        )
+        expected = self._expected_time(self.VI_A, self.VI_B, 10.0)
+        assert t is not None
+        assert abs(t - expected) < 1e-5, f"VI M=10: expected {expected:.6f}, got {t:.6f}"
+        assert abs(t - 1.5) < 1e-5  # Exact: 13.5 / 9 = 1.5
+
+    # =========================================================================
+    # Extremely Inverse (EI) Golden Points
+    # =========================================================================
+
+    def test_ei_golden_m2(self):
+        """EI at M=2: t = 80 / (2^2 - 1) = 26.666..."""
+        t = compute_iec_inverse_time(
+            i_fault_a=200.0, i_pickup_a=100.0, tms=1.0,
+            a=self.EI_A, b=self.EI_B,
+        )
+        expected = self._expected_time(self.EI_A, self.EI_B, 2.0)
+        assert t is not None
+        assert abs(t - expected) < 1e-5, f"EI M=2: expected {expected:.6f}, got {t:.6f}"
+        assert abs(t - 80.0 / 3.0) < 1e-5  # Exact: 80 / 3 = 26.666...
+
+    def test_ei_golden_m5(self):
+        """EI at M=5: t = 80 / (5^2 - 1) = 3.333..."""
+        t = compute_iec_inverse_time(
+            i_fault_a=500.0, i_pickup_a=100.0, tms=1.0,
+            a=self.EI_A, b=self.EI_B,
+        )
+        expected = self._expected_time(self.EI_A, self.EI_B, 5.0)
+        assert t is not None
+        assert abs(t - expected) < 1e-5, f"EI M=5: expected {expected:.6f}, got {t:.6f}"
+        assert abs(t - 80.0 / 24.0) < 1e-5  # Exact: 80 / 24 = 3.333...
+
+    def test_ei_golden_m10(self):
+        """EI at M=10: t = 80 / (10^2 - 1) = 0.808..."""
+        t = compute_iec_inverse_time(
+            i_fault_a=1000.0, i_pickup_a=100.0, tms=1.0,
+            a=self.EI_A, b=self.EI_B,
+        )
+        expected = self._expected_time(self.EI_A, self.EI_B, 10.0)
+        assert t is not None
+        assert abs(t - expected) < 1e-5, f"EI M=10: expected {expected:.6f}, got {t:.6f}"
+        assert abs(t - 80.0 / 99.0) < 1e-5  # Exact: 80 / 99 = 0.808...
+
+    def test_ei_golden_m20(self):
+        """EI at M=20: t = 80 / (20^2 - 1) = 0.200..."""
+        t = compute_iec_inverse_time(
+            i_fault_a=2000.0, i_pickup_a=100.0, tms=1.0,
+            a=self.EI_A, b=self.EI_B,
+        )
+        expected = self._expected_time(self.EI_A, self.EI_B, 20.0)
+        assert t is not None
+        assert abs(t - expected) < 1e-5, f"EI M=20: expected {expected:.6f}, got {t:.6f}"
+        assert abs(t - 80.0 / 399.0) < 1e-5  # Exact: 80 / 399 = 0.200...
+
+
+# =============================================================================
+# PROPERTY TESTS (MATHEMATICAL INVARIANTS)
+# =============================================================================
+
+
+class TestIecInverseTimeProperties:
+    """
+    Property tests verifying mathematical invariants of IEC IDMT curves.
+
+    These tests verify:
+    1. Monotonicity: higher M → shorter time
+    2. TMS scaling: t(TMS=k) = k * t(TMS=1)
+    3. No-trip boundary: M <= 1 → None
+    4. Numerical stability: no NaN/Inf near boundaries
+    5. Determinism: identical inputs → identical outputs
+    """
+
+    def test_monotonicity_si(self):
+        """SI curve: t(M2) < t(M1) for M1 < M2."""
+        # Test multiple M values
+        m_values = [1.5, 2.0, 5.0, 10.0, 20.0]
+        times = []
+        for m in m_values:
+            t = compute_iec_inverse_time(
+                i_fault_a=m * 100.0, i_pickup_a=100.0, tms=1.0,
+                a=0.14, b=0.02,
+            )
+            assert t is not None, f"SI should trip at M={m}"
+            times.append(t)
+
+        # Verify strictly decreasing
+        for i in range(len(times) - 1):
+            assert times[i] > times[i + 1], \
+                f"SI monotonicity failed: t(M={m_values[i]})={times[i]} <= t(M={m_values[i+1]})={times[i+1]}"
+
+    def test_monotonicity_vi(self):
+        """VI curve: t(M2) < t(M1) for M1 < M2."""
+        m_values = [1.5, 2.0, 5.0, 10.0, 20.0]
+        times = []
+        for m in m_values:
+            t = compute_iec_inverse_time(
+                i_fault_a=m * 100.0, i_pickup_a=100.0, tms=1.0,
+                a=13.5, b=1.0,
+            )
+            assert t is not None
+            times.append(t)
+
+        for i in range(len(times) - 1):
+            assert times[i] > times[i + 1], f"VI monotonicity failed at M={m_values[i]}"
+
+    def test_monotonicity_ei(self):
+        """EI curve: t(M2) < t(M1) for M1 < M2."""
+        m_values = [1.5, 2.0, 5.0, 10.0, 20.0]
+        times = []
+        for m in m_values:
+            t = compute_iec_inverse_time(
+                i_fault_a=m * 100.0, i_pickup_a=100.0, tms=1.0,
+                a=80.0, b=2.0,
+            )
+            assert t is not None
+            times.append(t)
+
+        for i in range(len(times) - 1):
+            assert times[i] > times[i + 1], f"EI monotonicity failed at M={m_values[i]}"
+
+    def test_tms_scaling_linear(self):
+        """TMS scales trip time linearly: t(TMS=k) = k * t(TMS=1)."""
+        # Test for SI curve at M=5
+        t1 = compute_iec_inverse_time(
+            i_fault_a=500.0, i_pickup_a=100.0, tms=1.0,
+            a=0.14, b=0.02,
+        )
+        t2 = compute_iec_inverse_time(
+            i_fault_a=500.0, i_pickup_a=100.0, tms=2.0,
+            a=0.14, b=0.02,
+        )
+        t3 = compute_iec_inverse_time(
+            i_fault_a=500.0, i_pickup_a=100.0, tms=0.5,
+            a=0.14, b=0.02,
+        )
+
+        assert t1 is not None and t2 is not None and t3 is not None
+        assert abs(t2 - 2.0 * t1) < 1e-5, "TMS=2 should give 2x time"
+        assert abs(t3 - 0.5 * t1) < 1e-5, "TMS=0.5 should give 0.5x time"
+
+    def test_no_trip_at_pickup(self):
+        """M = 1 (I = Ip) → no trip (None)."""
+        for a, b in [(0.14, 0.02), (13.5, 1.0), (80.0, 2.0)]:
+            t = compute_iec_inverse_time(
+                i_fault_a=100.0, i_pickup_a=100.0, tms=1.0,
+                a=a, b=b,
+            )
+            assert t is None, f"Should not trip at M=1 for curve (A={a}, B={b})"
+
+    def test_no_trip_below_pickup(self):
+        """M < 1 (I < Ip) → no trip (None)."""
+        for a, b in [(0.14, 0.02), (13.5, 1.0), (80.0, 2.0)]:
+            for i_fault in [50.0, 80.0, 99.9]:
+                t = compute_iec_inverse_time(
+                    i_fault_a=i_fault, i_pickup_a=100.0, tms=1.0,
+                    a=a, b=b,
+                )
+                assert t is None, f"Should not trip at I={i_fault}A < Ip=100A"
+
+    def test_numerical_stability_near_boundary(self):
+        """M = 1.0001 should give finite (large) time, not NaN/Inf."""
+        for a, b, name in [(0.14, 0.02, "SI"), (13.5, 1.0, "VI"), (80.0, 2.0, "EI")]:
+            t = compute_iec_inverse_time(
+                i_fault_a=100.01, i_pickup_a=100.0, tms=1.0,
+                a=a, b=b,
+            )
+            assert t is not None, f"{name} should trip at M=1.0001"
+            assert t > 0, f"{name} time should be positive"
+            assert t < float("inf"), f"{name} time should be finite"
+            # Time should be very large near boundary
+            assert t > 100.0, f"{name} time should be large near M=1"
+
+    def test_determinism_repeated_calls(self):
+        """Same inputs must produce identical outputs."""
+        results = []
+        for _ in range(10):
+            t = compute_iec_inverse_time(
+                i_fault_a=500.0, i_pickup_a=100.0, tms=0.3,
+                a=0.14, b=0.02,
+            )
+            results.append(t)
+
+        assert all(r == results[0] for r in results), \
+            f"Determinism failed: got different results {set(results)}"
+
+    def test_curve_ordering_at_high_m(self):
+        """At high M (e.g., 20), EI < VI < SI (EI is fastest)."""
+        t_si = compute_iec_inverse_time(
+            i_fault_a=2000.0, i_pickup_a=100.0, tms=1.0,
+            a=0.14, b=0.02,
+        )
+        t_vi = compute_iec_inverse_time(
+            i_fault_a=2000.0, i_pickup_a=100.0, tms=1.0,
+            a=13.5, b=1.0,
+        )
+        t_ei = compute_iec_inverse_time(
+            i_fault_a=2000.0, i_pickup_a=100.0, tms=1.0,
+            a=80.0, b=2.0,
+        )
+
+        assert t_si is not None and t_vi is not None and t_ei is not None
+        assert t_ei < t_vi < t_si, \
+            f"At M=20: expected EI < VI < SI, got EI={t_ei}, VI={t_vi}, SI={t_si}"
+
+
+# =============================================================================
+# TRACE AUDIT TESTS
+# =============================================================================
+
+
+class TestProtectionTraceAudit:
+    """Tests verifying trace contains all required audit fields."""
+
+    @pytest.fixture
+    def engine(self):
+        return ProtectionEvaluationEngine()
+
+    def test_trace_contains_curve_parameters(self, engine):
+        """Trace step must contain curve_kind, A, B, i_pickup, i_fault, tms."""
+        device = ProtectionDevice(
+            device_id="relay-001",
+            device_type_ref="sepam-20",
+            protected_element_ref="bus-001",
+            i_pickup_a=100.0,
+            tms=0.3,
+            curve_ref="curve-si",
+            curve_kind="inverse",
+            curve_parameters={"A": 0.14, "B": 0.02},
+        )
+
+        fault = FaultPoint(
+            fault_id="bus-001",
+            i_fault_a=500.0,
+            fault_type="3F",
+        )
+
+        input_data = ProtectionEvaluationInput(
+            run_id="run-001",
+            sc_run_id="sc-001",
+            protection_case_id="case-001",
+            template_ref="template-001",
+            template_fingerprint="abc123",
+            library_manifest_ref=None,
+            devices=(device,),
+            faults=(fault,),
+        )
+
+        result, trace = engine.evaluate(input_data)
+
+        # Find device evaluation step
+        eval_steps = [s for s in trace.steps if s.step == "device_evaluation"]
+        assert len(eval_steps) == 1, "Should have one device evaluation step"
+
+        step = eval_steps[0]
+
+        # Verify required audit fields in inputs
+        assert "curve_kind" in step.inputs, "Trace must contain curve_kind"
+        assert "i_fault_a" in step.inputs, "Trace must contain i_fault_a"
+        assert "i_pickup_a" in step.inputs, "Trace must contain i_pickup_a"
+        assert "tms" in step.inputs, "Trace must contain tms"
+        assert "curve_parameters" in step.inputs, "Trace must contain curve_parameters"
+
+        # Verify values
+        assert step.inputs["curve_kind"] == "inverse"
+        assert step.inputs["i_fault_a"] == 500.0
+        assert step.inputs["i_pickup_a"] == 100.0
+        assert step.inputs["tms"] == 0.3
+
+        # Verify outputs contain trip result
+        assert "trip_state" in step.outputs, "Trace must contain trip_state"
+        assert "t_trip_s" in step.outputs, "Trace must contain t_trip_s"
+
+    def test_trace_serialization_deterministic(self, engine):
+        """Trace JSON serialization must be deterministic."""
+        device = ProtectionDevice(
+            device_id="relay-001",
+            device_type_ref="sepam-20",
+            protected_element_ref="bus-001",
+            i_pickup_a=100.0,
+            tms=0.3,
+            curve_ref="curve-si",
+            curve_kind="inverse",
+            curve_parameters={"A": 0.14, "B": 0.02},
+        )
+
+        fault = FaultPoint(
+            fault_id="bus-001",
+            i_fault_a=500.0,
+            fault_type="3F",
+        )
+
+        input_data = ProtectionEvaluationInput(
+            run_id="run-001",
+            sc_run_id="sc-001",
+            protection_case_id="case-001",
+            template_ref="template-001",
+            template_fingerprint="abc123",
+            library_manifest_ref=None,
+            devices=(device,),
+            faults=(fault,),
+        )
+
+        # Execute twice
+        _, trace1 = engine.evaluate(input_data)
+        _, trace2 = engine.evaluate(input_data)
+
+        # Compare trace dictionaries (excluding created_at which is time-dependent)
+        dict1 = trace1.to_dict()
+        dict2 = trace2.to_dict()
+        del dict1["created_at"]
+        del dict2["created_at"]
+
+        assert dict1 == dict2, "Trace serialization must be deterministic"
+
