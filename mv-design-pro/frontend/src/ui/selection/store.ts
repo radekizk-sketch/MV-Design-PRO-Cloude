@@ -5,6 +5,7 @@
  * - sld_rules.md § E.1: Selection patterns (single click, ctrl+click, etc.)
  * - sld_rules.md § G.1: SLD ↔ Wizard synchronization
  * - wizard_screens.md § 2.4: Property Grid updates on selection
+ * - P30c: Multi-select for Property Grid multi-edit
  *
  * Single source of truth for selection state.
  * Synchronizes SLD ↔ Tree ↔ Property Grid.
@@ -12,14 +13,15 @@
 
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import type { ElementType, OperatingMode, ResultStatus, SelectedElement } from '../types';
+import type { ElementType, OperatingMode, ResultStatus, SelectedElement, MultiSelection } from '../types';
 
 /**
  * Selection state interface.
  */
 interface SelectionState {
-  // Current selection
-  selectedElement: SelectedElement | null;
+  // Current selection (P30c: multi-select support)
+  selectedElements: SelectedElement[]; // Always sorted by ID (determinism)
+  selectedElement: SelectedElement | null; // Computed: first element (compatibility)
 
   // Operating mode (controls what actions are allowed)
   mode: OperatingMode;
@@ -34,8 +36,10 @@ interface SelectionState {
   treeExpandedNodes: Set<string>;
   sldCenterOnElement: string | null;
 
-  // Actions
-  selectElement: (element: SelectedElement | null) => void;
+  // Actions (P30c: multi-select)
+  selectElement: (element: SelectedElement | null) => void; // Single select (compatibility)
+  selectElements: (elements: SelectedElement[]) => void; // Multi-select (P30c)
+  getMultiSelection: () => MultiSelection | null; // Get multi-selection state
   setMode: (mode: OperatingMode) => void;
   setResultStatus: (status: ResultStatus) => void;
   togglePropertyGrid: (open?: boolean) => void;
@@ -55,22 +59,52 @@ interface SelectionState {
  */
 export const useSelectionStore = create<SelectionState>()(
   persist(
-    (set) => ({
+    (set, get) => ({
       // Initial state
-      selectedElement: null,
+      selectedElements: [],
+      get selectedElement() {
+        return get().selectedElements[0] ?? null;
+      },
       mode: 'MODEL_EDIT',
       resultStatus: 'NONE',
       propertyGridOpen: false,
       treeExpandedNodes: new Set<string>(),
       sldCenterOnElement: null,
 
-      // Select an element (from SLD, Tree, or List)
+      // Select an element (from SLD, Tree, or List) - single select (compatibility)
       selectElement: (element) =>
         set((state) => ({
-          selectedElement: element,
+          selectedElements: element ? [element] : [],
           // Auto-open property grid on selection
           propertyGridOpen: element !== null || state.propertyGridOpen,
         })),
+
+      // P30c: Multi-select (deterministic, sorted by ID)
+      selectElements: (elements) =>
+        set((state) => {
+          const sorted = [...elements].sort((a, b) => a.id.localeCompare(b.id));
+          return {
+            selectedElements: sorted,
+            // Auto-open property grid on selection
+            propertyGridOpen: sorted.length > 0 || state.propertyGridOpen,
+          };
+        }),
+
+      // P30c: Get multi-selection state
+      getMultiSelection: () => {
+        const state = get();
+        if (state.selectedElements.length === 0) return null;
+
+        // Find common type (or null if mixed)
+        const firstType = state.selectedElements[0].type;
+        const allSameType = state.selectedElements.every((el) => el.type === firstType);
+        const commonType = allSameType ? firstType : null;
+
+        return {
+          elements: state.selectedElements,
+          commonType,
+        };
+      },
 
       // Change operating mode
       setMode: (mode) =>
@@ -114,7 +148,7 @@ export const useSelectionStore = create<SelectionState>()(
       // Clear selection
       clearSelection: () =>
         set(() => ({
-          selectedElement: null,
+          selectedElements: [],
           sldCenterOnElement: null,
         })),
     }),
@@ -316,4 +350,22 @@ export function useContextMenuConfig(): {
  */
 export function usePropertyGridEditable(): boolean {
   return useSelectionStore((state) => state.mode === 'MODEL_EDIT');
+}
+
+/**
+ * P30c: Hook to get multi-selection state.
+ *
+ * Returns null if no selection, otherwise returns MultiSelection with:
+ * - elements: sorted array of selected elements
+ * - commonType: element type if all same, null if mixed types
+ */
+export function useMultiSelection(): MultiSelection | null {
+  return useSelectionStore((state) => state.getMultiSelection());
+}
+
+/**
+ * P30c: Hook to get selected elements.
+ */
+export function useSelectedElements(): SelectedElement[] {
+  return useSelectionStore((state) => state.selectedElements);
 }

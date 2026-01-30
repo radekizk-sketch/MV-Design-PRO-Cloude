@@ -1,12 +1,17 @@
 /**
- * Property Grid Container (with Type Picker integration)
+ * Property Grid Container (with Type Picker integration + P30c Multi-Edit)
  *
  * CANONICAL ALIGNMENT:
  * - P13a: Type Library Browser + type_ref integration
+ * - P30c: Multi-edit with Apply/Cancel transactions
  * - SYSTEM_SPEC.md § 4: Type Catalog (Library)
  *
  * This container wires up PropertyGrid with TypePicker modal and catalog API.
+ * P30c: Detects multi-select and uses PropertyGridMultiEdit for N > 1 elements.
+ *
  * Handles:
+ * - Single-select: PropertyGrid (classic)
+ * - Multi-select: PropertyGridMultiEdit (P30c)
  * - Type assignment (assign type_ref)
  * - Type clearing (set type_ref to null)
  * - Element data refresh after type changes
@@ -14,7 +19,9 @@
 
 import { useState, useCallback } from 'react';
 import { PropertyGrid } from './PropertyGrid';
+import { PropertyGridMultiEdit } from './PropertyGridMultiEdit';
 import { TypePicker } from '../catalog/TypePicker';
+import { useMultiSelection } from '../selection';
 import {
   assignTypeToBranch,
   assignTypeToTransformer,
@@ -25,22 +32,31 @@ import {
 } from '../catalog/api';
 import type { ElementType, ValidationMessage } from '../types';
 import type { TypeCategory } from '../catalog/types';
+import type { ElementData } from './multi-edit-helpers';
 
 interface PropertyGridContainerProps {
   projectId: string;
-  elementId: string;
-  elementType: ElementType;
-  elementName: string;
+
+  // Single-select (legacy)
+  elementId?: string;
+  elementType?: ElementType;
+  elementName?: string;
   elementData?: Record<string, unknown>;
   validationMessages?: ValidationMessage[];
+
+  // Multi-select (P30c)
+  elements?: ElementData[];
+
   onFieldChange?: (fieldKey: string, value: unknown) => void;
+  onFieldChangeMulti?: (elementId: string, fieldKey: string, value: unknown) => void | Promise<void>;
   onDataRefresh?: () => void; // Callback to refresh element data after type assignment
 }
 
 /**
  * Property Grid Container Component.
  *
- * Integrates PropertyGrid with TypePicker and catalog API.
+ * Integrates PropertyGrid (single) or PropertyGridMultiEdit (multi) with TypePicker and catalog API.
+ * P30c: Automatically detects single vs multi-select mode.
  */
 export function PropertyGridContainer({
   projectId,
@@ -49,9 +65,12 @@ export function PropertyGridContainer({
   elementName,
   elementData = {},
   validationMessages = [],
+  elements,
   onFieldChange,
+  onFieldChangeMulti,
   onDataRefresh,
 }: PropertyGridContainerProps) {
+  const multiSelection = useMultiSelection();
   const [isTypePickerOpen, setIsTypePickerOpen] = useState(false);
   const [typePickerCategory, setTypePickerCategory] = useState<TypeCategory | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -162,6 +181,10 @@ export function PropertyGridContainer({
 
   const { currentTypeRef } = getTypeCategoryAndRef();
 
+  // P30c: Detect multi-select mode
+  const isMultiMode = elements && elements.length > 1;
+  const isSingleMode = !isMultiMode && elementId && elementType && elementName;
+
   return (
     <>
       {/* Error display */}
@@ -178,17 +201,34 @@ export function PropertyGridContainer({
         </div>
       )}
 
-      {/* Property Grid */}
-      <PropertyGrid
-        elementId={elementId}
-        elementType={elementType}
-        elementName={elementName}
-        elementData={elementData}
-        validationMessages={validationMessages}
-        onFieldChange={onFieldChange}
-        onAssignType={handleAssignType}
-        onClearType={handleClearType}
-      />
+      {/* P30c: Multi-Edit Mode (N > 1) */}
+      {isMultiMode && (
+        <PropertyGridMultiEdit
+          elements={elements!}
+          onApplyChange={onFieldChangeMulti}
+        />
+      )}
+
+      {/* Single-Edit Mode (N = 1, legacy) */}
+      {isSingleMode && (
+        <PropertyGrid
+          elementId={elementId!}
+          elementType={elementType!}
+          elementName={elementName!}
+          elementData={elementData}
+          validationMessages={validationMessages}
+          onFieldChange={onFieldChange}
+          onAssignType={handleAssignType}
+          onClearType={handleClearType}
+        />
+      )}
+
+      {/* No selection */}
+      {!isMultiMode && !isSingleMode && (
+        <div className="bg-white border border-gray-200 rounded-lg shadow-sm p-8 text-center text-sm text-gray-500">
+          Nie wybrano żadnych elementów
+        </div>
+      )}
 
       {/* Type Picker Modal */}
       {typePickerCategory && (

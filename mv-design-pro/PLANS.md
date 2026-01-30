@@ -3067,10 +3067,119 @@ Global keyboard listener in `UndoRedoButtons.tsx` component.
 
 ### 25.13 Next Steps (Roadmap)
 
-- **P30b**: Property Grid integration (edycja pól → pushCommand)
-- **P30c**: SLD integration (przesunięcie symboli → transaction)
+- **P30b**: SLD Editor (multi-select, drag, align/distribute) — DONE
+- **P30c**: Property Grid Multi-Edit (Apply/Cancel, multi-select) — DONE
 - **P30d**: Add/Delete element commands
 - **P30e**: Backend persistence (undo across sessions)
 - **P30f**: E2E tests (Playwright)
+
+---
+
+## 26. P30c PROPERTY GRID MULTI-EDIT (ROLA BINDING) — DONE
+
+**Priority:** HIGH
+**Status:** ✅ DONE
+**Branch:** `claude/rola-binding-implementation-jSWjQ`
+**Model:** Sonnet 4.5
+**Typ:** UI-only, 1 mały PR
+
+### 26.1 Cel (PowerFactory++ / ≥110% PF)
+
+Podnieść Property Grid do standardu PowerFactory++:
+- **Multi-edit** (wspólne pola dla wielu obiektów)
+- **Inline validation + jednostki**
+- **Apply/Cancel** jako **jedna transakcja UNDO/REDO**
+- **Synchronizacja z selekcją** (SLD/Tree)
+- **Blokady trybów** (CASE_CONFIG/RESULT_VIEW → read-only)
+
+### 26.2 Zakres (MUST)
+
+1. **Multi-edit (core)**:
+   - Przy zaznaczeniu N obiektów: pokazuj tylko pola wspólne
+   - Różne wartości → placeholder "— (różne)"
+   - Zmiana wartości → zastosuj do wszystkich (1 transakcja)
+
+2. **Inline validation + jednostki**:
+   - Walidacja natychmiastowa (zakres, typ, required)
+   - Jednostki jawnie w nagłówkach/tooltipach (np. kV, MW, Ω)
+   - Komunikaty PL, bez modali
+
+3. **Apply/Cancel (transakcje)**:
+   - Edycja w grid = draft
+   - "Zastosuj" → 1 komenda UNDO (PropertyBatchEditCommand)
+   - "Anuluj" → porzuca draft, brak wpisu w historii
+
+4. **Synchronizacja selekcji**:
+   - Zmiana selekcji w SLD/Tree → grid się aktualizuje
+   - Zmiana w grid → nie zmienia selekcji
+
+5. **Blokady trybów**:
+   - CASE_CONFIG/RESULT_VIEW: pola disabled, komunikat PL
+
+### 26.3 Implementacja
+
+**Kluczowe pliki:**
+
+| Plik | Opis |
+|------|------|
+| `ui/types.ts` | Dodano `MultiSelection`, `MultiEditFieldValue`, `PropertyGridDraft` |
+| `ui/selection/store.ts` | Rozszerzono o `selectedElements[]`, `selectElements()`, `getMultiSelection()` |
+| `ui/property-grid/PropertyGridMultiEdit.tsx` | Główny component multi-edit z draft state |
+| `ui/property-grid/multi-edit-helpers.ts` | Logika wspólnych pól, merge values, "— (różne)" |
+| `ui/history/commands/PropertyBatchEditCommand.ts` | UNDO/REDO command dla batch edit |
+| `ui/property-grid/PropertyGridContainer.tsx` | Wykrywa multi-select, używa PropertyGridMultiEdit |
+| `ui/property-grid/__tests__/multi-edit-helpers.test.ts` | Testy jednostkowe |
+
+**Mechanizm:**
+
+1. **Selection Store**:
+   - `selectedElements: SelectedElement[]` (ZAWSZE sortowane dla determinizmu)
+   - `selectedElement` (computed: pierwszy element, kompatybilność wsteczna)
+   - `selectElements()` (nowy action dla multi-select)
+   - `getMultiSelection()` (zwraca `MultiSelection` z common type)
+
+2. **Multi-Edit Logic** (`multi-edit-helpers.ts`):
+   - `getCommonFields()`: znajduje pola wspólne dla wszystkich elementów
+   - `mergeFieldValues()`: uniform (wszystkie te same) vs mixed (różne)
+   - `formatMultiEditValue()`: wyświetla wartość lub "— (różne)"
+   - `isMultiEditFieldEditable()`: tylko instance fields, nie type/calculated/audit
+
+3. **PropertyGridMultiEdit**:
+   - Draft state: `Map<fieldKey, newValue>`
+   - Apply: tworzy `PropertyBatchEditCommand` z wszystkimi zmianami
+   - Cancel: porzuca draft
+   - Inline validation: blokuje Apply przy błędach
+
+4. **PropertyBatchEditCommand**:
+   - Jedna transakcja UNDO/REDO dla wszystkich zmian
+   - `apply()`: stosuje `newValue` dla każdego elementu
+   - `revert()`: przywraca `oldValue` dla każdego elementu
+   - Deterministyczne (sortowane po elementId)
+
+### 26.4 DoD (Definition of Done)
+
+- [x] Multi-edit działa deterministycznie (sortowane IDs)
+- [x] Walidacja + jednostki inline
+- [x] Apply/Cancel = 1 UNDO/REDO
+- [x] Sync z selekcją (selectedElements → PropertyGrid)
+- [x] 100% PL (komunikaty, etykiety)
+- [x] Blokady trybów (CASE_CONFIG/RESULT_VIEW)
+- [x] Testy jednostkowe (multi-edit-helpers)
+- [x] Jeden mały PR (UI-only)
+- [x] PLANS.md: P30c DONE
+
+### 26.5 Exclusions (NOT modified)
+
+- ❌ Backend (tylko UI changes)
+- ❌ Solverów / Result API / Proof
+- ❌ Globalnych refaktorów store/router
+- ❌ SLD Editor (już działa w P30b)
+
+### 26.6 Next Steps
+
+- **P30d**: Add/Delete element commands (UNDO/REDO)
+- **P30e**: Backend persistence (undo across sessions)
+- **P30f**: E2E tests (Playwright)
+- **Synchronizacja z SLD**: Hook do przekazywania `selectedIds` → `selectedElements`
 
 ---
