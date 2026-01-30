@@ -11,8 +11,8 @@
  * - Deterministic field ordering
  */
 
-import type { PropertyField, PropertySection, ElementType, MultiEditFieldValue } from '../types';
-import { getFieldDefinitions } from './field-definitions';
+import type { PropertyField, PropertySection, ElementType, OperatingMode, MultiEditFieldValue } from '../types';
+import { getFieldDefinitionsForMode } from './field-definitions';
 
 /**
  * Element data for multi-edit.
@@ -28,15 +28,18 @@ export interface ElementData {
  * Find common fields across multiple elements.
  * Only returns fields that exist in ALL elements and have the same definition.
  *
+ * P30e: Now accepts operating mode to filter fields contextually.
+ *
  * @param elements Array of elements with data
+ * @param mode Operating mode (MODEL_EDIT | CASE_CONFIG | RESULT_VIEW)
  * @returns Array of common fields with merged values
  */
-export function getCommonFields(elements: ElementData[]): PropertySection[] {
+export function getCommonFields(elements: ElementData[], mode: OperatingMode = 'MODEL_EDIT'): PropertySection[] {
   if (elements.length === 0) return [];
 
-  // Single element: return all fields
+  // Single element: return all fields for the mode
   if (elements.length === 1) {
-    const sections = getFieldDefinitions(elements[0].type);
+    const sections = getFieldDefinitionsForMode(elements[0].type, mode);
     return sections.map((section) => ({
       ...section,
       fields: section.fields.map((field) => ({
@@ -55,8 +58,8 @@ export function getCommonFields(elements: ElementData[]): PropertySection[] {
     return [];
   }
 
-  // All same type: get field definitions and merge values
-  const sections = getFieldDefinitions(firstType);
+  // All same type: get field definitions for the mode and merge values
+  const sections = getFieldDefinitionsForMode(firstType, mode);
 
   return sections.map((section) => ({
     ...section,
