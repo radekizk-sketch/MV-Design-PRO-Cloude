@@ -72,6 +72,17 @@ export interface SelectedElement {
 }
 
 /**
+ * Multi-selection state (P30c).
+ * Used for Property Grid multi-edit functionality.
+ */
+export interface MultiSelection {
+  /** Selected elements (ALWAYS sorted by ID for determinism) */
+  elements: SelectedElement[];
+  /** Common element type (null if mixed types) */
+  commonType: ElementType | null;
+}
+
+/**
  * Property field definition for Property Grid.
  * Deterministic ordering per powerfactory_ui_parity.md § D.3.
  */
@@ -113,6 +124,24 @@ export interface ElementProperties {
   elementName: string;
   sections: PropertySection[];
   validationMessages: ValidationMessage[];
+}
+
+/**
+ * P30c: Multi-edit field value.
+ * Represents a field value across multiple elements.
+ */
+export type MultiEditFieldValue =
+  | { kind: 'uniform'; value: unknown } // All elements have same value
+  | { kind: 'mixed' }; // Elements have different values
+
+/**
+ * P30c: Draft state for Property Grid (Apply/Cancel).
+ */
+export interface PropertyGridDraft {
+  /** Draft changes (field → new value) */
+  changes: Map<string, unknown>;
+  /** Has any unsaved changes */
+  isDirty: boolean;
 }
 
 /**
