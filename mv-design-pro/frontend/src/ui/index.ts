@@ -119,3 +119,20 @@ export type {
 // Issue Panel (P30d - Validation Browser)
 export { IssuePanel, IssuePanelContainer } from './issue-panel';
 export type { IssuePanelProps, IssuePanelContainerProps } from './issue-panel';
+
+// Inspector (READ-ONLY Property Grid - PowerFactory parity)
+export {
+  InspectorPanel,
+  InspectorPanelConnected,
+  PropertyGrid as InspectorPropertyGrid,
+  INSPECTOR_SECTION_LABELS,
+  FLAG_LABELS as INSPECTOR_FLAG_LABELS,
+} from './inspector';
+export type {
+  InspectorSection,
+  InspectorField,
+  InspectorElementData,
+  BusResultData,
+  BranchResultData,
+  ShortCircuitResultData,
+} from './inspector';
