@@ -1,9 +1,9 @@
 # RESULTS / PROOF / SLD — MAKSYMALNA ARCHITEKTURA UI
 
 **Status**: BINDING
-**Wersja**: 1.0
+**Wersja**: 1.1 (AMENDMENT)
 **Data**: 2026-01-31
-**Typ**: UI Architecture Contract — Maksymalistyczny
+**Typ**: UI Architecture Contract — Maksymalistyczny + Decision/Review/Context
 **Model referencyjny**: SUPERIOR vs DIgSILENT PowerFactory / ETAP
 
 ---
@@ -32,11 +32,20 @@ Niniejszy dokument definiuje **MAKSYMALNIE ROZBUDOWANĄ ARCHITEKTURĘ UI** dla t
 
 | Obszar | PowerFactory | ETAP | MV-DESIGN-PRO |
 |--------|--------------|------|---------------|
-| Widoki Results | 12 | 10 | **47** |
-| Widoki Proof | 2 | 0 | **24** |
+| Widoki Results | 12 | 10 | **52** |
+| Widoki Proof | 2 | 0 | **20** |
 | Tryby SLD | 3 | 2 | **12** |
+| Context Modes SLD | 0 | 0 | **4** |
 | Warstwy SLD | 4 | 3 | **18** |
-| Interakcje SLD | 8 | 6 | **32** |
+| Interakcje SLD | 8 | 6 | **12** |
+| Decision Support | 0 | 0 | **8** |
+| Review/Approval | 0 | 0 | **10** |
+| **TOTAL** | **~32** | **~23** | **138** |
+
+**Nowe warstwy (v1.1)**:
+- **DECISION SUPPORT** — UI prowadzi do decyzji, nie tylko prezentuje dane
+- **REVIEW/APPROVAL** — formalny workflow przeglądu i zatwierdzania
+- **CONTEXT MODES** — tryby kontekstowe (projektowy, analityczny, operacyjny, audytowy)
 
 ---
 
@@ -884,6 +893,360 @@ Macierz **wszystkich scenariuszy** z kluczowymi wskaźnikami.
 
 ---
 
+## 5. DECISION SUPPORT LAYER — WARSTWA WSPARCIA DECYZYJNEGO
+
+### 5.1. Filozofia warstwy decyzyjnej
+
+**DECISION SUPPORT LAYER** to warstwa UI, która **nie tylko prezentuje dane**, ale **prowadzi inżyniera do decyzji**. Każdy widok w tej warstwie odpowiada na pytanie: **„Co powinienem teraz zrobić?"**
+
+| Zasada | Opis |
+|--------|------|
+| **DATA → INSIGHT → ACTION** | Od danych przez wgląd do działania |
+| **ZERO INTERPRETACJI WYMAGANYCH** | Wynik jest czytelny bez dodatkowej analizy |
+| **PRIORYTETYZACJA PROBLEMÓW** | Najważniejsze problemy na górze |
+| **REKOMENDACJE KONTEKSTOWE** | Sugestie dostosowane do sytuacji |
+| **NEXT STEP GUIDANCE** | Jasna ścieżka działania |
+
+---
+
+### 5.2. Widok: Ocena spełnienia norm (NORM_COMPLIANCE_ASSESSMENT)
+
+#### 5.2.1. Cel decyzyjny
+Jednoznaczna odpowiedź na pytanie: **„Czy sieć spełnia wymagania normowe?"**
+
+#### 5.2.2. Struktura widoku
+
+| Sekcja | Zawartość | Cel decyzyjny |
+|--------|-----------|---------------|
+| **VERDICT BANNER** | PASS ✅ / FAIL ❌ / WARNING ⚠️ | Natychmiastowa ocena globalna |
+| **NORM CHECKLIST** | Lista norm z statusem | Które normy są naruszone |
+| **VIOLATION SUMMARY** | Liczba i kategorie naruszeń | Skala problemu |
+| **BLOCKING ISSUES** | Krytyczne naruszenia | Co blokuje zatwierdzenie |
+| **RECOMMENDATIONS** | Sugestie naprawy | Co zrobić dalej |
+
+#### 5.2.3. VERDICT BANNER — Definicja stanów
+
+| Status | Warunek | Kolor | Ikona | Komunikat |
+|--------|---------|-------|-------|-----------|
+| **PASS** | 0 violations, 0 warnings | Zielony (#28a745) | ✅ | „Sieć spełnia wszystkie wymagania normowe" |
+| **WARNING** | 0 violations, ≥1 warnings | Żółty (#ffc107) | ⚠️ | „Sieć spełnia wymagania z uwagami" |
+| **FAIL** | ≥1 violations | Czerwony (#dc3545) | ❌ | „Sieć NIE spełnia wymagań normowych" |
+
+#### 5.2.4. NORM CHECKLIST — Struktura
+
+| Norma | Status | Violations | Warnings | Details |
+|-------|--------|------------|----------|---------|
+| IEC 60909 (SC) | ✅ PASS | 0 | 0 | [Expand] |
+| PN-EN 50160 (Voltage) | ⚠️ WARNING | 0 | 3 | [Expand] |
+| IEC 60287 (Thermal) | ❌ FAIL | 2 | 1 | [Expand] |
+| PN-HD 60364 (Installation) | ✅ PASS | 0 | 0 | [Expand] |
+
+#### 5.2.5. BLOCKING ISSUES — Sekcja krytyczna
+
+| Element | Norma | Parametr | Wartość | Limit | Przekroczenie | Akcja |
+|---------|-------|----------|---------|-------|---------------|-------|
+| Bus 15-03 | IEC 60909 | Ik″_max | 32.5 kA | 25 kA | +30% | [Fix] [Details] [Proof] |
+| Line L-07 | IEC 60287 | θ_max | 92°C | 70°C | +31% | [Fix] [Details] [Proof] |
+
+#### 5.2.6. RECOMMENDATIONS — Sekcje rekomendacji
+
+| Priorytet | Rekomendacja | Wpływ | Koszt | Akcja |
+|-----------|--------------|-------|-------|-------|
+| 🔴 CRITICAL | Wymień aparaturę w Bus 15-03 na 31.5 kA | Eliminacja violation SC | Wysoki | [Simulate] |
+| 🔴 CRITICAL | Zwiększ przekrój kabla L-07 | Eliminacja violation thermal | Średni | [Simulate] |
+| 🟡 MEDIUM | Sprawdź nastawy zabezpieczeń | Poprawa marginesów | Niski | [Review] |
+
+---
+
+### 5.3. Widok: Ranking elementów krytycznych (CRITICAL_ELEMENTS_RANKING)
+
+#### 5.3.1. Cel decyzyjny
+Odpowiedź na pytanie: **„Które elementy wymagają natychmiastowej uwagi?"**
+
+#### 5.3.2. Struktura widoku
+
+| Kolumna | Opis | Cel |
+|---------|------|-----|
+| **RANK** | Pozycja w rankingu krytyczności | Priorytetyzacja |
+| **ELEMENT** | Identyfikator i nazwa | Identyfikacja |
+| **RISK SCORE** | Wskaźnik ryzyka 0-100 | Obiektywna ocena |
+| **VIOLATIONS** | Liczba naruszeń | Skala problemu |
+| **MARGIN** | Najmniejszy margines | Bliskość limitu |
+| **TREND** | Zmiana vs poprzedni Run | Kierunek zmian |
+| **ROOT CAUSE** | Główna przyczyna | Zrozumienie problemu |
+| **RECOMMENDED ACTION** | Sugestia działania | Następny krok |
+
+#### 5.3.3. RISK SCORE — Algorytm
+
+| Składnik | Waga | Opis |
+|----------|------|------|
+| Violation count | 40% | Liczba naruszeń × 10 punktów |
+| Lowest margin | 30% | (1 - margin/100) × 30 punktów |
+| Criticality class | 20% | CRITICAL=20, HIGH=15, MEDIUM=10, LOW=5 |
+| Trend regression | 10% | Pogorszenie vs poprzedni Run |
+
+#### 5.3.4. Interakcje
+
+| Akcja | Efekt |
+|-------|-------|
+| Klik na wiersz | Otwarcie Element Inspector |
+| Klik na „ROOT CAUSE" | Otwarcie ProofGraph z podświetloną przyczyną |
+| Klik na „RECOMMENDED ACTION" | Otwarcie What-If Preview z sugerowaną zmianą |
+
+---
+
+### 5.4. Widok: Główne przyczyny przekroczeń (ROOT_CAUSE_ANALYSIS)
+
+#### 5.4.1. Cel decyzyjny
+Odpowiedź na pytanie: **„Dlaczego sieć nie spełnia wymagań?"**
+
+#### 5.4.2. Struktura widoku — Drzewo przyczynowo-skutkowe
+
+```
+VIOLATION: Bus 15-03 Ik″_max = 32.5 kA > 25 kA
+│
+├── DIRECT CAUSE: Wysokie Sk″ sieci zasilającej
+│   │
+│   ├── CONTRIBUTOR 1: Grid Source (Sk″ = 500 MVA) — 65%
+│   │   └── ROOT: Warunki przyłączenia OSD
+│   │
+│   └── CONTRIBUTOR 2: Generator G-01 (Xd″ = 15%) — 35%
+│       └── ROOT: Parametry generatora
+│
+└── AGGRAVATING FACTOR: Niska impedancja transformatora T-01 (uk = 4%)
+    └── ROOT: Specyfikacja transformatora
+```
+
+#### 5.4.3. Tabela przyczyn z rekomendacjami
+
+| Przyczyna | Typ | Wpływ | Możliwość zmiany | Rekomendacja |
+|-----------|-----|-------|------------------|--------------|
+| Warunki przyłączenia OSD | EXTERNAL | 65% | NIE | Weryfikacja z OSD |
+| Parametry generatora G-01 | DESIGN | 35% | TAK | Zwiększenie Xd″ |
+| Niska impedancja T-01 | DESIGN | 15% | TAK | Transformator z wyższym uk |
+
+#### 5.4.4. Interakcje
+
+| Akcja | Efekt |
+|-------|-------|
+| Klik na przyczynę | Rozwinięcie szczegółów |
+| Klik na „Rekomendacja" | Otwarcie What-If Preview |
+| Klik na „EXTERNAL" | Informacja o ograniczeniach zewnętrznych |
+
+---
+
+### 5.5. Widok: Wpływ parametrów — Sensitivity Light (SENSITIVITY_LIGHT)
+
+#### 5.5.1. Cel decyzyjny
+Odpowiedź na pytanie: **„Które parametry mają największy wpływ na wynik?"**
+
+#### 5.5.2. Struktura widoku
+
+| Parametr | Element | Wartość bazowa | Wpływ na Ik″ | Wpływ na V% | Wpływ na I% |
+|----------|---------|----------------|--------------|-------------|-------------|
+| Sk″_grid | Grid Source | 500 MVA | ████████ 85% | ░░░░░░░░ 5% | ░░░░░░░░ 8% |
+| uk_T01 | Trafo T-01 | 6% | ████░░░░ 45% | ██░░░░░░ 15% | ██░░░░░░ 12% |
+| X_L01 | Line L-01 | 0.4 Ω/km | ██░░░░░░ 20% | ████░░░░ 35% | ████████ 78% |
+
+#### 5.5.3. Wizualizacja — Tornado Chart
+
+```
+Wpływ na Ik″_max (Bus 15-03):
+
+Sk″_grid     ████████████████████████████████████████ +8.5 kA
+uk_T01       ████████████████████░░░░░░░░░░░░░░░░░░░░ +4.2 kA
+Xd″_G01      ██████████░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░ +2.1 kA
+X_L01        ████░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░ +0.8 kA
+             ─────────────────────────────────────────
+             -10 kA           0           +10 kA
+```
+
+#### 5.5.4. Interakcje
+
+| Akcja | Efekt |
+|-------|-------|
+| Klik na parametr | Otwarcie slidera What-If |
+| Hover na bar | Tooltip z dokładną wartością wpływu |
+| Klik na „Explore" | Pełna analiza Sensitivity dla parametru |
+
+---
+
+### 5.6. Widok: What-If Preview (WHAT_IF_PREVIEW)
+
+#### 5.6.1. Cel decyzyjny
+Odpowiedź na pytanie: **„Co się stanie, jeśli zmienię ten parametr?"**
+
+**WAŻNE**: What-If Preview **NIE URUCHAMIA SOLVERA**. Używa aproksymacji liniowej z ostatniego pełnego obliczenia.
+
+#### 5.6.2. Struktura widoku
+
+| Sekcja | Zawartość |
+|--------|-----------|
+| **PARAMETER SELECTOR** | Wybór parametru do zmiany |
+| **VALUE SLIDER** | Slider z zakresem wartości |
+| **INSTANT PREVIEW** | Natychmiastowy podgląd wpływu |
+| **CONFIDENCE INDICATOR** | Wskaźnik dokładności aproksymacji |
+| **RUN FULL ANALYSIS** | Przycisk uruchomienia pełnego obliczenia |
+
+#### 5.6.3. INSTANT PREVIEW — Struktura
+
+| Parametr | Wartość bazowa | Nowa wartość | Zmiana | Wpływ na wynik |
+|----------|----------------|--------------|--------|----------------|
+| uk_T01 | 6% | 8% | +2% | Ik″_max: 32.5 → 28.7 kA (↓12%) |
+
+| Wynik | Przed | Po (preview) | Zmiana | Nowy status |
+|-------|-------|--------------|--------|-------------|
+| Ik″_max | 32.5 kA | ~28.7 kA | -3.8 kA | ⚠️ WARNING (limit 25 kA) |
+| Margin | -30% | ~-15% | +15% | Poprawa, nadal violation |
+
+#### 5.6.4. CONFIDENCE INDICATOR
+
+| Confidence | Warunek | Kolor | Komunikat |
+|------------|---------|-------|-----------|
+| HIGH | Zmiana < 10% wartości bazowej | Zielony | „Aproksymacja wiarygodna" |
+| MEDIUM | Zmiana 10-25% | Żółty | „Aproksymacja orientacyjna" |
+| LOW | Zmiana > 25% | Czerwony | „Wymagane pełne obliczenie" |
+
+#### 5.6.5. Interakcje
+
+| Akcja | Efekt |
+|-------|-------|
+| Przesunięcie slidera | Natychmiastowy update preview |
+| Klik „Apply & Run" | Zastosowanie zmiany + uruchomienie solvera |
+| Klik „Reset" | Powrót do wartości bazowej |
+| Klik „Compare" | Dodanie wariantu do porównania |
+
+---
+
+### 5.7. Widok: Action Plan Generator (ACTION_PLAN_GENERATOR)
+
+#### 5.7.1. Cel decyzyjny
+Odpowiedź na pytanie: **„Jaki jest plan naprawy sieci?"**
+
+#### 5.7.2. Struktura widoku
+
+| Sekcja | Zawartość |
+|--------|-----------|
+| **PROBLEM SUMMARY** | Podsumowanie naruszeń |
+| **PROPOSED ACTIONS** | Lista proponowanych działań |
+| **IMPACT MATRIX** | Macierz wpływu działań na naruszenia |
+| **PRIORITY SEQUENCE** | Sekwencja działań (co najpierw) |
+| **COST-BENEFIT** | Analiza kosztów i korzyści |
+
+#### 5.7.3. PROPOSED ACTIONS — Struktura
+
+| # | Działanie | Typ | Wpływ | Koszt | Priorytet | Status |
+|---|-----------|-----|-------|-------|-----------|--------|
+| 1 | Wymiana aparatury Bus 15-03 na 31.5 kA | CAPEX | Eliminacja 1 violation SC | Wysoki | 🔴 CRITICAL | [Simulate] |
+| 2 | Transformator T-01: uk 6% → 8% | REPLACE | Redukcja Ik″ o 12% | Średni | 🟡 HIGH | [Simulate] |
+| 3 | Kabel L-07: zwiększenie przekroju | UPGRADE | Eliminacja 1 violation thermal | Średni | 🔴 CRITICAL | [Simulate] |
+
+#### 5.7.4. IMPACT MATRIX
+
+| Działanie | V-001 (SC) | V-002 (Thermal) | W-001 (Voltage) | W-002 (Margin) |
+|-----------|------------|-----------------|-----------------|----------------|
+| Wymiana aparatury | ✅ FIX | — | — | ✅ IMPROVE |
+| Transformator uk 8% | ⚠️ REDUCE | — | — | ✅ IMPROVE |
+| Kabel L-07 upgrade | — | ✅ FIX | — | ✅ IMPROVE |
+
+#### 5.7.5. PRIORITY SEQUENCE
+
+```
+REKOMENDOWANA KOLEJNOŚĆ DZIAŁAŃ:
+
+1. [CRITICAL] Wymiana aparatury Bus 15-03
+   └── Eliminuje blocking violation SC
+
+2. [CRITICAL] Upgrade kabla L-07
+   └── Eliminuje blocking violation thermal
+
+3. [HIGH] Zmiana transformatora T-01
+   └── Zwiększa marginesy, redukuje ryzyko
+
+4. [MEDIUM] Przegląd nastaw zabezpieczeń
+   └── Optymalizacja koordynacji
+```
+
+---
+
+### 5.8. Widok: Decision Dashboard (DECISION_DASHBOARD)
+
+#### 5.8.1. Cel decyzyjny
+Centralne miejsce podejmowania decyzji — **„Command Center"** dla inżyniera.
+
+#### 5.8.2. Struktura widoku — Layout
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ DECISION DASHBOARD                                            [Case: Main] │
+├─────────────────────────────────────────────────────────────────────────────┤
+│ ┌─────────────────────┐ ┌─────────────────────┐ ┌─────────────────────────┐ │
+│ │   VERDICT BANNER    │ │   RISK SUMMARY      │ │   TREND INDICATOR       │ │
+│ │   ❌ FAIL (2)       │ │   🔴 HIGH (65/100)  │ │   ↓ REGRESSED (-12%)   │ │
+│ └─────────────────────┘ └─────────────────────┘ └─────────────────────────┘ │
+├─────────────────────────────────────────────────────────────────────────────┤
+│ BLOCKING ISSUES (must fix before approval)                                  │
+│ ┌─────────────────────────────────────────────────────────────────────────┐ │
+│ │ 1. Bus 15-03: Ik″ = 32.5 kA > 25 kA         [Fix] [Details] [Proof]    │ │
+│ │ 2. Line L-07: θ = 92°C > 70°C               [Fix] [Details] [Proof]    │ │
+│ └─────────────────────────────────────────────────────────────────────────┘ │
+├─────────────────────────────────────────────────────────────────────────────┤
+│ TOP 5 CRITICAL ELEMENTS              │ RECOMMENDED NEXT STEPS              │
+│ ┌───────────────────────────────────┐│┌───────────────────────────────────┐│
+│ │ 1. Bus 15-03 (Risk: 95) [→]      │││ 1. Review blocking issues          ││
+│ │ 2. Line L-07 (Risk: 88) [→]      │││ 2. Run What-If for T-01 upgrade    ││
+│ │ 3. Bus 15-01 (Risk: 72) [→]      │││ 3. Generate Action Plan            ││
+│ │ 4. Trafo T-01 (Risk: 65) [→]     │││ 4. Schedule review meeting         ││
+│ │ 5. Line L-03 (Risk: 58) [→]      │││ 5. Export compliance report        ││
+│ └───────────────────────────────────┘│└───────────────────────────────────┘│
+├─────────────────────────────────────────────────────────────────────────────┤
+│ QUICK ACTIONS: [Run Analysis ▼] [Compare Cases] [Export Report] [Approve]  │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+#### 5.8.3. Widgety
+
+| Widget | Zawartość | Interakcja |
+|--------|-----------|------------|
+| VERDICT BANNER | Status globalny PASS/FAIL/WARNING | Klik → NORM_COMPLIANCE_ASSESSMENT |
+| RISK SUMMARY | Wskaźnik ryzyka 0-100 | Klik → CRITICAL_ELEMENTS_RANKING |
+| TREND INDICATOR | Zmiana vs poprzedni Run | Klik → RUN_COMPARISON |
+| BLOCKING ISSUES | Lista krytycznych naruszeń | Klik → Element Inspector |
+| TOP 5 CRITICAL | Ranking elementów | Klik → Element Inspector |
+| RECOMMENDED NEXT STEPS | Sugestie działań | Klik → wykonanie akcji |
+
+---
+
+### 5.9. Widok: Approval Readiness Check (APPROVAL_READINESS)
+
+#### 5.9.1. Cel decyzyjny
+Odpowiedź na pytanie: **„Czy projekt jest gotowy do zatwierdzenia?"**
+
+#### 5.9.2. Struktura widoku — Checklist
+
+| Kategoria | Wymóg | Status | Akcja |
+|-----------|-------|--------|-------|
+| **COMPLIANCE** | Brak naruszeń normowych | ❌ FAIL | [View Violations] |
+| **COMPLIANCE** | Wszystkie warnings reviewed | ⚠️ PENDING | [Review Warnings] |
+| **DATA QUALITY** | Kompletność danych wejściowych | ✅ PASS | [View Data] |
+| **DATA QUALITY** | Katalogi aktualne | ✅ PASS | [View Catalogs] |
+| **CALCULATIONS** | LF converged | ✅ PASS | [View Results] |
+| **CALCULATIONS** | SC completed | ✅ PASS | [View Results] |
+| **REVIEW** | Proof reviewed | ⚠️ PENDING | [Review Proof] |
+| **REVIEW** | Comments resolved | ⚠️ PENDING | [View Comments] |
+| **APPROVAL** | Technical approval | ⏳ WAITING | [Request Approval] |
+| **APPROVAL** | Managerial approval | ⏳ WAITING | [Request Approval] |
+
+#### 5.9.3. APPROVAL GATE
+
+| Gate | Warunek | Status |
+|------|---------|--------|
+| **GATE 1: Technical** | 0 violations + all warnings reviewed | ❌ BLOCKED |
+| **GATE 2: Review** | Proof reviewed + comments resolved | ⚠️ PENDING |
+| **GATE 3: Approval** | Technical + Managerial approval | ⏳ WAITING |
+
+---
+
 # CZĘŚĆ II: PROOF / ŚLAD OBLICZEŃ — MAKSYMALNA ARCHITEKTURA
 
 ---
@@ -1218,6 +1581,294 @@ Zakładka **Proof (P11)** w Element Inspector zawiera:
 
 ---
 
+## 8. REVIEW / APPROVAL LAYER — WARSTWA PRZEGLĄDU I ZATWIERDZANIA
+
+### 8.1. Filozofia warstwy Review / Approval
+
+**REVIEW / APPROVAL LAYER** to formalna warstwa procesu zatwierdzania obliczeń, która:
+
+| Zasada | Opis |
+|--------|------|
+| **FORMAL WORKFLOW** | Każdy Proof przechodzi przez formalny proces review |
+| **AUDIT TRAIL** | Pełny ślad: kto, kiedy, co zatwierdził |
+| **CHECKLIST-DRIVEN** | Strukturalne checklisty audytowe |
+| **ROLE-BASED** | Różne uprawnienia dla różnych ról |
+| **IMMUTABLE HISTORY** | Historia zmian niemodyfikowalna |
+
+---
+
+### 8.2. Status kroku Proof (PROOF_STEP_STATUS)
+
+#### 8.2.1. Stany statusu
+
+| Status | Ikona | Kolor | Opis | Dozwolone akcje |
+|--------|-------|-------|------|-----------------|
+| **DRAFT** | 📝 | Szary | Krok obliczeniowy utworzony, nie przeglądany | Edit, Submit for Review |
+| **PENDING_REVIEW** | ⏳ | Żółty | Oczekuje na przegląd | Review, Reject |
+| **IN_REVIEW** | 🔍 | Niebieski | W trakcie przeglądu | Approve, Reject, Comment |
+| **REVIEWED** | ✓ | Zielony jasny | Przegląd zakończony pozytywnie | Request Approval |
+| **APPROVED** | ✅ | Zielony | Formalnie zatwierdzony | Lock, Export |
+| **REJECTED** | ❌ | Czerwony | Odrzucony, wymaga poprawy | Edit, Resubmit |
+| **LOCKED** | 🔒 | Szary ciemny | Zablokowany (produkcja) | View Only |
+
+#### 8.2.2. Diagram przejść stanów
+
+```
+                    ┌─────────────────────────────────────────┐
+                    │                                         │
+                    ▼                                         │
+┌─────────┐    ┌─────────────────┐    ┌───────────┐    ┌──────────┐
+│  DRAFT  │───▶│ PENDING_REVIEW  │───▶│ IN_REVIEW │───▶│ REVIEWED │
+└─────────┘    └─────────────────┘    └───────────┘    └──────────┘
+     ▲                                      │               │
+     │                                      ▼               ▼
+     │                               ┌──────────┐    ┌──────────┐
+     └───────────────────────────────│ REJECTED │    │ APPROVED │
+                                     └──────────┘    └──────────┘
+                                                          │
+                                                          ▼
+                                                     ┌─────────┐
+                                                     │ LOCKED  │
+                                                     └─────────┘
+```
+
+---
+
+### 8.3. Checklisty audytowe (AUDIT_CHECKLISTS)
+
+#### 8.3.1. Checklist: Zgodność normowa (NORM_COMPLIANCE_CHECKLIST)
+
+| # | Wymóg | Status | Komentarz | Reviewer |
+|---|-------|--------|-----------|----------|
+| 1 | Norma bazowa zidentyfikowana (IEC 60909) | ☐ | — | — |
+| 2 | Wersja normy aktualna (2016+) | ☐ | — | — |
+| 3 | Współczynnik c_max zgodny z Tab. 1 | ☐ | — | — |
+| 4 | Współczynnik c_min zgodny z Tab. 1 | ☐ | — | — |
+| 5 | Metoda obliczeń zgodna z Clause 4 | ☐ | — | — |
+| 6 | Korekcje impedancji zastosowane (Clause 6) | ☐ | — | — |
+| 7 | Składowe symetryczne poprawne | ☐ | — | — |
+| 8 | Jednostki zgodne z SI | ☐ | — | — |
+
+#### 8.3.2. Checklist: Dane wejściowe (INPUT_DATA_CHECKLIST)
+
+| # | Wymóg | Status | Komentarz | Reviewer |
+|---|-------|--------|-----------|----------|
+| 1 | Dane katalogowe kompletne | ☐ | — | — |
+| 2 | Dane katalogowe ze źródła zaufanego | ☐ | — | — |
+| 3 | Topologia sieci poprawna | ☐ | — | — |
+| 4 | Stany łączeniowe zgodne z rzeczywistością | ☐ | — | — |
+| 5 | Warunki brzegowe zdefiniowane | ☐ | — | — |
+| 6 | Sk″ sieci zasilającej zweryfikowane z OSD | ☐ | — | — |
+
+#### 8.3.3. Checklist: Obliczenia (CALCULATION_CHECKLIST)
+
+| # | Wymóg | Status | Komentarz | Reviewer |
+|---|-------|--------|-----------|----------|
+| 1 | Wzory matematyczne poprawne | ☐ | — | — |
+| 2 | Podstawienia liczbowe poprawne | ☐ | — | — |
+| 3 | Jednostki spójne w całym obliczeniu | ☐ | — | — |
+| 4 | Zaokrąglenia zgodne z normą | ☐ | — | — |
+| 5 | Wyniki w sensownym zakresie | ☐ | — | — |
+| 6 | Brak błędów numerycznych | ☐ | — | — |
+
+#### 8.3.4. Checklist: Warianty normowe (NORM_VARIANTS_CHECKLIST)
+
+| # | Wymóg | Status | Komentarz | Reviewer |
+|---|-------|--------|-----------|----------|
+| 1 | c_max dla obliczeń maksymalnych | ☐ | — | — |
+| 2 | c_min dla obliczeń minimalnych | ☐ | — | — |
+| 3 | Near-to-generator dla źródeł bliskich | ☐ | — | — |
+| 4 | Far-from-generator dla sieci dystrybucyjnych | ☐ | — | — |
+| 5 | Prąd udarowy κ poprawnie obliczony | ☐ | — | — |
+| 6 | Prąd cieplny Ith poprawnie obliczony | ☐ | — | — |
+
+---
+
+### 8.4. Ślad przeglądu (REVIEW_TRAIL)
+
+#### 8.4.1. Struktura wpisu Review Trail
+
+| Pole | Typ | Opis |
+|------|-----|------|
+| **Timestamp** | datetime | Data i czas akcji |
+| **User** | string | Identyfikator użytkownika |
+| **Role** | enum | ENGINEER / REVIEWER / APPROVER / ADMIN |
+| **Action** | enum | SUBMIT / REVIEW_START / COMMENT / APPROVE / REJECT / LOCK |
+| **Previous_status** | enum | Status przed akcją |
+| **New_status** | enum | Status po akcji |
+| **Comment** | text | Komentarz (opcjonalny) |
+| **Checklist_id** | UUID | Powiązana checklist (opcjonalnie) |
+| **Digital_signature** | hash | Podpis cyfrowy wpisu |
+
+#### 8.4.2. Przykład Review Trail
+
+| Timestamp | User | Role | Action | Status change | Comment |
+|-----------|------|------|--------|---------------|---------|
+| 2026-01-28 14:32:15 | jan.kowalski | ENGINEER | SUBMIT | DRAFT → PENDING_REVIEW | „Obliczenia SC dla Bus 15-03" |
+| 2026-01-28 15:45:22 | anna.nowak | REVIEWER | REVIEW_START | PENDING_REVIEW → IN_REVIEW | — |
+| 2026-01-28 16:12:08 | anna.nowak | REVIEWER | COMMENT | — | „Sprawdzić wartość c_max" |
+| 2026-01-28 16:45:33 | anna.nowak | REVIEWER | APPROVE | IN_REVIEW → REVIEWED | „Obliczenia poprawne" |
+| 2026-01-29 09:15:00 | piotr.wisniewski | APPROVER | APPROVE | REVIEWED → APPROVED | „Zatwierdzam do dokumentacji" |
+| 2026-01-29 09:20:00 | SYSTEM | ADMIN | LOCK | APPROVED → LOCKED | „Auto-lock after approval" |
+
+---
+
+### 8.5. Komentarze inżynierskie (ENGINEERING_COMMENTS)
+
+#### 8.5.1. Typy komentarzy
+
+| Typ | Ikona | Kolor | Opis | Wymagana akcja |
+|-----|-------|-------|------|----------------|
+| **NOTE** | 📝 | Niebieski | Notatka informacyjna | Brak |
+| **QUESTION** | ❓ | Żółty | Pytanie wymagające odpowiedzi | Odpowiedź |
+| **CONCERN** | ⚠️ | Pomarańczowy | Wątpliwość techniczna | Wyjaśnienie |
+| **ISSUE** | 🔴 | Czerwony | Problem blokujący | Rozwiązanie |
+| **SUGGESTION** | 💡 | Zielony | Sugestia ulepszenia | Opcjonalne |
+
+#### 8.5.2. Struktura komentarza
+
+| Pole | Opis |
+|------|------|
+| **ID** | Unikalny identyfikator komentarza |
+| **Type** | Typ komentarza (NOTE/QUESTION/CONCERN/ISSUE/SUGGESTION) |
+| **Author** | Autor komentarza |
+| **Timestamp** | Data i czas utworzenia |
+| **Target** | Element Proof, do którego się odnosi |
+| **Content** | Treść komentarza |
+| **Status** | OPEN / RESOLVED / WONT_FIX |
+| **Resolution** | Opis rozwiązania (jeśli RESOLVED) |
+| **Resolved_by** | Kto rozwiązał |
+| **Resolved_at** | Kiedy rozwiązano |
+
+#### 8.5.3. Widok komentarzy w Proof
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ KROK 5: Obliczenie impedancji wypadkowej                                    │
+├─────────────────────────────────────────────────────────────────────────────┤
+│ Wzór: Z_k = Z_Q + Z_T + Z_L                                                 │
+│ Wynik: Z_k = 2.21 Ω                                                         │
+├─────────────────────────────────────────────────────────────────────────────┤
+│ 💬 COMMENTS (2)                                                             │
+│ ┌─────────────────────────────────────────────────────────────────────────┐ │
+│ │ ❓ [OPEN] anna.nowak (2026-01-28 16:12):                                │ │
+│ │ „Czy uwzględniono korekcję KT dla transformatora?"                      │ │
+│ │                                                                         │ │
+│ │ ↳ jan.kowalski (2026-01-28 16:30):                                      │ │
+│ │   „Tak, KT = 0.95 zastosowane w kroku 3"                                │ │
+│ │   [Mark as Resolved]                                                    │ │
+│ ├─────────────────────────────────────────────────────────────────────────┤ │
+│ │ 📝 [NOTE] piotr.wisniewski (2026-01-29 09:10):                          │ │
+│ │ „Wartość zgodna z poprzednimi obliczeniami dla tej stacji"              │ │
+│ └─────────────────────────────────────────────────────────────────────────┘ │
+│ [Add Comment]                                                               │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+#### 8.5.4. Tryb Read-Only w produkcji
+
+W trybie **LOCKED** (produkcja):
+- Komentarze są widoczne, ale **nie można dodawać nowych**
+- Nie można edytować istniejących komentarzy
+- Nie można zmieniać statusu komentarzy
+- Widoczny komunikat: „Proof is locked. Comments are read-only."
+
+---
+
+### 8.6. Panel Review (REVIEW_PANEL)
+
+#### 8.6.1. Struktura panelu
+
+| Sekcja | Zawartość |
+|--------|-----------|
+| **STATUS HEADER** | Aktualny status Proof + historia statusów |
+| **CHECKLIST PROGRESS** | Postęp wypełniania checklisty |
+| **COMMENTS SUMMARY** | Liczba komentarzy per typ + unresloved |
+| **REVIEWER INFO** | Aktualny reviewer + przypisani |
+| **ACTIONS** | Przyciski akcji (Approve, Reject, Comment) |
+
+#### 8.6.2. Przykład wizualizacji
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ REVIEW PANEL                                                                │
+├─────────────────────────────────────────────────────────────────────────────┤
+│ STATUS: 🔍 IN_REVIEW                                                        │
+│ Submitted by: jan.kowalski (2026-01-28 14:32)                               │
+│ Reviewer: anna.nowak (assigned 2026-01-28 15:45)                            │
+├─────────────────────────────────────────────────────────────────────────────┤
+│ CHECKLIST PROGRESS                                                          │
+│ ┌─────────────────────────────────────────────────────────────────────────┐ │
+│ │ Norm Compliance:    ████████░░ 80% (8/10 items)                         │ │
+│ │ Input Data:         ██████████ 100% (6/6 items)                         │ │
+│ │ Calculations:       ████████░░ 83% (5/6 items)                          │ │
+│ │ Norm Variants:      ██████░░░░ 67% (4/6 items)                          │ │
+│ └─────────────────────────────────────────────────────────────────────────┘ │
+├─────────────────────────────────────────────────────────────────────────────┤
+│ COMMENTS: 5 total | 2 📝 | 1 ❓ (unresolved) | 1 ⚠️ (unresolved) | 1 💡     │
+├─────────────────────────────────────────────────────────────────────────────┤
+│ [Approve ✅]  [Reject ❌]  [Add Comment 💬]  [Request Changes 🔄]           │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+### 8.7. Approval Workflow (APPROVAL_WORKFLOW)
+
+#### 8.7.1. Role w workflow
+
+| Rola | Uprawnienia | Odpowiedzialność |
+|------|-------------|------------------|
+| **ENGINEER** | Create, Edit, Submit | Tworzenie i edycja Proof |
+| **REVIEWER** | Review, Comment, Request Changes | Techniczny przegląd |
+| **APPROVER** | Approve, Reject | Formalne zatwierdzenie |
+| **ADMIN** | Lock, Unlock, Delete | Administracja systemem |
+
+#### 8.7.2. Warunki zatwierdzenia
+
+| Gate | Warunek | Blokada |
+|------|---------|---------|
+| **REVIEW** | Wszystkie checklisty 100% | Nie można APPROVE bez 100% |
+| **REVIEW** | Wszystkie ISSUE resolved | Nie można APPROVE z open ISSUE |
+| **APPROVAL** | REVIEWED status | Nie można APPROVE bez REVIEWED |
+| **LOCK** | APPROVED status | Nie można LOCK bez APPROVED |
+
+#### 8.7.3. Powiadomienia
+
+| Event | Odbiorcy | Kanał |
+|-------|----------|-------|
+| Submit for Review | Przypisani reviewerzy | Email + In-app |
+| Comment Added | Autor Proof + Reviewer | In-app |
+| Review Completed | Autor Proof + Approvers | Email + In-app |
+| Approved | Wszyscy uczestnicy | Email + In-app |
+| Rejected | Autor Proof | Email + In-app |
+
+---
+
+### 8.8. Eksport Review (REVIEW_EXPORT)
+
+#### 8.8.1. Formaty eksportu Review
+
+| Format | Zawartość | Zastosowanie |
+|--------|-----------|--------------|
+| PDF Audit Report | Proof + Review Trail + Comments + Checklists | Dokumentacja audytowa |
+| Excel Checklist | Wszystkie checklisty z statusami | Przegląd offline |
+| JSON Review Data | Surowe dane review | Integracja z innymi systemami |
+
+#### 8.8.2. Zawartość PDF Audit Report
+
+| Sekcja | Zawartość |
+|--------|-----------|
+| Header | Case, Snapshot, Run, Element, Timestamp |
+| Proof Summary | Kluczowe wyniki z Proof |
+| Review Trail | Pełna historia statusów |
+| Checklists | Wszystkie checklisty z zaznaczeniami |
+| Comments | Wszystkie komentarze z rozwiązaniami |
+| Signatures | Podpisy cyfrowe: Engineer, Reviewer, Approver |
+| Footer | Hash dokumentu, timestamp generacji |
+
+---
+
 # CZĘŚĆ III: SLD — MAKSYMALNA ARCHITEKTURA
 
 ---
@@ -1498,7 +2149,291 @@ Wizualizacja **śladu obliczeń** na schemacie SLD — powiązanie Proof z topol
 
 ---
 
-## 10. WARSTWY SLD (LAYERS)
+## 10. CONTEXT MODES — TRYBY KONTEKSTOWE SLD
+
+### 10.1. Filozofia trybów kontekstowych
+
+**CONTEXT MODES** definiują **kontekst pracy** inżyniera z SLD. Każdy tryb kontekstowy:
+
+| Zasada | Opis |
+|--------|------|
+| **DISTINCT PURPOSE** | Każdy tryb ma jasno określony cel pracy |
+| **TAILORED LAYERS** | Aktywne warstwy dostosowane do kontekstu |
+| **RESTRICTED ACTIONS** | Dozwolone akcje ograniczone do kontekstu |
+| **ROLE-BASED** | Różne tryby dla różnych ról |
+| **SWITCHING GUARD** | Przełączanie trybów z potwierdzeniem |
+
+---
+
+### 10.2. Tryb PROJEKTOWY (CONTEXT_DESIGN)
+
+#### 10.2.1. Cel inżynierski
+Projektowanie i modyfikacja topologii sieci — **tryb kreatywny**.
+
+#### 10.2.2. Aktywne warstwy
+
+| Warstwa | Status | Cel |
+|---------|--------|-----|
+| LAYER_TOPOLOGY | ✅ ACTIVE | Podstawowa topologia |
+| LAYER_TECHNICAL_VOLTAGES | ✅ ACTIVE | Napięcia znamionowe |
+| LAYER_TECHNICAL_IMPEDANCES | ✅ ACTIVE | Impedancje elementów |
+| LAYER_ANALYTICAL_MARGINS | ⚪ OPTIONAL | Marginesy (po obliczeniu) |
+| LAYER_PROTECTION_SETTINGS | ⚪ OPTIONAL | Nastawy zabezpieczeń |
+| LAYER_CAD_SYMBOLS | ✅ ACTIVE | Symbole CAD |
+| LAYER_SCADA_STATUS | ❌ INACTIVE | Nie dotyczy projektowania |
+
+#### 10.2.3. Dozwolone akcje
+
+| Akcja | Status | Opis |
+|-------|--------|------|
+| Add Element | ✅ ALLOWED | Dodawanie nowych elementów |
+| Delete Element | ✅ ALLOWED | Usuwanie elementów |
+| Modify Parameters | ✅ ALLOWED | Zmiana parametrów |
+| Change Topology | ✅ ALLOWED | Zmiana połączeń |
+| Run Analysis | ✅ ALLOWED | Uruchamianie obliczeń |
+| Export to CAD | ✅ ALLOWED | Eksport do AutoCAD |
+| Switch States | ⚠️ DESIGN ONLY | Tylko stany projektowe |
+| Approve Changes | ❌ BLOCKED | Wymaga trybu AUDYTOWEGO |
+
+#### 10.2.4. Toolbar kontekstowy
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ MODE: DESIGN 🏗️                                                             │
+├─────────────────────────────────────────────────────────────────────────────┤
+│ [Add Bus] [Add Line] [Add Trafo] [Add Source] [Add Load] │ [Run LF] [Run SC]│
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+### 10.3. Tryb ANALITYCZNY (CONTEXT_ANALYSIS)
+
+#### 10.3.1. Cel inżynierski
+Analiza wyników obliczeń i identyfikacja problemów — **tryb badawczy**.
+
+#### 10.3.2. Aktywne warstwy
+
+| Warstwa | Status | Cel |
+|---------|--------|-----|
+| LAYER_TOPOLOGY | ✅ ACTIVE | Podstawowa topologia |
+| LAYER_TECHNICAL_VOLTAGES | ✅ ACTIVE | Wyniki napięciowe |
+| LAYER_TECHNICAL_CURRENTS | ✅ ACTIVE | Wyniki prądowe |
+| LAYER_TECHNICAL_POWERS | ✅ ACTIVE | Przepływy mocy |
+| LAYER_TECHNICAL_LOSSES | ✅ ACTIVE | Straty |
+| LAYER_ANALYTICAL_MARGINS | ✅ ACTIVE | Marginesy |
+| LAYER_ANALYTICAL_VIOLATIONS | ✅ ACTIVE | Naruszenia |
+| LAYER_PROOF_IMPEDANCES | ⚪ OPTIONAL | Impedancje Proof |
+| LAYER_COMPARISON_DELTAS | ⚪ OPTIONAL | Porównania |
+
+#### 10.3.3. Dozwolone akcje
+
+| Akcja | Status | Opis |
+|-------|--------|------|
+| View Results | ✅ ALLOWED | Przeglądanie wyników |
+| Open Proof | ✅ ALLOWED | Otwarcie śladu obliczeń |
+| Compare Cases | ✅ ALLOWED | Porównywanie wariantów |
+| What-If Preview | ✅ ALLOWED | Podgląd wpływu zmian |
+| Run Analysis | ✅ ALLOWED | Uruchamianie obliczeń |
+| Export Results | ✅ ALLOWED | Eksport wyników |
+| Modify Parameters | ⚠️ WITH CONFIRMATION | Zmiana z potwierdzeniem |
+| Delete Element | ❌ BLOCKED | Wymaga trybu PROJEKTOWEGO |
+
+#### 10.3.4. Toolbar kontekstowy
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ MODE: ANALYSIS 🔬                                                           │
+├─────────────────────────────────────────────────────────────────────────────┤
+│ [Show LF] [Show SC] [Compare] [What-If] │ [Violations ▼] [Export Results]  │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+### 10.4. Tryb OPERACYJNY (CONTEXT_OPERATIONS)
+
+#### 10.4.1. Cel inżynierski
+Symulacja i planowanie operacji łączeniowych — **tryb zgodny z Instrukcją Czynności Łączeniowych**.
+
+#### 10.4.2. Aktywne warstwy
+
+| Warstwa | Status | Cel |
+|---------|--------|-----|
+| LAYER_TOPOLOGY | ✅ ACTIVE | Topologia z aktualnymi stanami |
+| LAYER_SCADA_STATUS | ✅ ACTIVE | Stany łączeniowe SCADA |
+| LAYER_TECHNICAL_VOLTAGES | ✅ ACTIVE | Napięcia aktualne |
+| LAYER_TECHNICAL_CURRENTS | ✅ ACTIVE | Prądy aktualne |
+| LAYER_PROTECTION_SETTINGS | ✅ ACTIVE | Nastawy zabezpieczeń |
+| LAYER_ANALYTICAL_MARGINS | ⚠️ HIGHLIGHTED | Marginesy podświetlone |
+| LAYER_ANALYTICAL_VIOLATIONS | ⚠️ HIGHLIGHTED | Naruszenia podświetlone |
+
+#### 10.4.3. Dozwolone akcje
+
+| Akcja | Status | Opis |
+|-------|--------|------|
+| Toggle Switch | ✅ ALLOWED | Przełączanie stanów łączeniowych |
+| Simulate Switching | ✅ ALLOWED | Symulacja sekwencji łączeń |
+| View Pre/Post State | ✅ ALLOWED | Podgląd przed/po przełączeniu |
+| Check Interlocks | ✅ ALLOWED | Sprawdzenie blokad |
+| Run LF After Switch | ✅ ALLOWED | LF po przełączeniu |
+| Generate Switching Order | ✅ ALLOWED | Generowanie polecenia łączeniowego |
+| Modify Parameters | ❌ BLOCKED | Wymaga trybu PROJEKTOWEGO |
+| Delete Element | ❌ BLOCKED | Wymaga trybu PROJEKTOWEGO |
+
+#### 10.4.4. Toolbar kontekstowy
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ MODE: OPERATIONS ⚡                                                         │
+├─────────────────────────────────────────────────────────────────────────────┤
+│ [Toggle Switch] [Simulate Sequence] [Interlocks] │ [Switching Order] [Log] │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+#### 10.4.5. Integracja z Instrukcją Czynności Łączeniowych
+
+| Element | Zawartość |
+|---------|-----------|
+| **SWITCHING SEQUENCE** | Sekwencja przełączeń z numeracją |
+| **PRE-CONDITIONS** | Warunki wstępne (stany początkowe) |
+| **POST-CONDITIONS** | Warunki końcowe (stany docelowe) |
+| **SAFETY CHECKS** | Sprawdzenia bezpieczeństwa |
+| **INTERLOCK VERIFICATION** | Weryfikacja blokad |
+| **RESPONSIBLE PERSON** | Odpowiedzialny za wykonanie |
+
+#### 10.4.6. Przykład Switching Order
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ POLECENIE ŁĄCZENIOWE nr 2026/01/28-001                                      │
+├─────────────────────────────────────────────────────────────────────────────┤
+│ CEL: Wyłączenie linii L-01 do prac konserwacyjnych                          │
+│ DATA: 2026-01-28                                                            │
+│ WYDAJĄCY: jan.kowalski                                                      │
+├─────────────────────────────────────────────────────────────────────────────┤
+│ SEKWENCJA ŁĄCZEŃ:                                                           │
+│ ┌───────────────────────────────────────────────────────────────────────┐   │
+│ │ #  │ Czynność                    │ Element   │ Stan   │ Potwierdzenie│   │
+│ ├───────────────────────────────────────────────────────────────────────┤   │
+│ │ 1  │ Wyłączyć wyłącznik          │ Q-L01-A   │ OPEN   │ ☐             │   │
+│ │ 2  │ Sprawdzić brak napięcia     │ L-01      │ —      │ ☐             │   │
+│ │ 3  │ Otworzyć rozłącznik         │ S-L01-A   │ OPEN   │ ☐             │   │
+│ │ 4  │ Otworzyć rozłącznik         │ S-L01-B   │ OPEN   │ ☐             │   │
+│ │ 5  │ Założyć uziemnik            │ E-L01-A   │ CLOSED │ ☐             │   │
+│ │ 6  │ Założyć uziemnik            │ E-L01-B   │ CLOSED │ ☐             │   │
+│ └───────────────────────────────────────────────────────────────────────┘   │
+├─────────────────────────────────────────────────────────────────────────────┤
+│ WARUNKI BEZPIECZEŃSTWA:                                                     │
+│ ✓ Wyłącznik Q-L01-A w stanie OPEN przed otwarciem rozłączników              │
+│ ✓ Brak napięcia potwierdzone przed założeniem uziemników                    │
+├─────────────────────────────────────────────────────────────────────────────┤
+│ [Wykonaj krok] [Anuluj] [Drukuj] [Zapisz PDF]                               │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+### 10.5. Tryb AUDYTOWY (CONTEXT_AUDIT)
+
+#### 10.5.1. Cel inżynierski
+Formalna weryfikacja i zatwierdzanie projektu — **tryb zgodności i audytu**.
+
+#### 10.5.2. Aktywne warstwy
+
+| Warstwa | Status | Cel |
+|---------|--------|-----|
+| LAYER_TOPOLOGY | ✅ ACTIVE | Topologia (read-only) |
+| LAYER_ANALYTICAL_VIOLATIONS | ✅ ACTIVE | Wszystkie naruszenia |
+| LAYER_ANALYTICAL_MARGINS | ✅ ACTIVE | Marginesy do limitów |
+| LAYER_PROOF_STEPS | ✅ ACTIVE | Kroki Proof |
+| LAYER_PROOF_IMPEDANCES | ✅ ACTIVE | Impedancje z Proof |
+
+#### 10.5.3. Dozwolone akcje
+
+| Akcja | Status | Opis |
+|-------|--------|------|
+| View All Results | ✅ ALLOWED | Przeglądanie wszystkich wyników |
+| Open Proof | ✅ ALLOWED | Pełny dostęp do Proof |
+| Review Checklist | ✅ ALLOWED | Wypełnianie checklisty audytowej |
+| Add Comment | ✅ ALLOWED | Dodawanie komentarzy audytowych |
+| Approve / Reject | ✅ ALLOWED | Zatwierdzanie / odrzucanie |
+| Export Audit Report | ✅ ALLOWED | Eksport raportu audytowego |
+| Modify Parameters | ❌ BLOCKED | Read-only mode |
+| Toggle Switch | ❌ BLOCKED | Read-only mode |
+| Delete Element | ❌ BLOCKED | Read-only mode |
+
+#### 10.5.4. Toolbar kontekstowy
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ MODE: AUDIT 📋                                                              │
+├─────────────────────────────────────────────────────────────────────────────┤
+│ [Violations] [Proof] [Checklist] [Comments] │ [Approve ✅] [Reject ❌] [PDF]│
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+#### 10.5.5. Audit Checklist Panel
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ AUDIT CHECKLIST — ELEMENT: Bus 15-03                                        │
+├─────────────────────────────────────────────────────────────────────────────┤
+│ NORM COMPLIANCE                                                             │
+│ ☑ IEC 60909 c_max = 1.1 correct                                             │
+│ ☑ Short-circuit calculation method correct                                  │
+│ ☐ Equipment rating verified                                                 │
+│ ☐ Protection coordination checked                                           │
+├─────────────────────────────────────────────────────────────────────────────┤
+│ PROOF VERIFICATION                                                          │
+│ ☑ Input data complete                                                       │
+│ ☑ Formulas correct                                                          │
+│ ☐ Numerical results verified                                                │
+│ ☐ Units consistent                                                          │
+├─────────────────────────────────────────────────────────────────────────────┤
+│ Progress: ████████░░ 60% (6/10)                                             │
+│ [Save Progress] [Complete Checklist]                                        │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+### 10.6. Przełączanie trybów (CONTEXT_SWITCHING)
+
+#### 10.6.1. Macierz dozwolonych przejść
+
+| Z / Do | DESIGN | ANALYSIS | OPERATIONS | AUDIT |
+|--------|--------|----------|------------|-------|
+| **DESIGN** | — | ✅ | ✅ | ⚠️ (save required) |
+| **ANALYSIS** | ✅ | — | ✅ | ✅ |
+| **OPERATIONS** | ⚠️ (confirm) | ✅ | — | ✅ |
+| **AUDIT** | ❌ (unlock) | ✅ | ❌ (unlock) | — |
+
+#### 10.6.2. Potwierdzenia przy przełączaniu
+
+| Przejście | Potwierdzenie |
+|-----------|---------------|
+| DESIGN → AUDIT | „Czy zapisać niezapisane zmiany?" |
+| OPERATIONS → DESIGN | „Czy anulować aktywną sekwencję łączeń?" |
+| AUDIT → DESIGN | „Audit mode is locked. Request unlock?" |
+| AUDIT → OPERATIONS | „Audit mode is locked. Request unlock?" |
+
+#### 10.6.3. Context Selector
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ CONTEXT MODE: [DESIGN ▼]                                                    │
+├─────────────────────────────────────────────────────────────────────────────┤
+│   🏗️ DESIGN      — Projektowanie topologii i parametrów                    │
+│   🔬 ANALYSIS    — Analiza wyników i identyfikacja problemów               │
+│   ⚡ OPERATIONS  — Planowanie i symulacja operacji łączeniowych            │
+│   📋 AUDIT       — Weryfikacja i zatwierdzanie projektu                    │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## 11. WARSTWY SLD (LAYERS)
 
 ### 10.1. Warstwa bazowa — Topologia (LAYER_TOPOLOGY)
 
@@ -1870,7 +2805,22 @@ Wizualizacja **śladu obliczeń** na schemacie SLD — powiązanie Proof z topol
 
 ---
 
-### 14.9. PROOF — Widoki
+### 14.9. RESULTS — Decision Support Layer
+
+| ID | Nazwa widoku | Obszar | Status | Docelowy ExecPlan |
+|----|--------------|--------|--------|-------------------|
+| R-DEC-001 | NORM_COMPLIANCE_ASSESSMENT | RESULTS | ENABLED | P-RESULTS-DECISION |
+| R-DEC-002 | CRITICAL_ELEMENTS_RANKING | RESULTS | ENABLED | P-RESULTS-DECISION |
+| R-DEC-003 | ROOT_CAUSE_ANALYSIS | RESULTS | ENABLED | P-RESULTS-DECISION |
+| R-DEC-004 | SENSITIVITY_LIGHT | RESULTS | ENABLED | P-RESULTS-DECISION |
+| R-DEC-005 | WHAT_IF_PREVIEW | RESULTS | ENABLED | P-RESULTS-DECISION |
+| R-DEC-006 | ACTION_PLAN_GENERATOR | RESULTS | ENABLED | P-RESULTS-DECISION |
+| R-DEC-007 | DECISION_DASHBOARD | RESULTS | ENABLED | P-RESULTS-DECISION |
+| R-DEC-008 | APPROVAL_READINESS | RESULTS | ENABLED | P-RESULTS-DECISION |
+
+---
+
+### 14.10. PROOF — Widoki
 
 | ID | Nazwa widoku | Obszar | Status | Docelowy ExecPlan |
 |----|--------------|--------|--------|-------------------|
@@ -1887,7 +2837,24 @@ Wizualizacja **śladu obliczeń** na schemacie SLD — powiązanie Proof z topol
 
 ---
 
-### 14.10. SLD — Tryby pracy
+### 14.11. PROOF — Review / Approval Layer
+
+| ID | Nazwa funkcji | Obszar | Status | Docelowy ExecPlan |
+|----|---------------|--------|--------|-------------------|
+| P-REV-001 | PROOF_STEP_STATUS | PROOF | ENABLED | P-PROOF-REVIEW |
+| P-REV-002 | NORM_COMPLIANCE_CHECKLIST | PROOF | ENABLED | P-PROOF-REVIEW |
+| P-REV-003 | INPUT_DATA_CHECKLIST | PROOF | ENABLED | P-PROOF-REVIEW |
+| P-REV-004 | CALCULATION_CHECKLIST | PROOF | ENABLED | P-PROOF-REVIEW |
+| P-REV-005 | NORM_VARIANTS_CHECKLIST | PROOF | ENABLED | P-PROOF-REVIEW |
+| P-REV-006 | REVIEW_TRAIL | PROOF | ENABLED | P-PROOF-REVIEW |
+| P-REV-007 | ENGINEERING_COMMENTS | PROOF | ENABLED | P-PROOF-REVIEW |
+| P-REV-008 | REVIEW_PANEL | PROOF | ENABLED | P-PROOF-REVIEW |
+| P-REV-009 | APPROVAL_WORKFLOW | PROOF | ENABLED | P-PROOF-REVIEW |
+| P-REV-010 | REVIEW_EXPORT | PROOF | ENABLED | P-PROOF-REVIEW |
+
+---
+
+### 14.12. SLD — Tryby pracy
 
 | ID | Nazwa trybu | Obszar | Status | Docelowy ExecPlan |
 |----|-------------|--------|--------|-------------------|
@@ -1963,7 +2930,22 @@ Wizualizacja **śladu obliczeń** na schemacie SLD — powiązanie Proof z topol
 
 ---
 
-### 14.14. Funkcje globalne
+### 14.16. SLD — Context Modes
+
+| ID | Nazwa trybu | Obszar | Status | Docelowy ExecPlan |
+|----|-------------|--------|--------|-------------------|
+| S-CTX-001 | CONTEXT_DESIGN | SLD | ENABLED | P-SLD-CONTEXT |
+| S-CTX-002 | CONTEXT_ANALYSIS | SLD | ENABLED | P-SLD-CONTEXT |
+| S-CTX-003 | CONTEXT_OPERATIONS | SLD | ENABLED | P-SLD-CONTEXT |
+| S-CTX-004 | CONTEXT_AUDIT | SLD | ENABLED | P-SLD-CONTEXT |
+| S-CTX-005 | CONTEXT_SWITCHING | SLD | ENABLED | P-SLD-CONTEXT |
+| S-CTX-006 | SWITCHING_ORDER_GENERATOR | SLD | ENABLED | P-SLD-OPERATIONS |
+| S-CTX-007 | INTERLOCK_VERIFICATION | SLD | ENABLED | P-SLD-OPERATIONS |
+| S-CTX-008 | AUDIT_CHECKLIST_PANEL | SLD | ENABLED | P-SLD-AUDIT |
+
+---
+
+### 14.17. Funkcje globalne
 
 | ID | Nazwa funkcji | Obszar | Status | Docelowy ExecPlan |
 |----|---------------|--------|--------|-------------------|
@@ -1986,33 +2968,48 @@ Wizualizacja **śladu obliczeń** na schemacie SLD — powiązanie Proof z topol
 
 | Obszar | ENABLED | DISABLED (SLOT) | TOTAL |
 |--------|---------|-----------------|-------|
-| RESULTS | 42 | 2 | 44 |
-| PROOF | 8 | 2 | 10 |
+| RESULTS (Core) | 42 | 2 | 44 |
+| RESULTS (Decision Support) | 8 | 0 | 8 |
+| PROOF (Core) | 8 | 2 | 10 |
+| PROOF (Review/Approval) | 10 | 0 | 10 |
 | SLD (Tryby) | 11 | 1 | 12 |
 | SLD (Warstwy) | 15 | 3 | 18 |
 | SLD (Interakcje) | 11 | 1 | 12 |
 | SLD (Eksport) | 4 | 2 | 6 |
+| SLD (Context Modes) | 8 | 0 | 8 |
 | GLOBAL | 7 | 3 | 10 |
-| **TOTAL** | **98** | **14** | **112** |
+| **TOTAL** | **124** | **14** | **138** |
 
 ### 15.2. Porównanie z PowerFactory / ETAP
 
 | Metryka | PowerFactory | ETAP | MV-DESIGN-PRO |
 |---------|--------------|------|---------------|
-| Widoki Results | ~15 | ~12 | **44** |
-| Widoki Proof | 2 | 0 | **10** |
+| Widoki Results | ~15 | ~12 | **52** |
+| Widoki Proof | 2 | 0 | **20** |
 | Tryby SLD | 3 | 2 | **12** |
+| Context Modes SLD | 0 | 0 | **8** |
 | Warstwy SLD | 4 | 3 | **18** |
 | Interakcje SLD | ~8 | ~6 | **12** |
-| **TOTAL** | **~32** | **~23** | **112** |
+| Decision Support | 0 | 0 | **8** |
+| Review/Approval | 0 | 0 | **10** |
+| **TOTAL** | **~32** | **~23** | **138** |
 
-**Współczynnik rozbudowania**: MV-DESIGN-PRO = **3.5x** PowerFactory, **4.9x** ETAP
+**Współczynnik rozbudowania**: MV-DESIGN-PRO = **4.3x** PowerFactory, **6.0x** ETAP
+
+### 15.3. Nowe warstwy (Amendment 1.1)
+
+| Warstwa | Cel | Funkcji |
+|---------|-----|---------|
+| **DECISION SUPPORT** | Prowadzenie inżyniera do decyzji | 8 |
+| **REVIEW/APPROVAL** | Formalny przegląd i zatwierdzanie | 10 |
+| **CONTEXT MODES** | Kontekst pracy (projektowanie/analiza/operacje/audyt) | 8 |
 
 ---
 
 ## 16. WERSJONOWANIE I ZMIANY
 
 - **Wersja 1.0**: definicja bazowa (2026-01-31)
+- **Wersja 1.1**: AMENDMENT — Decision Support, Review/Approval, Context Modes (2026-01-31)
 - Zmiany w kontrakcie wymagają aktualizacji wersji i code review
 - Breaking changes wymagają migracji UI i aktualizacji testów E2E
 - Sloty DISABLED mogą być aktywowane bez breaking change
