@@ -31,6 +31,24 @@ import { useAppStateStore } from './ui/app-state';
 import { ROUTES } from './ui/navigation';
 
 /**
+ * E2E_STABILIZATION: App ready indicator for tests.
+ * Set after initial hydration and route sync.
+ */
+function useAppReady(): boolean {
+  const [ready, setReady] = useState(false);
+
+  useEffect(() => {
+    // Mark app as ready after initial render cycle completes
+    const timer = requestAnimationFrame(() => {
+      setReady(true);
+    });
+    return () => cancelAnimationFrame(timer);
+  }, []);
+
+  return ready;
+}
+
+/**
  * Check if route is a results route (requires RESULT_VIEW mode).
  */
 function isResultsRoute(route: string): boolean {
@@ -45,6 +63,7 @@ function isResultsRoute(route: string): boolean {
 function App() {
   const [route, setRoute] = useState(() => window.location.hash);
   const setActiveMode = useAppStateStore((state) => state.setActiveMode);
+  const appReady = useAppReady();
 
   useEffect(() => {
     const handler = () => setRoute(window.location.hash);
@@ -76,9 +95,17 @@ function App() {
     window.location.hash = ROUTES.RESULTS.hash;
   }, []);
 
+  // E2E_STABILIZATION: Wrapper with app-ready indicator
+  const wrapWithReadyIndicator = (content: React.ReactNode) => (
+    <div data-testid="app-root" data-ready={appReady}>
+      {appReady && <div data-testid="app-ready" style={{ display: 'none' }} />}
+      {content}
+    </div>
+  );
+
   // UI_INTEGRATION_E2E: Przegląd wyników (Results Browser)
   if (route === '#results') {
-    return (
+    return wrapWithReadyIndicator(
       <MainLayout
         onCalculate={handleCalculate}
         onViewResults={handleViewResults}
@@ -90,7 +117,7 @@ function App() {
 
   // Ślad obliczeń (Proof Inspector)
   if (route === '#proof') {
-    return (
+    return wrapWithReadyIndicator(
       <MainLayout
         onCalculate={handleCalculate}
         onViewResults={handleViewResults}
@@ -102,7 +129,7 @@ function App() {
 
   // Protection Results Inspector
   if (route === '#protection-results') {
-    return (
+    return wrapWithReadyIndicator(
       <MainLayout
         onCalculate={handleCalculate}
         onViewResults={handleViewResults}
@@ -114,7 +141,7 @@ function App() {
 
   // P20b: Power Flow Results Inspector
   if (route === '#power-flow-results') {
-    return (
+    return wrapWithReadyIndicator(
       <MainLayout
         onCalculate={handleCalculate}
         onViewResults={handleViewResults}
@@ -125,7 +152,7 @@ function App() {
   }
 
   // Default: Designer page with full layout
-  return (
+  return wrapWithReadyIndicator(
     <MainLayout
       onCalculate={handleCalculate}
       onViewResults={handleViewResults}

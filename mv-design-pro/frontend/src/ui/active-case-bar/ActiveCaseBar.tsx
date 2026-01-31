@@ -108,6 +108,7 @@ export function ActiveCaseBar({
 
   return (
     <div
+      data-testid="active-case-bar"
       className={clsx(
         'flex items-center justify-between px-4 py-2',
         'bg-white border-b border-gray-200 shadow-sm',
@@ -151,6 +152,7 @@ export function ActiveCaseBar({
           <>
             <span className="text-gray-300">|</span>
             <div
+              data-testid="result-status"
               className={clsx(
                 'flex items-center gap-1.5 px-2 py-0.5 rounded text-xs font-medium',
                 RESULT_STATUS_COLORS[resultStatus]
@@ -168,6 +170,7 @@ export function ActiveCaseBar({
       <div className="flex items-center gap-2">
         {/* Change Case Button */}
         <button
+          data-testid="btn-change-case"
           onClick={handleChangeCaseClick}
           className={clsx(
             'px-3 py-1.5 text-sm rounded',
@@ -180,6 +183,7 @@ export function ActiveCaseBar({
 
         {/* Configure Button */}
         <button
+          data-testid="btn-configure"
           onClick={handleConfigureClick}
           disabled={!hasActiveCase}
           className={clsx(
@@ -199,6 +203,7 @@ export function ActiveCaseBar({
 
         {/* Calculate Button */}
         <button
+          data-testid="btn-calculate"
           onClick={handleCalculateClick}
           disabled={!canCalculate}
           className={clsx(
@@ -214,6 +219,7 @@ export function ActiveCaseBar({
 
         {/* Results Button */}
         <button
+          data-testid="btn-results"
           onClick={handleResultsClick}
           disabled={!hasActiveCase || resultStatus === 'NONE'}
           className={clsx(
@@ -278,6 +284,8 @@ function ModeIndicator({ mode }: ModeIndicatorProps) {
 
   return (
     <div
+      data-testid="mode-indicator"
+      data-mode={mode}
       className={clsx(
         'flex items-center gap-1.5 px-2 py-1 rounded border text-xs font-medium',
         color
