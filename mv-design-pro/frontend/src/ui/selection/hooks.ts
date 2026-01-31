@@ -14,7 +14,7 @@
 
 import { useCallback, useEffect } from 'react';
 import { useSelectionStore } from './store';
-import type { ElementType, SelectedElement } from '../types';
+import type { ElementType } from '../types';
 
 /**
  * Hook for handling SLD element click.
@@ -25,7 +25,7 @@ import type { ElementType, SelectedElement } from '../types';
  * - Syncs with Tree/List
  */
 export function useSldSelection() {
-  const { selectElement, centerSldOnElement, selectedElement } = useSelectionStore();
+  const { selectElement, selectedElement } = useSelectionStore();
 
   /**
    * Handle click on SLD symbol.
@@ -168,5 +168,126 @@ export function useContextMenuState() {
     isEditMode: mode === 'MODEL_EDIT',
     isCaseConfigMode: mode === 'CASE_CONFIG',
     isResultMode: mode === 'RESULT_VIEW',
+  };
+}
+
+// =============================================================================
+// UI_INTEGRATION_E2E: Global Selection Synchronization
+// =============================================================================
+
+/**
+ * Hook for global selection synchronization across all UI layers.
+ *
+ * CANONICAL ALIGNMENT:
+ * - UI_CORE_ARCHITECTURE.md § 10.3: Selection synchronization
+ * - SLD_UI_ARCHITECTURE.md § 7.1: Single source of truth for selection
+ *
+ * Synchronizes selection between:
+ * - SLD (Schemat jednokreskowy)
+ * - Results Browser (Przegląd wyników)
+ * - Inspector Panel (Inspektor elementu)
+ * - Proof Panel (Ślad obliczeń)
+ *
+ * BINDING: Change in one place = change in all places.
+ */
+export function useGlobalSelectionSync() {
+  const {
+    selectElement,
+    selectedElement,
+    selectedElements,
+    centerSldOnElement,
+    propertyGridOpen,
+    togglePropertyGrid,
+  } = useSelectionStore();
+
+  /**
+   * Select element from any source (SLD, Results, Tree, Proof).
+   * Updates all synchronized views.
+   */
+  const selectFromAnySource = useCallback(
+    (
+      elementId: string,
+      elementType: ElementType,
+      elementName: string,
+      options?: {
+        centerSld?: boolean;
+        openInspector?: boolean;
+      }
+    ) => {
+      selectElement({ id: elementId, type: elementType, name: elementName });
+
+      if (options?.centerSld) {
+        centerSldOnElement(elementId);
+      }
+
+      if (options?.openInspector && !propertyGridOpen) {
+        togglePropertyGrid(true);
+      }
+    },
+    [selectElement, centerSldOnElement, propertyGridOpen, togglePropertyGrid]
+  );
+
+  /**
+   * Select element from Results Browser.
+   * Per RESULTS_UI_ARCHITECTURE.md § 9.2: Click in Results → SLD highlight + Inspector open
+   */
+  const selectFromResults = useCallback(
+    (elementId: string, elementType: ElementType, elementName: string) => {
+      selectFromAnySource(elementId, elementType, elementName, {
+        centerSld: true,
+        openInspector: true,
+      });
+    },
+    [selectFromAnySource]
+  );
+
+  /**
+   * Select element from SLD.
+   * Per SLD_UI_ARCHITECTURE.md § 7.2: Click on SLD → Inspector open
+   */
+  const selectFromSld = useCallback(
+    (elementId: string, elementType: ElementType, elementName: string) => {
+      selectFromAnySource(elementId, elementType, elementName, {
+        centerSld: false,
+        openInspector: true,
+      });
+    },
+    [selectFromAnySource]
+  );
+
+  /**
+   * Select element from Proof/Ślad obliczeń.
+   * Per PROOF_UI_ARCHITECTURE.md § 6.4: Navigation to element from Proof
+   */
+  const selectFromProof = useCallback(
+    (elementId: string, elementType: ElementType, elementName: string) => {
+      selectFromAnySource(elementId, elementType, elementName, {
+        centerSld: true,
+        openInspector: true,
+      });
+    },
+    [selectFromAnySource]
+  );
+
+  /**
+   * Clear selection.
+   */
+  const clearSelection = useCallback(() => {
+    selectElement(null);
+  }, [selectElement]);
+
+  return {
+    // State
+    selectedElement,
+    selectedElements,
+    hasSelection: selectedElement !== null,
+
+    // Actions
+    selectFromSld,
+    selectFromResults,
+    selectFromProof,
+    selectFromAnySource,
+    clearSelection,
+    centerSldOnElement,
   };
 }

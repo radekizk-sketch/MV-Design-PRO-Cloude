@@ -1,14 +1,22 @@
 /**
- * App Root — P12a Data Manager Parity
+ * App Root — UI_INTEGRATION_E2E
  *
  * CANONICAL ALIGNMENT:
  * - wizard_screens.md § 1.3: Active case bar (always visible)
  * - powerfactory_ui_parity.md § A: Operating modes
+ * - UI_CORE_ARCHITECTURE.md § 4.1: Navigation structure
  *
  * Main application entry with:
- * - Hash-based routing
+ * - Hash-based routing with Polish labels
  * - MainLayout with Active Case Bar
  * - Mode-aware page rendering
+ *
+ * Routes (Polish):
+ * - "" / "#sld" → Schemat jednokreskowy (SLD)
+ * - "#results" → Przegląd wyników (Results Browser)
+ * - "#proof" → Ślad obliczeń (Proof)
+ * - "#protection-results" → Wyniki zabezpieczeń
+ * - "#power-flow-results" → Wyniki rozpływu
  */
 
 import { useEffect, useState, useCallback } from 'react';
@@ -17,8 +25,22 @@ import { DesignerPage } from './designer/DesignerPage';
 import { ProofInspectorPage } from './proof-inspector';
 import { ProtectionResultsInspectorPage } from './ui/protection-results';
 import { PowerFlowResultsInspectorPage } from './ui/power-flow-results';
+import { ResultsInspectorPage } from './ui/results-inspector';
 import { MainLayout } from './ui/layout';
 import { useAppStateStore } from './ui/app-state';
+import { ROUTES } from './ui/navigation';
+
+/**
+ * Check if route is a results route (requires RESULT_VIEW mode).
+ */
+function isResultsRoute(route: string): boolean {
+  return (
+    route === '#results' ||
+    route === '#proof' ||
+    route === '#protection-results' ||
+    route === '#power-flow-results'
+  );
+}
 
 function App() {
   const [route, setRoute] = useState(() => window.location.hash);
@@ -32,7 +54,7 @@ function App() {
 
   // Sync mode with route
   useEffect(() => {
-    if (route === '#proof' || route === '#protection-results' || route === '#power-flow-results') {
+    if (isResultsRoute(route)) {
       setActiveMode('RESULT_VIEW');
     } else if (route === '#case-config') {
       setActiveMode('CASE_CONFIG');
@@ -46,11 +68,27 @@ function App() {
     console.log('Calculate triggered');
   }, []);
 
+  /**
+   * Navigate to Results (Przegląd wyników).
+   * UI_INTEGRATION_E2E: Uses #results route.
+   */
   const handleViewResults = useCallback(() => {
-    window.location.hash = '#proof';
+    window.location.hash = ROUTES.RESULTS.hash;
   }, []);
 
-  // ProofInspectorPage has its own layout for results view
+  // UI_INTEGRATION_E2E: Przegląd wyników (Results Browser)
+  if (route === '#results') {
+    return (
+      <MainLayout
+        onCalculate={handleCalculate}
+        onViewResults={handleViewResults}
+      >
+        <ResultsInspectorPage />
+      </MainLayout>
+    );
+  }
+
+  // Ślad obliczeń (Proof Inspector)
   if (route === '#proof') {
     return (
       <MainLayout

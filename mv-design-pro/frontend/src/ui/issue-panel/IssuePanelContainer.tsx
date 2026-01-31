@@ -13,7 +13,7 @@ import React, { useEffect, useState } from 'react';
 import { IssuePanel } from './IssuePanel';
 import type { Issue, IssueSeverity, IssueSource } from '../types';
 import { useSldEditorStore } from '../sld-editor/SldEditorStore';
-import { useAppState } from '../app-state/store';
+import { useAppStateStore } from '../app-state/store';
 
 // =============================================================================
 // API Client
@@ -48,7 +48,7 @@ export const IssuePanelContainer: React.FC<IssuePanelContainerProps> = ({ caseId
   const [error, setError] = useState<string | null>(null);
 
   const sldStore = useSldEditorStore();
-  const activeMode = useAppState((state) => state.activeMode);
+  const activeMode = useAppStateStore((state) => state.activeMode);
 
   // Fetch issues when case changes
   useEffect(() => {
