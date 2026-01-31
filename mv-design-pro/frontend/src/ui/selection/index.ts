@@ -15,4 +15,5 @@ export {
   useSelectionSync,
   usePropertyGridSelection,
   useContextMenuState,
+  useGlobalSelectionSync,
 } from './hooks';

@@ -30,7 +30,14 @@ import type { OperatingMode, ResultStatus } from '../types';
 export type CaseKind = 'ShortCircuitCase' | 'PowerFlowCase';
 
 /**
+ * Analysis type for UI Context.
+ * CANONICAL: UI_CORE_ARCHITECTURE.md § 5.2 — Analysis type in Context Bar hierarchy
+ */
+export type AnalysisType = 'SHORT_CIRCUIT' | 'LOAD_FLOW' | 'PROTECTION' | null;
+
+/**
  * Global application state interface.
+ * Extended for UI_INTEGRATION_E2E: SnapshotId, AnalysisType per UI_CORE_ARCHITECTURE.md
  */
 interface AppState {
   // Project context
@@ -43,11 +50,17 @@ interface AppState {
   activeCaseKind: CaseKind | null;
   activeCaseResultStatus: ResultStatus;
 
+  // UI_INTEGRATION_E2E: Snapshot context
+  activeSnapshotId: string | null;
+
   // Operating mode (controls UI gating)
   activeMode: OperatingMode;
 
   // Results context (only in RESULT_VIEW)
   activeRunId: string | null;
+
+  // UI_INTEGRATION_E2E: Analysis type context
+  activeAnalysisType: AnalysisType;
 
   // UI state
   caseManagerOpen: boolean;
@@ -64,6 +77,8 @@ interface AppState {
   setActiveCaseResultStatus: (status: ResultStatus) => void;
   setActiveMode: (mode: OperatingMode) => void;
   setActiveRun: (runId: string | null) => void;
+  setActiveSnapshot: (snapshotId: string | null) => void; // UI_INTEGRATION_E2E
+  setActiveAnalysisType: (analysisType: AnalysisType) => void; // UI_INTEGRATION_E2E
   toggleCaseManager: (open?: boolean) => void;
   toggleIssuePanel: (open?: boolean) => void; // P30d
 
@@ -88,8 +103,10 @@ const initialState = {
   activeCaseName: null,
   activeCaseKind: null,
   activeCaseResultStatus: 'NONE' as ResultStatus,
+  activeSnapshotId: null, // UI_INTEGRATION_E2E
   activeMode: 'MODEL_EDIT' as OperatingMode,
   activeRunId: null,
+  activeAnalysisType: null as AnalysisType, // UI_INTEGRATION_E2E
   caseManagerOpen: false,
   issuePanelOpen: false, // P30d
 };
@@ -117,7 +134,9 @@ export const useAppStateStore = create<AppState>()(
             activeCaseName: null,
             activeCaseKind: null,
             activeCaseResultStatus: 'NONE',
+            activeSnapshotId: null, // UI_INTEGRATION_E2E
             activeRunId: null,
+            activeAnalysisType: null, // UI_INTEGRATION_E2E
           });
         } else {
           set({
@@ -136,8 +155,9 @@ export const useAppStateStore = create<AppState>()(
           activeCaseName: caseName,
           activeCaseKind: caseKind,
           activeCaseResultStatus: resultStatus,
-          // Clear run when case changes
+          // Clear run and snapshot when case changes
           activeRunId: null,
+          activeSnapshotId: null, // UI_INTEGRATION_E2E
         });
       },
 
@@ -164,6 +184,20 @@ export const useAppStateStore = create<AppState>()(
        */
       setActiveRun: (runId) => {
         set({ activeRunId: runId });
+      },
+
+      /**
+       * UI_INTEGRATION_E2E: Set active snapshot.
+       */
+      setActiveSnapshot: (snapshotId) => {
+        set({ activeSnapshotId: snapshotId });
+      },
+
+      /**
+       * UI_INTEGRATION_E2E: Set active analysis type.
+       */
+      setActiveAnalysisType: (analysisType) => {
+        set({ activeAnalysisType: analysisType });
       },
 
       /**
@@ -242,6 +276,7 @@ export const useAppStateStore = create<AppState>()(
         activeCaseId: state.activeCaseId,
         activeCaseName: state.activeCaseName,
         activeCaseKind: state.activeCaseKind,
+        activeSnapshotId: state.activeSnapshotId, // UI_INTEGRATION_E2E
       }),
     }
   )
@@ -377,4 +412,76 @@ export function useCanCalculate(): { allowed: boolean; reason: string | null } {
  */
 export function useCaseManagerOpen(): boolean {
   return useAppStateStore((state) => state.caseManagerOpen);
+}
+
+/**
+ * Hook: Check if Issue Panel is open.
+ * P30d: Issue Panel toggle
+ */
+export function useIssuePanelOpen(): boolean {
+  return useAppStateStore((state) => state.issuePanelOpen);
+}
+
+// =============================================================================
+// UI_INTEGRATION_E2E: Additional Context Hooks
+// =============================================================================
+
+/**
+ * Hook: Get active snapshot ID.
+ * UI_INTEGRATION_E2E: Single source of truth for snapshot context.
+ */
+export function useActiveSnapshotId(): string | null {
+  return useAppStateStore((state) => state.activeSnapshotId);
+}
+
+/**
+ * Hook: Get active analysis type.
+ * UI_INTEGRATION_E2E: Single source of truth for analysis context.
+ */
+export function useActiveAnalysisType(): AnalysisType {
+  return useAppStateStore((state) => state.activeAnalysisType);
+}
+
+/**
+ * Hook: Get active analysis type label in Polish.
+ * CANONICAL: PROOF_UI_ARCHITECTURE.md § 7.6 — Polish terminology in UI
+ */
+export function useActiveAnalysisTypeLabel(): string | null {
+  const analysisType = useAppStateStore((state) => state.activeAnalysisType);
+  if (!analysisType) return null;
+  switch (analysisType) {
+    case 'SHORT_CIRCUIT':
+      return 'Analiza zwarciowa';
+    case 'LOAD_FLOW':
+      return 'Rozpływ mocy';
+    case 'PROTECTION':
+      return 'Koordynacja zabezpieczeń';
+    default:
+      return analysisType;
+  }
+}
+
+/**
+ * Hook: Get active run ID.
+ */
+export function useActiveRunId(): string | null {
+  return useAppStateStore((state) => state.activeRunId);
+}
+
+/**
+ * Hook: Get complete UI context for Context Bar.
+ * UI_INTEGRATION_E2E: Single source of truth per UI_CORE_ARCHITECTURE.md § 5.2
+ */
+export function useUIContext() {
+  return useAppStateStore((state) => ({
+    projectId: state.activeProjectId,
+    projectName: state.activeProjectName,
+    caseId: state.activeCaseId,
+    caseName: state.activeCaseName,
+    snapshotId: state.activeSnapshotId,
+    runId: state.activeRunId,
+    analysisType: state.activeAnalysisType,
+    mode: state.activeMode,
+    resultStatus: state.activeCaseResultStatus,
+  }));
 }
