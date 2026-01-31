@@ -8,14 +8,16 @@
  * PAGE INTEGRATION:
  * - Uses symbols from SldEditorStore (shared with SldEditor)
  * - Syncs selection with URL / Project Tree / Inspector
+ * - Diagnostics panel with jump-to-element
  * - Read-only mode (no editing)
  * - 100% Polish UI
  */
 
-import React, { useEffect, useMemo } from 'react';
+import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import { SLDView } from './SLDView';
 import { useSldEditorStore } from '../sld-editor/SldEditorStore';
 import { useSelectionStore } from '../selection/store';
+import { ProtectionDiagnosticsPanel } from '../results/ProtectionDiagnosticsPanel';
 import type { AnySldSymbol } from '../sld-editor/types';
 
 /**
@@ -154,16 +156,24 @@ const DEMO_SYMBOLS: AnySldSymbol[] = [
 export interface SLDViewPageProps {
   /** Use demo data (for development) */
   useDemo?: boolean;
+  /** Show diagnostics panel */
+  showDiagnosticsPanel?: boolean;
 }
 
 /**
  * SLD View Page component.
  * Integrates SLDView with application state.
  */
-export const SLDViewPage: React.FC<SLDViewPageProps> = ({ useDemo = false }) => {
+export const SLDViewPage: React.FC<SLDViewPageProps> = ({
+  useDemo = false,
+  showDiagnosticsPanel = true,
+}) => {
   // Get symbols from store
   const storeSymbols = useSldEditorStore((state) => Array.from(state.symbols.values()));
   const setSymbols = useSldEditorStore((state) => state.setSymbols);
+
+  // Panel collapsed state
+  const [diagnosticsPanelCollapsed, setDiagnosticsPanelCollapsed] = useState(false);
 
   // Use demo symbols if store is empty and demo mode is enabled
   const symbols = useMemo(() => {
@@ -183,17 +193,64 @@ export const SLDViewPage: React.FC<SLDViewPageProps> = ({ useDemo = false }) => 
   // Get current selection from store (for synchronization)
   const selectedElement = useSelectionStore((state) => state.selectedElements[0] ?? null);
 
+  // Toggle diagnostics panel
+  const toggleDiagnosticsPanel = useCallback(() => {
+    setDiagnosticsPanelCollapsed((prev) => !prev);
+  }, []);
+
   return (
     <div
       data-testid="sld-view-page"
-      className="h-full w-full"
+      className="h-full w-full flex"
     >
-      <SLDView
-        symbols={symbols}
-        selectedElement={selectedElement}
-        showGrid={true}
-        fitOnMount={true}
-      />
+      {/* SLD View (main area) */}
+      <div className="flex-1 min-w-0">
+        <SLDView
+          symbols={symbols}
+          selectedElement={selectedElement}
+          showGrid={true}
+          fitOnMount={true}
+        />
+      </div>
+
+      {/* Diagnostics Panel (collapsible sidebar) */}
+      {showDiagnosticsPanel && (
+        <div
+          data-testid="sld-diagnostics-sidebar"
+          className={`border-l border-gray-200 bg-white transition-all duration-300 ${
+            diagnosticsPanelCollapsed ? 'w-10' : 'w-96'
+          }`}
+        >
+          {/* Collapse toggle */}
+          <button
+            type="button"
+            onClick={toggleDiagnosticsPanel}
+            className="w-full px-2 py-2 text-xs text-gray-600 hover:bg-gray-100 border-b border-gray-200 flex items-center justify-center"
+            title={diagnosticsPanelCollapsed ? 'Rozwin panel diagnostyki' : 'Zwin panel diagnostyki'}
+            aria-label={diagnosticsPanelCollapsed ? 'Rozwin panel diagnostyki' : 'Zwin panel diagnostyki'}
+          >
+            {diagnosticsPanelCollapsed ? (
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+              </svg>
+            ) : (
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+              </svg>
+            )}
+          </button>
+
+          {/* Panel content (hidden when collapsed) */}
+          {!diagnosticsPanelCollapsed && (
+            <div className="h-[calc(100%-36px)] overflow-hidden">
+              <ProtectionDiagnosticsPanel
+                projectId="demo-project"
+                diagramId="demo-diagram"
+              />
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 };

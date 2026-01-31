@@ -60,6 +60,9 @@ interface DiagnosticsMarkerProps {
   /** Whether this element is selected */
   isSelected: boolean;
 
+  /** Whether this element should show focus pulse */
+  hasFocusPulse: boolean;
+
   /** Click handler to select element */
   onMarkerClick: (elementId: string, elementType: ElementType, elementName: string) => void;
 }
@@ -71,6 +74,7 @@ function DiagnosticsMarker({
   diagnostics,
   position,
   isSelected,
+  hasFocusPulse,
   onMarkerClick,
 }: DiagnosticsMarkerProps) {
   const severity = diagnostics.max_severity;
@@ -137,6 +141,7 @@ function DiagnosticsMarker({
         hover:scale-110 hover:shadow-lg
         ${colors.marker} ${colors.border} text-white
         ${isSelected ? 'ring-2 ring-blue-400 ring-offset-1' : ''}
+        ${hasFocusPulse ? 'animate-pulse ring-4 ring-blue-500 ring-opacity-75' : ''}
       `}
       style={{
         left: `${position.x + MARKER_OFFSET_X}px`,
@@ -149,6 +154,7 @@ function DiagnosticsMarker({
       onClick={handleClick}
       role="button"
       aria-label={`Diagnostyka: ${diagnostics.error_count} bledow, ${diagnostics.warn_count} ostrzezen`}
+      data-focus-pulse={hasFocusPulse ? 'true' : undefined}
     >
       <span className="text-xs font-bold">{icon}</span>
 
@@ -184,13 +190,16 @@ export interface DiagnosticsOverlayProps {
   /** Currently selected element ID */
   selectedElementId?: string | null;
 
+  /** ID of element that should show focus pulse effect */
+  focusPulseElementId?: string | null;
+
   /** Overlay visibility */
   visible: boolean;
 
   /** Severity filter */
   filter: DiagnosticsSeverityFilter;
 
-  /** Callback when marker is clicked (for selection) */
+  /** Callback when marker is clicked (for selection + center) */
   onMarkerClick: (element: SelectedElement) => void;
 
   /** Project ID for data fetching */
@@ -211,6 +220,7 @@ export function DiagnosticsOverlay({
   symbols,
   viewport,
   selectedElementId,
+  focusPulseElementId,
   visible,
   filter,
   onMarkerClick,
@@ -241,6 +251,7 @@ export function DiagnosticsOverlay({
       diagnostics: ElementDiagnostics;
       position: Position;
       isSelected: boolean;
+      hasFocusPulse: boolean;
     }> = [];
 
     for (const diagnostics of filteredByElement.values()) {
@@ -276,6 +287,7 @@ export function DiagnosticsOverlay({
           diagnostics,
           position,
           isSelected: selectedElementId === diagnostics.element_id,
+          hasFocusPulse: focusPulseElementId === diagnostics.element_id,
         });
       }
     }
@@ -297,6 +309,7 @@ export function DiagnosticsOverlay({
     symbols,
     viewport,
     selectedElementId,
+    focusPulseElementId,
   ]);
 
   // Handle marker click - convert to SelectedElement
@@ -320,12 +333,13 @@ export function DiagnosticsOverlay({
       className="pointer-events-none absolute inset-0 overflow-hidden"
     >
       {/* Markers (pointer-events-auto for click) */}
-      {markers.map(({ diagnostics, position, isSelected }) => (
+      {markers.map(({ diagnostics, position, isSelected, hasFocusPulse }) => (
         <DiagnosticsMarker
           key={diagnostics.element_id}
           diagnostics={diagnostics}
           position={position}
           isSelected={isSelected}
+          hasFocusPulse={hasFocusPulse}
           onMarkerClick={handleMarkerClick}
         />
       ))}
