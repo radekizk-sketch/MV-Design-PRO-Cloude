@@ -1,5 +1,5 @@
 /**
- * P16a/P16b — Protection Section Component (READ-ONLY)
+ * P16a/P16b/P16c — Protection Section Component (READ-ONLY)
  *
  * CANONICAL ALIGNMENT:
  * - powerfactory_ui_parity.md: PowerFactory-like protection visualization
@@ -7,18 +7,19 @@
  * - ANSI/IEEE C37.2: Device function numbers
  *
  * FEATURES:
- * - Wyświetla przypisane zabezpieczenia dla wybranego elementu
- * - SETPOINT jako źródło prawdy (np. "3×In", "0,8×Un")
- * - COMPUTED (A/V) tylko gdy dostępne dane bazowe
+ * - Wyswietla przypisane zabezpieczenia dla wybranego elementu
+ * - SETPOINT jako zrodlo prawdy (np. "3×In", "0,8×Un")
+ * - COMPUTED (A/V) tylko gdy dostepne dane bazowe
+ * - Format PF/ETAP: "50 I>>: 3×In (≈ 1509 A), T=0,1 s"
  * - Read-only: brak edycji
  * - Zwijalna sekcja
  *
- * STATUS: PLACEHOLDER (używa fixture data przez useProtectionAssignment)
+ * STATUS: PLACEHOLDER (uzywa fixture data przez useProtectionAssignment)
  *
  * 100% POLISH UI
  */
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import { clsx } from 'clsx';
 import { useProtectionAssignment } from '../protection';
 import type { ElementProtectionAssignment, ProtectionSettingsSummary } from '../protection';
@@ -28,6 +29,7 @@ import {
   PROTECTION_STATUS_LABELS,
   PROTECTION_STATUS_COLORS,
 } from '../protection';
+import { formatProtectionFunction, formatNumberPl } from './formatProtection';
 
 // =============================================================================
 // Types
@@ -195,18 +197,18 @@ function SettingsSummaryView({ summary }: SettingsSummaryViewProps) {
         </div>
       )}
 
-      {/* Dane bazowe (jeśli dostępne) */}
+      {/* Dane bazowe (jesli dostepne) */}
       {summary.base_values && (
         <div className="text-xs text-gray-500 pt-1 border-t border-gray-200">
           <span className="italic">Dane bazowe:</span>
           {summary.base_values.i_rated_a !== undefined && (
-            <span className="ml-2">In={summary.base_values.i_rated_a} A</span>
+            <span className="ml-2">In={formatNumberPl(summary.base_values.i_rated_a, 0)} A</span>
           )}
           {summary.base_values.u_rated_kv !== undefined && (
-            <span className="ml-2">Un={summary.base_values.u_rated_kv} kV</span>
+            <span className="ml-2">Un={formatNumberPl(summary.base_values.u_rated_kv, 1)} kV</span>
           )}
           {summary.base_values.f_rated_hz !== undefined && (
-            <span className="ml-2">fn={summary.base_values.f_rated_hz} Hz</span>
+            <span className="ml-2">fn={formatNumberPl(summary.base_values.f_rated_hz, 0)} Hz</span>
           )}
         </div>
       )}
@@ -215,40 +217,59 @@ function SettingsSummaryView({ summary }: SettingsSummaryViewProps) {
 }
 
 // =============================================================================
-// FunctionSummaryRow Component
+// FunctionSummaryRow Component (PF/ETAP style)
 // =============================================================================
 
 interface FunctionSummaryRowProps {
   func: ProtectionFunctionSummary;
 }
 
+/**
+ * Wiersz funkcji zabezpieczeniowej w stylu PF/ETAP.
+ *
+ * FORMAT: "ANSI shortcut: setpoint (≈ computed), T=time s"
+ *
+ * @example
+ * "50 I>>: 3×In (≈ 1509 A), T=0,1 s"
+ * "51 I>: 1,2×In, T=1,0 s"
+ * "27 U<: 0,8×Un, T=5 s"
+ * "81U f<: 47,5 Hz, T=0,3 s"
+ * "79 SPZ: Wlaczone, T=600 s"
+ */
 function FunctionSummaryRow({ func }: FunctionSummaryRowProps) {
-  // Format: "50 I>>: 3×In (≈ 1509 A)" lub "50 I>>: 3×In" gdy brak computed
-  const ansiStr = func.ansi.join('/');
-
-  // Formatuj computed value (jeśli dostępne)
-  const computedStr = func.computed
-    ? ` (≈ ${formatComputedValue(func.computed.value, func.computed.unit)})`
-    : '';
-
-  // Czas opóźnienia
-  const timeStr = func.time_delay_s !== undefined ? `, T=${func.time_delay_s} s` : '';
+  // Formatuj funkcje w stylu PF/ETAP
+  const formatted = useMemo(() => formatProtectionFunction(func), [func]);
 
   return (
     <div
       className="text-xs border-l-2 border-amber-300 pl-2 py-1"
-      data-testid={`protection-function-${func.code}`}
+      data-testid={formatted.testId}
     >
-      {/* Główna linia: ANSI label_pl: setpoint (computed) */}
+      {/* Glowna linia: ANSI shortcut: setpoint (computed), T=time */}
       <div className="flex items-baseline gap-1 flex-wrap">
-        <span className="font-mono font-medium text-amber-800">{ansiStr}</span>
-        <span className="text-gray-700">{func.label_pl}:</span>
-        <span className="font-mono font-medium text-gray-900">{func.setpoint.display_pl}</span>
-        {computedStr && <span className="text-gray-500">{computedStr}</span>}
-        {timeStr && <span className="text-gray-600">{timeStr}</span>}
+        {/* ANSI code */}
+        <span className="font-mono font-semibold text-amber-800">
+          {formatted.ansiCodes}
+        </span>
+        {/* Shortcut (I>>, U<, etc.) */}
+        <span className="font-mono font-medium text-amber-700">
+          {formatted.shortcut}:
+        </span>
+        {/* Setpoint (3×In, 0,8×Un, etc.) */}
+        <span className="font-mono font-medium text-gray-900">
+          {formatted.setpoint}
+        </span>
+        {/* Computed (opcjonalnie) */}
+        {formatted.computed && (
+          <span className="text-gray-500">{formatted.computed}</span>
+        )}
+        {/* Time delay (opcjonalnie) */}
+        {formatted.time && (
+          <span className="text-gray-600">, {formatted.time}</span>
+        )}
       </div>
 
-      {/* Charakterystyka (jeśli specyficzna dla funkcji) */}
+      {/* Charakterystyka (jesli specyficzna dla funkcji) */}
       {func.curve_type && (
         <div className="text-gray-500 mt-0.5">
           Krzywa: <span className="font-mono">{func.curve_type}</span>
@@ -256,26 +277,11 @@ function FunctionSummaryRow({ func }: FunctionSummaryRowProps) {
       )}
 
       {/* Notatki (np. dla SPZ) */}
-      {func.notes_pl && (
-        <div className="text-gray-500 italic mt-0.5">{func.notes_pl}</div>
+      {formatted.notes && (
+        <div className="text-gray-500 italic mt-0.5">{formatted.notes}</div>
       )}
     </div>
   );
-}
-
-// =============================================================================
-// Helpers
-// =============================================================================
-
-/**
- * Formatuje wartość computed dla wyświetlenia.
- */
-function formatComputedValue(value: number, unit: string): string {
-  const formattedValue = value.toLocaleString('pl-PL', {
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 1,
-  });
-  return `${formattedValue} ${unit}`;
 }
 
 export default ProtectionSection;

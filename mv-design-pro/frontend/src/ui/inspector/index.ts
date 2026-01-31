@@ -12,6 +12,18 @@ export { InspectorPanel, InspectorPanelConnected } from './InspectorPanel';
 export { PropertyGrid } from './PropertyGrid';
 export { ProtectionSection } from './ProtectionSection';
 
+// Protection formatting (PF/ETAP parity)
+export {
+  formatProtectionFunction,
+  formatAnsiCodes,
+  getShortcutForAnsi,
+  formatNumberPl,
+  formatTimeDelay,
+  formatComputedDisplay,
+  ANSI_TO_SHORTCUT,
+  type FormattedProtectionFunction,
+} from './formatProtection';
+
 // Types
 export type {
   InspectorSection,
