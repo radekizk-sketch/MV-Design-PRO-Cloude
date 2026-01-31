@@ -25,7 +25,7 @@
  *   - Wyniki
  */
 
-import { useState, useCallback, useMemo } from 'react';
+import { useCallback, useMemo } from 'react';
 import { clsx } from 'clsx';
 import type { TreeNode, TreeNodeType, ElementType, OperatingMode } from '../types';
 import type { RunHistoryItem } from '../comparison/types';
@@ -165,7 +165,7 @@ export function ProjectTree({
   typeCounts = { lineTypes: 0, cableTypes: 0, transformerTypes: 0, switchEquipmentTypes: 0 },
   studyCases = [],
   runHistory = [],
-  resultsCount = 0,
+  resultsCount: _resultsCount = 0,
   onNodeClick,
   onCategoryClick,
   onStudyCaseClick,
@@ -456,17 +456,20 @@ export function ProjectTree({
   );
 
   return (
-    <div className="bg-white border border-gray-200 rounded-lg shadow-sm h-full flex flex-col">
+    <div
+      className="bg-white border border-gray-200 rounded-lg shadow-sm h-full flex flex-col"
+      data-testid="project-tree"
+    >
       {/* Header */}
-      <div className="bg-gray-50 border-b border-gray-200 px-4 py-3">
+      <div className="bg-gray-50 border-b border-gray-200 px-4 py-3" data-testid="project-tree-header">
         <h2 className="text-sm font-semibold text-gray-900">DRZEWO PROJEKTU</h2>
-        <p className="text-xs text-gray-500 mt-0.5">
+        <p className="text-xs text-gray-500 mt-0.5" data-testid="project-tree-mode">
           {getModeLabel(mode)}
         </p>
       </div>
 
       {/* Tree */}
-      <div className="flex-1 overflow-auto p-2">
+      <div className="flex-1 overflow-auto p-2" data-testid="project-tree-content">
         <TreeNodeComponent
           node={tree}
           level={0}
@@ -535,10 +538,29 @@ function TreeNodeComponent({
   const icon = getIcon();
   const label = isElement || isStudyCase || isRunItem ? node.label : TREE_NODE_LABELS[node.nodeType];
 
+  // PROJECT_TREE_PARITY_V1: Deterministic data-testid for E2E testing
+  const getTestId = (): string => {
+    if (isElement && node.elementId) {
+      return `tree-node-element-${node.elementId}`;
+    }
+    if (isStudyCase && node.studyCaseId) {
+      return `tree-node-case-${node.studyCaseId}`;
+    }
+    if (isRunItem && node.runId) {
+      return `tree-node-run-${node.runId}`;
+    }
+    return `tree-node-${node.id}`;
+  };
+
   return (
-    <div>
+    <div data-testid={`tree-node-container-${node.id}`}>
       {/* Node row */}
       <div
+        data-testid={getTestId()}
+        data-node-type={node.nodeType}
+        data-node-id={node.id}
+        data-expanded={isExpanded}
+        data-selected={isSelected}
         className={clsx(
           'flex items-center py-1 px-2 rounded cursor-pointer',
           'hover:bg-gray-100 transition-colors',
@@ -555,6 +577,9 @@ function TreeNodeComponent({
         {hasChildren ? (
           <button
             className="w-4 h-4 flex items-center justify-center text-gray-400 hover:text-gray-600 mr-1"
+            data-testid={`tree-toggle-${node.id}`}
+            aria-expanded={isExpanded}
+            aria-label={isExpanded ? 'Zwiń węzeł' : 'Rozwiń węzeł'}
             onClick={(e) => {
               e.stopPropagation();
               onToggle(node.id);
@@ -563,7 +588,7 @@ function TreeNodeComponent({
             {isExpanded ? '▼' : '▶'}
           </button>
         ) : (
-          <span className="w-4 h-4 mr-1" />
+          <span className="w-4 h-4 mr-1" aria-hidden="true" />
         )}
 
         {/* P10: Active case indicator */}
@@ -608,7 +633,7 @@ function TreeNodeComponent({
 
       {/* Children */}
       {hasChildren && isExpanded && (
-        <div>
+        <div data-testid={`tree-children-${node.id}`} role="group">
           {node.children!.map((child) => (
             <TreeNodeComponent
               key={child.id}

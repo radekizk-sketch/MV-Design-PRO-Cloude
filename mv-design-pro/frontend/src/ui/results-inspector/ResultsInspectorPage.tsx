@@ -595,6 +595,7 @@ export function ResultsInspectorPage({ runId, onClose }: ResultsInspectorPagePro
   } = useResultsInspectorStore();
 
   const selectElement = useSelectionStore((state) => state.selectElement);
+  const globalSelectedElement = useSelectionStore((state) => state.selectedElement);
   const hasShortCircuit = useHasShortCircuitResults();
   const isLoading = useIsAnyLoading();
 
@@ -612,6 +613,46 @@ export function ResultsInspectorPage({ runId, onClose }: ResultsInspectorPagePro
   useEffect(() => {
     setSelectedResultRow(null);
   }, [activeTab]);
+
+  // PROJECT_TREE_PARITY_V1: Sync selection from Tree/URL to Results Table
+  // When globalSelectedElement changes (e.g., from Tree click), find matching row
+  const { busResults, branchResults, shortCircuitResults } = useResultsInspectorStore();
+
+  useEffect(() => {
+    if (!globalSelectedElement) {
+      return;
+    }
+
+    const { id, type } = globalSelectedElement;
+
+    // Try to find matching row in current results
+    if (type === 'Bus' && busResults?.rows) {
+      const matchingRow = busResults.rows.find((row) => row.bus_id === id);
+      if (matchingRow) {
+        setSelectedResultRow({ type: 'bus', data: matchingRow });
+        setActiveTab('BUSES');
+        return;
+      }
+      // Also check short circuit (target is a Bus)
+      if (shortCircuitResults?.rows) {
+        const scRow = shortCircuitResults.rows.find((row) => row.target_id === id);
+        if (scRow) {
+          setSelectedResultRow({ type: 'short_circuit', data: scRow });
+          setActiveTab('SHORT_CIRCUIT');
+          return;
+        }
+      }
+    }
+
+    if ((type === 'LineBranch' || type === 'TransformerBranch') && branchResults?.rows) {
+      const matchingRow = branchResults.rows.find((row) => row.branch_id === id);
+      if (matchingRow) {
+        setSelectedResultRow({ type: 'branch', data: matchingRow });
+        setActiveTab('BRANCHES');
+        return;
+      }
+    }
+  }, [globalSelectedElement, busResults, branchResults, shortCircuitResults, setActiveTab]);
 
   // Handle bus row selection
   const handleBusRowSelect = useCallback((row: BusResultRow) => {
