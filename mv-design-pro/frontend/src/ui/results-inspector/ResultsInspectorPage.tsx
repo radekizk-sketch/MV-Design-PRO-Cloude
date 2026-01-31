@@ -37,6 +37,7 @@ import {
 import { useSelectionStore } from '../selection';
 import type { ElementType } from '../types';
 import { InspectorPanel } from '../inspector';
+import { ResultsExport } from './ResultsExport';
 
 // =============================================================================
 // Helper Functions
@@ -599,6 +600,10 @@ export function ResultsInspectorPage({ runId, onClose }: ResultsInspectorPagePro
   const hasShortCircuit = useHasShortCircuitResults();
   const isLoading = useIsAnyLoading();
 
+  // Filtered results for export
+  const filteredBusRows = useFilteredBusResults();
+  const filteredBranchRows = useFilteredBranchResults();
+
   // Local state for selected result row
   const [selectedResultRow, setSelectedResultRow] = useState<SelectedResultRow>(null);
 
@@ -754,6 +759,15 @@ export function ResultsInspectorPage({ runId, onClose }: ResultsInspectorPagePro
               <h1 className="text-2xl font-semibold text-slate-900">Wyniki analizy</h1>
             </div>
             <div className="flex items-center gap-3">
+              <ResultsExport
+                exportData={{
+                  activeTab,
+                  busRows: filteredBusRows,
+                  branchRows: filteredBranchRows,
+                  shortCircuitRows: shortCircuitResults?.rows ?? [],
+                  runHeader: run_header,
+                }}
+              />
               <div className="rounded border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-700">
                 Tylko do odczytu
               </div>
