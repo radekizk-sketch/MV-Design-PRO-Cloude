@@ -1,5 +1,5 @@
 /**
- * App Root — UI_INTEGRATION_E2E + PROJECT_TREE_PARITY_V1
+ * App Root — UI_INTEGRATION_E2E + PROJECT_TREE_PARITY_V1 + SLD_READ_ONLY_UI
  *
  * CANONICAL ALIGNMENT:
  * - wizard_screens.md § 1.3: Active case bar (always visible)
@@ -13,7 +13,8 @@
  * - Mode-aware page rendering
  *
  * Routes (Polish):
- * - "" / "#sld" → Schemat jednokreskowy (SLD)
+ * - "" / "#sld" → Schemat jednokreskowy (SLD Editor)
+ * - "#sld-view" → Podglad schematu (SLD Read-Only Viewer)
  * - "#results" → Przegląd wyników (Results Browser)
  * - "#proof" → Ślad obliczeń (Proof)
  * - "#protection-results" → Wyniki zabezpieczeń
@@ -27,6 +28,7 @@ import { ProofInspectorPage } from './proof-inspector';
 import { ProtectionResultsInspectorPage } from './ui/protection-results';
 import { PowerFlowResultsInspectorPage } from './ui/power-flow-results';
 import { ResultsInspectorPage } from './ui/results-inspector';
+import { SLDViewPage } from './ui/sld';
 import { MainLayout } from './ui/layout';
 import { useAppStateStore } from './ui/app-state';
 import { ROUTES, useUrlSelectionSync, getCurrentHashRoute } from './ui/navigation';
@@ -208,6 +210,24 @@ function App() {
         onViewResults={handleViewResults}
       >
         <PowerFlowResultsInspectorPage />
+      </MainLayout>
+    );
+  }
+
+  // SLD_READ_ONLY_UI: Podglad schematu jednokreskowego (tylko odczyt)
+  if (route === '#sld-view') {
+    return wrapWithReadyIndicator(
+      <MainLayout
+        onCalculate={handleCalculate}
+        onViewResults={handleViewResults}
+        showProjectTree={true}
+        projectName={projectName ?? 'Nowy projekt'}
+        treeElements={treeElements}
+        onTreeNodeClick={handleTreeNodeClick}
+        onTreeCategoryClick={handleTreeCategoryClick}
+        onTreeRunClick={handleTreeRunClick}
+      >
+        <SLDViewPage useDemo={true} />
       </MainLayout>
     );
   }
