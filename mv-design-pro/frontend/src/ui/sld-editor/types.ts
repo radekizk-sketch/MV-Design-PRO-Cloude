@@ -72,6 +72,13 @@ export interface NodeSymbol extends SldSymbol {
 }
 
 /**
+ * Branch type for LineBranch elements.
+ * LINE = linia napowietrzna (overhead line) - solid stroke
+ * CABLE = linia kablowa (underground cable) - dashed stroke
+ */
+export type BranchType = 'LINE' | 'CABLE';
+
+/**
  * Branch symbol (line/cable/transformer).
  */
 export interface BranchSymbol extends SldSymbol {
@@ -79,6 +86,8 @@ export interface BranchSymbol extends SldSymbol {
   fromNodeId: string;
   toNodeId: string;
   points: Position[]; // polyline points
+  /** Typ gałęzi dla LineBranch (LINE = napowietrzna, CABLE = kablowa) */
+  branchType?: BranchType;
 }
 
 /**
