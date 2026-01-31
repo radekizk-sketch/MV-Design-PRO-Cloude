@@ -14,6 +14,10 @@ export { SLDView } from './SLDView';
 export { SLDViewCanvas } from './SLDViewCanvas';
 export { SLDViewPage } from './SLDViewPage';
 
+// Overlay components
+export { ResultsOverlay } from './ResultsOverlay';
+export type { ResultsOverlayProps } from './ResultsOverlay';
+
 // Types
 export type { SLDViewProps, SLDViewCanvasProps, ViewportState } from './types';
 export type { SLDViewPageProps } from './SLDViewPage';
@@ -27,3 +31,18 @@ export {
   fitToContent,
   calculateSymbolsBounds,
 } from './types';
+
+// Overlay utilities
+export {
+  mapPositionToScreen,
+  buildOverlayPositionMaps,
+  formatVoltageKv,
+  formatVoltagePu,
+  formatCurrentA,
+  formatCurrentKa,
+  formatPowerMw,
+  formatPowerMvar,
+  formatLoadingPct,
+  getLoadingColorClass,
+  getLoadingBgClass,
+} from './overlayUtils';
