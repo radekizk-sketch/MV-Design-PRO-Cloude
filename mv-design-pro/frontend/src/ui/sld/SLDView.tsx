@@ -17,6 +17,7 @@
 
 import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { SLDViewCanvas } from './SLDViewCanvas';
+import { ResultsOverlay } from './ResultsOverlay';
 import {
   DEFAULT_VIEWPORT,
   ZOOM_MIN,
@@ -28,6 +29,7 @@ import {
 } from './types';
 import type { ElementType, SelectedElement } from '../types';
 import { useSelectionStore } from '../selection/store';
+import { useResultsInspectorStore } from '../results-inspector/store';
 import { updateUrlWithSelection } from '../navigation/urlState';
 
 /**
@@ -60,6 +62,12 @@ export const SLDView: React.FC<SLDViewProps> = ({
   const storeSelectedElement = useSelectionStore((state) => state.selectedElements[0] ?? null);
   const centerSldOnElement = useSelectionStore((state) => state.centerSldOnElement);
   const sldCenterOnElement = useSelectionStore((state) => state.sldCenterOnElement);
+
+  // Results overlay store integration
+  const overlayVisible = useResultsInspectorStore((state) => state.overlayVisible);
+  const sldOverlay = useResultsInspectorStore((state) => state.sldOverlay);
+  const toggleOverlay = useResultsInspectorStore((state) => state.toggleOverlay);
+  const hasResults = sldOverlay !== null;
 
   // Use external selection if provided, otherwise use store
   const selectedElement = externalSelectedElement !== undefined ? externalSelectedElement : storeSelectedElement;
@@ -292,13 +300,33 @@ export const SLDView: React.FC<SLDViewProps> = ({
           >
             Reset
           </button>
+
+          {/* Results overlay toggle */}
+          {hasResults && (
+            <>
+              <div className="w-px h-4 bg-gray-300 mx-1" />
+              <button
+                type="button"
+                onClick={() => toggleOverlay()}
+                className={`px-2 py-1 text-xs rounded ${
+                  overlayVisible
+                    ? 'bg-blue-100 text-blue-700 hover:bg-blue-200'
+                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                }`}
+                title={overlayVisible ? 'Ukryj nakladke wynikow' : 'Pokaz nakladke wynikow'}
+                data-testid="sld-overlay-toggle"
+              >
+                {overlayVisible ? 'Nakladka: Wl.' : 'Nakladka: Wyl.'}
+              </button>
+            </>
+          )}
         </div>
       </div>
 
       {/* Canvas container */}
       <div
         ref={containerRef}
-        className="flex-1 overflow-hidden"
+        className="flex-1 overflow-hidden relative"
         onWheel={handleWheel}
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
@@ -315,6 +343,13 @@ export const SLDView: React.FC<SLDViewProps> = ({
           showGrid={showGrid}
           width={width}
           height={height}
+        />
+
+        {/* Results overlay layer */}
+        <ResultsOverlay
+          symbols={symbols}
+          viewport={viewport}
+          selectedElementId={selectedElement?.id}
         />
       </div>
 
