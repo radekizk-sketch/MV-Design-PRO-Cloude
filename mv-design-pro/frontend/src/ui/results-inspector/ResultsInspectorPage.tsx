@@ -13,6 +13,7 @@
  * - Tabs: Szyny, Gałęzie, Zwarcia (SC only), Ślad obliczeń
  * - Sortable, filterable tables
  * - SLD overlay toggle
+ * - Inspector panel (read-only property grid) - PowerFactory parity
  *
  * 100% POLISH UI
  */
@@ -35,6 +36,7 @@ import {
 } from './types';
 import { useSelectionStore } from '../selection';
 import type { ElementType } from '../types';
+import { InspectorPanel } from '../inspector';
 
 // =============================================================================
 // Helper Functions
@@ -509,7 +511,7 @@ function TraceView() {
 }
 
 // =============================================================================
-// Selected Result Row Types
+// Selected Result Row Types (for InspectorPanel integration)
 // =============================================================================
 
 type SelectedResultRow =
@@ -518,162 +520,56 @@ type SelectedResultRow =
   | { type: 'short_circuit'; data: ShortCircuitRow }
   | null;
 
-// =============================================================================
-// Results Inspector Panel (read-only property grid)
-// =============================================================================
+/**
+ * Mapuje dane wiersza wyniku do formatu InspectorPanel.
+ */
+function mapResultRowToInspectorData(row: SelectedResultRow) {
+  if (!row) return null;
 
-interface ResultsInspectorPanelProps {
-  selectedRow: SelectedResultRow;
-  onClose: () => void;
-}
-
-function ResultsInspectorPanel({ selectedRow, onClose }: ResultsInspectorPanelProps) {
-  if (!selectedRow) {
-    return (
-      <div
-        className="rounded border border-slate-200 bg-white p-4"
-        data-testid="results-inspector-panel-empty"
-      >
-        <p className="text-sm text-slate-500">
-          Wybierz wiersz w tabeli, aby zobaczyć szczegóły.
-        </p>
-      </div>
-    );
+  switch (row.type) {
+    case 'bus':
+      return {
+        type: 'bus' as const,
+        data: {
+          bus_id: row.data.bus_id,
+          name: row.data.name,
+          un_kv: row.data.un_kv,
+          u_kv: row.data.u_kv,
+          u_pu: row.data.u_pu,
+          angle_deg: row.data.angle_deg,
+          flags: row.data.flags,
+        },
+      };
+    case 'branch':
+      return {
+        type: 'branch' as const,
+        data: {
+          branch_id: row.data.branch_id,
+          name: row.data.name,
+          from_bus: row.data.from_bus,
+          to_bus: row.data.to_bus,
+          i_a: row.data.i_a,
+          p_mw: row.data.p_mw,
+          q_mvar: row.data.q_mvar,
+          s_mva: row.data.s_mva,
+          loading_pct: row.data.loading_pct,
+          flags: row.data.flags,
+        },
+      };
+    case 'short_circuit':
+      return {
+        type: 'short_circuit' as const,
+        data: {
+          target_id: row.data.target_id,
+          target_name: row.data.target_name,
+          fault_type: row.data.fault_type,
+          ikss_ka: row.data.ikss_ka,
+          ip_ka: row.data.ip_ka,
+          ith_ka: row.data.ith_ka,
+          sk_mva: row.data.sk_mva,
+        },
+      };
   }
-
-  const getTitle = () => {
-    switch (selectedRow.type) {
-      case 'bus':
-        return `Szyna: ${selectedRow.data.name}`;
-      case 'branch':
-        return `Gałąź: ${selectedRow.data.name}`;
-      case 'short_circuit':
-        return `Zwarcie: ${selectedRow.data.target_name ?? selectedRow.data.target_id.substring(0, 8)}`;
-    }
-  };
-
-  const renderProperties = () => {
-    switch (selectedRow.type) {
-      case 'bus':
-        return (
-          <dl className="divide-y divide-slate-100" data-testid="inspector-properties-bus">
-            <PropertyRow label="Nazwa" value={selectedRow.data.name} />
-            <PropertyRow label="ID węzła" value={selectedRow.data.bus_id} />
-            <PropertyRow label="Napięcie znamionowe" value={formatNumber(selectedRow.data.un_kv, 1)} unit="kV" />
-            <PropertyRow label="Napięcie" value={formatNumber(selectedRow.data.u_kv)} unit="kV" />
-            <PropertyRow label="Napięcie (p.u.)" value={formatNumber(selectedRow.data.u_pu, 4)} unit="pu" />
-            <PropertyRow label="Kąt fazowy" value={formatNumber(selectedRow.data.angle_deg, 2)} unit="°" />
-            <PropertyRow label="Flagi" value={formatFlags(selectedRow.data.flags) || '—'} />
-          </dl>
-        );
-      case 'branch':
-        return (
-          <dl className="divide-y divide-slate-100" data-testid="inspector-properties-branch">
-            <PropertyRow label="Nazwa" value={selectedRow.data.name} />
-            <PropertyRow label="ID gałęzi" value={selectedRow.data.branch_id} />
-            <PropertyRow label="Od węzła" value={selectedRow.data.from_bus} />
-            <PropertyRow label="Do węzła" value={selectedRow.data.to_bus} />
-            <PropertyRow label="Prąd" value={formatNumber(selectedRow.data.i_a, 1)} unit="A" />
-            <PropertyRow label="Moc czynna" value={formatNumber(selectedRow.data.p_mw)} unit="MW" />
-            <PropertyRow label="Moc bierna" value={formatNumber(selectedRow.data.q_mvar)} unit="Mvar" />
-            <PropertyRow label="Moc pozorna" value={formatNumber(selectedRow.data.s_mva)} unit="MVA" />
-            <PropertyRow
-              label="Obciążenie"
-              value={formatNumber(selectedRow.data.loading_pct, 1)}
-              unit="%"
-              highlight={
-                selectedRow.data.loading_pct !== null && selectedRow.data.loading_pct > 100
-                  ? 'error'
-                  : selectedRow.data.loading_pct !== null && selectedRow.data.loading_pct > 80
-                    ? 'warning'
-                    : undefined
-              }
-            />
-            <PropertyRow label="Flagi" value={formatFlags(selectedRow.data.flags) || '—'} />
-          </dl>
-        );
-      case 'short_circuit':
-        return (
-          <dl className="divide-y divide-slate-100" data-testid="inspector-properties-short-circuit">
-            <PropertyRow label="Węzeł zwarcia" value={selectedRow.data.target_name ?? selectedRow.data.target_id} />
-            <PropertyRow label="ID węzła" value={selectedRow.data.target_id} />
-            <PropertyRow label="Rodzaj zwarcia" value={selectedRow.data.fault_type ?? '—'} />
-            <PropertyRow label="Ik''" value={formatNumber(selectedRow.data.ikss_ka)} unit="kA" highlight="primary" />
-            <PropertyRow label="ip" value={formatNumber(selectedRow.data.ip_ka)} unit="kA" />
-            <PropertyRow label="Ith" value={formatNumber(selectedRow.data.ith_ka)} unit="kA" />
-            <PropertyRow label="Sk''" value={formatNumber(selectedRow.data.sk_mva, 1)} unit="MVA" />
-          </dl>
-        );
-    }
-  };
-
-  return (
-    <div
-      className="rounded border border-slate-200 bg-white"
-      data-testid="results-inspector-panel"
-    >
-      {/* Header */}
-      <div className="flex items-center justify-between border-b border-slate-200 bg-slate-50 px-4 py-3">
-        <div>
-          <p className="text-xs font-medium uppercase tracking-wide text-slate-400">
-            Właściwości wyniku
-          </p>
-          <h3 className="text-sm font-semibold text-slate-800">{getTitle()}</h3>
-        </div>
-        <button
-          type="button"
-          onClick={onClose}
-          className="rounded p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
-          aria-label="Zamknij panel właściwości"
-          data-testid="inspector-close-button"
-        >
-          ✕
-        </button>
-      </div>
-
-      {/* Read-only badge */}
-      <div className="border-b border-slate-100 bg-green-50 px-4 py-2">
-        <div className="flex items-center gap-2 text-xs text-green-700">
-          <span>🔒</span>
-          <span>Tryb wyników — tylko do odczytu</span>
-        </div>
-      </div>
-
-      {/* Properties */}
-      <div className="p-4">{renderProperties()}</div>
-    </div>
-  );
-}
-
-// =============================================================================
-// Property Row Component
-// =============================================================================
-
-interface PropertyRowProps {
-  label: string;
-  value: string;
-  unit?: string;
-  highlight?: 'error' | 'warning' | 'primary';
-}
-
-function PropertyRow({ label, value, unit, highlight }: PropertyRowProps) {
-  const valueClass = highlight === 'error'
-    ? 'font-semibold text-rose-600'
-    : highlight === 'warning'
-      ? 'text-amber-600'
-      : highlight === 'primary'
-        ? 'font-semibold text-blue-700'
-        : 'text-slate-800';
-
-  return (
-    <div className="flex items-center justify-between py-2" data-testid={`property-row-${label.toLowerCase().replace(/\s+/g, '-')}`}>
-      <dt className="text-xs text-slate-500">{label}</dt>
-      <dd className={`text-xs font-mono ${valueClass}`}>
-        {value}
-        {unit && <span className="ml-1 text-slate-400">{unit}</span>}
-      </dd>
-    </div>
-  );
 }
 
 // =============================================================================
@@ -902,10 +798,10 @@ export function ResultsInspectorPage({ runId, onClose }: ResultsInspectorPagePro
             {activeTab === 'TRACE' && <TraceView />}
           </div>
 
-          {/* Inspector panel */}
+          {/* Inspector panel (PowerFactory-style read-only property grid) */}
           <div className="lg:col-span-1" data-testid="results-inspector-container">
-            <ResultsInspectorPanel
-              selectedRow={selectedResultRow}
+            <InspectorPanel
+              selectedRow={mapResultRowToInspectorData(selectedResultRow)}
               onClose={handleCloseInspector}
             />
           </div>
