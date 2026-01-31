@@ -10,6 +10,7 @@
 // Components
 export { InspectorPanel, InspectorPanelConnected } from './InspectorPanel';
 export { PropertyGrid } from './PropertyGrid';
+export { ProtectionSection } from './ProtectionSection';
 
 // Types
 export type {

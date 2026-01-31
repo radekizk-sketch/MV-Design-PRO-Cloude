@@ -6,4 +6,6 @@
 
 export * from './types';
 export * from './api';
+export * from './element-assignment';
+export { useProtectionAssignment, useProtectionAssignments } from './useProtectionAssignment';
 export { ProtectionLibraryBrowser } from './ProtectionLibraryBrowser';
