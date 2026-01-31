@@ -11,6 +11,7 @@
 export { InspectorPanel, InspectorPanelConnected } from './InspectorPanel';
 export { PropertyGrid } from './PropertyGrid';
 export { ProtectionSection } from './ProtectionSection';
+export { DiagnosticsSection } from './DiagnosticsSection';
 
 // Protection formatting (PF/ETAP parity)
 export {
