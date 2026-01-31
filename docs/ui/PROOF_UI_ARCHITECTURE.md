@@ -1,7 +1,7 @@
 # PROOF UI ARCHITECTURE — MV-DESIGN-PRO
 
 **Status**: BINDING
-**Wersja**: 1.0
+**Wersja**: 1.1
 **Data**: 2026-01-31
 **Typ**: Architecture Document — Warstwa PROOF (White Box)
 **Zależność nadrzędna**: UI_CORE_ARCHITECTURE.md
@@ -29,7 +29,7 @@ Dokument stanowi **źródło prawdy** dla:
 | **White Box** | Prezentacja pełnego śladu obliczeń — wzór → dane → podstawienie → wynik |
 | **Deterministyczność** | Gwarancja, że ten sam input zawsze produkuje ten sam output wizualny |
 | **Audytowalność** | Możliwość formalnej weryfikacji każdego kroku obliczeniowego |
-| **P11 Compliance** | Dokumentacja zgodności z normami (IEC, PN-EN) w formacie audytowalnym |
+| **Zgodność obliczeń** | Dokumentacja zgodności z normami (IEC, PN-EN) w formacie audytowalnym |
 | **Expert Support** | Wsparcie dla trybu Analyst i Auditor |
 
 ### 1.3. Czym NIE JEST warstwa PROOF
@@ -98,7 +98,7 @@ Dokument stanowi **źródło prawdy** dla:
 │  • Navigation   │◀───────▶│  • Browser      │────────▶│  • ProofGraph   │
 │  • Inspector    │         │  • Tables       │         │  • ProofSteps   │
 │  • Context Bar  │         │  • Comparisons  │◀────────│  • Audit Trail  │
-│  • Expert Mode  │         │  • Decision Sup │         │  • P11 Export   │
+│  • Expert Mode  │         │  • Decision Sup │         │  • Eksport śladu│
 └─────────────────┘         └─────────────────┘         └─────────────────┘
         │                           │                           │
         │                           │                           │
@@ -113,7 +113,7 @@ Dokument stanowi **źródło prawdy** dla:
 |----------|------|------|
 | PROOF → CORE | Selekcja ProofStep | Wybrany krok → Inspector, SLD highlight |
 | CORE → PROOF | Kontekst | Element + Run + Norma → filtrowanie śladu |
-| PROOF → RESULTS | Status P11 | Compliance status → Decision Support |
+| PROOF → RESULTS | Status zgodności | Compliance status → Decision Support |
 | RESULTS → PROOF | Żądanie | Inicjacja prezentacji śladu dla elementu |
 | SOLVER → PROOF | ProofGraph | Kompletny ślad obliczeń z solvera |
 | NORMA → PROOF | Criteria | Limity i kryteria do weryfikacji |
@@ -273,7 +273,7 @@ Variable = {
 │  ┌─────────────────────────────────────────────────────────────┐   │
 │  │ 1. PROOF PANEL (Inspector zakładka "Proof")                  │   │
 │  │    → Ślad obliczeń dla wybranego elementu                    │   │
-│  │    → Tryb: Linear View / Graph View                          │   │
+│  │    → Tryb: Widok liniowy / Widok grafu                        │   │
 │  └─────────────────────────────────────────────────────────────┘   │
 │                                                                     │
 │  ┌─────────────────────────────────────────────────────────────┐   │
@@ -308,7 +308,7 @@ Variable = {
 │  RUN: #3 (2026-01-31 14:32) │ STATUS: ✅ COMPLIANT                  │
 │                                                                     │
 ├─────────────────────────────────────────────────────────────────────┤
-│  [Linear View] [Graph View] [Audit Mode]            [📤 Export PDF] │
+│  [Widok liniowy] [Widok grafu] [Tryb audytu]    [📤 Eksport śladu PDF] │
 ├─────────────────────────────────────────────────────────────────────┤
 │                                                                     │
 │  ┌─────────────────────────────────────────────────────────────┐   │
@@ -349,7 +349,7 @@ Variable = {
 |------|------|--------------|
 | **Linear View** | Lista kroków w kolejności sekwencyjnej | Szybki przegląd, domyślny |
 | **Graph View** | Interaktywny DAG z wizualizacją zależności | Analiza przepływu danych |
-| **Audit Mode** | Rozszerzony widok z pełnymi odniesieniami do norm | Audytorzy, compliance |
+| **Tryb audytu** | Rozszerzony widok z pełnymi odniesieniami do norm | Audytorzy, compliance |
 
 ### 4.4. Graph View — wizualizacja DAG
 
@@ -388,7 +388,7 @@ Variable = {
 │              │     ✅ PASS      │                                    │
 │              └─────────────────┘                                    │
 │                                                                     │
-│  [Pan] [Zoom] [Fit] [Export SVG]                                    │
+│  [Przesuwanie] [Powiększenie] [Dopasuj] [Eksport SVG]               │
 │                                                                     │
 └─────────────────────────────────────────────────────────────────────┘
 ```
@@ -400,7 +400,7 @@ Variable = {
 │ PROOF EXPLORER                                                      │
 ├─────────────────────────────────────────────────────────────────────┤
 │                                                                     │
-│  [🔍 Search] [⬇️ Filter: All / FAIL / WARNING] [📊 Sort]            │
+│  [🔍 Szukaj] [⬇️ Filtr: Wszystkie / FAIL / WARNING] [📊 Sortuj]     │
 │                                                                     │
 │  📁 Run #3 (2026-01-31 14:32)                                       │
 │  ├── 📂 Short-Circuit Analysis (IEC 60909)                          │
@@ -440,10 +440,10 @@ Variable = {
 
 | Scenariusz | Punkt wejścia | Workflow |
 |------------|---------------|----------|
-| **Z Inspector** | Zakładka "Proof" | Element → Inspector → Proof Tab |
-| **Z RESULTS** | Klik "Show Proof" | RESULTS Table → kontekstowe menu → Proof |
-| **Z Navigation** | Proof Tree mode | Navigation Panel → tryb Proof → Element |
-| **Z SLD** | Context menu | SLD → prawy klik → "Show Proof" |
+| **Z Inspector** | Zakładka „Ślad obliczeń" | Element → Inspector → zakładka Ślad |
+| **Z RESULTS** | Klik „Pokaż ślad obliczeń" | Tabela wyników → menu kontekstowe → Ślad |
+| **Z Navigation** | Tryb drzewa śladów | Navigation Panel → tryb Ślad → Element |
+| **Z SLD** | Menu kontekstowe | SLD → prawy klik → „Pokaż ślad obliczeń" |
 
 ### 5.2. Workflow dla statusu PASS
 
@@ -461,7 +461,7 @@ Variable = {
 │     └─ Sprawdzenie marginesu do limitu                              │
 │                                                                     │
 │  3. EXPORT (dla dokumentacji)                                       │
-│     └─ Generowanie PDF P11 dla archiwum projektu                    │
+│     └─ Generowanie raportu śladu obliczeń (PDF) dla archiwum        │
 │                                                                     │
 └─────────────────────────────────────────────────────────────────────┘
 ```
@@ -487,7 +487,7 @@ Variable = {
 │  3. AKCJE DOSTĘPNE                                                  │
 │     ├─ [📊 Pokaż Contributions] → kto kontrybuuje do Ik"            │
 │     ├─ [🗺️ Pokaż na SLD] → lokalizacja + ścieżka zwarcia           │
-│     ├─ [📋 Generuj Proof P11] → formalny raport niezgodności        │
+│     ├─ [📋 Generuj raport śladu] → formalny raport niezgodności     │
 │     └─ [↩️ Wróć do RESULTS] → kontekst porównawczy                  │
 │                                                                     │
 │  4. DECYZJA PROJEKTOWA                                              │
@@ -565,8 +565,8 @@ Warstwa PROOF **MUST** reagować na zmiany w Global Context Bar:
 
 | Kierunek | Dane | Opis |
 |----------|------|------|
-| RESULTS → PROOF | Żądanie Proof | Klik "Show Proof" w tabeli wyników |
-| PROOF → RESULTS | Compliance Status | Status P11 widoczny w kolumnie Status |
+| RESULTS → PROOF | Żądanie Proof | Klik "Pokaż ślad obliczeń" w tabeli wyników |
+| PROOF → RESULTS | Compliance Status | Status zgodności widoczny w kolumnie Status |
 | RESULTS → PROOF | Element context | Przekazanie element_id, run_id do PROOF |
 | PROOF → RESULTS | Navigation back | Przycisk "Wróć do RESULTS" |
 
@@ -577,7 +577,7 @@ Warstwa PROOF **MUST** reagować na zmiany w Global Context Bar:
 │ RESULTS TABLE                                                       │
 ├─────────────────────────────────────────────────────────────────────┤
 │ ID       │ Name    │ Ik" [kA] │ Limit │ Status │ Actions           │
-│ BUS-PT-01│ PT-01   │ 28.5     │ 25.0  │ ❌ FAIL │ [📝 Proof] [🗺️]   │
+│ BUS-PT-01│ PT-01   │ 28.5     │ 25.0  │ ❌ FAIL │ [📝 Ślad] [🗺️]    │
 │                                                    ▲                │
 │                                                    │                │
 │                                           Klik otwiera PROOF Panel  │
@@ -616,7 +616,7 @@ Warstwa PROOF **MUST** reagować na zmiany w Global Context Bar:
 │     │ PT1 │ ◄─── Element z FAIL                                     │
 │     └─────┘      [BUS-PT-01]                                        │
 │                                                                     │
-│  [Wyłącz Overlay] [Zoom to Fault] [Show All Contributors]           │
+│  [Wyłącz nakładkę] [Przybliż do zwarcia] [Pokaż kontrybutorów]      │
 │                                                                     │
 └─────────────────────────────────────────────────────────────────────┘
 ```
@@ -708,6 +708,51 @@ Warstwa PROOF **MUST** reagować na zmiany w Global Context Bar:
 
 **Uwaga**: Żaden tryb NIE UKRYWA danych — różnica polega tylko na domyślnym rozwinięciu.
 
+### 7.6. Terminologia UI — zakaz wewnętrznych identyfikatorów (BINDING)
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│ ZASADA: TERMINOLOGIA UI — BRAK WEWNĘTRZNYCH KODÓW                   │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                     │
+│  UI MUST używać wyłącznie nazw użytkowych (polski):                 │
+│     • „Ślad obliczeń"                                               │
+│     • „Dowód obliczeń"                                              │
+│     • „Raport śladu obliczeń"                                       │
+│     • „Eksport śladu obliczeń"                                      │
+│     • „Pokaż ślad obliczeń"                                         │
+│     • „Tryb audytu"                                                 │
+│                                                                     │
+│  UI MUST NOT używać w etykietach UX:                                │
+│     • „P11" / „Proof P11" / „P11 Export" / „P11 Compliance"         │
+│     • innych wewnętrznych identyfikatorów dokumentacji              │
+│                                                                     │
+│  DOZWOLONE wyłącznie w dokumentacji wewnętrznej repozytorium:       │
+│     • Termin „P11" jako wewnętrzny identyfikator projektu           │
+│     • NIE jest prezentowany w UI użytkownika końcowego              │
+│                                                                     │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+**Tabela mapowania terminów wewnętrznych → UX:**
+
+| Termin wewnętrzny (repo) | Termin UX (interfejs) |
+|--------------------------|----------------------|
+| P11 Export | Eksport śladu obliczeń (PDF) |
+| Proof P11 | Raport śladu obliczeń |
+| P11 Compliance | Zgodność obliczeń |
+| Show Proof | Pokaż ślad obliczeń |
+| Audit Mode | Tryb audytu |
+| ProofGraph | *(termin techniczny — nie wyświetlany w UI)* |
+| ProofStep | *(termin techniczny — nie wyświetlany w UI)* |
+
+**Uwaga o terminach technicznych:**
+
+Terminy `ProofGraph`, `ProofStep`, `Variable` są **wewnętrznymi nazwami struktur danych** używanymi w kodzie i dokumentacji architektury. **NIE SĄ** prezentowane użytkownikowi w interfejsie. W UI użytkownik widzi wyłącznie:
+- „Ślad obliczeń" (dla ProofGraph)
+- „Krok obliczeniowy" (dla ProofStep)
+- „Zmienna" (dla Variable)
+
 ---
 
 ## 8. PERFORMANCE I DETERMINISM
@@ -798,7 +843,7 @@ Warstwa PROOF UI **NIE JEST ODPOWIEDZIALNA** za:
 │ ✅ Prezentacja statusów compliance (PASS/FAIL/WARNING)              │
 │ ✅ Odniesienia do norm (sekcje, paragrafy)                          │
 │ ✅ Synchronizacja z Inspector, SLD, Context Bar                     │
-│ ✅ Inicjacja eksportu PDF (P11)                                     │
+│ ✅ Inicjacja eksportu raportu śladu obliczeń (PDF)                  │
 │ ✅ Obsługa trybów eksperckich (Analyst, Auditor)                    │
 ├─────────────────────────────────────────────────────────────────────┤
 │ ❌ Obliczenia (LF, SC, Protection)                                  │
@@ -861,7 +906,7 @@ UI_CORE_ARCHITECTURE.md (NADRZĘDNY)
 |----------|--------|--------|
 | `PROOF_PANEL_CONTRACT.md` | FUTURE | Szczegóły implementacji panelu Proof |
 | `PROOF_GRAPH_RENDER_CONTRACT.md` | FUTURE | Specyfikacja renderingu Graph View |
-| `P11_EXPORT_CONTRACT.md` | FUTURE | Format i struktura eksportu PDF |
+| `PROOF_EXPORT_CONTRACT.md` | FUTURE | Format i struktura eksportu PDF |
 
 ---
 
@@ -870,6 +915,7 @@ UI_CORE_ARCHITECTURE.md (NADRZĘDNY)
 | Wersja | Data | Zmiany |
 |--------|------|--------|
 | **1.0** | 2026-01-31 | Definicja bazowa |
+| **1.1** | 2026-01-31 | UX-CLEANUP: usunięto termin „P11" z UI, dodano sekcję 7.6 (terminologia UI), ujednolicono nazewnictwo PL |
 
 ---
 
