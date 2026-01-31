@@ -1,14 +1,15 @@
 /**
- * App Root — UI_INTEGRATION_E2E
+ * App Root — UI_INTEGRATION_E2E + PROJECT_TREE_PARITY_V1
  *
  * CANONICAL ALIGNMENT:
  * - wizard_screens.md § 1.3: Active case bar (always visible)
- * - powerfactory_ui_parity.md § A: Operating modes
+ * - powerfactory_ui_parity.md § A: Operating modes, Project Tree
  * - UI_CORE_ARCHITECTURE.md § 4.1: Navigation structure
  *
  * Main application entry with:
  * - Hash-based routing with Polish labels
  * - MainLayout with Active Case Bar
+ * - Project Tree (left sidebar) for navigation
  * - Mode-aware page rendering
  *
  * Routes (Polish):
@@ -19,7 +20,7 @@
  * - "#power-flow-results" → Wyniki rozpływu
  */
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 
 import { DesignerPage } from './designer/DesignerPage';
 import { ProofInspectorPage } from './proof-inspector';
@@ -29,6 +30,14 @@ import { ResultsInspectorPage } from './ui/results-inspector';
 import { MainLayout } from './ui/layout';
 import { useAppStateStore } from './ui/app-state';
 import { ROUTES, useUrlSelectionSync, getCurrentHashRoute } from './ui/navigation';
+import { useSelectionStore } from './ui/selection';
+import type { TreeNode, TreeNodeType, ElementType } from './ui/types';
+
+// PROJECT_TREE_PARITY_V1: Get active project name from store
+function useActiveProjectName(): string | null {
+  const store = useAppStateStore();
+  return (store as { activeProjectName?: string | null }).activeProjectName ?? null;
+}
 
 /**
  * E2E_STABILIZATION: App ready indicator for tests.
@@ -65,6 +74,9 @@ function App() {
   const [route, setRoute] = useState(() => getCurrentHashRoute());
   const setActiveMode = useAppStateStore((state) => state.setActiveMode);
   const appReady = useAppReady();
+  const projectName = useActiveProjectName();
+  const selectElement = useSelectionStore((state) => state.selectElement);
+  const centerSldOnElement = useSelectionStore((state) => state.centerSldOnElement);
 
   // NAVIGATION_SELECTOR_UI: Sync selection with URL (refresh preserves selection)
   useUrlSelectionSync();
@@ -100,6 +112,44 @@ function App() {
     window.location.hash = ROUTES.RESULTS.hash;
   }, []);
 
+  // PROJECT_TREE_PARITY_V1: Tree node click handler
+  // Updates selection → syncs URL → triggers Results Table / Inspector update
+  const handleTreeNodeClick = useCallback((node: TreeNode) => {
+    // Only handle element nodes (not categories)
+    if (node.nodeType === 'ELEMENT' && node.elementId && node.elementType) {
+      selectElement({
+        id: node.elementId,
+        type: node.elementType as ElementType,
+        name: node.label,
+      });
+      centerSldOnElement(node.elementId);
+    }
+  }, [selectElement, centerSldOnElement]);
+
+  // PROJECT_TREE_PARITY_V1: Tree category click handler
+  const handleTreeCategoryClick = useCallback((_nodeType: TreeNodeType, _elementType?: ElementType) => {
+    // Category clicks could navigate to Data Manager or filter views
+    // For now, this is a no-op placeholder
+  }, []);
+
+  // PROJECT_TREE_PARITY_V1: Tree run click handler
+  const handleTreeRunClick = useCallback((runId: string) => {
+    // Navigate to results with run context
+    window.location.hash = `#results?run=${runId}`;
+  }, []);
+
+  // PROJECT_TREE_PARITY_V1: Mock tree elements for demonstration
+  // In production, this would come from network model store
+  const treeElements = useMemo(() => ({
+    buses: [],
+    lines: [],
+    cables: [],
+    transformers: [],
+    switches: [],
+    sources: [],
+    loads: [],
+  }), []);
+
   // E2E_STABILIZATION: Wrapper with app-ready indicator
   const wrapWithReadyIndicator = (content: React.ReactNode) => (
     <div data-testid="app-root" data-ready={appReady}>
@@ -108,12 +158,18 @@ function App() {
     </div>
   );
 
-  // UI_INTEGRATION_E2E: Przegląd wyników (Results Browser)
+  // UI_INTEGRATION_E2E + PROJECT_TREE_PARITY_V1: Przegląd wyników (Results Browser)
   if (route === '#results') {
     return wrapWithReadyIndicator(
       <MainLayout
         onCalculate={handleCalculate}
         onViewResults={handleViewResults}
+        showProjectTree={true}
+        projectName={projectName ?? 'Nowy projekt'}
+        treeElements={treeElements}
+        onTreeNodeClick={handleTreeNodeClick}
+        onTreeCategoryClick={handleTreeCategoryClick}
+        onTreeRunClick={handleTreeRunClick}
       >
         <ResultsInspectorPage />
       </MainLayout>
