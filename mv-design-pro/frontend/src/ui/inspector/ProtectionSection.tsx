@@ -1,15 +1,17 @@
 /**
- * P16a — Protection Section Component (READ-ONLY)
+ * P16a/P16b — Protection Section Component (READ-ONLY)
  *
  * CANONICAL ALIGNMENT:
  * - powerfactory_ui_parity.md: PowerFactory-like protection visualization
  * - sld_rules.md § G.1: Synchronizacja selection SLD ↔ Tree ↔ Inspector
+ * - ANSI/IEEE C37.2: Device function numbers
  *
  * FEATURES:
  * - Wyświetla przypisane zabezpieczenia dla wybranego elementu
+ * - SETPOINT jako źródło prawdy (np. "3×In", "0,8×Un")
+ * - COMPUTED (A/V) tylko gdy dostępne dane bazowe
  * - Read-only: brak edycji
  * - Zwijalna sekcja
- * - Tooltip z dodatkowymi informacjami
  *
  * STATUS: PLACEHOLDER (używa fixture data przez useProtectionAssignment)
  *
@@ -19,7 +21,8 @@
 import { useState, useCallback } from 'react';
 import { clsx } from 'clsx';
 import { useProtectionAssignment } from '../protection';
-import type { ElementProtectionAssignment } from '../protection';
+import type { ElementProtectionAssignment, ProtectionSettingsSummary } from '../protection';
+import type { ProtectionFunctionSummary } from '../protection';
 import {
   PROTECTION_DEVICE_KIND_LABELS,
   PROTECTION_STATUS_LABELS,
@@ -153,12 +156,9 @@ function ProtectionAssignmentCard({ assignment }: ProtectionAssignmentCardProps)
       {/* Device type */}
       <div className="text-xs text-gray-600 mb-2">{kindLabel}</div>
 
-      {/* Settings summary */}
+      {/* Settings summary (nowy model P16b) */}
       {assignment.settings_summary && (
-        <div className="bg-gray-50 rounded p-2 space-y-1">
-          <div className="text-xs font-medium text-gray-700 mb-1">Nastawy:</div>
-          <SettingsSummaryView summary={assignment.settings_summary} />
-        </div>
+        <SettingsSummaryView summary={assignment.settings_summary} />
       )}
 
       {/* Device ID (small) */}
@@ -168,55 +168,114 @@ function ProtectionAssignmentCard({ assignment }: ProtectionAssignmentCardProps)
 }
 
 // =============================================================================
-// SettingsSummaryView Component
+// SettingsSummaryView Component (P16b: setpoint + computed)
 // =============================================================================
 
 interface SettingsSummaryViewProps {
-  summary: ElementProtectionAssignment['settings_summary'];
+  summary: ProtectionSettingsSummary;
 }
 
 function SettingsSummaryView({ summary }: SettingsSummaryViewProps) {
-  if (!summary) return null;
-
-  const settings: Array<{ label: string; value: string }> = [];
-
-  if (summary.i_pickup_a !== undefined) {
-    settings.push({ label: 'I>', value: `${summary.i_pickup_a} A` });
-  }
-  if (summary.i_pickup_fast_a !== undefined) {
-    settings.push({ label: 'I>>', value: `${summary.i_pickup_fast_a} A` });
-  }
-  if (summary.t_delay_s !== undefined) {
-    settings.push({ label: 't', value: `${summary.t_delay_s} s` });
-  }
-  if (summary.curve_type) {
-    settings.push({ label: 'Charakterystyka', value: summary.curve_type });
-  }
-  if (summary.i_rated_a !== undefined) {
-    settings.push({ label: 'In', value: `${summary.i_rated_a} A` });
-  }
-
-  // Extra settings
-  if (summary.extra) {
-    for (const [key, value] of Object.entries(summary.extra)) {
-      settings.push({ label: key, value: String(value) });
-    }
-  }
-
-  if (settings.length === 0) {
+  if (!summary.functions || summary.functions.length === 0) {
     return <div className="text-xs text-gray-500 italic">Brak danych nastaw</div>;
   }
 
   return (
-    <div className="grid grid-cols-2 gap-x-4 gap-y-1">
-      {settings.map((setting) => (
-        <div key={setting.label} className="flex justify-between text-xs">
-          <span className="text-gray-600">{setting.label}:</span>
-          <span className="font-mono text-gray-900">{setting.value}</span>
-        </div>
+    <div className="bg-gray-50 rounded p-2 space-y-2">
+      <div className="text-xs font-medium text-gray-700 mb-1">Funkcje zabezpieczeniowe:</div>
+
+      {summary.functions.map((func, index) => (
+        <FunctionSummaryRow key={`${func.code}-${index}`} func={func} />
       ))}
+
+      {/* Charakterystyka czasowa (jeśli wspólna) */}
+      {summary.curve_type && (
+        <div className="text-xs text-gray-600 pt-1 border-t border-gray-200">
+          Charakterystyka: <span className="font-mono">{summary.curve_type}</span>
+        </div>
+      )}
+
+      {/* Dane bazowe (jeśli dostępne) */}
+      {summary.base_values && (
+        <div className="text-xs text-gray-500 pt-1 border-t border-gray-200">
+          <span className="italic">Dane bazowe:</span>
+          {summary.base_values.i_rated_a !== undefined && (
+            <span className="ml-2">In={summary.base_values.i_rated_a} A</span>
+          )}
+          {summary.base_values.u_rated_kv !== undefined && (
+            <span className="ml-2">Un={summary.base_values.u_rated_kv} kV</span>
+          )}
+          {summary.base_values.f_rated_hz !== undefined && (
+            <span className="ml-2">fn={summary.base_values.f_rated_hz} Hz</span>
+          )}
+        </div>
+      )}
     </div>
   );
+}
+
+// =============================================================================
+// FunctionSummaryRow Component
+// =============================================================================
+
+interface FunctionSummaryRowProps {
+  func: ProtectionFunctionSummary;
+}
+
+function FunctionSummaryRow({ func }: FunctionSummaryRowProps) {
+  // Format: "50 I>>: 3×In (≈ 1509 A)" lub "50 I>>: 3×In" gdy brak computed
+  const ansiStr = func.ansi.join('/');
+
+  // Formatuj computed value (jeśli dostępne)
+  const computedStr = func.computed
+    ? ` (≈ ${formatComputedValue(func.computed.value, func.computed.unit)})`
+    : '';
+
+  // Czas opóźnienia
+  const timeStr = func.time_delay_s !== undefined ? `, T=${func.time_delay_s} s` : '';
+
+  return (
+    <div
+      className="text-xs border-l-2 border-amber-300 pl-2 py-1"
+      data-testid={`protection-function-${func.code}`}
+    >
+      {/* Główna linia: ANSI label_pl: setpoint (computed) */}
+      <div className="flex items-baseline gap-1 flex-wrap">
+        <span className="font-mono font-medium text-amber-800">{ansiStr}</span>
+        <span className="text-gray-700">{func.label_pl}:</span>
+        <span className="font-mono font-medium text-gray-900">{func.setpoint.display_pl}</span>
+        {computedStr && <span className="text-gray-500">{computedStr}</span>}
+        {timeStr && <span className="text-gray-600">{timeStr}</span>}
+      </div>
+
+      {/* Charakterystyka (jeśli specyficzna dla funkcji) */}
+      {func.curve_type && (
+        <div className="text-gray-500 mt-0.5">
+          Krzywa: <span className="font-mono">{func.curve_type}</span>
+        </div>
+      )}
+
+      {/* Notatki (np. dla SPZ) */}
+      {func.notes_pl && (
+        <div className="text-gray-500 italic mt-0.5">{func.notes_pl}</div>
+      )}
+    </div>
+  );
+}
+
+// =============================================================================
+// Helpers
+// =============================================================================
+
+/**
+ * Formatuje wartość computed dla wyświetlenia.
+ */
+function formatComputedValue(value: number, unit: string): string {
+  const formattedValue = value.toLocaleString('pl-PL', {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 1,
+  });
+  return `${formattedValue} ${unit}`;
 }
 
 export default ProtectionSection;

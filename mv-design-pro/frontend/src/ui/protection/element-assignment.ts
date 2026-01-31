@@ -75,26 +75,32 @@ export interface ElementProtectionAssignment {
 
 /**
  * Podsumowanie nastaw zabezpieczenia (read-only).
- * Tylko podstawowe parametry do wyświetlenia w tooltipie/panelu.
+ *
+ * NOWY MODEL (P16b):
+ * - Nastawy jako funkcje z setpoint (źródło prawdy)
+ * - Computed (A/V) tylko gdy dostępne dane bazowe
+ *
+ * @see settings-model.ts dla typów ProtectionFunctionSummary
  */
 export interface ProtectionSettingsSummary {
-  /** Prąd rozruchowy I> [A] */
-  i_pickup_a?: number;
+  /** Lista funkcji zabezpieczeniowych (nowy model setpoint/computed) */
+  functions: import('./settings-model').ProtectionFunctionSummary[];
 
-  /** Prąd rozruchowy szybki I>> [A] */
-  i_pickup_fast_a?: number;
-
-  /** Czas opóźnienia [s] */
-  t_delay_s?: number;
-
-  /** Charakterystyka (np. "IEC SI", "IEC VI", "ANSI") */
+  /** Charakterystyka czasowa (np. "IEC SI", "IEC VI", "ANSI EI") */
   curve_type?: string;
 
-  /** Prąd znamionowy [A] */
-  i_rated_a?: number;
-
-  /** Dodatkowe parametry (klucz-wartość) */
-  extra?: Record<string, string | number>;
+  /**
+   * Dane bazowe z modelu (opcjonalne).
+   * Jeśli dostępne, pozwalają obliczyć wartości computed.
+   */
+  base_values?: {
+    /** Prąd znamionowy [A] */
+    i_rated_a?: number;
+    /** Napięcie znamionowe [kV] */
+    u_rated_kv?: number;
+    /** Częstotliwość bazowa [Hz] */
+    f_rated_hz?: number;
+  };
 }
 
 // =============================================================================
@@ -185,23 +191,73 @@ export const PROTECTION_STATUS_COLORS: Record<ProtectionDeviceStatus, string> = 
 // Fixture Data (dla testów i mockowania)
 // =============================================================================
 
+import {
+  createInMultiplierSetpoint,
+  createUnMultiplierSetpoint,
+  createFrequencySetpoint,
+  createRocofSetpoint,
+  createPercentSetpoint,
+  computeFromSetpoint,
+  type ProtectionFunctionSummary,
+} from './settings-model';
+
 /**
  * Przykładowe dane fixture do testów UI.
- * UWAGA: To są dane testowe, nie produkcyjne.
+ *
+ * ZASADA P16b:
+ * - Nastawy jako setpoint (źródło prawdy): np. "3×In", "0,8×Un"
+ * - Computed tylko gdy dostępne base_values (np. In = 503 A → I>> = 1509 A)
+ * - BRAK hardcoded wartości A/V jako źródła prawdy
  */
 export const PROTECTION_ASSIGNMENT_FIXTURES: ElementProtectionAssignment[] = [
   {
     element_id: 'switch-001',
     element_type: 'Switch',
     device_id: 'relay-oc-001',
-    device_name_pl: 'Przekaznik I> (F1)',
+    device_name_pl: 'Przekaznik nadpradowy (F1)',
     device_kind: 'RELAY_OVERCURRENT',
     status: 'ACTIVE',
     settings_summary: {
-      i_pickup_a: 630,
-      i_pickup_fast_a: 2500,
-      t_delay_s: 0.5,
+      functions: [
+        // I> (51) = 1.2×In, T=1.0 s
+        {
+          code: 'OVERCURRENT_TIME',
+          ansi: ['51'],
+          label_pl: 'Nadpradowa czasowa (I>)',
+          setpoint: createInMultiplierSetpoint(1.2, 'GT'),
+          time_delay_s: 1.0,
+          curve_type: 'IEC SI',
+          // computed: brak — bo nie ma base_values.i_rated_a
+        },
+        // I>> (50) = 3×In, T=0.1 s
+        {
+          code: 'OVERCURRENT_INST',
+          ansi: ['50'],
+          label_pl: 'Nadpradowa zwarciowa (I>>)',
+          setpoint: createInMultiplierSetpoint(3.0, 'GT'),
+          time_delay_s: 0.1,
+          // computed: brak — bo nie ma base_values.i_rated_a
+        },
+      ],
       curve_type: 'IEC SI',
+      // base_values: brak — więc computed nie jest obliczane
+    },
+  },
+  {
+    element_id: 'switch-002',
+    element_type: 'Switch',
+    device_id: 'relay-oc-002',
+    device_name_pl: 'Przekaznik nadpradowy (F2)',
+    device_kind: 'RELAY_OVERCURRENT',
+    status: 'ACTIVE',
+    settings_summary: {
+      functions: createOvercurrentFunctionsWithComputed(503), // In = 503 A
+      curve_type: 'IEC SI',
+      base_values: {
+        i_rated_a: 503,
+        u_rated_kv: 15,
+        f_rated_hz: 50,
+      },
     },
   },
   {
@@ -212,8 +268,87 @@ export const PROTECTION_ASSIGNMENT_FIXTURES: ElementProtectionAssignment[] = [
     device_kind: 'RELAY_DIFFERENTIAL',
     status: 'ACTIVE',
     settings_summary: {
-      i_pickup_a: 0.3, // 30% In
-      t_delay_s: 0,
+      functions: [
+        // 87 różnicowa = 30%
+        {
+          code: 'DIFFERENTIAL',
+          ansi: ['87'],
+          label_pl: 'Roznicowa',
+          setpoint: createPercentSetpoint(30, 'GT'),
+          time_delay_s: 0,
+        },
+      ],
+    },
+  },
+  {
+    element_id: 'pcc-001',
+    element_type: 'Bus',
+    device_id: 'relay-freq-001',
+    device_name_pl: 'Zabezpieczenie czestotliwosciowe (PCC)',
+    device_kind: 'RELAY_OVERCURRENT', // tu powinno być inne, ale na potrzeby fixture
+    status: 'ACTIVE',
+    settings_summary: {
+      functions: [
+        // U< (27) = 0.8×Un, T=5 s
+        {
+          code: 'UNDERVOLTAGE',
+          ansi: ['27'],
+          label_pl: 'Podnapieciowa (U<)',
+          setpoint: createUnMultiplierSetpoint(0.8, 'LT'),
+          time_delay_s: 5.0,
+        },
+        // U> (59) = 1.15×Un, T=0.3 s
+        {
+          code: 'OVERVOLTAGE',
+          ansi: ['59'],
+          label_pl: 'Nadnapieciowa (U>)',
+          setpoint: createUnMultiplierSetpoint(1.15, 'GT'),
+          time_delay_s: 0.3,
+        },
+        // f< (81U) = 47.5 Hz, T=0.3 s
+        {
+          code: 'UNDERFREQUENCY',
+          ansi: ['81U'],
+          label_pl: 'Podczestotliwosciowa (f<)',
+          setpoint: createFrequencySetpoint(47.5, 'LT'),
+          time_delay_s: 0.3,
+        },
+        // f> (81O) = 51.5 Hz, T=0.3 s
+        {
+          code: 'OVERFREQUENCY',
+          ansi: ['81O'],
+          label_pl: 'Nadczestotliwosciowa (f>)',
+          setpoint: createFrequencySetpoint(51.5, 'GT'),
+          time_delay_s: 0.3,
+        },
+        // df/dt (81R) = 2 Hz/s, T=0.3 s
+        {
+          code: 'ROCOF',
+          ansi: ['81R'],
+          label_pl: 'Pochodna czestotliwosci (df/dt)',
+          setpoint: createRocofSetpoint(2.0, 'GT'),
+          time_delay_s: 0.3,
+        },
+        // SPZ (79)
+        {
+          code: 'RECLOSING',
+          ansi: ['79'],
+          label_pl: 'SPZ (Samoczynne Ponowne Zalaczenie)',
+          setpoint: {
+            basis: 'ABS',
+            operator: 'EQ',
+            abs_value: 1,
+            unit: 'pu',
+            display_pl: 'Wlaczone',
+          },
+          time_delay_s: 600,
+          notes_pl: 'Cykl: 1×SPZ, przerwa 0.5s, blokada po 2 probach',
+        },
+      ],
+      base_values: {
+        u_rated_kv: 15,
+        f_rated_hz: 50,
+      },
     },
   },
   {
@@ -223,5 +358,34 @@ export const PROTECTION_ASSIGNMENT_FIXTURES: ElementProtectionAssignment[] = [
     device_name_pl: 'Przekaznik odleglosciowy (L1)',
     device_kind: 'RELAY_DISTANCE',
     status: 'BLOCKED',
+    // brak settings_summary — urządzenie zablokowane
   },
 ];
+
+/**
+ * Helper: tworzy funkcje nadprądowe z computed (gdy In jest znane).
+ */
+function createOvercurrentFunctionsWithComputed(i_rated_a: number): ProtectionFunctionSummary[] {
+  const setpointTime = createInMultiplierSetpoint(1.2, 'GT');
+  const setpointInst = createInMultiplierSetpoint(3.0, 'GT');
+
+  return [
+    {
+      code: 'OVERCURRENT_TIME',
+      ansi: ['51'],
+      label_pl: 'Nadpradowa czasowa (I>)',
+      setpoint: setpointTime,
+      computed: computeFromSetpoint(setpointTime, i_rated_a, 'A', 'In'),
+      time_delay_s: 1.0,
+      curve_type: 'IEC SI',
+    },
+    {
+      code: 'OVERCURRENT_INST',
+      ansi: ['50'],
+      label_pl: 'Nadpradowa zwarciowa (I>>)',
+      setpoint: setpointInst,
+      computed: computeFromSetpoint(setpointInst, i_rated_a, 'A', 'In'),
+      time_delay_s: 0.1,
+    },
+  ];
+}
