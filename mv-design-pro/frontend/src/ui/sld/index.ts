@@ -17,6 +17,17 @@ export { SLDViewPage } from './SLDViewPage';
 // Overlay components
 export { ResultsOverlay } from './ResultsOverlay';
 export type { ResultsOverlayProps } from './ResultsOverlay';
+export { DiagnosticsOverlay } from './DiagnosticsOverlay';
+export type { DiagnosticsOverlayProps } from './DiagnosticsOverlay';
+export { DiagnosticsLegend } from './DiagnosticsLegend';
+export type { DiagnosticsLegendProps } from './DiagnosticsLegend';
+
+// Diagnostics store
+export {
+  useDiagnosticsStore,
+  useDiagnosticsVisible,
+  useDiagnosticsFilter,
+} from './diagnosticsStore';
 
 // Types
 export type { SLDViewProps, SLDViewCanvasProps, ViewportState } from './types';

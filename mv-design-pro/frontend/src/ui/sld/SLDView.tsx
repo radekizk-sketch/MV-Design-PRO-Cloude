@@ -18,6 +18,7 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { SLDViewCanvas } from './SLDViewCanvas';
 import { ResultsOverlay } from './ResultsOverlay';
+import { DiagnosticsOverlay } from './DiagnosticsOverlay';
 import { SwitchingStateLegend } from './SwitchingStateLegend';
 import {
   DEFAULT_VIEWPORT,
@@ -31,7 +32,10 @@ import {
 import type { ElementType, SelectedElement } from '../types';
 import { useSelectionStore } from '../selection/store';
 import { useResultsInspectorStore } from '../results-inspector/store';
+import { useDiagnosticsStore } from './diagnosticsStore';
 import { updateUrlWithSelection } from '../navigation/urlState';
+import { SEVERITY_FILTER_LABELS_PL, type DiagnosticsSeverityFilter } from '../protection';
+import { useSanityChecks } from '../protection';
 
 /**
  * Default canvas dimensions.
@@ -69,6 +73,15 @@ export const SLDView: React.FC<SLDViewProps> = ({
   const sldOverlay = useResultsInspectorStore((state) => state.sldOverlay);
   const toggleOverlay = useResultsInspectorStore((state) => state.toggleOverlay);
   const hasResults = sldOverlay !== null;
+
+  // Diagnostics overlay store integration
+  const diagnosticsVisible = useDiagnosticsStore((state) => state.diagnosticsVisible);
+  const diagnosticsFilter = useDiagnosticsStore((state) => state.diagnosticsFilter);
+  const toggleDiagnostics = useDiagnosticsStore((state) => state.toggleDiagnostics);
+  const setDiagnosticsFilter = useDiagnosticsStore((state) => state.setDiagnosticsFilter);
+
+  // Check if there are any diagnostics results (fixture for now)
+  const { hasResults: hasDiagnostics } = useSanityChecks('demo-project', 'demo-diagram');
 
   // Use external selection if provided, otherwise use store
   const selectedElement = externalSelectedElement !== undefined ? externalSelectedElement : storeSelectedElement;
@@ -231,6 +244,35 @@ export const SLDView: React.FC<SLDViewProps> = ({
     e.preventDefault();
   }, []);
 
+  /**
+   * Handle diagnostics marker click — select element.
+   */
+  const handleDiagnosticsMarkerClick = useCallback(
+    (element: SelectedElement) => {
+      // Update selection store
+      selectElement(element);
+
+      // Sync to URL
+      updateUrlWithSelection(element);
+
+      // Call external handler if provided
+      if (onElementClick) {
+        onElementClick(element);
+      }
+    },
+    [selectElement, onElementClick]
+  );
+
+  /**
+   * Handle diagnostics filter change.
+   */
+  const handleFilterChange = useCallback(
+    (e: React.ChangeEvent<HTMLSelectElement>) => {
+      setDiagnosticsFilter(e.target.value as DiagnosticsSeverityFilter);
+    },
+    [setDiagnosticsFilter]
+  );
+
   // Zoom percentage for display
   const zoomPercent = Math.round(viewport.zoom * 100);
 
@@ -321,6 +363,43 @@ export const SLDView: React.FC<SLDViewProps> = ({
               </button>
             </>
           )}
+
+          {/* Diagnostics overlay toggle and filter */}
+          {hasDiagnostics && (
+            <>
+              <div className="w-px h-4 bg-gray-300 mx-1" />
+              <button
+                type="button"
+                onClick={() => toggleDiagnostics()}
+                className={`px-2 py-1 text-xs rounded ${
+                  diagnosticsVisible
+                    ? 'bg-rose-100 text-rose-700 hover:bg-rose-200'
+                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                }`}
+                title={diagnosticsVisible ? 'Ukryj diagnostyke' : 'Pokaz diagnostyke'}
+                data-testid="sld-diagnostics-toggle"
+              >
+                {diagnosticsVisible ? 'Diagnostyka: Wl.' : 'Diagnostyka: Wyl.'}
+              </button>
+
+              {/* Severity filter (visible only when diagnostics visible) */}
+              {diagnosticsVisible && (
+                <select
+                  value={diagnosticsFilter}
+                  onChange={handleFilterChange}
+                  className="px-2 py-1 text-xs rounded border border-gray-300 bg-white hover:border-gray-400 focus:outline-none focus:ring-1 focus:ring-rose-500"
+                  title="Filtr severity"
+                  data-testid="sld-diagnostics-filter"
+                >
+                  {Object.entries(SEVERITY_FILTER_LABELS_PL).map(([value, label]) => (
+                    <option key={value} value={value}>
+                      {label}
+                    </option>
+                  ))}
+                </select>
+              )}
+            </>
+          )}
         </div>
       </div>
 
@@ -351,6 +430,19 @@ export const SLDView: React.FC<SLDViewProps> = ({
           symbols={symbols}
           viewport={viewport}
           selectedElementId={selectedElement?.id}
+        />
+
+        {/* Diagnostics overlay layer */}
+        <DiagnosticsOverlay
+          symbols={symbols}
+          viewport={viewport}
+          selectedElementId={selectedElement?.id}
+          visible={diagnosticsVisible}
+          filter={diagnosticsFilter}
+          onMarkerClick={handleDiagnosticsMarkerClick}
+          projectId="demo-project"
+          diagramId="demo-diagram"
+          showLegend={true}
         />
 
         {/* Switching state & energization legend (base layer) */}
