@@ -161,6 +161,7 @@ function CaseManagerPanel({
       {/* Backdrop */}
       {open && (
         <div
+          data-testid="case-manager-backdrop"
           className="absolute inset-0 bg-black/20 z-20"
           onClick={onClose}
         />
@@ -168,6 +169,8 @@ function CaseManagerPanel({
 
       {/* Panel */}
       <div
+        data-testid="case-manager-panel"
+        data-open={open}
         className={clsx(
           'absolute top-0 right-0 h-full w-[480px] bg-white shadow-xl z-30',
           'transform transition-transform duration-300 ease-in-out',

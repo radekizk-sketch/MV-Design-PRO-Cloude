@@ -436,6 +436,7 @@ export const SldCanvas: React.FC = () => {
   return (
     <svg
       ref={svgRef}
+      data-testid="sld-canvas"
       width={CANVAS_WIDTH}
       height={CANVAS_HEIGHT}
       className="border border-gray-300 bg-white"
