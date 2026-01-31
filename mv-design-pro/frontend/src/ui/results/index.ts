@@ -24,3 +24,5 @@ export {
   useShouldShowOverlay,
   useOverlayVisibility,
 } from './modeGating';
+
+export { ProtectionDiagnosticsPanel } from './ProtectionDiagnosticsPanel';

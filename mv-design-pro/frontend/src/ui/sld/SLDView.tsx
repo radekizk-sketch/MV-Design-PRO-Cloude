@@ -15,7 +15,7 @@
  * NO EDITING: This is a presentation-only view.
  */
 
-import React, { useState, useCallback, useRef, useEffect } from 'react';
+import React, { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { SLDViewCanvas } from './SLDViewCanvas';
 import { ResultsOverlay } from './ResultsOverlay';
 import { DiagnosticsOverlay } from './DiagnosticsOverlay';
@@ -61,6 +61,10 @@ export const SLDView: React.FC<SLDViewProps> = ({
     ...DEFAULT_VIEWPORT,
     zoom: initialZoom,
   }));
+
+  // Focus pulse state (for marker click visual feedback)
+  const [focusPulseElementId, setFocusPulseElementId] = useState<string | null>(null);
+  const focusPulseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Selection store integration
   const selectElement = useSelectionStore((state) => state.selectElement);
@@ -245,7 +249,7 @@ export const SLDView: React.FC<SLDViewProps> = ({
   }, []);
 
   /**
-   * Handle diagnostics marker click — select element.
+   * Handle diagnostics marker click — select element + center + pulse.
    */
   const handleDiagnosticsMarkerClick = useCallback(
     (element: SelectedElement) => {
@@ -255,13 +259,34 @@ export const SLDView: React.FC<SLDViewProps> = ({
       // Sync to URL
       updateUrlWithSelection(element);
 
+      // Center SLD on the element
+      centerSldOnElement(element.id);
+
+      // Trigger focus pulse effect
+      if (focusPulseTimerRef.current) {
+        clearTimeout(focusPulseTimerRef.current);
+      }
+      setFocusPulseElementId(element.id);
+      focusPulseTimerRef.current = setTimeout(() => {
+        setFocusPulseElementId(null);
+      }, 1500); // Pulse duration 1.5s
+
       // Call external handler if provided
       if (onElementClick) {
         onElementClick(element);
       }
     },
-    [selectElement, onElementClick]
+    [selectElement, centerSldOnElement, onElementClick]
   );
+
+  // Cleanup focus pulse timer on unmount
+  useEffect(() => {
+    return () => {
+      if (focusPulseTimerRef.current) {
+        clearTimeout(focusPulseTimerRef.current);
+      }
+    };
+  }, []);
 
   /**
    * Handle diagnostics filter change.
@@ -275,6 +300,20 @@ export const SLDView: React.FC<SLDViewProps> = ({
 
   // Zoom percentage for display
   const zoomPercent = Math.round(viewport.zoom * 100);
+
+  // Compute focus indicator position (for sld-focus-<element_id> testid)
+  const focusIndicatorPosition = useMemo(() => {
+    if (!focusPulseElementId) return null;
+    const symbol = symbols.find(
+      (s) => s.id === focusPulseElementId || s.elementId === focusPulseElementId
+    );
+    if (!symbol) return null;
+    return {
+      x: symbol.position.x * viewport.zoom + viewport.offsetX,
+      y: symbol.position.y * viewport.zoom + viewport.offsetY,
+      elementId: focusPulseElementId,
+    };
+  }, [focusPulseElementId, symbols, viewport]);
 
   return (
     <div
@@ -432,11 +471,28 @@ export const SLDView: React.FC<SLDViewProps> = ({
           selectedElementId={selectedElement?.id}
         />
 
+        {/* Focus indicator (for jump-to-element visual feedback) */}
+        {focusIndicatorPosition && (
+          <div
+            data-testid={`sld-focus-${focusIndicatorPosition.elementId}`}
+            className="pointer-events-none absolute z-20"
+            style={{
+              left: `${focusIndicatorPosition.x}px`,
+              top: `${focusIndicatorPosition.y}px`,
+              transform: 'translate(-50%, -50%)',
+            }}
+          >
+            <div className="w-16 h-16 rounded-full border-4 border-blue-500 animate-ping opacity-75" />
+            <div className="absolute inset-0 w-16 h-16 rounded-full border-2 border-blue-400" />
+          </div>
+        )}
+
         {/* Diagnostics overlay layer */}
         <DiagnosticsOverlay
           symbols={symbols}
           viewport={viewport}
           selectedElementId={selectedElement?.id}
+          focusPulseElementId={focusPulseElementId}
           visible={diagnosticsVisible}
           filter={diagnosticsFilter}
           onMarkerClick={handleDiagnosticsMarkerClick}
