@@ -18,6 +18,7 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { SLDViewCanvas } from './SLDViewCanvas';
 import { ResultsOverlay } from './ResultsOverlay';
+import { SwitchingStateLegend } from './SwitchingStateLegend';
 import {
   DEFAULT_VIEWPORT,
   ZOOM_MIN,
@@ -351,6 +352,9 @@ export const SLDView: React.FC<SLDViewProps> = ({
           viewport={viewport}
           selectedElementId={selectedElement?.id}
         />
+
+        {/* Switching state & energization legend (base layer) */}
+        <SwitchingStateLegend visible={true} />
       </div>
 
       {/* Status bar */}

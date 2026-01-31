@@ -24,12 +24,13 @@
  * - Load → fallback (trójkąt, brak symbolu ETAP)
  */
 
-import React, { useCallback } from 'react';
+import React, { useCallback, useMemo } from 'react';
 import type { AnySldSymbol, BranchSymbol, SwitchSymbol } from '../sld-editor/types';
 import type { ElementType } from '../types';
 import type { SLDViewCanvasProps, ViewportState } from './types';
 import { resolveSymbol, type ResolvedSymbol } from './SymbolResolver';
-import { EtapSymbol } from './EtapSymbolRenderer';
+import { EtapSymbol, type SwitchState } from './EtapSymbolRenderer';
+import { calculateEnergization } from './energization';
 
 /**
  * Symbol size configuration.
@@ -51,6 +52,7 @@ interface SymbolProps {
   symbol: AnySldSymbol;
   selected: boolean;
   onClick: (symbolId: string, elementType: ElementType, elementName: string) => void;
+  energized: boolean;
 }
 
 /**
@@ -61,11 +63,17 @@ const EtapSymbolWrapper: React.FC<{
   selected: boolean;
   inService: boolean;
   size: { width: number; height: number };
-}> = ({ resolvedSymbol, selected, inService, size }) => {
-  // Visual styling
-  const stroke = selected ? '#3b82f6' : inService ? '#1f2937' : '#9ca3af';
+  switchState?: SwitchState;
+  energized?: boolean;
+}> = ({ resolvedSymbol, selected, inService, size, switchState, energized = true }) => {
+  // Visual styling - base layer with energization
+  // Energized: normal stroke, Not energized: grayed out
+  const isEnergized = energized && inService;
+  const baseStroke = isEnergized ? '#1f2937' : '#9ca3af';
+  const stroke = selected ? '#3b82f6' : baseStroke;
   const fill = selected ? '#dbeafe' : '#ffffff';
-  const opacity = inService ? 1 : 0.5;
+  // Not energized: reduced opacity
+  const opacity = inService ? (isEnergized ? 1 : 0.6) : 0.5;
 
   return (
     <EtapSymbol
@@ -75,6 +83,7 @@ const EtapSymbolWrapper: React.FC<{
       strokeWidth={selected ? 3.5 : 3}
       opacity={opacity}
       size={Math.max(size.width, size.height)}
+      switchState={switchState}
     />
   );
 };
@@ -87,10 +96,14 @@ const LoadFallback: React.FC<{
   selected: boolean;
   inService: boolean;
   elementName: string;
-}> = ({ selected, inService, elementName }) => {
-  const stroke = selected ? '#3b82f6' : inService ? '#1f2937' : '#9ca3af';
+  energized?: boolean;
+}> = ({ selected, inService, elementName, energized = true }) => {
+  // Energization affects base color
+  const isEnergized = energized && inService;
+  const baseStroke = isEnergized ? '#1f2937' : '#9ca3af';
+  const stroke = selected ? '#3b82f6' : baseStroke;
   const strokeWidth = selected ? 2.5 : 1.5;
-  const opacity = inService ? 1 : 0.5;
+  const opacity = inService ? (isEnergized ? 1 : 0.6) : 0.5;
 
   return (
     <>
@@ -177,7 +190,7 @@ const UnknownSymbolFallback: React.FC<{
 /**
  * Main symbol component using ETAP symbols.
  */
-const Symbol: React.FC<SymbolProps> = ({ symbol, selected, onClick }) => {
+const Symbol: React.FC<SymbolProps> = ({ symbol, selected, onClick, energized }) => {
   const handleClick = useCallback(
     (e: React.MouseEvent) => {
       e.stopPropagation();
@@ -225,6 +238,9 @@ const Symbol: React.FC<SymbolProps> = ({ symbol, selected, onClick }) => {
     testIdAttrs['data-branch-type'] = branchSymbol.branchType ?? 'CABLE';
   }
 
+  // Add energization state
+  testIdAttrs['data-energized'] = energized ? 'true' : 'false';
+
   const cursor = 'pointer';
 
   // Handle Load fallback (no ETAP symbol)
@@ -240,6 +256,7 @@ const Symbol: React.FC<SymbolProps> = ({ symbol, selected, onClick }) => {
           selected={selected}
           inService={inService}
           elementName={elementName}
+          energized={energized}
         />
       </g>
     );
@@ -265,6 +282,12 @@ const Symbol: React.FC<SymbolProps> = ({ symbol, selected, onClick }) => {
     );
   }
 
+  // Get switch state for CB/DS elements
+  const switchState: SwitchState | undefined =
+    elementType === 'Switch'
+      ? ((symbol as SwitchSymbol).switchState as SwitchState) ?? 'UNKNOWN'
+      : undefined;
+
   // Render ETAP symbol
   return (
     <g
@@ -280,6 +303,8 @@ const Symbol: React.FC<SymbolProps> = ({ symbol, selected, onClick }) => {
           selected={selected}
           inService={inService}
           size={size}
+          switchState={switchState}
+          energized={energized}
         />
       </g>
 
@@ -372,6 +397,9 @@ export const SLDViewCanvas: React.FC<SLDViewCanvasProps> = ({
   // Sort symbols for deterministic rendering (by ID)
   const sortedSymbols = [...symbols].sort((a, b) => a.id.localeCompare(b.id));
 
+  // Calculate energization state (UI-only, deterministic)
+  const energizationState = useMemo(() => calculateEnergization(symbols), [symbols]);
+
   return (
     <svg
       data-testid="sld-view-canvas"
@@ -388,13 +416,14 @@ export const SLDViewCanvas: React.FC<SLDViewCanvasProps> = ({
         transform={`translate(${viewport.offsetX}, ${viewport.offsetY}) scale(${viewport.zoom})`}
         data-testid="sld-content-group"
       >
-        {/* Render symbols */}
+        {/* Render symbols with energization state */}
         {sortedSymbols.map((symbol) => (
           <Symbol
             key={symbol.id}
             symbol={symbol}
             selected={symbol.id === selectedId || symbol.elementId === selectedId}
             onClick={onSymbolClick}
+            energized={energizationState.energizedElements.get(symbol.id) ?? true}
           />
         ))}
       </g>
