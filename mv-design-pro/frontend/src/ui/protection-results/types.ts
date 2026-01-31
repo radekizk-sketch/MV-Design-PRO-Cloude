@@ -137,7 +137,7 @@ export interface ProtectionSldOverlay {
 // UI State
 // =============================================================================
 
-export type ProtectionResultsTab = 'EVALUATIONS' | 'SUMMARY' | 'TRACE';
+export type ProtectionResultsTab = 'EVALUATIONS' | 'SUMMARY' | 'DIAGNOSTICS' | 'TRACE';
 
 export type ProtectionComparisonTab = 'DIFFERENCES' | 'RANKING' | 'TRACE';
 
@@ -150,6 +150,7 @@ export type ProtectionViewMode = 'RUN' | 'COMPARISON';
 export const PROTECTION_TAB_LABELS: Record<ProtectionResultsTab, string> = {
   EVALUATIONS: 'Oceny',
   SUMMARY: 'Podsumowanie',
+  DIAGNOSTICS: 'Diagnostyka',
   TRACE: 'Ślad obliczeń',
 };
 

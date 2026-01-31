@@ -101,6 +101,7 @@ export const INSPECTOR_SECTION_LABELS: Record<string, string> = {
   power_flow: 'Rozplyw mocy',
   short_circuit: 'Prady zwarciowe',
   protection: 'Zabezpieczenia',
+  diagnostics: 'Diagnostyka',
   flags: 'Flagi i ostrzezenia',
   pcc: 'Punkt wspolnego przylaczenia (PCC)',
 };
