@@ -1,7 +1,7 @@
 # UI CORE ARCHITECTURE — MV-DESIGN-PRO
 
 **Status**: BINDING
-**Wersja**: 1.0
+**Wersja**: 1.1
 **Data**: 2026-01-31
 **Typ**: Architecture Document — Fundamentalny
 
@@ -745,6 +745,7 @@ Każdy interaktywny element **MUST** mieć:
 ## 17. WERSJONOWANIE I ZMIANY
 
 - **Wersja 1.0**: Definicja bazowa (2026-01-31),
+- **Wersja 1.1**: Dodano sekcje 19-22 (Decision Support Layer, Status Funkcji UI, Non-Goals, Kontrakty) (2026-01-31),
 - Zmiany w architekturze wymagają aktualizacji wersji i code review,
 - Breaking changes wymagają migracji wszystkich komponentów UI.
 
@@ -765,6 +766,472 @@ Każdy interaktywny element **MUST** mieć:
 | **P11** | Proof — dowód audytowalny zgodności z normami |
 | **PARITY** | Funkcjonalna równoważność z konkurencją |
 | **SUPERIOR** | Funkcjonalna przewaga nad konkurencją |
+
+---
+
+## 19. DECISION SUPPORT LAYER (UI CORE)
+
+### 19.1. Definicja Decision Support Layer
+
+Decision Support Layer to **fundamentalna warstwa UI** odpowiedzialna za prezentację ocen decyzyjnych wyników obliczeń. Warstwa ta stanowi **integralną część UI CORE** — nie jest opcjonalnym dodatkiem ani wtyczką.
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                     DECISION SUPPORT LAYER                          │
+│                         (UI CORE)                                   │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                     │
+│   PASS   │   FAIL   │   WARNING   │   INFO   │   UNKNOWN           │
+│    ✅    │    ❌    │     ⚠️     │    ℹ️    │      ❓              │
+│                                                                     │
+│   Wartość      Wartość      Wartość       Dane         Brak        │
+│   w normie     poza normą   blisko        neutralne    danych      │
+│                             limitu                                  │
+│                                                                     │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+### 19.2. Statusy decyzyjne (BINDING)
+
+| Status | Symbol | Kolor | Definicja | Próg |
+|--------|--------|-------|-----------|------|
+| **PASS** | ✅ | Zielony (#22C55E) | Wartość mieści się w dopuszczalnym zakresie normy | value ≤ 80% limit |
+| **FAIL** | ❌ | Czerwony (#EF4444) | Wartość przekracza dopuszczalny zakres normy | value > 100% limit |
+| **WARNING** | ⚠️ | Żółty (#EAB308) | Wartość blisko granicy normy — wymaga uwagi | 80% limit < value ≤ 100% limit |
+| **INFO** | ℹ️ | Niebieski (#3B82F6) | Dane informacyjne bez kryterium normatywnego | brak kryterium |
+| **UNKNOWN** | ❓ | Szary (#94A3B8) | Brak danych lub niemożność oceny | brak wartości / brak limitu |
+
+### 19.3. Hierarchia krytyczności
+
+Decision Support Layer stosuje **hierarchię krytyczności** dla agregacji statusów:
+
+```
+FAIL > WARNING > UNKNOWN > PASS > INFO
+  ↓       ↓         ↓        ↓      ↓
+  5       4         3        2      1
+```
+
+**Zasady agregacji:**
+
+| Kontekst | Reguła agregacji | Przykład |
+|----------|-----------------|----------|
+| Element → Ogółem | Najwyższa krytyczność | Bus: PASS (V), FAIL (Ik) → FAIL |
+| Case → Ogółem | Najwyższa krytyczność | Case: 45 PASS, 2 WARNING, 1 FAIL → FAIL |
+| Analysis → Ogółem | Najwyższa krytyczność | LF: PASS, SC: FAIL → FAIL |
+| Snapshot → Ogółem | Najwyższa krytyczność | Wszystkie analizy |
+
+### 19.4. Propagacja statusów w hierarchii UI
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│ GLOBAL CONTEXT BAR                                                  │
+│ [Project: ✅] [Case: ⚠️] [Snapshot: ⚠️] [Run: ⚠️]                  │
+├─────────────────────────────────────────────────────────────────────┤
+│ NAVIGATION PANEL            │ MAIN WORKSPACE (Table View)          │
+│                             │                                       │
+│ 📁 Case 1: ⚠️               │ ID       │ Name    │ Status │ V[kV]  │
+│ ├─ 📸 Baseline: ⚠️          │ BUS-001  │ GPZ-01  │ ✅     │ 19.8   │
+│ │  ├─ ⚡ LF: ✅              │ BUS-002  │ GPZ-02  │ ⚠️     │ 21.2   │
+│ │  └─ ⚠️ SC: ⚠️             │ BUS-003  │ PT-01   │ ✅     │ 20.1   │
+│ │                           │ BUS-004  │ PT-02   │ ❌     │ 22.8   │
+│                             │                                       │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+### 19.5. Relacja Decision Support Layer ↔ RESULTS
+
+| Aspekt | Decision Support Layer | RESULTS |
+|--------|------------------------|---------|
+| **Funkcja** | Ocena decyzyjna | Dane surowe |
+| **Zawartość** | Status (PASS/FAIL/WARNING) | Wartości liczbowe |
+| **Źródło** | Algorytm ewaluacji | Solver (LF, SC) |
+| **Widoczność** | Ikony, kolory, badges | Tabele, wykresy |
+| **Użytkownik** | Szybka orientacja | Szczegółowa analiza |
+
+**Zasada (BINDING):**
+```
+DECISION SUPPORT LAYER NIGDY NIE ZASTĘPUJE RESULTS.
+DECISION SUPPORT LAYER UZUPEŁNIA RESULTS O OCENĘ DECYZYJNĄ.
+```
+
+### 19.6. Relacja Decision Support Layer ↔ PROOF
+
+| Aspekt | Decision Support Layer | PROOF |
+|--------|------------------------|-------|
+| **Funkcja** | Szybka orientacja | Formalna weryfikacja |
+| **Głębokość** | Status zagregowany | Pełny audit trail |
+| **Format** | Ikona + kolor | Dokument PDF |
+| **Audytowalność** | Poglądowa | Pełna (P11) |
+| **Użytkownik** | Operator, Analyst | Auditor |
+
+**Zasada (BINDING):**
+```
+DECISION SUPPORT LAYER = PIERWSZY POZIOM OCENY (QUICK SCAN).
+PROOF = PEŁNA WERYFIKACJA NORMATYWNA (AUDIT).
+```
+
+### 19.7. Wymagania implementacyjne Decision Support Layer
+
+| Wymaganie | Typ | Opis |
+|-----------|-----|------|
+| Status na każdym elemencie | MUST | Każdy element z wynikami ma status |
+| Status w Navigation Panel | MUST | Ikony statusu przy węzłach drzewa |
+| Status w tabelach | MUST | Kolumna Status z ikonami/kolorami |
+| Status na SLD | MUST | Overlay kolorów na elementach |
+| Status w Context Bar | SHOULD | Agregowany status Case/Snapshot |
+| Filtrowanie po statusie | MUST | „Pokaż tylko FAIL", „Pokaż tylko WARNING" |
+| Sortowanie po statusie | MUST | Najpoważniejsze na górze |
+
+---
+
+## 20. STATUS FUNKCJI UI
+
+### 20.1. Definicja statusów funkcji
+
+Każda funkcja UI w MV-DESIGN-PRO posiada jawny **status dostępności**:
+
+| Status | Symbol | Definicja |
+|--------|--------|-----------|
+| **ENABLED** | ✅ | Funkcja w pełni zaimplementowana i dostępna |
+| **DISABLED** | ⛔ | Funkcja zaimplementowana, ale wyłączona (konfiguracja / licencja) |
+| **FUTURE** | 🔮 | Funkcja zaplanowana, jeszcze niezaimplementowana |
+
+### 20.2. Zasady stosowania statusów
+
+**ENABLED:**
+- Funkcja przeszła pełne testy (unit, integration, E2E),
+- Funkcja jest udokumentowana,
+- Funkcja jest dostępna dla wszystkich użytkowników (lub zgodnie z licencją),
+- Funkcja jest stabilna (brak known critical bugs).
+
+**DISABLED:**
+- Funkcja jest zaimplementowana w kodzie,
+- Funkcja jest wyłączona przez konfigurację lub brak licencji,
+- UI **MUST** wyświetlać jasny komunikat o przyczynie wyłączenia,
+- UI **MUST NOT** ukrywać funkcji — pokazuje ją jako niedostępną.
+
+**FUTURE:**
+- Funkcja jest zaplanowana w roadmapie,
+- Funkcja **MUST NOT** być widoczna w produkcyjnym UI,
+- Funkcja może być widoczna w trybie deweloperskim (feature flag),
+- Dokumentacja może wspominać o funkcji z oznaczeniem FUTURE.
+
+### 20.3. Prezentacja statusów w UI
+
+| Status | Wizualizacja UI |
+|--------|-----------------|
+| **ENABLED** | Normalny wygląd, pełna interaktywność |
+| **DISABLED** | Wyszarzony (opacity: 0.5), kursor „not-allowed", tooltip z przyczyną |
+| **FUTURE** | Niewidoczny w produkcji, opcjonalnie z badge „Coming Soon" w dev mode |
+
+### 20.4. Tabela przykładów statusów funkcji
+
+| Funkcja | Status | Uzasadnienie |
+|---------|--------|--------------|
+| Load Flow Analysis | ENABLED | Podstawowa funkcjonalność |
+| Short-Circuit Analysis (IEC 60909) | ENABLED | Podstawowa funkcjonalność |
+| Short-Circuit Analysis (ANSI/IEEE) | DISABLED | Wymaga licencji rozszerzonej |
+| Transient Stability Analysis | FUTURE | Zaplanowane na Q3 2026 |
+| Arc Flash Analysis | FUTURE | Zaplanowane na Q4 2026 |
+| Export to PDF | ENABLED | Podstawowa funkcjonalność |
+| Export to PowerFactory format | DISABLED | Wymaga licencji Premium |
+| Export to ETAP format | FUTURE | Zaplanowane na Q2 2026 |
+| Real-time SCADA integration | DISABLED | Wymaga modułu SCADA Gateway |
+| Multi-user collaboration | FUTURE | Zaplanowane na 2027 |
+| Offline mode | ENABLED | Podstawowa funkcjonalność |
+| Cloud sync | DISABLED | Wymaga subskrypcji Cloud |
+| Protection Coordination | ENABLED | Podstawowa funkcjonalność |
+| Relay Settings Optimization | FUTURE | Zaplanowane na Q3 2026 |
+| Cable Sizing Calculator | ENABLED | Podstawowa funkcjonalność |
+| Harmonic Analysis | FUTURE | Zaplanowane na Q4 2026 |
+
+### 20.5. Wymagania dla DISABLED funkcji (BINDING)
+
+| Wymaganie | Typ | Opis |
+|-----------|-----|------|
+| Widoczność | MUST | Funkcja DISABLED jest widoczna, ale nieaktywna |
+| Tooltip | MUST | Tooltip wyjaśnia przyczynę wyłączenia |
+| Call-to-action | SHOULD | Link do strony licencji / upgrade |
+| Brak ukrywania | MUST | Funkcja nigdy nie jest ukrywana „dla uproszczenia" |
+| Spójność | MUST | Wygląd DISABLED jest spójny w całym UI |
+
+### 20.6. Feature Flags (wewnętrzne)
+
+Statusy funkcji są kontrolowane przez **feature flags**:
+
+| Flag | Wartość | Efekt |
+|------|---------|-------|
+| `feature.scada.enabled` | `true/false` | SCADA integration |
+| `feature.ansi_sc.enabled` | `true/false` | ANSI Short-Circuit |
+| `feature.cloud_sync.enabled` | `true/false` | Cloud synchronization |
+| `feature.dev_mode` | `true/false` | Pokaż FUTURE features |
+
+---
+
+## 21. NON-GOALS UI CORE
+
+### 21.1. Definicja Non-Goals
+
+Niniejsza sekcja jawnie definiuje **funkcjonalności wykluczane z zakresu UI CORE** MV-DESIGN-PRO. Wykluczenie z UI CORE nie oznacza wykluczenia z produktu — oznacza, że dana funkcjonalność należy do innej warstwy lub modułu.
+
+### 21.2. Lista Non-Goals UI CORE
+
+| Non-Goal | Uzasadnienie | Gdzie należy |
+|----------|--------------|--------------|
+| **Logika obliczeniowa** | UI CORE prezentuje wyniki, nie oblicza | Solver Layer (Backend) |
+| **Walidacja modelu sieci** | UI CORE nie sprawdza poprawności topologii | Model Validation Layer |
+| **Persystencja danych** | UI CORE nie zarządza zapisem/odczytem | Data Layer (Backend) |
+| **Autoryzacja użytkowników** | UI CORE nie weryfikuje uprawnień | Auth Layer |
+| **Szyfrowanie danych** | UI CORE nie szyfruje | Security Layer |
+| **Synchronizacja z SCADA** | UI CORE nie komunikuje się z systemami SCADA | SCADA Gateway Module |
+| **Generowanie raportów (logika)** | UI CORE inicjuje eksport, nie generuje PDF | Report Engine |
+| **Obliczenia real-time** | UI CORE nie wykonuje obliczeń na żywo | Real-time Engine |
+| **Zarządzanie licencjami** | UI CORE sprawdza status, nie zarządza | License Manager |
+| **Backup/Restore** | UI CORE nie zarządza kopiami zapasowymi | Data Management Layer |
+
+### 21.3. Granice odpowiedzialności UI CORE
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                         UI CORE SCOPE                               │
+├─────────────────────────────────────────────────────────────────────┤
+│ ✅ Prezentacja danych                                               │
+│ ✅ Nawigacja użytkownika                                            │
+│ ✅ Interakcja (klik, drag, edit)                                    │
+│ ✅ Wizualizacja wyników                                             │
+│ ✅ Decision Support (PASS/FAIL/WARNING)                             │
+│ ✅ Eksport (inicjacja)                                              │
+│ ✅ Filtrowanie, sortowanie, wyszukiwanie                            │
+│ ✅ Synchronizacja selekcji między panelami                          │
+│ ✅ Responsywność (desktop/tablet/mobile)                            │
+│ ✅ Accessibility (WCAG 2.1 AA)                                      │
+├─────────────────────────────────────────────────────────────────────┤
+│ ❌ Logika biznesowa                                                 │
+│ ❌ Obliczenia elektryczne                                           │
+│ ❌ Walidacja danych wejściowych (poza walidacją formularzy)         │
+│ ❌ Komunikacja z systemami zewnętrznymi                             │
+│ ❌ Zarządzanie stanem aplikacji (poza UI state)                     │
+│ ❌ Autoryzacja / Autentykacja                                       │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+### 21.4. Konsekwencje Non-Goals
+
+| Non-Goal | Konsekwencja dla UI CORE |
+|----------|--------------------------|
+| Logika obliczeniowa w Backend | UI CORE wywołuje API, czeka na wyniki |
+| Autoryzacja w Auth Layer | UI CORE otrzymuje informację o uprawnieniach, nie decyduje |
+| Persystencja w Data Layer | UI CORE wywołuje „save", nie zarządza plikami |
+| SCADA w osobnym module | UI CORE nie wie o połączeniu SCADA, wyświetla dane jak inne |
+
+### 21.5. Anti-patterns (FORBIDDEN)
+
+| Anti-pattern | Dlaczego FORBIDDEN |
+|--------------|-------------------|
+| Obliczenia w UI | Narusza separation of concerns |
+| Bezpośredni dostęp do bazy danych z UI | Narusza architekturę warstwową |
+| Hardcoded limity normatywne w UI | Limity należą do Norma Engine |
+| Logika walidacji modelu w UI | Walidacja należy do Model Layer |
+| Zarządzanie sesjami użytkowników w UI | Należy do Auth Layer |
+
+---
+
+## 22. KONTRAKTY MIĘDZY WARSTWAMI UI
+
+### 22.1. Definicja kontraktów międzywarstwowych
+
+Kontrakty między warstwami UI definiują **interfejsy komunikacji** między komponentami architektury MV-DESIGN-PRO. Każdy kontrakt jest **BINDING** i nie może być naruszany.
+
+### 22.2. Kontrakt CORE ↔ RESULTS
+
+**Kierunek:** RESULTS → CORE (jednokierunkowy)
+
+```
+┌─────────────────┐         ┌─────────────────┐
+│    RESULTS      │────────▶│    UI CORE      │
+│    LAYER        │         │                 │
+│                 │         │  • Prezentacja  │
+│  • Solver LF    │         │  • Wizualizacja │
+│  • Solver SC    │         │  • Nawigacja    │
+│  • Raw Data     │         │  • Eksport      │
+│                 │         │                 │
+└─────────────────┘         └─────────────────┘
+```
+
+**Interfejs kontraktu:**
+
+| Element | Typ | Opis |
+|---------|-----|------|
+| `ResultSet` | Object | Zestaw wyników dla Analysis/Run |
+| `ResultSet.analysis_type` | Enum | LF, SC, PROOF |
+| `ResultSet.run_id` | UUID | Identyfikator Run |
+| `ResultSet.timestamp` | DateTime | Czas uruchomienia |
+| `ResultSet.status` | Enum | SUCCESS, FAILED, PARTIAL |
+| `ResultSet.elements[]` | Array | Lista wyników per element |
+| `ResultSet.elements[].id` | String | ID elementu |
+| `ResultSet.elements[].type` | Enum | BUS, LINE, TRAFO, ... |
+| `ResultSet.elements[].values{}` | Object | Wartości wynikowe |
+| `ResultSet.elements[].status` | Enum | PASS, FAIL, WARNING, INFO, UNKNOWN |
+
+**Gwarancje RESULTS → CORE:**
+
+| Gwarancja | Opis |
+|-----------|------|
+| Kompletność | Wszystkie elementy z wynikami są w ResultSet |
+| Immutability | ResultSet nie zmienia się po dostarczeniu |
+| Status per element | Każdy element ma obliczony status |
+| Jednostki | Wartości zawsze z jednostką (kV, kA, MW, ...) |
+
+**Obowiązki CORE:**
+
+| Obowiązek | Opis |
+|-----------|------|
+| Prezentacja zgodna z ResultSet | CORE nie modyfikuje wartości |
+| Obsługa wszystkich statusów | CORE obsługuje PASS, FAIL, WARNING, INFO, UNKNOWN |
+| Obsługa FAILED Run | CORE wyświetla komunikat błędu |
+
+### 22.3. Kontrakt CORE ↔ PROOF
+
+**Kierunek:** PROOF ↔ CORE (dwukierunkowy)
+
+```
+┌─────────────────┐         ┌─────────────────┐
+│     PROOF       │◀───────▶│    UI CORE      │
+│     LAYER       │         │                 │
+│                 │         │  • Prezentacja  │
+│  • P11 Engine   │────────▶│  • Inspector    │
+│  • Compliance   │         │  • Proof Panel  │
+│  • Audit Trail  │         │  • Export PDF   │
+│                 │◀────────│                 │
+│                 │ Request │  • Trigger      │
+└─────────────────┘         └─────────────────┘
+```
+
+**Interfejs kontraktu (PROOF → CORE):**
+
+| Element | Typ | Opis |
+|---------|-----|------|
+| `ProofDocument` | Object | Dokument dowodowy P11 |
+| `ProofDocument.element_id` | String | ID elementu |
+| `ProofDocument.norma` | String | Norma (IEC 60909, PN-EN 50160, ...) |
+| `ProofDocument.compliance_status` | Enum | COMPLIANT, NON_COMPLIANT, PARTIAL |
+| `ProofDocument.checks[]` | Array | Lista sprawdzeń |
+| `ProofDocument.checks[].criterion` | String | Kryterium normy |
+| `ProofDocument.checks[].value` | Number | Wartość obliczona |
+| `ProofDocument.checks[].limit` | Number | Limit normatywny |
+| `ProofDocument.checks[].margin` | Percent | Margines do limitu |
+| `ProofDocument.checks[].status` | Enum | PASS, FAIL, WARNING |
+| `ProofDocument.audit_trail[]` | Array | Historia obliczeń |
+
+**Interfejs kontraktu (CORE → PROOF):**
+
+| Element | Typ | Opis |
+|---------|-----|------|
+| `ProofRequest` | Object | Żądanie wygenerowania Proof |
+| `ProofRequest.element_id` | String | ID elementu |
+| `ProofRequest.run_id` | UUID | Identyfikator Run |
+| `ProofRequest.norma` | String | Żądana norma |
+| `ProofRequest.format` | Enum | JSON, PDF |
+
+**Gwarancje PROOF → CORE:**
+
+| Gwarancja | Opis |
+|-----------|------|
+| Kompletność | Wszystkie sprawdzenia normatywne |
+| Audytowalność | Pełny audit trail |
+| Formatowanie | PDF gotowy do druku |
+| Spójność | Zgodność z ResultSet |
+
+### 22.4. Kontrakt CORE ↔ SLD
+
+**Kierunek:** CORE ↔ SLD (dwukierunkowy)
+
+```
+┌─────────────────┐         ┌─────────────────┐
+│      SLD        │◀───────▶│    UI CORE      │
+│     LAYER       │         │                 │
+│                 │         │  • Selekcja     │
+│  • CAD Layer    │────────▶│  • Context Bar  │
+│  • SCADA Layer  │         │  • Inspector    │
+│  • Overlay      │         │  • Navigation   │
+│                 │◀────────│                 │
+│                 │ Events  │  • Events       │
+└─────────────────┘         └─────────────────┘
+```
+
+**Interfejs kontraktu (SLD → CORE):**
+
+| Element | Typ | Opis |
+|---------|-----|------|
+| `SLD.onElementClick(element_id)` | Event | Kliknięcie w element |
+| `SLD.onElementHover(element_id)` | Event | Hover nad elementem |
+| `SLD.onSelectionChange(element_ids[])` | Event | Zmiana selekcji |
+| `SLD.onViewportChange(bounds)` | Event | Zmiana widoku (pan/zoom) |
+| `SLD.onLayerToggle(layer, visible)` | Event | Włączenie/wyłączenie warstwy |
+
+**Interfejs kontraktu (CORE → SLD):**
+
+| Element | Typ | Opis |
+|---------|-----|------|
+| `SLD.setSelection(element_ids[])` | Command | Ustaw selekcję |
+| `SLD.highlightElement(element_id, style)` | Command | Podświetl element |
+| `SLD.clearHighlights()` | Command | Usuń podświetlenia |
+| `SLD.setOverlayData(data)` | Command | Ustaw dane overlay (wyniki) |
+| `SLD.setLayerVisibility(layer, visible)` | Command | Zmień widoczność warstwy |
+| `SLD.zoomToElement(element_id)` | Command | Przybliż do elementu |
+| `SLD.zoomToFit()` | Command | Dopasuj widok do całości |
+
+**Gwarancje SLD → CORE:**
+
+| Gwarancja | Opis |
+|-----------|------|
+| Event consistency | Każdy klik/hover generuje event |
+| Element ID validity | ID zawsze poprawne (z modelu) |
+| Bounds accuracy | Viewport bounds dokładne |
+
+**Gwarancje CORE → SLD:**
+
+| Gwarancja | Opis |
+|-----------|------|
+| Valid element IDs | CORE wysyła tylko istniejące ID |
+| Style consistency | Style zgodne z Design System |
+| Performance | Overlay data zoptymalizowane |
+
+### 22.5. Macierz zależności kontraktów
+
+| Warstwa | RESULTS | PROOF | SLD | MODEL | AUTH |
+|---------|---------|-------|-----|-------|------|
+| **UI CORE** | ← odczyt | ↔ odczyt/żądanie | ↔ events/commands | ← odczyt | ← odczyt |
+| **RESULTS** | — | → dostarcza | → dostarcza | ← odczyt | — |
+| **PROOF** | ← odczyt | — | — | ← odczyt | — |
+| **SLD** | ← odczyt | — | — | ← odczyt | — |
+
+### 22.6. Obsługa błędów w kontraktach
+
+| Scenariusz | Odpowiedzialność | Reakcja UI CORE |
+|------------|------------------|-----------------|
+| RESULTS zwraca błąd | RESULTS Layer | Wyświetl komunikat błędu, ukryj tabele wyników |
+| PROOF niedostępny | PROOF Layer | Wyświetl „Proof unavailable", ukryj zakładkę Proof |
+| SLD nie odpowiada | SLD Layer | Wyświetl placeholder, pozwól na nawigację Tree |
+| MODEL niepoprawny | MODEL Layer | Wyświetl listę błędów, zablokuj obliczenia |
+| AUTH timeout | AUTH Layer | Przekieruj do logowania |
+
+### 22.7. Wersjonowanie kontraktów
+
+| Kontrakt | Wersja | Kompatybilność |
+|----------|--------|----------------|
+| CORE ↔ RESULTS | 1.0 | Breaking changes wymagają migracji |
+| CORE ↔ PROOF | 1.0 | Breaking changes wymagają migracji |
+| CORE ↔ SLD | 1.0 | Breaking changes wymagają migracji |
+
+---
+
+## 23. CHANGELOG
+
+| Wersja | Data | Zmiany |
+|--------|------|--------|
+| **1.0** | 2026-01-31 | Definicja bazowa |
+| **1.1** | 2026-01-31 | Dodano sekcje: Decision Support Layer (19), Status Funkcji UI (20), Non-Goals UI CORE (21), Kontrakty między warstwami UI (22) |
 
 ---
 
