@@ -25,6 +25,7 @@ import type { AnySldSymbol, Position } from '../sld-editor/types';
 import type { ViewportState } from './types';
 import { useResultsInspectorStore } from '../results-inspector/store';
 import { buildOverlayPositionMaps, getLoadingColorClass, getLoadingBgClass } from './overlayUtils';
+import { LegendPanel } from './LegendPanel';
 
 // =============================================================================
 // Formatters (deterministic)
@@ -323,6 +324,9 @@ export function ResultsOverlay({
           isSelected={label.isSelected}
         />
       ))}
+
+      {/* Legend panel */}
+      <LegendPanel overlay={sldOverlay} />
     </div>
   );
 }

@@ -46,3 +46,21 @@ export {
   getLoadingColorClass,
   getLoadingBgClass,
 } from './overlayUtils';
+
+// Legend components
+export { LegendPanel } from './LegendPanel';
+export type { LegendPanelProps } from './LegendPanel';
+
+// Scale utilities
+export {
+  calculateOverlayRanges,
+  formatRange,
+  formatVoltagePuRange,
+  formatVoltageKvRange,
+  formatCurrentRange,
+  formatLoadingRange,
+  formatPowerMwRange,
+  formatPowerMvarRange,
+  formatIkssRange,
+} from './scale';
+export type { ValueRange, OverlayRanges } from './scale';
