@@ -73,10 +73,15 @@ export const ROUTES: Record<string, RouteDefinition> = {
 
 /**
  * Get route by hash.
+ * NAVIGATION_SELECTOR_UI: Strips query params before matching.
  */
 export function getRouteByHash(hash: string): RouteDefinition | null {
+  // Strip query params from hash for matching
+  const queryIndex = hash.indexOf('?');
+  const cleanHash = queryIndex !== -1 ? hash.slice(0, queryIndex) : hash;
+
   for (const route of Object.values(ROUTES)) {
-    if (route.hash === hash || route.hash === hash.replace('#', '')) {
+    if (route.hash === cleanHash || route.hash === cleanHash.replace('#', '')) {
       return route;
     }
   }
@@ -85,6 +90,7 @@ export function getRouteByHash(hash: string): RouteDefinition | null {
 
 /**
  * Get current route from window.location.hash.
+ * NAVIGATION_SELECTOR_UI: Uses getRouteByHash which handles query params.
  */
 export function getCurrentRoute(): RouteDefinition {
   const hash = typeof window !== 'undefined' ? window.location.hash : '';
@@ -93,11 +99,17 @@ export function getCurrentRoute(): RouteDefinition {
 
 /**
  * Navigate to route.
+ * NAVIGATION_SELECTOR_UI: Preserves selection query params during navigation.
  */
 export function navigateTo(route: RouteDefinition | string): void {
   const targetRoute = typeof route === 'string' ? ROUTES[route] : route;
   if (targetRoute && typeof window !== 'undefined') {
-    window.location.hash = targetRoute.hash;
+    // Preserve query params (selection state) during navigation
+    const currentHash = window.location.hash;
+    const queryIndex = currentHash.indexOf('?');
+    const queryPart = queryIndex !== -1 ? currentHash.slice(queryIndex) : '';
+
+    window.location.hash = targetRoute.hash + queryPart;
   }
 }
 

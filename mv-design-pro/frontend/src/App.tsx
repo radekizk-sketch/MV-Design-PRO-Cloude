@@ -28,7 +28,7 @@ import { PowerFlowResultsInspectorPage } from './ui/power-flow-results';
 import { ResultsInspectorPage } from './ui/results-inspector';
 import { MainLayout } from './ui/layout';
 import { useAppStateStore } from './ui/app-state';
-import { ROUTES } from './ui/navigation';
+import { ROUTES, useUrlSelectionSync, getCurrentHashRoute } from './ui/navigation';
 
 /**
  * E2E_STABILIZATION: App ready indicator for tests.
@@ -61,12 +61,17 @@ function isResultsRoute(route: string): boolean {
 }
 
 function App() {
-  const [route, setRoute] = useState(() => window.location.hash);
+  // NAVIGATION_SELECTOR_UI: Use getCurrentHashRoute to strip query params from hash
+  const [route, setRoute] = useState(() => getCurrentHashRoute());
   const setActiveMode = useAppStateStore((state) => state.setActiveMode);
   const appReady = useAppReady();
 
+  // NAVIGATION_SELECTOR_UI: Sync selection with URL (refresh preserves selection)
+  useUrlSelectionSync();
+
   useEffect(() => {
-    const handler = () => setRoute(window.location.hash);
+    // NAVIGATION_SELECTOR_UI: Strip query params when handling hash changes
+    const handler = () => setRoute(getCurrentHashRoute());
     window.addEventListener('hashchange', handler);
     return () => window.removeEventListener('hashchange', handler);
   }, []);
