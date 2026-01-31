@@ -97,11 +97,12 @@ export const INSPECTOR_SECTION_LABELS: Record<string, string> = {
   identification: 'Identyfikacja',
   topology: 'Topologia',
   electrical: 'Parametry elektryczne',
-  results: 'Wyniki obliczeń',
-  power_flow: 'Rozpływ mocy',
-  short_circuit: 'Prądy zwarciowe',
-  flags: 'Flagi i ostrzeżenia',
-  pcc: 'Punkt wspólnego przyłączenia (PCC)',
+  results: 'Wyniki obliczen',
+  power_flow: 'Rozplyw mocy',
+  short_circuit: 'Prady zwarciowe',
+  protection: 'Zabezpieczenia',
+  flags: 'Flagi i ostrzezenia',
+  pcc: 'Punkt wspolnego przylaczenia (PCC)',
 };
 
 /**
