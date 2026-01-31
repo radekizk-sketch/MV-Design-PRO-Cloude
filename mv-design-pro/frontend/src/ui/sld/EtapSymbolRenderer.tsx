@@ -16,6 +16,15 @@ import React from 'react';
 import type { EtapSymbolId } from './SymbolResolver';
 
 /**
+ * Switch state for CB/DS elements.
+ * ETAP-like visual representation:
+ * - OPEN: gap/break in circuit (rozwarcie)
+ * - CLOSED: continuous symbol (połączenie)
+ * - UNKNOWN: indeterminate state (stan nieznany)
+ */
+export type SwitchState = 'OPEN' | 'CLOSED' | 'UNKNOWN';
+
+/**
  * Props dla renderera symbolu ETAP.
  */
 export interface EtapSymbolProps {
@@ -33,6 +42,8 @@ export interface EtapSymbolProps {
   strokeDasharray?: string;
   /** Skala symbolu (w pikselach, domyślnie 40) */
   size?: number;
+  /** Stan łączeniowy dla CB/DS (ETAP-like) */
+  switchState?: SwitchState;
 }
 
 /**
@@ -61,52 +72,116 @@ const BusbarSymbol: React.FC<Omit<EtapSymbolProps, 'symbolId'>> = ({
 
 /**
  * Circuit Breaker / Wyłącznik
- * Square with X pattern inside.
+ * ETAP-like visual representation:
+ * - CLOSED: Square with X pattern, continuous connections
+ * - OPEN: Square with X pattern, gap in bottom connection showing break
+ * - UNKNOWN: Dashed outline indicating indeterminate state
  */
 const CircuitBreakerSymbol: React.FC<Omit<EtapSymbolProps, 'symbolId'>> = ({
   stroke = '#000000',
   fill = 'none',
   strokeWidth = 3,
   opacity = 1,
-}) => (
-  <>
-    <rect
-      x="30"
-      y="30"
-      width="40"
-      height="40"
-      fill={fill}
-      stroke={stroke}
-      strokeWidth={strokeWidth}
-      opacity={opacity}
-    />
-    <line x1="30" y1="30" x2="70" y2="70" stroke={stroke} strokeWidth={2} opacity={opacity} />
-    <line x1="70" y1="30" x2="30" y2="70" stroke={stroke} strokeWidth={2} opacity={opacity} />
-    {/* Connection stubs */}
-    <line x1="50" y1="0" x2="50" y2="30" stroke={stroke} strokeWidth={strokeWidth} opacity={opacity} />
-    <line x1="50" y1="70" x2="50" y2="100" stroke={stroke} strokeWidth={strokeWidth} opacity={opacity} />
-  </>
-);
+  switchState = 'CLOSED',
+}) => {
+  const isOpen = switchState === 'OPEN';
+  const isUnknown = switchState === 'UNKNOWN';
+
+  // UNKNOWN state: dashed outline
+  const rectDasharray = isUnknown ? '4,2' : undefined;
+
+  return (
+    <>
+      <rect
+        x="30"
+        y="30"
+        width="40"
+        height="40"
+        fill={fill}
+        stroke={stroke}
+        strokeWidth={strokeWidth}
+        strokeDasharray={rectDasharray}
+        opacity={opacity}
+        data-testid="sld-switch-state-cb-rect"
+      />
+      <line x1="30" y1="30" x2="70" y2="70" stroke={stroke} strokeWidth={2} opacity={opacity} />
+      <line x1="70" y1="30" x2="30" y2="70" stroke={stroke} strokeWidth={2} opacity={opacity} />
+      {/* Top connection - always connected */}
+      <line x1="50" y1="0" x2="50" y2="30" stroke={stroke} strokeWidth={strokeWidth} opacity={opacity} />
+      {/* Bottom connection - OPEN shows gap, CLOSED shows continuous */}
+      {isOpen ? (
+        <>
+          {/* Gap indicator - disconnected at y=75 */}
+          <line x1="50" y1="70" x2="50" y2="75" stroke={stroke} strokeWidth={strokeWidth} opacity={opacity} />
+          {/* Bottom stub with gap */}
+          <line x1="50" y1="85" x2="50" y2="100" stroke={stroke} strokeWidth={strokeWidth} opacity={opacity} />
+          {/* Open indicator marks */}
+          <line x1="45" y1="77" x2="55" y2="83" stroke={stroke} strokeWidth={2} opacity={opacity} />
+        </>
+      ) : (
+        <line x1="50" y1="70" x2="50" y2="100" stroke={stroke} strokeWidth={strokeWidth} opacity={opacity} />
+      )}
+    </>
+  );
+};
 
 /**
  * Disconnector / Rozłącznik
- * Two terminals with open gap between them.
+ * ETAP-like visual representation:
+ * - OPEN: Blade angled away (łopatka otwarta)
+ * - CLOSED: Blade vertical connecting contacts (łopatka zamknięta)
+ * - UNKNOWN: Dashed blade indicating indeterminate state
  */
 const DisconnectorSymbol: React.FC<Omit<EtapSymbolProps, 'symbolId'>> = ({
   stroke = '#000000',
   strokeWidth = 3,
   opacity = 1,
-}) => (
-  <>
-    <line x1="50" y1="0" x2="50" y2="35" stroke={stroke} strokeWidth={strokeWidth} opacity={opacity} />
-    <line x1="50" y1="65" x2="50" y2="100" stroke={stroke} strokeWidth={strokeWidth} opacity={opacity} />
-    {/* Open blade (angled line) */}
-    <line x1="50" y1="35" x2="70" y2="50" stroke={stroke} strokeWidth={strokeWidth} opacity={opacity} />
-    {/* Fixed contact points */}
-    <circle cx="50" cy="35" r="4" fill={stroke} stroke="none" opacity={opacity} />
-    <circle cx="50" cy="65" r="4" fill={stroke} stroke="none" opacity={opacity} />
-  </>
-);
+  switchState = 'CLOSED',
+}) => {
+  const isOpen = switchState === 'OPEN';
+  const isUnknown = switchState === 'UNKNOWN';
+
+  // UNKNOWN state: dashed blade
+  const bladeDasharray = isUnknown ? '4,2' : undefined;
+
+  return (
+    <>
+      {/* Top connection */}
+      <line x1="50" y1="0" x2="50" y2="35" stroke={stroke} strokeWidth={strokeWidth} opacity={opacity} />
+      {/* Bottom connection */}
+      <line x1="50" y1="65" x2="50" y2="100" stroke={stroke} strokeWidth={strokeWidth} opacity={opacity} />
+      {/* Blade - OPEN: angled, CLOSED: vertical */}
+      {isOpen ? (
+        <line
+          x1="50"
+          y1="35"
+          x2="70"
+          y2="50"
+          stroke={stroke}
+          strokeWidth={strokeWidth}
+          strokeDasharray={bladeDasharray}
+          opacity={opacity}
+          data-testid="sld-switch-state-ds-blade-open"
+        />
+      ) : (
+        <line
+          x1="50"
+          y1="35"
+          x2="50"
+          y2="65"
+          stroke={stroke}
+          strokeWidth={strokeWidth}
+          strokeDasharray={bladeDasharray}
+          opacity={opacity}
+          data-testid="sld-switch-state-ds-blade-closed"
+        />
+      )}
+      {/* Fixed contact points */}
+      <circle cx="50" cy="35" r="4" fill={stroke} stroke="none" opacity={opacity} />
+      <circle cx="50" cy="65" r="4" fill={stroke} stroke="none" opacity={opacity} />
+    </>
+  );
+};
 
 /**
  * Overhead Line / Linia napowietrzna
@@ -400,7 +475,7 @@ const SYMBOL_COMPONENTS: Record<EtapSymbolId, React.FC<Omit<EtapSymbolProps, 'sy
  * Użycie:
  * ```tsx
  * <g transform={`translate(${x}, ${y}) scale(${scale})`}>
- *   <EtapSymbol symbolId="circuit_breaker" stroke="#1f2937" />
+ *   <EtapSymbol symbolId="circuit_breaker" stroke="#1f2937" switchState="OPEN" />
  * </g>
  * ```
  */
@@ -411,6 +486,7 @@ export const EtapSymbol: React.FC<EtapSymbolProps> = ({
   strokeWidth = 3,
   opacity = 1,
   size = 40,
+  switchState,
 }) => {
   const SymbolComponent = SYMBOL_COMPONENTS[symbolId];
 
@@ -423,12 +499,13 @@ export const EtapSymbol: React.FC<EtapSymbolProps> = ({
   const scale = size / 100;
 
   return (
-    <g transform={`scale(${scale})`} data-etap-symbol={symbolId}>
+    <g transform={`scale(${scale})`} data-etap-symbol={symbolId} data-switch-state={switchState}>
       <SymbolComponent
         stroke={stroke}
         fill={fill}
         strokeWidth={strokeWidth / scale} // Compensate for scaling
         opacity={opacity}
+        switchState={switchState}
       />
     </g>
   );
