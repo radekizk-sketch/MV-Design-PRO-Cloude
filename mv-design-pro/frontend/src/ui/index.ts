@@ -136,3 +136,22 @@ export type {
   BranchResultData,
   ShortCircuitResultData,
 } from './inspector';
+
+// SLD Read-Only Viewer (PowerFactory parity - presentation only)
+export {
+  SLDView,
+  SLDViewCanvas,
+  SLDViewPage,
+  DEFAULT_VIEWPORT,
+  ZOOM_MIN,
+  ZOOM_MAX,
+  ZOOM_STEP,
+  fitToContent,
+  calculateSymbolsBounds,
+} from './sld';
+export type {
+  SLDViewProps,
+  SLDViewCanvasProps,
+  SLDViewPageProps,
+  ViewportState,
+} from './sld';

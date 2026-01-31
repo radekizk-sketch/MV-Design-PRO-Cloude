@@ -41,6 +41,13 @@ export const ROUTES: Record<string, RouteDefinition> = {
     icon: '⚡',
     requiredMode: undefined, // Available in all modes
   },
+  SLD_VIEW: {
+    hash: '#sld-view',
+    label: 'Podglad schematu',
+    description: 'Podglad schematu jednokreskowego (tylko odczyt)',
+    icon: '👁️',
+    requiredMode: undefined, // Available in all modes (read-only)
+  },
   RESULTS: {
     hash: '#results',
     label: 'Przegląd wyników',
