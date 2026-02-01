@@ -36,6 +36,18 @@ import { useDiagnosticsStore } from './diagnosticsStore';
 import { updateUrlWithSelection } from '../navigation/urlState';
 import { SEVERITY_FILTER_LABELS_PL, type DiagnosticsSeverityFilter } from '../protection';
 import { useSanityChecks } from '../protection';
+import {
+  SldSnapshotExportDialog,
+  executeSldExport,
+  getCurrentLayerState,
+  createExportOptions,
+  type ExportFormat,
+  type ExportLayerOptions,
+  type PngScale,
+  type PdfPageSize,
+  type PdfOrientation,
+  type ExportScope,
+} from './export';
 
 /**
  * Default canvas dimensions.
@@ -86,6 +98,10 @@ export const SLDView: React.FC<SLDViewProps> = ({
 
   // Check if there are any diagnostics results (fixture for now)
   const { hasResults: hasDiagnostics } = useSanityChecks('demo-project', 'demo-diagram');
+
+  // Export dialog state
+  const [exportDialogOpen, setExportDialogOpen] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
 
   // Use external selection if provided, otherwise use store
   const selectedElement = externalSelectedElement !== undefined ? externalSelectedElement : storeSelectedElement;
@@ -292,6 +308,101 @@ export const SLDView: React.FC<SLDViewProps> = ({
     [setDiagnosticsFilter]
   );
 
+  /**
+   * Handle export dialog open.
+   */
+  const handleExportClick = useCallback(() => {
+    setExportDialogOpen(true);
+  }, []);
+
+  /**
+   * Handle export dialog close.
+   */
+  const handleExportDialogClose = useCallback(() => {
+    setExportDialogOpen(false);
+  }, []);
+
+  /**
+   * Handle export.
+   */
+  const handleExport = useCallback(
+    async (
+      format: ExportFormat,
+      options: {
+        scale?: PngScale;
+        pageSize?: PdfPageSize;
+        orientation?: PdfOrientation;
+        scope: ExportScope;
+        layers: ExportLayerOptions;
+      }
+    ) => {
+      const containerElement = containerRef.current?.closest('[data-testid="sld-view"]');
+      if (!containerElement || !(containerElement instanceof HTMLElement)) {
+        console.error('[SLDView] Nie znaleziono kontenera SLD do eksportu');
+        return;
+      }
+
+      setIsExporting(true);
+
+      try {
+        const metadata = {
+          projectName: 'demo-project', // TODO: Get from context
+          caseName: 'demo-case', // TODO: Get from context
+          runId: sldOverlay?.run_id,
+          zoomPercent: Math.round(viewport.zoom * 100),
+          timestamp: new Date().toISOString(),
+        };
+
+        const exportOptions =
+          format === 'png'
+            ? createExportOptions('png', options, metadata)
+            : createExportOptions('pdf', options, metadata);
+
+        const result = await executeSldExport(
+          {
+            containerElement,
+            symbols,
+            currentViewport: viewport,
+            canvasWidth: width,
+            canvasHeight: height,
+          },
+          exportOptions
+        );
+
+        if (result.success) {
+          setExportDialogOpen(false);
+        } else {
+          console.error('[SLDView] Błąd eksportu:', result.error);
+        }
+      } finally {
+        setIsExporting(false);
+      }
+    },
+    [symbols, viewport, width, height, sldOverlay]
+  );
+
+  /**
+   * Current layer state for export dialog defaults.
+   */
+  const currentLayerState = useMemo(
+    () => getCurrentLayerState(overlayVisible, diagnosticsVisible),
+    [overlayVisible, diagnosticsVisible]
+  );
+
+  /**
+   * Export metadata.
+   */
+  const exportMetadata = useMemo(
+    () => ({
+      projectName: 'demo-project', // TODO: Get from context
+      caseName: 'demo-case', // TODO: Get from context
+      runId: sldOverlay?.run_id,
+      zoomPercent: Math.round(viewport.zoom * 100),
+      timestamp: new Date().toISOString(),
+    }),
+    [viewport.zoom, sldOverlay]
+  );
+
   // Zoom percentage for display
   const zoomPercent = Math.round(viewport.zoom * 100);
 
@@ -433,6 +544,18 @@ export const SLDView: React.FC<SLDViewProps> = ({
               )}
             </>
           )}
+
+          {/* Export button */}
+          <div className="w-px h-4 bg-gray-300 mx-1" />
+          <button
+            type="button"
+            onClick={handleExportClick}
+            className="px-2 py-1 text-xs bg-gray-100 hover:bg-gray-200 rounded"
+            title="Eksportuj schemat"
+            data-testid="sld-export-btn"
+          >
+            Eksportuj
+          </button>
         </div>
       </div>
 
@@ -523,6 +646,18 @@ export const SLDView: React.FC<SLDViewProps> = ({
           Przeciagaj srodkowym/prawym przyciskiem myszy | Scroll: zoom
         </div>
       </div>
+
+      {/* Export dialog */}
+      <SldSnapshotExportDialog
+        isOpen={exportDialogOpen}
+        onClose={handleExportDialogClose}
+        onExport={handleExport}
+        currentLayerState={currentLayerState}
+        metadata={exportMetadata}
+        hasResultsOverlay={hasResults}
+        hasDiagnosticsOverlay={hasDiagnostics}
+        isExporting={isExporting}
+      />
     </div>
   );
 };
