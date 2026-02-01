@@ -27,7 +27,10 @@ from typing import Any
 
 import numpy as np
 from network_model.core.graph import NetworkGraph
-from network_model.solvers.power_flow_newton import PowerFlowNewtonSolution
+from network_model.solvers.power_flow_newton import (
+    PowerFlowNewtonSolution,
+    PowerFlowNewtonSolver,
+)
 from network_model.solvers.power_flow_newton_internal import (
     build_initial_voltage,
     build_power_spec,
@@ -51,11 +54,26 @@ class GaussSeidelOptions(PowerFlowOptions):
         acceleration_factor: Successive over-relaxation (SOR) factor.
             - 1.0: Standard Gauss-Seidel (default)
             - 1.0 < α < 2.0: Over-relaxation (faster convergence for some cases)
-            - 0.0 < α < 1.0: Under-relaxation (more stable but slower)
+            - 0.5 < α < 1.0: Under-relaxation (more stable but slower)
             Typical optimal value is around 1.4-1.8 for well-conditioned systems.
+            Valid range: [0.5, 2.0]
+        allow_fallback: If True and GS doesn't converge, automatically fall back
+            to Newton-Raphson solver. Default is False.
     """
 
     acceleration_factor: float = 1.0
+    allow_fallback: bool = False
+
+    def __post_init__(self) -> None:
+        """Validate acceleration_factor range."""
+        if not (0.5 <= self.acceleration_factor <= 2.0):
+            raise ValueError(
+                f"Współczynnik przyspieszenia (acceleration_factor) musi być w zakresie "
+                f"[0.5, 2.0], otrzymano: {self.acceleration_factor}. "
+                f"Wartość 1.0 oznacza standardową metodę Gaussa-Seidla, "
+                f"wartości > 1.0 przyspieszają zbieżność (SOR), "
+                f"wartości < 1.0 zwiększają stabilność (under-relaxation)."
+            )
 
 
 @dataclass
@@ -113,9 +131,11 @@ class PowerFlowGaussSeidelSolver:
         # Merge options
         if gs_options is not None:
             accel = gs_options.acceleration_factor
+            allow_fallback = gs_options.allow_fallback
             full_trace = gs_options.trace_level == "full" or options.trace_level == "full"
         else:
             accel = 1.0
+            allow_fallback = False
             full_trace = options.trace_level == "full"
 
         validation_warnings: list[str] = []
@@ -214,8 +234,74 @@ class PowerFlowGaussSeidelSolver:
             pf_input.base_mva,
         )
 
-        # Handle non-convergence
+        # Handle non-convergence with optional fallback to Newton-Raphson
+        fallback_info: dict[str, str] | None = None
         if not converged:
+            if allow_fallback:
+                # Fallback to Newton-Raphson solver with proper settings
+                # Create a new input with default NR-friendly options
+
+                fallback_options = PowerFlowOptions(
+                    tolerance=pf_input.options.tolerance,
+                    max_iter=30,  # Use reasonable max_iter for NR
+                    damping=pf_input.options.damping,
+                    flat_start=pf_input.options.flat_start,
+                    validate=False,  # Already validated
+                    trace_level=pf_input.options.trace_level,
+                )
+                fallback_input = PowerFlowInput(
+                    graph=pf_input.graph,
+                    base_mva=pf_input.base_mva,
+                    slack=pf_input.slack,
+                    pq=pf_input.pq,
+                    pv=pf_input.pv,
+                    shunts=pf_input.shunts,
+                    taps=pf_input.taps,
+                    bus_limits=pf_input.bus_limits,
+                    branch_limits=pf_input.branch_limits,
+                    options=fallback_options,
+                )
+                nr_result = PowerFlowNewtonSolver().solve(fallback_input)
+                # Return NR result with fallback info
+                return PowerFlowNewtonSolution(
+                    converged=nr_result.converged,
+                    iterations=nr_result.iterations,
+                    max_mismatch=nr_result.max_mismatch,
+                    node_voltage=nr_result.node_voltage,
+                    node_u_mag=nr_result.node_u_mag,
+                    node_angle=nr_result.node_angle,
+                    node_voltage_kv=nr_result.node_voltage_kv,
+                    branch_current=nr_result.branch_current,
+                    branch_s_from=nr_result.branch_s_from,
+                    branch_s_to=nr_result.branch_s_to,
+                    branch_current_ka=nr_result.branch_current_ka,
+                    branch_s_from_mva=nr_result.branch_s_from_mva,
+                    branch_s_to_mva=nr_result.branch_s_to_mva,
+                    losses_total=nr_result.losses_total,
+                    slack_power=nr_result.slack_power,
+                    sum_pq_spec=nr_result.sum_pq_spec,
+                    branch_flow_note=nr_result.branch_flow_note,
+                    missing_voltage_base_nodes=nr_result.missing_voltage_base_nodes,
+                    validation_warnings=nr_result.validation_warnings,
+                    validation_errors=nr_result.validation_errors,
+                    slack_island_nodes=nr_result.slack_island_nodes,
+                    not_solved_nodes=nr_result.not_solved_nodes,
+                    ybus_trace=nr_result.ybus_trace,
+                    nr_trace=nr_result.nr_trace,
+                    applied_taps=nr_result.applied_taps,
+                    applied_shunts=nr_result.applied_shunts,
+                    pv_to_pq_switches=nr_result.pv_to_pq_switches,
+                    init_state=nr_result.init_state,
+                    solver_method="newton-raphson",
+                    fallback_info={
+                        "fallback_used": "newton-raphson",
+                        "cause": "non_convergence",
+                        "gs_iterations": str(options.max_iter),
+                        "gs_max_mismatch": str(max_mismatch),
+                    },
+                )
+
+            # No fallback - mark as failed
             iterations = int(options.max_iter)
             if gs_trace:
                 if "cause_if_failed_optional" not in gs_trace[-1]:
@@ -319,6 +405,8 @@ class PowerFlowGaussSeidelSolver:
             applied_shunts=applied_shunts,
             pv_to_pq_switches=pv_to_pq_switches,
             init_state=init_state,
+            solver_method="gauss-seidel",
+            fallback_info=fallback_info,
         )
 
     def _gauss_seidel_solve(

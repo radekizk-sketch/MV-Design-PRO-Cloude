@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Literal
 
 import numpy as np
-
 from network_model.core.graph import NetworkGraph
 from network_model.solvers.power_flow_newton_internal import (
     build_initial_voltage,
@@ -23,6 +23,7 @@ from network_model.solvers.power_flow_types import PowerFlowInput
 @dataclass(frozen=True)
 class PowerFlowNewtonSolution:
     """P20a: Power flow solution with full white-box trace support."""
+
     converged: bool
     iterations: int
     max_mismatch: float
@@ -52,6 +53,10 @@ class PowerFlowNewtonSolution:
     pv_to_pq_switches: list[dict[str, object]]
     # P20a: Initial state for white-box trace (V0, θ0)
     init_state: dict[str, dict[str, float]] | None = None
+    # FIX-08b: Solver method identifier for trace clarity
+    solver_method: Literal["newton-raphson", "gauss-seidel"] = "newton-raphson"
+    # FIX-08b: Fallback information (if GS fell back to NR)
+    fallback_info: dict[str, str] | None = None
 
 
 class PowerFlowNewtonSolver:
@@ -67,16 +72,12 @@ class PowerFlowNewtonSolver:
             if validation_errors:
                 raise ValueError("; ".join(validation_errors))
 
-        slack_island_nodes, not_solved_nodes = build_slack_island(
-            graph, pf_input.slack.node_id
-        )
+        slack_island_nodes, not_solved_nodes = build_slack_island(graph, pf_input.slack.node_id)
 
         if not slack_island_nodes:
             raise ValueError("Slack island could not be determined.")
 
-        tap_ratios = {
-            spec.branch_id: spec.tap_ratio for spec in pf_input.taps
-        }
+        tap_ratios = {spec.branch_id: spec.tap_ratio for spec in pf_input.taps}
 
         ybus_pu, node_index_map, ybus_trace, applied_taps, applied_shunts = build_ybus_pu(
             graph,
@@ -143,9 +144,7 @@ class PowerFlowNewtonSolver:
                 node_index_to_id,
             )
         else:
-            p_spec, q_spec = build_power_spec(
-                slack_island_nodes, pf_input.base_mva, pf_input.pq
-            )
+            p_spec, q_spec = build_power_spec(slack_island_nodes, pf_input.base_mva, pf_input.pq)
             pv_to_pq_switches = []
             if pq_indices:
                 v, converged, iterations, max_mismatch, nr_trace = newton_raphson_solve(
@@ -182,12 +181,11 @@ class PowerFlowNewtonSolver:
                     }
                 )
 
-        node_voltage = {
-            node_id: v[node_index_map[node_id]]
-            for node_id in slack_island_nodes
-        }
+        node_voltage = {node_id: v[node_index_map[node_id]] for node_id in slack_island_nodes}
         node_u_mag = {node_id: float(abs(voltage)) for node_id, voltage in node_voltage.items()}
-        node_angle = {node_id: float(np.angle(voltage)) for node_id, voltage in node_voltage.items()}
+        node_angle = {
+            node_id: float(np.angle(voltage)) for node_id, voltage in node_voltage.items()
+        }
 
         slack_voltage_kv = graph.nodes[pf_input.slack.node_id].voltage_level
         (
@@ -222,12 +220,10 @@ class PowerFlowNewtonSolver:
                 branch_current_ka[branch_id] = float(abs(current_pu) * i_base_ka)
 
         branch_s_from_mva = {
-            branch_id: value * pf_input.base_mva
-            for branch_id, value in branch_s_from.items()
+            branch_id: value * pf_input.base_mva for branch_id, value in branch_s_from.items()
         }
         branch_s_to_mva = {
-            branch_id: value * pf_input.base_mva
-            for branch_id, value in branch_s_to.items()
+            branch_id: value * pf_input.base_mva for branch_id, value in branch_s_to.items()
         }
 
         p_calc, q_calc = compute_power_injections(ybus_pu, v)

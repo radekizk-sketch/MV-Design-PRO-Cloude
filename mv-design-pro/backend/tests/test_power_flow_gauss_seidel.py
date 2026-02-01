@@ -730,3 +730,222 @@ class TestGaussSeidelSolverAPI:
         assert hasattr(result, "ybus_trace")
         assert hasattr(result, "nr_trace")
         assert hasattr(result, "pv_to_pq_switches")
+
+
+class TestFix08bSolverMethodField:
+    """FIX-08b: Tests for solver_method field."""
+
+    def test_gs_result_has_solver_method_gauss_seidel(self) -> None:
+        """Test that GS result has solver_method='gauss-seidel'."""
+        graph = NetworkGraph()
+        graph.add_node(_make_slack_node("A"))
+        graph.add_node(_make_pq_node("B"))
+        _add_line(graph, "L1", "A", "B")
+
+        pf_input = PowerFlowInput(
+            graph=graph,
+            base_mva=10.0,
+            slack=SlackSpec(node_id="A", u_pu=1.0, angle_rad=0.0),
+            pq=[PQSpec(node_id="B", p_mw=1.0, q_mvar=0.5)],
+            options=PowerFlowOptions(max_iter=100),
+        )
+
+        result = solve_power_flow_gauss_seidel(pf_input)
+
+        assert result.solver_method == "gauss-seidel"
+        assert result.fallback_info is None
+
+    def test_nr_result_has_solver_method_newton_raphson(self) -> None:
+        """Test that NR result has solver_method='newton-raphson' (default)."""
+        graph = NetworkGraph()
+        graph.add_node(_make_slack_node("A"))
+        graph.add_node(_make_pq_node("B"))
+        _add_line(graph, "L1", "A", "B")
+
+        pf_input = PowerFlowInput(
+            graph=graph,
+            base_mva=10.0,
+            slack=SlackSpec(node_id="A", u_pu=1.0, angle_rad=0.0),
+            pq=[PQSpec(node_id="B", p_mw=1.0, q_mvar=0.5)],
+            options=PowerFlowOptions(max_iter=100),
+        )
+
+        result = solve_power_flow_physics(pf_input)
+
+        assert result.solver_method == "newton-raphson"
+        assert result.fallback_info is None
+
+
+class TestFix08bAccelerationFactorValidation:
+    """FIX-08b: Tests for acceleration_factor validation."""
+
+    def test_valid_acceleration_factor_1_0(self) -> None:
+        """Test that acceleration_factor=1.0 is valid."""
+        options = GaussSeidelOptions(acceleration_factor=1.0)
+        assert options.acceleration_factor == 1.0
+
+    def test_valid_acceleration_factor_0_5(self) -> None:
+        """Test that acceleration_factor=0.5 (lower bound) is valid."""
+        options = GaussSeidelOptions(acceleration_factor=0.5)
+        assert options.acceleration_factor == 0.5
+
+    def test_valid_acceleration_factor_2_0(self) -> None:
+        """Test that acceleration_factor=2.0 (upper bound) is valid."""
+        options = GaussSeidelOptions(acceleration_factor=2.0)
+        assert options.acceleration_factor == 2.0
+
+    def test_valid_acceleration_factor_1_5(self) -> None:
+        """Test that acceleration_factor=1.5 (SOR) is valid."""
+        options = GaussSeidelOptions(acceleration_factor=1.5)
+        assert options.acceleration_factor == 1.5
+
+    def test_invalid_acceleration_factor_too_low(self) -> None:
+        """Test that acceleration_factor < 0.5 raises ValueError with Polish message."""
+        with pytest.raises(ValueError) as exc_info:
+            GaussSeidelOptions(acceleration_factor=0.3)
+
+        error_msg = str(exc_info.value)
+        assert "Współczynnik przyspieszenia" in error_msg
+        assert "0.3" in error_msg
+        assert "[0.5, 2.0]" in error_msg
+
+    def test_invalid_acceleration_factor_too_high(self) -> None:
+        """Test that acceleration_factor > 2.0 raises ValueError with Polish message."""
+        with pytest.raises(ValueError) as exc_info:
+            GaussSeidelOptions(acceleration_factor=2.5)
+
+        error_msg = str(exc_info.value)
+        assert "Współczynnik przyspieszenia" in error_msg
+        assert "2.5" in error_msg
+        assert "[0.5, 2.0]" in error_msg
+
+    def test_invalid_acceleration_factor_negative(self) -> None:
+        """Test that negative acceleration_factor raises ValueError."""
+        with pytest.raises(ValueError) as exc_info:
+            GaussSeidelOptions(acceleration_factor=-0.5)
+
+        assert "Współczynnik przyspieszenia" in str(exc_info.value)
+
+
+class TestFix08bFallbackToNewtonRaphson:
+    """FIX-08b: Tests for GS to NR fallback functionality."""
+
+    def test_fallback_triggers_on_non_convergence(self) -> None:
+        """Test that fallback to NR triggers when GS doesn't converge."""
+        graph = NetworkGraph()
+        graph.add_node(_make_slack_node("A"))
+        graph.add_node(_make_pq_node("B"))
+        _add_line(graph, "L1", "A", "B")
+
+        # Use very low max_iter to force non-convergence in GS
+        pf_input = PowerFlowInput(
+            graph=graph,
+            base_mva=10.0,
+            slack=SlackSpec(node_id="A", u_pu=1.0, angle_rad=0.0),
+            pq=[PQSpec(node_id="B", p_mw=2.0, q_mvar=1.0)],
+            options=PowerFlowOptions(max_iter=2, tolerance=1e-12),  # Very tight
+        )
+
+        gs_options = GaussSeidelOptions(
+            acceleration_factor=1.0,
+            allow_fallback=True,
+            max_iter=2,
+            tolerance=1e-12,
+        )
+
+        result = solve_power_flow_gauss_seidel(pf_input, gs_options)
+
+        # Should have fallen back to NR and converged
+        assert result.converged is True
+        assert result.solver_method == "newton-raphson"
+        assert result.fallback_info is not None
+        assert result.fallback_info["fallback_used"] == "newton-raphson"
+        assert result.fallback_info["cause"] == "non_convergence"
+
+    def test_no_fallback_when_disabled(self) -> None:
+        """Test that no fallback occurs when allow_fallback=False."""
+        graph = NetworkGraph()
+        graph.add_node(_make_slack_node("A"))
+        graph.add_node(_make_pq_node("B"))
+        _add_line(graph, "L1", "A", "B")
+
+        pf_input = PowerFlowInput(
+            graph=graph,
+            base_mva=10.0,
+            slack=SlackSpec(node_id="A", u_pu=1.0, angle_rad=0.0),
+            pq=[PQSpec(node_id="B", p_mw=2.0, q_mvar=1.0)],
+            options=PowerFlowOptions(max_iter=2, tolerance=1e-12),
+        )
+
+        gs_options = GaussSeidelOptions(
+            acceleration_factor=1.0,
+            allow_fallback=False,  # Fallback disabled
+            max_iter=2,
+            tolerance=1e-12,
+        )
+
+        result = solve_power_flow_gauss_seidel(pf_input, gs_options)
+
+        # Should NOT have converged (no fallback)
+        assert result.converged is False
+        assert result.solver_method == "gauss-seidel"
+        assert result.fallback_info is None
+
+    def test_no_fallback_when_gs_converges(self) -> None:
+        """Test that no fallback occurs when GS converges successfully."""
+        graph = NetworkGraph()
+        graph.add_node(_make_slack_node("A"))
+        graph.add_node(_make_pq_node("B"))
+        _add_line(graph, "L1", "A", "B")
+
+        pf_input = PowerFlowInput(
+            graph=graph,
+            base_mva=10.0,
+            slack=SlackSpec(node_id="A", u_pu=1.0, angle_rad=0.0),
+            pq=[PQSpec(node_id="B", p_mw=1.0, q_mvar=0.5)],
+            options=PowerFlowOptions(max_iter=100, tolerance=1e-6),
+        )
+
+        gs_options = GaussSeidelOptions(
+            acceleration_factor=1.5,
+            allow_fallback=True,  # Fallback enabled, but not needed
+        )
+
+        result = solve_power_flow_gauss_seidel(pf_input, gs_options)
+
+        # Should have converged without fallback
+        assert result.converged is True
+        assert result.solver_method == "gauss-seidel"
+        assert result.fallback_info is None
+
+    def test_fallback_result_matches_direct_nr_result(self) -> None:
+        """Test that fallback result matches direct NR result."""
+        graph = NetworkGraph()
+        graph.add_node(_make_slack_node("A"))
+        graph.add_node(_make_pq_node("B"))
+        _add_line(graph, "L1", "A", "B")
+
+        pf_input = PowerFlowInput(
+            graph=graph,
+            base_mva=10.0,
+            slack=SlackSpec(node_id="A", u_pu=1.0, angle_rad=0.0),
+            pq=[PQSpec(node_id="B", p_mw=2.0, q_mvar=1.0)],
+            options=PowerFlowOptions(max_iter=30, tolerance=1e-8),
+        )
+
+        # Get direct NR result
+        nr_result = solve_power_flow_physics(pf_input)
+
+        # Get GS with fallback (force fallback with low iterations)
+        gs_options = GaussSeidelOptions(
+            acceleration_factor=1.0,
+            allow_fallback=True,
+            max_iter=1,  # Force non-convergence
+            tolerance=1e-12,
+        )
+        fallback_result = solve_power_flow_gauss_seidel(pf_input, gs_options)
+
+        # Results should match
+        assert fallback_result.converged == nr_result.converged
+        for node_id in ["A", "B"]:
+            assert abs(fallback_result.node_u_mag[node_id] - nr_result.node_u_mag[node_id]) < 1e-10
