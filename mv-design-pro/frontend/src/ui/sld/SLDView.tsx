@@ -63,8 +63,8 @@ export const SLDView: React.FC<SLDViewProps> = ({
   }));
 
   // Focus pulse state (for marker click visual feedback)
+  // Cleared via CSS animationend event (no setTimeout for deterministic E2E)
   const [focusPulseElementId, setFocusPulseElementId] = useState<string | null>(null);
-  const focusPulseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Selection store integration
   const selectElement = useSelectionStore((state) => state.selectElement);
@@ -107,6 +107,7 @@ export const SLDView: React.FC<SLDViewProps> = ({
 
   /**
    * Center on element when requested by store.
+   * Also triggers focus pulse for visual feedback.
    */
   useEffect(() => {
     if (sldCenterOnElement) {
@@ -120,6 +121,8 @@ export const SLDView: React.FC<SLDViewProps> = ({
           offsetX: width / 2 - symbol.position.x * prev.zoom,
           offsetY: height / 2 - symbol.position.y * prev.zoom,
         }));
+        // Trigger focus pulse for visual feedback (no timeout - CSS handles duration)
+        setFocusPulseElementId(sldCenterOnElement);
       }
       // Clear the center request
       centerSldOnElement(null);
@@ -250,6 +253,7 @@ export const SLDView: React.FC<SLDViewProps> = ({
 
   /**
    * Handle diagnostics marker click — select element + center + pulse.
+   * Focus pulse is triggered via centerSldOnElement effect.
    */
   const handleDiagnosticsMarkerClick = useCallback(
     (element: SelectedElement) => {
@@ -259,17 +263,8 @@ export const SLDView: React.FC<SLDViewProps> = ({
       // Sync to URL
       updateUrlWithSelection(element);
 
-      // Center SLD on the element
+      // Center SLD on the element (this also triggers focus pulse via effect)
       centerSldOnElement(element.id);
-
-      // Trigger focus pulse effect
-      if (focusPulseTimerRef.current) {
-        clearTimeout(focusPulseTimerRef.current);
-      }
-      setFocusPulseElementId(element.id);
-      focusPulseTimerRef.current = setTimeout(() => {
-        setFocusPulseElementId(null);
-      }, 1500); // Pulse duration 1.5s
 
       // Call external handler if provided
       if (onElementClick) {
@@ -279,13 +274,12 @@ export const SLDView: React.FC<SLDViewProps> = ({
     [selectElement, centerSldOnElement, onElementClick]
   );
 
-  // Cleanup focus pulse timer on unmount
-  useEffect(() => {
-    return () => {
-      if (focusPulseTimerRef.current) {
-        clearTimeout(focusPulseTimerRef.current);
-      }
-    };
+  /**
+   * Handle focus pulse animation end — clear pulse state.
+   * Uses CSS animationend event for deterministic cleanup (no setTimeout flakiness).
+   */
+  const handleFocusPulseAnimationEnd = useCallback(() => {
+    setFocusPulseElementId(null);
   }, []);
 
   /**
@@ -481,8 +475,14 @@ export const SLDView: React.FC<SLDViewProps> = ({
               top: `${focusIndicatorPosition.y}px`,
               transform: 'translate(-50%, -50%)',
             }}
+            onAnimationEnd={handleFocusPulseAnimationEnd}
           >
-            <div className="w-16 h-16 rounded-full border-4 border-blue-500 animate-ping opacity-75" />
+            {/* Pulsing ring - animation clears state on end */}
+            <div
+              className="w-16 h-16 rounded-full border-4 border-blue-500 animate-ping opacity-75"
+              style={{ animationIterationCount: 2 }}
+              onAnimationEnd={handleFocusPulseAnimationEnd}
+            />
             <div className="absolute inset-0 w-16 h-16 rounded-full border-2 border-blue-400" />
           </div>
         )}
