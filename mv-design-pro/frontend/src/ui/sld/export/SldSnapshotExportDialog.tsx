@@ -9,12 +9,13 @@
  * - Format selection: PNG (1×/2×) / PDF (A4/A3)
  * - Scope: viewport vs fit-to-network
  * - Layer checkboxes (legend, results, diagnostics, energization, CT/VT)
+ * - Export view presets (Czysty SLD, Wyniki, Diagnostyka, Raport)
  * - Export preview info
  *
  * 100% POLISH UI
  */
 
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import type {
   ExportFormat,
   ExportScope,
@@ -32,6 +33,15 @@ import {
   PDF_ORIENTATION_LABELS_PL,
   DEFAULT_LAYER_OPTIONS,
 } from './types';
+import type { ExportPresetId } from './presets';
+import {
+  EXPORT_PRESETS,
+  PRESET_LAYER_CONFIGS,
+  detectPresetFromLayers,
+  readExportPresetFromStorage,
+  saveExportPresetToStorage,
+  updateUrlWithExportPreset,
+} from './presets';
 
 /**
  * Dialog props.
@@ -87,11 +97,60 @@ export const SldSnapshotExportDialog: React.FC<SldSnapshotExportDialogProps> = (
     ...DEFAULT_LAYER_OPTIONS,
     ...currentLayerState,
   }));
+  const [selectedPreset, setSelectedPreset] = useState<ExportPresetId>('CUSTOM');
 
-  // Update layer option
+  // Initialize preset from URL/localStorage on mount
+  useEffect(() => {
+    const savedPreset = readExportPresetFromStorage();
+    if (savedPreset && savedPreset !== 'CUSTOM') {
+      const presetLayers = PRESET_LAYER_CONFIGS[savedPreset];
+      if (presetLayers) {
+        setSelectedPreset(savedPreset);
+        setLayers(presetLayers);
+      }
+    } else {
+      // Detect preset from current layer state
+      const detected = detectPresetFromLayers(
+        { ...DEFAULT_LAYER_OPTIONS, ...currentLayerState },
+        hasResultsOverlay,
+        hasDiagnosticsOverlay
+      );
+      setSelectedPreset(detected);
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Update layer option — switches to CUSTOM when manually changed
   const handleLayerChange = useCallback(
     (key: keyof ExportLayerOptions, value: boolean) => {
-      setLayers((prev) => ({ ...prev, [key]: value }));
+      setLayers((prev) => {
+        const newLayers = { ...prev, [key]: value };
+        // Check if new config matches any preset
+        const detected = detectPresetFromLayers(
+          newLayers,
+          hasResultsOverlay,
+          hasDiagnosticsOverlay
+        );
+        setSelectedPreset(detected);
+        return newLayers;
+      });
+    },
+    [hasResultsOverlay, hasDiagnosticsOverlay]
+  );
+
+  // Handle preset selection
+  const handlePresetChange = useCallback(
+    (presetId: ExportPresetId) => {
+      setSelectedPreset(presetId);
+
+      if (presetId !== 'CUSTOM') {
+        const presetLayers = PRESET_LAYER_CONFIGS[presetId];
+        if (presetLayers) {
+          setLayers(presetLayers);
+          // Persist selection
+          saveExportPresetToStorage(presetId);
+          updateUrlWithExportPreset(presetId);
+        }
+      }
     },
     []
   );
@@ -162,6 +221,43 @@ export const SldSnapshotExportDialog: React.FC<SldSnapshotExportDialogProps> = (
 
         {/* Content */}
         <div className="px-6 py-4 space-y-5">
+          {/* Preset selection */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Profil widoku
+            </label>
+            <select
+              value={selectedPreset}
+              onChange={(e) => handlePresetChange(e.target.value as ExportPresetId)}
+              className="w-full px-3 py-2 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+              data-testid="sld-export-preset"
+            >
+              {EXPORT_PRESETS.map((preset) => {
+                // Disable presets that require unavailable layers
+                const isDisabled =
+                  (preset.id === 'RESULTS' && !hasResultsOverlay) ||
+                  (preset.id === 'DIAGNOSTICS' && !hasDiagnosticsOverlay) ||
+                  (preset.id === 'REPORT' && (!hasResultsOverlay || !hasDiagnosticsOverlay));
+
+                return (
+                  <option
+                    key={preset.id}
+                    value={preset.id}
+                    disabled={isDisabled && preset.id !== 'CUSTOM'}
+                  >
+                    {preset.label}
+                    {isDisabled && preset.id !== 'CUSTOM' ? ' (niedostępny)' : ''}
+                  </option>
+                );
+              })}
+            </select>
+            {selectedPreset !== 'CUSTOM' && (
+              <p className="mt-1 text-xs text-gray-500">
+                {EXPORT_PRESETS.find((p) => p.id === selectedPreset)?.description}
+              </p>
+            )}
+          </div>
+
           {/* Format selection */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">

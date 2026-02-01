@@ -46,3 +46,19 @@ export {
 // UI Components
 export { SldSnapshotExportDialog } from './SldSnapshotExportDialog';
 export type { SldSnapshotExportDialogProps } from './SldSnapshotExportDialog';
+
+// Export Presets
+export type { ExportPresetId, ExportPreset } from './presets';
+export {
+  EXPORT_PRESETS,
+  PRESET_LAYER_CONFIGS,
+  getPresetById,
+  getPresetLabel,
+  detectPresetFromLayers,
+  readExportPresetFromStorage,
+  saveExportPresetToStorage,
+  updateUrlWithExportPreset,
+  clearExportPresetFromUrl,
+  EXPORT_PRESET_URL_PARAM,
+  EXPORT_PRESET_STORAGE_KEY,
+} from './presets';
