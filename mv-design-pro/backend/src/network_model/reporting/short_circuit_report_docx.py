@@ -4,6 +4,9 @@ Reporting/export layer - DOCX report generator for ShortCircuitResult.
 This module provides functions to export IEC 60909 short-circuit calculation
 results to DOCX format. It uses the stable Result API contract
 (ShortCircuitResult.to_dict() + white_box_trace) without modifying any solver logic.
+
+CANONICAL ALIGNMENT:
+- Binary determinism: same input -> identical bytes (SHA256)
 """
 
 from __future__ import annotations
@@ -23,6 +26,8 @@ try:
     _DOCX_AVAILABLE = True
 except ImportError:
     _DOCX_AVAILABLE = False
+
+from network_model.reporting.docx_determinism import make_docx_deterministic
 
 
 def _format_complex(value: dict | complex | str | Any) -> str:
@@ -199,6 +204,9 @@ def export_short_circuit_result_to_docx(
 
     # Save document
     doc.save(str(output_path))
+
+    # Normalize for binary determinism (fixed timestamps, sorted ZIP entries)
+    make_docx_deterministic(output_path)
 
     return output_path
 

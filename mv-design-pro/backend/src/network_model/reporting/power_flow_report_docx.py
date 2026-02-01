@@ -10,6 +10,7 @@ CANONICAL ALIGNMENT:
 - NOT-A-SOLVER: No physics calculations, only formatting
 - 100% Polish labels
 - UTF-8 encoding
+- Binary determinism: same input -> identical bytes (SHA256)
 """
 
 from __future__ import annotations
@@ -30,6 +31,8 @@ try:
     _DOCX_AVAILABLE = True
 except ImportError:
     _DOCX_AVAILABLE = False
+
+from network_model.reporting.docx_determinism import make_docx_deterministic
 
 
 def _format_value(value: Any) -> str:
@@ -305,6 +308,9 @@ def export_power_flow_result_to_docx(
     # Save document
     doc.save(str(output_path))
 
+    # Normalize for binary determinism (fixed timestamps, sorted ZIP entries)
+    make_docx_deterministic(output_path)
+
     return output_path
 
 
@@ -472,5 +478,8 @@ def export_power_flow_comparison_to_docx(
 
     # Save document
     doc.save(str(output_path))
+
+    # Normalize for binary determinism (fixed timestamps, sorted ZIP entries)
+    make_docx_deterministic(output_path)
 
     return output_path
