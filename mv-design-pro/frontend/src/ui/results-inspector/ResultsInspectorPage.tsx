@@ -38,6 +38,7 @@ import { useSelectionStore } from '../selection';
 import type { ElementType } from '../types';
 import { InspectorPanel } from '../inspector';
 import { ResultsExport } from './ResultsExport';
+import { TraceViewerContainer } from '../proof';
 
 // =============================================================================
 // Helper Functions
@@ -396,122 +397,6 @@ function ShortCircuitResultsTable({ selectedRowId, onRowSelect }: ShortCircuitRe
 }
 
 // =============================================================================
-// Extended Trace View (Ślad obliczeń)
-// =============================================================================
-
-function TraceView() {
-  const { extendedTrace, isLoadingTrace, loadExtendedTrace } = useResultsInspectorStore();
-  const [searchQuery, setSearchQuery] = useState('');
-  const [expandedSteps, setExpandedSteps] = useState<Set<number>>(new Set());
-
-  useEffect(() => {
-    if (!extendedTrace) {
-      loadExtendedTrace();
-    }
-  }, [extendedTrace, loadExtendedTrace]);
-
-  const filteredSteps = useMemo(() => {
-    if (!extendedTrace) return [];
-    const query = searchQuery.toLowerCase().trim();
-    if (!query) return extendedTrace.white_box_trace;
-    return extendedTrace.white_box_trace.filter((step) => {
-      const description = step.description?.toLowerCase() ?? '';
-      const phase = step.phase?.toLowerCase() ?? '';
-      const equationId = step.equation_id?.toLowerCase() ?? '';
-      return (
-        description.includes(query) || phase.includes(query) || equationId.includes(query)
-      );
-    });
-  }, [extendedTrace, searchQuery]);
-
-  const toggleStep = (index: number) => {
-    setExpandedSteps((prev) => {
-      const next = new Set(prev);
-      if (next.has(index)) {
-        next.delete(index);
-      } else {
-        next.add(index);
-      }
-      return next;
-    });
-  };
-
-  if (isLoadingTrace) return <LoadingSpinner />;
-  if (!extendedTrace || extendedTrace.white_box_trace.length === 0) {
-    return <EmptyState message="Brak śladu obliczeń dla tego obliczenia." />;
-  }
-
-  return (
-    <div>
-      <div className="mb-4 rounded border border-slate-200 bg-slate-50 p-3">
-        <div className="grid gap-2 text-sm md:grid-cols-2">
-          <div>
-            <span className="font-medium text-slate-700">Snapshot ID:</span>{' '}
-            <span className="text-slate-600">{extendedTrace.snapshot_id ?? '—'}</span>
-          </div>
-          <div>
-            <span className="font-medium text-slate-700">Input hash:</span>{' '}
-            <span className="font-mono text-xs text-slate-600">
-              {extendedTrace.input_hash.substring(0, 16)}...
-            </span>
-          </div>
-        </div>
-      </div>
-
-      <div className="mb-4">
-        <input
-          type="search"
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          placeholder="Szukaj w śladzie obliczeń..."
-          aria-label="Szukaj w śladzie obliczeń"
-          className="w-full max-w-md rounded border border-slate-200 px-3 py-2 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500"
-        />
-      </div>
-
-      <div className="space-y-2">
-        {filteredSteps.map((step, index) => (
-          <div key={index} className="rounded border border-slate-200 bg-white">
-            <button
-              type="button"
-              onClick={() => toggleStep(index)}
-              className="flex w-full items-center justify-between px-4 py-3 text-left hover:bg-slate-50"
-              aria-label={`Rozwiń krok ${index + 1}`}
-            >
-              <div className="flex items-center gap-3">
-                <span className="rounded bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600">
-                  {index + 1}
-                </span>
-                {step.phase && (
-                  <span className="rounded bg-blue-50 px-2 py-0.5 text-xs text-blue-700">
-                    {step.phase}
-                  </span>
-                )}
-                <span className="text-sm font-medium text-slate-800">
-                  {step.description ?? step.equation_id ?? 'Krok obliczeń'}
-                </span>
-              </div>
-              <span className="text-slate-400">{expandedSteps.has(index) ? '▼' : '▶'}</span>
-            </button>
-            {expandedSteps.has(index) && (
-              <div className="border-t border-slate-100 bg-slate-50 px-4 py-3">
-                <pre className="overflow-x-auto whitespace-pre-wrap text-xs text-slate-600">
-                  {JSON.stringify(step, null, 2)}
-                </pre>
-              </div>
-            )}
-          </div>
-        ))}
-      </div>
-
-      <p className="mt-4 text-xs text-slate-500">
-        Wyświetlono {filteredSteps.length} z {extendedTrace.white_box_trace.length} kroków
-      </p>
-    </div>
-  );
-}
-
-// =============================================================================
 // Selected Result Row Types (for InspectorPanel integration)
 // =============================================================================
 
@@ -621,7 +506,14 @@ export function ResultsInspectorPage({ runId, onClose }: ResultsInspectorPagePro
 
   // PROJECT_TREE_PARITY_V1: Sync selection from Tree/URL to Results Table
   // When globalSelectedElement changes (e.g., from Tree click), find matching row
-  const { busResults, branchResults, shortCircuitResults } = useResultsInspectorStore();
+  const { busResults, branchResults, shortCircuitResults, extendedTrace, isLoadingTrace, loadExtendedTrace } = useResultsInspectorStore();
+
+  // Load trace when TRACE tab is active
+  useEffect(() => {
+    if (activeTab === 'TRACE' && !extendedTrace && !isLoadingTrace) {
+      loadExtendedTrace();
+    }
+  }, [activeTab, extendedTrace, isLoadingTrace, loadExtendedTrace]);
 
   useEffect(() => {
     if (!globalSelectedElement) {
@@ -850,7 +742,12 @@ export function ResultsInspectorPage({ runId, onClose }: ResultsInspectorPagePro
                 onRowSelect={handleShortCircuitRowSelect}
               />
             )}
-            {activeTab === 'TRACE' && <TraceView />}
+            {activeTab === 'TRACE' && (
+              <TraceViewerContainer
+                trace={extendedTrace}
+                isLoading={isLoadingTrace}
+              />
+            )}
           </div>
 
           {/* Inspector panel (PowerFactory-style read-only property grid) */}

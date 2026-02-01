@@ -155,3 +155,14 @@ export type {
   SLDViewPageProps,
   ViewportState,
 } from './sld';
+
+// Ślad obliczeń / Calculation Trace Viewer (READ-ONLY)
+export {
+  TraceViewer,
+  TraceViewerContainer,
+  TraceToc,
+  TraceStepView,
+  TraceStepViewEmpty,
+  TraceMetadataPanel,
+  TraceMetadataPanelEmpty,
+} from './proof';
