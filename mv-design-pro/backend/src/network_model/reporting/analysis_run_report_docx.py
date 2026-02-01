@@ -3,6 +3,9 @@ Reporting/export layer - DOCX report generator for AnalysisRun bundles.
 
 This module exports read-only AnalysisRun report data to DOCX format using the
 shared reporting dependencies (python-docx) without invoking solvers.
+
+CANONICAL ALIGNMENT:
+- Binary determinism: same input -> identical bytes (SHA256)
 """
 
 from __future__ import annotations
@@ -18,6 +21,8 @@ if _DOCX_AVAILABLE:
     from docx import Document
     from docx.enum.text import WD_ALIGN_PARAGRAPH
     from docx.shared import Pt
+
+from network_model.reporting.docx_determinism import make_docx_bytes_deterministic
 
 
 def export_analysis_run_to_docx(bundle: dict[str, Any]) -> bytes:
@@ -43,7 +48,8 @@ def export_analysis_run_to_docx(bundle: dict[str, Any]) -> bytes:
 
     output = BytesIO()
     doc.save(output)
-    return output.getvalue()
+    # Normalize for binary determinism (fixed timestamps, sorted ZIP entries)
+    return make_docx_bytes_deterministic(output.getvalue())
 
 
 def _add_title(doc: Document, title: str) -> None:
