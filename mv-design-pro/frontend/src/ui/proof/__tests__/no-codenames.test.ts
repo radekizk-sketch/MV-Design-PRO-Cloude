@@ -15,7 +15,7 @@ const PROOF_DIR = path.join(__dirname, '..');
 const RESULTS_INSPECTOR_DIR = path.join(__dirname, '..', '..', 'results-inspector');
 
 // Regex dla nazw kodowych - wyklucza komentarze
-const CODENAME_REGEX = /['"`].*?(P11|P14|P17).*?['"`]/g;
+const CODENAME_REGEX = /['"`].*?(P11|P14|P17).*?['"`]/g; // no-codenames-ignore
 
 // Pliki do sprawdzenia
 const UI_FILES = [
@@ -33,7 +33,7 @@ const UI_FILES = [
 ];
 
 describe('UI Codenames Check', () => {
-  it('should not contain P11, P14, or P17 in UI-visible strings', () => {
+  it('should not contain codenames in UI-visible strings', () => { // no-codenames-ignore
     const violations: { file: string; line: number; content: string }[] = [];
 
     for (const filePath of UI_FILES) {
@@ -68,8 +68,9 @@ describe('UI Codenames Check', () => {
         (v) => `  ${v.file}:${v.line}: ${v.content}`
       ).join('\n');
 
+      // no-codenames-ignore (meta: komunikat błędu dla testu)
       expect.fail(
-        `Found codenames (P11, P14, P17) in UI-visible strings:\n${violationMessages}\n\n` +
+        `Found codenames in UI-visible strings:\n${violationMessages}\n\n` +
         'These codenames should NEVER appear in user-facing UI. Use Polish labels instead.'
       );
     }

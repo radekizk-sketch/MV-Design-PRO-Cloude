@@ -36,7 +36,7 @@ import { COLUMN_VIEW_PRESET_LABELS } from '../types';
 // Project Tree Tests
 // ============================================================================
 
-describe('P9: Project Tree', () => {
+describe('Drzewo Projektu', () => {
   describe('Tree Structure (PF-style)', () => {
     it('should have canonical tree node types', () => {
       const expectedNodeTypes: TreeNodeType[] = [
@@ -198,7 +198,7 @@ describe('P9: Project Tree', () => {
 // Data Manager Tests
 // ============================================================================
 
-describe('P9: Data Manager', () => {
+describe('Menedżer Danych', () => {
   describe('Deterministic Column Ordering', () => {
     it('should have fixed column order for Bus elements', () => {
       const busColumns: DataManagerColumn[] = [
@@ -481,7 +481,7 @@ describe('P9: Data Manager', () => {
 // Mode Gating Tests
 // ============================================================================
 
-describe('P9: Mode Gating', () => {
+describe('Blokada Trybu', () => {
   beforeEach(() => {
     const store = useSelectionStore.getState();
     store.clearSelection();
@@ -557,7 +557,7 @@ describe('P9: Mode Gating', () => {
 // 4-Way Sync Tests
 // ============================================================================
 
-describe('P9: 4-Way Sync (Tree ↔ DM ↔ Grid ↔ SLD)', () => {
+describe('Synchronizacja 4-kierunkowa (Drzewo ↔ MD ↔ Siatka ↔ SLD)', () => {
   beforeEach(() => {
     const store = useSelectionStore.getState();
     store.clearSelection();
@@ -622,7 +622,7 @@ describe('P9: 4-Way Sync (Tree ↔ DM ↔ Grid ↔ SLD)', () => {
 // Batch Edit Operation Tests
 // ============================================================================
 
-describe('P9: Batch Edit Operations', () => {
+describe('Operacje edycji zbiorczej', () => {
   it('should define SET_IN_SERVICE operation', () => {
     const operation: BatchEditOperation = { type: 'SET_IN_SERVICE', value: true };
     expect(operation.type).toBe('SET_IN_SERVICE');
@@ -664,7 +664,7 @@ describe('P9: Batch Edit Operations', () => {
 // Polish Labels Tests
 // ============================================================================
 
-describe('P9: Polish UI Labels', () => {
+describe('Polskie etykiety UI', () => {
   it('should have Polish labels for tree categories', () => {
     const labels = {
       BUSES: 'Szyny',
@@ -728,7 +728,7 @@ describe('P9: Polish UI Labels', () => {
 // P9.1: Persistencja stanu UI
 // ============================================================================
 
-describe('P9.1: UI State Persistence', () => {
+describe('Persystencja stanu UI', () => {
   beforeEach(() => {
     // Clear localStorage
     localStorage.clear();
@@ -818,7 +818,7 @@ describe('P9.1: UI State Persistence', () => {
 // P9.1: Column View Presets
 // ============================================================================
 
-describe('P9.1: Column View Presets', () => {
+describe('Presety widoku kolumn', () => {
   it('should have three preset types', () => {
     const presets: ColumnViewPreset[] = ['BASIC', 'TECHNICAL', 'OPERATIONAL'];
     expect(presets.length).toBe(3);
@@ -848,7 +848,7 @@ describe('P9.1: Column View Presets', () => {
 // P9.1: Error Filtering & Signaling
 // ============================================================================
 
-describe('P9.1: Error Filtering & Signaling', () => {
+describe('Filtrowanie i sygnalizacja błędów', () => {
   const testRowsWithErrors: DataManagerRow[] = [
     {
       id: 'bus-001',
@@ -928,7 +928,7 @@ describe('P9.1: Error Filtering & Signaling', () => {
 // P9.1: Quick Actions (MODEL_EDIT Only)
 // ============================================================================
 
-describe('P9.1: Quick Actions', () => {
+describe('Szybkie akcje', () => {
   it('should have toggle in-service action', () => {
     const operations: BatchEditOperation[] = [
       { type: 'SET_IN_SERVICE', value: true },

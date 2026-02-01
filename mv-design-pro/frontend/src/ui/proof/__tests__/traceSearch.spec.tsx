@@ -476,15 +476,15 @@ describe('TraceSearchBar', () => {
 // =============================================================================
 
 describe('No Codenames in Search Module', () => {
-  it('does not expose P11, P14, or P17 in search results', () => {
+  it('does not expose codenames in search results', () => { // no-codenames-ignore
     // Search for potential codenames
     const results = searchTraceSteps(mockSteps, '', defaultFilters);
 
     // Verify matchKey format doesn't contain codenames
     for (const result of results) {
-      expect(result.matchKey).not.toContain('P11');
-      expect(result.matchKey).not.toContain('P14');
-      expect(result.matchKey).not.toContain('P17');
+      expect(result.matchKey).not.toContain('P11'); // no-codenames-ignore
+      expect(result.matchKey).not.toContain('P14'); // no-codenames-ignore
+      expect(result.matchKey).not.toContain('P17'); // no-codenames-ignore
     }
   });
 });
