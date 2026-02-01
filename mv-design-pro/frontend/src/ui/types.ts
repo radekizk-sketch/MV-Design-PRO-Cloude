@@ -179,6 +179,8 @@ export interface ContextMenuConfig {
 export type TreeNodeType =
   | 'PROJECT'
   | 'NETWORK'
+  | 'STATION'           // FIX-05: Logical station container
+  | 'VOLTAGE_LEVEL'     // FIX-05: Voltage level grouping
   | 'BUSES'
   | 'LINES'
   | 'CABLES'
@@ -215,6 +217,9 @@ export interface TreeNode {
   count?: number; // Number of items in category
   expanded?: boolean;
   icon?: string;
+  // FIX-05: Station properties
+  stationId?: string; // For STATION nodes
+  voltageLevelKv?: number; // For VOLTAGE_LEVEL nodes
   // P10: Study case properties
   studyCaseId?: string; // For STUDY_CASE nodes
   isActive?: boolean; // For STUDY_CASE nodes - active case indicator
