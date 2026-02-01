@@ -14,6 +14,7 @@ from .node import Node, NodeType
 from .branch import Branch
 from .inverter import InverterSource
 from .switch import Switch
+from .station import Station
 
 
 class NetworkGraph:
@@ -52,6 +53,7 @@ class NetworkGraph:
         self.branches: Dict[str, Branch] = {}
         self.inverter_sources: Dict[str, InverterSource] = {}
         self.switches: Dict[str, Switch] = {}
+        self.stations: Dict[str, Station] = {}
         self._graph: nx.MultiGraph = nx.MultiGraph()
 
     def add_node(self, node: Node) -> None:
@@ -433,6 +435,125 @@ class NetworkGraph:
         switches.sort(key=lambda item: item.id)
         return switches
 
+    # =========================================================================
+    # Station Management (Logical Containers - NO PHYSICS)
+    # =========================================================================
+
+    def add_station(self, station: Station) -> None:
+        """
+        Dodaje stację (kontener logiczny) do sieci.
+
+        UWAGA: Stacje są TYLKO grupowaniem logicznym.
+        NIE mają wpływu na obliczenia fizyczne.
+
+        Args:
+            station: Stacja do dodania.
+
+        Raises:
+            ValueError: Gdy stacja o podanym ID już istnieje.
+        """
+        if station.id in self.stations:
+            raise ValueError(
+                f"Stacja o ID '{station.id}' już istnieje w grafie."
+            )
+        self.stations[station.id] = station
+
+    def remove_station(self, station_id: str) -> None:
+        """
+        Usuwa stację z sieci.
+
+        UWAGA: Nie usuwa elementów przypisanych do stacji,
+        tylko samą stację jako kontener.
+
+        Args:
+            station_id: ID stacji do usunięcia.
+
+        Raises:
+            ValueError: Gdy stacja o podanym ID nie istnieje.
+        """
+        if station_id not in self.stations:
+            raise ValueError(
+                f"Stacja o ID '{station_id}' nie istnieje w grafie."
+            )
+        del self.stations[station_id]
+
+    def get_station(self, station_id: str) -> Station:
+        """
+        Zwraca stację o podanym ID.
+
+        Args:
+            station_id: ID stacji.
+
+        Returns:
+            Obiekt Station.
+
+        Raises:
+            ValueError: Gdy stacja o podanym ID nie istnieje.
+        """
+        if station_id not in self.stations:
+            raise ValueError(
+                f"Stacja o ID '{station_id}' nie istnieje w grafie."
+            )
+        return self.stations[station_id]
+
+    def get_station_optional(self, station_id: str) -> Station | None:
+        """
+        Zwraca stację o podanym ID lub None jeśli nie istnieje.
+
+        Args:
+            station_id: ID stacji.
+
+        Returns:
+            Obiekt Station lub None.
+        """
+        return self.stations.get(station_id)
+
+    def list_stations(self) -> List[Station]:
+        """
+        Zwraca listę wszystkich stacji w sieci.
+
+        Returns:
+            Lista stacji posortowana deterministycznie po ID.
+        """
+        stations = list(self.stations.values())
+        stations.sort(key=lambda item: item.id)
+        return stations
+
+    def get_station_for_bus(self, bus_id: str) -> Station | None:
+        """
+        Znajduje stację zawierającą dany węzeł.
+
+        Args:
+            bus_id: ID węzła.
+
+        Returns:
+            Stacja zawierająca węzeł lub None jeśli nie znaleziono.
+
+        Notes:
+            Węzeł może należeć do maksymalnie jednej stacji.
+            Jeśli jest wiele stacji z tym węzłem, zwraca pierwszą
+            znalezioną (deterministycznie po ID stacji).
+        """
+        for station in sorted(self.stations.values(), key=lambda s: s.id):
+            if bus_id in station.bus_ids:
+                return station
+        return None
+
+    def get_station_for_element(self, element_id: str) -> Station | None:
+        """
+        Znajduje stację zawierającą dany element (bus, branch, switch).
+
+        Args:
+            element_id: ID elementu.
+
+        Returns:
+            Stacja zawierająca element lub None jeśli nie znaleziono.
+        """
+        for station in sorted(self.stations.values(), key=lambda s: s.id):
+            if station.contains(element_id):
+                return station
+        return None
+
     def get_slack_node(self) -> Node:
         """
         Zwraca jedyny węzeł SLACK w sieci.
@@ -652,5 +773,6 @@ class NetworkGraph:
             f"NetworkGraph(nodes={len(self.nodes)}, "
             f"branches={len(self.branches)}, "
             f"switches={len(self.switches)}, "
+            f"stations={len(self.stations)}, "
             f"connected={connected})"
         )

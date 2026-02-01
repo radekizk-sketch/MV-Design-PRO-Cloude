@@ -15,6 +15,7 @@ from .bus import Bus
 from .node import Node, NodeType
 from .branch import BranchType, Branch, LineBranch, TransformerBranch
 from .switch import Switch, SwitchType, SwitchState
+from .station import Station, StationType
 from .graph import NetworkGraph
 from .inverter import InverterSource
 from .snapshot import NetworkSnapshot, SnapshotMeta, create_network_snapshot
@@ -45,6 +46,9 @@ __all__ = [
     "Switch",
     "SwitchType",
     "SwitchState",
+    # Stations (logical containers - no physics)
+    "Station",
+    "StationType",
     # Network topology
     "NetworkGraph",
     # Sources

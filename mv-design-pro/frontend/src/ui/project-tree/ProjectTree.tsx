@@ -39,6 +39,8 @@ import { useTreeSelection } from '../selection/hooks';
 const TREE_NODE_ICONS: Record<TreeNodeType, string> = {
   PROJECT: '📁',
   NETWORK: '🔌',
+  STATION: '🏭',           // FIX-05: Station container icon
+  VOLTAGE_LEVEL: '⚡',     // FIX-05: Voltage level icon
   BUSES: '═══',
   LINES: '───',
   CABLES: '━━━',
@@ -66,6 +68,8 @@ const TREE_NODE_ICONS: Record<TreeNodeType, string> = {
 const TREE_NODE_LABELS: Record<TreeNodeType, string> = {
   PROJECT: 'Projekt',
   NETWORK: 'Sieć',
+  STATION: 'Stacja',          // FIX-05: Station label (or from station name)
+  VOLTAGE_LEVEL: 'Poziom napięcia',  // FIX-05: Voltage level label
   BUSES: 'Szyny',
   LINES: 'Linie',
   CABLES: 'Kable',
@@ -526,6 +530,8 @@ function TreeNodeComponent({
   const isElement = node.nodeType === 'ELEMENT';
   const isStudyCase = node.nodeType === 'STUDY_CASE';
   const isRunItem = node.nodeType === 'RUN_ITEM'; // P11c
+  const isStation = node.nodeType === 'STATION'; // FIX-05
+  const isVoltageLevel = node.nodeType === 'VOLTAGE_LEVEL'; // FIX-05
 
   // P10/P11c: Get appropriate icon for study case or run item (status-based)
   const getIcon = () => {
@@ -536,7 +542,10 @@ function TreeNodeComponent({
   };
 
   const icon = getIcon();
-  const label = isElement || isStudyCase || isRunItem ? node.label : TREE_NODE_LABELS[node.nodeType];
+  // FIX-05: Station and VoltageLevel use node.label (dynamic name)
+  const label = isElement || isStudyCase || isRunItem || isStation || isVoltageLevel
+    ? node.label
+    : TREE_NODE_LABELS[node.nodeType];
 
   // PROJECT_TREE_PARITY_V1: Deterministic data-testid for E2E testing
   const getTestId = (): string => {
@@ -548,6 +557,10 @@ function TreeNodeComponent({
     }
     if (isRunItem && node.runId) {
       return `tree-node-run-${node.runId}`;
+    }
+    // FIX-05: Station test ID
+    if (isStation && node.stationId) {
+      return `tree-node-station-${node.stationId}`;
     }
     return `tree-node-${node.id}`;
   };
