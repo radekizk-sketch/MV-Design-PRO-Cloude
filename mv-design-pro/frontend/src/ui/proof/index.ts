@@ -50,3 +50,37 @@ export {
   exportTracePdf,
   generateTracePdfHtml,
 } from './export';
+
+// Trace Comparison (v1)
+export {
+  // Types
+  type TraceDiffStatus,
+  type TraceDiffFilter,
+  type TraceFieldDiff,
+  type TraceDiffStep,
+  type TraceCompareMetadata,
+  type TraceDiffSummary,
+  type TraceComparisonResult,
+  type TraceDiffExport,
+  TRACE_DIFF_STATUS_LABELS,
+  TRACE_DIFF_STATUS_COLORS,
+  TRACE_DIFF_STATUS_BORDER,
+  TRACE_DIFF_FILTER_LABELS,
+  // Algorithm
+  generateStepKey,
+  diffTraces,
+  filterDiffSteps,
+  findChangeIndices,
+  findNextChange,
+  findPrevChange,
+  sortDiffStepsByImportance,
+  // Export
+  createDiffExport,
+  generateExportFilename,
+  downloadDiffJson,
+  copyDiffJsonToClipboard,
+  // Components
+  TraceDiffList,
+  TraceCompareView,
+  TraceComparePage,
+} from './compare';
