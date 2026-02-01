@@ -14,7 +14,7 @@
  * 100% POLISH UI
  */
 
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import type {
   ExportFormat,
   ExportScope,
@@ -32,6 +32,15 @@ import {
   PDF_ORIENTATION_LABELS_PL,
   DEFAULT_LAYER_OPTIONS,
 } from './types';
+import type { ExportPresetId } from './presets';
+import {
+  PRESET_OPTIONS,
+  PRESET_LABELS_PL,
+  readPersistedPreset,
+  persistPreset,
+  detectPresetFromLayers,
+  getPresetLayers,
+} from './presets';
 
 /**
  * Dialog props.
@@ -87,13 +96,70 @@ export const SldSnapshotExportDialog: React.FC<SldSnapshotExportDialogProps> = (
     ...DEFAULT_LAYER_OPTIONS,
     ...currentLayerState,
   }));
+  const [selectedPreset, setSelectedPreset] = useState<ExportPresetId>(() =>
+    readPersistedPreset()
+  );
 
-  // Update layer option
-  const handleLayerChange = useCallback(
-    (key: keyof ExportLayerOptions, value: boolean) => {
-      setLayers((prev) => ({ ...prev, [key]: value }));
+  // Layer availability
+  const layerAvailability = useMemo(
+    () => ({
+      include_legend: true,
+      include_results_overlay: hasResultsOverlay,
+      include_diagnostics_overlay: hasDiagnosticsOverlay,
+      include_energization_layer: true,
+      include_measurement_labels: true,
+    }),
+    [hasResultsOverlay, hasDiagnosticsOverlay]
+  );
+
+  // Apply preset layers on preset change
+  const handlePresetChange = useCallback(
+    (presetId: ExportPresetId) => {
+      setSelectedPreset(presetId);
+      persistPreset(presetId);
+
+      // Apply preset layers if not CUSTOM
+      const presetLayers = getPresetLayers(presetId);
+      if (presetLayers) {
+        setLayers((prev) => ({
+          ...prev,
+          ...presetLayers,
+        }));
+      }
     },
     []
+  );
+
+  // Initialize layers from selected preset on dialog open
+  useEffect(() => {
+    if (isOpen && selectedPreset !== 'CUSTOM') {
+      const presetLayers = getPresetLayers(selectedPreset);
+      if (presetLayers) {
+        setLayers((prev) => ({
+          ...prev,
+          ...presetLayers,
+        }));
+      }
+    }
+    // Only run when dialog opens
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen]);
+
+  // Update layer option — switches to CUSTOM if manual change
+  const handleLayerChange = useCallback(
+    (key: keyof ExportLayerOptions, value: boolean) => {
+      setLayers((prev) => {
+        const newLayers = { ...prev, [key]: value };
+        // Detect if still matches a preset
+        const detectedPreset = detectPresetFromLayers(newLayers, layerAvailability);
+        if (detectedPreset !== selectedPreset) {
+          setSelectedPreset(detectedPreset);
+          persistPreset(detectedPreset);
+        }
+        return newLayers;
+      });
+    },
+    [layerAvailability, selectedPreset]
   );
 
   // Handle export
@@ -107,18 +173,6 @@ export const SldSnapshotExportDialog: React.FC<SldSnapshotExportDialogProps> = (
 
     await onExport(format, options);
   }, [format, pngScale, pdfPageSize, pdfOrientation, scope, layers, onExport]);
-
-  // Layer availability
-  const layerAvailability = useMemo(
-    () => ({
-      include_legend: true,
-      include_results_overlay: hasResultsOverlay,
-      include_diagnostics_overlay: hasDiagnosticsOverlay,
-      include_energization_layer: true,
-      include_measurement_labels: true,
-    }),
-    [hasResultsOverlay, hasDiagnosticsOverlay]
-  );
 
   if (!isOpen) return null;
 
@@ -162,6 +216,30 @@ export const SldSnapshotExportDialog: React.FC<SldSnapshotExportDialogProps> = (
 
         {/* Content */}
         <div className="px-6 py-4 space-y-5">
+          {/* View preset selection */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Profil widoku
+            </label>
+            <select
+              value={selectedPreset}
+              onChange={(e) => handlePresetChange(e.target.value as ExportPresetId)}
+              className="w-full px-3 py-2 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+              data-testid="sld-export-preset"
+            >
+              {PRESET_OPTIONS.map((preset) => (
+                <option key={preset.id} value={preset.id}>
+                  {PRESET_LABELS_PL[preset.id]}
+                </option>
+              ))}
+            </select>
+            {selectedPreset !== 'CUSTOM' && (
+              <p className="mt-1 text-xs text-gray-500">
+                {PRESET_OPTIONS.find((p) => p.id === selectedPreset)?.description}
+              </p>
+            )}
+          </div>
+
           {/* Format selection */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
