@@ -12,18 +12,27 @@
  * - Prawy panel: Metadane (TraceMetadataPanel) - kontekst, statystyki
  *
  * FEATURES:
- * - Wyszukiwanie w obrębie śladu (client-side)
+ * - Wyszukiwanie pełnotekstowe (client-side, deterministyczne)
+ * - Filtry po fazie i "tylko problemy"
+ * - Nawigacja wyników (prev/next)
  * - Deterministyczne sortowanie kroków
  * - 100% Polish UI
  *
  * NOTE: Nazwy kodowe (P11, P14, P17) NIGDY nie są pokazywane w UI.
  */
 
-import { useState, useCallback, useMemo } from 'react';
+import { useState, useCallback, useMemo, useRef, useEffect } from 'react';
 import type { ExtendedTrace, TraceStep } from '../results-inspector/types';
 import { TraceToc } from './TraceToc';
 import { TraceStepView, TraceStepViewEmpty } from './TraceStepView';
-import { TraceMetadataPanel, TraceMetadataPanelEmpty } from './TraceMetadataPanel';
+import { TraceMetadataPanel } from './TraceMetadataPanel';
+import { TraceSearchBar } from './search/TraceSearchBar';
+import {
+  searchTraceSteps,
+  hasValidationSteps,
+  getAvailablePhases,
+  type TraceFilterOptions,
+} from './search/traceSearch';
 
 // =============================================================================
 // Types
@@ -58,43 +67,6 @@ function sortSteps(steps: TraceStep[]): TraceStep[] {
 // =============================================================================
 // Sub-Components
 // =============================================================================
-
-interface SearchBarProps {
-  value: string;
-  onChange: (value: string) => void;
-}
-
-function SearchBar({ value, onChange }: SearchBarProps) {
-  return (
-    <div className="relative">
-      <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
-        <svg
-          className="h-4 w-4 text-slate-400"
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-          aria-hidden="true"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-          />
-        </svg>
-      </div>
-      <input
-        type="search"
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        placeholder="Szukaj w śladzie obliczeń..."
-        aria-label="Szukaj w śladzie obliczeń"
-        data-testid="trace-search-input"
-        className="w-full rounded-md border border-slate-200 bg-white py-2 pl-10 pr-4 text-sm placeholder:text-slate-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-      />
-    </div>
-  );
-}
 
 function LoadingState() {
   return (
@@ -142,10 +114,30 @@ function EmptyState() {
 
 export function TraceViewer({ trace }: TraceViewerProps) {
   const [searchQuery, setSearchQuery] = useState('');
+  const [filters, setFilters] = useState<TraceFilterOptions>({
+    phase: null,
+    onlyProblems: false,
+  });
   const [selectedStepIndex, setSelectedStepIndex] = useState<number | null>(null);
+  const [activeResultIndex, setActiveResultIndex] = useState(0);
+
+  // Ref do przewijania
+  const tocRef = useRef<HTMLDivElement>(null);
 
   // Sortuj kroki deterministycznie
   const sortedSteps = useMemo(() => sortSteps(trace.white_box_trace), [trace.white_box_trace]);
+
+  // Wyszukaj kroki (deterministycznie)
+  const searchResults = useMemo(
+    () => searchTraceSteps(sortedSteps, searchQuery, filters),
+    [sortedSteps, searchQuery, filters]
+  );
+
+  // Dostępne fazy do filtrowania
+  const availablePhases = useMemo(() => getAvailablePhases(sortedSteps), [sortedSteps]);
+
+  // Czy pokazać filtr "tylko problemy"
+  const showProblemsFilter = useMemo(() => hasValidationSteps(sortedSteps), [sortedSteps]);
 
   // Pobierz wybrany krok
   const selectedStep = useMemo(() => {
@@ -153,14 +145,41 @@ export function TraceViewer({ trace }: TraceViewerProps) {
     return sortedSteps[selectedStepIndex] ?? null;
   }, [sortedSteps, selectedStepIndex]);
 
+  // Resetuj aktywny wynik gdy zmienia się query lub filtry
+  useEffect(() => {
+    setActiveResultIndex(0);
+  }, [searchQuery, filters]);
+
   // Handler wyboru kroku
   const handleSelectStep = useCallback((index: number) => {
     setSelectedStepIndex(index);
   }, []);
 
-  // Wyczyść wyszukiwanie
-  const handleClearSearch = useCallback(() => {
-    setSearchQuery('');
+  // Handler nawigacji do wyniku wyszukiwania
+  const handleNavigateToResult = useCallback(
+    (resultIndex: number) => {
+      if (resultIndex < 0 || resultIndex >= searchResults.length) return;
+
+      setActiveResultIndex(resultIndex);
+      const match = searchResults[resultIndex];
+      setSelectedStepIndex(match.stepIndex);
+
+      // Przewiń do kroku w TOC
+      if (tocRef.current) {
+        const stepElement = tocRef.current.querySelector(
+          `[data-testid="trace-toc-step-${match.stepIndex}"]`
+        );
+        if (stepElement) {
+          stepElement.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+      }
+    },
+    [searchResults]
+  );
+
+  // Handler zmiany filtrów
+  const handleFiltersChange = useCallback((newFilters: TraceFilterOptions) => {
+    setFilters(newFilters);
   }, []);
 
   // Sprawdź czy są kroki do wyświetlenia
@@ -173,19 +192,16 @@ export function TraceViewer({ trace }: TraceViewerProps) {
       className="flex flex-col h-full bg-slate-50"
       data-testid="trace-viewer"
     >
-      {/* Header z wyszukiwarką */}
+      {/* Header z wyszukiwarką i filtrami */}
       <header className="flex-shrink-0 border-b border-slate-200 bg-white px-4 py-3">
-        <div className="flex items-center justify-between gap-4">
+        <div className="flex items-center justify-between gap-4 mb-3">
           <div>
             <h2 className="text-lg font-semibold text-slate-900">
               Ślad obliczeń
             </h2>
             <p className="text-sm text-slate-500">
-              {sortedSteps.length} kroków obliczeniowych
+              {searchResults.length} z {sortedSteps.length} kroków
             </p>
-          </div>
-          <div className="flex-1 max-w-md">
-            <SearchBar value={searchQuery} onChange={setSearchQuery} />
           </div>
           <div className="flex-shrink-0">
             <span className="inline-flex items-center rounded bg-amber-50 px-2 py-1 text-xs font-medium text-amber-700 ring-1 ring-inset ring-amber-600/20">
@@ -193,17 +209,34 @@ export function TraceViewer({ trace }: TraceViewerProps) {
             </span>
           </div>
         </div>
+        <TraceSearchBar
+          query={searchQuery}
+          onQueryChange={setSearchQuery}
+          filters={filters}
+          onFiltersChange={handleFiltersChange}
+          results={searchResults}
+          activeResultIndex={activeResultIndex}
+          onNavigateToResult={handleNavigateToResult}
+          availablePhases={availablePhases}
+          showProblemsFilter={showProblemsFilter}
+        />
       </header>
 
       {/* 3-panelowy układ */}
       <div className="flex-1 grid grid-cols-1 lg:grid-cols-12 min-h-0">
         {/* Lewy panel: Spis treści */}
-        <div className="lg:col-span-3 border-r border-slate-200 bg-white overflow-hidden">
+        <div
+          ref={tocRef}
+          className="lg:col-span-3 border-r border-slate-200 bg-white overflow-hidden"
+        >
           <TraceToc
             steps={sortedSteps}
             selectedStepIndex={selectedStepIndex}
             onSelectStep={handleSelectStep}
             searchQuery={searchQuery}
+            filters={filters}
+            searchResults={searchResults}
+            activeResultIndex={activeResultIndex}
           />
         </div>
 
