@@ -53,8 +53,8 @@ class PowerFlowNewtonSolution:
     pv_to_pq_switches: list[dict[str, object]]
     # P20a: Initial state for white-box trace (V0, θ0)
     init_state: dict[str, dict[str, float]] | None = None
-    # FIX-08b: Solver method identifier for trace clarity
-    solver_method: Literal["newton-raphson", "gauss-seidel"] = "newton-raphson"
+    # FIX-08b/FIX-09: Solver method identifier for trace clarity
+    solver_method: Literal["newton-raphson", "gauss-seidel", "fast-decoupled"] = "newton-raphson"
     # FIX-08b: Fallback information (if GS fell back to NR)
     fallback_info: dict[str, str] | None = None
 
