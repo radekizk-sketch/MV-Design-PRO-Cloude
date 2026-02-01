@@ -146,30 +146,99 @@ export const TEST_SHORT_CIRCUIT_RESULTS = {
 };
 
 // =============================================================================
-// Proof/Trace Fixtures
+// Proof/Trace Fixtures (Ślad obliczeń)
 // =============================================================================
 
+/**
+ * Extended trace fixture with full WhiteBoxStep structure.
+ * Matches backend tracer.py structure.
+ *
+ * NOTE: No P11/P14/P17 codenames in UI-visible content.
+ */
 export const TEST_EXTENDED_TRACE = {
+  run_id: TEST_RUN.id,
   snapshot_id: TEST_SNAPSHOT.id,
   input_hash: 'abc123def456789012345678901234567890',
   white_box_trace: [
     {
       step: 1,
+      key: 'init_voltage',
+      title: 'Inicjalizacja napięcia znamionowego',
       phase: 'INITIALIZATION',
-      description: 'Inicjalizacja danych wejściowych',
-      equation_id: 'EQ_INIT_001',
+      formula_latex: 'U_n = \\text{napięcie znamionowe sieci}',
+      inputs: {
+        un_kv: { value: 110, unit: 'kV', label: 'Napięcie znamionowe' },
+        c_factor: { value: 1.1, unit: '', label: 'Współczynnik napięciowy c' },
+      },
+      substitution: 'U_n = 110 kV, c = 1.1',
+      result: {
+        c_un_kv: { value: 121, unit: 'kV', label: 'Napięcie źródłowe' },
+      },
+      notes: 'Wartość współczynnika c zgodna z IEC 60909 dla zwarcia maksymalnego',
     },
     {
       step: 2,
+      key: 'calc_z_thevenin',
+      title: 'Obliczenie impedancji Thevenina w punkcie zwarcia',
       phase: 'CALCULATION',
-      description: 'Obliczenie impedancji zastępczej',
-      equation_id: 'EQ_Z_001',
+      formula_latex: 'Z_{th} = \\sqrt{R_{th}^2 + X_{th}^2}',
+      inputs: {
+        r_ohm: { value: 0.5, unit: 'Ω', label: 'Rezystancja' },
+        x_ohm: { value: 2.5, unit: 'Ω', label: 'Reaktancja' },
+      },
+      substitution: 'Z_{th} = √(0.5² + 2.5²) = √(0.25 + 6.25) = √6.5',
+      result: {
+        z_thevenin_ohm: { value: 2.55, unit: 'Ω', label: 'Impedancja Thevenina' },
+      },
+      notes: 'Impedancja wyznaczona metodą składowych symetrycznych',
     },
     {
       step: 3,
+      key: 'calc_ikss',
+      title: 'Obliczenie początkowego prądu zwarciowego symetrycznego Ik"',
       phase: 'CALCULATION',
-      description: 'Obliczenie prądu zwarciowego Ik"',
-      equation_id: 'EQ_IK_001',
+      formula_latex: "I_k'' = \\frac{c \\cdot U_n}{\\sqrt{3} \\cdot Z_{th}}",
+      inputs: {
+        c_un_kv: { value: 121, unit: 'kV', label: 'Napięcie źródłowe' },
+        z_thevenin_ohm: { value: 2.55, unit: 'Ω', label: 'Impedancja Thevenina' },
+      },
+      substitution: "I_k'' = (121 × 10³) / (√3 × 2.55) = 121000 / 4.42",
+      result: {
+        ikss_ka: { value: 27.38, unit: 'kA', label: 'Prąd zwarciowy początkowy' },
+      },
+      notes: 'Prąd zwarciowy trójfazowy symetryczny wg IEC 60909',
+    },
+    {
+      step: 4,
+      key: 'calc_ip',
+      title: 'Obliczenie prądu udarowego ip',
+      phase: 'CALCULATION',
+      formula_latex: "i_p = \\kappa \\cdot \\sqrt{2} \\cdot I_k''",
+      inputs: {
+        ikss_ka: { value: 27.38, unit: 'kA', label: 'Prąd zwarciowy początkowy' },
+        kappa: { value: 1.8, unit: '', label: 'Współczynnik κ' },
+      },
+      substitution: 'i_p = 1.8 × √2 × 27.38 = 1.8 × 1.414 × 27.38',
+      result: {
+        ip_ka: { value: 69.68, unit: 'kA', label: 'Prąd udarowy' },
+      },
+      notes: 'Współczynnik κ wyznaczony z R/X sieci',
+    },
+    {
+      step: 5,
+      key: 'calc_sk',
+      title: 'Obliczenie mocy zwarciowej',
+      phase: 'OUTPUT',
+      formula_latex: "S_k'' = \\sqrt{3} \\cdot U_n \\cdot I_k''",
+      inputs: {
+        un_kv: { value: 110, unit: 'kV', label: 'Napięcie znamionowe' },
+        ikss_ka: { value: 27.38, unit: 'kA', label: 'Prąd zwarciowy początkowy' },
+      },
+      substitution: "S_k'' = √3 × 110 × 27.38 = 1.732 × 110 × 27.38",
+      result: {
+        sk_mva: { value: 5216.5, unit: 'MVA', label: 'Moc zwarciowa' },
+      },
+      notes: 'Moc zwarciowa w punkcie wspólnego przyłączenia (PCC)',
     },
   ],
 };

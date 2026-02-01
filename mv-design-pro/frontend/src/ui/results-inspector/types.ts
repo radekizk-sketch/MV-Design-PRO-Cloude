@@ -150,17 +150,100 @@ export interface ShortCircuitResults {
 
 /**
  * Single trace step.
+ *
+ * Matches backend WhiteBoxStep structure from network_model/whitebox/tracer.py
+ * Polish labels in UI:
+ * - title → Opis kroku
+ * - formula_latex → Wzór
+ * - inputs → Dane wejściowe
+ * - substitution → Podstawienie
+ * - result → Wynik
+ * - notes → Uwagi
  */
 export interface TraceStep {
+  /** Unique key for the step (internal) */
+  key?: string;
+  /** Step index (1-based for display) */
+  step?: number;
+  /** Human-readable step title (Polish) */
+  title?: string;
+  /** LaTeX formula for the calculation */
+  formula_latex?: string;
+  /** Input values with units */
+  inputs?: Record<string, TraceValue>;
+  /** Substitution string (formula with values) */
+  substitution?: string;
+  /** Result values with units */
+  result?: Record<string, TraceValue>;
+  /** Additional notes or references */
+  notes?: string;
+  /** Legacy fields for backward compatibility */
   step_id?: string;
   phase?: string;
   description?: string;
   equation_id?: string;
-  inputs?: Record<string, unknown>;
   output?: unknown;
   timestamp?: string;
   [key: string]: unknown;
 }
+
+/**
+ * Trace value with unit and optional label.
+ */
+export interface TraceValue {
+  value: number | string | boolean | null;
+  unit?: string;
+  label?: string;
+}
+
+/**
+ * Polish labels for trace step fields.
+ */
+export const TRACE_FIELD_LABELS: Record<string, string> = {
+  key: 'Identyfikator',
+  step: 'Numer kroku',
+  title: 'Opis',
+  formula_latex: 'Wzór',
+  inputs: 'Dane wejściowe',
+  substitution: 'Podstawienie',
+  result: 'Wynik',
+  notes: 'Uwagi',
+  phase: 'Faza',
+  description: 'Opis',
+  equation_id: 'Równanie',
+};
+
+/**
+ * Polish labels for common trace value keys.
+ */
+export const TRACE_VALUE_LABELS: Record<string, string> = {
+  // Impedance
+  z_thevenin_ohm: 'Impedancja Thevenina',
+  r_ohm: 'Rezystancja',
+  x_ohm: 'Reaktancja',
+  z_ohm: 'Impedancja',
+  // Currents
+  ikss_ka: 'Prąd zwarciowy początkowy Ik"',
+  ip_ka: 'Prąd udarowy ip',
+  ith_ka: 'Prąd cieplny Ith',
+  i_a: 'Prąd',
+  // Voltages
+  un_kv: 'Napięcie znamionowe',
+  u_kv: 'Napięcie',
+  u_pu: 'Napięcie (j.w.)',
+  c_factor: 'Współczynnik napięciowy c',
+  // Power
+  sk_mva: 'Moc zwarciowa Sk"',
+  p_mw: 'Moc czynna',
+  q_mvar: 'Moc bierna',
+  s_mva: 'Moc pozorna',
+  // Grid
+  pcc: 'Punkt wspólnego przyłączenia (PCC)',
+  // Other
+  kappa: 'Współczynnik κ',
+  m_factor: 'Współczynnik m',
+  n_factor: 'Współczynnik n',
+};
 
 /**
  * Extended trace with run context.
