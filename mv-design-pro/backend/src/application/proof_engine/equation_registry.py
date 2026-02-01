@@ -1362,6 +1362,265 @@ EQ_EARTH_003 = EquationDefinition(
 
 
 # =============================================================================
+# P14: Power Flow Verification — Kanoniczne równania (BINDING)
+# =============================================================================
+
+EQ_PF_001 = EquationDefinition(
+    equation_id="EQ_PF_001",
+    name_pl="Kryterium zbieżności Power Flow",
+    standard_ref="Newton-Raphson method",
+    latex=r"\text{converged} = \left(\max(|\Delta P|, |\Delta Q|) < \epsilon\right)",
+    symbols=(
+        SymbolDefinition(
+            symbol=r"\text{converged}",
+            unit="—",
+            description_pl="Status zbieżności",
+            mapping_key="converged",
+        ),
+        SymbolDefinition(
+            symbol=r"\max(|\Delta P|, |\Delta Q|)",
+            unit="p.u.",
+            description_pl="Maksymalny mismatch",
+            mapping_key="max_mismatch_pu",
+        ),
+        SymbolDefinition(
+            symbol=r"\epsilon",
+            unit="p.u.",
+            description_pl="Tolerancja zbieżności",
+            mapping_key="tolerance",
+        ),
+    ),
+    unit_derivation="p.u. < p.u. → —",
+    notes="Solver osiąga zbieżność gdy maksymalny mismatch jest mniejszy od tolerancji.",
+)
+
+EQ_PF_002 = EquationDefinition(
+    equation_id="EQ_PF_002",
+    name_pl="Bilans mocy czynnej",
+    standard_ref="Power Flow equations",
+    latex=r"\sum P_{gen} = \sum P_{load} + P_{losses}",
+    symbols=(
+        SymbolDefinition(
+            symbol=r"\sum P_{gen}",
+            unit="MW",
+            description_pl="Suma mocy generowanej",
+            mapping_key="p_gen_total_mw",
+        ),
+        SymbolDefinition(
+            symbol=r"\sum P_{load}",
+            unit="MW",
+            description_pl="Suma mocy pobieranej",
+            mapping_key="p_load_total_mw",
+        ),
+        SymbolDefinition(
+            symbol="P_{losses}",
+            unit="MW",
+            description_pl="Straty mocy czynnej",
+            mapping_key="p_losses_total_mw",
+        ),
+    ),
+    unit_derivation="MW = MW + MW",
+    notes="Weryfikacja bilansu mocy czynnej w sieci.",
+)
+
+EQ_PF_003 = EquationDefinition(
+    equation_id="EQ_PF_003",
+    name_pl="Bilans mocy biernej",
+    standard_ref="Power Flow equations",
+    latex=r"\sum Q_{gen} = \sum Q_{load} + Q_{losses}",
+    symbols=(
+        SymbolDefinition(
+            symbol=r"\sum Q_{gen}",
+            unit="Mvar",
+            description_pl="Suma mocy biernej generowanej",
+            mapping_key="q_gen_total_mvar",
+        ),
+        SymbolDefinition(
+            symbol=r"\sum Q_{load}",
+            unit="Mvar",
+            description_pl="Suma mocy biernej pobieranej",
+            mapping_key="q_load_total_mvar",
+        ),
+        SymbolDefinition(
+            symbol="Q_{losses}",
+            unit="Mvar",
+            description_pl="Straty mocy biernej",
+            mapping_key="q_losses_total_mvar",
+        ),
+    ),
+    unit_derivation="Mvar = Mvar + Mvar",
+    notes="Weryfikacja bilansu mocy biernej w sieci.",
+)
+
+EQ_PF_004 = EquationDefinition(
+    equation_id="EQ_PF_004",
+    name_pl="Weryfikacja zakresu napięć",
+    standard_ref="praktyka inżynierska",
+    latex=r"U_{min} \le U_i \le U_{max}",
+    symbols=(
+        SymbolDefinition(
+            symbol="U_{min}",
+            unit="p.u.",
+            description_pl="Minimalne napięcie w sieci",
+            mapping_key="v_min_pu",
+        ),
+        SymbolDefinition(
+            symbol="U_{max}",
+            unit="p.u.",
+            description_pl="Maksymalne napięcie w sieci",
+            mapping_key="v_max_pu",
+        ),
+        SymbolDefinition(
+            symbol="U_i",
+            unit="p.u.",
+            description_pl="Napięcie w węźle i",
+            mapping_key="v_pu",
+        ),
+    ),
+    unit_derivation="p.u. ≤ p.u. ≤ p.u. → —",
+    notes="Weryfikacja czy napięcia mieszczą się w dopuszczalnym zakresie.",
+)
+
+
+# =============================================================================
+# P16: Losses Proof — Kanoniczne równania (BINDING)
+# =============================================================================
+
+EQ_LOSS_001 = EquationDefinition(
+    equation_id="EQ_LOSS_001",
+    name_pl="Straty mocy czynnej na gałęzi",
+    standard_ref="Power Flow equations",
+    latex=r"P_{loss,ij} = P_{from,ij} + P_{to,ij}",
+    symbols=(
+        SymbolDefinition(
+            symbol="P_{loss,ij}",
+            unit="MW",
+            description_pl="Straty mocy czynnej na gałęzi",
+            mapping_key="p_loss_mw",
+        ),
+        SymbolDefinition(
+            symbol="P_{from,ij}",
+            unit="MW",
+            description_pl="Moc czynna wchodząca",
+            mapping_key="p_from_mw",
+        ),
+        SymbolDefinition(
+            symbol="P_{to,ij}",
+            unit="MW",
+            description_pl="Moc czynna wychodząca",
+            mapping_key="p_to_mw",
+        ),
+    ),
+    unit_derivation="MW + MW = MW",
+    notes="Straty jako różnica mocy wchodzącej i wychodzącej.",
+)
+
+EQ_LOSS_002 = EquationDefinition(
+    equation_id="EQ_LOSS_002",
+    name_pl="Straty mocy biernej na gałęzi",
+    standard_ref="Power Flow equations",
+    latex=r"Q_{loss,ij} = Q_{from,ij} + Q_{to,ij}",
+    symbols=(
+        SymbolDefinition(
+            symbol="Q_{loss,ij}",
+            unit="Mvar",
+            description_pl="Straty mocy biernej na gałęzi",
+            mapping_key="q_loss_mvar",
+        ),
+        SymbolDefinition(
+            symbol="Q_{from,ij}",
+            unit="Mvar",
+            description_pl="Moc bierna wchodząca",
+            mapping_key="q_from_mvar",
+        ),
+        SymbolDefinition(
+            symbol="Q_{to,ij}",
+            unit="Mvar",
+            description_pl="Moc bierna wychodząca",
+            mapping_key="q_to_mvar",
+        ),
+    ),
+    unit_derivation="Mvar + Mvar = Mvar",
+    notes="Straty mocy biernej na gałęzi.",
+)
+
+EQ_LOSS_003 = EquationDefinition(
+    equation_id="EQ_LOSS_003",
+    name_pl="Suma strat mocy czynnej w sieci",
+    standard_ref="Power Flow equations",
+    latex=r"P_{losses,total} = \sum_{ij} P_{loss,ij}",
+    symbols=(
+        SymbolDefinition(
+            symbol="P_{losses,total}",
+            unit="MW",
+            description_pl="Całkowite straty mocy czynnej",
+            mapping_key="p_losses_total_mw",
+        ),
+        SymbolDefinition(
+            symbol="P_{loss,ij}",
+            unit="MW",
+            description_pl="Straty na gałęzi ij",
+            mapping_key="p_loss_mw",
+        ),
+    ),
+    unit_derivation="Σ MW = MW",
+    notes="Suma strat na wszystkich gałęziach.",
+)
+
+EQ_LOSS_004 = EquationDefinition(
+    equation_id="EQ_LOSS_004",
+    name_pl="Suma strat mocy biernej w sieci",
+    standard_ref="Power Flow equations",
+    latex=r"Q_{losses,total} = \sum_{ij} Q_{loss,ij}",
+    symbols=(
+        SymbolDefinition(
+            symbol="Q_{losses,total}",
+            unit="Mvar",
+            description_pl="Całkowite straty mocy biernej",
+            mapping_key="q_losses_total_mvar",
+        ),
+        SymbolDefinition(
+            symbol="Q_{loss,ij}",
+            unit="Mvar",
+            description_pl="Straty na gałęzi ij",
+            mapping_key="q_loss_mvar",
+        ),
+    ),
+    unit_derivation="Σ Mvar = Mvar",
+    notes="Suma strat mocy biernej na wszystkich gałęziach.",
+)
+
+EQ_LOSS_005 = EquationDefinition(
+    equation_id="EQ_LOSS_005",
+    name_pl="Procent strat mocy czynnej",
+    standard_ref="praktyka inżynierska",
+    latex=r"\eta_{P} = 100 \cdot \frac{P_{losses}}{P_{gen}}",
+    symbols=(
+        SymbolDefinition(
+            symbol=r"\eta_{P}",
+            unit="%",
+            description_pl="Procentowe straty mocy czynnej",
+            mapping_key="p_loss_percent",
+        ),
+        SymbolDefinition(
+            symbol="P_{losses}",
+            unit="MW",
+            description_pl="Straty mocy czynnej",
+            mapping_key="p_losses_total_mw",
+        ),
+        SymbolDefinition(
+            symbol="P_{gen}",
+            unit="MW",
+            description_pl="Moc generowana",
+            mapping_key="p_gen_total_mw",
+        ),
+    ),
+    unit_derivation="100 · MW / MW = %",
+    notes="Procentowe straty względem mocy generowanej.",
+)
+
+
+# =============================================================================
 # Q(U) Regulation — Kanoniczne równania (BINDING) P11.1b
 # =============================================================================
 
@@ -2027,6 +2286,23 @@ LE_EQUATIONS: dict[str, EquationDefinition] = {
     "EQ_LE_004": EQ_LE_004,
 }
 
+# P14: Power Flow Verification equations registry
+PF_EQUATIONS: dict[str, EquationDefinition] = {
+    "EQ_PF_001": EQ_PF_001,
+    "EQ_PF_002": EQ_PF_002,
+    "EQ_PF_003": EQ_PF_003,
+    "EQ_PF_004": EQ_PF_004,
+}
+
+# P16: Losses Proof equations registry
+LOSS_EQUATIONS: dict[str, EquationDefinition] = {
+    "EQ_LOSS_001": EQ_LOSS_001,
+    "EQ_LOSS_002": EQ_LOSS_002,
+    "EQ_LOSS_003": EQ_LOSS_003,
+    "EQ_LOSS_004": EQ_LOSS_004,
+    "EQ_LOSS_005": EQ_LOSS_005,
+}
+
 # P18: Protection Overcurrent & Selectivity equations registry
 PR_EQUATIONS: dict[str, EquationDefinition] = {
     "EQ_PR_001": EQ_PR_001,
@@ -2113,6 +2389,23 @@ LE_STEP_ORDER: list[str] = [
     "EQ_LE_004",  # E_loss = P_loss * t (wariant stały)
 ]
 
+# Step order for P14: Power Flow Verification (BINDING)
+PF_STEP_ORDER: list[str] = [
+    "EQ_PF_001",  # Kryterium zbieżności
+    "EQ_PF_002",  # Bilans mocy czynnej
+    "EQ_PF_003",  # Bilans mocy biernej
+    "EQ_PF_004",  # Weryfikacja zakresu napięć
+]
+
+# Step order for P16: Losses Proof (BINDING)
+LOSS_STEP_ORDER: list[str] = [
+    "EQ_LOSS_001",  # Straty P na gałęzi
+    "EQ_LOSS_002",  # Straty Q na gałęzi
+    "EQ_LOSS_003",  # Suma strat P
+    "EQ_LOSS_004",  # Suma strat Q
+    "EQ_LOSS_005",  # Procent strat P
+]
+
 # Step order for P18 (BINDING)
 PR_STEP_ORDER: list[str] = [
     "EQ_PR_001",  # Warunek wyłączalności
@@ -2172,6 +2465,8 @@ FROZEN_IDS: dict[str, list[str]] = {
     "le_equations": list(LE_EQUATIONS.keys()),
     "pr_equations": list(PR_EQUATIONS.keys()),
     "earth_equations": list(EARTH_EQUATIONS.keys()),
+    "pf_equations": list(PF_EQUATIONS.keys()),
+    "loss_equations": list(LOSS_EQUATIONS.keys()),
     "mapping_keys": [
         # SC3F
         "ikss_ka", "ip_ka", "ith_ka", "idyn_ka", "sk_mva",
@@ -2202,6 +2497,14 @@ FROZEN_IDS: dict[str, list[str]] = {
         "selectivity_margin_setting_s",
         # P19
         "u0_v", "z_e_ohm", "i_earth_a", "i_u_a", "i_p_a", "r_u_ohm", "u_touch_v",
+        # P14 (Power Flow)
+        "converged", "max_mismatch_pu", "tolerance",
+        "p_gen_total_mw", "p_load_total_mw", "p_losses_total_mw",
+        "q_gen_total_mvar", "q_load_total_mvar", "q_losses_total_mvar",
+        "v_min_pu", "v_max_pu",
+        # P16 (Losses)
+        "p_loss_mw", "q_loss_mvar", "p_from_mw", "p_to_mw",
+        "q_from_mvar", "q_to_mvar", "p_loss_percent",
     ],
 }
 
@@ -2216,6 +2519,8 @@ registry.merge(EARTH_EQUATIONS)
 registry.merge(QU_EQUATIONS)
 registry.merge(SC1_EQUATIONS)
 registry.merge(LS_EQUATIONS)
+registry.merge(PF_EQUATIONS)
+registry.merge(LOSS_EQUATIONS)
 registry.freeze()
 
 
@@ -2316,6 +2621,26 @@ class EquationRegistry:
     def get_sc1_equations(cls) -> dict[str, EquationDefinition]:
         """Zwraca wszystkie równania SC1 (P11.1c)."""
         return SC1_EQUATIONS.copy()
+
+    @classmethod
+    def get_pf_equations(cls) -> dict[str, EquationDefinition]:
+        """Zwraca wszystkie równania P14 (Power Flow Verification)."""
+        return PF_EQUATIONS.copy()
+
+    @classmethod
+    def get_pf_step_order(cls) -> list[str]:
+        """Zwraca kolejność kroków dla dowodu P14."""
+        return PF_STEP_ORDER.copy()
+
+    @classmethod
+    def get_loss_equations(cls) -> dict[str, EquationDefinition]:
+        """Zwraca wszystkie równania P16 (Losses Proof)."""
+        return LOSS_EQUATIONS.copy()
+
+    @classmethod
+    def get_loss_step_order(cls) -> list[str]:
+        """Zwraca kolejność kroków dla dowodu P16."""
+        return LOSS_STEP_ORDER.copy()
 
     @classmethod
     def get_sc1_step_order(cls, fault_type: str) -> list[str]:
