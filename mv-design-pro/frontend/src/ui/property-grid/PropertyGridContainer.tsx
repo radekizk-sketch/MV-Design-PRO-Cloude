@@ -21,6 +21,7 @@ import { useState, useCallback } from 'react';
 import { PropertyGrid } from './PropertyGrid';
 import { PropertyGridMultiEdit } from './PropertyGridMultiEdit';
 import { TypePicker } from '../catalog/TypePicker';
+import { DiagnosticsSection } from '../inspector/DiagnosticsSection';
 import { useMultiSelection } from '../selection';
 import {
   assignTypeToBranch,
@@ -211,16 +212,25 @@ export function PropertyGridContainer({
 
       {/* Single-Edit Mode (N = 1, legacy) */}
       {isSingleMode && (
-        <PropertyGrid
-          elementId={elementId!}
-          elementType={elementType!}
-          elementName={elementName!}
-          elementData={elementData}
-          validationMessages={validationMessages}
-          onFieldChange={onFieldChange}
-          onAssignType={handleAssignType}
-          onClearType={handleClearType}
-        />
+        <>
+          <PropertyGrid
+            elementId={elementId!}
+            elementType={elementType!}
+            elementName={elementName!}
+            elementData={elementData}
+            validationMessages={validationMessages}
+            onFieldChange={onFieldChange}
+            onAssignType={handleAssignType}
+            onClearType={handleClearType}
+          />
+
+          {/* Diagnostics Section (reuse from #238) - shows protection sanity results */}
+          <DiagnosticsSection
+            elementId={elementId}
+            defaultCollapsed={false}
+            className="mt-4"
+          />
+        </>
       )}
 
       {/* No selection */}
