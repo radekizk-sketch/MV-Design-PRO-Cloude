@@ -363,9 +363,9 @@ describe('Export PDF', () => {
   it('does not contain codenames in PDF output', () => {
     const html = generateTracePdfHtml(mockExtendedTrace);
 
-    expect(html).not.toContain('P11');
-    expect(html).not.toContain('P14');
-    expect(html).not.toContain('P17');
+    expect(html).not.toContain('P11'); // no-codenames-ignore
+    expect(html).not.toContain('P14'); // no-codenames-ignore
+    expect(html).not.toContain('P17'); // no-codenames-ignore
     expect(html).not.toContain('Proof Engine');
   });
 });
@@ -431,16 +431,16 @@ describe('Selection → Trace Navigation', () => {
 // =============================================================================
 
 describe('No Codenames in Rendered UI', () => {
-  it('does not render P11, P14, or P17 codenames', () => {
+  it('does not render codenames in UI', () => { // no-codenames-ignore
     render(<TraceViewer trace={mockExtendedTrace} />);
 
     // Get all text content
     const textContent = document.body.textContent || '';
 
     // Check that codenames are not present (except in comments which aren't rendered)
-    expect(textContent).not.toContain('P11');
-    expect(textContent).not.toContain('P14');
-    expect(textContent).not.toContain('P17');
+    expect(textContent).not.toContain('P11'); // no-codenames-ignore
+    expect(textContent).not.toContain('P14'); // no-codenames-ignore
+    expect(textContent).not.toContain('P17'); // no-codenames-ignore
     expect(textContent).not.toContain('Proof Engine');
   });
 });
