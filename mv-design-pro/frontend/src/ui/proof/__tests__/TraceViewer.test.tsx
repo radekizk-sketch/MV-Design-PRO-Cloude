@@ -215,7 +215,9 @@ describe('TraceStepView', () => {
     render(<TraceStepView step={mockTraceStep} stepIndex={0} />);
 
     expect(screen.getByText('Wzór')).toBeInTheDocument();
-    expect(screen.getByText(/Z_\{th\}/)).toBeInTheDocument();
+    // Formula is now rendered by KaTeX, so check for data-testid instead of raw text
+    const formulaBlock = screen.getByTestId('formula-block-wzór');
+    expect(formulaBlock).toBeInTheDocument();
   });
 
   it('renders inputs table with Polish labels', () => {
