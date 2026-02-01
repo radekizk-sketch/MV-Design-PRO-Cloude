@@ -25,6 +25,7 @@ import {
   RESULT_STATUS_LABELS,
   RESULT_STATUS_SEVERITY,
 } from './types';
+import { ProtectionDiagnosticsPanelContainer } from '../protection-diagnostics';
 
 // =============================================================================
 // Helper Functions
@@ -470,6 +471,7 @@ export function ProtectionResultsInspectorPage() {
           {isLoading && <LoadingSpinner />}
           {!isLoading && activeTab === 'EVALUATIONS' && <EvaluationsTable />}
           {!isLoading && activeTab === 'SUMMARY' && <SummaryTab />}
+          {!isLoading && activeTab === 'DIAGNOSTICS' && <ProtectionDiagnosticsPanelContainer />}
           {!isLoading && activeTab === 'TRACE' && <TraceTab />}
         </div>
       </div>
