@@ -2,14 +2,18 @@
  * Test: TraceViewer components
  *
  * Tests for the "Ślad obliczeń" (Calculation Trace) viewer.
- * Verifies 3-panel layout, step navigation, search, and Polish UI.
+ * Verifies 3-panel layout, step navigation, search, Polish UI,
+ * deep linking, selection mapping, and export functionality.
  */
 
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { TraceViewer, TraceViewerContainer } from '../TraceViewer';
+import type { SelectionToTraceMap } from '../TraceViewer';
 import { TraceToc } from '../TraceToc';
 import { TraceStepView, TraceStepViewEmpty } from '../TraceStepView';
+import { generateTraceJsonl, generateJsonlFilename } from '../export/exportTraceJsonl';
+import { generateTracePdfHtml, generatePdfFilename } from '../export/exportTracePdf';
 import type { ExtendedTrace, TraceStep } from '../../results-inspector/types';
 
 // =============================================================================
@@ -184,7 +188,7 @@ describe('TraceToc', () => {
   it('highlights selected step', () => {
     render(<TraceToc {...defaultProps} selectedStepIndex={0} />);
 
-    const selectedButton = screen.getByTestId('trace-toc-step-0');
+    const selectedButton = screen.getByTestId('trace-step-0');
     expect(selectedButton).toHaveAttribute('aria-current', 'true');
   });
 
@@ -192,7 +196,7 @@ describe('TraceToc', () => {
     const onSelectStep = vi.fn();
     render(<TraceToc {...defaultProps} onSelectStep={onSelectStep} />);
 
-    fireEvent.click(screen.getByTestId('trace-toc-step-1'));
+    fireEvent.click(screen.getByTestId('trace-step-1'));
 
     expect(onSelectStep).toHaveBeenCalledWith(1);
   });
@@ -261,6 +265,164 @@ describe('TraceStepViewEmpty', () => {
 
     expect(screen.getByTestId('trace-step-view-empty')).toBeInTheDocument();
     expect(screen.getByText('Wybierz krok z listy')).toBeInTheDocument();
+  });
+});
+
+// =============================================================================
+// Export Buttons Tests
+// =============================================================================
+
+describe('TraceViewer Export Buttons', () => {
+  it('renders export JSONL button with correct data-testid', () => {
+    render(<TraceViewer trace={mockExtendedTrace} />);
+
+    const jsonlButton = screen.getByTestId('trace-export-jsonl');
+    expect(jsonlButton).toBeInTheDocument();
+    expect(jsonlButton).toHaveTextContent('JSONL');
+  });
+
+  it('renders export PDF button with correct data-testid', () => {
+    render(<TraceViewer trace={mockExtendedTrace} />);
+
+    const pdfButton = screen.getByTestId('trace-export-pdf');
+    expect(pdfButton).toBeInTheDocument();
+    expect(pdfButton).toHaveTextContent('PDF');
+  });
+
+  it('shows deep link button when step is selected', () => {
+    render(<TraceViewer trace={mockExtendedTrace} />);
+
+    // Initially no deep link button (no step selected)
+    expect(screen.queryByTestId('trace-deeplink')).not.toBeInTheDocument();
+
+    // Select a step
+    fireEvent.click(screen.getByTestId('trace-step-0'));
+
+    // Now deep link button should appear
+    expect(screen.getByTestId('trace-deeplink')).toBeInTheDocument();
+  });
+});
+
+// =============================================================================
+// Export JSONL Tests
+// =============================================================================
+
+describe('Export JSONL', () => {
+  it('generates valid JSONL content', () => {
+    const jsonl = generateTraceJsonl(mockExtendedTrace);
+    const lines = jsonl.split('\n');
+
+    // Should have header + 3 steps = 4 lines
+    expect(lines).toHaveLength(4);
+
+    // Each line should be valid JSON
+    lines.forEach((line) => {
+      expect(() => JSON.parse(line)).not.toThrow();
+    });
+
+    // First line should be header
+    const header = JSON.parse(lines[0]);
+    expect(header.type).toBe('header');
+    expect(header.data.run_id).toBe('test-run-001');
+    expect(header.data.total_steps).toBe(3);
+  });
+
+  it('generates deterministic filename', () => {
+    const filename = generateJsonlFilename(mockExtendedTrace);
+
+    expect(filename).toMatch(/^slad_obliczen_test-run.*\.jsonl$/);
+  });
+});
+
+// =============================================================================
+// Export PDF Tests
+// =============================================================================
+
+describe('Export PDF', () => {
+  it('generates valid HTML content', () => {
+    const html = generateTracePdfHtml(mockExtendedTrace);
+
+    // Should contain Polish labels
+    expect(html).toContain('Ślad obliczeń');
+    expect(html).toContain('ID wykonania');
+    expect(html).toContain('Krok');
+    expect(html).toContain('Wzór');
+    expect(html).toContain('Wynik');
+
+    // Should contain trace data
+    expect(html).toContain('test-run-001');
+    expect(html).toContain('Obliczenie impedancji Thevenina');
+  });
+
+  it('generates deterministic filename', () => {
+    const filename = generatePdfFilename(mockExtendedTrace);
+
+    expect(filename).toMatch(/^slad_obliczen_test-run.*\.pdf$/);
+  });
+
+  it('does not contain codenames in PDF output', () => {
+    const html = generateTracePdfHtml(mockExtendedTrace);
+
+    expect(html).not.toContain('P11');
+    expect(html).not.toContain('P14');
+    expect(html).not.toContain('P17');
+    expect(html).not.toContain('Proof Engine');
+  });
+});
+
+// =============================================================================
+// Selection → Trace Navigation Tests
+// =============================================================================
+
+describe('Selection → Trace Navigation', () => {
+  it('navigates to mapped step when selectionId matches', () => {
+    const selectionToTraceMap: SelectionToTraceMap = new Map([
+      ['bus_123', 1], // Maps to second step
+    ]);
+
+    render(
+      <TraceViewer
+        trace={mockExtendedTrace}
+        selectionId="bus_123"
+        selectionToTraceMap={selectionToTraceMap}
+      />
+    );
+
+    // Should show the mapped step view
+    const stepView = screen.getByTestId('trace-step-view-1');
+    expect(stepView).toBeInTheDocument();
+  });
+
+  it('does not break when selectionId has no mapping', () => {
+    const selectionToTraceMap: SelectionToTraceMap = new Map([
+      ['bus_123', 1],
+    ]);
+
+    // Should render without errors when selectionId has no mapping
+    expect(() => {
+      render(
+        <TraceViewer
+          trace={mockExtendedTrace}
+          selectionId="unknown_id"
+          selectionToTraceMap={selectionToTraceMap}
+        />
+      );
+    }).not.toThrow();
+
+    // Should show empty state (no step selected)
+    expect(screen.getByTestId('trace-step-view-empty')).toBeInTheDocument();
+  });
+
+  it('does not break when selectionToTraceMap is undefined', () => {
+    expect(() => {
+      render(
+        <TraceViewer
+          trace={mockExtendedTrace}
+          selectionId="bus_123"
+          selectionToTraceMap={undefined}
+        />
+      );
+    }).not.toThrow();
   });
 });
 

@@ -186,7 +186,7 @@ export function TraceToc({
                       onClick={() => onSelectStep(index)}
                       className={buttonClasses}
                       aria-current={isSelected ? 'true' : undefined}
-                      data-testid={`trace-toc-step-${index}`}
+                      data-testid={`trace-step-${index}`}
                     >
                       <div className="flex items-center gap-2">
                         <span className={numberClasses}>
