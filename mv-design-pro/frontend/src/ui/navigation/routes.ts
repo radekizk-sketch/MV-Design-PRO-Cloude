@@ -76,6 +76,13 @@ export const ROUTES: Record<string, RouteDefinition> = {
     icon: '⚡',
     requiredMode: 'RESULT_VIEW',
   },
+  COMPARE: {
+    hash: '#compare',
+    label: 'Porównanie przypadków',
+    description: 'Porównanie wyników i diagnostyki między przypadkami',
+    icon: '⚖️',
+    requiredMode: 'RESULT_VIEW',
+  },
 };
 
 /**
@@ -139,4 +146,11 @@ export function navigateToResults(): void {
  */
 export function navigateToProof(): void {
   navigateTo(ROUTES.PROOF);
+}
+
+/**
+ * Navigate to Compare (Porównanie przypadków).
+ */
+export function navigateToCompare(): void {
+  navigateTo(ROUTES.COMPARE);
 }
