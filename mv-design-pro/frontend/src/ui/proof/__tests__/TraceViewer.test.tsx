@@ -5,7 +5,7 @@
  * Verifies 3-panel layout, step navigation, search, and Polish UI.
  */
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { TraceViewer, TraceViewerContainer } from '../TraceViewer';
 import { TraceToc } from '../TraceToc';
@@ -92,7 +92,10 @@ describe('TraceViewer', () => {
   it('shows step count in Polish', () => {
     render(<TraceViewer trace={mockExtendedTrace} />);
 
-    expect(screen.getByText('3 kroków obliczeniowych')).toBeInTheDocument();
+    // With no filters/search, shows "X z Y kroków" pattern
+    // Use regex since the text may be split across nodes
+    const stepCountElements = screen.getAllByText(/3.*z.*3.*krok/);
+    expect(stepCountElements.length).toBeGreaterThanOrEqual(1);
   });
 
   it('renders search input with Polish placeholder', () => {
@@ -159,6 +162,9 @@ describe('TraceToc', () => {
     selectedStepIndex: null,
     onSelectStep: () => {},
     searchQuery: '',
+    filters: { phase: null, onlyProblems: false },
+    searchResults: [],
+    activeResultIndex: 0,
   };
 
   it('renders all steps in TOC', () => {
