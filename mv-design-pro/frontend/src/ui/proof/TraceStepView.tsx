@@ -18,6 +18,7 @@
 
 import type { TraceStep, TraceValue } from '../results-inspector/types';
 import { TRACE_VALUE_LABELS } from '../results-inspector/types';
+import { MathRenderer } from './MathRenderer';
 
 // =============================================================================
 // Types
@@ -136,14 +137,20 @@ function FormulaBlock({ title, content, isLatex = false }: FormulaBlockProps) {
   return (
     <div className="mb-4">
       <h4 className="text-sm font-medium text-slate-700 mb-2">{title}</h4>
-      <div className={`
-        rounded border border-slate-200 bg-slate-50 px-4 py-3
-        ${isLatex ? 'font-mono text-sm' : 'text-sm'}
-      `}>
-        {/* TODO: Render LaTeX properly with KaTeX/MathJax in future version */}
-        <code className="text-slate-800 whitespace-pre-wrap break-words">
-          {content}
-        </code>
+      <div
+        className={`
+          rounded border border-slate-200 bg-slate-50 px-4 py-3
+          ${isLatex ? 'text-center overflow-x-auto' : 'text-sm'}
+        `}
+        data-testid={`formula-block-${title.toLowerCase().replace(/\s+/g, '-')}`}
+      >
+        {isLatex ? (
+          <MathRenderer latex={content} block className="text-slate-800" />
+        ) : (
+          <code className="text-slate-800 whitespace-pre-wrap break-words">
+            {content}
+          </code>
+        )}
       </div>
     </div>
   );
@@ -206,6 +213,7 @@ export function TraceStepView({ step, stepIndex }: TraceStepViewProps) {
           <FormulaBlock
             title="Podstawienie"
             content={step.substitution}
+            isLatex
           />
         )}
 

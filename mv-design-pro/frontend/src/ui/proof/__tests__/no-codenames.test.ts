@@ -23,6 +23,7 @@ const UI_FILES = [
   path.join(PROOF_DIR, 'TraceToc.tsx'),
   path.join(PROOF_DIR, 'TraceStepView.tsx'),
   path.join(PROOF_DIR, 'TraceMetadataPanel.tsx'),
+  path.join(PROOF_DIR, 'MathRenderer.tsx'),
   path.join(PROOF_DIR, 'index.ts'),
   path.join(RESULTS_INSPECTOR_DIR, 'types.ts'),
 ];
