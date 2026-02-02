@@ -29,6 +29,8 @@ describe('ReferencePatternsPage', () => {
       runError: null,
       activeTab: 'WYNIK',
       traceSearchQuery: '',
+      isExporting: false,
+      exportError: null,
     });
 
     // Mock fetch to return empty patterns

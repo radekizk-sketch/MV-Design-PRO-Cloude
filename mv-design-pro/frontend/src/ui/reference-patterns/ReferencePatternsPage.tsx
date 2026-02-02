@@ -114,6 +114,9 @@ function FixturesList() {
     runFixture,
     isLoadingFixtures,
     isRunningPattern,
+    isExporting,
+    exportToPdf,
+    exportToDocx,
   } = useReferencePatternsStore();
 
   if (isLoadingFixtures) {
@@ -167,13 +170,49 @@ function FixturesList() {
             )}
           </button>
           {selectedFixtureId === fixture.fixture_id && (
-            <button
-              onClick={() => runFixture(fixture.filename)}
-              disabled={isRunningPattern}
-              className="mt-2 w-full rounded bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700 disabled:bg-slate-400 disabled:cursor-not-allowed transition-colors"
-            >
-              {isRunningPattern ? 'Wykonywanie...' : 'Uruchom wzorzec'}
-            </button>
+            <div className="mt-2 space-y-2">
+              <button
+                onClick={() => runFixture(fixture.filename)}
+                disabled={isRunningPattern}
+                className="w-full rounded bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700 disabled:bg-slate-400 disabled:cursor-not-allowed transition-colors"
+              >
+                {isRunningPattern ? 'Wykonywanie...' : 'Uruchom wzorzec'}
+              </button>
+
+              {/* Export buttons for selected fixture */}
+              <div className="flex gap-1">
+                <button
+                  onClick={() => exportToPdf(fixture.filename)}
+                  disabled={isExporting || isRunningPattern}
+                  title="Pobierz raport PDF"
+                  className="flex-1 rounded border border-slate-200 bg-white px-2 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                  {isExporting ? (
+                    <span className="inline-flex items-center gap-1">
+                      <span className="h-3 w-3 animate-spin rounded-full border border-slate-300 border-t-blue-600" />
+                      PDF...
+                    </span>
+                  ) : (
+                    'PDF'
+                  )}
+                </button>
+                <button
+                  onClick={() => exportToDocx(fixture.filename)}
+                  disabled={isExporting || isRunningPattern}
+                  title="Pobierz raport DOCX"
+                  className="flex-1 rounded border border-slate-200 bg-white px-2 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                  {isExporting ? (
+                    <span className="inline-flex items-center gap-1">
+                      <span className="h-3 w-3 animate-spin rounded-full border border-slate-300 border-t-blue-600" />
+                      DOCX...
+                    </span>
+                  ) : (
+                    'DOCX'
+                  )}
+                </button>
+              </div>
+            </div>
           )}
         </div>
       ))}
@@ -240,6 +279,129 @@ function VerdictBanner() {
           <p className="mt-2 text-sm text-slate-800">{summary_pl}</p>
         </div>
       </div>
+    </div>
+  );
+}
+
+// =============================================================================
+// Export Section Component
+// =============================================================================
+
+function ExportSection() {
+  const {
+    runResult,
+    isExporting,
+    exportError,
+    exportToPdf,
+    exportToDocx,
+    clearExportError,
+    selectedFixtureId,
+    fixtures,
+  } = useReferencePatternsStore();
+
+  // Get the selected fixture to retrieve filename for export
+  const selectedFixture = fixtures.find((f) => f.fixture_id === selectedFixtureId);
+
+  if (!runResult || !selectedFixture) return null;
+
+  const handleExportPdf = () => {
+    exportToPdf(selectedFixture.filename);
+  };
+
+  const handleExportDocx = () => {
+    exportToDocx(selectedFixture.filename);
+  };
+
+  return (
+    <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+      <div className="flex items-center justify-between">
+        <div>
+          <h3 className="text-sm font-semibold text-slate-700">Raport</h3>
+          <p className="mt-1 text-xs text-slate-500">
+            Pobierz raport wyników w wybranym formacie
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleExportPdf}
+            disabled={isExporting}
+            className="inline-flex items-center gap-2 rounded border border-slate-200 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          >
+            {isExporting ? (
+              <>
+                <span className="h-4 w-4 animate-spin rounded-full border-2 border-slate-300 border-t-blue-600" />
+                Pobieranie...
+              </>
+            ) : (
+              <>
+                <svg
+                  className="h-4 w-4"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                  aria-hidden="true"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
+                  />
+                </svg>
+                Pobierz PDF
+              </>
+            )}
+          </button>
+          <button
+            onClick={handleExportDocx}
+            disabled={isExporting}
+            className="inline-flex items-center gap-2 rounded border border-slate-200 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          >
+            {isExporting ? (
+              <>
+                <span className="h-4 w-4 animate-spin rounded-full border-2 border-slate-300 border-t-blue-600" />
+                Pobieranie...
+              </>
+            ) : (
+              <>
+                <svg
+                  className="h-4 w-4"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                  aria-hidden="true"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
+                  />
+                </svg>
+                Pobierz DOCX
+              </>
+            )}
+          </button>
+        </div>
+      </div>
+
+      {/* Error message */}
+      {exportError && (
+        <div className="mt-3 rounded border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700">
+          <div className="flex items-start justify-between">
+            <span>{exportError}</span>
+            <button
+              onClick={clearExportError}
+              className="ml-2 text-rose-500 hover:text-rose-700"
+              aria-label="Zamknij komunikat błędu"
+            >
+              <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -491,6 +653,7 @@ function ResultContent() {
       {activeTab === 'WYNIK' && (
         <>
           <VerdictBanner />
+          <ExportSection />
           <ChecksTable />
         </>
       )}
