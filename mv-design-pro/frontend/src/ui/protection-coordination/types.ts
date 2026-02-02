@@ -315,7 +315,7 @@ export const LABELS = {
   checks: {
     sensitivity: {
       title: 'Czulosc',
-      subtitle: 'Sprawdzenie czy zabezpieczenie zadzial dla I_min',
+      subtitle: 'Sprawdzenie czy zabezpieczenie zadzial dla I_min (zgodnie z IEC 60909)',
       description: 'Weryfikacja dzialania zabezpieczenia przy minimalnym pradzie zwarciowym',
       iFaultMin: 'I_min zwarcia [A]',
       iPickup: 'I_pickup [A]',
@@ -325,7 +325,7 @@ export const LABELS = {
     },
     selectivity: {
       title: 'Selektywnosc',
-      subtitle: 'Sprawdzenie stopniowania czasowego',
+      subtitle: 'Sprawdzenie stopniowania czasowego (zgodnie z IEC 60255)',
       description: 'Weryfikacja prawidlowego stopniowania czasowego pomiedzy zabezpieczeniami',
       downstream: 'Podrzedne',
       upstream: 'Nadrzedne',
@@ -339,7 +339,7 @@ export const LABELS = {
     },
     overload: {
       title: 'Przeciazalnosc',
-      subtitle: 'Sprawdzenie czy nie zadzial dla I_roboczego',
+      subtitle: 'Sprawdzenie czy nie zadzial dla I_roboczego (zgodnie z IEC 60255)',
       description: 'Weryfikacja braku zadzialania przy normalnym pradzie roboczym',
       iOperating: 'I_robocze [A]',
       iPickup: 'I_pickup [A]',
