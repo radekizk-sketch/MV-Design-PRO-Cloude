@@ -1,0 +1,178 @@
+/**
+ * Reference Patterns Types — Wzorce odniesienia
+ *
+ * CANONICAL ALIGNMENT:
+ * - NOT-A-SOLVER: Reference patterns are INTERPRETATION layer
+ * - Polish labels (100% PL UI)
+ * - READ-ONLY: No mutations, no physics
+ *
+ * Types for reference pattern validation display.
+ */
+
+// =============================================================================
+// Verdict Types
+// =============================================================================
+
+export type ReferenceVerdict = 'ZGODNE' | 'GRANICZNE' | 'NIEZGODNE';
+
+export type CheckStatus = 'PASS' | 'FAIL' | 'WARN' | 'INFO';
+
+// =============================================================================
+// Pattern Metadata
+// =============================================================================
+
+export interface PatternMetadata {
+  pattern_id: string;
+  name_pl: string;
+  description_pl: string;
+}
+
+export interface FixtureMetadata {
+  fixture_id: string;
+  filename: string;
+  description: string | null;
+  expected_verdict: ReferenceVerdict | null;
+  notes_pl: string | null;
+}
+
+// =============================================================================
+// Check Result
+// =============================================================================
+
+export interface CheckResult {
+  name_pl: string;
+  status: CheckStatus;
+  status_pl: string;
+  description_pl: string;
+  details?: Record<string, number | string | boolean | null>;
+}
+
+// =============================================================================
+// Trace Step
+// =============================================================================
+
+export interface TraceStep {
+  step: string;
+  description_pl: string;
+  inputs: Record<string, number | string | boolean | null>;
+  formula?: string;
+  calculation?: Record<string, number | string | boolean | null>;
+  outputs?: Record<string, number | string | boolean | null>;
+}
+
+// =============================================================================
+// Pattern Result Artifacts
+// =============================================================================
+
+export interface PatternArtifacts {
+  tk_total_s?: number;
+  ithn_a?: number;
+  ithdop_a?: number;
+  i_min_sel_primary_a?: number;
+  i_min_sel_secondary_a?: number;
+  i_max_sens_primary_a?: number;
+  i_max_sens_secondary_a?: number;
+  i_max_th_primary_a?: number;
+  i_max_th_secondary_a?: number;
+  window_i_min_primary_a?: number;
+  window_i_max_primary_a?: number;
+  window_i_min_secondary_a?: number;
+  window_i_max_secondary_a?: number;
+  window_valid?: boolean;
+  limiting_criterion_min?: string;
+  limiting_criterion_max?: string;
+  recommended_setting_secondary_a?: number;
+}
+
+// =============================================================================
+// Pattern Run Result
+// =============================================================================
+
+export interface PatternRunResult {
+  run_id: string;
+  pattern_id: string;
+  name_pl: string;
+  verdict: ReferenceVerdict;
+  verdict_description_pl: string;
+  summary_pl: string;
+  checks: CheckResult[];
+  trace: TraceStep[];
+  artifacts: PatternArtifacts;
+}
+
+// =============================================================================
+// API Responses
+// =============================================================================
+
+export interface PatternListResponse {
+  patterns: PatternMetadata[];
+}
+
+export interface FixtureListResponse {
+  pattern_id: string;
+  fixtures: FixtureMetadata[];
+}
+
+// =============================================================================
+// UI State Types
+// =============================================================================
+
+export type ReferencePatternsTab = 'WYNIK' | 'CHECKI' | 'WARTOSCI' | 'SLAD';
+
+export type PanelSection = 'PATTERNS' | 'FIXTURES';
+
+// =============================================================================
+// Polish Labels (100% PL)
+// =============================================================================
+
+export const VERDICT_LABELS_PL: Record<ReferenceVerdict, string> = {
+  ZGODNE: 'Zgodne',
+  GRANICZNE: 'Graniczne',
+  NIEZGODNE: 'Niezgodne',
+};
+
+export const VERDICT_DESCRIPTIONS_PL: Record<ReferenceVerdict, string> = {
+  ZGODNE: 'Wszystkie kryteria spełnione, okno nastaw prawidłowe',
+  GRANICZNE: 'Warunki spełnione z ograniczeniami (wąskie okno lub ostrzeżenia SPZ)',
+  NIEZGODNE: 'Kryteria niespełnione, brak prawidłowego okna nastaw',
+};
+
+export const VERDICT_COLORS: Record<ReferenceVerdict, string> = {
+  ZGODNE: 'bg-emerald-100 text-emerald-800 border-emerald-300',
+  GRANICZNE: 'bg-amber-100 text-amber-800 border-amber-300',
+  NIEZGODNE: 'bg-rose-100 text-rose-800 border-rose-300',
+};
+
+export const VERDICT_BADGE_COLORS: Record<ReferenceVerdict, string> = {
+  ZGODNE: 'bg-emerald-500 text-white',
+  GRANICZNE: 'bg-amber-500 text-white',
+  NIEZGODNE: 'bg-rose-500 text-white',
+};
+
+export const CHECK_STATUS_LABELS_PL: Record<CheckStatus, string> = {
+  PASS: 'Spełnione',
+  FAIL: 'Niespełnione',
+  WARN: 'Ostrzeżenie',
+  INFO: 'Informacja',
+};
+
+export const CHECK_STATUS_COLORS: Record<CheckStatus, string> = {
+  PASS: 'bg-emerald-100 text-emerald-700',
+  FAIL: 'bg-rose-100 text-rose-700',
+  WARN: 'bg-amber-100 text-amber-700',
+  INFO: 'bg-slate-100 text-slate-600',
+};
+
+export const CHECK_STATUS_ICONS: Record<CheckStatus, string> = {
+  PASS: '✓',
+  FAIL: '✗',
+  WARN: '⚠',
+  INFO: 'ℹ',
+};
+
+export const TAB_LABELS_PL: Record<ReferencePatternsTab, string> = {
+  WYNIK: 'Wynik',
+  CHECKI: 'Checki',
+  WARTOSCI: 'Wartości pośrednie',
+  SLAD: 'Ślad obliczeń',
+};

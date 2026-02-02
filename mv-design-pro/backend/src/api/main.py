@@ -18,6 +18,7 @@ from api.project_archive import router as project_archive_router  # P31
 from api.proof_pack import router as proof_pack_router
 from api.protection_comparisons import router as protection_comparisons_router  # P15b
 from api.protection_runs import router as protection_runs_router  # P15a
+from api.reference_patterns import router as reference_patterns_router  # Wzorce odniesienia
 from api.sld import router as sld_router  # P11a
 from api.snapshots import router as snapshots_router
 from api.study_cases import router as study_cases_router
@@ -54,6 +55,7 @@ app.include_router(project_archive_router)  # P31
 app.include_router(proof_pack_router)
 app.include_router(protection_comparisons_router)  # P15b
 app.include_router(protection_runs_router)  # P15a
+app.include_router(reference_patterns_router)  # Wzorce odniesienia
 app.include_router(sld_router)  # P11a
 app.include_router(snapshots_router)
 app.include_router(study_cases_router)
