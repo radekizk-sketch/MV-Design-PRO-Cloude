@@ -52,13 +52,16 @@ const EXPORT_FORMAT_LABELS: Record<ExportFormat, string> = {
 interface ExportButtonProps {
   runId: string | null;
   disabled?: boolean;
+  /** UI-10: Werdykt ogólny - gdy PASS, przycisk jest wyróżniony */
+  overallVerdict?: CoordinationVerdict | null;
 }
 
 /**
  * P20d: Export dropdown button for Power Flow results.
  * Polish labels, minimal footprint.
+ * UI-10: Podświetlenie przycisku gdy werdykt to PASS.
  */
-function ExportButton({ runId, disabled }: ExportButtonProps) {
+function ExportButton({ runId, disabled, overallVerdict }: ExportButtonProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
 
@@ -95,13 +98,20 @@ function ExportButton({ runId, disabled }: ExportButtonProps) {
     }
   };
 
+  // UI-10: Highlight button when verdict is PASS
+  const isSuccess = overallVerdict === 'PASS';
+  const buttonBaseClass = isSuccess
+    ? 'flex items-center gap-2 rounded px-4 py-2 text-sm font-medium text-white bg-emerald-600 hover:bg-emerald-700 ring-2 ring-emerald-300 ring-offset-1 animate-pulse disabled:cursor-not-allowed disabled:bg-slate-300 disabled:ring-0 disabled:animate-none'
+    : 'flex items-center gap-2 rounded bg-slate-600 px-4 py-2 text-sm font-medium text-white hover:bg-slate-700 disabled:cursor-not-allowed disabled:bg-slate-300';
+
   return (
     <div className="relative">
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}
         disabled={disabled || isExporting || !runId}
-        className="flex items-center gap-2 rounded bg-slate-600 px-4 py-2 text-sm font-medium text-white hover:bg-slate-700 disabled:cursor-not-allowed disabled:bg-slate-300"
+        className={buttonBaseClass}
+        title={isSuccess ? 'Werdykt pozytywny - zalecany eksport raportu' : undefined}
       >
         {isExporting ? 'Eksportuje...' : 'Eksportuj raport'}
         <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -264,6 +274,21 @@ function ResultStatusBar() {
     }
   }, [runHeader.created_at]);
 
+  // UI-10: Calculate quick verdict for export button highlighting
+  const overallVerdict = useMemo((): CoordinationVerdict | null => {
+    if (!results || !results.converged) return null;
+    const { summary, bus_results, branch_results } = results;
+    // Quick check: if voltage range is within limits, consider it PASS
+    const voltageOk = summary.min_v_pu >= 0.95 && summary.max_v_pu <= 1.05;
+    if (!voltageOk) {
+      // Check if any bus/branch has FAIL
+      const hasFail = bus_results.some(b => getVoltageVerdict(b.v_pu).verdict === 'FAIL') ||
+        branch_results.some(br => getBranchLoadingVerdict(null, br.losses_p_mw).verdict === 'FAIL');
+      return hasFail ? 'FAIL' : 'MARGINAL';
+    }
+    return 'PASS';
+  }, [results]);
+
   return (
     <div className="flex flex-wrap items-center justify-between gap-4 rounded border border-slate-200 bg-white p-3">
       <div className="flex items-center gap-4">
@@ -290,7 +315,11 @@ function ResultStatusBar() {
       </div>
       <div className="flex items-center gap-4">
         <span className="text-sm text-slate-500">{formattedDate}</span>
-        <ExportButton runId={selectedRunId || runHeader.id} disabled={!results} />
+        <ExportButton
+          runId={selectedRunId || runHeader.id}
+          disabled={!results}
+          overallVerdict={overallVerdict}
+        />
       </div>
     </div>
   );
