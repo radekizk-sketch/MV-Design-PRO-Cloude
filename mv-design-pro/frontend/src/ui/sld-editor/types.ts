@@ -188,13 +188,70 @@ export type AlignDirection = 'left' | 'right' | 'top' | 'bottom' | 'center-horiz
 export type DistributeDirection = 'horizontal' | 'vertical';
 
 /**
+ * Snapshot symbolu w schowku (bez referencji do modelu).
+ * Zawiera wszystkie dane potrzebne do odtworzenia symbolu przy wklejeniu.
+ */
+export interface ClipboardSymbolSnapshot {
+  /** Oryginalny ID symbolu (do mapowania połączeń wewnętrznych) */
+  originalSymbolId: string;
+
+  /** Oryginalny elementId (do mapowania referencji) */
+  originalElementId: string;
+
+  /** Typ elementu */
+  elementType: ElementType;
+
+  /** Nazwa elementu */
+  elementName: string;
+
+  /** Pozycja względna (względem referencePoint) */
+  relativePosition: Position;
+
+  /** Czy w służbie */
+  inService: boolean;
+
+  /** Dodatkowe właściwości specyficzne dla typu */
+  typeSpecificProps: Record<string, unknown>;
+}
+
+/**
+ * Połączenie wewnętrzne w schowku.
+ * Łączy symbole WEWNĄTRZ zestawu wklejanego (nie do zewnętrznych).
+ */
+export interface ClipboardInternalConnection {
+  /** Oryginalny ID symbolu źródłowego */
+  fromOriginalSymbolId: string;
+
+  /** Oryginalny ID symbolu docelowego */
+  toOriginalSymbolId: string;
+
+  /** Typ połączenia */
+  connectionType: 'fromNodeId' | 'toNodeId' | 'connectedToNodeId';
+}
+
+/**
  * Clipboard data (for copy/paste).
+ *
+ * ETAP-STANDARD (N-03):
+ * - Schowek przechowuje "snapshot" symboli (bez referencji do elementów modelu)
+ * - Wklejenie tworzy NOWE elementy modelu + NOWE symbole
+ * - Połączenia wewnętrzne są odtwarzane (między wklejanymi elementami)
+ * - Połączenia zewnętrzne NIE są odtwarzane (wymaga ręcznego podłączenia)
  */
 export interface ClipboardData {
-  /** Symbols in clipboard */
+  /** Snapshoty symboli w schowku */
+  symbolSnapshots: ClipboardSymbolSnapshot[];
+
+  /** Połączenia wewnętrzne (między symbolami w schowku) */
+  internalConnections: ClipboardInternalConnection[];
+
+  /** Punkt odniesienia (środek zaznaczenia) */
+  referencePoint: Position;
+
+  /** DEPRECATED: Stara lista symboli (dla kompatybilności wstecznej) */
   symbols: AnySldSymbol[];
 
-  /** Timestamp when copied */
+  /** DEPRECATED: Timestamp (nie używany w nowym mechanizmie) */
   timestamp: number;
 }
 
