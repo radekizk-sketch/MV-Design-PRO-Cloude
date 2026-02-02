@@ -6,12 +6,14 @@
  * - sld_rules.md § D.1: Visual state encoding (in_service, selected)
  * - powerfactory_ui_parity.md: PowerFactory-like presentation
  * - etap_symbols/*: ETAP-parity symbol library
+ * - AUDYT_SLD_ETAP.md N-02: hierarchiczne auto-rozmieszczenie
  *
  * READ-ONLY canvas:
  * - No drag/drop
  * - No lasso selection
  * - No editing
  * - Click → selection only
+ * - AUTOMATYCZNE auto-rozmieszczenie (bez przycisku)
  *
  * ETAP SYMBOL INTEGRATION:
  * - Bus → busbar
@@ -33,6 +35,7 @@ import { EtapSymbol, type SwitchState } from './EtapSymbolRenderer';
 import { calculateEnergization } from './energization';
 import { ConnectionsLayer } from './ConnectionRenderer';
 import { generateConnections } from '../sld-editor/utils/connectionRouting';
+import { useAutoLayout } from '../sld-editor/hooks/useAutoLayout';
 
 /**
  * Symbol size configuration.
@@ -386,9 +389,15 @@ const Grid: React.FC<GridProps> = ({ width, height, gridSize, viewport }) => {
 
 /**
  * Main SLD View Canvas component (read-only) with ETAP symbols.
+ *
+ * AUTO-LAYOUT (N-02):
+ * - Layout jest wyliczany AUTOMATYCZNIE przy kazdej zmianie topologii
+ * - Brak przycisku "Rozmiesc automatycznie"
+ * - Deterministyczny (ten sam model -> ten sam uklad)
+ * - Stabilny (mala zmiana nie powoduje "przeskoku")
  */
 export const SLDViewCanvas: React.FC<SLDViewCanvasProps> = ({
-  symbols,
+  symbols: inputSymbols,
   selectedId,
   onSymbolClick,
   viewport,
@@ -396,8 +405,16 @@ export const SLDViewCanvas: React.FC<SLDViewCanvasProps> = ({
   width,
   height,
 }) => {
+  // AUTO-LAYOUT (N-02): Automatyczne rozmieszczenie przy kazdej zmianie topologii
+  // DETERMINISM: Ten sam model -> ten sam uklad
+  // STABILNOSC: Mala zmiana = mala zmiana ukladu
+  const { layoutSymbols } = useAutoLayout(inputSymbols);
+
   // Sort symbols for deterministic rendering (by ID)
-  const sortedSymbols = [...symbols].sort((a, b) => a.id.localeCompare(b.id));
+  const sortedSymbols = [...layoutSymbols].sort((a, b) => a.id.localeCompare(b.id));
+
+  // Use layout symbols for energization and connections
+  const symbols = layoutSymbols;
 
   // Calculate energization state (UI-only, deterministic)
   const energizationState = useMemo(() => calculateEnergization(symbols), [symbols]);
