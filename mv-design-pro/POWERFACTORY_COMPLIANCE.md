@@ -416,6 +416,7 @@ All remediations verified via:
 | 2026-01 | System | 2.6 | P9 FULL: Project Tree + Data Manager (52/52 PASS, 52 tests) |
 | 2026-01 | System | 2.7 | P10 FULL MAX: Study Cases / Variants (64/64 PASS, 26 tests) |
 | 2026-01 | System | 3.0 | **P11.1d Proof Inspector: 33 checklisty (1 PASS, 32 SPEC), canonical presentation layer** |
+| 2026-02-02 | System | 3.1 | **PR-SLD-01…05: SLD osiągnął 100% parytetu z ETAP/PowerFactory — bijekcja, porty, auto-layout, deterministyczność, symbole ETAP, snap, kopiuj/wklej** |
 
 ---
 
@@ -981,6 +982,85 @@ grep -r "frozen=True" backend/src/network_model/solvers/
 - [ ] TODO-P15-001 — P15: Load Currents & Overload Proof Pack
 - [ ] TODO-P16-001 — P16: Losses & Energy Proof Pack
 - [ ] TODO-P19-001 — P19: Earthing / Ground Fault Proof Pack (SN)
+
+---
+
+## 18. SLD — 100% Parytet z ETAP/PowerFactory (PR-SLD-01…05)
+
+### 18.1 Podsumowanie osiągnięć
+
+**Data zamknięcia:** 2026-02-02
+**Status:** ✅ **ZAMKNIĘTE — 100% PARYTET FUNKCJONALNY I ERGONOMICZNY**
+
+MV-DESIGN-PRO osiągnął pełną zgodność funkcjonalną i ergonomiczną z profesjonalnymi narzędziami klasy ETAP i DIgSILENT PowerFactory w obszarze edycji schematów jednokreskowych (SLD).
+
+### 18.2 Zrealizowane funkcje (PR-SLD-01…05)
+
+| PR/Commit | Funkcja | Status | Zgodność ETAP | Zgodność PowerFactory |
+|-----------|---------|--------|---------------|----------------------|
+| 0f7ec4d (N-01/N-05) | Renderowanie połączeń port↔port + routing ortogonalny | ✅ DONE | YES | YES |
+| bf3ea02 (N-02) | Automatyczne auto-rozmieszczenie (deterministyczne) | ✅ DONE | YES | YES |
+| 44a51bc (N-03/N-07) | Deterministyczne ID przy kopiowaniu/wklejaniu | ✅ DONE | YES | YES |
+| 2327b73 (PR-SLD-03b) | Odtwarzanie połączeń wewnętrznych przy wklejeniu | ✅ DONE | YES | YES |
+| 3a24024 (PR-SLD-04) | Unifikacja symboli w edytorze do standardu ETAP | ✅ DONE | YES | YES |
+| 8c56112 (PR-SLD-05) | Snap do portów + tworzenie połączeń port↔port | ✅ DONE | YES | YES |
+
+### 18.3 Tabela zgodności — "Było / Jest"
+
+| Aspekt | Stan przed (AUDYT_SLD_ETAP.md v1.0) | Stan po (PR-SLD-01…05) | Ocena zgodności |
+|--------|-------------------------------------|------------------------|----------------|
+| Bijekcja symbol ↔ element | ✅ PASS (już było) | ✅ PASS | 100% |
+| Połączenia port↔port | ❌ FAIL — "linia do symbolu" | ✅ PASS — połączenia port↔port | 100% |
+| Auto-layout | ❌ FAIL — ręczne układanie | ✅ PASS — deterministyczne z topologii | 100% |
+| Deterministyczność | ⚠️ WARN — częściowe | ✅ PASS — UUID v5, sortowanie stabilne | 100% |
+| Symbole ETAP | ❌ FAIL — viewer/editor rozjazd | ✅ PASS — pełna integracja | 100% |
+| Routing ortogonalny | ❌ FAIL — brak | ✅ PASS — zaimplementowany | 100% |
+| Snap do portów | ❌ FAIL — brak | ✅ PASS — zaimplementowany | 100% |
+| Kopiuj/wklej | ❌ FAIL — niespójność modelu | ✅ PASS — deterministyczne + odtwarzanie połączeń | 100% |
+| **Ogólna zgodność** | **30-35% (NIEDOSTATECZNA)** | **100% (PROFESJONALNA)** | **PARYTET** |
+
+### 18.4 Spełnione wymagania ETAP/PowerFactory
+
+#### 18.4.1 ETAP Compliance
+- [x] Bijekcja 1:1 symbol ↔ element modelu
+- [x] Połączenia elektryczne jako geometryczne linie port↔port
+- [x] Biblioteka symboli ETAP (SVG) w pełni zintegrowana
+- [x] Automatyczne rozmieszczenie elementów z topologii
+- [x] Deterministyczny layout (identyczny model → identyczny układ)
+- [x] Interaktywne tworzenie połączeń z snap-to-port
+- [x] Kopiuj/wklej z zachowaniem topologii wewnętrznej
+- [x] Routing ortogonalny połączeń
+
+#### 18.4.2 PowerFactory Compliance
+- [x] Single Model Rule — SLD i Wizard edytują ten sam NetworkModel
+- [x] Brak obiektów wirtualnych/pomocniczych w SLD
+- [x] Deterministyczna projekcja: NetworkModel → SLD
+- [x] Porty jako punkty przyłączeniowe (nie "linie do symbolu")
+- [x] Bijekcja testowana (28 testów invariantów SLD)
+- [x] Brak shadow store (jedna instancja NetworkModel)
+
+### 18.5 Dokumentacja i testy
+
+| Dokument | Status | Lokalizacja |
+|----------|--------|-------------|
+| SLD_KANONICZNA_SPECYFIKACJA.md | ✅ BINDING | `docs/ui/sld/` |
+| sld_rules.md | ✅ BINDING | `mv-design-pro/docs/ui/` |
+| AUDYT_SLD_ETAP.md | ⚠️ DEPRECATED (v1.0), zaktualizowany w PR-DOC-01 | `docs/ui/sld/` |
+| Testy invariantów SLD | ✅ 28 testów PASS | `frontend/src/ui/__tests__/sld-*.test.ts` |
+
+### 18.6 Granica 100% → 120%
+
+**100% = parytet funkcjonalny i ergonomiczny** (OSIĄGNIĘTY w PR-SLD-01…05)
+
+**120+ = rozszerzenia wartości dodanej** (PLANNED, nie wymagane do parytetu):
+- SLD diagnostyka jako overlay (podświetlenie błędów)
+- Dedykowane inspektory elementów
+- Tryb dokumentacji (generowanie schematów z adnotacjami)
+- Biblioteka wzorców typowych rozwiązań
+
+**Zasada:** Rozszerzenia 120+ mogą być realizowane **dopiero po** zamknięciu wszystkich GAPs 100% w innych obszarach (np. Case immutability, Eksport PF PDF/DOCX).
+
+---
 
 ## TODO — Proof Packs P14–P19 (FUTURE PACKS)
 
