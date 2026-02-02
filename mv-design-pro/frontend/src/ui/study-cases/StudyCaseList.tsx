@@ -13,7 +13,7 @@
 import { useState, useCallback } from 'react';
 import { clsx } from 'clsx';
 import type { StudyCaseListItem, StudyCaseResultStatus } from './types';
-import { RESULT_STATUS_LABELS } from './types';
+import { RESULT_STATUS_TOOLTIPS } from './types';
 import {
   useStudyCasesStore,
   useSortedCases,
@@ -206,7 +206,7 @@ function StudyCaseListItem({
       {/* Status icon */}
       <span
         className={clsx('mr-2', STATUS_COLORS[caseItem.result_status])}
-        title={RESULT_STATUS_LABELS[caseItem.result_status]}
+        title={RESULT_STATUS_TOOLTIPS[caseItem.result_status]}
       >
         {STATUS_ICONS[caseItem.result_status]}
       </span>
