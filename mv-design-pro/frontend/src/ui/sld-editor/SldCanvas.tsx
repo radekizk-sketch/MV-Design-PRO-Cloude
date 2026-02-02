@@ -14,12 +14,14 @@
  * - Mouse interactions (click, drag, lasso)
  */
 
-import React, { useCallback, useRef } from 'react';
+import React, { useCallback, useRef, useMemo } from 'react';
 import { useSldEditorStore } from './SldEditorStore';
 import { useSldDrag } from './hooks/useSldDrag';
 import type { AnySldSymbol, Position } from './types';
 import type { IssueSeverity } from '../types';
 import { useIsMutationBlocked } from '../selection/store';
+import { generateConnections } from './utils/connectionRouting';
+import { ConnectionsLayer } from '../sld/ConnectionRenderer';
 
 /**
  * Symbol rendering component.
@@ -346,6 +348,10 @@ export const SldCanvas: React.FC = () => {
   const gridConfig = sldStore.gridConfig;
   const lassoState = sldStore.lassoState;
 
+  // Generate connections (N-01: port-to-port, N-05: orthogonal routing)
+  // DETERMINISM: Same symbols -> same connections
+  const connections = useMemo(() => generateConnections(symbols), [symbols]);
+
   // Canvas size (fixed for now, could be dynamic)
   const CANVAS_WIDTH = 1200;
   const CANVAS_HEIGHT = 800;
@@ -451,6 +457,12 @@ export const SldCanvas: React.FC = () => {
         height={CANVAS_HEIGHT}
         gridSize={gridConfig.size}
         visible={gridConfig.visible}
+      />
+
+      {/* Connections layer (rendered UNDER symbols) - N-01, N-05 */}
+      <ConnectionsLayer
+        connections={connections}
+        selectedConnectionId={null}
       />
 
       {/* Symbols */}
