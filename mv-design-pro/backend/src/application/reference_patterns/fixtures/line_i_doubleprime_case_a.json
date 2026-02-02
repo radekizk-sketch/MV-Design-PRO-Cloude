@@ -1,0 +1,52 @@
+{
+  "_description": "Wzorzec A — Przypadek referencyjny ZGODNY dla doboru I>> linii SN",
+  "_pattern_id": "RP-LINE-I2-THERMAL-SPZ",
+  "_expected_verdict": "ZGODNE",
+  "_notes_pl": "Typowa linia kablowa SN 15kV, Al 150mm2, SPZ jednokrotne, prawidlowe okno nastaw",
+
+  "line_id": "line-ref-001",
+  "line_name": "Linia SN 15kV Stacja A - Stacja B (referencja)",
+  "ct_ratio": 80.0,
+
+  "conductor": {
+    "material": "XLPE_AL",
+    "cross_section_mm2": 150.0,
+    "jthn_a_mm2": 94.0,
+    "theta_b_deg": 40.0,
+    "theta_k_deg": 250.0
+  },
+
+  "spz_config": {
+    "mode": "SINGLE",
+    "t_dead_1_s": 0.5,
+    "t_dead_2_s": 15.0,
+    "t_fault_max_s": 0.5
+  },
+
+  "local_generation": {
+    "enabled": false
+  },
+
+  "ik_max_busbars_a": 3500.0,
+  "ik_min_busbars_a": 3000.0,
+  "ik_max_next_protection_a": 1200.0,
+  "ik_min_2f_busbars_a": 2600.0,
+
+  "t_nast_1_s": 0.5,
+  "t_nast_2_s": 0.0,
+  "t_breaker_s": 0.05,
+
+  "kb": 1.2,
+  "kc": 1.5,
+  "kbth": 0.9,
+
+  "_expected_results": {
+    "i_min_sel_primary_a": 1440.0,
+    "i_max_sens_primary_a": 1733.3,
+    "ithn_a": 14100.0,
+    "tk_s": 1.1,
+    "ithdop_a": 13442.0,
+    "window_valid": true,
+    "spz_allowed": true
+  }
+}
