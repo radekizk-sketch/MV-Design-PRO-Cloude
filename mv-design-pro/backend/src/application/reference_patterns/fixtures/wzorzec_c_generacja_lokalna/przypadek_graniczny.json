@@ -1,0 +1,75 @@
+{
+  "_opis": "Wzorzec C — Przypadek GRANICZNY: zauważalny wpływ generacji lokalnej, możliwy do opanowania",
+  "_pattern_id": "RP-LOC-GEN-IMPACT",
+  "_expected_verdict": "GRANICZNE",
+  "_notes_pl": "Farma fotowoltaiczna 1 MW + magazyn BESS 500 kW w sieci SN 15 kV. Zmiana prądu zwarciowego w zakresie granicznym (10-30%). Wymagana weryfikacja nastaw zabezpieczeń.",
+
+  "punkt_zabezpieczenia_id": "pz-ref-C-graniczne",
+  "punkt_zabezpieczenia_nazwa": "Pole liniowe L-12 GPZ Wschód",
+  "szyny_id": "szyny-gpz-wschod",
+  "szyny_nazwa": "Szyny 15 kV GPZ Wschód",
+
+  "zrodla_generacji": [
+    {
+      "id": "pv-farm-001",
+      "nazwa": "Farma PV Pole Zachodnie",
+      "typ": "PV",
+      "moc_znamionowa_kw": 1000.0,
+      "prad_zwarciowy_a": 580.0
+    },
+    {
+      "id": "bess-001",
+      "nazwa": "Magazyn energii BESS",
+      "typ": "BESS",
+      "moc_znamionowa_kw": 500.0,
+      "prad_zwarciowy_a": 350.0
+    }
+  ],
+
+  "dane_bez_generacji": {
+    "ik_3f_a": 4200.0,
+    "ik_2f_a": 3640.0,
+    "ik_1f_a": 3100.0,
+    "wklad_generacji_a": 0.0
+  },
+
+  "dane_generacja_min": {
+    "ik_3f_a": 4450.0,
+    "ik_2f_a": 3854.0,
+    "ik_1f_a": 3285.0,
+    "wklad_generacji_a": 250.0
+  },
+
+  "dane_generacja_max": {
+    "ik_3f_a": 5130.0,
+    "ik_2f_a": 4443.0,
+    "ik_1f_a": 3788.0,
+    "wklad_generacji_a": 930.0
+  },
+
+  "nastawy": {
+    "i_wyzszy_stopien_a": 2100.0,
+    "i_nizszy_stopien_a": 700.0,
+    "prog_blokady_szyn_a": 1800.0
+  },
+
+  "ik_za_nastepnym_zabezpieczeniem_a": 1400.0,
+
+  "_expected_results": {
+    "_comment": "Obliczenia referencyjne",
+    "zmiana_pradu_pct": 22.1,
+    "stosunek_gen_do_blokady_pct": 51.7,
+    "margines_selektywnosci": 1.50,
+    "wynik_a": "GRANICZNE",
+    "wynik_b": "PASS",
+    "wynik_c": "PASS",
+    "verdict": "GRANICZNE"
+  },
+
+  "_calculation_trace": {
+    "_step_A_zmiana_pradu": "Delta_Ik = |5130 - 4200| / 4200 * 100% = 22.1% => 10% < 22.1% <= 30% => GRANICZNE",
+    "_step_B_blokada_szyn": "Wklad_gen = 930 A, Prog_blokady = 1800 A, Stosunek = 51.7% < 80% => PASS",
+    "_step_C_selektywnosc": "Margines = 2100 / 1400 = 1.50 >= 1.2 => PASS",
+    "_step_werdykt": "Sprawdzenie A = GRANICZNE, pozostale PASS => GRANICZNE"
+  }
+}
