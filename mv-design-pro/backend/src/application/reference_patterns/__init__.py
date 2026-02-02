@@ -71,6 +71,14 @@ from .wzorzec_c_generacja_lokalna import (
     get_pattern_c_fixtures_dir,
 )
 
+from .reporting import (
+    # Report generators
+    export_reference_pattern_to_docx,
+    export_reference_pattern_to_pdf,
+    # Metadata type
+    ReportMetadata,
+)
+
 __all__ = [
     # Types
     "ReferenceVerdict",
@@ -110,4 +118,8 @@ __all__ = [
     "load_fixture_c",
     "fixture_to_input_c",
     "get_pattern_c_fixtures_dir",
+    # Reporting
+    "export_reference_pattern_to_docx",
+    "export_reference_pattern_to_pdf",
+    "ReportMetadata",
 ]
