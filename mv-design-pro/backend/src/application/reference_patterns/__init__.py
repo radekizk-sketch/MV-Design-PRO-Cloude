@@ -34,6 +34,7 @@ from .pattern_line_i_doubleprime_thermal_spz import (
     PATTERN_ID,
     PATTERN_NAME_PL,
     NARROW_WINDOW_THRESHOLD,
+    PATTERN_A_FIXTURES_SUBDIR,
     # Validator
     LineIDoublePrimeReferencePattern,
     # Public API
@@ -41,6 +42,7 @@ from .pattern_line_i_doubleprime_thermal_spz import (
     # Fixture utilities
     load_fixture,
     fixture_to_input,
+    get_pattern_a_fixtures_dir,
 )
 
 __all__ = [
@@ -59,8 +61,10 @@ __all__ = [
     "PATTERN_ID",
     "PATTERN_NAME_PL",
     "NARROW_WINDOW_THRESHOLD",
+    "PATTERN_A_FIXTURES_SUBDIR",
     "LineIDoublePrimeReferencePattern",
     "run_pattern_a",
     "load_fixture",
     "fixture_to_input",
+    "get_pattern_a_fixtures_dir",
 ]

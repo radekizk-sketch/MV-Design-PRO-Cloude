@@ -96,8 +96,11 @@ I_{nast} \leq \frac{I''_{k,min}}{k_c \times \theta_i}
 $$
 
 **Variables:**
-- $I''_{k,min}$ — minimum fault current at busbars [A] (typically 2-phase)
+- $I''_{k,min}$ — minimum fault current at busbars [A]
 - $k_c$ — sensitivity coefficient (1.2 - 1.5, typical 1.5)
+
+**Note:** When 2-phase minimum fault current ($I''_{k,min,2f}$) is available,
+it is used instead of 3-phase minimum, as it represents the worst case for sensitivity.
 
 **Maximum setting (primary):**
 $$
@@ -202,28 +205,31 @@ $$
 
 ---
 
-### 5. Reference Data (Case A)
+### 5. Reference Cases (A, B, C)
 
-The following reference case produces verdict **ZGODNE**:
+Three reference cases are provided to validate the pattern implementation:
+
+#### 5.1 Case A: ZGODNE (Compliant)
+
+**Scenario**: Standard MV cable line with comfortable setting window.
 
 | Parameter | Symbol | Value | Unit |
 |-----------|--------|-------|------|
-| Line name | — | Linia SN 15kV Stacja A - Stacja B | — |
+| Line name | — | Linia SN 15kV GPZ Północ - RS Centrum | — |
 | CT ratio | $\theta_i$ | 80 | — |
 | Conductor material | — | XLPE Al | — |
 | Cross-section | $S$ | 150 | mm² |
 | Thermal density | $j_{th,n}$ | 94 | A/mm² |
 | Max fault at busbars | $I''_{k,max}$ | 3500 | A |
-| Min fault at busbars | $I''_{k,min}$ | 3000 | A |
+| Min fault at busbars (3ph) | $I''_{k,min,3f}$ | 3000 | A |
+| Min fault at busbars (2ph) | $I''_{k,min,2f}$ | 2600 | A |
 | Max fault at next prot. | $I''_{k,max}^{(next)}$ | 1200 | A |
 | Selectivity coeff. | $k_b$ | 1.2 | — |
 | Sensitivity coeff. | $k_c$ | 1.5 | — |
 | Thermal coeff. | $k_{bth}$ | 0.9 | — |
 | SPZ mode | — | Jednokrotne (SINGLE) | — |
-| Fault time | $t_{fault}$ | 0.5 | s |
-| Breaker time | $t_{breaker}$ | 0.05 | s |
 
-**Expected intermediate values:**
+**Calculations:**
 
 | Quantity | Formula | Value | Unit |
 |----------|---------|-------|------|
@@ -231,11 +237,72 @@ The following reference case produces verdict **ZGODNE**:
 | $t_k$ | $2 \times (0.5 + 0.05)$ | 1.1 | s |
 | $I_{th,dop}$ | $14100 / \sqrt{1.1}$ | 13442 | A |
 | $I_{min,sel}$ | $1.2 \times 1200$ | 1440 | A |
-| $I_{max,sens}$ | $3000 / 1.5$ | 2000 | A |
+| $I_{max,sens}$ | $2600 / 1.5$ (uses 2ph min) | 1733 | A |
 | $I_{max,th}$ | $0.9 \times 13442$ | 12098 | A |
-| $I_{max}$ | $\min(2000, 12098)$ | 2000 | A |
-| Window | $[1440, 2000]$ | valid | A |
-| Verdict | — | ZGODNE | — |
+| $I_{max}$ | $\min(1733, 12098)$ | 1733 | A |
+| Window | $[1440, 1733]$ | valid | A |
+| Relative width | $(1733-1440)/1440$ | 20.4% | — |
+| **Verdict** | — | **ZGODNE** | — |
+
+**Conclusion**: Wide window allows comfortable setting selection. All criteria pass.
+
+---
+
+#### 5.2 Case B: NIEZGODNE (Non-Compliant)
+
+**Scenario**: Network configuration with high fault current at downstream protection,
+causing conflict between selectivity and sensitivity criteria.
+
+| Parameter | Symbol | Value | Unit |
+|-----------|--------|-------|------|
+| Line name | — | Linia SN 15kV GPZ Wschód - Zakład Przemysłowy | — |
+| CT ratio | $\theta_i$ | 100 | — |
+| Conductor | — | XLPE Al 150 mm² | — |
+| Max fault at busbars | $I''_{k,max}$ | 8000 | A |
+| Min fault at busbars (3ph) | $I''_{k,min,3f}$ | 6000 | A |
+| Min fault at busbars (2ph) | $I''_{k,min,2f}$ | 5200 | A |
+| Max fault at next prot. | $I''_{k,max}^{(next)}$ | 6000 | A |
+
+**Calculations:**
+
+| Quantity | Formula | Value | Unit |
+|----------|---------|-------|------|
+| $I_{min,sel}$ | $1.2 \times 6000$ | 7200 | A |
+| $I_{max,sens}$ | $5200 / 1.5$ (uses 2ph min) | 3467 | A |
+| $I_{max}$ | $\min(3467, 12098)$ | 3467 | A |
+| Window | $[7200, 3467]$ | **INVALID** | A |
+| **Verdict** | — | **NIEZGODNE** | — |
+
+**Conclusion**: $I_{min} > I_{max}$ — impossible to select setting satisfying all criteria.
+Network reconfiguration or protection scheme change required.
+
+---
+
+#### 5.3 Case C: GRANICZNE (Borderline)
+
+**Scenario**: Network configuration where setting window is valid but very narrow
+(< 5% relative width).
+
+| Parameter | Symbol | Value | Unit |
+|-----------|--------|-------|------|
+| Line name | — | Linia SN 15kV GPZ Południe - RS Fabryka | — |
+| CT ratio | $\theta_i$ | 80 | — |
+| Conductor | — | XLPE Al 150 mm² | — |
+| Min fault at busbars (2ph) | $I''_{k,min,2f}$ | 3120 | A |
+| Max fault at next prot. | $I''_{k,max}^{(next)}$ | 1666.67 | A |
+
+**Calculations:**
+
+| Quantity | Formula | Value | Unit |
+|----------|---------|-------|------|
+| $I_{min,sel}$ | $1.2 \times 1666.67$ | 2000 | A |
+| $I_{max,sens}$ | $3120 / 1.5$ (uses 2ph min) | 2080 | A |
+| Window | $[2000, 2080]$ | valid | A |
+| Relative width | $(2080-2000)/2000$ | **4.0%** | — |
+| **Verdict** | — | **GRANICZNE** | — |
+
+**Conclusion**: Window is valid but narrow (< 5%). Setting selection technically possible
+but requires precision. Any network parameter change may invalidate the window.
 
 ---
 

@@ -69,6 +69,9 @@ PATTERN_NAME_PL = "Dobór I>> dla linii SN: selektywność, czułość, cieplne,
 # Narrow window threshold: (I_max - I_min) / I_min < 0.05 (5%)
 NARROW_WINDOW_THRESHOLD = 0.05
 
+# Pattern A fixture subdirectory
+PATTERN_A_FIXTURES_SUBDIR = "pattern_a_line_i_doubleprime_thermal_spz"
+
 
 # =============================================================================
 # FIXTURE LOADING
@@ -80,22 +83,45 @@ def get_fixtures_dir() -> Path:
     return Path(__file__).parent / "fixtures"
 
 
+def get_pattern_a_fixtures_dir() -> Path:
+    """Get path to Pattern A specific fixtures directory."""
+    return get_fixtures_dir() / PATTERN_A_FIXTURES_SUBDIR
+
+
 def load_fixture(filename: str) -> dict[str, Any]:
     """
     Load fixture data from JSON file.
 
+    Searches in the following order:
+    1. Pattern A specific subfolder (pattern_a_line_i_doubleprime_thermal_spz/)
+    2. Root fixtures folder (for backwards compatibility)
+
     Args:
-        filename: Fixture filename (e.g., "line_i_doubleprime_case_a.json")
+        filename: Fixture filename (e.g., "case_A_zgodne.json")
 
     Returns:
         Parsed fixture data as dictionary.
 
     Raises:
-        FileNotFoundError: If fixture file doesn't exist.
+        FileNotFoundError: If fixture file doesn't exist in any location.
     """
-    filepath = get_fixtures_dir() / filename
-    with open(filepath, encoding="utf-8") as f:
-        return json.load(f)
+    # Try Pattern A subfolder first
+    pattern_a_path = get_pattern_a_fixtures_dir() / filename
+    if pattern_a_path.exists():
+        with open(pattern_a_path, encoding="utf-8") as f:
+            return json.load(f)
+
+    # Fall back to root fixtures folder (backwards compatibility)
+    root_path = get_fixtures_dir() / filename
+    if root_path.exists():
+        with open(root_path, encoding="utf-8") as f:
+            return json.load(f)
+
+    # If neither exists, raise error with helpful message
+    raise FileNotFoundError(
+        f"Fixture '{filename}' nie znaleziony. "
+        f"Sprawdzono: {pattern_a_path}, {root_path}"
+    )
 
 
 def fixture_to_input(fixture: dict[str, Any]) -> LineOvercurrentSettingInput:
