@@ -34,6 +34,10 @@ import type {
   SourceSymbol,
   LoadSymbol,
   NodeSymbol,
+  ConnectionCreationState,
+  PortSnapState,
+  StatusMessage,
+  PortName,
 } from './types';
 import type { IssueSeverity } from '../types';
 import { generatePasteIdentifiers } from './utils/deterministicId';
@@ -81,6 +85,22 @@ interface SldEditorState {
   /** Grid configuration */
   gridConfig: GridConfig;
 
+  // ===== CONNECTION CREATION (PR-SLD-05) =====
+  /** Stan tworzenia polaczenia port-to-port */
+  connectionCreationState: ConnectionCreationState | null;
+
+  // ===== PORT SNAP (PR-SLD-05) =====
+  /** Stan snap do portu podczas przeciagania */
+  portSnapState: PortSnapState | null;
+
+  // ===== STATUS MESSAGE (PR-SLD-05) =====
+  /** Komunikat dla uzytkownika */
+  statusMessage: StatusMessage | null;
+
+  // ===== HOVER STATE (PR-SLD-05) =====
+  /** ID portu pod kursorem (dla podswietlenia) */
+  hoveredPortId: string | null;
+
   // ===== ACTIONS: SYMBOLS =====
   setSymbols: (symbols: AnySldSymbol[]) => void;
   addSymbol: (symbol: AnySldSymbol) => void;
@@ -122,6 +142,42 @@ interface SldEditorState {
   setGridSize: (size: number) => void;
   snapToGrid: (position: Position) => Position;
 
+  // ===== ACTIONS: CONNECTION CREATION (PR-SLD-05) =====
+  /** Rozpocznij tworzenie polaczenia z danego portu */
+  startConnectionCreation: (
+    symbolId: string,
+    portName: PortName,
+    position: Position,
+    elementId: string
+  ) => void;
+  /** Aktualizuj pozycje kursora podczas tworzenia polaczenia */
+  updateConnectionCreation: (
+    mousePosition: Position,
+    targetPort: ConnectionCreationState['targetPort']
+  ) => void;
+  /** Zatwierdz polaczenie do portu docelowego */
+  confirmConnection: () => { fromPort: ConnectionCreationState['fromPort']; toPort: NonNullable<ConnectionCreationState['targetPort']> } | null;
+  /** Anuluj tworzenie polaczenia */
+  cancelConnectionCreation: () => void;
+  /** Czy tryb tworzenia polaczenia jest aktywny */
+  isConnectionCreationActive: () => boolean;
+
+  // ===== ACTIONS: PORT SNAP (PR-SLD-05) =====
+  /** Ustaw stan snap do portu */
+  setPortSnapState: (state: PortSnapState | null) => void;
+
+  // ===== ACTIONS: STATUS MESSAGE (PR-SLD-05) =====
+  /** Ustaw komunikat statusu */
+  setStatusMessage: (message: StatusMessage | null) => void;
+  /** Ustaw komunikat bledu (skrot) */
+  showError: (text: string) => void;
+  /** Ustaw komunikat informacyjny (skrot) */
+  showInfo: (text: string) => void;
+
+  // ===== ACTIONS: HOVER STATE (PR-SLD-05) =====
+  /** Ustaw port pod kursorem */
+  setHoveredPort: (portId: string | null) => void;
+
   // ===== HELPERS =====
   getSymbol: (symbolId: string) => AnySldSymbol | undefined;
   hasSelection: () => boolean;
@@ -141,6 +197,11 @@ export const useSldEditorStore = create<SldEditorState>()((set, get) => ({
   lassoState: null,
   clipboard: null,
   gridConfig: DEFAULT_GRID_CONFIG,
+  // PR-SLD-05: Connection creation state
+  connectionCreationState: null,
+  portSnapState: null,
+  statusMessage: null,
+  hoveredPortId: null,
 
   // ===== SYMBOLS =====
 
@@ -578,6 +639,115 @@ export const useSldEditorStore = create<SldEditorState>()((set, get) => ({
       x: Math.round(position.x / size) * size,
       y: Math.round(position.y / size) * size,
     };
+  },
+
+  // ===== CONNECTION CREATION (PR-SLD-05) =====
+
+  startConnectionCreation: (
+    symbolId: string,
+    portName: PortName,
+    position: Position,
+    elementId: string
+  ) => {
+    set({
+      connectionCreationState: {
+        fromPort: { symbolId, portName, position, elementId },
+        currentMousePosition: position,
+        targetPort: null,
+      },
+      // Wyczysc zaznaczenie przy rozpoczeciu tworzenia polaczenia
+      selectedIds: [],
+    });
+  },
+
+  updateConnectionCreation: (
+    mousePosition: Position,
+    targetPort: ConnectionCreationState['targetPort']
+  ) => {
+    set((state) => {
+      if (!state.connectionCreationState) return state;
+      return {
+        connectionCreationState: {
+          ...state.connectionCreationState,
+          currentMousePosition: mousePosition,
+          targetPort,
+        },
+      };
+    });
+  },
+
+  confirmConnection: () => {
+    const state = get();
+    if (!state.connectionCreationState || !state.connectionCreationState.targetPort) {
+      return null;
+    }
+
+    const { fromPort, targetPort } = state.connectionCreationState;
+
+    // Wyczysc stan tworzenia polaczenia
+    set({ connectionCreationState: null });
+
+    return { fromPort, toPort: targetPort };
+  },
+
+  cancelConnectionCreation: () => {
+    set({ connectionCreationState: null });
+  },
+
+  isConnectionCreationActive: () => {
+    return get().connectionCreationState !== null;
+  },
+
+  // ===== PORT SNAP (PR-SLD-05) =====
+
+  setPortSnapState: (state: PortSnapState | null) => {
+    set({ portSnapState: state });
+  },
+
+  // ===== STATUS MESSAGE (PR-SLD-05) =====
+
+  setStatusMessage: (message: StatusMessage | null) => {
+    set({ statusMessage: message });
+  },
+
+  showError: (text: string) => {
+    set({
+      statusMessage: {
+        text,
+        type: 'error',
+        duration: 3000,
+      },
+    });
+    // Auto-ukryj po czasie
+    setTimeout(() => {
+      const current = get().statusMessage;
+      if (current?.text === text) {
+        set({ statusMessage: null });
+      }
+    }, 3000);
+  },
+
+  showInfo: (text: string) => {
+    set({
+      statusMessage: {
+        text,
+        type: 'info',
+        duration: 2000,
+      },
+    });
+    // Auto-ukryj po czasie
+    setTimeout(() => {
+      const current = get().statusMessage;
+      if (current?.text === text) {
+        set({ statusMessage: null });
+      }
+    }, 2000);
+  },
+
+  // ===== HOVER STATE (PR-SLD-05) =====
+
+  setHoveredPort: (portId: string | null) => {
+    set({ hoveredPortId: portId });
   },
 
   // ===== HELPERS =====

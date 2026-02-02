@@ -342,6 +342,285 @@ export function pointInBoundingBox(
   );
 }
 
+// =============================================================================
+// SNAP DO PORTOW (PR-SLD-05)
+// =============================================================================
+
+/** Konfiguracja snap do portow */
+export const SNAP_CONFIG = {
+  /** Promien snap w pikselach */
+  snapRadius: 12,
+  /** Promien hitbox portu dla klikaniec */
+  portHitboxRadius: 10,
+  /** Promien wizualny portu przy hover */
+  portVisualRadius: 6,
+};
+
+/** Informacja o porcie z pozycja absolutna */
+export interface PortInfo {
+  symbolId: string;
+  elementId: string;
+  portName: PortName;
+  position: Position;
+  elementType: string;
+}
+
+/**
+ * Pobierz wszystkie porty dla symbolu z pozycjami absolutnymi.
+ *
+ * @param symbol - Symbol SLD
+ * @param rotation - Rotacja symbolu (domyslnie 0)
+ * @returns Lista portow z pozycjami
+ */
+export function getSymbolPorts(symbol: AnySldSymbol, rotation: number = 0): PortInfo[] {
+  const portNames: PortName[] = ['top', 'bottom', 'left', 'right'];
+
+  return portNames.map((portName) => ({
+    symbolId: symbol.id,
+    elementId: symbol.elementId,
+    portName,
+    position: getPortPoint(symbol, portName, rotation),
+    elementType: symbol.elementType,
+  }));
+}
+
+/**
+ * Znajdz najblizszy port w promieniu snap.
+ *
+ * DETERMINIZM: Przy rownych odleglosciach wybiera port o najnizszym ID symbolu,
+ * a przy tym samym ID - port w kolejnosci: top, bottom, left, right.
+ *
+ * @param point - Punkt referencyjny
+ * @param symbols - Lista symboli do przeszukania
+ * @param excludeSymbolIds - ID symboli do wylaczenia (np. przeciagany symbol)
+ * @param snapRadius - Promien snap (domyslnie z SNAP_CONFIG)
+ * @returns Najblizszy port lub null
+ */
+export function findNearestPort(
+  point: Position,
+  symbols: AnySldSymbol[],
+  excludeSymbolIds: Set<string> = new Set(),
+  snapRadius: number = SNAP_CONFIG.snapRadius
+): PortInfo | null {
+  let nearestPort: PortInfo | null = null;
+  let nearestDistance = snapRadius;
+
+  // Kolejnosc portow dla deterministycznego tie-break
+  const portPriority: Record<PortName, number> = {
+    top: 0,
+    bottom: 1,
+    left: 2,
+    right: 3,
+  };
+
+  for (const symbol of symbols) {
+    if (excludeSymbolIds.has(symbol.id)) continue;
+
+    const ports = getSymbolPorts(symbol);
+
+    for (const portInfo of ports) {
+      const dx = portInfo.position.x - point.x;
+      const dy = portInfo.position.y - point.y;
+      const distance = Math.sqrt(dx * dx + dy * dy);
+
+      if (distance <= snapRadius) {
+        // Sprawdz czy ten port jest lepszy (blizszy lub deterministic tie-break)
+        const isBetter =
+          distance < nearestDistance ||
+          (distance === nearestDistance && nearestPort !== null && (
+            symbol.id < nearestPort.symbolId ||
+            (symbol.id === nearestPort.symbolId &&
+              portPriority[portInfo.portName] < portPriority[nearestPort.portName])
+          ));
+
+        if (isBetter || nearestPort === null) {
+          nearestPort = portInfo;
+          nearestDistance = distance;
+        }
+      }
+    }
+  }
+
+  return nearestPort;
+}
+
+/**
+ * Znajdz port w poblizu punktu (dla klikaniec).
+ * Uzywane do wykrywania klikniecia na port.
+ *
+ * @param point - Punkt klikniecia
+ * @param symbols - Lista symboli
+ * @param hitboxRadius - Promien hitbox (domyslnie z SNAP_CONFIG)
+ * @returns Port lub null
+ */
+export function findPortAtPoint(
+  point: Position,
+  symbols: AnySldSymbol[],
+  hitboxRadius: number = SNAP_CONFIG.portHitboxRadius
+): PortInfo | null {
+  return findNearestPort(point, symbols, new Set(), hitboxRadius);
+}
+
+/**
+ * Oblicz pozycje snap dla symbolu podczas przeciagania.
+ *
+ * Jesli jakikolwiek port przeciaganego symbolu jest w promieniu snap
+ * od portu innego symbolu, zwraca skorygowana pozycje centrum symbolu.
+ *
+ * @param symbol - Przeciagany symbol
+ * @param proposedPosition - Proponowana pozycja centrum symbolu
+ * @param allSymbols - Wszystkie symbole (do przeszukania portow)
+ * @param snapRadius - Promien snap
+ * @returns Skorygowana pozycja lub null jesli brak snap
+ */
+export function calculateSnapPosition(
+  symbol: AnySldSymbol,
+  proposedPosition: Position,
+  allSymbols: AnySldSymbol[],
+  snapRadius: number = SNAP_CONFIG.snapRadius
+): { position: Position; snappedPort: PortInfo; targetPort: PortInfo } | null {
+  // Tymczasowo ustaw pozycje symbolu aby obliczyc porty
+  const tempSymbol = { ...symbol, position: proposedPosition };
+  const symbolPorts = getSymbolPorts(tempSymbol);
+
+  // Szukaj snap dla kazdego portu symbolu
+  let bestSnap: { symbolPort: PortInfo; targetPort: PortInfo; distance: number } | null = null;
+
+  const excludeIds = new Set([symbol.id]);
+
+  for (const symbolPort of symbolPorts) {
+    const nearestTarget = findNearestPort(
+      symbolPort.position,
+      allSymbols,
+      excludeIds,
+      snapRadius
+    );
+
+    if (nearestTarget) {
+      const dx = nearestTarget.position.x - symbolPort.position.x;
+      const dy = nearestTarget.position.y - symbolPort.position.y;
+      const distance = Math.sqrt(dx * dx + dy * dy);
+
+      // Deterministic: wybierz port o najmniejszej odleglosci,
+      // przy rownych - port o najnizszym priority symbolu
+      if (!bestSnap || distance < bestSnap.distance ||
+          (distance === bestSnap.distance && symbolPort.portName < bestSnap.symbolPort.portName)) {
+        bestSnap = { symbolPort, targetPort: nearestTarget, distance };
+      }
+    }
+  }
+
+  if (!bestSnap) return null;
+
+  // Oblicz skorygowana pozycje centrum symbolu
+  // tak aby port symbolu pokrywal sie z portem docelowym
+  const offset = {
+    x: bestSnap.symbolPort.position.x - proposedPosition.x,
+    y: bestSnap.symbolPort.position.y - proposedPosition.y,
+  };
+
+  const snappedPosition = {
+    x: bestSnap.targetPort.position.x - offset.x,
+    y: bestSnap.targetPort.position.y - offset.y,
+  };
+
+  return {
+    position: snappedPosition,
+    snappedPort: bestSnap.symbolPort,
+    targetPort: bestSnap.targetPort,
+  };
+}
+
+// =============================================================================
+// WALIDACJA POLACZEN (PR-SLD-05)
+// =============================================================================
+
+/** Wynik walidacji polaczenia */
+export interface ConnectionValidationResult {
+  valid: boolean;
+  /** Komunikat bledu po polsku (jesli !valid) */
+  errorMessage?: string;
+}
+
+/**
+ * Waliduj polaczenie miedzy dwoma portami.
+ *
+ * Reguly walidacji (logika inzynierska):
+ * 1. Port nie moze byc polaczony z portem tego samego elementu
+ * 2. Nie mozna utworzyc duplikatu polaczenia
+ * 3. Bus moze byc polaczony z dowolnym innym typem
+ * 4. Switch/Branch musza byc polaczone z Bus
+ *
+ * @param fromPort - Port zrodlowy
+ * @param toPort - Port docelowy
+ * @param existingConnections - Istniejace polaczenia (do wykrycia duplikatow)
+ * @returns Wynik walidacji
+ */
+export function validateConnection(
+  fromPort: PortInfo,
+  toPort: PortInfo,
+  existingConnections: Array<{ fromSymbolId: string; toSymbolId: string }> = []
+): ConnectionValidationResult {
+  // Regula 1: Nie mozna polaczyc portu z portem tego samego elementu
+  if (fromPort.symbolId === toPort.symbolId) {
+    return {
+      valid: false,
+      errorMessage: 'Nie można połączyć portu z portem tego samego elementu',
+    };
+  }
+
+  // Regula 2: Sprawdz duplikaty (w obu kierunkach)
+  const isDuplicate = existingConnections.some(
+    (conn) =>
+      (conn.fromSymbolId === fromPort.symbolId && conn.toSymbolId === toPort.symbolId) ||
+      (conn.fromSymbolId === toPort.symbolId && conn.toSymbolId === fromPort.symbolId)
+  );
+
+  if (isDuplicate) {
+    return {
+      valid: false,
+      errorMessage: 'Połączenie między tymi elementami już istnieje',
+    };
+  }
+
+  // Regula 3/4: Sprawdz kompatybilnosc typow
+  const fromIsBus = fromPort.elementType === 'Bus';
+  const toIsBus = toPort.elementType === 'Bus';
+
+  // Przynajmniej jeden element musi byc szyna (Bus)
+  if (!fromIsBus && !toIsBus) {
+    return {
+      valid: false,
+      errorMessage: 'Połączenie musi zawierać przynajmniej jedną szynę zbiorczą',
+    };
+  }
+
+  return { valid: true };
+}
+
+/**
+ * Sprawdz czy port jest juz zajetny przez polaczenie.
+ *
+ * @param port - Port do sprawdzenia
+ * @param existingConnections - Istniejace polaczenia
+ * @returns true jesli port jest juz uzyty
+ */
+export function isPortOccupied(
+  port: PortInfo,
+  existingConnections: Array<{
+    fromSymbolId: string;
+    fromPortName: PortName;
+    toSymbolId: string;
+    toPortName: PortName;
+  }>
+): boolean {
+  return existingConnections.some(
+    (conn) =>
+      (conn.fromSymbolId === port.symbolId && conn.fromPortName === port.portName) ||
+      (conn.toSymbolId === port.symbolId && conn.toPortName === port.portName)
+  );
+}
+
 /**
  * Sprawdz czy odcinek liniowy przecina bounding box.
  */
