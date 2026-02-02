@@ -16,7 +16,7 @@
 
 import { describe, it, expect, beforeEach } from 'vitest';
 import { useSldEditorStore } from '../SldEditorStore';
-import type { NodeSymbol, BranchSymbol, SourceSymbol, Position } from '../types';
+import type { NodeSymbol, BranchSymbol, SourceSymbol, SwitchSymbol, LoadSymbol, Position } from '../types';
 import {
   resetIdGeneratorContext,
   generateDeterministicSymbolId,
@@ -80,6 +80,44 @@ describe('PR-SLD-03: Copy/Paste (N-03, N-07)', () => {
     elementId,
     elementType: 'Source',
     elementName: `Źródło ${id}`,
+    position: { x, y },
+    inService: true,
+    connectedToNodeId,
+  });
+
+  // Helper: Utwórz symbol łącznika (switch)
+  const createSwitchSymbol = (
+    id: string,
+    elementId: string,
+    fromNodeId: string,
+    toNodeId: string,
+    x: number,
+    y: number
+  ): SwitchSymbol => ({
+    id,
+    elementId,
+    elementType: 'Switch',
+    elementName: `Łącznik ${id}`,
+    position: { x, y },
+    inService: true,
+    fromNodeId,
+    toNodeId,
+    switchState: 'CLOSED',
+    switchType: 'BREAKER',
+  });
+
+  // Helper: Utwórz symbol odbiornika (load)
+  const createLoadSymbol = (
+    id: string,
+    elementId: string,
+    connectedToNodeId: string,
+    x: number,
+    y: number
+  ): LoadSymbol => ({
+    id,
+    elementId,
+    elementType: 'Load',
+    elementName: `Odbiornik ${id}`,
     position: { x, y },
     inService: true,
     connectedToNodeId,
@@ -406,6 +444,210 @@ describe('PR-SLD-03: Copy/Paste (N-03, N-07)', () => {
 
       const duplicateIssues = result.issues.filter((i) => i.ruleId === 'V-01b');
       expect(duplicateIssues.length).toBe(0);
+    });
+  });
+
+  // =============================================================================
+  // TEST 9: PR-SLD-03b — Odtwarzanie połączeń wewnętrznych
+  // =============================================================================
+  describe('PR-SLD-03b: Odtwarzanie połączeń wewnętrznych', () => {
+    it('powinno odtworzyć połączenie wewnętrzne dla szyna+linia+szyna', () => {
+      const store = useSldEditorStore.getState();
+
+      // Szyna 1 → Linia → Szyna 2
+      const bus1 = createNodeSymbol('bus1', 'elem_bus_1', 100, 100);
+      const bus2 = createNodeSymbol('bus2', 'elem_bus_2', 300, 100);
+      const line = createBranchSymbol('line1', 'elem_line_1', 'elem_bus_1', 'elem_bus_2', 200, 100);
+
+      store.setSymbols([bus1, bus2, line]);
+
+      // Zaznacz wszystkie i skopiuj
+      store.selectMultiple(['bus1', 'bus2', 'line1']);
+      store.copySelection();
+
+      // Wklej
+      const newSymbols = store.pasteFromClipboard({ x: 0, y: 200 });
+
+      // Powinny być 3 nowe symbole
+      expect(newSymbols.length).toBe(3);
+
+      // Znajdź nowe symbole
+      const newBus1 = newSymbols.find((s) => s.elementType === 'Bus' && s.elementName.includes('Szyna bus1'));
+      const newBus2 = newSymbols.find((s) => s.elementType === 'Bus' && s.elementName.includes('Szyna bus2'));
+      const newLine = newSymbols.find((s) => s.elementType === 'LineBranch') as BranchSymbol;
+
+      expect(newBus1).toBeDefined();
+      expect(newBus2).toBeDefined();
+      expect(newLine).toBeDefined();
+
+      // Nowe ID powinny być różne od oryginałów
+      expect(newBus1!.elementId).not.toBe('elem_bus_1');
+      expect(newBus2!.elementId).not.toBe('elem_bus_2');
+      expect(newLine!.elementId).not.toBe('elem_line_1');
+
+      // KLUCZOWE: Połączenia wewnętrzne powinny być odtworzone
+      // fromNodeId i toNodeId powinny wskazywać na NOWE elementId szyn
+      expect(newLine.fromNodeId).toBe(newBus1!.elementId);
+      expect(newLine.toNodeId).toBe(newBus2!.elementId);
+    });
+
+    it('powinno odtworzyć połączenie wewnętrzne dla szyna+łącznik+szyna', () => {
+      const store = useSldEditorStore.getState();
+
+      // Szyna 1 → Łącznik → Szyna 2
+      const bus1 = createNodeSymbol('bus1', 'elem_bus_1', 100, 100);
+      const bus2 = createNodeSymbol('bus2', 'elem_bus_2', 300, 100);
+      const sw = createSwitchSymbol('sw1', 'elem_sw_1', 'elem_bus_1', 'elem_bus_2', 200, 100);
+
+      store.setSymbols([bus1, bus2, sw]);
+      store.selectMultiple(['bus1', 'bus2', 'sw1']);
+      store.copySelection();
+
+      const newSymbols = store.pasteFromClipboard({ x: 0, y: 200 });
+
+      const newBus1 = newSymbols.find((s) => s.elementType === 'Bus' && s.elementName.includes('Szyna bus1'));
+      const newBus2 = newSymbols.find((s) => s.elementType === 'Bus' && s.elementName.includes('Szyna bus2'));
+      const newSwitch = newSymbols.find((s) => s.elementType === 'Switch') as SwitchSymbol;
+
+      expect(newSwitch.fromNodeId).toBe(newBus1!.elementId);
+      expect(newSwitch.toNodeId).toBe(newBus2!.elementId);
+    });
+
+    it('powinno odtworzyć połączenie wewnętrzne dla szyna+źródło', () => {
+      const store = useSldEditorStore.getState();
+
+      const bus = createNodeSymbol('bus1', 'elem_bus_1', 100, 100);
+      const source = createSourceSymbol('src1', 'elem_src_1', 'elem_bus_1', 50, 100);
+
+      store.setSymbols([bus, source]);
+      store.selectMultiple(['bus1', 'src1']);
+      store.copySelection();
+
+      const newSymbols = store.pasteFromClipboard({ x: 0, y: 200 });
+
+      const newBus = newSymbols.find((s) => s.elementType === 'Bus');
+      const newSource = newSymbols.find((s) => s.elementType === 'Source') as SourceSymbol;
+
+      // Połączenie wewnętrzne powinno być odtworzone
+      expect(newSource.connectedToNodeId).toBe(newBus!.elementId);
+    });
+
+    it('powinno odtworzyć połączenie wewnętrzne dla szyna+odbiornik', () => {
+      const store = useSldEditorStore.getState();
+
+      const bus = createNodeSymbol('bus1', 'elem_bus_1', 100, 100);
+      const load = createLoadSymbol('load1', 'elem_load_1', 'elem_bus_1', 150, 100);
+
+      store.setSymbols([bus, load]);
+      store.selectMultiple(['bus1', 'load1']);
+      store.copySelection();
+
+      const newSymbols = store.pasteFromClipboard({ x: 0, y: 200 });
+
+      const newBus = newSymbols.find((s) => s.elementType === 'Bus');
+      const newLoad = newSymbols.find((s) => s.elementType === 'Load') as LoadSymbol;
+
+      expect(newLoad.connectedToNodeId).toBe(newBus!.elementId);
+    });
+
+    it('połączenia zewnętrzne powinny pozostać puste', () => {
+      const store = useSldEditorStore.getState();
+
+      // Szyna zewnętrzna (nie kopiowana) + linia + szyna wewnętrzna
+      const externalBus = createNodeSymbol('ext_bus', 'elem_ext_bus', 50, 100);
+      const internalBus = createNodeSymbol('int_bus', 'elem_int_bus', 300, 100);
+      const line = createBranchSymbol('line1', 'elem_line_1', 'elem_ext_bus', 'elem_int_bus', 175, 100);
+
+      store.setSymbols([externalBus, internalBus, line]);
+
+      // Kopiuj TYLKO wewnętrzną szynę i linię (BEZ zewnętrznej szyny)
+      store.selectMultiple(['int_bus', 'line1']);
+      store.copySelection();
+
+      const newSymbols = store.pasteFromClipboard({ x: 0, y: 200 });
+
+      const newLine = newSymbols.find((s) => s.elementType === 'LineBranch') as BranchSymbol;
+      const newBus = newSymbols.find((s) => s.elementType === 'Bus');
+
+      // toNodeId (wewnętrzne) powinno być odtworzone
+      expect(newLine.toNodeId).toBe(newBus!.elementId);
+
+      // fromNodeId (zewnętrzne) powinno być puste
+      expect(newLine.fromNodeId).toBe('');
+    });
+  });
+
+  // =============================================================================
+  // TEST 10: PR-SLD-03b — Deterministyczność połączeń wewnętrznych
+  // =============================================================================
+  describe('PR-SLD-03b: Deterministyczność połączeń', () => {
+    it('to samo wklejenie powinno dać te same połączenia wewnętrzne', () => {
+      resetIdGeneratorContext();
+      const store = useSldEditorStore.getState();
+
+      const bus1 = createNodeSymbol('bus1', 'elem_bus_1', 100, 100);
+      const bus2 = createNodeSymbol('bus2', 'elem_bus_2', 300, 100);
+      const line = createBranchSymbol('line1', 'elem_line_1', 'elem_bus_1', 'elem_bus_2', 200, 100);
+
+      store.setSymbols([bus1, bus2, line]);
+      store.selectMultiple(['bus1', 'bus2', 'line1']);
+      store.copySelection();
+
+      // Zapisz stan schowka
+      const clipboardCopy = JSON.stringify(store.clipboard);
+
+      // Pierwsze wklejenie
+      const first = store.pasteFromClipboard({ x: 0, y: 200 });
+      const firstLine = first.find((s) => s.elementType === 'LineBranch') as BranchSymbol;
+      const firstFromNodeId = firstLine.fromNodeId;
+      const firstToNodeId = firstLine.toNodeId;
+
+      // Reset i powtórz
+      resetIdGeneratorContext();
+      store.setSymbols([bus1, bus2, line]);
+      store.clipboard = JSON.parse(clipboardCopy);
+
+      // Drugie wklejenie (identyczne warunki)
+      const second = store.pasteFromClipboard({ x: 0, y: 200 });
+      const secondLine = second.find((s) => s.elementType === 'LineBranch') as BranchSymbol;
+      const secondFromNodeId = secondLine.fromNodeId;
+      const secondToNodeId = secondLine.toNodeId;
+
+      // Połączenia powinny być identyczne
+      expect(secondFromNodeId).toBe(firstFromNodeId);
+      expect(secondToNodeId).toBe(firstToNodeId);
+    });
+
+    it('schowek powinien zawierać połączenia wewnętrzne posortowane deterministycznie', () => {
+      const store = useSldEditorStore.getState();
+
+      // Kilka elementów z połączeniami
+      const bus1 = createNodeSymbol('bus1', 'elem_bus_1', 100, 100);
+      const bus2 = createNodeSymbol('bus2', 'elem_bus_2', 300, 100);
+      const line = createBranchSymbol('line1', 'elem_line_1', 'elem_bus_1', 'elem_bus_2', 200, 100);
+      const source = createSourceSymbol('src1', 'elem_src_1', 'elem_bus_1', 50, 100);
+
+      store.setSymbols([bus1, bus2, line, source]);
+      store.selectMultiple(['bus1', 'bus2', 'line1', 'src1']);
+      store.copySelection();
+
+      const connections = store.clipboard!.internalConnections;
+
+      // Powinny być połączenia wewnętrzne
+      expect(connections.length).toBeGreaterThan(0);
+
+      // Powinny być posortowane deterministycznie
+      for (let i = 1; i < connections.length; i++) {
+        const prev = connections[i - 1];
+        const curr = connections[i];
+
+        const cmpResult =
+          prev.fromOriginalElementId.localeCompare(curr.fromOriginalElementId) ||
+          prev.connectionType.localeCompare(curr.connectionType) ||
+          prev.toOriginalElementId.localeCompare(curr.toOriginalElementId);
+
+        expect(cmpResult).toBeLessThanOrEqual(0);
+      }
     });
   });
 });
