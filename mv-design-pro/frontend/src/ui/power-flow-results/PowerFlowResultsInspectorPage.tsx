@@ -466,6 +466,124 @@ function BranchResultsTable() {
 }
 
 // =============================================================================
+// UI-05: Network Overall Verdict Calculation
+// =============================================================================
+
+interface NetworkProblem {
+  type: 'voltage' | 'loading';
+  element_id: string;
+  description: string;
+  severity: 'MARGINAL' | 'FAIL';
+}
+
+interface NetworkVerdictResult {
+  verdict: CoordinationVerdict;
+  problems: NetworkProblem[];
+  recommendations: string[];
+  stats: {
+    busPass: number;
+    busMarginal: number;
+    busFail: number;
+    branchPass: number;
+    branchMarginal: number;
+    branchFail: number;
+  };
+}
+
+/**
+ * UI-05: Oblicza ogólny werdykt sieci na podstawie wyników szyn i gałęzi.
+ */
+function calculateNetworkVerdict(
+  busResults: PowerFlowBusResult[],
+  branchResults: PowerFlowBranchResult[]
+): NetworkVerdictResult {
+  const problems: NetworkProblem[] = [];
+  const recommendations: string[] = [];
+  const stats = {
+    busPass: 0,
+    busMarginal: 0,
+    busFail: 0,
+    branchPass: 0,
+    branchMarginal: 0,
+    branchFail: 0,
+  };
+
+  // Analyze bus results
+  for (const bus of busResults) {
+    const result = getVoltageVerdict(bus.v_pu);
+    if (result.verdict === 'PASS') {
+      stats.busPass++;
+    } else if (result.verdict === 'MARGINAL') {
+      stats.busMarginal++;
+      problems.push({
+        type: 'voltage',
+        element_id: bus.bus_id,
+        description: `Szyna ${bus.bus_id.substring(0, 8)}...: ${result.notes}`,
+        severity: 'MARGINAL',
+      });
+    } else if (result.verdict === 'FAIL') {
+      stats.busFail++;
+      problems.push({
+        type: 'voltage',
+        element_id: bus.bus_id,
+        description: `Szyna ${bus.bus_id.substring(0, 8)}...: ${result.notes}`,
+        severity: 'FAIL',
+      });
+    }
+  }
+
+  // Analyze branch results
+  for (const branch of branchResults) {
+    const result = getBranchLoadingVerdict(null, branch.losses_p_mw);
+    if (result.verdict === 'PASS') {
+      stats.branchPass++;
+    } else if (result.verdict === 'MARGINAL') {
+      stats.branchMarginal++;
+      problems.push({
+        type: 'loading',
+        element_id: branch.branch_id,
+        description: `Galaz ${branch.branch_id.substring(0, 8)}...: ${result.notes}`,
+        severity: 'MARGINAL',
+      });
+    } else if (result.verdict === 'FAIL') {
+      stats.branchFail++;
+      problems.push({
+        type: 'loading',
+        element_id: branch.branch_id,
+        description: `Galaz ${branch.branch_id.substring(0, 8)}...: ${result.notes}`,
+        severity: 'FAIL',
+      });
+    }
+  }
+
+  // Generate recommendations
+  if (stats.busFail > 0) {
+    recommendations.push('Skoryguj poziomy napiec na szynach z przekroczeniami granic');
+  }
+  if (stats.busMarginal > 0) {
+    recommendations.push('Zweryfikuj marginesy napieciowe na szynach granicznych');
+  }
+  if (stats.branchFail > 0) {
+    recommendations.push('Rozważ wzmocnienie przeciazonych galezi lub redystrybucje obciazen');
+  }
+  if (stats.branchMarginal > 0) {
+    recommendations.push('Monitoruj galezi o wysokich stratach');
+  }
+
+  // Determine overall verdict
+  let verdict: CoordinationVerdict;
+  if (stats.busFail > 0 || stats.branchFail > 0) {
+    verdict = 'FAIL';
+  } else if (stats.busMarginal > 0 || stats.branchMarginal > 0) {
+    verdict = 'MARGINAL';
+  } else {
+    verdict = 'PASS';
+  }
+
+  return { verdict, problems, recommendations, stats };
+}
+
+// =============================================================================
 // Summary Tab (Podsumowanie)
 // =============================================================================
 
@@ -483,10 +601,74 @@ function SummaryTab() {
     return <EmptyState message="Brak wynikow do wyswietlenia." />;
   }
 
-  const { summary, converged, iterations_count, tolerance_used, base_mva, slack_bus_id } = results;
+  const { summary, converged, iterations_count, tolerance_used, base_mva, slack_bus_id, bus_results, branch_results } = results;
+
+  // UI-05: Calculate network verdict
+  const networkVerdict = useMemo(
+    () => calculateNetworkVerdict(bus_results, branch_results),
+    [bus_results, branch_results]
+  );
 
   return (
     <div className="space-y-4">
+      {/* UI-05: Overall network verdict */}
+      <div className="rounded border border-slate-200 bg-white p-4">
+        <h3 className="mb-3 text-sm font-semibold text-slate-700">Werdykt ogolny sieci</h3>
+        <div className="flex items-center gap-4">
+          <VerdictBadge
+            verdict={networkVerdict.verdict}
+            size="md"
+            notesPl={
+              networkVerdict.verdict === 'PASS'
+                ? 'Wszystkie szyny i galezi w granicach dopuszczalnych'
+                : networkVerdict.verdict === 'MARGINAL'
+                ? 'Sa elementy na granicy, ale brak przekroczen'
+                : 'Wykryto przekroczenia granic - wymagana korekta'
+            }
+          />
+          <div className="text-sm text-slate-600">
+            <span className="font-medium text-emerald-600">{networkVerdict.stats.busPass + networkVerdict.stats.branchPass}</span> zgodnych,{' '}
+            <span className="font-medium text-amber-600">{networkVerdict.stats.busMarginal + networkVerdict.stats.branchMarginal}</span> granicznych,{' '}
+            <span className="font-medium text-rose-600">{networkVerdict.stats.busFail + networkVerdict.stats.branchFail}</span> z przekroczeniami
+          </div>
+        </div>
+      </div>
+
+      {/* UI-05: Problems list (if any) */}
+      {networkVerdict.problems.length > 0 && (
+        <div className="rounded border border-amber-200 bg-amber-50 p-4">
+          <h3 className="mb-2 text-sm font-semibold text-amber-800">Wykryte problemy ({networkVerdict.problems.length})</h3>
+          <ul className="space-y-1 text-sm text-amber-700">
+            {networkVerdict.problems.slice(0, 10).map((problem, idx) => (
+              <li key={`${problem.element_id}-${idx}`} className="flex items-start gap-2">
+                <span className={problem.severity === 'FAIL' ? 'text-rose-600' : 'text-amber-600'}>
+                  {problem.severity === 'FAIL' ? '✗' : '⚠'}
+                </span>
+                {problem.description}
+              </li>
+            ))}
+            {networkVerdict.problems.length > 10 && (
+              <li className="text-amber-500">...i {networkVerdict.problems.length - 10} wiecej</li>
+            )}
+          </ul>
+        </div>
+      )}
+
+      {/* UI-05: Recommendations (if any) */}
+      {networkVerdict.recommendations.length > 0 && (
+        <div className="rounded border border-blue-200 bg-blue-50 p-4">
+          <h3 className="mb-2 text-sm font-semibold text-blue-800">Zalecane dzialania</h3>
+          <ul className="space-y-1 text-sm text-blue-700">
+            {networkVerdict.recommendations.map((rec, idx) => (
+              <li key={idx} className="flex items-start gap-2">
+                <span className="text-blue-500">→</span>
+                {rec}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
       {/* Convergence status */}
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
         <div className={`rounded border p-4 ${converged ? 'border-emerald-200 bg-emerald-50' : 'border-rose-200 bg-rose-50'}`}>
