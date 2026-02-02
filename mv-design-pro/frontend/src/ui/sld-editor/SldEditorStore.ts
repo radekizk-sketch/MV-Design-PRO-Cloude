@@ -662,17 +662,16 @@ function extractTypeSpecificProps(symbol: AnySldSymbol): Record<string, unknown>
 }
 
 /**
- * Wyodrębnij połączenia wewnętrzne (między symbolami w zestawie).
+ * Wyodrębnij połączenia wewnętrzne (między elementami w zestawie).
+ *
+ * PR-SLD-03b: Używamy elementId jako podstawy odtwarzania połączeń.
+ * Połączenia wewnętrzne to takie, których OBA końce znajdują się w zestawie.
  */
 function extractInternalConnections(
   symbols: AnySldSymbol[],
   selectedElementIds: Set<string>
 ): ClipboardInternalConnection[] {
   const connections: ClipboardInternalConnection[] = [];
-
-  // Mapa: elementId -> symbolId
-  const elementToSymbol = new Map<string, string>();
-  symbols.forEach((s) => elementToSymbol.set(s.elementId, s.id));
 
   for (const symbol of symbols) {
     // Branch: fromNodeId, toNodeId
@@ -681,26 +680,20 @@ function extractInternalConnections(
 
       // Połączenie z fromNodeId (jeśli wewnętrzne)
       if (selectedElementIds.has(branch.fromNodeId)) {
-        const fromSymbolId = elementToSymbol.get(branch.fromNodeId);
-        if (fromSymbolId) {
-          connections.push({
-            fromOriginalSymbolId: fromSymbolId,
-            toOriginalSymbolId: symbol.id,
-            connectionType: 'fromNodeId',
-          });
-        }
+        connections.push({
+          fromOriginalElementId: branch.fromNodeId,
+          toOriginalElementId: symbol.elementId,
+          connectionType: 'fromNodeId',
+        });
       }
 
       // Połączenie z toNodeId (jeśli wewnętrzne)
       if (selectedElementIds.has(branch.toNodeId)) {
-        const toSymbolId = elementToSymbol.get(branch.toNodeId);
-        if (toSymbolId) {
-          connections.push({
-            fromOriginalSymbolId: toSymbolId,
-            toOriginalSymbolId: symbol.id,
-            connectionType: 'toNodeId',
-          });
-        }
+        connections.push({
+          fromOriginalElementId: branch.toNodeId,
+          toOriginalElementId: symbol.elementId,
+          connectionType: 'toNodeId',
+        });
       }
     }
 
@@ -709,57 +702,56 @@ function extractInternalConnections(
       const sw = symbol as SwitchSymbol;
 
       if (selectedElementIds.has(sw.fromNodeId)) {
-        const fromSymbolId = elementToSymbol.get(sw.fromNodeId);
-        if (fromSymbolId) {
-          connections.push({
-            fromOriginalSymbolId: fromSymbolId,
-            toOriginalSymbolId: symbol.id,
-            connectionType: 'fromNodeId',
-          });
-        }
+        connections.push({
+          fromOriginalElementId: sw.fromNodeId,
+          toOriginalElementId: symbol.elementId,
+          connectionType: 'fromNodeId',
+        });
       }
 
       if (selectedElementIds.has(sw.toNodeId)) {
-        const toSymbolId = elementToSymbol.get(sw.toNodeId);
-        if (toSymbolId) {
-          connections.push({
-            fromOriginalSymbolId: toSymbolId,
-            toOriginalSymbolId: symbol.id,
-            connectionType: 'toNodeId',
-          });
-        }
+        connections.push({
+          fromOriginalElementId: sw.toNodeId,
+          toOriginalElementId: symbol.elementId,
+          connectionType: 'toNodeId',
+        });
       }
     }
 
-    // Source/Load: connectedToNodeId
+    // Source: connectedToNodeId
     if (symbol.elementType === 'Source') {
       const src = symbol as SourceSymbol;
       if (selectedElementIds.has(src.connectedToNodeId)) {
-        const nodeSymbolId = elementToSymbol.get(src.connectedToNodeId);
-        if (nodeSymbolId) {
-          connections.push({
-            fromOriginalSymbolId: nodeSymbolId,
-            toOriginalSymbolId: symbol.id,
-            connectionType: 'connectedToNodeId',
-          });
-        }
+        connections.push({
+          fromOriginalElementId: src.connectedToNodeId,
+          toOriginalElementId: symbol.elementId,
+          connectionType: 'connectedToNodeId',
+        });
       }
     }
 
+    // Load: connectedToNodeId
     if (symbol.elementType === 'Load') {
       const load = symbol as LoadSymbol;
       if (selectedElementIds.has(load.connectedToNodeId)) {
-        const nodeSymbolId = elementToSymbol.get(load.connectedToNodeId);
-        if (nodeSymbolId) {
-          connections.push({
-            fromOriginalSymbolId: nodeSymbolId,
-            toOriginalSymbolId: symbol.id,
-            connectionType: 'connectedToNodeId',
-          });
-        }
+        connections.push({
+          fromOriginalElementId: load.connectedToNodeId,
+          toOriginalElementId: symbol.elementId,
+          connectionType: 'connectedToNodeId',
+        });
       }
     }
   }
+
+  // PR-SLD-03b: Deterministyczne sortowanie połączeń
+  // (fromElementId, connectionType, toElementId)
+  connections.sort((a, b) => {
+    const cmp1 = a.fromOriginalElementId.localeCompare(b.fromOriginalElementId);
+    if (cmp1 !== 0) return cmp1;
+    const cmp2 = a.connectionType.localeCompare(b.connectionType);
+    if (cmp2 !== 0) return cmp2;
+    return a.toOriginalElementId.localeCompare(b.toOriginalElementId);
+  });
 
   return connections;
 }
@@ -839,25 +831,81 @@ function createNewSymbol(
 /**
  * Zastosuj połączenia wewnętrzne do nowo utworzonych symboli.
  *
+ * PR-SLD-03b: Odtwarza połączenia wewnętrzne po wklejeniu grupy.
+ *
  * Mapuje oryginalne elementId na nowe elementId dla połączeń wewnętrznych.
  * Połączenia zewnętrzne (do elementów spoza zestawu) pozostają puste.
  *
- * NOTE: W tej uproszczonej implementacji połączenia wewnętrzne nie są
- * automatycznie odtwarzane — użytkownik musi ręcznie połączyć elementy.
- * Jest to zgodne z wymaganiem ETAP: "połączenia zewnętrzne wymagają
- * ręcznego podłączenia".
+ * ETAP-STANDARD:
+ * - Połączenia WEWNĘTRZNE (oba końce w zestawie) są odtwarzane automatycznie
+ * - Połączenia ZEWNĘTRZNE (jeden koniec spoza zestawu) pozostają puste
  *
- * FUTURE: Rozszerzyć ClipboardInternalConnection o elementId zamiast symbolId
- * aby umożliwić automatyczne odtwarzanie połączeń wewnętrznych.
+ * @param newSymbols - Nowo utworzone symbole (z nowymi elementId)
+ * @param connections - Lista połączeń wewnętrznych ze schowka
+ * @param elementIdMapping - Mapa: stary elementId -> nowy elementId
  */
 function applyInternalConnections(
-  _newSymbols: AnySldSymbol[],
-  _connections: ClipboardInternalConnection[],
-  _elementIdMapping: Map<string, string>
+  newSymbols: AnySldSymbol[],
+  connections: ClipboardInternalConnection[],
+  elementIdMapping: Map<string, string>
 ): void {
-  // SIMPLIFIED: Połączenia wewnętrzne pozostają puste w tej wersji.
-  // Użytkownik musi ręcznie połączyć elementy po wklejeniu.
-  // Jest to akceptowalne zachowanie zgodne z ETAP-standardem.
+  // Brak połączeń do odtworzenia
+  if (connections.length === 0) return;
+
+  // Mapa: nowy elementId -> symbol (dla szybkiego dostępu)
+  const newElementToSymbol = new Map<string, AnySldSymbol>();
+  for (const symbol of newSymbols) {
+    newElementToSymbol.set(symbol.elementId, symbol);
+  }
+
+  // Przetwórz każde połączenie wewnętrzne
+  for (const conn of connections) {
+    // Znajdź nowe elementId dla obu końców
+    const newFromElementId = elementIdMapping.get(conn.fromOriginalElementId);
+    const newToElementId = elementIdMapping.get(conn.toOriginalElementId);
+
+    // Jeśli któryś koniec nie został zmapowany, pomiń (diagnostyka)
+    if (!newFromElementId || !newToElementId) {
+      // eslint-disable-next-line no-console
+      console.debug(
+        `[PR-SLD-03b] Pominięto połączenie wewnętrzne: brak mapowania dla ` +
+        `from=${conn.fromOriginalElementId} lub to=${conn.toOriginalElementId}`
+      );
+      continue;
+    }
+
+    // Znajdź symbol docelowy (element łączący: branch, switch, source, load)
+    const targetSymbol = newElementToSymbol.get(newToElementId);
+    if (!targetSymbol) {
+      // eslint-disable-next-line no-console
+      console.debug(
+        `[PR-SLD-03b] Pominięto połączenie wewnętrzne: nie znaleziono symbolu ` +
+        `dla elementId=${newToElementId}`
+      );
+      continue;
+    }
+
+    // Ustaw odpowiednie pole w zależności od typu połączenia
+    switch (conn.connectionType) {
+      case 'fromNodeId':
+        if ('fromNodeId' in targetSymbol) {
+          (targetSymbol as BranchSymbol | SwitchSymbol).fromNodeId = newFromElementId;
+        }
+        break;
+
+      case 'toNodeId':
+        if ('toNodeId' in targetSymbol) {
+          (targetSymbol as BranchSymbol | SwitchSymbol).toNodeId = newFromElementId;
+        }
+        break;
+
+      case 'connectedToNodeId':
+        if ('connectedToNodeId' in targetSymbol) {
+          (targetSymbol as SourceSymbol | LoadSymbol).connectedToNodeId = newFromElementId;
+        }
+        break;
+    }
+  }
 }
 
 /**

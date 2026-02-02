@@ -216,16 +216,19 @@ export interface ClipboardSymbolSnapshot {
 
 /**
  * Połączenie wewnętrzne w schowku.
- * Łączy symbole WEWNĄTRZ zestawu wklejanego (nie do zewnętrznych).
+ * Łączy elementy WEWNĄTRZ zestawu wklejanego (nie do zewnętrznych).
+ *
+ * PR-SLD-03b: Używamy elementId (nie symbolId) jako podstawy odtwarzania połączeń.
+ * To zapewnia poprawne odtworzenie połączeń nawet gdy symbolId się zmienia.
  */
 export interface ClipboardInternalConnection {
-  /** Oryginalny ID symbolu źródłowego */
-  fromOriginalSymbolId: string;
+  /** Oryginalny elementId węzła (Bus) */
+  fromOriginalElementId: string;
 
-  /** Oryginalny ID symbolu docelowego */
-  toOriginalSymbolId: string;
+  /** Oryginalny elementId elementu łączącego (Branch, Switch, Source, Load) */
+  toOriginalElementId: string;
 
-  /** Typ połączenia */
+  /** Typ połączenia (określa które pole ustawić) */
   connectionType: 'fromNodeId' | 'toNodeId' | 'connectedToNodeId';
 }
 
