@@ -216,3 +216,42 @@ export type ToolbarAction =
   | 'distribute-v'
   | 'toggle-grid'
   | 'toggle-snap';
+
+// =============================================================================
+// CONNECTION TYPES (N-01, N-05)
+// =============================================================================
+
+/**
+ * Port name for connection endpoints.
+ */
+export type PortName = 'top' | 'bottom' | 'left' | 'right';
+
+/**
+ * Connection between two symbol ports (port-to-port).
+ * Per SLD_KANONICZNA_SPECYFIKACJA.md § 4: Polaczenia.
+ */
+export interface Connection {
+  /** Unique connection ID */
+  id: string;
+
+  /** Source symbol ID */
+  fromSymbolId: string;
+
+  /** Source port name */
+  fromPortName: PortName;
+
+  /** Target symbol ID */
+  toSymbolId: string;
+
+  /** Target port name */
+  toPortName: PortName;
+
+  /** Path points (orthogonal polyline) */
+  path: Position[];
+
+  /** Element ID in NetworkModel (for highlighting) */
+  elementId?: string;
+
+  /** Connection type (for styling) */
+  connectionType?: 'branch' | 'switch' | 'source' | 'load';
+}

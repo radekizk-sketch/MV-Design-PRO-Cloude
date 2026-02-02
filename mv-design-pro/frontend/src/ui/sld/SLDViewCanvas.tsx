@@ -31,6 +31,8 @@ import type { SLDViewCanvasProps, ViewportState } from './types';
 import { resolveSymbol, type ResolvedSymbol } from './SymbolResolver';
 import { EtapSymbol, type SwitchState } from './EtapSymbolRenderer';
 import { calculateEnergization } from './energization';
+import { ConnectionsLayer } from './ConnectionRenderer';
+import { generateConnections } from '../sld-editor/utils/connectionRouting';
 
 /**
  * Symbol size configuration.
@@ -400,6 +402,22 @@ export const SLDViewCanvas: React.FC<SLDViewCanvasProps> = ({
   // Calculate energization state (UI-only, deterministic)
   const energizationState = useMemo(() => calculateEnergization(symbols), [symbols]);
 
+  // Generate connections (N-01: port-to-port, N-05: orthogonal routing)
+  // DETERMINISM: Same symbols -> same connections
+  const connections = useMemo(() => generateConnections(symbols), [symbols]);
+
+  // Build energization map for connections
+  const connectionEnergizationMap = useMemo(() => {
+    const map = new Map<string, boolean>();
+    connections.forEach((conn) => {
+      // Connection is energized if both endpoints are energized
+      const fromEnergized = energizationState.energizedElements.get(conn.fromSymbolId) ?? true;
+      const toEnergized = energizationState.energizedElements.get(conn.toSymbolId) ?? true;
+      map.set(conn.id, fromEnergized && toEnergized);
+    });
+    return map;
+  }, [connections, energizationState]);
+
   return (
     <svg
       data-testid="sld-view-canvas"
@@ -416,6 +434,13 @@ export const SLDViewCanvas: React.FC<SLDViewCanvasProps> = ({
         transform={`translate(${viewport.offsetX}, ${viewport.offsetY}) scale(${viewport.zoom})`}
         data-testid="sld-content-group"
       >
+        {/* Connections layer (rendered UNDER symbols) */}
+        <ConnectionsLayer
+          connections={connections}
+          selectedConnectionId={null}
+          energizationMap={connectionEnergizationMap}
+        />
+
         {/* Render symbols with energization state */}
         {sortedSymbols.map((symbol) => (
           <Symbol
