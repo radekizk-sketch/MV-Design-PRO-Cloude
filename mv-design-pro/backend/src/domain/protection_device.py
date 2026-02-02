@@ -582,3 +582,193 @@ class ProtectionCoordinationResult:
             summary=data.get("summary", {}),
             created_at=datetime.fromisoformat(data["created_at"]) if "created_at" in data else datetime.now(timezone.utc),
         )
+
+
+# =============================================================================
+# I>> SETTING CHECKS (FIX-12D Integration)
+# =============================================================================
+
+
+@dataclass(frozen=True)
+class InstantaneousSelectivityCheck:
+    """
+    Result of I>> selectivity check (selektywność I>>).
+
+    Verifies I>> setting is above max fault at next protection.
+    Criterion: I_nast >= kb * Ikmax(next_protection) / θi
+
+    Attributes:
+        line_id: Line/branch identifier
+        i_setting_a: I>> setting [A]
+        i_min_required_a: Minimum required setting [A]
+        ik_max_next_a: Max fault at next protection [A]
+        kb_used: Selectivity coefficient used
+        ct_ratio: CT ratio used
+        verdict: PASS/MARGINAL/FAIL
+        notes_pl: Polish explanation
+    """
+
+    line_id: str
+    i_setting_a: float
+    i_min_required_a: float
+    ik_max_next_a: float
+    kb_used: float
+    ct_ratio: float
+    verdict: CoordinationVerdict
+    notes_pl: str
+
+    def to_dict(self) -> dict[str, Any]:
+        """Serialize to dictionary."""
+        return {
+            "check_type": "instantaneous_selectivity",
+            "check_type_pl": "Selektywność I>>",
+            "line_id": self.line_id,
+            "i_setting_a": self.i_setting_a,
+            "i_min_required_a": self.i_min_required_a,
+            "ik_max_next_a": self.ik_max_next_a,
+            "kb_used": self.kb_used,
+            "ct_ratio": self.ct_ratio,
+            "verdict": self.verdict.value,
+            "verdict_pl": VERDICT_LABELS_PL.get(self.verdict.value, self.verdict.value),
+            "notes_pl": self.notes_pl,
+        }
+
+
+@dataclass(frozen=True)
+class InstantaneousSensitivityCheck:
+    """
+    Result of I>> sensitivity check (czułość I>>).
+
+    Verifies I>> will trip for minimum fault at busbars.
+    Criterion: Ikmin(busbars) / θi >= kc * I_nast
+
+    Attributes:
+        line_id: Line/branch identifier
+        i_setting_a: I>> setting [A]
+        i_max_allowed_a: Maximum allowed setting [A]
+        ik_min_busbars_a: Min fault at busbars [A]
+        kc_used: Sensitivity coefficient used
+        ct_ratio: CT ratio used
+        verdict: PASS/MARGINAL/FAIL
+        notes_pl: Polish explanation
+    """
+
+    line_id: str
+    i_setting_a: float
+    i_max_allowed_a: float
+    ik_min_busbars_a: float
+    kc_used: float
+    ct_ratio: float
+    verdict: CoordinationVerdict
+    notes_pl: str
+
+    def to_dict(self) -> dict[str, Any]:
+        """Serialize to dictionary."""
+        return {
+            "check_type": "instantaneous_sensitivity",
+            "check_type_pl": "Czułość I>>",
+            "line_id": self.line_id,
+            "i_setting_a": self.i_setting_a,
+            "i_max_allowed_a": self.i_max_allowed_a,
+            "ik_min_busbars_a": self.ik_min_busbars_a,
+            "kc_used": self.kc_used,
+            "ct_ratio": self.ct_ratio,
+            "verdict": self.verdict.value,
+            "verdict_pl": VERDICT_LABELS_PL.get(self.verdict.value, self.verdict.value),
+            "notes_pl": self.notes_pl,
+        }
+
+
+@dataclass(frozen=True)
+class InstantaneousThermalCheck:
+    """
+    Result of I>> thermal check (wytrzymałość cieplna I>>).
+
+    Verifies I>> setting protects conductor thermal capacity.
+    Criterion: I_nast <= kbth * Ithdop / θi
+
+    Attributes:
+        line_id: Line/branch identifier
+        i_setting_a: I>> setting [A]
+        i_max_thermal_a: Maximum setting from thermal [A]
+        ithn_a: Rated short-time current 1s [A]
+        ithdop_a: Permissible thermal current [A]
+        tk_s: Total fault duration [s]
+        kbth_used: Thermal coefficient used
+        ct_ratio: CT ratio used
+        verdict: PASS/MARGINAL/FAIL
+        notes_pl: Polish explanation
+    """
+
+    line_id: str
+    i_setting_a: float
+    i_max_thermal_a: float
+    ithn_a: float
+    ithdop_a: float
+    tk_s: float
+    kbth_used: float
+    ct_ratio: float
+    verdict: CoordinationVerdict
+    notes_pl: str
+
+    def to_dict(self) -> dict[str, Any]:
+        """Serialize to dictionary."""
+        return {
+            "check_type": "instantaneous_thermal",
+            "check_type_pl": "Wytrzymałość cieplna I>>",
+            "line_id": self.line_id,
+            "i_setting_a": self.i_setting_a,
+            "i_max_thermal_a": self.i_max_thermal_a,
+            "ithn_a": self.ithn_a,
+            "ithdop_a": self.ithdop_a,
+            "tk_s": self.tk_s,
+            "kbth_used": self.kbth_used,
+            "ct_ratio": self.ct_ratio,
+            "verdict": self.verdict.value,
+            "verdict_pl": VERDICT_LABELS_PL.get(self.verdict.value, self.verdict.value),
+            "notes_pl": self.notes_pl,
+        }
+
+
+@dataclass(frozen=True)
+class SPZFromInstantaneousCheck:
+    """
+    Result of SPZ blocking from I>> check.
+
+    Verifies if SPZ should be blocked when I>> operates.
+
+    Attributes:
+        line_id: Line/branch identifier
+        spz_allowed: Whether SPZ is allowed
+        blocking_reason_pl: Reason for blocking (if blocked)
+        i_threshold_a: Current threshold for SPZ decision [A]
+        i_fault_start_a: Fault current at line start [A]
+        tk_single_s: Single fault duration [s]
+        verdict: PASS (SPZ allowed) / FAIL (SPZ blocked)
+        notes_pl: Polish explanation
+    """
+
+    line_id: str
+    spz_allowed: bool
+    blocking_reason_pl: str | None
+    i_threshold_a: float
+    i_fault_start_a: float
+    tk_single_s: float
+    verdict: CoordinationVerdict
+    notes_pl: str
+
+    def to_dict(self) -> dict[str, Any]:
+        """Serialize to dictionary."""
+        return {
+            "check_type": "spz_from_instantaneous",
+            "check_type_pl": "SPZ od I>>",
+            "line_id": self.line_id,
+            "spz_allowed": self.spz_allowed,
+            "blocking_reason_pl": self.blocking_reason_pl,
+            "i_threshold_a": self.i_threshold_a,
+            "i_fault_start_a": self.i_fault_start_a,
+            "tk_single_s": self.tk_single_s,
+            "verdict": self.verdict.value,
+            "verdict_pl": VERDICT_LABELS_PL.get(self.verdict.value, self.verdict.value),
+            "notes_pl": self.notes_pl,
+        }
