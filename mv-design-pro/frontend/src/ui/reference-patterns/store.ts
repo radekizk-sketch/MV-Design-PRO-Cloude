@@ -16,6 +16,8 @@ import {
   fetchPatterns,
   fetchPatternFixtures,
   runPatternWithFixture,
+  exportPatternToPdf,
+  exportPatternToDocx,
 } from './api';
 
 // =============================================================================
@@ -44,6 +46,10 @@ interface ReferencePatternsState {
   // Trace search
   traceSearchQuery: string;
 
+  // Export state
+  isExporting: boolean;
+  exportError: string | null;
+
   // Actions
   loadPatterns: () => Promise<void>;
   selectPattern: (patternId: string) => void;
@@ -53,6 +59,9 @@ interface ReferencePatternsState {
   runFixture: (fixtureFilename: string) => Promise<void>;
   setActiveTab: (tab: ReferencePatternsTab) => void;
   setTraceSearchQuery: (query: string) => void;
+  exportToPdf: (fixtureFilename: string) => Promise<void>;
+  exportToDocx: (fixtureFilename: string) => Promise<void>;
+  clearExportError: () => void;
   reset: () => void;
 }
 
@@ -72,6 +81,8 @@ const initialState = {
   runError: null,
   activeTab: 'WYNIK' as ReferencePatternsTab,
   traceSearchQuery: '',
+  isExporting: false,
+  exportError: null,
 };
 
 // =============================================================================
@@ -168,6 +179,38 @@ export const useReferencePatternsStore = create<ReferencePatternsState>((set, ge
   setActiveTab: (tab) => set({ activeTab: tab }),
 
   setTraceSearchQuery: (query) => set({ traceSearchQuery: query }),
+
+  exportToPdf: async (fixtureFilename) => {
+    set({ isExporting: true, exportError: null });
+    try {
+      await exportPatternToPdf(fixtureFilename);
+      set({ isExporting: false });
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Nieznany błąd eksportu';
+      console.error('Failed to export PDF:', error);
+      set({
+        isExporting: false,
+        exportError: errorMessage,
+      });
+    }
+  },
+
+  exportToDocx: async (fixtureFilename) => {
+    set({ isExporting: true, exportError: null });
+    try {
+      await exportPatternToDocx(fixtureFilename);
+      set({ isExporting: false });
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Nieznany błąd eksportu';
+      console.error('Failed to export DOCX:', error);
+      set({
+        isExporting: false,
+        exportError: errorMessage,
+      });
+    }
+  },
+
+  clearExportError: () => set({ exportError: null }),
 
   reset: () => set(initialState),
 }));

@@ -72,3 +72,87 @@ export async function runPattern(
 
   return response.json();
 }
+
+// =============================================================================
+// Export Functions — PDF and DOCX
+// =============================================================================
+
+/**
+ * Download a blob as a file.
+ */
+function downloadBlob(blob: Blob, filename: string): void {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+/**
+ * Export reference pattern result to PDF.
+ *
+ * @param fixtureFile - Fixture filename (e.g., "case_A_zgodne.json")
+ * @returns Promise that resolves when download starts
+ */
+export async function exportPatternToPdf(fixtureFile: string): Promise<void> {
+  const response = await fetch(
+    `${API_BASE}/fixtures/${encodeURIComponent(fixtureFile)}/export/pdf`
+  );
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(
+      errorData.detail || `Nie udało się pobrać raportu PDF: ${response.statusText}`
+    );
+  }
+
+  const blob = await response.blob();
+
+  // Extract filename from Content-Disposition header or generate default
+  const contentDisposition = response.headers.get('Content-Disposition');
+  let filename = `wzorzec_odniesienia_${fixtureFile.replace('.json', '')}.pdf`;
+  if (contentDisposition) {
+    const match = contentDisposition.match(/filename="?([^"]+)"?/);
+    if (match) {
+      filename = match[1];
+    }
+  }
+
+  downloadBlob(blob, filename);
+}
+
+/**
+ * Export reference pattern result to DOCX.
+ *
+ * @param fixtureFile - Fixture filename (e.g., "case_A_zgodne.json")
+ * @returns Promise that resolves when download starts
+ */
+export async function exportPatternToDocx(fixtureFile: string): Promise<void> {
+  const response = await fetch(
+    `${API_BASE}/fixtures/${encodeURIComponent(fixtureFile)}/export/docx`
+  );
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(
+      errorData.detail || `Nie udało się pobrać raportu DOCX: ${response.statusText}`
+    );
+  }
+
+  const blob = await response.blob();
+
+  // Extract filename from Content-Disposition header or generate default
+  const contentDisposition = response.headers.get('Content-Disposition');
+  let filename = `wzorzec_odniesienia_${fixtureFile.replace('.json', '')}.docx`;
+  if (contentDisposition) {
+    const match = contentDisposition.match(/filename="?([^"]+)"?/);
+    if (match) {
+      filename = match[1];
+    }
+  }
+
+  downloadBlob(blob, filename);
+}
