@@ -11,17 +11,17 @@ Creates Word document report with:
 CANONICAL ALIGNMENT:
 - NOT-A-SOLVER: Only formatting, no physics calculations
 - 100% Polish labels
-- Deterministic output
+- Deterministic output (uses shared docx_determinism module)
 """
 
 from __future__ import annotations
 
-import zipfile
-import hashlib
-from datetime import datetime, timezone
 from io import BytesIO
 from pathlib import Path
 from typing import Any
+
+# Import shared determinism module
+from network_model.reporting.docx_determinism import make_docx_bytes_deterministic
 
 # Check for python-docx availability
 try:
@@ -66,101 +66,6 @@ def _format_value(value: Any) -> str:
         return "Tak" if value else "Nie"
     return str(value)
 
-
-def make_docx_deterministic(docx_bytes: bytes) -> bytes:
-    """
-    Remove non-deterministic metadata from DOCX to ensure binary reproducibility.
-
-    DOCX files are ZIP archives containing XML files. We normalize:
-    - Creation/modification dates
-    - App version strings
-    - Random IDs
-
-    Args:
-        docx_bytes: Original DOCX file bytes
-
-    Returns:
-        Normalized DOCX bytes (deterministic)
-    """
-    # Fixed timestamp for determinism
-    FIXED_TIMESTAMP = datetime(2024, 1, 1, 0, 0, 0, tzinfo=timezone.utc)
-
-    input_zip = zipfile.ZipFile(BytesIO(docx_bytes), "r")
-    output_buffer = BytesIO()
-
-    with zipfile.ZipFile(output_buffer, "w", zipfile.ZIP_DEFLATED) as output_zip:
-        # Sort entries for deterministic order
-        for item in sorted(input_zip.namelist()):
-            data = input_zip.read(item)
-
-            # Normalize core.xml (dates, creator)
-            if item == "docProps/core.xml":
-                data = _normalize_core_xml(data, FIXED_TIMESTAMP)
-
-            # Normalize app.xml (application version)
-            if item == "docProps/app.xml":
-                data = _normalize_app_xml(data)
-
-            # Write with fixed date
-            info = zipfile.ZipInfo(item)
-            info.date_time = FIXED_TIMESTAMP.timetuple()[:6]
-            info.compress_type = zipfile.ZIP_DEFLATED
-            output_zip.writestr(info, data)
-
-    input_zip.close()
-    return output_buffer.getvalue()
-
-
-def _normalize_core_xml(data: bytes, timestamp: datetime) -> bytes:
-    """Normalize core.xml properties."""
-    import re
-
-    text = data.decode("utf-8")
-
-    # Fixed date strings
-    iso_date = timestamp.strftime("%Y-%m-%dT%H:%M:%SZ")
-
-    # Replace dates
-    text = re.sub(
-        r"<dcterms:created[^>]*>.*?</dcterms:created>",
-        f'<dcterms:created xsi:type="dcterms:W3CDTF">{iso_date}</dcterms:created>',
-        text,
-    )
-    text = re.sub(
-        r"<dcterms:modified[^>]*>.*?</dcterms:modified>",
-        f'<dcterms:modified xsi:type="dcterms:W3CDTF">{iso_date}</dcterms:modified>',
-        text,
-    )
-
-    # Replace creator
-    text = re.sub(
-        r"<dc:creator>.*?</dc:creator>",
-        "<dc:creator>MV-DESIGN-PRO</dc:creator>",
-        text,
-    )
-
-    return text.encode("utf-8")
-
-
-def _normalize_app_xml(data: bytes) -> bytes:
-    """Normalize app.xml properties."""
-    import re
-
-    text = data.decode("utf-8")
-
-    # Fixed application name
-    text = re.sub(
-        r"<Application>.*?</Application>",
-        "<Application>MV-DESIGN-PRO</Application>",
-        text,
-    )
-    text = re.sub(
-        r"<AppVersion>.*?</AppVersion>",
-        "<AppVersion>1.0.0</AppVersion>",
-        text,
-    )
-
-    return text.encode("utf-8")
 
 
 def export_protection_coordination_to_docx(
@@ -266,12 +171,52 @@ def export_protection_coordination_to_docx(
     doc.add_paragraph()
 
     # ==========================================================================
+    # DEVICE SETTINGS TABLE
+    # ==========================================================================
+    doc.add_heading("Tabela urządzeń i nastaw", level=1)
+
+    devices = result.get("devices", [])
+    if devices:
+        # Sort by device name for deterministic order
+        sorted_devices = sorted(devices, key=lambda d: d.get("name", d.get("id", "")))
+
+        dev_table = doc.add_table(rows=1, cols=5)
+        dev_table.style = "Table Grid"
+
+        # Header
+        dev_headers = ["Nazwa", "Typ", "I_pickup [A]", "TMS", "Krzywa"]
+        hdr_cells = dev_table.rows[0].cells
+        for i, h in enumerate(dev_headers):
+            hdr_cells[i].text = h
+            hdr_cells[i].paragraphs[0].runs[0].bold = True
+
+        # Data rows
+        for dev in sorted_devices:
+            row = dev_table.add_row().cells
+            settings = dev.get("settings", {})
+            stage_51 = settings.get("stage_51", {})
+            curve_settings = stage_51.get("curve_settings", {})
+
+            row[0].text = dev.get("name", "—")[:20]
+            row[1].text = dev.get("device_type", "—")[:15]
+            row[2].text = _format_value(stage_51.get("pickup_current_a"))
+            row[3].text = _format_value(curve_settings.get("time_multiplier"))
+            row[4].text = curve_settings.get("variant", "—")
+    else:
+        doc.add_paragraph("Brak urządzeń", style="No Spacing")
+
+    doc.add_paragraph()
+
+    # ==========================================================================
     # SENSITIVITY CHECKS
     # ==========================================================================
     doc.add_heading("Sprawdzenie czułości (I_min / I_pickup)", level=1)
 
     sensitivity_checks = result.get("sensitivity_checks", [])
     if sensitivity_checks:
+        # Sort by device_id for deterministic order
+        sorted_sens_checks = sorted(sensitivity_checks, key=lambda c: c.get("device_id", ""))
+
         sens_table = doc.add_table(rows=1, cols=5)
         sens_table.style = "Table Grid"
 
@@ -283,7 +228,7 @@ def export_protection_coordination_to_docx(
             hdr_cells[i].paragraphs[0].runs[0].bold = True
 
         # Data
-        for check in sensitivity_checks:
+        for check in sorted_sens_checks:
             row = sens_table.add_row().cells
             row[0].text = check.get("device_id", "—")[:12]
             row[1].text = _format_value(check.get("i_fault_min_a"))
@@ -308,6 +253,12 @@ def export_protection_coordination_to_docx(
 
     selectivity_checks = result.get("selectivity_checks", [])
     if selectivity_checks:
+        # Sort by (downstream_device_id, upstream_device_id) for deterministic order
+        sorted_sel_checks = sorted(
+            selectivity_checks,
+            key=lambda c: (c.get("downstream_device_id", ""), c.get("upstream_device_id", ""))
+        )
+
         sel_table = doc.add_table(rows=1, cols=6)
         sel_table.style = "Table Grid"
 
@@ -319,7 +270,7 @@ def export_protection_coordination_to_docx(
             hdr_cells[i].paragraphs[0].runs[0].bold = True
 
         # Data
-        for check in selectivity_checks:
+        for check in sorted_sel_checks:
             row = sel_table.add_row().cells
             row[0].text = check.get("downstream_device_id", "—")[:12]
             row[1].text = check.get("upstream_device_id", "—")[:12]
@@ -345,6 +296,9 @@ def export_protection_coordination_to_docx(
 
     overload_checks = result.get("overload_checks", [])
     if overload_checks:
+        # Sort by device_id for deterministic order
+        sorted_ovl_checks = sorted(overload_checks, key=lambda c: c.get("device_id", ""))
+
         ovl_table = doc.add_table(rows=1, cols=5)
         ovl_table.style = "Table Grid"
 
@@ -356,7 +310,7 @@ def export_protection_coordination_to_docx(
             hdr_cells[i].paragraphs[0].runs[0].bold = True
 
         # Data
-        for check in overload_checks:
+        for check in sorted_ovl_checks:
             row = ovl_table.add_row().cells
             row[0].text = check.get("device_id", "—")[:12]
             row[1].text = _format_value(check.get("i_operating_a"))
@@ -381,6 +335,9 @@ def export_protection_coordination_to_docx(
 
     tcc_curves = result.get("tcc_curves", [])
     if tcc_curves:
+        # Sort by device_name for deterministic order
+        sorted_tcc_curves = sorted(tcc_curves, key=lambda c: c.get("device_name", ""))
+
         tcc_table = doc.add_table(rows=1, cols=4)
         tcc_table.style = "Table Grid"
 
@@ -392,7 +349,7 @@ def export_protection_coordination_to_docx(
             hdr_cells[i].paragraphs[0].runs[0].bold = True
 
         # Data
-        for curve in tcc_curves:
+        for curve in sorted_tcc_curves:
             row = tcc_table.add_row().cells
             row[0].text = curve.get("device_name", "—")[:20]
             row[1].text = curve.get("curve_type", "—")
@@ -420,9 +377,9 @@ def export_protection_coordination_to_docx(
     doc.save(buffer)
     docx_bytes = buffer.getvalue()
 
-    # Make deterministic if requested
+    # Make deterministic if requested (use shared module)
     if deterministic:
-        docx_bytes = make_docx_deterministic(docx_bytes)
+        docx_bytes = make_docx_bytes_deterministic(docx_bytes)
 
     # Write to file
     output_path.write_bytes(docx_bytes)

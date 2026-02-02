@@ -13,6 +13,7 @@ CANONICAL ALIGNMENT:
 - NOT-A-SOLVER: Only formatting, no physics calculations
 - 100% Polish labels
 - UTF-8 encoding
+- DETERMINISTIC: invariant mode for binary reproducibility
 """
 
 from __future__ import annotations
@@ -22,6 +23,7 @@ from typing import Any
 
 # Check for reportlab availability at import time
 try:
+    from reportlab import rl_config
     from reportlab.pdfgen import canvas
     from reportlab.lib.pagesizes import A4
     from reportlab.lib.units import mm
@@ -30,6 +32,7 @@ try:
     _PDF_AVAILABLE = True
 except ImportError:
     _PDF_AVAILABLE = False
+    rl_config = None  # type: ignore
 
 
 # =============================================================================
@@ -94,8 +97,18 @@ def export_protection_coordination_to_pdf(
     output_path = Path(path)
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
-    # Create PDF canvas
-    c = canvas.Canvas(str(output_path), pagesize=A4)
+    # Enable deterministic PDF generation
+    rl_config.invariant = 1
+
+    # Create PDF canvas with invariant mode
+    c = canvas.Canvas(str(output_path), pagesize=A4, invariant=1, pageCompression=0)
+
+    # Set fixed metadata for determinism
+    c.setCreator("MV-DESIGN-PRO")
+    c.setAuthor("MV-DESIGN-PRO")
+    c.setTitle("Raport koordynacji zabezpieczeń nadprądowych")
+    c.setSubject("Raport deterministyczny — analiza koordynacji")
+
     page_width, page_height = A4
 
     # Margins and layout
@@ -229,7 +242,48 @@ def export_protection_coordination_to_pdf(
     y -= section_spacing
 
     # ==========================================================================
-    # 4) SENSITIVITY CHECKS
+    # 4) DEVICE SETTINGS TABLE
+    # ==========================================================================
+    y = check_page_break(30 * mm)
+    draw_text("Tabela urządzeń i nastaw", left_margin, font_size=14, bold=True)
+    y -= 3 * mm
+
+    devices = result.get("devices", [])
+    if devices:
+        # Sort by device name for deterministic order
+        sorted_devices = sorted(devices, key=lambda d: d.get("name", d.get("id", "")))
+        dev_cols = [35 * mm, 25 * mm, 25 * mm, 25 * mm, 25 * mm]
+        draw_table_row(
+            ["Nazwa", "Typ", "I_pickup [A]", "TMS", "Krzywa"],
+            dev_cols, left_margin, bold=True
+        )
+        y -= 2 * mm
+
+        for dev in sorted_devices:
+            y = check_page_break(line_height)
+            settings = dev.get("settings", {})
+            stage_51 = settings.get("stage_51", {})
+            curve_settings = stage_51.get("curve_settings", {})
+
+            draw_table_row(
+                [
+                    dev.get("name", "—")[:12],
+                    dev.get("device_type", "—")[:10],
+                    _format_value(stage_51.get("pickup_current_a")),
+                    _format_value(curve_settings.get("time_multiplier")),
+                    curve_settings.get("variant", "—"),
+                ],
+                dev_cols, left_margin,
+            )
+    else:
+        c.setFont("Helvetica-Oblique", 10)
+        c.drawString(left_margin, y, "Brak urządzeń")
+        y -= line_height
+
+    y -= section_spacing
+
+    # ==========================================================================
+    # 5) SENSITIVITY CHECKS
     # ==========================================================================
     y = check_page_break(30 * mm)
     draw_text("Sprawdzenie czułości (I_min / I_pickup)", left_margin, font_size=14, bold=True)
@@ -269,7 +323,7 @@ def export_protection_coordination_to_pdf(
     y -= section_spacing
 
     # ==========================================================================
-    # 5) SELECTIVITY CHECKS
+    # 6) SELECTIVITY CHECKS
     # ==========================================================================
     y = check_page_break(30 * mm)
     draw_text("Sprawdzenie selektywności czasowej (Δt)", left_margin, font_size=14, bold=True)
@@ -310,7 +364,7 @@ def export_protection_coordination_to_pdf(
     y -= section_spacing
 
     # ==========================================================================
-    # 6) OVERLOAD CHECKS
+    # 7) OVERLOAD CHECKS
     # ==========================================================================
     y = check_page_break(30 * mm)
     draw_text("Sprawdzenie przeciążalności (I_pickup / I_rob)", left_margin, font_size=14, bold=True)
@@ -350,7 +404,7 @@ def export_protection_coordination_to_pdf(
     y -= section_spacing
 
     # ==========================================================================
-    # 7) TCC CURVES INFO
+    # 8) TCC CURVES INFO
     # ==========================================================================
     y = check_page_break(30 * mm)
     draw_text("Krzywe czasowo-prądowe (TCC)", left_margin, font_size=14, bold=True)
@@ -387,7 +441,7 @@ def export_protection_coordination_to_pdf(
         y -= line_height
 
     # ==========================================================================
-    # 8) FOOTER
+    # 9) FOOTER
     # ==========================================================================
     y = check_page_break(20 * mm)
     y -= section_spacing
