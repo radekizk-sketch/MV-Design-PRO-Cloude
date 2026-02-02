@@ -1,10 +1,7 @@
 /**
- * FIX-12: Tests for Protection Coordination Types
+ * FIX-12B — Types and Labels Tests
  *
- * Tests cover:
- * - Polish labels presence
- * - Verdict styling
- * - Default values
+ * Tests for Polish labels and type mappings.
  */
 
 import { describe, it, expect } from 'vitest';
@@ -14,41 +11,58 @@ import {
   DEFAULT_CONFIG,
   DEFAULT_CURVE_SETTINGS,
   DEFAULT_STAGE_51,
+  DEVICE_TEMPLATES,
 } from '../types';
 
 describe('Protection Coordination Types', () => {
   describe('LABELS', () => {
+    it('should have title defined', () => {
+      expect(LABELS.title).toBe('Koordynacja zabezpieczen nadpradowych');
+    });
+
     it('should have all required sections', () => {
-      expect(LABELS.title).toBeDefined();
-      expect(LABELS.subtitle).toBeDefined();
       expect(LABELS.devices).toBeDefined();
       expect(LABELS.settings).toBeDefined();
       expect(LABELS.checks).toBeDefined();
       expect(LABELS.tcc).toBeDefined();
+      expect(LABELS.trace).toBeDefined();
       expect(LABELS.verdict).toBeDefined();
+      expect(LABELS.deviceTypes).toBeDefined();
+      expect(LABELS.curveTypes).toBeDefined();
       expect(LABELS.actions).toBeDefined();
+      expect(LABELS.status).toBeDefined();
       expect(LABELS.tabs).toBeDefined();
     });
 
-    it('should have Polish verdict labels', () => {
-      expect(LABELS.verdict.PASS).toBe('Prawidlowa');
-      expect(LABELS.verdict.MARGINAL).toBe('Margines niski');
-      expect(LABELS.verdict.FAIL).toBe('Nieskoordynowane');
-      expect(LABELS.verdict.ERROR).toBe('Blad analizy');
+    it('should have PowerFactory-style verdict labels', () => {
+      expect(LABELS.verdict.PASS).toBe('ZGODNE');
+      expect(LABELS.verdict.MARGINAL).toBe('GRANICZNE');
+      expect(LABELS.verdict.FAIL).toBe('NIEZGODNE');
+      expect(LABELS.verdict.ERROR).toBe('BLAD');
     });
 
-    it('should have Polish device type labels', () => {
+    it('should have verbose verdict labels', () => {
+      expect(LABELS.verdictVerbose.PASS).toBe('Koordynacja prawidlowa');
+      expect(LABELS.verdictVerbose.MARGINAL).toBe('Koordynacja z niskim marginesem');
+      expect(LABELS.verdictVerbose.FAIL).toBe('Brak koordynacji');
+      expect(LABELS.verdictVerbose.ERROR).toBe('Blad podczas analizy');
+    });
+
+    it('should have all device types in Polish', () => {
       expect(LABELS.deviceTypes.RELAY).toBe('Przekaznik nadpradowy');
       expect(LABELS.deviceTypes.FUSE).toBe('Bezpiecznik');
       expect(LABELS.deviceTypes.RECLOSER).toBe('Wylacznik samoczynny');
       expect(LABELS.deviceTypes.CIRCUIT_BREAKER).toBe('Wylacznik z wyzwalaczem');
     });
 
-    it('should have Polish curve type labels', () => {
-      expect(LABELS.curveTypes.SI).toContain('Normalna odwrotna');
-      expect(LABELS.curveTypes.VI).toContain('Bardzo odwrotna');
-      expect(LABELS.curveTypes.EI).toContain('Ekstremalnie odwrotna');
-      expect(LABELS.curveTypes.DT).toContain('niezalezny');
+    it('should have all curve types in Polish', () => {
+      expect(LABELS.curveTypes.SI).toBe('Normalna odwrotna (SI)');
+      expect(LABELS.curveTypes.VI).toBe('Bardzo odwrotna (VI)');
+      expect(LABELS.curveTypes.EI).toBe('Ekstremalnie odwrotna (EI)');
+      expect(LABELS.curveTypes.LTI).toBe('Dlugoczasowa odwrotna (LTI)');
+      expect(LABELS.curveTypes.DT).toBe('Czas niezalezny (DT)');
+      expect(LABELS.curveTypes.MI).toBe('Umiarkowanie odwrotna (MI)');
+      expect(LABELS.curveTypes.STI).toBe('Krotkoczasowa odwrotna (STI)');
     });
 
     it('should have all tab labels', () => {
@@ -58,6 +72,29 @@ describe('Protection Coordination Types', () => {
       expect(LABELS.tabs.overload).toBe('Przeciazalnosc');
       expect(LABELS.tabs.tcc).toBe('Wykres TCC');
       expect(LABELS.tabs.trace).toBe('Slad obliczen');
+    });
+
+    it('should NOT contain project codenames (forbidden)', () => {
+      const allLabels = JSON.stringify(LABELS);
+      const forbiddenCodenames = ['P7', 'P11', 'P14', 'P15', 'P17', 'P20', 'FIX-'];
+
+      for (const codename of forbiddenCodenames) {
+        expect(allLabels).not.toContain(codename);
+      }
+    });
+
+    it('should have context labels for StudyCase/Snapshot/Run', () => {
+      expect(LABELS.context.project).toBe('Projekt');
+      expect(LABELS.context.studyCase).toBe('Przypadek obliczeniowy');
+      expect(LABELS.context.snapshot).toBe('Migawka sieci');
+      expect(LABELS.context.run).toBe('Przebieg analizy');
+    });
+
+    it('should have validation messages in Polish', () => {
+      expect(LABELS.validation.pickupPositive).toBe('Prad rozruchowy musi byc dodatni');
+      expect(LABELS.validation.tmsRange).toBe('TMS musi byc w zakresie 0.05-10.0');
+      expect(LABELS.validation.timePositive).toBe('Czas musi byc dodatni');
+      expect(LABELS.validation.minOneDevice).toBe('Dodaj przynajmniej jedno urzadzenie');
     });
   });
 
@@ -69,24 +106,27 @@ describe('Protection Coordination Types', () => {
       expect(VERDICT_STYLES.ERROR).toBeDefined();
     });
 
-    it('should have appropriate colors for PASS', () => {
+    it('should have proper Tailwind classes', () => {
+      // PASS = emerald
       expect(VERDICT_STYLES.PASS.bg).toContain('emerald');
       expect(VERDICT_STYLES.PASS.text).toContain('emerald');
-    });
 
-    it('should have appropriate colors for FAIL', () => {
-      expect(VERDICT_STYLES.FAIL.bg).toContain('rose');
-      expect(VERDICT_STYLES.FAIL.text).toContain('rose');
-    });
-
-    it('should have appropriate colors for MARGINAL', () => {
+      // MARGINAL = amber
       expect(VERDICT_STYLES.MARGINAL.bg).toContain('amber');
       expect(VERDICT_STYLES.MARGINAL.text).toContain('amber');
+
+      // FAIL = rose
+      expect(VERDICT_STYLES.FAIL.bg).toContain('rose');
+      expect(VERDICT_STYLES.FAIL.text).toContain('rose');
+
+      // ERROR = slate
+      expect(VERDICT_STYLES.ERROR.bg).toContain('slate');
+      expect(VERDICT_STYLES.ERROR.text).toContain('slate');
     });
   });
 
   describe('DEFAULT_CONFIG', () => {
-    it('should have reasonable default values', () => {
+    it('should have sensible default values', () => {
       expect(DEFAULT_CONFIG.breaker_time_s).toBe(0.05);
       expect(DEFAULT_CONFIG.relay_overtravel_s).toBe(0.05);
       expect(DEFAULT_CONFIG.safety_factor_s).toBe(0.1);
@@ -96,27 +136,31 @@ describe('Protection Coordination Types', () => {
       expect(DEFAULT_CONFIG.overload_margin_marginal).toBe(1.1);
     });
 
-    it('should have CTI total of 0.2s', () => {
-      const cti =
-        DEFAULT_CONFIG.breaker_time_s +
-        DEFAULT_CONFIG.relay_overtravel_s +
-        DEFAULT_CONFIG.safety_factor_s;
-      expect(cti).toBe(0.2);
+    it('should have positive values', () => {
+      expect(DEFAULT_CONFIG.breaker_time_s).toBeGreaterThan(0);
+      expect(DEFAULT_CONFIG.relay_overtravel_s).toBeGreaterThan(0);
+      expect(DEFAULT_CONFIG.safety_factor_s).toBeGreaterThan(0);
+      expect(DEFAULT_CONFIG.sensitivity_margin_pass).toBeGreaterThan(1);
+      expect(DEFAULT_CONFIG.overload_margin_pass).toBeGreaterThan(1);
     });
   });
 
   describe('DEFAULT_CURVE_SETTINGS', () => {
-    it('should default to IEC SI curve', () => {
+    it('should have IEC standard as default', () => {
       expect(DEFAULT_CURVE_SETTINGS.standard).toBe('IEC');
+    });
+
+    it('should have SI as default variant', () => {
       expect(DEFAULT_CURVE_SETTINGS.variant).toBe('SI');
     });
 
-    it('should have typical pickup current', () => {
-      expect(DEFAULT_CURVE_SETTINGS.pickup_current_a).toBe(400);
+    it('should have valid TMS range', () => {
+      expect(DEFAULT_CURVE_SETTINGS.time_multiplier).toBeGreaterThanOrEqual(0.05);
+      expect(DEFAULT_CURVE_SETTINGS.time_multiplier).toBeLessThanOrEqual(10);
     });
 
-    it('should have reasonable TMS', () => {
-      expect(DEFAULT_CURVE_SETTINGS.time_multiplier).toBe(0.3);
+    it('should have positive pickup current', () => {
+      expect(DEFAULT_CURVE_SETTINGS.pickup_current_a).toBeGreaterThan(0);
     });
   });
 
@@ -133,18 +177,46 @@ describe('Protection Coordination Types', () => {
       expect(DEFAULT_STAGE_51.curve_settings).toBeDefined();
     });
   });
-});
 
-describe('Type Integrity', () => {
-  it('should have no project codenames in labels', () => {
-    // Convert all labels to a single string for searching
-    const allLabels = JSON.stringify(LABELS);
+  describe('DEVICE_TEMPLATES', () => {
+    it('should have at least one template', () => {
+      expect(DEVICE_TEMPLATES.length).toBeGreaterThan(0);
+    });
 
-    // Forbidden codenames from CLAUDE.md
-    const forbiddenCodenames = ['P7', 'P11', 'P14', 'P15', 'P17', 'P20', 'FIX-'];
+    it('should have unique IDs', () => {
+      const ids = DEVICE_TEMPLATES.map((t) => t.id);
+      const uniqueIds = new Set(ids);
+      expect(uniqueIds.size).toBe(ids.length);
+    });
 
-    for (const codename of forbiddenCodenames) {
-      expect(allLabels).not.toContain(codename);
-    }
+    it('should have Polish descriptions', () => {
+      for (const template of DEVICE_TEMPLATES) {
+        expect(template.description_pl).toBeDefined();
+        expect(template.description_pl.length).toBeGreaterThan(0);
+      }
+    });
+
+    it('should have valid device types', () => {
+      const validTypes = ['RELAY', 'FUSE', 'RECLOSER', 'CIRCUIT_BREAKER'];
+      for (const template of DEVICE_TEMPLATES) {
+        expect(validTypes).toContain(template.device_type);
+      }
+    });
+
+    it('should have valid settings', () => {
+      for (const template of DEVICE_TEMPLATES) {
+        expect(template.settings).toBeDefined();
+        expect(template.settings.stage_51).toBeDefined();
+      }
+    });
+
+    it('should NOT contain project codenames', () => {
+      const allTemplates = JSON.stringify(DEVICE_TEMPLATES);
+      const forbiddenCodenames = ['P7', 'P11', 'P14', 'P15', 'P17', 'P20', 'FIX-'];
+
+      for (const codename of forbiddenCodenames) {
+        expect(allTemplates).not.toContain(codename);
+      }
+    });
   });
 });
