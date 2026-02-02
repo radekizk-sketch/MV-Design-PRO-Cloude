@@ -11,6 +11,10 @@
  * - Group drag (maintains relative positions)
  * - Snap-to-grid support
  * - Full UNDO/REDO integration
+ *
+ * PR-SLD-05: Snap do portow
+ * - Podczas przeciagania sprawdza snap do portow innych symboli
+ * - Priorytet: snap do portu > snap do siatki
  */
 
 import { useCallback } from 'react';
@@ -18,6 +22,7 @@ import { useHistoryStore } from '../../history/HistoryStore';
 import { useIsMutationBlocked } from '../../selection/store';
 import { useSldEditorStore } from '../SldEditorStore';
 import { MultiSymbolMoveCommand, type SymbolPositionChange } from '../commands/MultiSymbolMoveCommand';
+import { calculateSnapPosition, SNAP_CONFIG } from '../utils/portUtils';
 
 export interface UseSldDragOptions {
   /** Callback when drag starts */
@@ -73,12 +78,53 @@ export function useSldDrag(options: UseSldDragOptions = {}) {
 
   /**
    * Update drag position.
+   * PR-SLD-05: Dodaje snap do portow - priorytet nad snap do siatki
    */
   const updateDrag = useCallback(
     (currentPosition: { x: number; y: number }) => {
       if (!sldStore.dragState) return;
 
+      // Najpierw wykonaj standardowy update (z snap do siatki)
       sldStore.updateDrag(currentPosition);
+
+      // PR-SLD-05: Sprawdz snap do portow (tylko dla pojedynczego symbolu)
+      const draggedSymbolIds = sldStore.dragState.symbolIds;
+      if (draggedSymbolIds.length === 1) {
+        const symbolId = draggedSymbolIds[0];
+        const symbol = sldStore.getSymbol(symbolId);
+
+        if (symbol) {
+          const allSymbols = Array.from(sldStore.symbols.values());
+          const snapResult = calculateSnapPosition(
+            symbol,
+            symbol.position,
+            allSymbols,
+            SNAP_CONFIG.snapRadius
+          );
+
+          if (snapResult) {
+            // Zastosuj snap do portu
+            sldStore.updateSymbolPosition(symbolId, snapResult.position);
+
+            // Ustaw stan snap dla wizualizacji
+            sldStore.setPortSnapState({
+              sourcePort: {
+                symbolId: snapResult.snappedPort.symbolId,
+                portName: snapResult.snappedPort.portName,
+                position: snapResult.snappedPort.position,
+              },
+              targetPort: {
+                symbolId: snapResult.targetPort.symbolId,
+                portName: snapResult.targetPort.portName,
+                position: snapResult.targetPort.position,
+              },
+            });
+          } else {
+            // Brak snap - wyczysc stan
+            sldStore.setPortSnapState(null);
+          }
+        }
+      }
 
       if (onDragUpdate) {
         onDragUpdate();
@@ -89,8 +135,12 @@ export function useSldDrag(options: UseSldDragOptions = {}) {
 
   /**
    * End drag operation and create UNDO/REDO command.
+   * PR-SLD-05: Czysci stan snap do portu
    */
   const endDrag = useCallback(() => {
+    // PR-SLD-05: Wyczysc stan snap
+    sldStore.setPortSnapState(null);
+
     const changes = sldStore.endDrag();
 
     if (!changes || changes.size === 0) {
@@ -126,8 +176,10 @@ export function useSldDrag(options: UseSldDragOptions = {}) {
 
   /**
    * Cancel drag operation (revert to original positions).
+   * PR-SLD-05: Czysci stan snap do portu
    */
   const cancelDrag = useCallback(() => {
+    sldStore.setPortSnapState(null);
     sldStore.cancelDrag();
   }, [sldStore]);
 

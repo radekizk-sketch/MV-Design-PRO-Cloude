@@ -22,9 +22,26 @@ import type { NodeSymbol, Position } from '../types';
 describe('SldEditorStore', () => {
   // Reset store before each test
   beforeEach(() => {
-    const store = useSldEditorStore.getState();
-    store.setSymbols([]);
-    store.clearSelection();
+    // Reset entire store state using Zustand setState
+    useSldEditorStore.setState({
+      symbols: new Map(),
+      selectedIds: [],
+      highlightedIds: [],
+      highlightSeverity: null,
+      dragState: null,
+      lassoState: null,
+      clipboard: null,
+      gridConfig: {
+        size: 20,
+        visible: true,
+        snapEnabled: true,
+      },
+      // PR-SLD-05: Reset new state
+      connectionCreationState: null,
+      portSnapState: null,
+      statusMessage: null,
+      hoveredPortId: null,
+    });
   });
 
   // Helper: Create test node symbol
@@ -381,6 +398,222 @@ describe('SldEditorStore', () => {
       store.selectAll();
 
       expect(store.selectedIds).toEqual(['sym1', 'sym2', 'sym3']);
+    });
+  });
+
+  // =============================================================================
+  // TEST 9: PR-SLD-05: Connection creation state
+  // =============================================================================
+  describe('PR-SLD-05: Connection creation state', () => {
+    it('should start connection creation and store from port', () => {
+      expect(useSldEditorStore.getState().connectionCreationState).toBeNull();
+
+      useSldEditorStore.getState().startConnectionCreation(
+        'sym1',
+        'bottom',
+        { x: 100, y: 120 },
+        'elem_sym1'
+      );
+
+      const state = useSldEditorStore.getState();
+      expect(state.connectionCreationState).not.toBeNull();
+      expect(state.connectionCreationState?.fromPort.symbolId).toBe('sym1');
+      expect(state.connectionCreationState?.fromPort.portName).toBe('bottom');
+      expect(state.connectionCreationState?.fromPort.position).toEqual({ x: 100, y: 120 });
+    });
+
+    it('should clear selection when starting connection creation', () => {
+      const symbol1 = createTestSymbol('sym1', 100, 100);
+      useSldEditorStore.getState().setSymbols([symbol1]);
+      useSldEditorStore.getState().selectSymbol('sym1', 'single');
+
+      expect(useSldEditorStore.getState().selectedIds).toEqual(['sym1']);
+
+      useSldEditorStore.getState().startConnectionCreation(
+        'sym1',
+        'bottom',
+        { x: 100, y: 120 },
+        'elem_sym1'
+      );
+
+      expect(useSldEditorStore.getState().selectedIds).toEqual([]);
+    });
+
+    it('should update connection creation with mouse position and target port', () => {
+      useSldEditorStore.getState().startConnectionCreation(
+        'sym1',
+        'bottom',
+        { x: 100, y: 120 },
+        'elem_sym1'
+      );
+
+      // Update with new position and no target
+      useSldEditorStore.getState().updateConnectionCreation({ x: 150, y: 150 }, null);
+      expect(useSldEditorStore.getState().connectionCreationState?.currentMousePosition).toEqual({ x: 150, y: 150 });
+      expect(useSldEditorStore.getState().connectionCreationState?.targetPort).toBeNull();
+
+      // Update with target port
+      useSldEditorStore.getState().updateConnectionCreation(
+        { x: 100, y: 180 },
+        {
+          symbolId: 'sym2',
+          portName: 'top',
+          position: { x: 100, y: 180 },
+          elementId: 'elem_sym2',
+        }
+      );
+      expect(useSldEditorStore.getState().connectionCreationState?.targetPort?.symbolId).toBe('sym2');
+    });
+
+    it('should confirm connection and return port info', () => {
+      useSldEditorStore.getState().startConnectionCreation(
+        'sym1',
+        'bottom',
+        { x: 100, y: 120 },
+        'elem_sym1'
+      );
+
+      useSldEditorStore.getState().updateConnectionCreation(
+        { x: 100, y: 180 },
+        {
+          symbolId: 'sym2',
+          portName: 'top',
+          position: { x: 100, y: 180 },
+          elementId: 'elem_sym2',
+        }
+      );
+
+      const result = useSldEditorStore.getState().confirmConnection();
+
+      expect(result).not.toBeNull();
+      expect(result?.fromPort.symbolId).toBe('sym1');
+      expect(result?.toPort.symbolId).toBe('sym2');
+      expect(useSldEditorStore.getState().connectionCreationState).toBeNull();
+    });
+
+    it('should return null when confirming without target port', () => {
+      useSldEditorStore.getState().startConnectionCreation(
+        'sym1',
+        'bottom',
+        { x: 100, y: 120 },
+        'elem_sym1'
+      );
+
+      // No target port set
+      const result = useSldEditorStore.getState().confirmConnection();
+
+      expect(result).toBeNull();
+    });
+
+    it('should cancel connection creation', () => {
+      useSldEditorStore.getState().startConnectionCreation(
+        'sym1',
+        'bottom',
+        { x: 100, y: 120 },
+        'elem_sym1'
+      );
+
+      expect(useSldEditorStore.getState().connectionCreationState).not.toBeNull();
+
+      useSldEditorStore.getState().cancelConnectionCreation();
+
+      expect(useSldEditorStore.getState().connectionCreationState).toBeNull();
+    });
+
+    it('should report if connection creation is active', () => {
+      expect(useSldEditorStore.getState().isConnectionCreationActive()).toBe(false);
+
+      useSldEditorStore.getState().startConnectionCreation(
+        'sym1',
+        'bottom',
+        { x: 100, y: 120 },
+        'elem_sym1'
+      );
+
+      expect(useSldEditorStore.getState().isConnectionCreationActive()).toBe(true);
+
+      useSldEditorStore.getState().cancelConnectionCreation();
+
+      expect(useSldEditorStore.getState().isConnectionCreationActive()).toBe(false);
+    });
+  });
+
+  // =============================================================================
+  // TEST 10: PR-SLD-05: Port snap state
+  // =============================================================================
+  describe('PR-SLD-05: Port snap state', () => {
+    it('should set and clear port snap state', () => {
+      expect(useSldEditorStore.getState().portSnapState).toBeNull();
+
+      useSldEditorStore.getState().setPortSnapState({
+        sourcePort: {
+          symbolId: 'sym1',
+          portName: 'bottom',
+          position: { x: 100, y: 120 },
+        },
+        targetPort: {
+          symbolId: 'sym2',
+          portName: 'top',
+          position: { x: 100, y: 180 },
+        },
+      });
+
+      expect(useSldEditorStore.getState().portSnapState).not.toBeNull();
+      expect(useSldEditorStore.getState().portSnapState?.sourcePort.symbolId).toBe('sym1');
+      expect(useSldEditorStore.getState().portSnapState?.targetPort.symbolId).toBe('sym2');
+
+      useSldEditorStore.getState().setPortSnapState(null);
+      expect(useSldEditorStore.getState().portSnapState).toBeNull();
+    });
+  });
+
+  // =============================================================================
+  // TEST 11: PR-SLD-05: Status message
+  // =============================================================================
+  describe('PR-SLD-05: Status message', () => {
+    it('should set and clear status message', () => {
+      expect(useSldEditorStore.getState().statusMessage).toBeNull();
+
+      useSldEditorStore.getState().setStatusMessage({
+        text: 'Test message',
+        type: 'info',
+        duration: 2000,
+      });
+
+      expect(useSldEditorStore.getState().statusMessage?.text).toBe('Test message');
+      expect(useSldEditorStore.getState().statusMessage?.type).toBe('info');
+
+      useSldEditorStore.getState().setStatusMessage(null);
+      expect(useSldEditorStore.getState().statusMessage).toBeNull();
+    });
+
+    it('should show error message', () => {
+      useSldEditorStore.getState().showError('Test error');
+
+      expect(useSldEditorStore.getState().statusMessage?.text).toBe('Test error');
+      expect(useSldEditorStore.getState().statusMessage?.type).toBe('error');
+    });
+
+    it('should show info message', () => {
+      useSldEditorStore.getState().showInfo('Test info');
+
+      expect(useSldEditorStore.getState().statusMessage?.text).toBe('Test info');
+      expect(useSldEditorStore.getState().statusMessage?.type).toBe('info');
+    });
+  });
+
+  // =============================================================================
+  // TEST 12: PR-SLD-05: Hovered port state
+  // =============================================================================
+  describe('PR-SLD-05: Hovered port state', () => {
+    it('should set and clear hovered port', () => {
+      expect(useSldEditorStore.getState().hoveredPortId).toBeNull();
+
+      useSldEditorStore.getState().setHoveredPort('sym1:bottom');
+      expect(useSldEditorStore.getState().hoveredPortId).toBe('sym1:bottom');
+
+      useSldEditorStore.getState().setHoveredPort(null);
+      expect(useSldEditorStore.getState().hoveredPortId).toBeNull();
     });
   });
 });

@@ -278,6 +278,65 @@ export type ToolbarAction =
   | 'toggle-snap';
 
 // =============================================================================
+// CONNECTION CREATION STATE (PR-SLD-05)
+// =============================================================================
+
+/**
+ * Stan tworzenia polaczenia port-to-port (ETAP-style).
+ *
+ * PR-SLD-05: Polaczenia tworzy sie WYLACZNIE przez klikniecie port A -> port B.
+ * Brak swobodnego rysowania linii.
+ */
+export interface ConnectionCreationState {
+  /** Port zrodlowy (klikniety jako pierwszy) */
+  fromPort: {
+    symbolId: string;
+    portName: PortName;
+    position: Position;
+    elementId: string;
+  };
+  /** Aktualna pozycja kursora (dla podgladu linii) */
+  currentMousePosition: Position;
+  /** Port docelowy w zasiegu snap (null jesli brak) */
+  targetPort: {
+    symbolId: string;
+    portName: PortName;
+    position: Position;
+    elementId: string;
+  } | null;
+}
+
+/**
+ * Stan snap do portu podczas przeciagania (PR-SLD-05).
+ */
+export interface PortSnapState {
+  /** Port przeciaganego symbolu ktory jest w zasiegu snap */
+  sourcePort: {
+    symbolId: string;
+    portName: PortName;
+    position: Position;
+  };
+  /** Port docelowy do ktorego nastapi snap */
+  targetPort: {
+    symbolId: string;
+    portName: PortName;
+    position: Position;
+  };
+}
+
+/**
+ * Komunikat statusu dla uzytkownika (pasek statusu).
+ */
+export interface StatusMessage {
+  /** Tresc komunikatu po polsku */
+  text: string;
+  /** Typ komunikatu */
+  type: 'info' | 'warning' | 'error';
+  /** Czas wyswietlenia w ms (null = bez limitu) */
+  duration: number | null;
+}
+
+// =============================================================================
 // CONNECTION TYPES (N-01, N-05)
 // =============================================================================
 
