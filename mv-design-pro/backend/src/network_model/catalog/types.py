@@ -39,17 +39,21 @@ class LineType:
 
     Attributes:
         id: Unique identifier.
-        name: Type name (e.g., "ACSR 240/40").
+        name: Type name (e.g., "AFL 6 120").
         manufacturer: Manufacturer name (optional).
         standard: Standard designation (optional).
-        r_ohm_per_km: Resistance per unit length [Ω/km].
+        r_ohm_per_km: Resistance per unit length at 20°C [Ω/km].
         x_ohm_per_km: Reactance per unit length [Ω/km].
         b_us_per_km: Susceptance per unit length [μS/km].
         rated_current_a: Continuous current rating [A].
         max_temperature_c: Maximum operating temperature [°C].
         voltage_rating_kv: Rated voltage [kV].
-        conductor_material: Conductor material (e.g., "ACSR", "AAC").
+        conductor_material: Conductor material (e.g., "AL", "AL_ST").
         cross_section_mm2: Conductor cross-section [mm²].
+        ith_1s_a: Short-time thermal current for 1s [A] (optional).
+        jth_1s_a_per_mm2: Short-time current density for 1s [A/mm²] (optional).
+        base_type_id: Reference to base type (for manufacturer types).
+        trade_name: Trade/commercial designation (optional).
     """
     id: str
     name: str
@@ -63,6 +67,49 @@ class LineType:
     voltage_rating_kv: float = 0.0
     conductor_material: Optional[str] = None
     cross_section_mm2: float = 0.0
+    # Thermal data for short-circuit analysis
+    ith_1s_a: Optional[float] = None
+    jth_1s_a_per_mm2: Optional[float] = None
+    # Manufacturer type linking
+    base_type_id: Optional[str] = None
+    trade_name: Optional[str] = None
+
+    @property
+    def dane_cieplne_kompletne(self) -> bool:
+        """
+        Check if thermal data is complete for protection analysis.
+
+        Returns True if:
+        - ith_1s_a > 0, OR
+        - (jth_1s_a_per_mm2 > 0 AND cross_section_mm2 > 0)
+        """
+        if self.ith_1s_a is not None and self.ith_1s_a > 0:
+            return True
+        if (
+            self.jth_1s_a_per_mm2 is not None
+            and self.jth_1s_a_per_mm2 > 0
+            and self.cross_section_mm2 > 0
+        ):
+            return True
+        return False
+
+    def get_ith_1s(self) -> Optional[float]:
+        """
+        Get short-time thermal current Ith(1s) [A].
+
+        If ith_1s_a is provided, returns it directly.
+        Otherwise calculates from jth_1s_a_per_mm2 * cross_section_mm2.
+        Returns None if data is incomplete.
+        """
+        if self.ith_1s_a is not None and self.ith_1s_a > 0:
+            return self.ith_1s_a
+        if (
+            self.jth_1s_a_per_mm2 is not None
+            and self.jth_1s_a_per_mm2 > 0
+            and self.cross_section_mm2 > 0
+        ):
+            return self.jth_1s_a_per_mm2 * self.cross_section_mm2
+        return None
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary."""
@@ -79,6 +126,11 @@ class LineType:
             "voltage_rating_kv": self.voltage_rating_kv,
             "conductor_material": self.conductor_material,
             "cross_section_mm2": self.cross_section_mm2,
+            "ith_1s_a": self.ith_1s_a,
+            "jth_1s_a_per_mm2": self.jth_1s_a_per_mm2,
+            "base_type_id": self.base_type_id,
+            "trade_name": self.trade_name,
+            "dane_cieplne_kompletne": self.dane_cieplne_kompletne,
         }
 
     @classmethod
@@ -97,6 +149,16 @@ class LineType:
             voltage_rating_kv=float(data.get("voltage_rating_kv", 0.0)),
             conductor_material=data.get("conductor_material"),
             cross_section_mm2=float(data.get("cross_section_mm2", 0.0)),
+            ith_1s_a=(
+                float(data["ith_1s_a"]) if data.get("ith_1s_a") is not None else None
+            ),
+            jth_1s_a_per_mm2=(
+                float(data["jth_1s_a_per_mm2"])
+                if data.get("jth_1s_a_per_mm2") is not None
+                else None
+            ),
+            base_type_id=data.get("base_type_id"),
+            trade_name=data.get("trade_name"),
         )
 
 
@@ -111,16 +173,21 @@ class CableType:
         id: Unique identifier.
         name: Type name (e.g., "NA2XS(F)2Y 1x240").
         manufacturer: Manufacturer name (optional).
-        r_ohm_per_km: Resistance per unit length [Ω/km].
+        r_ohm_per_km: Resistance per unit length at 20°C [Ω/km].
         x_ohm_per_km: Reactance per unit length [Ω/km].
         c_nf_per_km: Capacitance per unit length [nF/km].
         rated_current_a: Continuous current rating [A].
         voltage_rating_kv: Rated voltage [kV].
         insulation_type: Insulation type (e.g., "XLPE", "EPR").
         standard: Standard designation (optional).
-        conductor_material: Conductor material (e.g., "Al", "Cu").
+        conductor_material: Conductor material (e.g., "AL", "CU").
         cross_section_mm2: Conductor cross-section [mm²].
         max_temperature_c: Maximum operating temperature [°C].
+        number_of_cores: Number of cores (1 or 3).
+        ith_1s_a: Short-time thermal current for 1s [A] (optional).
+        jth_1s_a_per_mm2: Short-time current density for 1s [A/mm²] (optional).
+        base_type_id: Reference to base type (for manufacturer types).
+        trade_name: Trade/commercial designation (optional).
     """
     id: str
     name: str
@@ -135,6 +202,13 @@ class CableType:
     conductor_material: Optional[str] = None
     cross_section_mm2: float = 0.0
     max_temperature_c: float = 90.0
+    number_of_cores: int = 1
+    # Thermal data for short-circuit analysis
+    ith_1s_a: Optional[float] = None
+    jth_1s_a_per_mm2: Optional[float] = None
+    # Manufacturer type linking
+    base_type_id: Optional[str] = None
+    trade_name: Optional[str] = None
 
     @property
     def b_us_per_km(self) -> float:
@@ -145,6 +219,43 @@ class CableType:
         Assuming f = 50 Hz
         """
         return 2 * 3.14159 * 50 * self.c_nf_per_km * 1e-3
+
+    @property
+    def dane_cieplne_kompletne(self) -> bool:
+        """
+        Check if thermal data is complete for protection analysis.
+
+        Returns True if:
+        - ith_1s_a > 0, OR
+        - (jth_1s_a_per_mm2 > 0 AND cross_section_mm2 > 0)
+        """
+        if self.ith_1s_a is not None and self.ith_1s_a > 0:
+            return True
+        if (
+            self.jth_1s_a_per_mm2 is not None
+            and self.jth_1s_a_per_mm2 > 0
+            and self.cross_section_mm2 > 0
+        ):
+            return True
+        return False
+
+    def get_ith_1s(self) -> Optional[float]:
+        """
+        Get short-time thermal current Ith(1s) [A].
+
+        If ith_1s_a is provided, returns it directly.
+        Otherwise calculates from jth_1s_a_per_mm2 * cross_section_mm2.
+        Returns None if data is incomplete.
+        """
+        if self.ith_1s_a is not None and self.ith_1s_a > 0:
+            return self.ith_1s_a
+        if (
+            self.jth_1s_a_per_mm2 is not None
+            and self.jth_1s_a_per_mm2 > 0
+            and self.cross_section_mm2 > 0
+        ):
+            return self.jth_1s_a_per_mm2 * self.cross_section_mm2
+        return None
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary."""
@@ -163,6 +274,12 @@ class CableType:
             "conductor_material": self.conductor_material,
             "cross_section_mm2": self.cross_section_mm2,
             "max_temperature_c": self.max_temperature_c,
+            "number_of_cores": self.number_of_cores,
+            "ith_1s_a": self.ith_1s_a,
+            "jth_1s_a_per_mm2": self.jth_1s_a_per_mm2,
+            "base_type_id": self.base_type_id,
+            "trade_name": self.trade_name,
+            "dane_cieplne_kompletne": self.dane_cieplne_kompletne,
         }
 
     @classmethod
@@ -182,6 +299,17 @@ class CableType:
             conductor_material=data.get("conductor_material"),
             cross_section_mm2=float(data.get("cross_section_mm2", 0.0)),
             max_temperature_c=float(data.get("max_temperature_c", 90.0)),
+            number_of_cores=int(data.get("number_of_cores", 1)),
+            ith_1s_a=(
+                float(data["ith_1s_a"]) if data.get("ith_1s_a") is not None else None
+            ),
+            jth_1s_a_per_mm2=(
+                float(data["jth_1s_a_per_mm2"])
+                if data.get("jth_1s_a_per_mm2") is not None
+                else None
+            ),
+            base_type_id=data.get("base_type_id"),
+            trade_name=data.get("trade_name"),
         )
 
 

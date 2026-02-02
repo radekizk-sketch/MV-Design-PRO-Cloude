@@ -9,13 +9,15 @@ PowerFactory Alignment:
 The Catalog is the single source of physical parameters for network elements.
 """
 
-from .repository import CatalogRepository
+from .repository import CatalogRepository, get_default_mv_catalog
 from .resolver import (
     ParameterSource,
     ResolvedLineParams,
+    ResolvedThermalParams,
     ResolvedTransformerParams,
     TypeNotFoundError,
     resolve_line_params,
+    resolve_thermal_params,
     resolve_transformer_params,
 )
 from .types import (
@@ -37,10 +39,13 @@ __all__ = [
     "ConverterType",
     "InverterType",
     "CatalogRepository",
+    "get_default_mv_catalog",
     "ParameterSource",
     "ResolvedLineParams",
+    "ResolvedThermalParams",
     "ResolvedTransformerParams",
     "TypeNotFoundError",
     "resolve_line_params",
+    "resolve_thermal_params",
     "resolve_transformer_params",
 ]
