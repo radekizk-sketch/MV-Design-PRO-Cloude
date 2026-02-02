@@ -1,22 +1,34 @@
 """
-Overcurrent Protection Coordination Analyzer — FIX-12
-
-Main analysis pipeline that:
-1. Takes Power Flow results (operating currents)
-2. Takes Short Circuit results (fault currents)
-3. Evaluates protection device settings
-4. Produces coordination results with PASS/MARGINAL/FAIL verdicts
+Overcurrent Protection Coordination Analyzer
 
 CANONICAL ALIGNMENT:
-- NOT-A-SOLVER: No physics calculations, only interpretation
-- WHITE BOX: Full trace of all evaluation steps
-- Deterministic: Same inputs → same outputs
-- Polish labels for all verdicts and messages
+- SYSTEM_SPEC.md: Analysis layer (NOT-A-SOLVER)
+- ARCHITECTURE.md: Interpretation layer
+
+NOT-A-SOLVER RULE (BINDING):
+    This module is an ANALYSIS/INTERPRETATION layer component.
+    It does NOT perform any physics calculations.
+    All physics data (fault currents, operating currents) comes from:
+    - Power Flow solver (operating currents)
+    - Short Circuit IEC 60909 solver (fault currents)
+    This module ONLY interprets pre-computed results.
+
+WHITE BOX:
+    Full trace of all evaluation steps is recorded.
+    Every intermediate value is exposed for audit.
+
+DETERMINISM:
+    Same inputs → identical outputs.
+    No randomness, no timestamps in calculations.
+
+LAYER BOUNDARY:
+    Input: PF results + SC results + device settings
+    Output: Coordination verdicts + TCC data
+    NO model mutation, NO solver calls
 """
 
 from __future__ import annotations
 
-import math
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any

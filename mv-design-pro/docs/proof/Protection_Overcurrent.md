@@ -1,4 +1,10 @@
-# Proof Pack: Protection Overcurrent Coordination — FIX-12
+# Proof Pack: Protection Overcurrent Coordination
+
+> **BINDING** — This document defines authoritative calculation rules.
+>
+> **UI-HIDDEN** — Internal engineering documentation. Not exposed in user interface.
+
+---
 
 ## Document Information
 
@@ -8,10 +14,25 @@
 | Version | 1.0.0 |
 | Standard | IEC 60255-151:2009, IEC 60909 |
 | Status | CANONICAL |
+| Visibility | INTERNAL (ui-hidden) |
+| Layer | Analysis (NOT-A-SOLVER) |
+
+---
+
+## Scope
+
+This Proof Pack:
+- Documents the mathematical foundations for overcurrent protection coordination
+- Provides WHITE-BOX calculation procedures (every intermediate value exposed)
+- Defines formulas in **LaTeX-only** format
+- Does NOT contain physics solver code (NOT-A-SOLVER rule)
+- Serves as audit reference for protection analysis results
+
+---
 
 ## Overview
 
-This Proof Pack documents the mathematical foundations and calculation procedures for overcurrent protection coordination analysis. All calculations are WHITE-BOX: every intermediate value is exposed for audit.
+All calculations are WHITE-BOX: every intermediate value is exposed for audit. This document uses IEC 60255-151:2009 standard formulas for inverse-time overcurrent characteristics.
 
 ---
 

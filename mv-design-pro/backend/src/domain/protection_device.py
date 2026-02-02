@@ -1,16 +1,26 @@
 """
-Protection Device Domain Model — FIX-12 Overcurrent Protection
+Protection Device Domain Model
 
 CANONICAL ALIGNMENT:
 - SYSTEM_SPEC.md: Domain layer model
-- Protection device represents physical protection apparatus (relay/fuse/recloser)
-- Settings stored per device, not in NetworkModel
-- Deterministic serialization
+- ARCHITECTURE.md: Domain entities
+
+DOMAIN LAYER RULES:
+    Protection device represents physical protection apparatus.
+    This module contains DATA MODELS only, not calculations.
+    Settings are stored per device, not in NetworkModel.
+
+NOT-A-SOLVER (BINDING):
+    This module does NOT contain any physics calculations.
+    It defines data structures for protection devices and settings.
+    All coordination calculations happen in the Analysis layer
+    (application.analyses.protection.coordination).
 
 INVARIANTS:
-- Frozen/immutable data structures
+- Frozen/immutable data structures (dataclass frozen=True)
 - Full Polish validation messages
-- No physics calculations (settings only)
+- Deterministic serialization (to_dict / from_dict)
+- No randomness in data structures
 """
 
 from __future__ import annotations
