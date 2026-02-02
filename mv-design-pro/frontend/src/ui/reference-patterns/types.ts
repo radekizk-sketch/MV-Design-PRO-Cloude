@@ -7,7 +7,19 @@
  * - READ-ONLY: No mutations, no physics
  *
  * Types for reference pattern validation display.
+ *
+ * UWAGA: Mapowanie werdyktów na komunikaty UI:
+ * - ZGODNE → "Zgodne"
+ * - GRANICZNE → "Na granicy dopuszczalności"
+ * - NIEZGODNE → "Wymaga korekty"
  */
+
+import {
+  VERDICT_UI_LABELS,
+  VERDICT_UI_DESCRIPTIONS,
+  VERDICT_UI_COLORS,
+  VERDICT_UI_BADGE_COLORS,
+} from '../shared/verdict-messages';
 
 // =============================================================================
 // Verdict Types
@@ -125,29 +137,26 @@ export type PanelSection = 'PATTERNS' | 'FIXTURES';
 // Polish Labels (100% PL)
 // =============================================================================
 
-export const VERDICT_LABELS_PL: Record<ReferenceVerdict, string> = {
-  ZGODNE: 'Zgodne',
-  GRANICZNE: 'Graniczne',
-  NIEZGODNE: 'Niezgodne',
-};
+/**
+ * Etykiety werdyktów UI — przyjazne dla użytkownika.
+ * Mapowanie: ZGODNE → "Zgodne", GRANICZNE → "Na granicy dopuszczalności", NIEZGODNE → "Wymaga korekty"
+ */
+export const VERDICT_LABELS_PL: Record<ReferenceVerdict, string> = VERDICT_UI_LABELS;
 
-export const VERDICT_DESCRIPTIONS_PL: Record<ReferenceVerdict, string> = {
-  ZGODNE: 'Wszystkie kryteria spełnione, okno nastaw prawidłowe',
-  GRANICZNE: 'Warunki spełnione z ograniczeniami (wąskie okno lub ostrzeżenia SPZ)',
-  NIEZGODNE: 'Kryteria niespełnione, brak prawidłowego okna nastaw',
-};
+/**
+ * Opisy werdyktów UI — techniczne, bez wyrokowego charakteru.
+ */
+export const VERDICT_DESCRIPTIONS_PL: Record<ReferenceVerdict, string> = VERDICT_UI_DESCRIPTIONS;
 
-export const VERDICT_COLORS: Record<ReferenceVerdict, string> = {
-  ZGODNE: 'bg-emerald-100 text-emerald-800 border-emerald-300',
-  GRANICZNE: 'bg-amber-100 text-amber-800 border-amber-300',
-  NIEZGODNE: 'bg-rose-100 text-rose-800 border-rose-300',
-};
+/**
+ * Kolory werdyktów UI — łagodniejsze tony dla "Wymaga korekty" (orange zamiast rose).
+ */
+export const VERDICT_COLORS: Record<ReferenceVerdict, string> = VERDICT_UI_COLORS;
 
-export const VERDICT_BADGE_COLORS: Record<ReferenceVerdict, string> = {
-  ZGODNE: 'bg-emerald-500 text-white',
-  GRANICZNE: 'bg-amber-500 text-white',
-  NIEZGODNE: 'bg-rose-500 text-white',
-};
+/**
+ * Kolory badge werdyktów UI.
+ */
+export const VERDICT_BADGE_COLORS: Record<ReferenceVerdict, string> = VERDICT_UI_BADGE_COLORS;
 
 export const CHECK_STATUS_LABELS_PL: Record<CheckStatus, string> = {
   PASS: 'Spełnione',

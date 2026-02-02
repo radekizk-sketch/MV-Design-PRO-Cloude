@@ -26,10 +26,15 @@ import type {
 import {
   VERDICT_BADGE_COLORS,
   VERDICT_LABELS_PL,
+  VERDICT_COLORS,
   CHECK_STATUS_COLORS,
   CHECK_STATUS_ICONS,
   TAB_LABELS_PL,
 } from './types';
+import {
+  buildVerdictMessage,
+  type VerdictMessage,
+} from '../shared/verdict-messages';
 
 // =============================================================================
 // Helper Functions
@@ -135,9 +140,10 @@ function FixturesList() {
   const getVerdictBadge = (verdict: string | null) => {
     if (!verdict) return null;
     const colors = VERDICT_BADGE_COLORS[verdict as keyof typeof VERDICT_BADGE_COLORS] || 'bg-slate-500 text-white';
+    const label = VERDICT_LABELS_PL[verdict as keyof typeof VERDICT_LABELS_PL] || verdict;
     return (
       <span className={`rounded px-1.5 py-0.5 text-xs font-medium ${colors}`}>
-        {verdict}
+        {label}
       </span>
     );
   };
@@ -260,6 +266,15 @@ function LeftPanel() {
 // Right Panel: Result View
 // =============================================================================
 
+/**
+ * VerdictBanner — Baner z wynikiem werdyktu
+ *
+ * Wyświetla strukturalny komunikat UI:
+ * - Status (etykieta/badge)
+ * - Przyczyna techniczna (dla GRANICZNE i NIEZGODNE)
+ * - Skutek (dla GRANICZNE i NIEZGODNE)
+ * - Zalecenie (dla GRANICZNE i NIEZGODNE)
+ */
 function VerdictBanner() {
   const { runResult } = useReferencePatternsStore();
 
@@ -267,16 +282,74 @@ function VerdictBanner() {
 
   const { verdict, verdict_description_pl, summary_pl } = runResult;
   const badgeColor = VERDICT_BADGE_COLORS[verdict] || 'bg-slate-500 text-white';
+  const borderColor = VERDICT_COLORS[verdict] || 'border-slate-200';
 
+  // Build structured message for non-ZGODNE verdicts
+  const message: VerdictMessage = buildVerdictMessage(
+    verdict,
+    verdict_description_pl,
+    summary_pl
+  );
+
+  // For ZGODNE verdict, show simple message
+  if (verdict === 'ZGODNE') {
+    return (
+      <div className={`rounded-lg border ${borderColor} bg-white p-4 shadow-sm`}>
+        <div className="flex items-start gap-4">
+          <span className={`rounded-lg px-4 py-2 text-lg font-bold ${badgeColor}`}>
+            {message.status}
+          </span>
+          <div className="flex-1">
+            <p className="text-sm text-slate-700">{verdict_description_pl}</p>
+            {summary_pl && (
+              <p className="mt-2 text-sm text-slate-600">{summary_pl}</p>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // For GRANICZNE and NIEZGODNE, show structured message
   return (
-    <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+    <div className={`rounded-lg border ${borderColor} bg-white p-4 shadow-sm`}>
       <div className="flex items-start gap-4">
-        <span className={`rounded-lg px-4 py-2 text-lg font-bold ${badgeColor}`}>
-          {VERDICT_LABELS_PL[verdict]}
+        {/* Status Badge */}
+        <span className={`flex-shrink-0 rounded-lg px-4 py-2 text-lg font-bold ${badgeColor}`}>
+          {message.status}
         </span>
-        <div className="flex-1">
-          <p className="text-sm text-slate-600">{verdict_description_pl}</p>
-          <p className="mt-2 text-sm text-slate-800">{summary_pl}</p>
+
+        {/* Structured Message Content */}
+        <div className="flex-1 space-y-3">
+          {/* Przyczyna techniczna */}
+          {message.cause && (
+            <div>
+              <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                Przyczyna
+              </span>
+              <p className="mt-0.5 text-sm text-slate-700">{message.cause}</p>
+            </div>
+          )}
+
+          {/* Skutek */}
+          {message.effect && (
+            <div>
+              <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                Skutek
+              </span>
+              <p className="mt-0.5 text-sm text-slate-700">{message.effect}</p>
+            </div>
+          )}
+
+          {/* Zalecenie */}
+          {message.recommendation && (
+            <div>
+              <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                Zalecenie
+              </span>
+              <p className="mt-0.5 text-sm text-slate-700">{message.recommendation}</p>
+            </div>
+          )}
         </div>
       </div>
     </div>
