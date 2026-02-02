@@ -30,6 +30,10 @@ export const URL_PARAMS = {
   DIAGNOSTICS_VISIBLE: 'diag',
   /** Diagnostics severity filter (all|err|errwarn) */
   DIAGNOSTICS_SEVERITY: 'diag_sev',
+  /** SLD mode (edit|results) */
+  SLD_MODE: 'sld_mode',
+  /** Diagnostic layer visibility (1|0) */
+  DIAGNOSTIC_LAYER: 'diag_layer',
 } as const;
 
 /**
@@ -315,6 +319,92 @@ export function updateUrlWithSelectionAndDiagnostics(
   if (diagnostics.visible) {
     params.set(URL_PARAMS.DIAGNOSTICS_VISIBLE, '1');
     params.set(URL_PARAMS.DIAGNOSTICS_SEVERITY, filterToUrlValue(diagnostics.filter));
+  }
+
+  const queryString = params.toString();
+  const newHash = queryString ? `${currentHash}?${queryString}` : currentHash;
+
+  // Use replaceState to avoid history pollution
+  const newUrl = `${window.location.pathname}${newHash}`;
+  window.history.replaceState(null, '', newUrl);
+}
+
+// =============================================================================
+// SLD Mode URL State (PR-SLD-06)
+// =============================================================================
+
+/**
+ * SLD Mode URL values.
+ */
+export const SLD_MODE_URL_VALUES = {
+  EDYCJA: 'edit',
+  WYNIKI: 'results',
+} as const;
+
+export type SldModeUrlValue = typeof SLD_MODE_URL_VALUES[keyof typeof SLD_MODE_URL_VALUES];
+
+export interface SldModeUrlState {
+  /** Tryb SLD */
+  mode: 'EDYCJA' | 'WYNIKI';
+  /** Widocznosc warstwy diagnostycznej */
+  diagnosticLayerVisible: boolean;
+}
+
+/**
+ * Convert SldMode to URL value.
+ */
+export function sldModeToUrlValue(mode: 'EDYCJA' | 'WYNIKI'): SldModeUrlValue {
+  return mode === 'WYNIKI' ? SLD_MODE_URL_VALUES.WYNIKI : SLD_MODE_URL_VALUES.EDYCJA;
+}
+
+/**
+ * Convert URL value to SldMode.
+ */
+export function urlValueToSldMode(value: string | null): 'EDYCJA' | 'WYNIKI' {
+  return value === SLD_MODE_URL_VALUES.WYNIKI ? 'WYNIKI' : 'EDYCJA';
+}
+
+/**
+ * Read SLD mode state from URL.
+ *
+ * @returns SldModeUrlState with current values from URL
+ */
+export function readSldModeFromUrl(): SldModeUrlState {
+  const params = getCurrentSearchParams();
+  const sldMode = params.get(URL_PARAMS.SLD_MODE);
+  const diagLayer = params.get(URL_PARAMS.DIAGNOSTIC_LAYER);
+
+  return {
+    mode: urlValueToSldMode(sldMode),
+    diagnosticLayerVisible: diagLayer === '1',
+  };
+}
+
+/**
+ * Update URL with SLD mode state.
+ * Preserves existing selection and diagnostics params.
+ *
+ * @param state - SLD mode state to encode
+ */
+export function updateUrlWithSldMode(state: SldModeUrlState): void {
+  if (typeof window === 'undefined') {
+    return;
+  }
+
+  const currentHash = getCurrentHashRoute();
+  const params = getCurrentSearchParams();
+
+  // Update SLD mode params
+  if (state.mode === 'WYNIKI') {
+    params.set(URL_PARAMS.SLD_MODE, SLD_MODE_URL_VALUES.WYNIKI);
+    if (state.diagnosticLayerVisible) {
+      params.set(URL_PARAMS.DIAGNOSTIC_LAYER, '1');
+    } else {
+      params.delete(URL_PARAMS.DIAGNOSTIC_LAYER);
+    }
+  } else {
+    params.delete(URL_PARAMS.SLD_MODE);
+    params.delete(URL_PARAMS.DIAGNOSTIC_LAYER);
   }
 
   const queryString = params.toString();

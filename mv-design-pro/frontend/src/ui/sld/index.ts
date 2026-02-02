@@ -29,6 +29,26 @@ export {
   useDiagnosticsFilter,
 } from './diagnosticsStore';
 
+// PR-SLD-06: SLD Mode store
+export {
+  useSldModeStore,
+  useSldMode,
+  useIsResultsMode,
+  useIsEditMode,
+  useDiagnosticLayerVisible,
+  useSldModeLabel,
+  SLD_MODE_LABELS_PL,
+} from './sldModeStore';
+export type { SldMode } from './sldModeStore';
+
+// PR-SLD-06: Diagnostic Results Layer
+export { DiagnosticResultsLayer } from './DiagnosticResultsLayer';
+export type {
+  DiagnosticResultsLayerProps,
+  BusDiagnosticData,
+  BranchDiagnosticData,
+} from './DiagnosticResultsLayer';
+
 // Types
 export type { SLDViewProps, SLDViewCanvasProps, ViewportState } from './types';
 export type { SLDViewPageProps } from './SLDViewPage';
