@@ -1,0 +1,68 @@
+{
+  "_opis": "Wzorzec C — Przypadek ZGODNY: brak istotnego wpływu generacji lokalnej",
+  "_pattern_id": "RP-LOC-GEN-IMPACT",
+  "_expected_verdict": "ZGODNE",
+  "_notes_pl": "Instalacja fotowoltaiczna 200 kW w sieci SN 15 kV. Wkład prądowy generacji stanowi niewielki procent prądu zwarciowego. Brak ryzyka blokady szyn. Selektywność zachowana z zapasem.",
+
+  "punkt_zabezpieczenia_id": "pz-ref-C-zgodne",
+  "punkt_zabezpieczenia_nazwa": "Pole liniowe L-04 GPZ Północ",
+  "szyny_id": "szyny-gpz-polnoc",
+  "szyny_nazwa": "Szyny 15 kV GPZ Północ",
+
+  "zrodla_generacji": [
+    {
+      "id": "pv-001",
+      "nazwa": "Instalacja PV Zakład Produkcyjny",
+      "typ": "PV",
+      "moc_znamionowa_kw": 200.0,
+      "prad_zwarciowy_a": 120.0
+    }
+  ],
+
+  "dane_bez_generacji": {
+    "ik_3f_a": 5200.0,
+    "ik_2f_a": 4500.0,
+    "ik_1f_a": 3800.0,
+    "wklad_generacji_a": 0.0
+  },
+
+  "dane_generacja_min": {
+    "ik_3f_a": 5250.0,
+    "ik_2f_a": 4545.0,
+    "ik_1f_a": 3840.0,
+    "wklad_generacji_a": 50.0
+  },
+
+  "dane_generacja_max": {
+    "ik_3f_a": 5320.0,
+    "ik_2f_a": 4608.0,
+    "ik_1f_a": 3895.0,
+    "wklad_generacji_a": 120.0
+  },
+
+  "nastawy": {
+    "i_wyzszy_stopien_a": 2700.0,
+    "i_nizszy_stopien_a": 800.0,
+    "prog_blokady_szyn_a": 1500.0
+  },
+
+  "ik_za_nastepnym_zabezpieczeniem_a": 1700.0,
+
+  "_expected_results": {
+    "_comment": "Obliczenia referencyjne",
+    "zmiana_pradu_pct": 2.3,
+    "stosunek_gen_do_blokady_pct": 8.0,
+    "margines_selektywnosci": 1.59,
+    "wynik_a": "INFO",
+    "wynik_b": "PASS",
+    "wynik_c": "PASS",
+    "verdict": "ZGODNE"
+  },
+
+  "_calculation_trace": {
+    "_step_A_zmiana_pradu": "Delta_Ik = |5320 - 5200| / 5200 * 100% = 2.3% <= 10% => INFO",
+    "_step_B_blokada_szyn": "Wklad_gen = 120 A, Prog_blokady = 1500 A, Stosunek = 8% < 80% => PASS",
+    "_step_C_selektywnosc": "Margines = 2700 / 1700 = 1.59 >= 1.5 => PASS",
+    "_step_werdykt": "Wszystkie sprawdzenia PASS/INFO => ZGODNE"
+  }
+}

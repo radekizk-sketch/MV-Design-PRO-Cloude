@@ -1,0 +1,82 @@
+{
+  "_opis": "Wzorzec C — Przypadek NIEZGODNY: generacja lokalna powoduje istotne ryzyko błędnego działania zabezpieczeń",
+  "_pattern_id": "RP-LOC-GEN-IMPACT",
+  "_expected_verdict": "NIEZGODNE",
+  "_notes_pl": "Duża farma PV 3 MW + agregaty kogeneracyjne 2 MW w sieci SN 15 kV o niskiej mocy zwarciowej. Znacząca zmiana prądu zwarciowego (>30%), ryzyko blokady zabezpieczenia szyn. Wymagane działania korygujące.",
+
+  "punkt_zabezpieczenia_id": "pz-ref-C-niezgodne",
+  "punkt_zabezpieczenia_nazwa": "Pole liniowe L-08 GPZ Południe",
+  "szyny_id": "szyny-gpz-poludnie",
+  "szyny_nazwa": "Szyny 15 kV GPZ Południe",
+
+  "zrodla_generacji": [
+    {
+      "id": "pv-farm-002",
+      "nazwa": "Farma PV Strefa Przemysłowa",
+      "typ": "PV",
+      "moc_znamionowa_kw": 3000.0,
+      "prad_zwarciowy_a": 1750.0
+    },
+    {
+      "id": "agregat-001",
+      "nazwa": "Agregat kogeneracyjny CHP-1",
+      "typ": "AGREGAT",
+      "moc_znamionowa_kw": 1000.0,
+      "prad_zwarciowy_a": 850.0
+    },
+    {
+      "id": "agregat-002",
+      "nazwa": "Agregat kogeneracyjny CHP-2",
+      "typ": "AGREGAT",
+      "moc_znamionowa_kw": 1000.0,
+      "prad_zwarciowy_a": 850.0
+    }
+  ],
+
+  "dane_bez_generacji": {
+    "ik_3f_a": 3200.0,
+    "ik_2f_a": 2770.0,
+    "ik_1f_a": 2350.0,
+    "wklad_generacji_a": 0.0
+  },
+
+  "dane_generacja_min": {
+    "ik_3f_a": 3650.0,
+    "ik_2f_a": 3160.0,
+    "ik_1f_a": 2685.0,
+    "wklad_generacji_a": 450.0
+  },
+
+  "dane_generacja_max": {
+    "ik_3f_a": 6650.0,
+    "ik_2f_a": 5757.0,
+    "ik_1f_a": 4893.0,
+    "wklad_generacji_a": 3450.0
+  },
+
+  "nastawy": {
+    "i_wyzszy_stopien_a": 1600.0,
+    "i_nizszy_stopien_a": 500.0,
+    "prog_blokady_szyn_a": 2500.0
+  },
+
+  "ik_za_nastepnym_zabezpieczeniem_a": 1100.0,
+
+  "_expected_results": {
+    "_comment": "Obliczenia referencyjne",
+    "zmiana_pradu_pct": 107.8,
+    "stosunek_gen_do_blokady_pct": 138.0,
+    "margines_selektywnosci": 1.45,
+    "wynik_a": "NIEZGODNE",
+    "wynik_b": "NIEZGODNE",
+    "wynik_c": "PASS",
+    "verdict": "NIEZGODNE"
+  },
+
+  "_calculation_trace": {
+    "_step_A_zmiana_pradu": "Delta_Ik = |6650 - 3200| / 3200 * 100% = 107.8% > 30% => NIEZGODNE",
+    "_step_B_blokada_szyn": "Wklad_gen = 3450 A, Prog_blokady = 2500 A, Stosunek = 138% >= 80% => NIEZGODNE (ryzyko blokady)",
+    "_step_C_selektywnosc": "Margines = 1600 / 1100 = 1.45 >= 1.2 => PASS",
+    "_step_werdykt": "Sprawdzenia A i B = NIEZGODNE => NIEZGODNE"
+  }
+}

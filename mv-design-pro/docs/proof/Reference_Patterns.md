@@ -457,12 +457,330 @@ print(result.summary_pl)  # Polish summary
 
 ---
 
+---
+
+## Wzorzec C — Wpływ generacji lokalnej na zabezpieczenia SN
+
+### Pattern Identification
+
+| Property | Value |
+|----------|-------|
+| Pattern ID | `RP-LOC-GEN-IMPACT` |
+| Name (PL) | Wpływ generacji lokalnej na zabezpieczenia SN |
+| Input Source | Dane zwarciowe (scenariusze: bez generacji, z generacją min/max) |
+| Output | ReferencePatternResult |
+| Verdict Values | ZGODNE / GRANICZNE / NIEZGODNE |
+
+---
+
+### 1. Zakres i cel wzorca
+
+Wzorzec odniesienia C służy do diagnostyki wpływu **generacji lokalnej** (PV, BESS, agregaty)
+na działanie zabezpieczeń SN, w szczególności:
+
+- Prądy „widziane" przez zabezpieczenia w różnych scenariuszach pracy generacji
+- Ryzyko niepożądanej blokady zabezpieczenia szyn
+- Wpływ na selektywność stopni nadprądowych I> oraz I>>
+
+**NOT-A-SOLVER**: Wzorzec nie wykonuje obliczeń fizycznych — jedynie analizuje i porównuje
+wyniki obliczeń zwarciowych wykonanych przez solver IEC 60909.
+
+---
+
+### 2. Sprawdzenia diagnostyczne
+
+#### 2.1 Sprawdzenie A: Zmiana prądu zwarciowego w punkcie zabezpieczenia
+
+Porównanie prądu zwarciowego bez generacji i z maksymalną generacją:
+
+$$
+\Delta I_{k} = \frac{|I''_{k,gen} - I''_{k,bez}|}{I''_{k,bez}} \times 100\%
+$$
+
+**Klasyfikacja:**
+
+| Zmiana względna | Status | Werdykt cząstkowy |
+|-----------------|--------|-------------------|
+| ≤ 10% | INFO | Informacyjne — brak istotnego wpływu |
+| 10–30% | WARN | GRANICZNE — wymagana weryfikacja nastaw |
+| > 30% | FAIL | NIEZGODNE — znacząca zmiana warunków zwarciowych |
+
+#### 2.2 Sprawdzenie B: Ryzyko niepożądanej blokady zabezpieczenia szyn
+
+Sprawdzenie, czy wkład prądowy od generacji lokalnej może spełnić warunki blokady
+zabezpieczenia szyn zbiorczych:
+
+$$
+Ryzyko = I_{gen} \geq 0.8 \times I_{blokada}
+$$
+
+gdzie:
+- $I_{gen}$ — wkład prądowy generacji lokalnej do prądu zwarciowego [A]
+- $I_{blokada}$ — próg blokady zabezpieczenia szyn [A]
+
+**Klasyfikacja:**
+
+| Warunek | Status | Werdykt cząstkowy |
+|---------|--------|-------------------|
+| $I_{gen} < 0.8 \times I_{blokada}$ | PASS | Brak ryzyka blokady |
+| $I_{gen} \geq 0.8 \times I_{blokada}$ | FAIL | NIEZGODNE — ryzyko niepożądanej blokady |
+| Brak progu blokady | INFO | Sprawdzenie nie dotyczy |
+
+**Zalecenia przy NIEZGODNE:**
+- Zastosowanie zabezpieczenia kierunkowego
+- Korekta progów blokady
+
+#### 2.3 Sprawdzenie C: Wpływ na selektywność zabezpieczeń nadprądowych
+
+Porównanie marginesu selektywności dla scenariuszy bez/z generacją:
+
+$$
+Margines_{sel} = \frac{I_{>>}}{I''_{k,next}}
+$$
+
+gdzie:
+- $I_{>>}$ — nastawa wyższego stopnia nadprądowego [A]
+- $I''_{k,next}$ — prąd zwarciowy za następnym zabezpieczeniem [A]
+
+**Klasyfikacja:**
+
+| Margines | Status | Werdykt cząstkowy |
+|----------|--------|-------------------|
+| ≥ 1.5 | PASS | Selektywność zachowana z zapasem |
+| 1.2–1.5 (spadek > 0.3 z powodu generacji) | WARN | GRANICZNE — weryfikacja koordynacji |
+| < 1.2 | FAIL | NIEZGODNE — utrata selektywności |
+
+---
+
+### 3. Werdykt końcowy
+
+| Warunki | Werdykt |
+|---------|---------|
+| Którekolwiek sprawdzenie = NIEZGODNE | **NIEZGODNE** |
+| Którekolwiek sprawdzenie = GRANICZNE (bez NIEZGODNE) | **GRANICZNE** |
+| Wszystkie sprawdzenia = PASS lub INFO | **ZGODNE** |
+
+---
+
+### 4. Przypadki referencyjne
+
+#### 4.1 Przypadek ZGODNY
+
+**Scenariusz**: Instalacja PV 200 kW w sieci SN 15 kV o wysokiej mocy zwarciowej.
+
+| Parametr | Wartość | Jednostka |
+|----------|---------|-----------|
+| Moc generacji | 200 | kW |
+| Typ źródła | PV | — |
+| Prąd zwarciowy bez generacji | 5200 | A |
+| Prąd zwarciowy z generacją max | 5320 | A |
+| Wkład generacji | 120 | A |
+| Próg blokady szyn | 1500 | A |
+
+**Wyniki:**
+
+| Sprawdzenie | Zmiana/Stosunek | Status |
+|-------------|-----------------|--------|
+| A) Zmiana prądu | 2.3% | INFO |
+| B) Blokada szyn | 8% progu | PASS |
+| C) Selektywność | 1.33 | PASS |
+| **Werdykt** | — | **ZGODNE** |
+
+#### 4.2 Przypadek GRANICZNY
+
+**Scenariusz**: Farma PV 1 MW + BESS 500 kW w sieci SN 15 kV.
+
+| Parametr | Wartość | Jednostka |
+|----------|---------|-----------|
+| Moc generacji | 1500 | kW |
+| Prąd zwarciowy bez generacji | 4200 | A |
+| Prąd zwarciowy z generacją max | 5130 | A |
+| Wkład generacji | 930 | A |
+
+**Wyniki:**
+
+| Sprawdzenie | Zmiana/Stosunek | Status |
+|-------------|-----------------|--------|
+| A) Zmiana prądu | 22.1% | WARN (GRANICZNE) |
+| B) Blokada szyn | 51.7% progu | PASS |
+| C) Selektywność | 1.50 | PASS |
+| **Werdykt** | — | **GRANICZNE** |
+
+#### 4.3 Przypadek NIEZGODNY
+
+**Scenariusz**: Farma PV 3 MW + agregaty 2 MW w sieci SN 15 kV o niskiej mocy zwarciowej.
+
+| Parametr | Wartość | Jednostka |
+|----------|---------|-----------|
+| Moc generacji | 5000 | kW |
+| Prąd zwarciowy bez generacji | 3200 | A |
+| Prąd zwarciowy z generacją max | 6650 | A |
+| Wkład generacji | 3450 | A |
+| Próg blokady szyn | 2500 | A |
+
+**Wyniki:**
+
+| Sprawdzenie | Zmiana/Stosunek | Status |
+|-------------|-----------------|--------|
+| A) Zmiana prądu | 107.8% | FAIL (NIEZGODNE) |
+| B) Blokada szyn | 138% progu | FAIL (NIEZGODNE) |
+| C) Selektywność | 1.45 | PASS |
+| **Werdykt** | — | **NIEZGODNE** |
+
+**Zalecane działania:**
+- Zastosowanie zabezpieczeń kierunkowych
+- Korekta nastaw zabezpieczeń
+- Zmiana schematu zabezpieczeń
+
+---
+
+### 5. Struktura śladu WHITE-BOX
+
+Każda walidacja generuje ślad z następującymi krokami:
+
+```json
+[
+  {
+    "step": "wczytanie_fixture",
+    "description_pl": "Wczytanie danych referencyjnych z pliku fixture"
+  },
+  {
+    "step": "inicjalizacja_diagnostyki",
+    "description_pl": "Inicjalizacja diagnostyki wpływu generacji lokalnej"
+  },
+  {
+    "step": "sprawdzenie_zmiany_pradu",
+    "description_pl": "Sprawdzenie A: analiza zmiany prądu zwarciowego",
+    "formula": "\\Delta I_{k} = |I''_{k,gen} - I''_{k,bez}| / I''_{k,bez} × 100%"
+  },
+  {
+    "step": "sprawdzenie_blokady_szyn",
+    "description_pl": "Sprawdzenie B: analiza ryzyka blokady zabezpieczenia szyn",
+    "formula": "Ryzyko = I_{gen} ≥ 0.8 × I_{blokada}"
+  },
+  {
+    "step": "sprawdzenie_selektywnosci",
+    "description_pl": "Sprawdzenie C: analiza wpływu na selektywność",
+    "formula": "Margines_{sel} = I_{>>} / I''_{k,next}"
+  },
+  {
+    "step": "wyznaczenie_werdyktu",
+    "description_pl": "Wyznaczenie werdyktu końcowego wzorca"
+  }
+]
+```
+
+---
+
+### 6. Artefakty wynikowe
+
+| Klucz | Opis | Jednostka |
+|-------|------|-----------|
+| `punkt_zabezpieczenia_id` | Identyfikator punktu zabezpieczenia | — |
+| `liczba_zrodel_generacji` | Liczba źródeł generacji | — |
+| `sumaryczna_moc_generacji_kw` | Sumaryczna moc generacji | kW |
+| `ik_bez_generacji_3f_a` | Prąd zwarciowy 3f bez generacji | A |
+| `ik_z_generacja_max_3f_a` | Prąd zwarciowy 3f z generacją max | A |
+| `zmiana_pradu_zwarciowego_pct` | Zmiana prądu zwarciowego | % |
+| `wklad_generacji_max_a` | Wkład prądowy generacji max | A |
+| `wynik_sprawdzenia_a` | Wynik sprawdzenia A | INFO/GRANICZNE/NIEZGODNE |
+| `wynik_sprawdzenia_b` | Wynik sprawdzenia B | PASS/NIEZGODNE |
+| `wynik_sprawdzenia_c` | Wynik sprawdzenia C | PASS/GRANICZNE/NIEZGODNE |
+
+---
+
+### 7. Gwarancja determinizmu
+
+Wzorzec gwarantuje deterministyczny wynik:
+
+- Brak znaczników czasu systemowego w śladzie obliczeń
+- Wszystkie kolekcje sortowane według deterministycznych kluczy
+- Stabilna serializacja JSON z posortowanymi kluczami
+- 2× uruchomienie z tymi samymi danymi → identyczny wynik
+
+Weryfikacja testowa:
+```python
+result1 = run_pattern_c(input_data=...)
+result2 = run_pattern_c(input_data=...)
+assert stable_json(result1.to_dict()) == stable_json(result2.to_dict())
+```
+
+---
+
+### 8. Przykład użycia
+
+```python
+from application.reference_patterns import (
+    run_pattern_c,
+    WzorzecCInput,
+    ZrodloGeneracji,
+    DaneZwarciowePunktuZabezpieczenia,
+    NastawyZabezpieczen,
+    TypGeneracji,
+)
+
+# Z pliku fixture
+result = run_pattern_c(fixture_file="przypadek_zgodny.json")
+
+# Z danych wejściowych
+input_data = WzorzecCInput(
+    punkt_zabezpieczenia_id="pz-001",
+    punkt_zabezpieczenia_nazwa="Pole liniowe L-04",
+    szyny_id="szyny-001",
+    szyny_nazwa="Szyny 15 kV GPZ",
+    zrodla_generacji=(
+        ZrodloGeneracji(
+            id="pv-001",
+            nazwa="Instalacja PV",
+            typ=TypGeneracji.PV,
+            moc_znamionowa_kw=200.0,
+            prad_zwarciowy_a=120.0,
+        ),
+    ),
+    dane_bez_generacji=DaneZwarciowePunktuZabezpieczenia(
+        scenariusz="bez_generacji",
+        ik_3f_a=5200.0,
+        ik_2f_a=4500.0,
+        ik_1f_a=3800.0,
+        wklad_generacji_a=0.0,
+    ),
+    dane_generacja_min=DaneZwarciowePunktuZabezpieczenia(
+        scenariusz="generacja_min",
+        ik_3f_a=5250.0,
+        ik_2f_a=4545.0,
+        ik_1f_a=3840.0,
+        wklad_generacji_a=50.0,
+    ),
+    dane_generacja_max=DaneZwarciowePunktuZabezpieczenia(
+        scenariusz="generacja_max",
+        ik_3f_a=5320.0,
+        ik_2f_a=4608.0,
+        ik_1f_a=3895.0,
+        wklad_generacji_a=120.0,
+    ),
+    nastawy=NastawyZabezpieczen(
+        i_wyzszy_stopien_a=2400.0,
+        i_nizszy_stopien_a=800.0,
+        prog_blokady_szyn_a=1500.0,
+    ),
+    ik_za_nastepnym_zabezpieczeniem_a=1800.0,
+)
+
+result = run_pattern_c(input_data=input_data)
+
+print(result.verdict)  # "ZGODNE"
+print(result.summary_pl)  # Podsumowanie po polsku
+```
+
+---
+
 ## References
 
 - IEC 60909:2016 — Short-circuit currents in three-phase a.c. systems
 - IEC 60255-151:2009 — Measuring relays and protection equipment
 - PN-EN 60909-0:2016-09 — Prądy zwarciowe w sieciach trójfazowych prądu przemiennego
 - FIX-12D — Line Overcurrent Setting Analysis Module (MV-DESIGN-PRO)
+- IRiESD — Instrukcja Ruchu i Eksploatacji Sieci Dystrybucyjnej (zasady przyłączania OZE)
 
 ---
 
