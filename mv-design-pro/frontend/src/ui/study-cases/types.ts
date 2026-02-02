@@ -129,6 +129,17 @@ export const RESULT_STATUS_LABELS: Record<StudyCaseResultStatus, string> = {
 };
 
 /**
+ * Polish tooltips for result status (expanded descriptions).
+ * UI-09: Rozbudowane tooltips statusów przypadków.
+ */
+export const RESULT_STATUS_TOOLTIPS: Record<StudyCaseResultStatus, string> = {
+  NONE: 'Brak wyników — obliczenia nie zostały jeszcze wykonane',
+  FRESH: 'Wyniki aktualne — obliczenia wykonane po ostatniej zmianie modelu',
+  OUTDATED:
+    'Wyniki nieaktualne — model został zmieniony po ostatnim obliczeniu. Zalecenie: Uruchom ponownie obliczenia.',
+};
+
+/**
  * Polish labels for configuration fields.
  */
 export const CONFIG_FIELD_LABELS: Record<keyof StudyCaseConfig, string> = {

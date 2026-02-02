@@ -34,6 +34,8 @@ import {
   SEVERITY_COLORS,
 } from './types';
 import { useState } from 'react';
+import { VerdictBadge } from '../protection-coordination/ResultsTables';
+import type { CoordinationVerdict } from '../protection-coordination/types';
 
 // =============================================================================
 // P20d: Export Types and Component
@@ -50,13 +52,16 @@ const EXPORT_FORMAT_LABELS: Record<ExportFormat, string> = {
 interface ExportButtonProps {
   runId: string | null;
   disabled?: boolean;
+  /** UI-10: Werdykt ogólny - gdy PASS, przycisk jest wyróżniony */
+  overallVerdict?: CoordinationVerdict | null;
 }
 
 /**
  * P20d: Export dropdown button for Power Flow results.
  * Polish labels, minimal footprint.
+ * UI-10: Podświetlenie przycisku gdy werdykt to PASS.
  */
-function ExportButton({ runId, disabled }: ExportButtonProps) {
+function ExportButton({ runId, disabled, overallVerdict }: ExportButtonProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
 
@@ -93,13 +98,20 @@ function ExportButton({ runId, disabled }: ExportButtonProps) {
     }
   };
 
+  // UI-10: Highlight button when verdict is PASS
+  const isSuccess = overallVerdict === 'PASS';
+  const buttonBaseClass = isSuccess
+    ? 'flex items-center gap-2 rounded px-4 py-2 text-sm font-medium text-white bg-emerald-600 hover:bg-emerald-700 ring-2 ring-emerald-300 ring-offset-1 animate-pulse disabled:cursor-not-allowed disabled:bg-slate-300 disabled:ring-0 disabled:animate-none'
+    : 'flex items-center gap-2 rounded bg-slate-600 px-4 py-2 text-sm font-medium text-white hover:bg-slate-700 disabled:cursor-not-allowed disabled:bg-slate-300';
+
   return (
     <div className="relative">
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}
         disabled={disabled || isExporting || !runId}
-        className="flex items-center gap-2 rounded bg-slate-600 px-4 py-2 text-sm font-medium text-white hover:bg-slate-700 disabled:cursor-not-allowed disabled:bg-slate-300"
+        className={buttonBaseClass}
+        title={isSuccess ? 'Werdykt pozytywny - zalecany eksport raportu' : undefined}
       >
         {isExporting ? 'Eksportuje...' : 'Eksportuj raport'}
         <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -149,6 +161,77 @@ function getStatusBadgeClass(severity: 'info' | 'success' | 'warning'): string {
 }
 
 // =============================================================================
+// UI-01/UI-02: Voltage and Loading Verdict Functions
+// =============================================================================
+
+/**
+ * UI-01: Oblicza werdykt dla napięcia szyny.
+ * PASS: 0.95 ≤ U_pu ≤ 1.05
+ * MARGINAL: 0.90 ≤ U_pu < 0.95 lub 1.05 < U_pu ≤ 1.10
+ * FAIL: U_pu < 0.90 lub U_pu > 1.10
+ */
+function getVoltageVerdict(v_pu: number): {
+  verdict: CoordinationVerdict;
+  notes: string;
+} {
+  if (v_pu >= 0.95 && v_pu <= 1.05) {
+    return { verdict: 'PASS', notes: '' };
+  }
+  if ((v_pu >= 0.90 && v_pu < 0.95) || (v_pu > 1.05 && v_pu <= 1.10)) {
+    const deviation = v_pu < 1.0 ? 'zanizone' : 'zawyzone';
+    return {
+      verdict: 'MARGINAL',
+      notes: `Napiecie ${deviation} o ${Math.abs((v_pu - 1.0) * 100).toFixed(1)}%`,
+    };
+  }
+  const deviation = v_pu < 1.0 ? 'ponizej' : 'powyzej';
+  const limit = v_pu < 1.0 ? '0.90 p.u.' : '1.10 p.u.';
+  return {
+    verdict: 'FAIL',
+    notes: `Napiecie ${deviation} granicy ${limit}. Wymagana korekta.`,
+  };
+}
+
+/**
+ * UI-02: Oblicza werdykt dla obciążenia gałęzi.
+ * PASS: obciążenie ≤ 80%
+ * MARGINAL: 80% < obciążenie ≤ 100%
+ * FAIL: obciążenie > 100%
+ *
+ * Uwaga: Jeśli brak danych obciążenia, używamy strat jako proxy.
+ */
+function getBranchLoadingVerdict(
+  loading_pct: number | null | undefined,
+  losses_p_mw: number
+): { verdict: CoordinationVerdict; notes: string } {
+  // Jeśli brak danych obciążenia, szacujemy na podstawie strat
+  if (loading_pct === null || loading_pct === undefined) {
+    // Wysokie straty mogą wskazywać na przeciążenie
+    if (losses_p_mw > 0.1) {
+      return {
+        verdict: 'MARGINAL',
+        notes: 'Brak danych obciazenia. Wysokie straty mogą wskazywać na przeciążenie.',
+      };
+    }
+    return { verdict: 'PASS', notes: 'Brak danych obciazenia procentowego' };
+  }
+
+  if (loading_pct <= 80) {
+    return { verdict: 'PASS', notes: '' };
+  }
+  if (loading_pct <= 100) {
+    return {
+      verdict: 'MARGINAL',
+      notes: `Obciazenie ${loading_pct.toFixed(1)}% - blisko granicy dopuszczalnej`,
+    };
+  }
+  return {
+    verdict: 'FAIL',
+    notes: `Przeciazenie: ${loading_pct.toFixed(1)}% > 100%. Wymagana korekta.`,
+  };
+}
+
+// =============================================================================
 // Sub-Components
 // =============================================================================
 
@@ -191,6 +274,21 @@ function ResultStatusBar() {
     }
   }, [runHeader.created_at]);
 
+  // UI-10: Calculate quick verdict for export button highlighting
+  const overallVerdict = useMemo((): CoordinationVerdict | null => {
+    if (!results || !results.converged) return null;
+    const { summary, bus_results, branch_results } = results;
+    // Quick check: if voltage range is within limits, consider it PASS
+    const voltageOk = summary.min_v_pu >= 0.95 && summary.max_v_pu <= 1.05;
+    if (!voltageOk) {
+      // Check if any bus/branch has FAIL
+      const hasFail = bus_results.some(b => getVoltageVerdict(b.v_pu).verdict === 'FAIL') ||
+        branch_results.some(br => getBranchLoadingVerdict(null, br.losses_p_mw).verdict === 'FAIL');
+      return hasFail ? 'FAIL' : 'MARGINAL';
+    }
+    return 'PASS';
+  }, [results]);
+
   return (
     <div className="flex flex-wrap items-center justify-between gap-4 rounded border border-slate-200 bg-white p-3">
       <div className="flex items-center gap-4">
@@ -217,7 +315,11 @@ function ResultStatusBar() {
       </div>
       <div className="flex items-center gap-4">
         <span className="text-sm text-slate-500">{formattedDate}</span>
-        <ExportButton runId={selectedRunId || runHeader.id} disabled={!results} />
+        <ExportButton
+          runId={selectedRunId || runHeader.id}
+          disabled={!results}
+          overallVerdict={overallVerdict}
+        />
       </div>
     </div>
   );
@@ -264,28 +366,35 @@ function BusResultsTable() {
               <th className="px-3 py-2 text-right font-semibold text-slate-700">Kat [deg]</th>
               <th className="px-3 py-2 text-right font-semibold text-slate-700">P<sub>inj</sub> [MW]</th>
               <th className="px-3 py-2 text-right font-semibold text-slate-700">Q<sub>inj</sub> [Mvar]</th>
+              <th className="px-3 py-2 text-center font-semibold text-slate-700">Status</th>
             </tr>
           </thead>
           <tbody>
-            {filteredRows.map((row: PowerFlowBusResult) => (
-              <tr key={row.bus_id} className="border-t border-slate-100 hover:bg-slate-50">
-                <td className="px-3 py-2 font-medium text-slate-800">
-                  {row.bus_id.substring(0, 12)}...
-                </td>
-                <td className="px-3 py-2 text-right font-mono text-slate-600">
-                  {formatNumber(row.v_pu, 4)}
-                </td>
-                <td className="px-3 py-2 text-right font-mono text-slate-600">
-                  {formatNumber(row.angle_deg, 2)}
-                </td>
-                <td className="px-3 py-2 text-right font-mono text-slate-600">
-                  {formatNumber(row.p_injected_mw, 3)}
-                </td>
-                <td className="px-3 py-2 text-right font-mono text-slate-600">
-                  {formatNumber(row.q_injected_mvar, 3)}
-                </td>
-              </tr>
-            ))}
+            {filteredRows.map((row: PowerFlowBusResult) => {
+              const voltageResult = getVoltageVerdict(row.v_pu);
+              return (
+                <tr key={row.bus_id} className="border-t border-slate-100 hover:bg-slate-50">
+                  <td className="px-3 py-2 font-medium text-slate-800">
+                    {row.bus_id.substring(0, 12)}...
+                  </td>
+                  <td className="px-3 py-2 text-right font-mono text-slate-600">
+                    {formatNumber(row.v_pu, 4)}
+                  </td>
+                  <td className="px-3 py-2 text-right font-mono text-slate-600">
+                    {formatNumber(row.angle_deg, 2)}
+                  </td>
+                  <td className="px-3 py-2 text-right font-mono text-slate-600">
+                    {formatNumber(row.p_injected_mw, 3)}
+                  </td>
+                  <td className="px-3 py-2 text-right font-mono text-slate-600">
+                    {formatNumber(row.q_injected_mvar, 3)}
+                  </td>
+                  <td className="px-3 py-2 text-center">
+                    <VerdictBadge verdict={voltageResult.verdict} notesPl={voltageResult.notes} />
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>
@@ -339,34 +448,42 @@ function BranchResultsTable() {
               <th className="px-3 py-2 text-right font-semibold text-slate-700">Q<sub>to</sub> [Mvar]</th>
               <th className="px-3 py-2 text-right font-semibold text-slate-700">Straty P [MW]</th>
               <th className="px-3 py-2 text-right font-semibold text-slate-700">Straty Q [Mvar]</th>
+              <th className="px-3 py-2 text-center font-semibold text-slate-700">Status</th>
             </tr>
           </thead>
           <tbody>
-            {filteredRows.map((row: PowerFlowBranchResult) => (
-              <tr key={row.branch_id} className="border-t border-slate-100 hover:bg-slate-50">
-                <td className="px-3 py-2 font-medium text-slate-800">
-                  {row.branch_id.substring(0, 12)}...
-                </td>
-                <td className="px-3 py-2 text-right font-mono text-slate-600">
-                  {formatNumber(row.p_from_mw, 3)}
-                </td>
-                <td className="px-3 py-2 text-right font-mono text-slate-600">
-                  {formatNumber(row.q_from_mvar, 3)}
-                </td>
-                <td className="px-3 py-2 text-right font-mono text-slate-600">
-                  {formatNumber(row.p_to_mw, 3)}
-                </td>
-                <td className="px-3 py-2 text-right font-mono text-slate-600">
-                  {formatNumber(row.q_to_mvar, 3)}
-                </td>
-                <td className="px-3 py-2 text-right font-mono text-rose-600">
-                  {formatNumber(row.losses_p_mw, 4)}
-                </td>
-                <td className="px-3 py-2 text-right font-mono text-rose-600">
-                  {formatNumber(row.losses_q_mvar, 4)}
-                </td>
-              </tr>
-            ))}
+            {filteredRows.map((row: PowerFlowBranchResult) => {
+              // UI-02: Werdykt dla obciążenia gałęzi (używamy strat jako proxy)
+              const loadingResult = getBranchLoadingVerdict(null, row.losses_p_mw);
+              return (
+                <tr key={row.branch_id} className="border-t border-slate-100 hover:bg-slate-50">
+                  <td className="px-3 py-2 font-medium text-slate-800">
+                    {row.branch_id.substring(0, 12)}...
+                  </td>
+                  <td className="px-3 py-2 text-right font-mono text-slate-600">
+                    {formatNumber(row.p_from_mw, 3)}
+                  </td>
+                  <td className="px-3 py-2 text-right font-mono text-slate-600">
+                    {formatNumber(row.q_from_mvar, 3)}
+                  </td>
+                  <td className="px-3 py-2 text-right font-mono text-slate-600">
+                    {formatNumber(row.p_to_mw, 3)}
+                  </td>
+                  <td className="px-3 py-2 text-right font-mono text-slate-600">
+                    {formatNumber(row.q_to_mvar, 3)}
+                  </td>
+                  <td className="px-3 py-2 text-right font-mono text-rose-600">
+                    {formatNumber(row.losses_p_mw, 4)}
+                  </td>
+                  <td className="px-3 py-2 text-right font-mono text-rose-600">
+                    {formatNumber(row.losses_q_mvar, 4)}
+                  </td>
+                  <td className="px-3 py-2 text-center">
+                    <VerdictBadge verdict={loadingResult.verdict} notesPl={loadingResult.notes} />
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>
@@ -375,6 +492,124 @@ function BranchResultsTable() {
       </p>
     </div>
   );
+}
+
+// =============================================================================
+// UI-05: Network Overall Verdict Calculation
+// =============================================================================
+
+interface NetworkProblem {
+  type: 'voltage' | 'loading';
+  element_id: string;
+  description: string;
+  severity: 'MARGINAL' | 'FAIL';
+}
+
+interface NetworkVerdictResult {
+  verdict: CoordinationVerdict;
+  problems: NetworkProblem[];
+  recommendations: string[];
+  stats: {
+    busPass: number;
+    busMarginal: number;
+    busFail: number;
+    branchPass: number;
+    branchMarginal: number;
+    branchFail: number;
+  };
+}
+
+/**
+ * UI-05: Oblicza ogólny werdykt sieci na podstawie wyników szyn i gałęzi.
+ */
+function calculateNetworkVerdict(
+  busResults: PowerFlowBusResult[],
+  branchResults: PowerFlowBranchResult[]
+): NetworkVerdictResult {
+  const problems: NetworkProblem[] = [];
+  const recommendations: string[] = [];
+  const stats = {
+    busPass: 0,
+    busMarginal: 0,
+    busFail: 0,
+    branchPass: 0,
+    branchMarginal: 0,
+    branchFail: 0,
+  };
+
+  // Analyze bus results
+  for (const bus of busResults) {
+    const result = getVoltageVerdict(bus.v_pu);
+    if (result.verdict === 'PASS') {
+      stats.busPass++;
+    } else if (result.verdict === 'MARGINAL') {
+      stats.busMarginal++;
+      problems.push({
+        type: 'voltage',
+        element_id: bus.bus_id,
+        description: `Szyna ${bus.bus_id.substring(0, 8)}...: ${result.notes}`,
+        severity: 'MARGINAL',
+      });
+    } else if (result.verdict === 'FAIL') {
+      stats.busFail++;
+      problems.push({
+        type: 'voltage',
+        element_id: bus.bus_id,
+        description: `Szyna ${bus.bus_id.substring(0, 8)}...: ${result.notes}`,
+        severity: 'FAIL',
+      });
+    }
+  }
+
+  // Analyze branch results
+  for (const branch of branchResults) {
+    const result = getBranchLoadingVerdict(null, branch.losses_p_mw);
+    if (result.verdict === 'PASS') {
+      stats.branchPass++;
+    } else if (result.verdict === 'MARGINAL') {
+      stats.branchMarginal++;
+      problems.push({
+        type: 'loading',
+        element_id: branch.branch_id,
+        description: `Galaz ${branch.branch_id.substring(0, 8)}...: ${result.notes}`,
+        severity: 'MARGINAL',
+      });
+    } else if (result.verdict === 'FAIL') {
+      stats.branchFail++;
+      problems.push({
+        type: 'loading',
+        element_id: branch.branch_id,
+        description: `Galaz ${branch.branch_id.substring(0, 8)}...: ${result.notes}`,
+        severity: 'FAIL',
+      });
+    }
+  }
+
+  // Generate recommendations
+  if (stats.busFail > 0) {
+    recommendations.push('Skoryguj poziomy napiec na szynach z przekroczeniami granic');
+  }
+  if (stats.busMarginal > 0) {
+    recommendations.push('Zweryfikuj marginesy napieciowe na szynach granicznych');
+  }
+  if (stats.branchFail > 0) {
+    recommendations.push('Rozważ wzmocnienie przeciazonych galezi lub redystrybucje obciazen');
+  }
+  if (stats.branchMarginal > 0) {
+    recommendations.push('Monitoruj galezi o wysokich stratach');
+  }
+
+  // Determine overall verdict
+  let verdict: CoordinationVerdict;
+  if (stats.busFail > 0 || stats.branchFail > 0) {
+    verdict = 'FAIL';
+  } else if (stats.busMarginal > 0 || stats.branchMarginal > 0) {
+    verdict = 'MARGINAL';
+  } else {
+    verdict = 'PASS';
+  }
+
+  return { verdict, problems, recommendations, stats };
 }
 
 // =============================================================================
@@ -395,10 +630,74 @@ function SummaryTab() {
     return <EmptyState message="Brak wynikow do wyswietlenia." />;
   }
 
-  const { summary, converged, iterations_count, tolerance_used, base_mva, slack_bus_id } = results;
+  const { summary, converged, iterations_count, tolerance_used, base_mva, slack_bus_id, bus_results, branch_results } = results;
+
+  // UI-05: Calculate network verdict
+  const networkVerdict = useMemo(
+    () => calculateNetworkVerdict(bus_results, branch_results),
+    [bus_results, branch_results]
+  );
 
   return (
     <div className="space-y-4">
+      {/* UI-05: Overall network verdict */}
+      <div className="rounded border border-slate-200 bg-white p-4">
+        <h3 className="mb-3 text-sm font-semibold text-slate-700">Werdykt ogolny sieci</h3>
+        <div className="flex items-center gap-4">
+          <VerdictBadge
+            verdict={networkVerdict.verdict}
+            size="md"
+            notesPl={
+              networkVerdict.verdict === 'PASS'
+                ? 'Wszystkie szyny i galezi w granicach dopuszczalnych'
+                : networkVerdict.verdict === 'MARGINAL'
+                ? 'Sa elementy na granicy, ale brak przekroczen'
+                : 'Wykryto przekroczenia granic - wymagana korekta'
+            }
+          />
+          <div className="text-sm text-slate-600">
+            <span className="font-medium text-emerald-600">{networkVerdict.stats.busPass + networkVerdict.stats.branchPass}</span> zgodnych,{' '}
+            <span className="font-medium text-amber-600">{networkVerdict.stats.busMarginal + networkVerdict.stats.branchMarginal}</span> granicznych,{' '}
+            <span className="font-medium text-rose-600">{networkVerdict.stats.busFail + networkVerdict.stats.branchFail}</span> z przekroczeniami
+          </div>
+        </div>
+      </div>
+
+      {/* UI-05: Problems list (if any) */}
+      {networkVerdict.problems.length > 0 && (
+        <div className="rounded border border-amber-200 bg-amber-50 p-4">
+          <h3 className="mb-2 text-sm font-semibold text-amber-800">Wykryte problemy ({networkVerdict.problems.length})</h3>
+          <ul className="space-y-1 text-sm text-amber-700">
+            {networkVerdict.problems.slice(0, 10).map((problem, idx) => (
+              <li key={`${problem.element_id}-${idx}`} className="flex items-start gap-2">
+                <span className={problem.severity === 'FAIL' ? 'text-rose-600' : 'text-amber-600'}>
+                  {problem.severity === 'FAIL' ? '✗' : '⚠'}
+                </span>
+                {problem.description}
+              </li>
+            ))}
+            {networkVerdict.problems.length > 10 && (
+              <li className="text-amber-500">...i {networkVerdict.problems.length - 10} wiecej</li>
+            )}
+          </ul>
+        </div>
+      )}
+
+      {/* UI-05: Recommendations (if any) */}
+      {networkVerdict.recommendations.length > 0 && (
+        <div className="rounded border border-blue-200 bg-blue-50 p-4">
+          <h3 className="mb-2 text-sm font-semibold text-blue-800">Zalecane dzialania</h3>
+          <ul className="space-y-1 text-sm text-blue-700">
+            {networkVerdict.recommendations.map((rec, idx) => (
+              <li key={idx} className="flex items-start gap-2">
+                <span className="text-blue-500">→</span>
+                {rec}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
       {/* Convergence status */}
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
         <div className={`rounded border p-4 ${converged ? 'border-emerald-200 bg-emerald-50' : 'border-rose-200 bg-rose-50'}`}>
