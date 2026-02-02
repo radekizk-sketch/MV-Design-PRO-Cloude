@@ -83,6 +83,13 @@ export const ROUTES: Record<string, RouteDefinition> = {
     icon: '⚖️',
     requiredMode: 'RESULT_VIEW',
   },
+  REFERENCE_PATTERNS: {
+    hash: '#reference-patterns',
+    label: 'Wzorce odniesienia',
+    description: 'Walidacja wzorców referencyjnych dla metodyki zabezpieczeń',
+    icon: '📐',
+    requiredMode: 'RESULT_VIEW',
+  },
 };
 
 /**

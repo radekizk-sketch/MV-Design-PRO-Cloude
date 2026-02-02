@@ -27,6 +27,7 @@ import { DesignerPage } from './designer/DesignerPage';
 import { ProofInspectorPage } from './proof-inspector';
 import { ProtectionResultsInspectorPage } from './ui/protection-results';
 import { PowerFlowResultsInspectorPage } from './ui/power-flow-results';
+import { ReferencePatternsPage } from './ui/reference-patterns';
 import { ResultsInspectorPage } from './ui/results-inspector';
 import { SLDViewPage } from './ui/sld';
 import { MainLayout } from './ui/layout';
@@ -67,7 +68,8 @@ function isResultsRoute(route: string): boolean {
     route === '#results' ||
     route === '#proof' ||
     route === '#protection-results' ||
-    route === '#power-flow-results'
+    route === '#power-flow-results' ||
+    route === '#reference-patterns'
   );
 }
 
@@ -210,6 +212,18 @@ function App() {
         onViewResults={handleViewResults}
       >
         <PowerFlowResultsInspectorPage />
+      </MainLayout>
+    );
+  }
+
+  // Wzorce odniesienia (Reference Patterns)
+  if (route === '#reference-patterns') {
+    return wrapWithReadyIndicator(
+      <MainLayout
+        onCalculate={handleCalculate}
+        onViewResults={handleViewResults}
+      >
+        <ReferencePatternsPage />
       </MainLayout>
     );
   }
