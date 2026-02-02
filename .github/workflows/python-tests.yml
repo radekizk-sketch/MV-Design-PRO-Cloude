@@ -4,6 +4,10 @@ on:
   push:
   pull_request:
 
+concurrency:
+  group: pytest-pr-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
+
 jobs:
   pytest:
     runs-on: ubuntu-latest
