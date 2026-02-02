@@ -1,19 +1,27 @@
 /**
  * P30b — SLD Canvas Component (SVG Rendering)
  *
+ * PR-SLD-04: Unifikacja symboli w edytorze do standardu ETAP
+ *
  * CANONICAL ALIGNMENT:
  * - sld_rules.md § A.2: Symbol types (Bus, Line, Transformer, etc.)
  * - sld_rules.md § D.1: Visual state encoding (in_service, selected, hover)
  * - powerfactory_ui_parity.md: ≥110% PowerFactory symbol rendering
  * - AUDYT_SLD_ETAP.md N-02: hierarchiczne auto-rozmieszczenie
+ * - AUDYT_SLD_ETAP.md N-04: edytor używa tego samego renderera co podgląd (ETAP)
  *
  * FEATURES:
- * - SVG rendering of all SLD symbols
+ * - SVG rendering of all SLD symbols using ETAP standard
  * - Grid background (when enabled)
  * - Lasso selection (drag rectangle)
  * - Drag handles for selected symbols
  * - Mouse interactions (click, drag, lasso)
  * - AUTOMATYCZNE auto-rozmieszczenie (bez przycisku)
+ *
+ * ETAP PARITY (N-04):
+ * - Edytor i podgląd używają tego samego UnifiedSymbolRenderer
+ * - Symbole ETAP zamiast uproszczonych kształtów
+ * - Porty spójne z definicjami w SymbolResolver.ts
  */
 
 import React, { useCallback, useRef, useMemo, useEffect } from 'react';
@@ -25,9 +33,12 @@ import type { IssueSeverity } from '../types';
 import { useIsMutationBlocked } from '../selection/store';
 import { generateConnections } from './utils/connectionRouting';
 import { ConnectionsLayer } from '../sld/ConnectionRenderer';
+import { UnifiedSymbolRenderer, type SymbolVisualState, type SymbolInteractionHandlers } from '../sld/symbols';
 
 /**
- * Symbol rendering component.
+ * Symbol rendering component using unified ETAP renderer.
+ *
+ * PR-SLD-04: Replaces simplified shapes with ETAP symbols.
  */
 interface SymbolRendererProps {
   symbol: AnySldSymbol;
@@ -46,212 +57,29 @@ const SymbolRenderer: React.FC<SymbolRendererProps> = ({
   onMouseDown,
   onClick
 }) => {
-  const handleMouseDown = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    const rect = (e.currentTarget as SVGElement).ownerSVGElement!.getBoundingClientRect();
-    const position = {
-      x: e.clientX - rect.left,
-      y: e.clientY - rect.top,
-    };
-    onMouseDown(symbol.id, position);
+  // Build visual state for unified renderer
+  const visualState: SymbolVisualState = {
+    selected,
+    inService: symbol.inService,
+    energized: true, // Editor doesn't calculate energization
+    highlighted,
+    highlightSeverity,
   };
 
-  const handleClick = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    const mode = e.shiftKey ? 'add' : e.ctrlKey || e.metaKey ? 'toggle' : 'single';
-    onClick(symbol.id, mode);
+  // Build interaction handlers
+  const handlers: SymbolInteractionHandlers = {
+    onMouseDown,
+    onClick,
   };
 
-  // Render symbol based on type
-  const renderSymbol = () => {
-    const { position, inService, elementType } = symbol;
-
-    // P30d: Determine stroke color (priority: highlight > selection > default)
-    let stroke: string;
-    let strokeWidth: number;
-
-    if (highlighted && highlightSeverity) {
-      // Highlight takes priority
-      switch (highlightSeverity) {
-        case 'HIGH':
-          stroke = '#dc2626'; // red-600
-          strokeWidth = 3;
-          break;
-        case 'WARN':
-          stroke = '#f59e0b'; // amber-500
-          strokeWidth = 3;
-          break;
-        case 'INFO':
-          stroke = '#3b82f6'; // blue-500
-          strokeWidth = 2;
-          break;
-        default:
-          stroke = selected ? '#3b82f6' : inService ? '#1f2937' : '#9ca3af';
-          strokeWidth = selected ? 2 : 1;
-      }
-    } else if (selected) {
-      stroke = '#3b82f6'; // blue-500
-      strokeWidth = 2;
-    } else {
-      stroke = inService ? '#1f2937' : '#9ca3af';
-      strokeWidth = 1;
-    }
-
-    const opacity = inService ? 1 : 0.5;
-    const strokeDasharray = inService ? undefined : '4,4';
-
-    switch (elementType) {
-      case 'Bus':
-        // Busbar: horizontal thick line
-        const nodeSymbol = symbol as any;
-        const width = nodeSymbol.width || 60;
-        const height = nodeSymbol.height || 8;
-        return (
-          <g transform={`translate(${position.x}, ${position.y})`}>
-            <rect
-              x={-width / 2}
-              y={-height / 2}
-              width={width}
-              height={height}
-              fill={selected ? '#dbeafe' : '#e5e7eb'}
-              stroke={stroke}
-              strokeWidth={strokeWidth}
-              opacity={opacity}
-              strokeDasharray={strokeDasharray}
-              onMouseDown={handleMouseDown}
-              onClick={handleClick}
-              style={{ cursor: 'move' }}
-            />
-            <text
-              x={0}
-              y={-height / 2 - 8}
-              textAnchor="middle"
-              fontSize="12"
-              fill="#374151"
-            >
-              {symbol.elementName}
-            </text>
-          </g>
-        );
-
-      case 'LineBranch':
-      case 'TransformerBranch':
-        // Line/cable/transformer: simple line for now
-        return (
-          <g>
-            <line
-              x1={position.x}
-              y1={position.y}
-              x2={position.x + 60}
-              y2={position.y}
-              stroke={stroke}
-              strokeWidth={strokeWidth}
-              opacity={opacity}
-              strokeDasharray={strokeDasharray}
-              onMouseDown={handleMouseDown}
-              onClick={handleClick}
-              style={{ cursor: 'move' }}
-            />
-            <text
-              x={position.x + 30}
-              y={position.y - 8}
-              textAnchor="middle"
-              fontSize="10"
-              fill="#374151"
-            >
-              {symbol.elementName}
-            </text>
-          </g>
-        );
-
-      case 'Switch':
-        // Switch: break symbol
-        return (
-          <g transform={`translate(${position.x}, ${position.y})`}>
-            <circle
-              cx={0}
-              cy={0}
-              r={8}
-              fill={selected ? '#dbeafe' : '#ffffff'}
-              stroke={stroke}
-              strokeWidth={strokeWidth}
-              opacity={opacity}
-              onMouseDown={handleMouseDown}
-              onClick={handleClick}
-              style={{ cursor: 'move' }}
-            />
-            <text
-              x={0}
-              y={-12}
-              textAnchor="middle"
-              fontSize="10"
-              fill="#374151"
-            >
-              {symbol.elementName}
-            </text>
-          </g>
-        );
-
-      case 'Source':
-        // Source: circle with arrow
-        return (
-          <g transform={`translate(${position.x}, ${position.y})`}>
-            <circle
-              cx={0}
-              cy={0}
-              r={12}
-              fill={selected ? '#fef3c7' : '#fef9c3'}
-              stroke={stroke}
-              strokeWidth={strokeWidth}
-              opacity={opacity}
-              onMouseDown={handleMouseDown}
-              onClick={handleClick}
-              style={{ cursor: 'move' }}
-            />
-            <text
-              x={0}
-              y={-16}
-              textAnchor="middle"
-              fontSize="10"
-              fill="#374151"
-            >
-              {symbol.elementName}
-            </text>
-          </g>
-        );
-
-      case 'Load':
-        // Load: triangle
-        return (
-          <g transform={`translate(${position.x}, ${position.y})`}>
-            <polygon
-              points="0,-12 10,8 -10,8"
-              fill={selected ? '#dbeafe' : '#e0f2fe'}
-              stroke={stroke}
-              strokeWidth={strokeWidth}
-              opacity={opacity}
-              onMouseDown={handleMouseDown}
-              onClick={handleClick}
-              style={{ cursor: 'move' }}
-            />
-            <text
-              x={0}
-              y={-16}
-              textAnchor="middle"
-              fontSize="10"
-              fill="#374151"
-            >
-              {symbol.elementName}
-            </text>
-          </g>
-        );
-
-      default:
-        return null;
-    }
-  };
-
-  return <>{renderSymbol()}</>;
+  return (
+    <UnifiedSymbolRenderer
+      symbol={symbol}
+      visualState={visualState}
+      handlers={handlers}
+      showLabel={true}
+    />
+  );
 };
 
 /**
