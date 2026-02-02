@@ -63,6 +63,8 @@ export interface ValidationResult {
 export interface ValidationOptions {
   /** Sprawdzaj orphan symbols (V-01) */
   checkOrphanSymbols?: boolean;
+  /** Sprawdzaj duplikaty elementId (V-01b) — N-03 ETAP */
+  checkDuplicateElementIds?: boolean;
   /** Sprawdzaj hidden elements (V-02) */
   checkHiddenElements?: boolean;
   /** Sprawdzaj połączenia (V-03) */
@@ -84,6 +86,7 @@ export interface ValidationOptions {
 /** Domyślne opcje */
 const DEFAULT_OPTIONS: ValidationOptions = {
   checkOrphanSymbols: true,
+  checkDuplicateElementIds: true, // N-03: Wykryj zduplikowane elementId
   checkHiddenElements: false, // Wymaga modelElementIds
   checkConnections: true,
   checkIslands: true,
@@ -114,6 +117,11 @@ export function validateSld(
   // V-01: Orphan symbols (symbol bez elementId)
   if (opts.checkOrphanSymbols) {
     issues.push(...checkOrphanSymbols(symbols));
+  }
+
+  // V-01b: Duplicate elementIds (N-03 ETAP)
+  if (opts.checkDuplicateElementIds) {
+    issues.push(...checkDuplicateElementIds(symbols));
   }
 
   // V-02: Hidden elements (element bez symbolu)
@@ -184,6 +192,49 @@ function checkOrphanSymbols(symbols: AnySldSymbol[]): ValidationIssue[] {
       });
     }
   });
+
+  return issues;
+}
+
+// =============================================================================
+// V-01b: DUPLICATE ELEMENT IDS (N-03 ETAP)
+// =============================================================================
+
+/**
+ * Sprawdź czy są zduplikowane elementId (bijection violation).
+ *
+ * N-03 ETAP: Kopiowanie/wklejanie musi tworzyć NOWE elementy modelu,
+ * nie duplikować referencje do istniejących.
+ */
+function checkDuplicateElementIds(symbols: AnySldSymbol[]): ValidationIssue[] {
+  const issues: ValidationIssue[] = [];
+  const elementIdMap = new Map<string, string[]>(); // elementId -> symbolIds
+
+  // Zbierz wszystkie elementId
+  symbols.forEach((symbol) => {
+    if (symbol.elementId && symbol.elementId.trim() !== '') {
+      const existing = elementIdMap.get(symbol.elementId) || [];
+      existing.push(symbol.id);
+      elementIdMap.set(symbol.elementId, existing);
+    }
+  });
+
+  // Znajdź duplikaty
+  for (const [elementId, symbolIds] of elementIdMap.entries()) {
+    if (symbolIds.length > 1) {
+      const symbolNames = symbolIds
+        .map((id) => symbols.find((s) => s.id === id)?.elementName || id)
+        .join(', ');
+
+      issues.push({
+        ruleId: 'V-01b',
+        severity: 'ERROR',
+        message: `Zduplikowany elementId "${elementId}" — ${symbolIds.length} symboli (${symbolNames}) wskazuje na ten sam element modelu`,
+        symbolIds: symbolIds,
+        suggestion: 'Każdy symbol musi wskazywać na unikalny element modelu. Usuń duplikaty lub utwórz nowe elementy.',
+      });
+    }
+  }
 
   return issues;
 }

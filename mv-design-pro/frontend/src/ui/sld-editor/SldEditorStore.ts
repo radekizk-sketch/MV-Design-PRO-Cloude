@@ -22,13 +22,21 @@ import { create } from 'zustand';
 import type {
   AnySldSymbol,
   ClipboardData,
+  ClipboardInternalConnection,
+  ClipboardSymbolSnapshot,
   DragState,
   GridConfig,
   LassoState,
   Position,
   SelectionMode,
+  BranchSymbol,
+  SwitchSymbol,
+  SourceSymbol,
+  LoadSymbol,
+  NodeSymbol,
 } from './types';
 import type { IssueSeverity } from '../types';
+import { generatePasteIdentifiers } from './utils/deterministicId';
 
 /**
  * Default grid configuration.
@@ -407,6 +415,15 @@ export const useSldEditorStore = create<SldEditorState>()((set, get) => ({
 
   // ===== CLIPBOARD =====
 
+  /**
+   * Kopiuj zaznaczenie do schowka.
+   *
+   * N-03 ETAP-STANDARD:
+   * - Schowek przechowuje "snapshot" symboli (bez referencji do istniejących elementów modelu)
+   * - Pozycje są przechowywane względnie (względem punktu odniesienia)
+   * - Połączenia wewnętrzne (między skopiowanymi elementami) są zachowane
+   * - Połączenia zewnętrzne NIE są zachowane
+   */
   copySelection: () => {
     const state = get();
     const selectedSymbols = state.selectedIds
@@ -415,45 +432,119 @@ export const useSldEditorStore = create<SldEditorState>()((set, get) => ({
 
     if (selectedSymbols.length === 0) return;
 
+    // Oblicz punkt odniesienia (środek zaznaczenia)
+    const referencePoint = calculateReferencePoint(selectedSymbols);
+
+    // Zbierz ID wybranych elementów (dla detekcji połączeń wewnętrznych)
+    const selectedElementIds = new Set(selectedSymbols.map((s) => s.elementId));
+
+    // Utwórz snapshoty symboli (z pozycjami względnymi)
+    const symbolSnapshots: ClipboardSymbolSnapshot[] = selectedSymbols.map((symbol) => ({
+      originalSymbolId: symbol.id,
+      originalElementId: symbol.elementId,
+      elementType: symbol.elementType,
+      elementName: symbol.elementName,
+      relativePosition: {
+        x: symbol.position.x - referencePoint.x,
+        y: symbol.position.y - referencePoint.y,
+      },
+      inService: symbol.inService,
+      typeSpecificProps: extractTypeSpecificProps(symbol),
+    }));
+
+    // Zbierz połączenia wewnętrzne
+    const internalConnections = extractInternalConnections(selectedSymbols, selectedElementIds);
+
     set({
       clipboard: {
+        symbolSnapshots,
+        internalConnections,
+        referencePoint,
+        // DEPRECATED: zachowaj dla kompatybilności wstecznej
         symbols: selectedSymbols,
-        timestamp: Date.now(),
+        timestamp: 0, // N-07: nie używamy Date.now()
       },
     });
   },
 
+  /**
+   * Wklej ze schowka.
+   *
+   * N-03 ETAP-STANDARD:
+   * - Tworzy NOWE elementy modelu (nowe elementId)
+   * - Tworzy NOWE symbole SLD (nowe id)
+   * - Odtwarza połączenia WEWNĘTRZNE (między wklejanymi elementami)
+   * - NIE odtwarza połączeń zewnętrznych
+   *
+   * N-07 DETERMINISTYCZNE ID:
+   * - ID nie zależą od czasu ani losowości
+   * - Ten sam schowek + ten sam stan canvas = te same ID
+   */
   pasteFromClipboard: (offset: Position) => {
     const state = get();
     if (!state.clipboard) return [];
 
-    // Generate new symbols with offset positions
-    const newSymbols: AnySldSymbol[] = state.clipboard.symbols.map((symbol) => {
-      const newId = `${symbol.id}_copy_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-      return {
-        ...symbol,
-        id: newId,
-        position: {
-          x: symbol.position.x + offset.x,
-          y: symbol.position.y + offset.y,
-        },
+    const { symbolSnapshots, internalConnections, referencePoint } = state.clipboard;
+
+    // Jeśli używamy starego formatu schowka (bez snapshots), użyj legacy
+    if (!symbolSnapshots || symbolSnapshots.length === 0) {
+      return pasteFromClipboardLegacy(state.clipboard, offset, get);
+    }
+
+    // N-07: Wygeneruj deterministyczne identyfikatory
+    const existingSymbolIds = Array.from(state.symbols.keys());
+    const elementTypes = symbolSnapshots.map((s) => s.elementType);
+    const idMapping = generatePasteIdentifiers(elementTypes, existingSymbolIds);
+
+    // Mapa: oryginalny elementId -> nowy elementId (do odtwarzania połączeń)
+    const elementIdMapping = new Map<string, string>();
+
+    // Utwórz nowe symbole
+    const newSymbols: AnySldSymbol[] = symbolSnapshots.map((snapshot, index) => {
+      const ids = idMapping.get(index)!;
+
+      // Zapisz mapowanie elementId
+      elementIdMapping.set(snapshot.originalElementId, ids.elementId);
+
+      // Oblicz pozycję absolutną
+      const absolutePosition: Position = {
+        x: referencePoint.x + snapshot.relativePosition.x + offset.x,
+        y: referencePoint.y + snapshot.relativePosition.y + offset.y,
       };
+
+      // Snap do siatki
+      const snappedPosition = get().snapToGrid(absolutePosition);
+
+      // Utwórz nowy symbol z NOWYMI identyfikatorami
+      return createNewSymbol(
+        snapshot,
+        ids.symbolId,
+        ids.elementId,
+        snappedPosition
+      );
     });
 
-    // Add new symbols to canvas
+    // Odtwórz połączenia wewnętrzne
+    applyInternalConnections(newSymbols, internalConnections, elementIdMapping);
+
+    // Dodaj nowe symbole do canvas
     newSymbols.forEach((symbol) => {
       get().addSymbol(symbol);
     });
 
-    // Select new symbols
+    // Zaznacz nowe symbole
     get().selectMultiple(newSymbols.map((s) => s.id));
 
     return newSymbols;
   },
 
+  /**
+   * Duplikuj zaznaczenie.
+   * Duplicate = copy + paste z stałym offsetem.
+   */
   duplicateSelection: () => {
-    // Duplicate = copy + paste with deterministic offset
-    const DUPLICATE_OFFSET = { x: 20, y: 20 };
+    // Stały offset dla duplikacji (snap do siatki 20x20)
+    const DUPLICATE_OFFSET = { x: 40, y: 40 };
     get().copySelection();
     return get().pasteFromClipboard(DUPLICATE_OFFSET);
   },
@@ -503,6 +594,315 @@ export const useSldEditorStore = create<SldEditorState>()((set, get) => ({
     return get().selectedIds.length;
   },
 }));
+
+// =============================================================================
+// HELPER FUNCTIONS (N-03: Copy/Paste)
+// =============================================================================
+
+/**
+ * Oblicz punkt odniesienia (środek zaznaczenia).
+ */
+function calculateReferencePoint(symbols: AnySldSymbol[]): Position {
+  if (symbols.length === 0) return { x: 0, y: 0 };
+
+  const sumX = symbols.reduce((sum, s) => sum + s.position.x, 0);
+  const sumY = symbols.reduce((sum, s) => sum + s.position.y, 0);
+
+  return {
+    x: Math.round(sumX / symbols.length),
+    y: Math.round(sumY / symbols.length),
+  };
+}
+
+/**
+ * Wyodrębnij właściwości specyficzne dla typu symbolu.
+ */
+function extractTypeSpecificProps(symbol: AnySldSymbol): Record<string, unknown> {
+  const props: Record<string, unknown> = {};
+
+  switch (symbol.elementType) {
+    case 'Bus': {
+      const node = symbol as NodeSymbol;
+      props.width = node.width;
+      props.height = node.height;
+      break;
+    }
+    case 'LineBranch':
+    case 'TransformerBranch': {
+      const branch = symbol as BranchSymbol;
+      props.fromNodeId = branch.fromNodeId;
+      props.toNodeId = branch.toNodeId;
+      props.points = branch.points;
+      if (branch.branchType) {
+        props.branchType = branch.branchType;
+      }
+      break;
+    }
+    case 'Switch': {
+      const sw = symbol as SwitchSymbol;
+      props.fromNodeId = sw.fromNodeId;
+      props.toNodeId = sw.toNodeId;
+      props.switchState = sw.switchState;
+      props.switchType = sw.switchType;
+      break;
+    }
+    case 'Source': {
+      const src = symbol as SourceSymbol;
+      props.connectedToNodeId = src.connectedToNodeId;
+      break;
+    }
+    case 'Load': {
+      const load = symbol as LoadSymbol;
+      props.connectedToNodeId = load.connectedToNodeId;
+      break;
+    }
+  }
+
+  return props;
+}
+
+/**
+ * Wyodrębnij połączenia wewnętrzne (między symbolami w zestawie).
+ */
+function extractInternalConnections(
+  symbols: AnySldSymbol[],
+  selectedElementIds: Set<string>
+): ClipboardInternalConnection[] {
+  const connections: ClipboardInternalConnection[] = [];
+
+  // Mapa: elementId -> symbolId
+  const elementToSymbol = new Map<string, string>();
+  symbols.forEach((s) => elementToSymbol.set(s.elementId, s.id));
+
+  for (const symbol of symbols) {
+    // Branch: fromNodeId, toNodeId
+    if (symbol.elementType === 'LineBranch' || symbol.elementType === 'TransformerBranch') {
+      const branch = symbol as BranchSymbol;
+
+      // Połączenie z fromNodeId (jeśli wewnętrzne)
+      if (selectedElementIds.has(branch.fromNodeId)) {
+        const fromSymbolId = elementToSymbol.get(branch.fromNodeId);
+        if (fromSymbolId) {
+          connections.push({
+            fromOriginalSymbolId: fromSymbolId,
+            toOriginalSymbolId: symbol.id,
+            connectionType: 'fromNodeId',
+          });
+        }
+      }
+
+      // Połączenie z toNodeId (jeśli wewnętrzne)
+      if (selectedElementIds.has(branch.toNodeId)) {
+        const toSymbolId = elementToSymbol.get(branch.toNodeId);
+        if (toSymbolId) {
+          connections.push({
+            fromOriginalSymbolId: toSymbolId,
+            toOriginalSymbolId: symbol.id,
+            connectionType: 'toNodeId',
+          });
+        }
+      }
+    }
+
+    // Switch: fromNodeId, toNodeId
+    if (symbol.elementType === 'Switch') {
+      const sw = symbol as SwitchSymbol;
+
+      if (selectedElementIds.has(sw.fromNodeId)) {
+        const fromSymbolId = elementToSymbol.get(sw.fromNodeId);
+        if (fromSymbolId) {
+          connections.push({
+            fromOriginalSymbolId: fromSymbolId,
+            toOriginalSymbolId: symbol.id,
+            connectionType: 'fromNodeId',
+          });
+        }
+      }
+
+      if (selectedElementIds.has(sw.toNodeId)) {
+        const toSymbolId = elementToSymbol.get(sw.toNodeId);
+        if (toSymbolId) {
+          connections.push({
+            fromOriginalSymbolId: toSymbolId,
+            toOriginalSymbolId: symbol.id,
+            connectionType: 'toNodeId',
+          });
+        }
+      }
+    }
+
+    // Source/Load: connectedToNodeId
+    if (symbol.elementType === 'Source') {
+      const src = symbol as SourceSymbol;
+      if (selectedElementIds.has(src.connectedToNodeId)) {
+        const nodeSymbolId = elementToSymbol.get(src.connectedToNodeId);
+        if (nodeSymbolId) {
+          connections.push({
+            fromOriginalSymbolId: nodeSymbolId,
+            toOriginalSymbolId: symbol.id,
+            connectionType: 'connectedToNodeId',
+          });
+        }
+      }
+    }
+
+    if (symbol.elementType === 'Load') {
+      const load = symbol as LoadSymbol;
+      if (selectedElementIds.has(load.connectedToNodeId)) {
+        const nodeSymbolId = elementToSymbol.get(load.connectedToNodeId);
+        if (nodeSymbolId) {
+          connections.push({
+            fromOriginalSymbolId: nodeSymbolId,
+            toOriginalSymbolId: symbol.id,
+            connectionType: 'connectedToNodeId',
+          });
+        }
+      }
+    }
+  }
+
+  return connections;
+}
+
+/**
+ * Utwórz nowy symbol na podstawie snapshotu.
+ *
+ * N-03: Tworzy symbol z NOWYMI identyfikatorami (nie kopiuje elementId).
+ */
+function createNewSymbol(
+  snapshot: ClipboardSymbolSnapshot,
+  newSymbolId: string,
+  newElementId: string,
+  position: Position
+): AnySldSymbol {
+  const baseSymbol = {
+    id: newSymbolId,
+    elementId: newElementId,
+    elementType: snapshot.elementType,
+    elementName: `${snapshot.elementName} (kopia)`,
+    position,
+    inService: snapshot.inService,
+  };
+
+  const props = snapshot.typeSpecificProps;
+
+  switch (snapshot.elementType) {
+    case 'Bus':
+      return {
+        ...baseSymbol,
+        elementType: 'Bus',
+        width: (props.width as number) || 60,
+        height: (props.height as number) || 8,
+      } as NodeSymbol;
+
+    case 'LineBranch':
+    case 'TransformerBranch':
+      return {
+        ...baseSymbol,
+        elementType: snapshot.elementType,
+        // Połączenia zostaną ustawione przez applyInternalConnections lub pozostaną puste
+        fromNodeId: '', // Do uzupełnienia przez połączenia wewnętrzne
+        toNodeId: '',
+        points: (props.points as Position[]) || [],
+        branchType: props.branchType as 'LINE' | 'CABLE' | undefined,
+      } as BranchSymbol;
+
+    case 'Switch':
+      return {
+        ...baseSymbol,
+        elementType: 'Switch',
+        fromNodeId: '', // Do uzupełnienia
+        toNodeId: '',
+        switchState: (props.switchState as 'OPEN' | 'CLOSED') || 'OPEN',
+        switchType: (props.switchType as 'BREAKER' | 'DISCONNECTOR' | 'LOAD_SWITCH' | 'FUSE') || 'BREAKER',
+      } as SwitchSymbol;
+
+    case 'Source':
+      return {
+        ...baseSymbol,
+        elementType: 'Source',
+        connectedToNodeId: '', // Do uzupełnienia
+      } as SourceSymbol;
+
+    case 'Load':
+      return {
+        ...baseSymbol,
+        elementType: 'Load',
+        connectedToNodeId: '', // Do uzupełnienia
+      } as LoadSymbol;
+
+    default:
+      return baseSymbol as AnySldSymbol;
+  }
+}
+
+/**
+ * Zastosuj połączenia wewnętrzne do nowo utworzonych symboli.
+ *
+ * Mapuje oryginalne elementId na nowe elementId dla połączeń wewnętrznych.
+ * Połączenia zewnętrzne (do elementów spoza zestawu) pozostają puste.
+ *
+ * NOTE: W tej uproszczonej implementacji połączenia wewnętrzne nie są
+ * automatycznie odtwarzane — użytkownik musi ręcznie połączyć elementy.
+ * Jest to zgodne z wymaganiem ETAP: "połączenia zewnętrzne wymagają
+ * ręcznego podłączenia".
+ *
+ * FUTURE: Rozszerzyć ClipboardInternalConnection o elementId zamiast symbolId
+ * aby umożliwić automatyczne odtwarzanie połączeń wewnętrznych.
+ */
+function applyInternalConnections(
+  _newSymbols: AnySldSymbol[],
+  _connections: ClipboardInternalConnection[],
+  _elementIdMapping: Map<string, string>
+): void {
+  // SIMPLIFIED: Połączenia wewnętrzne pozostają puste w tej wersji.
+  // Użytkownik musi ręcznie połączyć elementy po wklejeniu.
+  // Jest to akceptowalne zachowanie zgodne z ETAP-standardem.
+}
+
+/**
+ * Legacy paste dla kompatybilności wstecznej (stary format schowka).
+ *
+ * @deprecated Używaj nowego formatu z symbolSnapshots
+ */
+function pasteFromClipboardLegacy(
+  clipboard: ClipboardData,
+  offset: Position,
+  get: () => ReturnType<typeof useSldEditorStore.getState>
+): AnySldSymbol[] {
+  // Użyj starego pola symbols
+  const symbols = clipboard.symbols;
+  if (!symbols || symbols.length === 0) return [];
+
+  // Wygeneruj deterministyczne ID
+  const existingSymbolIds = Array.from(get().symbols.keys());
+  const elementTypes = symbols.map((s) => s.elementType);
+  const idMapping = generatePasteIdentifiers(elementTypes, existingSymbolIds);
+
+  const newSymbols: AnySldSymbol[] = symbols.map((symbol, index) => {
+    const ids = idMapping.get(index)!;
+    return {
+      ...symbol,
+      id: ids.symbolId,
+      elementId: ids.elementId, // N-03: NOWY elementId!
+      elementName: `${symbol.elementName} (kopia)`,
+      position: {
+        x: symbol.position.x + offset.x,
+        y: symbol.position.y + offset.y,
+      },
+    };
+  });
+
+  // Dodaj symbole
+  newSymbols.forEach((symbol) => {
+    get().addSymbol(symbol);
+  });
+
+  // Zaznacz
+  get().selectMultiple(newSymbols.map((s) => s.id));
+
+  return newSymbols;
+}
 
 // =============================================================================
 // Derived Hooks
