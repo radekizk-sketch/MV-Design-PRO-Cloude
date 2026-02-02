@@ -1,0 +1,394 @@
+/**
+ * FIX-12 — Protection Coordination Types
+ *
+ * TypeScript types for protection coordination analysis.
+ *
+ * CANONICAL ALIGNMENT:
+ * - Mirrors backend domain models
+ * - 100% Polish UI labels
+ * - READ-ONLY views of backend data
+ */
+
+// =============================================================================
+// Enums and Constants
+// =============================================================================
+
+export type DeviceType = 'RELAY' | 'FUSE' | 'RECLOSER' | 'CIRCUIT_BREAKER';
+export type CurveStandard = 'IEC' | 'IEEE' | 'FUSE';
+export type CurveVariant = 'SI' | 'VI' | 'EI' | 'LTI' | 'DT' | 'MI' | 'STI';
+export type CoordinationVerdict = 'PASS' | 'MARGINAL' | 'FAIL' | 'ERROR';
+
+// =============================================================================
+// Settings Types
+// =============================================================================
+
+export interface CurveSettings {
+  standard: CurveStandard;
+  variant: CurveVariant;
+  pickup_current_a: number;
+  time_multiplier: number;
+  definite_time_s?: number;
+}
+
+export interface StageSettings {
+  enabled: boolean;
+  pickup_current_a: number;
+  time_s?: number;
+  curve_settings?: CurveSettings;
+  directional: boolean;
+}
+
+export interface OvercurrentSettings {
+  stage_51: StageSettings;
+  stage_50?: StageSettings;
+  stage_50_high?: StageSettings;
+  stage_51n?: StageSettings;
+  stage_50n?: StageSettings;
+}
+
+export interface ProtectionDevice {
+  id: string;
+  name: string;
+  device_type: DeviceType;
+  location_element_id: string;
+  settings: OvercurrentSettings;
+  manufacturer?: string;
+  model?: string;
+  location_description?: string;
+  ct_ratio?: string;
+  rated_current_a?: number;
+}
+
+// =============================================================================
+// Currents Data
+// =============================================================================
+
+export interface FaultCurrentData {
+  location_id: string;
+  ik_max_3f_a: number;
+  ik_min_3f_a: number;
+  ik_max_2f_a?: number;
+  ik_min_1f_a?: number;
+}
+
+export interface OperatingCurrentData {
+  location_id: string;
+  i_operating_a: number;
+  i_max_operating_a?: number;
+  loading_percent?: number;
+}
+
+// =============================================================================
+// Check Results
+// =============================================================================
+
+export interface SensitivityCheck {
+  device_id: string;
+  i_fault_min_a: number;
+  i_pickup_a: number;
+  margin_percent: number;
+  verdict: CoordinationVerdict;
+  verdict_pl: string;
+  notes_pl: string;
+}
+
+export interface SelectivityCheck {
+  upstream_device_id: string;
+  downstream_device_id: string;
+  analysis_current_a: number;
+  t_upstream_s: number;
+  t_downstream_s: number;
+  margin_s: number;
+  required_margin_s: number;
+  verdict: CoordinationVerdict;
+  verdict_pl: string;
+  notes_pl: string;
+}
+
+export interface OverloadCheck {
+  device_id: string;
+  i_operating_a: number;
+  i_pickup_a: number;
+  margin_percent: number;
+  verdict: CoordinationVerdict;
+  verdict_pl: string;
+  notes_pl: string;
+}
+
+// =============================================================================
+// TCC Types
+// =============================================================================
+
+export interface TCCPoint {
+  current_a: number;
+  current_multiple: number;
+  time_s: number;
+}
+
+export interface TCCCurve {
+  device_id: string;
+  device_name: string;
+  curve_type: string;
+  pickup_current_a: number;
+  time_multiplier: number;
+  points: TCCPoint[];
+  color: string;
+}
+
+export interface FaultMarker {
+  id: string;
+  label_pl: string;
+  current_a: number;
+  fault_type: string;
+  location: string;
+}
+
+// =============================================================================
+// Analysis Results
+// =============================================================================
+
+export interface CoordinationSummary {
+  total_devices: number;
+  total_checks: number;
+  sensitivity: { pass: number; marginal: number; fail: number; error: number };
+  selectivity: { pass: number; marginal: number; fail: number; error: number };
+  overload: { pass: number; marginal: number; fail: number; error: number };
+  overall_verdict: CoordinationVerdict;
+  overall_verdict_pl: string;
+}
+
+export interface CoordinationResult {
+  run_id: string;
+  project_id: string;
+  sensitivity_checks: SensitivityCheck[];
+  selectivity_checks: SelectivityCheck[];
+  overload_checks: OverloadCheck[];
+  tcc_curves: TCCCurve[];
+  fault_markers: FaultMarker[];
+  overall_verdict: CoordinationVerdict;
+  summary: CoordinationSummary;
+  trace_steps: TraceStep[];
+  pf_run_id?: string;
+  sc_run_id?: string;
+  created_at: string;
+}
+
+export interface TraceStep {
+  step: string;
+  description_pl: string;
+  inputs: Record<string, unknown>;
+  outputs: Record<string, unknown>;
+}
+
+// =============================================================================
+// API Request/Response
+// =============================================================================
+
+export interface RunCoordinationRequest {
+  devices: ProtectionDevice[];
+  fault_currents: FaultCurrentData[];
+  operating_currents: OperatingCurrentData[];
+  config?: CoordinationConfig;
+  pf_run_id?: string;
+  sc_run_id?: string;
+}
+
+export interface CoordinationConfig {
+  breaker_time_s: number;
+  relay_overtravel_s: number;
+  safety_factor_s: number;
+  sensitivity_margin_pass: number;
+  sensitivity_margin_marginal: number;
+  overload_margin_pass: number;
+  overload_margin_marginal: number;
+}
+
+export interface CoordinationSummaryResponse {
+  run_id: string;
+  project_id: string;
+  overall_verdict: CoordinationVerdict;
+  overall_verdict_pl: string;
+  total_devices: number;
+  total_checks: number;
+  sensitivity_pass: number;
+  sensitivity_fail: number;
+  selectivity_pass: number;
+  selectivity_fail: number;
+  overload_pass: number;
+  overload_fail: number;
+}
+
+// =============================================================================
+// Polish Labels
+// =============================================================================
+
+export const LABELS = {
+  title: 'Koordynacja zabezpieczen nadpradowych',
+  subtitle: 'Analiza czulosci, selektywnosci i przeciazalnosci',
+
+  devices: {
+    title: 'Urzadzenia zabezpieczeniowe',
+    add: 'Dodaj urzadzenie',
+    remove: 'Usun',
+    name: 'Nazwa',
+    type: 'Typ',
+    location: 'Lokalizacja',
+    settings: 'Nastawy',
+  },
+
+  settings: {
+    title: 'Nastawy zabezpieczenia',
+    stage51: 'Stopien I> (51)',
+    stage50: 'Stopien I>> (50)',
+    stage50high: 'Stopien I>>> (50 high-set)',
+    stage51n: 'Stopien I0> (51N)',
+    stage50n: 'Stopien I0>> (50N)',
+    pickup: 'Prad rozruchowy [A]',
+    tms: 'Mnoznik czasowy TMS',
+    time: 'Czas [s]',
+    curve: 'Charakterystyka',
+    directional: 'Kierunkowy',
+    enabled: 'Aktywny',
+  },
+
+  checks: {
+    sensitivity: {
+      title: 'Czulosc',
+      subtitle: 'Sprawdzenie czy zabezpieczenie zadzial dla I_min',
+      iFaultMin: 'I_min zwarcia [A]',
+      iPickup: 'I_pickup [A]',
+      margin: 'Margines [%]',
+    },
+    selectivity: {
+      title: 'Selektywnosc',
+      subtitle: 'Sprawdzenie stopniowania czasowego',
+      downstream: 'Podrzedne',
+      upstream: 'Nadrzedne',
+      tDownstream: 't_pod [s]',
+      tUpstream: 't_nad [s]',
+      deltaT: 'Δt [s]',
+    },
+    overload: {
+      title: 'Przeciazalnosc',
+      subtitle: 'Sprawdzenie czy nie zadzial dla I_roboczego',
+      iOperating: 'I_robocze [A]',
+      iPickup: 'I_pickup [A]',
+      margin: 'Margines [%]',
+    },
+  },
+
+  tcc: {
+    title: 'Wykres czasowo-pradowy (TCC)',
+    xAxis: 'Prad [A]',
+    yAxis: 'Czas [s]',
+    noData: 'Brak danych wykresu',
+  },
+
+  verdict: {
+    PASS: 'Prawidlowa',
+    MARGINAL: 'Margines niski',
+    FAIL: 'Nieskoordynowane',
+    ERROR: 'Blad analizy',
+  },
+
+  deviceTypes: {
+    RELAY: 'Przekaznik nadpradowy',
+    FUSE: 'Bezpiecznik',
+    RECLOSER: 'Wylacznik samoczynny',
+    CIRCUIT_BREAKER: 'Wylacznik z wyzwalaczem',
+  },
+
+  curveTypes: {
+    SI: 'Normalna odwrotna (SI)',
+    VI: 'Bardzo odwrotna (VI)',
+    EI: 'Ekstremalnie odwrotna (EI)',
+    LTI: 'Dlugoczasowa odwrotna (LTI)',
+    DT: 'Czas niezalezny (DT)',
+    MI: 'Umiarkowanie odwrotna (MI)',
+    STI: 'Krotkoczasowa odwrotna (STI)',
+  },
+
+  actions: {
+    run: 'Uruchom analize',
+    export: 'Eksportuj',
+    exportPdf: 'Eksportuj PDF',
+    exportDocx: 'Eksportuj DOCX',
+    refresh: 'Odswiez',
+    save: 'Zapisz',
+    cancel: 'Anuluj',
+  },
+
+  status: {
+    loading: 'Ladowanie...',
+    running: 'Trwa analiza...',
+    success: 'Analiza zakonczona',
+    error: 'Blad analizy',
+  },
+
+  tabs: {
+    summary: 'Podsumowanie',
+    sensitivity: 'Czulosc',
+    selectivity: 'Selektywnosc',
+    overload: 'Przeciazalnosc',
+    tcc: 'Wykres TCC',
+    trace: 'Slad obliczen',
+  },
+} as const;
+
+// =============================================================================
+// Verdict Styling
+// =============================================================================
+
+export const VERDICT_STYLES: Record<
+  CoordinationVerdict,
+  { bg: string; text: string; border: string }
+> = {
+  PASS: {
+    bg: 'bg-emerald-100',
+    text: 'text-emerald-700',
+    border: 'border-emerald-300',
+  },
+  MARGINAL: {
+    bg: 'bg-amber-100',
+    text: 'text-amber-700',
+    border: 'border-amber-300',
+  },
+  FAIL: {
+    bg: 'bg-rose-100',
+    text: 'text-rose-700',
+    border: 'border-rose-300',
+  },
+  ERROR: {
+    bg: 'bg-slate-100',
+    text: 'text-slate-700',
+    border: 'border-slate-300',
+  },
+};
+
+// =============================================================================
+// Default Values
+// =============================================================================
+
+export const DEFAULT_CONFIG: CoordinationConfig = {
+  breaker_time_s: 0.05,
+  relay_overtravel_s: 0.05,
+  safety_factor_s: 0.1,
+  sensitivity_margin_pass: 1.5,
+  sensitivity_margin_marginal: 1.2,
+  overload_margin_pass: 1.2,
+  overload_margin_marginal: 1.1,
+};
+
+export const DEFAULT_CURVE_SETTINGS: CurveSettings = {
+  standard: 'IEC',
+  variant: 'SI',
+  pickup_current_a: 400,
+  time_multiplier: 0.3,
+};
+
+export const DEFAULT_STAGE_51: StageSettings = {
+  enabled: true,
+  pickup_current_a: 400,
+  curve_settings: DEFAULT_CURVE_SETTINGS,
+  directional: false,
+};
