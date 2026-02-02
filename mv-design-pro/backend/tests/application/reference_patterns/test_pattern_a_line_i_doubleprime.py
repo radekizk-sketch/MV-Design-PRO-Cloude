@@ -697,3 +697,240 @@ class TestEdgeCases:
         # Should skip run_analysis step
         step_names = [s["step"] for s in result.trace]
         assert "run_analysis" not in step_names
+
+
+# =============================================================================
+# TEST: FIXTURE-BASED VERDICTS (CASE A, B, C)
+# =============================================================================
+
+
+class TestFixtureVerdicts:
+    """Tests for verdicts from the three reference fixtures."""
+
+    def test_case_A_verdict_zgodne(self, pattern: LineIDoublePrimeReferencePattern):
+        """Test ZGODNE verdict from case_A_zgodne.json fixture."""
+        result = pattern.validate(fixture_file="case_A_zgodne.json")
+
+        assert result.verdict == "ZGODNE"
+        assert result.artifacts["window_valid"] is True
+
+        # Verify window is not narrow (relative width > 5%)
+        i_min = result.artifacts["window_i_min_primary_a"]
+        i_max = result.artifacts["window_i_max_primary_a"]
+        relative_width = (i_max - i_min) / i_min
+        assert relative_width > 0.05, "Window should not be narrow for ZGODNE"
+
+    def test_case_B_verdict_niezgodne(self, pattern: LineIDoublePrimeReferencePattern):
+        """Test NIEZGODNE verdict from case_B_niezgodne_konflikt.json fixture."""
+        result = pattern.validate(fixture_file="case_B_niezgodne_konflikt.json")
+
+        assert result.verdict == "NIEZGODNE"
+        assert result.artifacts["window_valid"] is False
+
+        # Verify I_min > I_max (conflict)
+        i_min = result.artifacts["window_i_min_primary_a"]
+        i_max = result.artifacts["window_i_max_primary_a"]
+        assert i_min > i_max, "I_min should be > I_max for NIEZGODNE"
+
+    def test_case_C_verdict_graniczne(self, pattern: LineIDoublePrimeReferencePattern):
+        """Test GRANICZNE verdict from case_C_graniczne_waskie_okno.json fixture."""
+        result = pattern.validate(fixture_file="case_C_graniczne_waskie_okno.json")
+
+        assert result.verdict == "GRANICZNE"
+        assert result.artifacts["window_valid"] is True
+
+        # Verify window is narrow (relative width < 5%)
+        i_min = result.artifacts["window_i_min_primary_a"]
+        i_max = result.artifacts["window_i_max_primary_a"]
+        relative_width = (i_max - i_min) / i_min
+        assert relative_width < 0.05, "Window should be narrow for GRANICZNE"
+
+
+# =============================================================================
+# TEST: DETERMINISM WITH FIXTURES
+# =============================================================================
+
+
+class TestDeterminismWithFixtures:
+    """Tests for deterministic behavior using fixtures."""
+
+    def test_determinism_case_A(self, pattern: LineIDoublePrimeReferencePattern):
+        """Test 2× run with case_A produces identical results."""
+        result1 = pattern.validate(fixture_file="case_A_zgodne.json")
+        result2 = pattern.validate(fixture_file="case_A_zgodne.json")
+
+        assert compare_results_deterministic(result1, result2)
+
+        # Verify stable JSON is identical
+        json1 = stable_json(result1.to_dict())
+        json2 = stable_json(result2.to_dict())
+        assert json1 == json2
+
+    def test_determinism_case_B(self, pattern: LineIDoublePrimeReferencePattern):
+        """Test 2× run with case_B produces identical results."""
+        result1 = pattern.validate(fixture_file="case_B_niezgodne_konflikt.json")
+        result2 = pattern.validate(fixture_file="case_B_niezgodne_konflikt.json")
+
+        assert compare_results_deterministic(result1, result2)
+
+    def test_determinism_case_C(self, pattern: LineIDoublePrimeReferencePattern):
+        """Test 2× run with case_C produces identical results."""
+        result1 = pattern.validate(fixture_file="case_C_graniczne_waskie_okno.json")
+        result2 = pattern.validate(fixture_file="case_C_graniczne_waskie_okno.json")
+
+        assert compare_results_deterministic(result1, result2)
+
+
+# =============================================================================
+# TEST: TRACE ORDERING
+# =============================================================================
+
+
+class TestTraceOrdering:
+    """Tests for deterministic trace/checks/artifacts ordering."""
+
+    def test_trace_ordering_case_A(self, pattern: LineIDoublePrimeReferencePattern):
+        """Test trace steps have deterministic order for case_A."""
+        result1 = pattern.validate(fixture_file="case_A_zgodne.json")
+        result2 = pattern.validate(fixture_file="case_A_zgodne.json")
+
+        # Trace should have identical order
+        assert result1.trace == result2.trace
+
+        # Steps should be in expected order
+        step_names = [s["step"] for s in result1.trace]
+        expected_order = [
+            "load_fixture",
+            "run_analysis",
+            "analysis_completed",
+            "extract_values",
+            "check_selectivity",
+            "check_sensitivity",
+            "check_thermal",
+            "check_window",
+            "check_spz",
+            "determine_verdict",
+        ]
+        assert step_names == expected_order
+
+    def test_checks_ordering_deterministic(self, pattern: LineIDoublePrimeReferencePattern):
+        """Test checks are sorted alphabetically by name_pl."""
+        result = pattern.validate(fixture_file="case_A_zgodne.json")
+
+        check_names = [c["name_pl"] for c in result.checks]
+        assert check_names == sorted(check_names), "Checks should be sorted alphabetically"
+
+    def test_artifacts_keys_sorted(self, pattern: LineIDoublePrimeReferencePattern):
+        """Test artifacts dictionary has sorted keys."""
+        result = pattern.validate(fixture_file="case_A_zgodne.json")
+
+        artifact_keys = list(result.artifacts.keys())
+        assert artifact_keys == sorted(artifact_keys), "Artifact keys should be sorted"
+
+
+# =============================================================================
+# TEST: FIXTURE LOADING FROM SUBDIRECTORY
+# =============================================================================
+
+
+class TestFixtureSubdirectory:
+    """Tests for fixture loading from pattern-specific subdirectory."""
+
+    def test_load_case_A_from_subdirectory(self):
+        """Test loading case_A fixture from subdirectory."""
+        from application.reference_patterns import load_fixture
+
+        fixture = load_fixture("case_A_zgodne.json")
+        assert fixture["line_id"] == "line-ref-A-zgodne"
+        assert fixture["_expected_verdict"] == "ZGODNE"
+
+    def test_load_case_B_from_subdirectory(self):
+        """Test loading case_B fixture from subdirectory."""
+        from application.reference_patterns import load_fixture
+
+        fixture = load_fixture("case_B_niezgodne_konflikt.json")
+        assert fixture["line_id"] == "line-ref-B-niezgodne"
+        assert fixture["_expected_verdict"] == "NIEZGODNE"
+
+    def test_load_case_C_from_subdirectory(self):
+        """Test loading case_C fixture from subdirectory."""
+        from application.reference_patterns import load_fixture
+
+        fixture = load_fixture("case_C_graniczne_waskie_okno.json")
+        assert fixture["line_id"] == "line-ref-C-graniczne"
+        assert fixture["_expected_verdict"] == "GRANICZNE"
+
+    def test_backwards_compatibility_with_root_fixture(self):
+        """Test loading fixture from root directory (backwards compatibility)."""
+        from application.reference_patterns import load_fixture
+
+        # The old fixture in root should still work
+        fixture = load_fixture("line_i_doubleprime_case_a.json")
+        assert fixture["line_id"] == "line-ref-001"
+
+    def test_fixture_not_found_error(self):
+        """Test helpful error message when fixture not found."""
+        from application.reference_patterns import load_fixture
+
+        with pytest.raises(FileNotFoundError) as exc_info:
+            load_fixture("nonexistent_fixture.json")
+
+        assert "nie znaleziony" in str(exc_info.value)
+
+
+# =============================================================================
+# TEST: CASE-SPECIFIC ARTIFACTS
+# =============================================================================
+
+
+class TestCaseSpecificArtifacts:
+    """Tests for case-specific artifact values."""
+
+    def test_case_A_artifacts_correctness(self, pattern: LineIDoublePrimeReferencePattern):
+        """Test case A artifacts match expected values."""
+        result = pattern.validate(fixture_file="case_A_zgodne.json")
+
+        # tk = 2 * (0.5 + 0.05) = 1.1 s
+        assert result.artifacts["tk_total_s"] == pytest.approx(1.1, rel=0.01)
+
+        # Ithn = 150 * 94 = 14100 A
+        assert result.artifacts["ithn_a"] == pytest.approx(14100.0, rel=0.01)
+
+        # I_min_sel = 1.2 * 1200 = 1440 A
+        assert result.artifacts["i_min_sel_primary_a"] == pytest.approx(1440.0, rel=0.01)
+
+        # I_max_sens = ik_min_2f / 1.5 = 2600 / 1.5 = 1733.33 A
+        # Note: FIX-12D uses ik_min_2f_busbars_a (2-phase min) when available
+        assert result.artifacts["i_max_sens_primary_a"] == pytest.approx(1733.33, rel=0.01)
+
+    def test_case_B_artifacts_conflict(self, pattern: LineIDoublePrimeReferencePattern):
+        """Test case B artifacts show conflict correctly."""
+        result = pattern.validate(fixture_file="case_B_niezgodne_konflikt.json")
+
+        # I_min_sel = 1.2 * 6000 = 7200 A
+        assert result.artifacts["i_min_sel_primary_a"] == pytest.approx(7200.0, rel=0.01)
+
+        # I_max_sens = ik_min_2f / 1.5 = 5200 / 1.5 = 3466.67 A
+        # Note: FIX-12D uses ik_min_2f_busbars_a (2-phase min) when available
+        assert result.artifacts["i_max_sens_primary_a"] == pytest.approx(3466.67, rel=0.01)
+
+        # Conflict: I_min > I_max
+        assert result.artifacts["window_i_min_primary_a"] > result.artifacts["window_i_max_primary_a"]
+
+    def test_case_C_narrow_window(self, pattern: LineIDoublePrimeReferencePattern):
+        """Test case C artifacts show narrow window correctly."""
+        result = pattern.validate(fixture_file="case_C_graniczne_waskie_okno.json")
+
+        # I_min_sel = 1.2 * 1666.67 ≈ 2000 A
+        assert result.artifacts["i_min_sel_primary_a"] == pytest.approx(2000.0, rel=0.01)
+
+        # I_max_sens = ik_min_2f / 1.5 = 3120 / 1.5 = 2080 A
+        # Note: FIX-12D uses ik_min_2f_busbars_a (2-phase min) when available
+        assert result.artifacts["i_max_sens_primary_a"] == pytest.approx(2080.0, rel=0.01)
+
+        # Window width ≈ 80 A
+        window_width = (
+            result.artifacts["window_i_max_primary_a"]
+            - result.artifacts["window_i_min_primary_a"]
+        )
+        assert window_width == pytest.approx(80.0, rel=0.02)
