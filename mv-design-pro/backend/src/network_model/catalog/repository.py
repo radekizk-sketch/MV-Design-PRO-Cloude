@@ -198,3 +198,30 @@ class CatalogRepository:
     def _sorted_pl(values: Iterable) -> list:
         """Sort protection types by name_pl, then id (deterministic)."""
         return sorted(values, key=lambda item: (str(item.name_pl), str(item.id)))
+
+
+def get_default_mv_catalog() -> CatalogRepository:
+    """
+    Get default MV cable and line catalog with full thermal data.
+
+    Returns a CatalogRepository pre-populated with:
+    - Base cable types (XLPE/EPR, Cu/Al, 1-core/3-core, 70-400mm²)
+    - Base overhead line types (Al/Al-St, 25-150mm²)
+    - Manufacturer-specific types (NKT, Tele-Fonika Kable)
+    - One incomplete type for testing (missing thermal data)
+
+    This is the canonical catalog for MV network design.
+    """
+    from .mv_cable_line_catalog import get_all_cable_types, get_all_line_types
+
+    return CatalogRepository.from_records(
+        line_types=get_all_line_types(),
+        cable_types=get_all_cable_types(),
+        transformer_types=[],
+        switch_equipment_types=[],
+        converter_types=[],
+        inverter_types=[],
+        protection_device_types=[],
+        protection_curves=[],
+        protection_setting_templates=[],
+    )
