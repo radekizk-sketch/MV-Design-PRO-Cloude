@@ -219,7 +219,36 @@ export interface CoordinationSummaryResponse {
 }
 
 // =============================================================================
-// Polish Labels
+// Analysis Status Type
+// =============================================================================
+
+export type AnalysisStatus = 'IDLE' | 'RUNNING' | 'SUCCESS' | 'ERROR';
+
+// =============================================================================
+// Context Types (StudyCase/Snapshot/Run integration)
+// =============================================================================
+
+export interface AnalysisContext {
+  projectId: string;
+  caseId?: string;
+  snapshotId?: string;
+  runId?: string;
+}
+
+// =============================================================================
+// Device Template Type
+// =============================================================================
+
+export interface DeviceTemplate {
+  id: string;
+  name: string;
+  description_pl: string;
+  device_type: DeviceType;
+  settings: OvercurrentSettings;
+}
+
+// =============================================================================
+// Polish Labels (100% PL, PowerFactory parity)
 // =============================================================================
 
 export const LABELS = {
@@ -230,10 +259,14 @@ export const LABELS = {
     title: 'Urzadzenia zabezpieczeniowe',
     add: 'Dodaj urzadzenie',
     remove: 'Usun',
+    clone: 'Klonuj',
+    applyTemplate: 'Zastosuj szablon',
     name: 'Nazwa',
     type: 'Typ',
     location: 'Lokalizacja',
     settings: 'Nastawy',
+    noDevices: 'Dodaj urzadzenia zabezpieczeniowe',
+    selectToEdit: 'Wybierz urzadzenie do edycji',
   },
 
   settings: {
@@ -247,48 +280,107 @@ export const LABELS = {
     tms: 'Mnoznik czasowy TMS',
     time: 'Czas [s]',
     curve: 'Charakterystyka',
+    standard: 'Norma',
     directional: 'Kierunkowy',
     enabled: 'Aktywny',
+    manufacturer: 'Producent',
+    model: 'Model',
+    ctRatio: 'Przekladnik pradowy',
+    ratedCurrent: 'Prad znamionowy [A]',
+  },
+
+  context: {
+    title: 'Kontekst analizy',
+    project: 'Projekt',
+    studyCase: 'Przypadek obliczeniowy',
+    snapshot: 'Migawka sieci',
+    run: 'Przebieg analizy',
+    noContext: 'Wybierz kontekst',
+    selectCase: 'Wybierz przypadek',
+    selectSnapshot: 'Wybierz migawke',
   },
 
   checks: {
     sensitivity: {
       title: 'Czulosc',
       subtitle: 'Sprawdzenie czy zabezpieczenie zadzial dla I_min',
+      description: 'Weryfikacja dzialania zabezpieczenia przy minimalnym pradzie zwarciowym',
       iFaultMin: 'I_min zwarcia [A]',
       iPickup: 'I_pickup [A]',
       margin: 'Margines [%]',
+      device: 'Urzadzenie',
+      notes: 'Uwagi',
     },
     selectivity: {
       title: 'Selektywnosc',
       subtitle: 'Sprawdzenie stopniowania czasowego',
+      description: 'Weryfikacja prawidlowego stopniowania czasowego pomiedzy zabezpieczeniami',
       downstream: 'Podrzedne',
       upstream: 'Nadrzedne',
       tDownstream: 't_pod [s]',
       tUpstream: 't_nad [s]',
       deltaT: 'Δt [s]',
+      requiredMargin: 'Wymagany margines [s]',
+      analysisCurrent: 'Prad analizy [A]',
+      notes: 'Uwagi',
+      minDevicesRequired: 'Wymaga minimum 2 urzadzen do sprawdzenia selektywnosci',
     },
     overload: {
       title: 'Przeciazalnosc',
       subtitle: 'Sprawdzenie czy nie zadzial dla I_roboczego',
+      description: 'Weryfikacja braku zadzialania przy normalnym pradzie roboczym',
       iOperating: 'I_robocze [A]',
       iPickup: 'I_pickup [A]',
       margin: 'Margines [%]',
+      device: 'Urzadzenie',
+      notes: 'Uwagi',
     },
   },
 
   tcc: {
     title: 'Wykres czasowo-pradowy (TCC)',
+    subtitle: 'Charakterystyki zabezpieczen w ukladzie log-log',
     xAxis: 'Prad [A]',
     yAxis: 'Czas [s]',
     noData: 'Brak danych wykresu',
+    curve: 'Krzywa',
+    tripTime: 'Czas wylaczenia',
+    faultCurrent: 'Prad zwarciowy',
+    operatingCurrent: 'Prad roboczy',
+    selectivityMargin: 'Margines selektywnosci',
+    legend: 'Legenda',
+    zoomIn: 'Przybliz',
+    zoomOut: 'Oddal',
+    resetView: 'Resetuj widok',
   },
 
+  trace: {
+    title: 'Slad obliczen (WHITE BOX)',
+    subtitle: 'Wszystkie kroki obliczen do audytu',
+    step: 'Krok',
+    description: 'Opis',
+    inputs: 'Wejscia',
+    outputs: 'Wyjscia',
+    noSteps: 'Brak kroków obliczeniowych',
+    timestamp: 'Znacznik czasu',
+    expandAll: 'Rozwin wszystkie',
+    collapseAll: 'Zwin wszystkie',
+  },
+
+  // PowerFactory-style verdicts (CRITICAL: must match spec)
   verdict: {
-    PASS: 'Prawidlowa',
-    MARGINAL: 'Margines niski',
-    FAIL: 'Nieskoordynowane',
-    ERROR: 'Blad analizy',
+    PASS: 'ZGODNE',
+    MARGINAL: 'GRANICZNE',
+    FAIL: 'NIEZGODNE',
+    ERROR: 'BLAD',
+  },
+
+  // Alternative verbose verdicts for summary text
+  verdictVerbose: {
+    PASS: 'Koordynacja prawidlowa',
+    MARGINAL: 'Koordynacja z niskim marginesem',
+    FAIL: 'Brak koordynacji',
+    ERROR: 'Blad podczas analizy',
   },
 
   deviceTypes: {
@@ -296,6 +388,12 @@ export const LABELS = {
     FUSE: 'Bezpiecznik',
     RECLOSER: 'Wylacznik samoczynny',
     CIRCUIT_BREAKER: 'Wylacznik z wyzwalaczem',
+  },
+
+  curveStandards: {
+    IEC: 'IEC 60255',
+    IEEE: 'IEEE C37.112',
+    FUSE: 'Bezpiecznik',
   },
 
   curveTypes: {
@@ -310,15 +408,20 @@ export const LABELS = {
 
   actions: {
     run: 'Uruchom analize',
+    runAnalysis: 'Uruchom analize koordynacji',
     export: 'Eksportuj',
     exportPdf: 'Eksportuj PDF',
     exportDocx: 'Eksportuj DOCX',
     refresh: 'Odswiez',
-    save: 'Zapisz',
+    save: 'Zapisz konfiguracje',
     cancel: 'Anuluj',
+    apply: 'Zastosuj',
+    reset: 'Resetuj',
+    close: 'Zamknij',
   },
 
   status: {
+    idle: 'Gotowe do analizy',
     loading: 'Ladowanie...',
     running: 'Trwa analiza...',
     success: 'Analiza zakonczona',
@@ -332,6 +435,34 @@ export const LABELS = {
     overload: 'Przeciazalnosc',
     tcc: 'Wykres TCC',
     trace: 'Slad obliczen',
+  },
+
+  summary: {
+    title: 'Wynik analizy',
+    overallVerdict: 'Werdykt ogolny',
+    totalDevices: 'Liczba urzadzen',
+    totalChecks: 'Liczba sprawdzen',
+    passCount: 'prawidlowych',
+    failCount: 'blednych',
+    marginalCount: 'granicznych',
+  },
+
+  validation: {
+    pickupPositive: 'Prad rozruchowy musi byc dodatni',
+    tmsRange: 'TMS musi byc w zakresie 0.05-10.0',
+    timePositive: 'Czas musi byc dodatni',
+    minOneDevice: 'Dodaj przynajmniej jedno urzadzenie',
+    invalidConfig: 'Nieprawidlowa konfiguracja',
+  },
+
+  templates: {
+    title: 'Szablony urzadzen',
+    apply: 'Zastosuj szablon',
+    noTemplates: 'Brak dostepnych szablonów',
+    relay50_51: 'Przekaznik 50/51 (typowy)',
+    relay50_51n: 'Przekaznik 50/51N (z ziemnozwarciem)',
+    fuse: 'Bezpiecznik SN',
+    recloser: 'Wylacznik samoczynny',
   },
 } as const;
 
@@ -392,3 +523,153 @@ export const DEFAULT_STAGE_51: StageSettings = {
   curve_settings: DEFAULT_CURVE_SETTINGS,
   directional: false,
 };
+
+export const DEFAULT_STAGE_50: StageSettings = {
+  enabled: true,
+  pickup_current_a: 2000,
+  time_s: 0.1,
+  directional: false,
+};
+
+// =============================================================================
+// Device Templates (PowerFactory-style presets)
+// =============================================================================
+
+export const DEVICE_TEMPLATES: DeviceTemplate[] = [
+  {
+    id: 'relay-50-51',
+    name: 'Przekaznik 50/51 (typowy)',
+    description_pl: 'Standardowy przekaznik nadpradowy z funkcja 50 i 51',
+    device_type: 'RELAY',
+    settings: {
+      stage_51: {
+        enabled: true,
+        pickup_current_a: 400,
+        curve_settings: {
+          standard: 'IEC',
+          variant: 'SI',
+          pickup_current_a: 400,
+          time_multiplier: 0.3,
+        },
+        directional: false,
+      },
+      stage_50: {
+        enabled: true,
+        pickup_current_a: 2000,
+        time_s: 0.1,
+        directional: false,
+      },
+    },
+  },
+  {
+    id: 'relay-50-51-51n',
+    name: 'Przekaznik 50/51/51N',
+    description_pl: 'Przekaznik z zabezpieczeniem ziemnozwarciowym',
+    device_type: 'RELAY',
+    settings: {
+      stage_51: {
+        enabled: true,
+        pickup_current_a: 400,
+        curve_settings: {
+          standard: 'IEC',
+          variant: 'SI',
+          pickup_current_a: 400,
+          time_multiplier: 0.3,
+        },
+        directional: false,
+      },
+      stage_50: {
+        enabled: true,
+        pickup_current_a: 2000,
+        time_s: 0.1,
+        directional: false,
+      },
+      stage_51n: {
+        enabled: true,
+        pickup_current_a: 100,
+        curve_settings: {
+          standard: 'IEC',
+          variant: 'SI',
+          pickup_current_a: 100,
+          time_multiplier: 0.2,
+        },
+        directional: false,
+      },
+    },
+  },
+  {
+    id: 'fuse-mv',
+    name: 'Bezpiecznik SN',
+    description_pl: 'Bezpiecznik sredniego napiecia',
+    device_type: 'FUSE',
+    settings: {
+      stage_51: {
+        enabled: true,
+        pickup_current_a: 100,
+        curve_settings: {
+          standard: 'FUSE',
+          variant: 'EI',
+          pickup_current_a: 100,
+          time_multiplier: 1.0,
+        },
+        directional: false,
+      },
+    },
+  },
+  {
+    id: 'recloser',
+    name: 'Wylacznik samoczynny',
+    description_pl: 'Reklozer z charakterystyka szybka i wolna',
+    device_type: 'RECLOSER',
+    settings: {
+      stage_51: {
+        enabled: true,
+        pickup_current_a: 300,
+        curve_settings: {
+          standard: 'IEC',
+          variant: 'VI',
+          pickup_current_a: 300,
+          time_multiplier: 0.2,
+        },
+        directional: false,
+      },
+      stage_50: {
+        enabled: true,
+        pickup_current_a: 1500,
+        time_s: 0.05,
+        directional: false,
+      },
+    },
+  },
+  {
+    id: 'circuit-breaker',
+    name: 'Wylacznik z wyzwalaczem',
+    description_pl: 'Wylacznik mocy z wyzwalaczem nadpradowym',
+    device_type: 'CIRCUIT_BREAKER',
+    settings: {
+      stage_51: {
+        enabled: true,
+        pickup_current_a: 500,
+        curve_settings: {
+          standard: 'IEC',
+          variant: 'SI',
+          pickup_current_a: 500,
+          time_multiplier: 0.4,
+        },
+        directional: false,
+      },
+      stage_50: {
+        enabled: true,
+        pickup_current_a: 3000,
+        time_s: 0.08,
+        directional: false,
+      },
+      stage_50_high: {
+        enabled: true,
+        pickup_current_a: 10000,
+        time_s: 0.02,
+        directional: false,
+      },
+    },
+  },
+];
