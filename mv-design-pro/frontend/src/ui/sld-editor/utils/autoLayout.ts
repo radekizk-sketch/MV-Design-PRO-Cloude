@@ -263,12 +263,12 @@ function buildLayoutGraph(symbols: AnySldSymbol[]): LayoutGraph {
 /**
  * Znajdź węzły źródłowe (Source, lub węzły bez krawędzi wchodzących).
  */
-function findRoots(graph: LayoutGraph, symbols: AnySldSymbol[]): string[] {
+function findRoots(graph: LayoutGraph, _symbols: AnySldSymbol[]): string[] {
   const roots: string[] = [];
 
   // Priorytet 1: Source (utility_feeder, generator, pv, fw, bess)
-  graph.nodes.forEach((node, id) => {
-    if (node.elementType === 'Source') {
+  graph.nodes.forEach((layoutNode, id) => {
+    if (layoutNode.elementType === 'Source') {
       roots.push(id);
     }
   });
@@ -280,7 +280,7 @@ function findRoots(graph: LayoutGraph, symbols: AnySldSymbol[]): string[] {
       hasIncoming.add(edge.toNodeId);
     });
 
-    graph.nodes.forEach((node, id) => {
+    graph.nodes.forEach((_layoutNode, id) => {
       if (!hasIncoming.has(id)) {
         roots.push(id);
       }

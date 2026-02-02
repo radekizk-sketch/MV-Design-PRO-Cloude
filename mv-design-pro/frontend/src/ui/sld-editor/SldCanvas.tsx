@@ -5,6 +5,7 @@
  * - sld_rules.md § A.2: Symbol types (Bus, Line, Transformer, etc.)
  * - sld_rules.md § D.1: Visual state encoding (in_service, selected, hover)
  * - powerfactory_ui_parity.md: ≥110% PowerFactory symbol rendering
+ * - AUDYT_SLD_ETAP.md N-02: hierarchiczne auto-rozmieszczenie
  *
  * FEATURES:
  * - SVG rendering of all SLD symbols
@@ -12,11 +13,13 @@
  * - Lasso selection (drag rectangle)
  * - Drag handles for selected symbols
  * - Mouse interactions (click, drag, lasso)
+ * - AUTOMATYCZNE auto-rozmieszczenie (bez przycisku)
  */
 
-import React, { useCallback, useRef, useMemo } from 'react';
+import React, { useCallback, useRef, useMemo, useEffect } from 'react';
 import { useSldEditorStore } from './SldEditorStore';
 import { useSldDrag } from './hooks/useSldDrag';
+import { useAutoLayout } from './hooks/useAutoLayout';
 import type { AnySldSymbol, Position } from './types';
 import type { IssueSeverity } from '../types';
 import { useIsMutationBlocked } from '../selection/store';
@@ -331,6 +334,12 @@ const LassoRectangle: React.FC<LassoRectangleProps> = ({ startX, startY, endX, e
 
 /**
  * Main SLD Canvas component.
+ *
+ * AUTO-LAYOUT (N-02):
+ * - Layout jest wyliczany AUTOMATYCZNIE przy kazdej zmianie topologii
+ * - Brak przycisku "Rozmiesc automatycznie"
+ * - Deterministyczny (ten sam model -> ten sam uklad)
+ * - Stabilny (mala zmiana nie powoduje "przeskoku")
  */
 export const SldCanvas: React.FC = () => {
   const sldStore = useSldEditorStore();
@@ -341,12 +350,44 @@ export const SldCanvas: React.FC = () => {
   const isDragging = useRef(false);
   const isLassoing = useRef(false);
 
-  const symbols = Array.from(sldStore.symbols.values());
+  const rawSymbols = Array.from(sldStore.symbols.values());
   const selectedIds = sldStore.selectedIds;
   const highlightedIds = sldStore.highlightedIds;
   const highlightSeverity = sldStore.highlightSeverity;
   const gridConfig = sldStore.gridConfig;
   const lassoState = sldStore.lassoState;
+
+  // AUTO-LAYOUT (N-02): Automatyczne rozmieszczenie przy kazdej zmianie topologii
+  // DETERMINISM: Ten sam model -> ten sam uklad
+  // STABILNOSC: Mala zmiana = mala zmiana ukladu
+  const {
+    layoutSymbols,
+    positions: autoLayoutPositions,
+    // addOverride - dostepne do implementacji recznego przesuwania
+    // debug - dostepne do debugowania
+  } = useAutoLayout(rawSymbols, { gridSize: gridConfig.size });
+
+  // Uzyj symboli z auto-layoutem
+  const symbols = layoutSymbols;
+
+  // Synchronizuj pozycje z auto-layoutu do store (jednorazowo przy zmianie topologii)
+  useEffect(() => {
+    if (autoLayoutPositions.size > 0 && rawSymbols.length > 0) {
+      // Sprawdz czy pozycje sie zmienily
+      let needsUpdate = false;
+      for (const [symbolId, pos] of autoLayoutPositions) {
+        const existingSymbol = sldStore.symbols.get(symbolId);
+        if (existingSymbol && (existingSymbol.position.x !== pos.x || existingSymbol.position.y !== pos.y)) {
+          needsUpdate = true;
+          break;
+        }
+      }
+
+      if (needsUpdate) {
+        sldStore.updateSymbolsPositions(autoLayoutPositions);
+      }
+    }
+  }, [autoLayoutPositions, rawSymbols.length]); // Reaguj na zmiany topologii (nie na same pozycje)
 
   // Generate connections (N-01: port-to-port, N-05: orthogonal routing)
   // DETERMINISM: Same symbols -> same connections
