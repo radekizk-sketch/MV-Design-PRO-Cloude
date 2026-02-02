@@ -7,6 +7,12 @@
  * - 100% Polish labels
  * - READ-ONLY views of backend data
  * - PowerFactory parity UX
+ *
+ * UWAGA: Komunikaty werdyktów UI:
+ * - PASS → "Zgodne"
+ * - MARGINAL → "Na granicy dopuszczalności"
+ * - FAIL → "Wymaga korekty"
+ * - ERROR → "Wystąpił błąd"
  */
 
 import type {
@@ -17,6 +23,9 @@ import type {
   ProtectionDevice,
 } from './types';
 import { LABELS, VERDICT_STYLES } from './types';
+import {
+  buildCoordinationVerdictMessage,
+} from '../shared/verdict-messages';
 
 // =============================================================================
 // Verdict Badge Component
@@ -25,19 +34,42 @@ import { LABELS, VERDICT_STYLES } from './types';
 interface VerdictBadgeProps {
   verdict: CoordinationVerdict;
   size?: 'sm' | 'md';
+  /** Notatki z analizy do wyświetlenia w tooltipie */
+  notesPl?: string | null;
 }
 
-export function VerdictBadge({ verdict, size = 'sm' }: VerdictBadgeProps) {
+/**
+ * VerdictBadge — Badge z werdyktem koordynacji
+ *
+ * Wyświetla status werdyktu z tooltipem zawierającym:
+ * - Status (etykieta)
+ * - Przyczyna (jeśli dostępna)
+ * - Skutek (dla MARGINAL i FAIL)
+ * - Zalecenie (dla MARGINAL i FAIL)
+ */
+export function VerdictBadge({ verdict, size = 'sm', notesPl }: VerdictBadgeProps) {
   const style = VERDICT_STYLES[verdict];
   const label = LABELS.verdict[verdict];
   const sizeClasses = size === 'sm'
     ? 'px-2 py-0.5 text-xs'
     : 'px-3 py-1 text-sm';
 
+  // Build tooltip text for non-PASS verdicts
+  let tooltipText = '';
+  if (verdict !== 'PASS') {
+    const message = buildCoordinationVerdictMessage(verdict, notesPl);
+    const parts: string[] = [];
+    if (message.cause) parts.push(`Przyczyna: ${message.cause}`);
+    if (message.effect) parts.push(`Skutek: ${message.effect}`);
+    if (message.recommendation) parts.push(`Zalecenie: ${message.recommendation}`);
+    tooltipText = parts.join('\n');
+  }
+
   return (
     <span
       className={`inline-flex items-center rounded-full font-semibold ${sizeClasses} ${style.bg} ${style.text}`}
       data-testid={`verdict-badge-${verdict.toLowerCase()}`}
+      title={tooltipText || undefined}
     >
       {label}
     </span>
@@ -135,7 +167,7 @@ export function SensitivityTable({
                   {formatNumber(check.margin_percent)}%
                 </td>
                 <td className="px-4 py-2 text-center">
-                  <VerdictBadge verdict={check.verdict} />
+                  <VerdictBadge verdict={check.verdict} notesPl={check.notes_pl} />
                 </td>
                 <td className="max-w-xs truncate px-4 py-2 text-sm text-slate-500">
                   {check.notes_pl}
@@ -246,7 +278,7 @@ export function SelectivityTable({
                   </span>
                 </td>
                 <td className="px-4 py-2 text-center">
-                  <VerdictBadge verdict={check.verdict} />
+                  <VerdictBadge verdict={check.verdict} notesPl={check.notes_pl} />
                 </td>
               </tr>
             ))}
@@ -332,7 +364,7 @@ export function OverloadTable({
                   {formatNumber(check.margin_percent)}%
                 </td>
                 <td className="px-4 py-2 text-center">
-                  <VerdictBadge verdict={check.verdict} />
+                  <VerdictBadge verdict={check.verdict} notesPl={check.notes_pl} />
                 </td>
                 <td className="max-w-xs truncate px-4 py-2 text-sm text-slate-500">
                   {check.notes_pl}

@@ -7,7 +7,19 @@
  * - Mirrors backend domain models
  * - 100% Polish UI labels
  * - READ-ONLY views of backend data
+ *
+ * UWAGA: Mapowanie werdyktów na komunikaty UI:
+ * - PASS → "Zgodne"
+ * - MARGINAL → "Na granicy dopuszczalności"
+ * - FAIL → "Wymaga korekty"
+ * - ERROR → "Wystąpił błąd"
  */
+
+import {
+  COORDINATION_VERDICT_UI_LABELS,
+  COORDINATION_VERDICT_UI_DESCRIPTIONS,
+  COORDINATION_VERDICT_UI_COLORS,
+} from '../shared/verdict-messages';
 
 // =============================================================================
 // Enums and Constants
@@ -367,21 +379,17 @@ export const LABELS = {
     collapseAll: 'Zwin wszystkie',
   },
 
-  // PowerFactory-style verdicts (CRITICAL: must match spec)
-  verdict: {
-    PASS: 'ZGODNE',
-    MARGINAL: 'GRANICZNE',
-    FAIL: 'NIEZGODNE',
-    ERROR: 'BLAD',
-  },
+  /**
+   * Etykiety werdyktów UI — przyjazne dla użytkownika.
+   * Mapowanie: PASS → "Zgodne", MARGINAL → "Na granicy dopuszczalności",
+   * FAIL → "Wymaga korekty", ERROR → "Wystąpił błąd"
+   */
+  verdict: COORDINATION_VERDICT_UI_LABELS,
 
-  // Alternative verbose verdicts for summary text
-  verdictVerbose: {
-    PASS: 'Koordynacja prawidlowa',
-    MARGINAL: 'Koordynacja z niskim marginesem',
-    FAIL: 'Brak koordynacji',
-    ERROR: 'Blad podczas analizy',
-  },
+  /**
+   * Opisy werdyktów UI — techniczne, bez wyrokowego charakteru.
+   */
+  verdictVerbose: COORDINATION_VERDICT_UI_DESCRIPTIONS,
 
   deviceTypes: {
     RELAY: 'Przekaznik nadpradowy',
@@ -470,31 +478,13 @@ export const LABELS = {
 // Verdict Styling
 // =============================================================================
 
+/**
+ * Kolory werdyktów UI — łagodniejsze tony dla "Wymaga korekty" (orange zamiast rose).
+ */
 export const VERDICT_STYLES: Record<
   CoordinationVerdict,
   { bg: string; text: string; border: string }
-> = {
-  PASS: {
-    bg: 'bg-emerald-100',
-    text: 'text-emerald-700',
-    border: 'border-emerald-300',
-  },
-  MARGINAL: {
-    bg: 'bg-amber-100',
-    text: 'text-amber-700',
-    border: 'border-amber-300',
-  },
-  FAIL: {
-    bg: 'bg-rose-100',
-    text: 'text-rose-700',
-    border: 'border-rose-300',
-  },
-  ERROR: {
-    bg: 'bg-slate-100',
-    text: 'text-slate-700',
-    border: 'border-slate-300',
-  },
-};
+> = COORDINATION_VERDICT_UI_COLORS;
 
 // =============================================================================
 // Default Values
