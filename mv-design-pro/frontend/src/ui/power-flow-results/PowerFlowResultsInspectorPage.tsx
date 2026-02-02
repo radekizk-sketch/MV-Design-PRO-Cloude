@@ -34,6 +34,8 @@ import {
   SEVERITY_COLORS,
 } from './types';
 import { useState } from 'react';
+import { VerdictBadge } from '../protection-coordination/ResultsTables';
+import type { CoordinationVerdict } from '../protection-coordination/types';
 
 // =============================================================================
 // P20d: Export Types and Component
@@ -146,6 +148,77 @@ function getStatusBadgeClass(severity: 'info' | 'success' | 'warning'): string {
     default:
       return 'bg-slate-100 text-slate-600';
   }
+}
+
+// =============================================================================
+// UI-01/UI-02: Voltage and Loading Verdict Functions
+// =============================================================================
+
+/**
+ * UI-01: Oblicza werdykt dla napięcia szyny.
+ * PASS: 0.95 ≤ U_pu ≤ 1.05
+ * MARGINAL: 0.90 ≤ U_pu < 0.95 lub 1.05 < U_pu ≤ 1.10
+ * FAIL: U_pu < 0.90 lub U_pu > 1.10
+ */
+function getVoltageVerdict(v_pu: number): {
+  verdict: CoordinationVerdict;
+  notes: string;
+} {
+  if (v_pu >= 0.95 && v_pu <= 1.05) {
+    return { verdict: 'PASS', notes: '' };
+  }
+  if ((v_pu >= 0.90 && v_pu < 0.95) || (v_pu > 1.05 && v_pu <= 1.10)) {
+    const deviation = v_pu < 1.0 ? 'zanizone' : 'zawyzone';
+    return {
+      verdict: 'MARGINAL',
+      notes: `Napiecie ${deviation} o ${Math.abs((v_pu - 1.0) * 100).toFixed(1)}%`,
+    };
+  }
+  const deviation = v_pu < 1.0 ? 'ponizej' : 'powyzej';
+  const limit = v_pu < 1.0 ? '0.90 p.u.' : '1.10 p.u.';
+  return {
+    verdict: 'FAIL',
+    notes: `Napiecie ${deviation} granicy ${limit}. Wymagana korekta.`,
+  };
+}
+
+/**
+ * UI-02: Oblicza werdykt dla obciążenia gałęzi.
+ * PASS: obciążenie ≤ 80%
+ * MARGINAL: 80% < obciążenie ≤ 100%
+ * FAIL: obciążenie > 100%
+ *
+ * Uwaga: Jeśli brak danych obciążenia, używamy strat jako proxy.
+ */
+function getBranchLoadingVerdict(
+  loading_pct: number | null | undefined,
+  losses_p_mw: number
+): { verdict: CoordinationVerdict; notes: string } {
+  // Jeśli brak danych obciążenia, szacujemy na podstawie strat
+  if (loading_pct === null || loading_pct === undefined) {
+    // Wysokie straty mogą wskazywać na przeciążenie
+    if (losses_p_mw > 0.1) {
+      return {
+        verdict: 'MARGINAL',
+        notes: 'Brak danych obciazenia. Wysokie straty mogą wskazywać na przeciążenie.',
+      };
+    }
+    return { verdict: 'PASS', notes: 'Brak danych obciazenia procentowego' };
+  }
+
+  if (loading_pct <= 80) {
+    return { verdict: 'PASS', notes: '' };
+  }
+  if (loading_pct <= 100) {
+    return {
+      verdict: 'MARGINAL',
+      notes: `Obciazenie ${loading_pct.toFixed(1)}% - blisko granicy dopuszczalnej`,
+    };
+  }
+  return {
+    verdict: 'FAIL',
+    notes: `Przeciazenie: ${loading_pct.toFixed(1)}% > 100%. Wymagana korekta.`,
+  };
 }
 
 // =============================================================================
@@ -264,28 +337,35 @@ function BusResultsTable() {
               <th className="px-3 py-2 text-right font-semibold text-slate-700">Kat [deg]</th>
               <th className="px-3 py-2 text-right font-semibold text-slate-700">P<sub>inj</sub> [MW]</th>
               <th className="px-3 py-2 text-right font-semibold text-slate-700">Q<sub>inj</sub> [Mvar]</th>
+              <th className="px-3 py-2 text-center font-semibold text-slate-700">Status</th>
             </tr>
           </thead>
           <tbody>
-            {filteredRows.map((row: PowerFlowBusResult) => (
-              <tr key={row.bus_id} className="border-t border-slate-100 hover:bg-slate-50">
-                <td className="px-3 py-2 font-medium text-slate-800">
-                  {row.bus_id.substring(0, 12)}...
-                </td>
-                <td className="px-3 py-2 text-right font-mono text-slate-600">
-                  {formatNumber(row.v_pu, 4)}
-                </td>
-                <td className="px-3 py-2 text-right font-mono text-slate-600">
-                  {formatNumber(row.angle_deg, 2)}
-                </td>
-                <td className="px-3 py-2 text-right font-mono text-slate-600">
-                  {formatNumber(row.p_injected_mw, 3)}
-                </td>
-                <td className="px-3 py-2 text-right font-mono text-slate-600">
-                  {formatNumber(row.q_injected_mvar, 3)}
-                </td>
-              </tr>
-            ))}
+            {filteredRows.map((row: PowerFlowBusResult) => {
+              const voltageResult = getVoltageVerdict(row.v_pu);
+              return (
+                <tr key={row.bus_id} className="border-t border-slate-100 hover:bg-slate-50">
+                  <td className="px-3 py-2 font-medium text-slate-800">
+                    {row.bus_id.substring(0, 12)}...
+                  </td>
+                  <td className="px-3 py-2 text-right font-mono text-slate-600">
+                    {formatNumber(row.v_pu, 4)}
+                  </td>
+                  <td className="px-3 py-2 text-right font-mono text-slate-600">
+                    {formatNumber(row.angle_deg, 2)}
+                  </td>
+                  <td className="px-3 py-2 text-right font-mono text-slate-600">
+                    {formatNumber(row.p_injected_mw, 3)}
+                  </td>
+                  <td className="px-3 py-2 text-right font-mono text-slate-600">
+                    {formatNumber(row.q_injected_mvar, 3)}
+                  </td>
+                  <td className="px-3 py-2 text-center">
+                    <VerdictBadge verdict={voltageResult.verdict} notesPl={voltageResult.notes} />
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>
@@ -339,34 +419,42 @@ function BranchResultsTable() {
               <th className="px-3 py-2 text-right font-semibold text-slate-700">Q<sub>to</sub> [Mvar]</th>
               <th className="px-3 py-2 text-right font-semibold text-slate-700">Straty P [MW]</th>
               <th className="px-3 py-2 text-right font-semibold text-slate-700">Straty Q [Mvar]</th>
+              <th className="px-3 py-2 text-center font-semibold text-slate-700">Status</th>
             </tr>
           </thead>
           <tbody>
-            {filteredRows.map((row: PowerFlowBranchResult) => (
-              <tr key={row.branch_id} className="border-t border-slate-100 hover:bg-slate-50">
-                <td className="px-3 py-2 font-medium text-slate-800">
-                  {row.branch_id.substring(0, 12)}...
-                </td>
-                <td className="px-3 py-2 text-right font-mono text-slate-600">
-                  {formatNumber(row.p_from_mw, 3)}
-                </td>
-                <td className="px-3 py-2 text-right font-mono text-slate-600">
-                  {formatNumber(row.q_from_mvar, 3)}
-                </td>
-                <td className="px-3 py-2 text-right font-mono text-slate-600">
-                  {formatNumber(row.p_to_mw, 3)}
-                </td>
-                <td className="px-3 py-2 text-right font-mono text-slate-600">
-                  {formatNumber(row.q_to_mvar, 3)}
-                </td>
-                <td className="px-3 py-2 text-right font-mono text-rose-600">
-                  {formatNumber(row.losses_p_mw, 4)}
-                </td>
-                <td className="px-3 py-2 text-right font-mono text-rose-600">
-                  {formatNumber(row.losses_q_mvar, 4)}
-                </td>
-              </tr>
-            ))}
+            {filteredRows.map((row: PowerFlowBranchResult) => {
+              // UI-02: Werdykt dla obciążenia gałęzi (używamy strat jako proxy)
+              const loadingResult = getBranchLoadingVerdict(null, row.losses_p_mw);
+              return (
+                <tr key={row.branch_id} className="border-t border-slate-100 hover:bg-slate-50">
+                  <td className="px-3 py-2 font-medium text-slate-800">
+                    {row.branch_id.substring(0, 12)}...
+                  </td>
+                  <td className="px-3 py-2 text-right font-mono text-slate-600">
+                    {formatNumber(row.p_from_mw, 3)}
+                  </td>
+                  <td className="px-3 py-2 text-right font-mono text-slate-600">
+                    {formatNumber(row.q_from_mvar, 3)}
+                  </td>
+                  <td className="px-3 py-2 text-right font-mono text-slate-600">
+                    {formatNumber(row.p_to_mw, 3)}
+                  </td>
+                  <td className="px-3 py-2 text-right font-mono text-slate-600">
+                    {formatNumber(row.q_to_mvar, 3)}
+                  </td>
+                  <td className="px-3 py-2 text-right font-mono text-rose-600">
+                    {formatNumber(row.losses_p_mw, 4)}
+                  </td>
+                  <td className="px-3 py-2 text-right font-mono text-rose-600">
+                    {formatNumber(row.losses_q_mvar, 4)}
+                  </td>
+                  <td className="px-3 py-2 text-center">
+                    <VerdictBadge verdict={loadingResult.verdict} notesPl={loadingResult.notes} />
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>
