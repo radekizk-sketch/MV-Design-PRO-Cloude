@@ -9,6 +9,7 @@
  * - Uses symbols from SldEditorStore (shared with SldEditor)
  * - Syncs selection with URL / Project Tree / Inspector
  * - Diagnostics panel with jump-to-element
+ * - Element inspector panel (PR-SLD-07)
  * - Read-only mode (no editing)
  * - 100% Polish UI
  */
@@ -18,6 +19,7 @@ import { SLDView } from './SLDView';
 import { useSldEditorStore } from '../sld-editor/SldEditorStore';
 import { useSelectionStore } from '../selection/store';
 import { ProtectionDiagnosticsPanel } from '../results/ProtectionDiagnosticsPanel';
+import { SldInspectorPanel } from './inspector';
 import type { AnySldSymbol } from '../sld-editor/types';
 
 /**
@@ -158,6 +160,8 @@ export interface SLDViewPageProps {
   useDemo?: boolean;
   /** Show diagnostics panel */
   showDiagnosticsPanel?: boolean;
+  /** Show inspector panel (PR-SLD-07) */
+  showInspectorPanel?: boolean;
 }
 
 /**
@@ -167,6 +171,7 @@ export interface SLDViewPageProps {
 export const SLDViewPage: React.FC<SLDViewPageProps> = ({
   useDemo = false,
   showDiagnosticsPanel = true,
+  showInspectorPanel = true,
 }) => {
   // Get symbols from store
   const storeSymbols = useSldEditorStore((state) => Array.from(state.symbols.values()));
@@ -174,6 +179,7 @@ export const SLDViewPage: React.FC<SLDViewPageProps> = ({
 
   // Panel collapsed state
   const [diagnosticsPanelCollapsed, setDiagnosticsPanelCollapsed] = useState(false);
+  const [inspectorPanelVisible, setInspectorPanelVisible] = useState(true);
 
   // Use demo symbols if store is empty and demo mode is enabled
   const symbols = useMemo(() => {
@@ -198,6 +204,18 @@ export const SLDViewPage: React.FC<SLDViewPageProps> = ({
     setDiagnosticsPanelCollapsed((prev) => !prev);
   }, []);
 
+  // Handle inspector close (PR-SLD-07)
+  const handleInspectorClose = useCallback(() => {
+    setInspectorPanelVisible(false);
+  }, []);
+
+  // Show inspector when selection changes (PR-SLD-07)
+  useEffect(() => {
+    if (selectedElement) {
+      setInspectorPanelVisible(true);
+    }
+  }, [selectedElement]);
+
   return (
     <div
       data-testid="sld-view-page"
@@ -212,6 +230,13 @@ export const SLDViewPage: React.FC<SLDViewPageProps> = ({
           fitOnMount={true}
         />
       </div>
+
+      {/* Inspector Panel (PR-SLD-07) */}
+      {showInspectorPanel && inspectorPanelVisible && selectedElement && (
+        <SldInspectorPanel
+          onClose={handleInspectorClose}
+        />
+      )}
 
       {/* Diagnostics Panel (collapsible sidebar) */}
       {showDiagnosticsPanel && (
