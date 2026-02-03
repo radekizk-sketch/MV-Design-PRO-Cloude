@@ -36,6 +36,7 @@ import {
 import { useState } from 'react';
 import { VerdictBadge } from '../protection-coordination/ResultsTables';
 import type { CoordinationVerdict } from '../protection-coordination/types';
+import { NormativeLabels } from '../shared/normativeLabels';
 
 // =============================================================================
 // P20d: Export Types and Component
@@ -183,34 +184,37 @@ function getVoltageVerdict(v_pu: number): {
   notes: string;
   recommendation: string;
 } {
+  const voltageLabels = NormativeLabels.voltage;
+
   if (v_pu >= 0.95 && v_pu <= 1.05) {
     return {
       verdict: 'PASS',
-      notes: '',
-      recommendation: '',
+      notes: voltageLabels.statusDescriptions.pass,
+      recommendation: voltageLabels.recommendations.pass,
     };
   }
   if ((v_pu >= 0.90 && v_pu < 0.95) || (v_pu > 1.05 && v_pu <= 1.10)) {
     const isLow = v_pu < 1.0;
-    const deviation = isLow ? 'zanizone' : 'zawyzone';
     const deviationPct = Math.abs((v_pu - 1.0) * 100).toFixed(1);
     return {
       verdict: 'MARGINAL',
-      notes: `Napiecie ${deviation} o ${deviationPct}%`,
+      notes: isLow
+        ? voltageLabels.statusDescriptions.marginalLow(deviationPct)
+        : voltageLabels.statusDescriptions.marginalHigh(deviationPct),
       recommendation: isLow
-        ? 'Zweryfikuj mozliwosc podwyzszenia napiecia zrodla lub redukcji obciazenia.'
-        : 'Zweryfikuj mozliwosc obnizenia napiecia zrodla lub zwiekszenia obciazenia.',
+        ? voltageLabels.recommendations.marginalLow
+        : voltageLabels.recommendations.marginalHigh,
     };
   }
   const isLow = v_pu < 1.0;
-  const deviation = isLow ? 'ponizej' : 'powyzej';
-  const limit = isLow ? '0.90 p.u.' : '1.10 p.u.';
   return {
     verdict: 'FAIL',
-    notes: `Napiecie ${deviation} granicy ${limit}.`,
+    notes: isLow
+      ? voltageLabels.statusDescriptions.failLow
+      : voltageLabels.statusDescriptions.failHigh,
     recommendation: isLow
-      ? 'Podwyz napiecie zrodla, zmniejsz obciazenie lub wzmocnij siec (przekroj, skrocenie trasy).'
-      : 'Obniz napiecie zrodla, zwieksz obciazenie lub zweryfikuj regulacje transformatora.',
+      ? voltageLabels.recommendations.failLow
+      : voltageLabels.recommendations.failHigh,
   };
 }
 
@@ -233,21 +237,23 @@ function getBranchLoadingVerdict(
   loading_pct: number | null | undefined,
   losses_p_mw: number
 ): { verdict: CoordinationVerdict; notes: string; recommendation: string } {
+  const branchLabels = NormativeLabels.branchLoading;
+
   // Jeśli brak danych obciążenia, szacujemy na podstawie strat
   if (loading_pct === null || loading_pct === undefined) {
     // Wysokie straty mogą wskazywać na przeciążenie (heurystyka)
     if (losses_p_mw > 0.1) {
       return {
         verdict: 'MARGINAL',
-        notes: 'Brak danych obciazenia. Wysokie straty moga wskazywac na przeciazenie.',
-        recommendation: 'Uzupelnij parametry dopuszczalnego obciazenia typu/elementu i zweryfikuj warunki pracy galezi.',
+        notes: branchLabels.statusDescriptions.noDataHighLosses,
+        recommendation: branchLabels.recommendations.noDataHighLosses,
       };
     }
     // Brak danych - werdykt PASS z zastrzeżeniem (zgodnie z wymaganiami UI-02)
     return {
       verdict: 'PASS',
-      notes: 'Brak danych o dopuszczalnym obciazeniu - nie mozna ocenic marginesu',
-      recommendation: 'Uzupelnij parametry dopuszczalnego obciazenia typu/elementu.',
+      notes: branchLabels.statusDescriptions.noData,
+      recommendation: branchLabels.recommendations.noData,
     };
   }
 
@@ -255,21 +261,21 @@ function getBranchLoadingVerdict(
   if (loading_pct <= 80) {
     return {
       verdict: 'PASS',
-      notes: '',
-      recommendation: '',
+      notes: branchLabels.statusDescriptions.pass,
+      recommendation: branchLabels.recommendations.pass,
     };
   }
   if (loading_pct <= 100) {
     return {
       verdict: 'MARGINAL',
-      notes: `Obciazenie ${loading_pct.toFixed(1)}% - blisko granicy dopuszczalnej`,
-      recommendation: 'Rozwaz przelaczenia/rekonfiguracje, aby odciazyc galaz, lub zweryfikuj nastawy/regulacje zrodla.',
+      notes: branchLabels.statusDescriptions.marginal(loading_pct.toFixed(1)),
+      recommendation: branchLabels.recommendations.marginal,
     };
   }
   return {
     verdict: 'FAIL',
-    notes: `Przeciazenie: ${loading_pct.toFixed(1)}% > 100%. Wymagana korekta.`,
-    recommendation: 'Odciaz galaz (przelaczenia), zwieksz przekroj/dodaj rownoleglą galaz lub ogranicz obciazenie; zweryfikuj parametry typu i zabezpieczenia.',
+    notes: branchLabels.statusDescriptions.fail(loading_pct.toFixed(1)),
+    recommendation: branchLabels.recommendations.fail,
   };
 }
 
@@ -281,7 +287,7 @@ function LoadingSpinner() {
   return (
     <div className="flex items-center justify-center p-8">
       <div className="h-8 w-8 animate-spin rounded-full border-4 border-slate-200 border-t-blue-600" />
-      <span className="ml-3 text-slate-600">Ladowanie...</span>
+      <span className="ml-3 text-slate-600">{NormativeLabels.common.loading.default}</span>
     </div>
   );
 }
@@ -305,7 +311,11 @@ function ResultStatusBar() {
 
   const statusLabel = RESULT_STATUS_LABELS[runHeader.result_status] ?? runHeader.result_status;
   const severity = RESULT_STATUS_SEVERITY[runHeader.result_status] ?? 'info';
-  const convergedLabel = results?.converged ? 'Zbiezny' : results?.converged === false ? 'Niezbiezny' : '—';
+  const convergedLabel = results?.converged
+    ? NormativeLabels.common.powerFlowLabels.converged
+    : results?.converged === false
+    ? NormativeLabels.common.powerFlowLabels.notConverged
+    : '—';
   const iterationsLabel = results?.iterations_count ?? runHeader.iterations ?? '—';
 
   const formattedDate = useMemo(() => {
@@ -340,19 +350,19 @@ function ResultStatusBar() {
           {statusLabel}
         </span>
         <span className="text-sm text-slate-600">
-          <span className="font-medium">Typ analizy:</span> Rozplyw mocy
+          <span className="font-medium">{NormativeLabels.common.powerFlowLabels.analysisType}:</span> {NormativeLabels.common.powerFlowLabels.powerFlow}
         </span>
         <span className="text-sm text-slate-600">
-          <span className="font-medium">Status:</span>{' '}
+          <span className="font-medium">{NormativeLabels.common.powerFlowLabels.convergenceStatus}:</span>{' '}
           <span className={results?.converged ? 'text-emerald-600' : 'text-rose-600'}>
             {convergedLabel}
           </span>
         </span>
         <span className="text-sm text-slate-600">
-          <span className="font-medium">Iteracje:</span> {iterationsLabel}
+          <span className="font-medium">{NormativeLabels.common.powerFlowLabels.iterations}:</span> {iterationsLabel}
         </span>
         <span className="text-sm text-slate-600">
-          <span className="font-medium">Run:</span> {runHeader.id.substring(0, 8)}...
+          <span className="font-medium">{NormativeLabels.common.powerFlowLabels.run}:</span> {runHeader.id.substring(0, 8)}...
         </span>
       </div>
       <div className="flex items-center gap-4">
@@ -384,7 +394,7 @@ function BusResultsTable() {
 
   if (isLoadingResults) return <LoadingSpinner />;
   if (!results || results.bus_results.length === 0) {
-    return <EmptyState message="Brak wynikow wezlowych dla tego obliczenia." />;
+    return <EmptyState message={NormativeLabels.common.emptyStates.noBusResults} />;
   }
 
   return (
@@ -394,8 +404,8 @@ function BusResultsTable() {
           type="search"
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
-          placeholder="Filtruj po ID szyny..."
-          aria-label="Filtruj wyniki wezlowe"
+          placeholder={NormativeLabels.common.filterPlaceholders.busId}
+          aria-label="Filtruj wyniki węzłowe"
           className="w-full max-w-md rounded border border-slate-200 px-3 py-2 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500"
         />
       </div>
@@ -403,12 +413,12 @@ function BusResultsTable() {
         <table className="min-w-full text-sm">
           <thead className="bg-slate-50">
             <tr>
-              <th className="px-3 py-2 text-left font-semibold text-slate-700">ID szyny</th>
-              <th className="px-3 py-2 text-right font-semibold text-slate-700">V [pu]</th>
-              <th className="px-3 py-2 text-right font-semibold text-slate-700">Kat [deg]</th>
-              <th className="px-3 py-2 text-right font-semibold text-slate-700">P<sub>inj</sub> [MW]</th>
-              <th className="px-3 py-2 text-right font-semibold text-slate-700">Q<sub>inj</sub> [Mvar]</th>
-              <th className="px-3 py-2 text-center font-semibold text-slate-700">Status</th>
+              <th className="px-3 py-2 text-left font-semibold text-slate-700">{NormativeLabels.common.tableHeaders.busId}</th>
+              <th className="px-3 py-2 text-right font-semibold text-slate-700">{NormativeLabels.common.tableHeaders.voltage}</th>
+              <th className="px-3 py-2 text-right font-semibold text-slate-700">{NormativeLabels.common.tableHeaders.angleDeg}</th>
+              <th className="px-3 py-2 text-right font-semibold text-slate-700">{NormativeLabels.common.tableHeaders.powerActive}</th>
+              <th className="px-3 py-2 text-right font-semibold text-slate-700">{NormativeLabels.common.tableHeaders.powerReactive}</th>
+              <th className="px-3 py-2 text-center font-semibold text-slate-700">{NormativeLabels.common.tableHeaders.status}</th>
             </tr>
           </thead>
           <tbody>
@@ -445,7 +455,7 @@ function BusResultsTable() {
         </table>
       </div>
       <p className="mt-2 text-xs text-slate-500">
-        Wyswietlono {filteredRows.length} z {results.bus_results.length} wierszy
+        {NormativeLabels.common.counters.displayed(filteredRows.length, results.bus_results.length)}
       </p>
     </div>
   );
@@ -468,7 +478,7 @@ function BranchResultsTable() {
 
   if (isLoadingResults) return <LoadingSpinner />;
   if (!results || results.branch_results.length === 0) {
-    return <EmptyState message="Brak wynikow galeziowych dla tego obliczenia." />;
+    return <EmptyState message={NormativeLabels.common.emptyStates.noBranchResults} />;
   }
 
   return (
@@ -478,8 +488,8 @@ function BranchResultsTable() {
           type="search"
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
-          placeholder="Filtruj po ID galezi..."
-          aria-label="Filtruj wyniki galeziowe"
+          placeholder={NormativeLabels.common.filterPlaceholders.branchId}
+          aria-label="Filtruj wyniki gałęziowe"
           className="w-full max-w-md rounded border border-slate-200 px-3 py-2 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500"
         />
       </div>
@@ -487,14 +497,14 @@ function BranchResultsTable() {
         <table className="min-w-full text-sm">
           <thead className="bg-slate-50">
             <tr>
-              <th className="px-3 py-2 text-left font-semibold text-slate-700">ID galezi</th>
+              <th className="px-3 py-2 text-left font-semibold text-slate-700">{NormativeLabels.common.tableHeaders.branchId}</th>
               <th className="px-3 py-2 text-right font-semibold text-slate-700">P<sub>from</sub> [MW]</th>
               <th className="px-3 py-2 text-right font-semibold text-slate-700">Q<sub>from</sub> [Mvar]</th>
               <th className="px-3 py-2 text-right font-semibold text-slate-700">P<sub>to</sub> [MW]</th>
               <th className="px-3 py-2 text-right font-semibold text-slate-700">Q<sub>to</sub> [Mvar]</th>
-              <th className="px-3 py-2 text-right font-semibold text-slate-700">Straty P [MW]</th>
-              <th className="px-3 py-2 text-right font-semibold text-slate-700">Straty Q [Mvar]</th>
-              <th className="px-3 py-2 text-center font-semibold text-slate-700">Status</th>
+              <th className="px-3 py-2 text-right font-semibold text-slate-700">{NormativeLabels.common.tableHeaders.lossesActive}</th>
+              <th className="px-3 py-2 text-right font-semibold text-slate-700">{NormativeLabels.common.tableHeaders.lossesReactive}</th>
+              <th className="px-3 py-2 text-center font-semibold text-slate-700">{NormativeLabels.common.tableHeaders.status}</th>
             </tr>
           </thead>
           <tbody>
@@ -538,7 +548,7 @@ function BranchResultsTable() {
         </table>
       </div>
       <p className="mt-2 text-xs text-slate-500">
-        Wyswietlono {filteredRows.length} z {results.branch_results.length} wierszy
+        {NormativeLabels.common.counters.displayed(filteredRows.length, results.branch_results.length)}
       </p>
     </div>
   );
@@ -597,7 +607,7 @@ function calculateNetworkVerdict(
       problems.push({
         type: 'voltage',
         element_id: bus.bus_id,
-        description: `Szyna ${bus.bus_id.substring(0, 8)}...: ${result.notes}`,
+        description: `${NormativeLabels.terms.bus.charAt(0).toUpperCase() + NormativeLabels.terms.bus.slice(1)} ${bus.bus_id.substring(0, 8)}...: ${result.notes}`,
         severity: 'MARGINAL',
       });
     } else if (result.verdict === 'FAIL') {
@@ -605,7 +615,7 @@ function calculateNetworkVerdict(
       problems.push({
         type: 'voltage',
         element_id: bus.bus_id,
-        description: `Szyna ${bus.bus_id.substring(0, 8)}...: ${result.notes}`,
+        description: `${NormativeLabels.terms.bus.charAt(0).toUpperCase() + NormativeLabels.terms.bus.slice(1)} ${bus.bus_id.substring(0, 8)}...: ${result.notes}`,
         severity: 'FAIL',
       });
     }
@@ -621,7 +631,7 @@ function calculateNetworkVerdict(
       problems.push({
         type: 'loading',
         element_id: branch.branch_id,
-        description: `Galaz ${branch.branch_id.substring(0, 8)}...: ${result.notes}`,
+        description: `${NormativeLabels.terms.branch.charAt(0).toUpperCase() + NormativeLabels.terms.branch.slice(1)} ${branch.branch_id.substring(0, 8)}...: ${result.notes}`,
         severity: 'MARGINAL',
       });
     } else if (result.verdict === 'FAIL') {
@@ -629,24 +639,25 @@ function calculateNetworkVerdict(
       problems.push({
         type: 'loading',
         element_id: branch.branch_id,
-        description: `Galaz ${branch.branch_id.substring(0, 8)}...: ${result.notes}`,
+        description: `${NormativeLabels.terms.branch.charAt(0).toUpperCase() + NormativeLabels.terms.branch.slice(1)} ${branch.branch_id.substring(0, 8)}...: ${result.notes}`,
         severity: 'FAIL',
       });
     }
   }
 
   // Generate recommendations
+  const networkLabels = NormativeLabels.networkVerdict;
   if (stats.busFail > 0) {
-    recommendations.push('Skoryguj poziomy napiec na szynach z przekroczeniami granic');
+    recommendations.push(networkLabels.systemRecommendations.busFail);
   }
   if (stats.busMarginal > 0) {
-    recommendations.push('Zweryfikuj marginesy napieciowe na szynach granicznych');
+    recommendations.push(networkLabels.systemRecommendations.busMarginal);
   }
   if (stats.branchFail > 0) {
-    recommendations.push('Rozważ wzmocnienie przeciazonych galezi lub redystrybucje obciazen');
+    recommendations.push(networkLabels.systemRecommendations.branchFail);
   }
   if (stats.branchMarginal > 0) {
-    recommendations.push('Monitoruj galezi o wysokich stratach');
+    recommendations.push(networkLabels.systemRecommendations.branchMarginal);
   }
 
   // Determine overall verdict
@@ -677,7 +688,7 @@ function SummaryTab() {
 
   if (isLoadingResults) return <LoadingSpinner />;
   if (!results) {
-    return <EmptyState message="Brak wynikow do wyswietlenia." />;
+    return <EmptyState message={NormativeLabels.common.emptyStates.noResults} />;
   }
 
   const { summary, converged, iterations_count, tolerance_used, base_mva, slack_bus_id, bus_results, branch_results } = results;
@@ -692,23 +703,23 @@ function SummaryTab() {
     <div className="space-y-4">
       {/* UI-05: Overall network verdict */}
       <div className="rounded border border-slate-200 bg-white p-4">
-        <h3 className="mb-3 text-sm font-semibold text-slate-700">Werdykt ogolny sieci</h3>
+        <h3 className="mb-3 text-sm font-semibold text-slate-700">{NormativeLabels.networkVerdict.title}</h3>
         <div className="flex items-center gap-4">
           <VerdictBadge
             verdict={networkVerdict.verdict}
             size="md"
             notesPl={
               networkVerdict.verdict === 'PASS'
-                ? 'Wszystkie szyny i galezi w granicach dopuszczalnych'
+                ? NormativeLabels.networkVerdict.overallDescriptions.pass
                 : networkVerdict.verdict === 'MARGINAL'
-                ? 'Sa elementy na granicy, ale brak przekroczen'
-                : 'Wykryto przekroczenia granic - wymagana korekta'
+                ? NormativeLabels.networkVerdict.overallDescriptions.marginal
+                : NormativeLabels.networkVerdict.overallDescriptions.fail
             }
           />
           <div className="text-sm text-slate-600">
-            <span className="font-medium text-emerald-600">{networkVerdict.stats.busPass + networkVerdict.stats.branchPass}</span> zgodnych,{' '}
-            <span className="font-medium text-amber-600">{networkVerdict.stats.busMarginal + networkVerdict.stats.branchMarginal}</span> granicznych,{' '}
-            <span className="font-medium text-rose-600">{networkVerdict.stats.busFail + networkVerdict.stats.branchFail}</span> z przekroczeniami
+            <span className="font-medium text-emerald-600">{networkVerdict.stats.busPass + networkVerdict.stats.branchPass}</span> {NormativeLabels.networkVerdict.statsLabels.compliant},{' '}
+            <span className="font-medium text-amber-600">{networkVerdict.stats.busMarginal + networkVerdict.stats.branchMarginal}</span> {NormativeLabels.networkVerdict.statsLabels.marginal},{' '}
+            <span className="font-medium text-rose-600">{networkVerdict.stats.busFail + networkVerdict.stats.branchFail}</span> {NormativeLabels.networkVerdict.statsLabels.nonCompliant}
           </div>
         </div>
       </div>
@@ -716,7 +727,7 @@ function SummaryTab() {
       {/* UI-05: Problems list (if any) */}
       {networkVerdict.problems.length > 0 && (
         <div className="rounded border border-amber-200 bg-amber-50 p-4">
-          <h3 className="mb-2 text-sm font-semibold text-amber-800">Wykryte problemy ({networkVerdict.problems.length})</h3>
+          <h3 className="mb-2 text-sm font-semibold text-amber-800">{NormativeLabels.networkVerdict.problemsTitle(networkVerdict.problems.length)}</h3>
           <ul className="space-y-1 text-sm text-amber-700">
             {networkVerdict.problems.slice(0, 10).map((problem, idx) => (
               <li key={`${problem.element_id}-${idx}`} className="flex items-start gap-2">
@@ -727,7 +738,7 @@ function SummaryTab() {
               </li>
             ))}
             {networkVerdict.problems.length > 10 && (
-              <li className="text-amber-500">...i {networkVerdict.problems.length - 10} wiecej</li>
+              <li className="text-amber-500">{NormativeLabels.networkVerdict.moreProblems(networkVerdict.problems.length - 10)}</li>
             )}
           </ul>
         </div>
@@ -736,7 +747,7 @@ function SummaryTab() {
       {/* UI-05: Recommendations (if any) */}
       {networkVerdict.recommendations.length > 0 && (
         <div className="rounded border border-blue-200 bg-blue-50 p-4">
-          <h3 className="mb-2 text-sm font-semibold text-blue-800">Zalecane dzialania</h3>
+          <h3 className="mb-2 text-sm font-semibold text-blue-800">{NormativeLabels.networkVerdict.recommendationsTitle}</h3>
           <ul className="space-y-1 text-sm text-blue-700">
             {networkVerdict.recommendations.map((rec, idx) => (
               <li key={idx} className="flex items-start gap-2">
@@ -752,55 +763,55 @@ function SummaryTab() {
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
         <div className={`rounded border p-4 ${converged ? 'border-emerald-200 bg-emerald-50' : 'border-rose-200 bg-rose-50'}`}>
           <div className={`text-sm font-medium ${converged ? 'text-emerald-700' : 'text-rose-700'}`}>
-            Status zbieznosci
+            {NormativeLabels.common.powerFlowLabels.convergenceTitle}
           </div>
           <div className={`mt-1 text-2xl font-bold ${converged ? 'text-emerald-900' : 'text-rose-900'}`}>
-            {converged ? 'Zbiezny' : 'Niezbiezny'}
+            {converged ? NormativeLabels.common.powerFlowLabels.converged : NormativeLabels.common.powerFlowLabels.notConverged}
           </div>
         </div>
 
         <div className="rounded border border-slate-200 bg-white p-4">
-          <div className="text-sm font-medium text-slate-600">Liczba iteracji</div>
+          <div className="text-sm font-medium text-slate-600">{NormativeLabels.common.powerFlowLabels.iterationsCount}</div>
           <div className="mt-1 text-2xl font-bold text-slate-900">{iterations_count}</div>
         </div>
 
         <div className="rounded border border-slate-200 bg-white p-4">
-          <div className="text-sm font-medium text-slate-600">Tolerancja</div>
+          <div className="text-sm font-medium text-slate-600">{NormativeLabels.common.powerFlowLabels.tolerance}</div>
           <div className="mt-1 text-lg font-mono font-semibold text-slate-900">
             {tolerance_used.toExponential(2)}
           </div>
         </div>
 
         <div className="rounded border border-slate-200 bg-white p-4">
-          <div className="text-sm font-medium text-slate-600">Moc bazowa</div>
+          <div className="text-sm font-medium text-slate-600">{NormativeLabels.common.powerFlowLabels.baseMva}</div>
           <div className="mt-1 text-2xl font-bold text-slate-900">{base_mva} MVA</div>
         </div>
       </div>
 
       {/* Losses and slack power */}
       <div className="rounded border border-slate-200 bg-white p-4">
-        <h3 className="mb-3 text-sm font-semibold text-slate-700">Straty i moc bilansujaca</h3>
+        <h3 className="mb-3 text-sm font-semibold text-slate-700">{NormativeLabels.common.powerFlowLabels.lossesAndSlack}</h3>
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           <div>
-            <div className="text-xs text-slate-500">Calkowite straty P</div>
+            <div className="text-xs text-slate-500">{NormativeLabels.common.powerFlowLabels.totalLossesP}</div>
             <div className="text-lg font-mono font-semibold text-rose-700">
               {formatNumber(summary.total_losses_p_mw, 4)} MW
             </div>
           </div>
           <div>
-            <div className="text-xs text-slate-500">Calkowite straty Q</div>
+            <div className="text-xs text-slate-500">{NormativeLabels.common.powerFlowLabels.totalLossesQ}</div>
             <div className="text-lg font-mono font-semibold text-rose-700">
               {formatNumber(summary.total_losses_q_mvar, 4)} Mvar
             </div>
           </div>
           <div>
-            <div className="text-xs text-slate-500">Moc czynna slack</div>
+            <div className="text-xs text-slate-500">{NormativeLabels.common.powerFlowLabels.slackP}</div>
             <div className="text-lg font-mono font-semibold text-slate-900">
               {formatNumber(summary.slack_p_mw, 3)} MW
             </div>
           </div>
           <div>
-            <div className="text-xs text-slate-500">Moc bierna slack</div>
+            <div className="text-xs text-slate-500">{NormativeLabels.common.powerFlowLabels.slackQ}</div>
             <div className="text-lg font-mono font-semibold text-slate-900">
               {formatNumber(summary.slack_q_mvar, 3)} Mvar
             </div>
@@ -810,16 +821,16 @@ function SummaryTab() {
 
       {/* Voltage range */}
       <div className="rounded border border-slate-200 bg-white p-4">
-        <h3 className="mb-3 text-sm font-semibold text-slate-700">Zakres napiec</h3>
+        <h3 className="mb-3 text-sm font-semibold text-slate-700">{NormativeLabels.common.powerFlowLabels.voltageRange}</h3>
         <div className="flex items-center gap-8">
           <div>
-            <div className="text-xs text-slate-500">Minimum V [pu]</div>
+            <div className="text-xs text-slate-500">{NormativeLabels.common.powerFlowLabels.minV}</div>
             <div className={`text-lg font-mono font-semibold ${summary.min_v_pu < 0.95 ? 'text-amber-600' : 'text-slate-900'}`}>
               {formatNumber(summary.min_v_pu, 4)}
             </div>
           </div>
           <div>
-            <div className="text-xs text-slate-500">Maksimum V [pu]</div>
+            <div className="text-xs text-slate-500">{NormativeLabels.common.powerFlowLabels.maxV}</div>
             <div className={`text-lg font-mono font-semibold ${summary.max_v_pu > 1.05 ? 'text-amber-600' : 'text-slate-900'}`}>
               {formatNumber(summary.max_v_pu, 4)}
             </div>
@@ -829,7 +840,7 @@ function SummaryTab() {
 
       {/* Slack bus info */}
       <div className="rounded border border-slate-200 bg-white p-4">
-        <h3 className="mb-2 text-sm font-semibold text-slate-700">Wezel bilansujacy (slack)</h3>
+        <h3 className="mb-2 text-sm font-semibold text-slate-700">{NormativeLabels.common.powerFlowLabels.slackBus}</h3>
         <div className="font-mono text-sm text-slate-600">{slack_bus_id}</div>
       </div>
     </div>
@@ -1223,7 +1234,7 @@ export function PowerFlowResultsInspectorPage() {
             onChange={() => toggleOverlay()}
             className="h-4 w-4"
           />
-          <span>Pokaz nakladke rozplywu mocy na SLD</span>
+          <span>{NormativeLabels.common.overlayLabels.showOnSld}</span>
         </label>
       </div>
 

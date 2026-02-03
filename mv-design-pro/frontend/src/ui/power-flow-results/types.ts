@@ -164,9 +164,9 @@ export type PowerFlowResultsTab = 'BUSES' | 'BRANCHES' | 'SUMMARY' | 'TRACE' | '
  */
 export const POWER_FLOW_TAB_LABELS: Record<PowerFlowResultsTab, string> = {
   BUSES: 'Szyny',
-  BRANCHES: 'Galezie',
+  BRANCHES: 'Gałęzie',
   SUMMARY: 'Podsumowanie',
-  TRACE: 'Slad obliczen',
+  TRACE: 'Ślad obliczeń',
   INTERPRETATION: 'Interpretacja',
 };
 
@@ -174,7 +174,7 @@ export const POWER_FLOW_TAB_LABELS: Record<PowerFlowResultsTab, string> = {
  * Result status labels (Polish).
  */
 export const RESULT_STATUS_LABELS: Record<string, string> = {
-  NONE: 'Brak wynikow',
+  NONE: 'Brak wyników',
   FRESH: 'Wyniki aktualne',
   VALID: 'Wyniki aktualne',
   OUTDATED: 'Wyniki nieaktualne',
@@ -194,8 +194,8 @@ export const RESULT_STATUS_SEVERITY: Record<string, 'info' | 'success' | 'warnin
  * Convergence status labels (Polish).
  */
 export const CONVERGENCE_LABELS: Record<string, string> = {
-  true: 'Zbiezny',
-  false: 'Niezbiezny',
+  true: 'Zbieżny',
+  false: 'Niezbieżny',
 };
 
 // =============================================================================
@@ -308,7 +308,7 @@ export interface PowerFlowInterpretation {
  */
 export const SEVERITY_LABELS: Record<FindingSeverity, string> = {
   INFO: 'Informacja',
-  WARN: 'Ostrzezenie',
+  WARN: 'Ostrzeżenie',
   HIGH: 'Istotny problem',
 };
 
