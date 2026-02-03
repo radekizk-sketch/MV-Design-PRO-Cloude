@@ -43,6 +43,7 @@ import {
 } from './ResultsTables';
 import { TccChartFromResult } from './TccChart';
 import { TracePanel } from './TracePanel';
+import { TccInterpretationPanel } from './TccInterpretationPanel';
 
 // =============================================================================
 // Types
@@ -726,14 +727,27 @@ export function ProtectionCoordinationPage() {
                   />
                 )}
                 {state.activeTab === 'tcc' && (
-                  <TccChartFromResult
-                    result={state.result}
-                    devices={state.devices}
-                    onDeviceClick={(deviceId) =>
-                      setState((prev) => ({ ...prev, editingDeviceId: deviceId }))
-                    }
-                    height={500}
-                  />
+                  <div className="space-y-4">
+                    {/* UI-04: TCC Interpretation Panel (obok wykresu) */}
+                    <div className="flex flex-col xl:flex-row gap-4">
+                      <div className="flex-1 min-w-0">
+                        <TccChartFromResult
+                          result={state.result}
+                          devices={state.devices}
+                          onDeviceClick={(deviceId) =>
+                            setState((prev) => ({ ...prev, editingDeviceId: deviceId }))
+                          }
+                          height={500}
+                        />
+                      </div>
+                      <div className="xl:w-96 flex-shrink-0">
+                        <TccInterpretationPanel
+                          selectivityChecks={state.result.selectivity_checks}
+                          devices={state.devices}
+                        />
+                      </div>
+                    </div>
+                  </div>
                 )}
                 {state.activeTab === 'trace' && (
                   <TracePanel

@@ -33,6 +33,8 @@ import {
   FLAG_LABELS,
   SOLVER_KIND_LABELS,
 } from './types';
+import { VerdictBadge } from '../protection-coordination/ResultsTables';
+import { calculateShortCircuitVerdict, formatMargin } from './shortCircuitVerdict';
 import { useSelectionStore } from '../selection';
 import type { ElementType } from '../types';
 import { InspectorPanel } from '../inspector';
@@ -361,34 +363,67 @@ function ShortCircuitResultsTable({ selectedRowId, onRowSelect }: ShortCircuitRe
             <th data-testid="col-header-ip_ka" className="px-3 py-2 text-right font-semibold text-slate-700">ip [kA]</th>
             <th data-testid="col-header-ith_ka" className="px-3 py-2 text-right font-semibold text-slate-700">Ith [kA]</th>
             <th data-testid="col-header-sk_mva" className="px-3 py-2 text-right font-semibold text-slate-700">Sk'' [MVA]</th>
+            <th data-testid="col-header-icu_ka" className="px-3 py-2 text-right font-semibold text-slate-700">Icu [kA]</th>
+            <th data-testid="col-header-margin" className="px-3 py-2 text-right font-semibold text-slate-700">Margines</th>
+            <th data-testid="col-header-verdict" className="px-3 py-2 text-center font-semibold text-slate-700">Werdykt</th>
           </tr>
         </thead>
         <tbody data-testid="results-table-body">
-          {shortCircuitResults.rows.map((row) => (
-            <tr
-              key={row.target_id}
-              data-testid={`results-row-${row.target_id}`}
-              onClick={() => onRowSelect(row)}
-              className={`border-t border-slate-100 cursor-pointer transition-colors ${
-                selectedRowId === row.target_id
-                  ? 'bg-blue-50 hover:bg-blue-100'
-                  : 'hover:bg-slate-50'
-              }`}
-              aria-selected={selectedRowId === row.target_id}
-              role="row"
-            >
-              <td data-testid={`cell-target-${row.target_id}`} className="px-3 py-2 font-medium text-slate-800">
-                {row.target_name ?? row.target_id.substring(0, 8)}
-              </td>
-              <td data-testid={`cell-fault_type-${row.target_id}`} className="px-3 py-2 text-slate-600">{row.fault_type ?? '—'}</td>
-              <td data-testid={`cell-ikss_ka-${row.target_id}`} className="px-3 py-2 text-right font-semibold text-slate-800">
-                {formatNumber(row.ikss_ka)}
-              </td>
-              <td data-testid={`cell-ip_ka-${row.target_id}`} className="px-3 py-2 text-right text-slate-600">{formatNumber(row.ip_ka)}</td>
-              <td data-testid={`cell-ith_ka-${row.target_id}`} className="px-3 py-2 text-right text-slate-600">{formatNumber(row.ith_ka)}</td>
-              <td data-testid={`cell-sk_mva-${row.target_id}`} className="px-3 py-2 text-right text-slate-600">{formatNumber(row.sk_mva, 1)}</td>
-            </tr>
-          ))}
+          {shortCircuitResults.rows.map((row) => {
+            // UI-03: Oblicz werdykt porównania Ik vs Icu
+            // TODO: icu_ka powinno pochodzić z katalogu urządzeń - obecnie stub
+            const icu_ka = (row as ShortCircuitRow & { icu_ka?: number | null }).icu_ka ?? null;
+            const verdictResult = calculateShortCircuitVerdict(row.ikss_ka, icu_ka);
+
+            return (
+              <tr
+                key={row.target_id}
+                data-testid={`results-row-${row.target_id}`}
+                onClick={() => onRowSelect(row)}
+                className={`border-t border-slate-100 cursor-pointer transition-colors ${
+                  selectedRowId === row.target_id
+                    ? 'bg-blue-50 hover:bg-blue-100'
+                    : 'hover:bg-slate-50'
+                }`}
+                aria-selected={selectedRowId === row.target_id}
+                role="row"
+              >
+                <td data-testid={`cell-target-${row.target_id}`} className="px-3 py-2 font-medium text-slate-800">
+                  {row.target_name ?? row.target_id.substring(0, 8)}
+                </td>
+                <td data-testid={`cell-fault_type-${row.target_id}`} className="px-3 py-2 text-slate-600">{row.fault_type ?? '—'}</td>
+                <td data-testid={`cell-ikss_ka-${row.target_id}`} className="px-3 py-2 text-right font-semibold text-slate-800">
+                  {formatNumber(row.ikss_ka)}
+                </td>
+                <td data-testid={`cell-ip_ka-${row.target_id}`} className="px-3 py-2 text-right text-slate-600">{formatNumber(row.ip_ka)}</td>
+                <td data-testid={`cell-ith_ka-${row.target_id}`} className="px-3 py-2 text-right text-slate-600">{formatNumber(row.ith_ka)}</td>
+                <td data-testid={`cell-sk_mva-${row.target_id}`} className="px-3 py-2 text-right text-slate-600">{formatNumber(row.sk_mva, 1)}</td>
+                <td data-testid={`cell-icu_ka-${row.target_id}`} className="px-3 py-2 text-right text-slate-600">
+                  {icu_ka !== null ? formatNumber(icu_ka) : <span className="text-slate-400 text-xs">Brak danych</span>}
+                </td>
+                <td data-testid={`cell-margin-${row.target_id}`} className="px-3 py-2 text-right font-mono text-sm">
+                  <span className={
+                    verdictResult.margin_pct === null
+                      ? 'text-slate-400'
+                      : verdictResult.margin_pct > 15
+                        ? 'text-emerald-600'
+                        : verdictResult.margin_pct >= 0
+                          ? 'text-amber-600'
+                          : 'text-rose-600 font-semibold'
+                  }>
+                    {formatMargin(verdictResult.margin_pct)}
+                  </span>
+                </td>
+                <td data-testid={`cell-verdict-${row.target_id}`} className="px-3 py-2 text-center">
+                  <VerdictBadge
+                    verdict={verdictResult.verdict}
+                    notesPl={verdictResult.notes}
+                    recommendationPl={verdictResult.recommendation}
+                  />
+                </td>
+              </tr>
+            );
+          })}
         </tbody>
       </table>
     </div>
