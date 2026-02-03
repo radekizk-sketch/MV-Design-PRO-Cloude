@@ -25,12 +25,16 @@ import type {
   FaultMarker,
   CoordinationResult,
   ProtectionDevice,
+  SelectivityCheck,
 } from './types';
-import { LABELS } from './types';
+import { LABELS, VERDICT_STYLES } from './types';
 
 // =============================================================================
 // Types
 // =============================================================================
+
+/** Globalny werdykt selektywności dla widoku TCC */
+export type TccSelectivityVerdict = 'OK' | 'NA_GRANICY' | 'NIE_OK';
 
 interface TccChartProps {
   /** TCC curves from backend */
@@ -49,11 +53,160 @@ interface TccChartProps {
   showLegend?: boolean;
   /** Available devices for name lookup */
   devices?: ProtectionDevice[];
+  /** Selectivity checks for assessment (UI-04) */
+  selectivityChecks?: SelectivityCheck[];
 }
 
 interface ChartControlsProps {
   config: TimeCurrentChartConfig;
   onConfigChange: (config: TimeCurrentChartConfig) => void;
+}
+
+// =============================================================================
+// Selectivity Assessment Logic (UI-04)
+// =============================================================================
+
+/**
+ * Agreguje werdykty z SelectivityCheck[] do jednego globalnego werdyktu dla TCC.
+ *
+ * Logika:
+ * - OK: wszystkie sprawdzenia PASS
+ * - NIE_OK: przynajmniej jedno sprawdzenie FAIL
+ * - NA_GRANICY: przynajmniej jedno MARGINAL (i żadne FAIL), lub ERROR
+ */
+function aggregateSelectivityVerdict(checks: SelectivityCheck[]): TccSelectivityVerdict {
+  if (checks.length === 0) {
+    return 'OK'; // Brak sprawdzeń = brak problemów
+  }
+
+  let hasError = false;
+  let hasFail = false;
+  let hasMarginal = false;
+
+  for (const check of checks) {
+    if (check.verdict === 'FAIL') {
+      hasFail = true;
+    } else if (check.verdict === 'MARGINAL') {
+      hasMarginal = true;
+    } else if (check.verdict === 'ERROR') {
+      hasError = true;
+    }
+  }
+
+  if (hasFail) {
+    return 'NIE_OK';
+  }
+
+  if (hasMarginal || hasError) {
+    return 'NA_GRANICY';
+  }
+
+  return 'OK';
+}
+
+/**
+ * Zwraca teksty interpretacji dla werdyktu selektywności TCC (UI-04).
+ * Nazewnictwo normowe: "pole odpływowe", "pole zasilające", "selektywność czasowa".
+ */
+function getSelectivityAssessmentTexts(verdict: TccSelectivityVerdict): {
+  status: string;
+  dlaczego: string;
+  coDalej: string;
+} {
+  switch (verdict) {
+    case 'OK':
+      return {
+        status: 'OK',
+        dlaczego:
+          'Selektywność zapewniona: zabezpieczenie w polu odpływowym działa wcześniej niż zabezpieczenie w polu zasilającym w całym analizowanym zakresie.',
+        coDalej: 'Brak wymaganych działań.',
+      };
+    case 'NA_GRANICY':
+      return {
+        status: 'NA GRANICY',
+        dlaczego:
+          'Rezerwa selektywności jest niewielka: krzywe czasowo-prądowe są zbliżone w części analizowanego zakresu.',
+        coDalej:
+          'Zwiększ rezerwę selektywności: skoryguj nastawy czasowe (Δt) i/lub charakterystykę zabezpieczenia w polu zasilającym, zachowując wymagania ochrony odpływu.',
+      };
+    case 'NIE_OK':
+      return {
+        status: 'NIE OK',
+        dlaczego:
+          'Brak selektywności: w analizowanym zakresie możliwe jest zadziałanie zabezpieczenia w polu zasilającym przed zabezpieczeniem w polu odpływowym (przecięcie lub brak jednoznacznej separacji krzywych).',
+        coDalej:
+          'Przywróć selektywność: skoryguj nastawy prądowe/czasowe lub zmień charakterystykę zabezpieczenia w polu zasilającym; w obecnym stanie możliwe jest niepożądane wyłączenie zasilania.',
+      };
+  }
+}
+
+// =============================================================================
+// Selectivity Assessment Component (UI-04)
+// =============================================================================
+
+interface SelectivityAssessmentProps {
+  selectivityChecks: SelectivityCheck[];
+}
+
+/**
+ * SelectivityAssessment — Ocena selektywności zabezpieczeń dla wykresu TCC
+ *
+ * Wyświetla blok tekstowy pod wykresem z:
+ * - WERDYKT (OK / NA GRANICY / NIE OK)
+ * - DLACZEGO (1-2 zdania, inżyniersko)
+ * - CO DALEJ (konkretne zalecenie operacyjne)
+ *
+ * UI-only, deterministyczne, bez nowych obliczeń.
+ */
+function SelectivityAssessment({ selectivityChecks }: SelectivityAssessmentProps) {
+  const verdict = aggregateSelectivityVerdict(selectivityChecks);
+  const texts = getSelectivityAssessmentTexts(verdict);
+
+  // Mapowanie werdyktu TCC na style badge
+  const badgeStyle = (() => {
+    switch (verdict) {
+      case 'OK':
+        return VERDICT_STYLES.PASS;
+      case 'NA_GRANICY':
+        return VERDICT_STYLES.MARGINAL;
+      case 'NIE_OK':
+        return VERDICT_STYLES.FAIL;
+    }
+  })();
+
+  return (
+    <div
+      className="border-t border-slate-200 bg-slate-50 p-4"
+      data-testid="selectivity-assessment"
+    >
+      <div className="space-y-3">
+        {/* Nagłówek z werdyktem */}
+        <div className="flex items-center gap-3">
+          <h4 className="font-semibold text-slate-900">
+            Ocena selektywności zabezpieczeń
+          </h4>
+          <span
+            className={`inline-flex items-center rounded-full px-3 py-1 text-sm font-semibold ${badgeStyle.bg} ${badgeStyle.text}`}
+            data-testid={`tcc-verdict-${verdict.toLowerCase().replace(/ /g, '-')}`}
+          >
+            {texts.status}
+          </span>
+        </div>
+
+        {/* DLACZEGO */}
+        <div>
+          <p className="text-sm font-medium text-slate-700">Dlaczego:</p>
+          <p className="text-sm text-slate-600">{texts.dlaczego}</p>
+        </div>
+
+        {/* CO DALEJ */}
+        <div>
+          <p className="text-sm font-medium text-slate-700">Co dalej:</p>
+          <p className="text-sm text-slate-600">{texts.coDalej}</p>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 // =============================================================================
@@ -264,6 +417,7 @@ export function TccChart({
   height = 500,
   showLegend = true,
   devices,
+  selectivityChecks = [],
 }: TccChartProps) {
   const labels = LABELS.tcc;
 
@@ -376,6 +530,11 @@ export function TccChart({
 
       {/* Marker list */}
       <MarkerList faultMarkers={faultMarkers} operatingCurrents={operatingCurrents} />
+
+      {/* Selectivity Assessment (UI-04) */}
+      {selectivityChecks.length > 0 && (
+        <SelectivityAssessment selectivityChecks={selectivityChecks} />
+      )}
     </div>
   );
 }
@@ -408,6 +567,7 @@ export function TccChartFromResult({
       onDeviceClick={onDeviceClick}
       height={height}
       showLegend={true}
+      selectivityChecks={result.selectivity_checks}
     />
   );
 }
