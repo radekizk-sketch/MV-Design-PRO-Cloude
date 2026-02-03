@@ -431,6 +431,15 @@ class NetworkGraph:
 **Changelog:**
 - P4: Result invalidation on NetworkModel change (PF-style)
 
+### 6.5 Task 4.5: StudyCaseService UoW lifecycle fix (DONE)
+
+**Location:** `backend/src/application/study_case/service.py`
+
+**Actions (DONE - 2025-03):**
+- [x] Wrap all StudyCaseService operations in `with uow_factory() as uow`
+- [x] Use `uow.cases` for repositories (no direct CaseRepository construction)
+- [x] Rely on UnitOfWork.__exit__ for commit/rollback
+
 ---
 
 ## 7. Phase 5: Interpretation Layer (DONE)

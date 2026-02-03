@@ -35,7 +35,6 @@ from domain.study_case import (
     compare_study_cases,
     new_study_case,
 )
-from infrastructure.persistence.repositories import CaseRepository
 
 from .errors import (
     ActiveCaseRequiredError,
@@ -83,11 +82,6 @@ class StudyCaseService:
         """
         self._uow_factory = uow_factory
 
-    def _get_repository(self) -> tuple[Any, CaseRepository]:
-        """Get a UoW and repository for operations."""
-        uow = self._uow_factory()
-        return uow, CaseRepository(uow.session)
-
     # =========================================================================
     # CRUD Operations
     # =========================================================================
@@ -113,19 +107,22 @@ class StudyCaseService:
         Returns:
             Created StudyCase
         """
-        uow, repo = self._get_repository()
+        with self._uow_factory() as uow:
+            repo = uow.cases
+            if repo is None:
+                raise CaseConfigurationError("Repozytorium przypadków jest niedostępne")
 
-        cfg = StudyCaseConfig.from_dict(config) if config else StudyCaseConfig()
-        case = new_study_case(
-            project_id=project_id,
-            name=name,
-            description=description,
-            config=cfg,
-            is_active=set_active,
-        )
+            cfg = StudyCaseConfig.from_dict(config) if config else StudyCaseConfig()
+            case = new_study_case(
+                project_id=project_id,
+                name=name,
+                description=description,
+                config=cfg,
+                is_active=set_active,
+            )
 
-        repo.add_study_case(case)
-        return case
+            repo.add_study_case(case)
+            return case
 
     def get_case(self, case_id: UUID) -> StudyCase:
         """
@@ -140,11 +137,15 @@ class StudyCaseService:
         Raises:
             StudyCaseNotFoundError: If case not found
         """
-        uow, repo = self._get_repository()
-        case = repo.get_study_case(case_id)
-        if case is None:
-            raise StudyCaseNotFoundError(str(case_id))
-        return case
+        with self._uow_factory() as uow:
+            repo = uow.cases
+            if repo is None:
+                raise CaseConfigurationError("Repozytorium przypadków jest niedostępne")
+
+            case = repo.get_study_case(case_id)
+            if case is None:
+                raise StudyCaseNotFoundError(str(case_id))
+            return case
 
     def list_cases(self, project_id: UUID) -> list[StudyCaseListItem]:
         """
@@ -156,19 +157,23 @@ class StudyCaseService:
         Returns:
             List of study case summary items, ordered by name
         """
-        uow, repo = self._get_repository()
-        cases = repo.list_study_cases(project_id)
-        return [
-            StudyCaseListItem(
-                id=str(case.id),
-                name=case.name,
-                description=case.description,
-                result_status=case.result_status.value,
-                is_active=case.is_active,
-                updated_at=case.updated_at.isoformat(),
-            )
-            for case in cases
-        ]
+        with self._uow_factory() as uow:
+            repo = uow.cases
+            if repo is None:
+                raise CaseConfigurationError("Repozytorium przypadków jest niedostępne")
+
+            cases = repo.list_study_cases(project_id)
+            return [
+                StudyCaseListItem(
+                    id=str(case.id),
+                    name=case.name,
+                    description=case.description,
+                    result_status=case.result_status.value,
+                    is_active=case.is_active,
+                    updated_at=case.updated_at.isoformat(),
+                )
+                for case in cases
+            ]
 
     def update_case(
         self,
@@ -192,22 +197,26 @@ class StudyCaseService:
         Raises:
             StudyCaseNotFoundError: If case not found
         """
-        uow, repo = self._get_repository()
-        case = repo.get_study_case(case_id)
-        if case is None:
-            raise StudyCaseNotFoundError(str(case_id))
+        with self._uow_factory() as uow:
+            repo = uow.cases
+            if repo is None:
+                raise CaseConfigurationError("Repozytorium przypadków jest niedostępne")
 
-        updated = case
-        if name is not None:
-            updated = updated.with_name(name)
-        if description is not None:
-            updated = updated.with_description(description)
-        if config is not None:
-            new_config = StudyCaseConfig.from_dict(config)
-            updated = updated.with_updated_config(new_config)
+            case = repo.get_study_case(case_id)
+            if case is None:
+                raise StudyCaseNotFoundError(str(case_id))
 
-        repo.update_study_case(updated)
-        return updated
+            updated = case
+            if name is not None:
+                updated = updated.with_name(name)
+            if description is not None:
+                updated = updated.with_description(description)
+            if config is not None:
+                new_config = StudyCaseConfig.from_dict(config)
+                updated = updated.with_updated_config(new_config)
+
+            repo.update_study_case(updated)
+            return updated
 
     def delete_case(self, case_id: UUID) -> bool:
         """
@@ -219,8 +228,11 @@ class StudyCaseService:
         Returns:
             True if deleted, False if not found
         """
-        uow, repo = self._get_repository()
-        return repo.delete_study_case(case_id)
+        with self._uow_factory() as uow:
+            repo = uow.cases
+            if repo is None:
+                raise CaseConfigurationError("Repozytorium przypadków jest niedostępne")
+            return repo.delete_study_case(case_id)
 
     # =========================================================================
     # Clone Operation
@@ -249,14 +261,18 @@ class StudyCaseService:
         Raises:
             StudyCaseNotFoundError: If source case not found
         """
-        uow, repo = self._get_repository()
-        source = repo.get_study_case(case_id)
-        if source is None:
-            raise StudyCaseNotFoundError(str(case_id))
+        with self._uow_factory() as uow:
+            repo = uow.cases
+            if repo is None:
+                raise CaseConfigurationError("Repozytorium przypadków jest niedostępne")
 
-        cloned = source.clone(new_name)
-        repo.add_study_case(cloned)
-        return cloned
+            source = repo.get_study_case(case_id)
+            if source is None:
+                raise StudyCaseNotFoundError(str(case_id))
+
+            cloned = source.clone(new_name)
+            repo.add_study_case(cloned)
+            return cloned
 
     # =========================================================================
     # Active Case Management
@@ -272,8 +288,11 @@ class StudyCaseService:
         Returns:
             Active StudyCase or None if no active case
         """
-        uow, repo = self._get_repository()
-        return repo.get_active_study_case(project_id)
+        with self._uow_factory() as uow:
+            repo = uow.cases
+            if repo is None:
+                raise CaseConfigurationError("Repozytorium przypadków jest niedostępne")
+            return repo.get_active_study_case(project_id)
 
     def set_active_case(self, project_id: UUID, case_id: UUID) -> StudyCase:
         """
@@ -291,11 +310,15 @@ class StudyCaseService:
         Raises:
             StudyCaseNotFoundError: If case not found
         """
-        uow, repo = self._get_repository()
-        case = repo.set_active_study_case(project_id, case_id)
-        if case is None:
-            raise StudyCaseNotFoundError(str(case_id))
-        return case
+        with self._uow_factory() as uow:
+            repo = uow.cases
+            if repo is None:
+                raise CaseConfigurationError("Repozytorium przypadków jest niedostępne")
+
+            case = repo.set_active_study_case(project_id, case_id)
+            if case is None:
+                raise StudyCaseNotFoundError(str(case_id))
+            return case
 
     # =========================================================================
     # Compare Operation
@@ -321,17 +344,20 @@ class StudyCaseService:
         Raises:
             StudyCaseNotFoundError: If either case not found
         """
-        uow, repo = self._get_repository()
+        with self._uow_factory() as uow:
+            repo = uow.cases
+            if repo is None:
+                raise CaseConfigurationError("Repozytorium przypadków jest niedostępne")
 
-        case_a = repo.get_study_case(case_a_id)
-        if case_a is None:
-            raise StudyCaseNotFoundError(str(case_a_id))
+            case_a = repo.get_study_case(case_a_id)
+            if case_a is None:
+                raise StudyCaseNotFoundError(str(case_a_id))
 
-        case_b = repo.get_study_case(case_b_id)
-        if case_b is None:
-            raise StudyCaseNotFoundError(str(case_b_id))
+            case_b = repo.get_study_case(case_b_id)
+            if case_b is None:
+                raise StudyCaseNotFoundError(str(case_b_id))
 
-        return compare_study_cases(case_a, case_b)
+            return compare_study_cases(case_a, case_b)
 
     # =========================================================================
     # Result Status Management
@@ -350,8 +376,11 @@ class StudyCaseService:
         Returns:
             Number of cases marked as OUTDATED
         """
-        uow, repo = self._get_repository()
-        return repo.mark_all_cases_outdated(project_id)
+        with self._uow_factory() as uow:
+            repo = uow.cases
+            if repo is None:
+                raise CaseConfigurationError("Repozytorium przypadków jest niedostępne")
+            return repo.mark_all_cases_outdated(project_id)
 
     def mark_case_outdated(self, case_id: UUID) -> bool:
         """
@@ -365,8 +394,11 @@ class StudyCaseService:
         Returns:
             True if case was marked, False if not found or already OUTDATED/NONE
         """
-        uow, repo = self._get_repository()
-        return repo.mark_case_outdated(case_id)
+        with self._uow_factory() as uow:
+            repo = uow.cases
+            if repo is None:
+                raise CaseConfigurationError("Repozytorium przypadków jest niedostępne")
+            return repo.mark_case_outdated(case_id)
 
     def mark_case_fresh(
         self,
@@ -387,14 +419,18 @@ class StudyCaseService:
         Returns:
             True if case was marked, False if not found
         """
-        uow, repo = self._get_repository()
-        result_ref = StudyCaseResult(
-            analysis_run_id=analysis_run_id,
-            analysis_type=analysis_type,
-            calculated_at=datetime.now(timezone.utc),
-            input_hash=input_hash,
-        )
-        return repo.mark_case_fresh(case_id, result_ref)
+        with self._uow_factory() as uow:
+            repo = uow.cases
+            if repo is None:
+                raise CaseConfigurationError("Repozytorium przypadków jest niedostępne")
+
+            result_ref = StudyCaseResult(
+                analysis_run_id=analysis_run_id,
+                analysis_type=analysis_type,
+                calculated_at=datetime.now(timezone.utc),
+                input_hash=input_hash,
+            )
+            return repo.mark_case_fresh(case_id, result_ref)
 
     # =========================================================================
     # Validation Helpers
@@ -425,21 +461,28 @@ class StudyCaseService:
         Returns:
             (can_calculate, error_message)
         """
-        uow, repo = self._get_repository()
-        case = repo.get_study_case(case_id)
-        if case is None:
-            return False, "Przypadek obliczeniowy nie istnieje"
+        with self._uow_factory() as uow:
+            repo = uow.cases
+            if repo is None:
+                raise CaseConfigurationError("Repozytorium przypadków jest niedostępne")
 
-        if not case.is_active:
-            return False, "Przypadek nie jest aktywny"
+            case = repo.get_study_case(case_id)
+            if case is None:
+                return False, "Przypadek obliczeniowy nie istnieje"
 
-        # Additional validation could be added here
-        return True, None
+            if not case.is_active:
+                return False, "Przypadek nie jest aktywny"
+
+            # Additional validation could be added here
+            return True, None
 
     def count_cases(self, project_id: UUID) -> int:
         """Count study cases for a project."""
-        uow, repo = self._get_repository()
-        return repo.count_study_cases(project_id)
+        with self._uow_factory() as uow:
+            repo = uow.cases
+            if repo is None:
+                raise CaseConfigurationError("Repozytorium przypadków jest niedostępne")
+            return repo.count_study_cases(project_id)
 
     # =========================================================================
     # Protection Configuration (P14c)
@@ -470,29 +513,31 @@ class StudyCaseService:
             StudyCaseNotFoundError: If case doesn't exist
             ValueError: If template_ref doesn't exist in catalog
         """
-        uow, repo = self._get_repository()
+        with self._uow_factory() as uow:
+            repo = uow.cases
+            if repo is None:
+                raise CaseConfigurationError("Repozytorium przypadków jest niedostępne")
 
-        # Get case
-        case = repo.get_study_case(case_id)
-        if case is None:
-            raise StudyCaseNotFoundError(str(case_id))
+            # Get case
+            case = repo.get_study_case(case_id)
+            if case is None:
+                raise StudyCaseNotFoundError(str(case_id))
 
-        # TODO P14c: Validate template_ref exists in catalog
-        # For now, we trust the frontend validation
+            # TODO P14c: Validate template_ref exists in catalog
+            # For now, we trust the frontend validation
 
-        # Create new ProtectionConfig
-        now = datetime.now(timezone.utc)
-        new_config = ProtectionConfig(
-            template_ref=template_ref,
-            template_fingerprint=template_fingerprint,
-            library_manifest_ref=library_manifest_ref,
-            overrides=overrides or {},
-            bound_at=now if template_ref else None,
-        )
+            # Create new ProtectionConfig
+            now = datetime.now(timezone.utc)
+            new_config = ProtectionConfig(
+                template_ref=template_ref,
+                template_fingerprint=template_fingerprint,
+                library_manifest_ref=library_manifest_ref,
+                overrides=overrides or {},
+                bound_at=now if template_ref else None,
+            )
 
-        # Update case
-        updated_case = case.with_protection_config(new_config)
-        repo.save_study_case(updated_case)
-        uow.commit()
+            # Update case
+            updated_case = case.with_protection_config(new_config)
+            repo.save_study_case(updated_case)
 
-        return updated_case
+            return updated_case
