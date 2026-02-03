@@ -1,5 +1,8 @@
 """Main FastAPI application entry point."""
 
+from contextlib import asynccontextmanager
+import os
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -22,6 +25,24 @@ from api.reference_patterns import router as reference_patterns_router  # Wzorce
 from api.sld import router as sld_router  # P11a
 from api.snapshots import router as snapshots_router
 from api.study_cases import router as study_cases_router
+from infrastructure.persistence.db import (
+    create_engine_from_url,
+    create_session_factory,
+    init_db,
+)
+from infrastructure.persistence.unit_of_work import build_uow_factory
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    database_url = os.getenv("DATABASE_URL", "sqlite+pysqlite:///./mv_design_pro.db")
+    engine = create_engine_from_url(database_url)
+    session_factory = create_session_factory(engine)
+    app.state.engine = engine
+    app.state.uow_factory = build_uow_factory(session_factory)
+    init_db(engine)
+    yield
+
 
 app = FastAPI(
     title="MV-DESIGN PRO API",
@@ -29,6 +50,7 @@ app = FastAPI(
     version="0.1.0",
     docs_url="/docs",
     redoc_url="/redoc",
+    lifespan=lifespan,
 )
 
 # CORS configuration
