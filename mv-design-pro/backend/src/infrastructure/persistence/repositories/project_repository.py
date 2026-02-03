@@ -4,6 +4,7 @@ from datetime import datetime, timezone
 from uuid import UUID
 
 from sqlalchemy import func, select
+from sqlalchemy.exc import OperationalError, ProgrammingError
 from sqlalchemy.orm import Session
 
 from domain.models import Project
@@ -139,44 +140,50 @@ class ProjectRepository:
         Check if project has dependencies (study cases, operating cases, analysis runs).
 
         Returns True if project has active dependent objects.
+        Returns False if tables don't exist (e.g., in test environment with clean DB).
         """
-        # Check study cases
-        study_case_count = (
-            self._session.execute(
-                select(func.count())
-                .select_from(StudyCaseORM)
-                .where(StudyCaseORM.project_id == project_id)
+        try:
+            # Check study cases
+            study_case_count = (
+                self._session.execute(
+                    select(func.count())
+                    .select_from(StudyCaseORM)
+                    .where(StudyCaseORM.project_id == project_id)
+                )
+                .scalar_one()
             )
-            .scalar_one()
-        )
-        if study_case_count > 0:
-            return True
+            if study_case_count > 0:
+                return True
 
-        # Check operating cases
-        operating_case_count = (
-            self._session.execute(
-                select(func.count())
-                .select_from(OperatingCaseORM)
-                .where(OperatingCaseORM.project_id == project_id)
+            # Check operating cases
+            operating_case_count = (
+                self._session.execute(
+                    select(func.count())
+                    .select_from(OperatingCaseORM)
+                    .where(OperatingCaseORM.project_id == project_id)
+                )
+                .scalar_one()
             )
-            .scalar_one()
-        )
-        if operating_case_count > 0:
-            return True
+            if operating_case_count > 0:
+                return True
 
-        # Check analysis runs
-        analysis_run_count = (
-            self._session.execute(
-                select(func.count())
-                .select_from(AnalysisRunORM)
-                .where(AnalysisRunORM.project_id == project_id)
+            # Check analysis runs
+            analysis_run_count = (
+                self._session.execute(
+                    select(func.count())
+                    .select_from(AnalysisRunORM)
+                    .where(AnalysisRunORM.project_id == project_id)
+                )
+                .scalar_one()
             )
-            .scalar_one()
-        )
-        if analysis_run_count > 0:
-            return True
+            if analysis_run_count > 0:
+                return True
 
-        return False
+            return False
+
+        except (OperationalError, ProgrammingError):
+            # Tables don't exist yet - no dependencies possible
+            return False
 
     def get_pcc(self, project_id: UUID) -> UUID | None:
         """Get PCC node ID for a project."""
