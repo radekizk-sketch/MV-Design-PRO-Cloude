@@ -56,7 +56,7 @@ interface ResultsTableProps<T> {
 function SortIndicator({ direction }: { direction: 'asc' | 'desc' }) {
   return (
     <span className="ml-1 inline-block text-xs">
-      {direction === 'asc' ? '▲' : '▼'}
+      {direction === 'asc' ? 'ASC' : 'DESC'}
     </span>
   );
 }

@@ -37,32 +37,32 @@ import { useTreeSelection } from '../selection/hooks';
 // ============================================================================
 
 const TREE_NODE_ICONS: Record<TreeNodeType, string> = {
-  PROJECT: '📁',
-  NETWORK: '🔌',
-  STATION: '🏭',           // FIX-05: Station container icon
-  VOLTAGE_LEVEL: '⚡',     // FIX-05: Voltage level icon
-  BUSES: '═══',
-  LINES: '───',
-  CABLES: '━━━',
-  TRANSFORMERS: '⊕',
-  SWITCHES: '⬡',
-  SOURCES: '⚡',
-  LOADS: '▼',
-  TYPE_CATALOG: '📚',
-  LINE_TYPES: '📏',
-  CABLE_TYPES: '📐',
-  TRANSFORMER_TYPES: '🔄',
-  SWITCH_EQUIPMENT_TYPES: '⚙️',
-  CASES: '📋',
-  STUDY_CASE: '◉',  // P10: Study case icon
-  RESULTS: '📊',
-  RUN_ITEM: '▸',  // P11c: Analysis run icon
-  PROTECTION_RESULTS: '🛡️',  // P15c: Protection results category
-  PROTECTION_RUNS: '▸',      // P15c: Protection runs
-  PROTECTION_COMPARISONS: '⚖️',  // P15c: Protection comparisons
-  POWER_FLOW_RESULTS: '⚡',  // P20b: Power flow results category
-  POWER_FLOW_RUNS: '▸',      // P20b: Power flow runs
-  ELEMENT: '•',
+  PROJECT: '[P]',
+  NETWORK: '[N]',
+  STATION: '[ST]',           // FIX-05: Station container icon
+  VOLTAGE_LEVEL: '[VL]',     // FIX-05: Voltage level icon
+  BUSES: '---',
+  LINES: '---',
+  CABLES: '===',
+  TRANSFORMERS: '[T]',
+  SWITCHES: '[S]',
+  SOURCES: '[SRC]',
+  LOADS: '[L]',
+  TYPE_CATALOG: '[CAT]',
+  LINE_TYPES: '[LT]',
+  CABLE_TYPES: '[CT]',
+  TRANSFORMER_TYPES: '[TT]',
+  SWITCH_EQUIPMENT_TYPES: '[SW]',
+  CASES: '[C]',
+  STUDY_CASE: '[SC]',  // P10: Study case icon
+  RESULTS: '[R]',
+  RUN_ITEM: '>',  // P11c: Analysis run icon
+  PROTECTION_RESULTS: '[PR]',  // P15c: Protection results category
+  PROTECTION_RUNS: '>',      // P15c: Protection runs
+  PROTECTION_COMPARISONS: '[CMP]',  // P15c: Protection comparisons
+  POWER_FLOW_RESULTS: '[PF]',  // P20b: Power flow results category
+  POWER_FLOW_RUNS: '>',      // P20b: Power flow runs
+  ELEMENT: '-',
 };
 
 const TREE_NODE_LABELS: Record<TreeNodeType, string> = {
@@ -504,9 +504,9 @@ interface TreeNodeComponentProps {
 
 // P10: Status icons and colors for study cases
 const RESULT_STATUS_ICONS: Record<string, string> = {
-  NONE: '○',
-  FRESH: '●',
-  OUTDATED: '◐',
+  NONE: '[ ]',
+  FRESH: '[OK]',
+  OUTDATED: '[!]',
 };
 
 const RESULT_STATUS_COLORS: Record<string, string> = {
@@ -598,7 +598,7 @@ function TreeNodeComponent({
               onToggle(node.id);
             }}
           >
-            {isExpanded ? '▼' : '▶'}
+            {isExpanded ? '[-]' : '[+]'}
           </button>
         ) : (
           <span className="w-4 h-4 mr-1" aria-hidden="true" />
@@ -606,7 +606,7 @@ function TreeNodeComponent({
 
         {/* P10: Active case indicator */}
         {isStudyCase && node.isActive && (
-          <span className="text-blue-600 mr-1" title="Aktywny przypadek">▸</span>
+          <span className="text-blue-600 mr-1 font-bold" title="Aktywny przypadek">&gt;</span>
         )}
 
         {/* Icon with status color for study cases and run items */}

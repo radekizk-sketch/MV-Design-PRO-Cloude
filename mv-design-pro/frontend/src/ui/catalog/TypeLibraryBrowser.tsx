@@ -36,10 +36,10 @@ interface Tab {
 }
 
 const TABS: Tab[] = [
-  { id: 'LINE', label: 'Typy linii', icon: '─' },
-  { id: 'CABLE', label: 'Typy kabli', icon: '═' },
-  { id: 'TRANSFORMER', label: 'Typy transformatorów', icon: '⚡' },
-  { id: 'SWITCH_EQUIPMENT', label: 'Typy aparatury łączeniowej', icon: '⚙️' },
+  { id: 'LINE', label: 'Typy linii', icon: '[LN]' },
+  { id: 'CABLE', label: 'Typy kabli', icon: '[CB]' },
+  { id: 'TRANSFORMER', label: 'Typy transformatorow', icon: '[TR]' },
+  { id: 'SWITCH_EQUIPMENT', label: 'Typy aparatury laczeniowej', icon: '[SW]' },
 ];
 
 interface TypeLibraryBrowserProps {
@@ -390,13 +390,13 @@ function ImportReportDialog({
           {report.success ? (
             <div className="bg-green-50 border border-green-200 rounded-md px-4 py-3">
               <p className="text-green-800 font-medium">
-                ✓ Import zakończony sukcesem
+                Import zakonczony sukcesem
               </p>
             </div>
           ) : (
             <div className="bg-red-50 border border-red-200 rounded-md px-4 py-3">
               <p className="text-red-800 font-medium">
-                ✗ Import zakończony błędami
+                Import zakonczony bledami
               </p>
             </div>
           )}

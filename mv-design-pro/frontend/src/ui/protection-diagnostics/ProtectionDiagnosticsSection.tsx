@@ -138,7 +138,7 @@ export const ProtectionDiagnosticsSection: React.FC<ProtectionDiagnosticsSection
             </span>
           )}
           {/* Collapse indicator */}
-          <span className="text-gray-400 text-xs">{collapsed ? '▸' : '▾'}</span>
+          <span className="text-gray-400 text-xs">{collapsed ? '[+]' : '[-]'}</span>
         </div>
       </button>
 

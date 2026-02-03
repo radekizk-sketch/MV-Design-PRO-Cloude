@@ -285,7 +285,7 @@ export function PropertyGridMultiEdit({
       {blockedMessage && mode !== 'RESULT_VIEW' && (
         <div className="bg-yellow-50 border-b border-yellow-200 px-4 py-3">
           <div className="flex items-center gap-2 text-xs text-yellow-800">
-            <span>⚠️</span>
+            <span className="font-bold">[!]</span>
             <span>{blockedMessage}</span>
           </div>
         </div>
@@ -296,7 +296,7 @@ export function PropertyGridMultiEdit({
         <div className="bg-blue-50 border-b border-blue-200 px-4 py-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2 text-xs text-blue-800">
-              <span>✏️</span>
+              <span className="font-bold">[*]</span>
               <span>Niezapisane zmiany: {draftChanges.size} {
                 draftChanges.size === 1 ? 'pole' :
                 (draftChanges.size >= 2 && draftChanges.size <= 4) ? 'pola' : 'pól'
@@ -356,7 +356,7 @@ export function PropertyGridMultiEdit({
               className="w-full flex items-center justify-between px-4 py-2 bg-gray-50 hover:bg-gray-100 transition-colors"
             >
               <span className="text-xs font-medium text-gray-700 flex items-center gap-2">
-                {collapsedSections.has('validation_summary') ? '▶' : '▼'}{' '}
+                {collapsedSections.has('validation_summary') ? '[+]' : '[-]'}{' '}
                 {SECTION_LABELS.validation || 'Stan walidacji'}
                 {localValidationErrors.size > 0 && (
                   <span
@@ -438,7 +438,7 @@ function PropertySection({
         className="w-full flex items-center justify-between px-4 py-2 bg-gray-50 hover:bg-gray-100 transition-colors"
       >
         <span className="text-xs font-medium text-gray-700 flex items-center gap-2">
-          {collapsed ? '▶' : '▼'} {section.label}
+          {collapsed ? '[+]' : '[-]'} {section.label}
           {errorCount > 0 && <ValidationIcon severity="ERROR" />}
           {warningCount > 0 && errorCount === 0 && <ValidationIcon severity="WARNING" />}
         </span>

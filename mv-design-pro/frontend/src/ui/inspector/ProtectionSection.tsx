@@ -91,7 +91,7 @@ export function ProtectionSection({
         data-testid="protection-section-toggle"
       >
         <span className="text-xs font-medium text-amber-800 flex items-center gap-2">
-          {collapsed ? '▶' : '▼'} Zabezpieczenia
+          {collapsed ? '[+]' : '[-]'} Zabezpieczenia
           {hasProtection && (
             <span className="px-1.5 py-0.5 bg-amber-200 text-amber-900 rounded text-xs">
               {assignments.length}

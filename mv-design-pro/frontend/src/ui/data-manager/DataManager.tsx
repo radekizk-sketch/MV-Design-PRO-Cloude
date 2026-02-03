@@ -943,9 +943,9 @@ export function DataManager({
                             ? 'bg-green-100 text-green-700 hover:bg-green-200'
                             : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                         )}
-                        title={row.inService ? 'Wyłącz' : 'Włącz'}
+                        title={row.inService ? 'Wylacz' : 'Wlacz'}
                       >
-                        {row.inService ? '✓' : '✗'}
+                        {row.inService ? 'ON' : 'OFF'}
                       </button>
                       {/* Toggle Switch State (Switch only) */}
                       {elementType === 'Switch' && row.switchState && (
@@ -1100,7 +1100,7 @@ function renderCellValue(row: DataManagerRow, col: DataManagerColumn): React.Rea
   }
 
   if (col.type === 'boolean') {
-    return value ? '✓' : '✗';
+    return value ? 'TAK' : 'NIE';
   }
 
   if (col.key === 'switchState') {

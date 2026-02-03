@@ -40,17 +40,17 @@ const MODE_STYLES: Record<OperatingMode, { bg: string; text: string; icon: strin
   MODEL_EDIT: {
     bg: 'bg-blue-600',
     text: 'text-white',
-    icon: '✏️',
+    icon: '[E]',
   },
   CASE_CONFIG: {
     bg: 'bg-purple-600',
     text: 'text-white',
-    icon: '⚙️',
+    icon: '[C]',
   },
   RESULT_VIEW: {
     bg: 'bg-green-600',
     text: 'text-white',
-    icon: '📊',
+    icon: '[R]',
   },
 };
 

@@ -85,7 +85,7 @@ export function DiagnosticsSection({
         data-testid="diagnostics-section-toggle"
       >
         <span className="text-xs font-medium text-rose-800 flex items-center gap-2">
-          {collapsed ? '▶' : '▼'} Diagnostyka
+          {collapsed ? '[+]' : '[-]'} Diagnostyka
           {hasDiagnostics && diagnostics && (
             <>
               {diagnostics.error_count > 0 && (

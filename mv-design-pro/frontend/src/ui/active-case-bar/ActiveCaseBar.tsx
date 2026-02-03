@@ -42,9 +42,9 @@ const RESULT_STATUS_COLORS: Record<ResultStatus, string> = {
 };
 
 const RESULT_STATUS_ICONS: Record<ResultStatus, string> = {
-  NONE: '○',
-  FRESH: '●',
-  OUTDATED: '◐',
+  NONE: '[ ]',
+  FRESH: '[OK]',
+  OUTDATED: '[!]',
 };
 
 // =============================================================================
@@ -266,17 +266,17 @@ function ModeIndicator({ mode }: ModeIndicatorProps) {
     MODEL_EDIT: {
       label: 'Edycja modelu',
       color: 'text-blue-700 bg-blue-50 border-blue-200',
-      icon: '✏️',
+      icon: '[E]',
     },
     CASE_CONFIG: {
       label: 'Konfiguracja',
       color: 'text-purple-700 bg-purple-50 border-purple-200',
-      icon: '⚙️',
+      icon: '[C]',
     },
     RESULT_VIEW: {
       label: 'Wyniki',
       color: 'text-green-700 bg-green-50 border-green-200',
-      icon: '📊',
+      icon: '[R]',
     },
   };
 

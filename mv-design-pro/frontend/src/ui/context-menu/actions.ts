@@ -96,7 +96,7 @@ export function buildContextMenuActions(
   // In service toggle (MODEL_EDIT only)
   actions.push({
     id: 'in_service',
-    label: `W eksploatacji ${inService ? '[✓]' : '[ ]'}`,
+    label: `W eksploatacji ${inService ? '[OK]' : '[ ]'}`,
     enabled: isModelEdit,
     visible: true,
     handler: onToggleInService,
@@ -235,7 +235,7 @@ export function buildBusContextMenu(
 
       baseActions.splice(insertIndex, 0, {
         id: 'connect',
-        label: '▶ Podłącz do szyny',
+        label: 'Podlacz do szyny',
         enabled: true,
         visible: true,
         submenu: connectSubmenu,
@@ -277,7 +277,7 @@ export function buildNetworkModelContextMenu(
   return [
     {
       id: 'add',
-      label: '▶ Dodaj',
+      label: 'Dodaj',
       enabled: isModelEdit,
       visible: true,
       submenu: addSubmenu,
@@ -309,12 +309,12 @@ export function getContextMenuHeader(
   elementName: string
 ): string {
   const typeLabels: Record<ElementType, string> = {
-    Bus: '═══ Szyna',
-    LineBranch: '─── Linia',
-    TransformerBranch: '⊕ Transformator',
-    Switch: '⬡ Łącznik',
-    Source: '⚡ Źródło',
-    Load: '▼ Odbiornik',
+    Bus: 'Szyna',
+    LineBranch: 'Linia',
+    TransformerBranch: 'Transformator',
+    Switch: 'Lacznik',
+    Source: 'Zrodlo',
+    Load: 'Odbiornik',
   };
 
   return `${typeLabels[elementType] || elementType}: ${elementName}`;

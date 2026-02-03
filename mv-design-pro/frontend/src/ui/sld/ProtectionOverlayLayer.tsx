@@ -203,7 +203,7 @@ function ProtectionLabel({
       >
         {/* Ikona stanu */}
         <span className={statusColors.icon}>
-          {summary.verification_status === 'SPELNIONE' ? '✓' : summary.verification_status === 'NIESPELNIONE' ? '!' : '?'}
+          {summary.verification_status === 'SPELNIONE' ? 'OK' : summary.verification_status === 'NIESPELNIONE' ? '!' : '?'}
         </span>
         <span>{statusLabel}</span>
         {summary.margin_pct !== null && summary.margin_pct !== undefined && (
@@ -371,7 +371,7 @@ function ProtectionLegend() {
       </div>
       <div className="space-y-1">
         <div className="flex items-center gap-2 text-[9px]">
-          <span className={`${VERIFICATION_STATUS_COLORS.SPELNIONE.icon}`}>✓</span>
+          <span className={`${VERIFICATION_STATUS_COLORS.SPELNIONE.icon}`}>OK</span>
           <span className="text-slate-600">{VERIFICATION_STATUS_LABELS_PL.SPELNIONE}</span>
         </div>
         <div className="flex items-center gap-2 text-[9px]">
