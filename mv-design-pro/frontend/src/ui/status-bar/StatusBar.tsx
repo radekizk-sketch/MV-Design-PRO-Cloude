@@ -36,21 +36,18 @@ import type { OperatingMode, ResultStatus } from '../types';
 // Status Styling
 // =============================================================================
 
-const MODE_STYLES: Record<OperatingMode, { bg: string; text: string; icon: string }> = {
+const MODE_STYLES: Record<OperatingMode, { bg: string; text: string }> = {
   MODEL_EDIT: {
     bg: 'bg-blue-600',
     text: 'text-white',
-    icon: '[E]',
   },
   CASE_CONFIG: {
     bg: 'bg-purple-600',
     text: 'text-white',
-    icon: '[C]',
   },
   RESULT_VIEW: {
     bg: 'bg-green-600',
     text: 'text-white',
-    icon: '[R]',
   },
 };
 
@@ -81,6 +78,14 @@ interface StatusBarProps {
   validationErrors?: number;
 
   /**
+   * Network statistics (optional).
+   */
+  networkStats?: {
+    nodeCount?: number;
+    branchCount?: number;
+  };
+
+  /**
    * Additional CSS classes.
    */
   className?: string;
@@ -94,6 +99,7 @@ export function StatusBar({
   validationStatus,
   validationWarnings = 0,
   validationErrors = 0,
+  networkStats,
   className,
 }: StatusBarProps) {
   const activeMode = useActiveMode();
@@ -117,14 +123,22 @@ export function StatusBar({
       : snapshotId
     : null;
 
+  // Determine background color based on state
+  const bgStyle = !projectId
+    ? 'bg-amber-900 border-amber-700'  // No project - warning state
+    : !caseId
+      ? 'bg-blue-900 border-blue-700'   // No case - info state
+      : 'bg-gray-800 border-gray-700';  // Normal state
+
   return (
     <div
       data-testid="status-bar"
       className={clsx(
         'flex items-center justify-between h-7 px-4',
-        'bg-gray-800 text-white text-xs',
-        'border-t border-gray-700',
+        'text-white text-xs',
+        'border-t',
         'select-none',
+        bgStyle,
         className
       )}
     >
@@ -135,12 +149,11 @@ export function StatusBar({
           data-testid="status-bar-mode"
           data-mode={activeMode}
           className={clsx(
-            'flex items-center gap-1.5 px-2 py-0.5 rounded text-xs font-medium',
+            'flex items-center px-2 py-0.5 rounded text-xs font-medium',
             modeStyle.bg,
             modeStyle.text
           )}
         >
-          <span>{modeStyle.icon}</span>
           <span>{modeLabel}</span>
         </div>
 
@@ -155,7 +168,7 @@ export function StatusBar({
               {projectName || projectId.substring(0, 8)}
             </span>
           ) : (
-            <span className="text-gray-500 italic">Brak</span>
+            <span className="text-amber-300 font-medium">Nie utworzono</span>
           )}
         </div>
 
@@ -241,6 +254,21 @@ export function StatusBar({
               data-testid="status-bar-result-status"
             >
               <span>{resultStatusLabel}</span>
+            </div>
+          </>
+        )}
+
+        {/* Network Statistics */}
+        {networkStats && (networkStats.nodeCount !== undefined || networkStats.branchCount !== undefined) && (
+          <>
+            <span className="text-gray-600">|</span>
+            <div className="flex items-center gap-3 text-gray-300" data-testid="status-bar-network-stats">
+              {networkStats.nodeCount !== undefined && (
+                <span>Wezly: <span className="font-medium text-white">{networkStats.nodeCount}</span></span>
+              )}
+              {networkStats.branchCount !== undefined && (
+                <span>Galezie: <span className="font-medium text-white">{networkStats.branchCount}</span></span>
+              )}
             </div>
           </>
         )}

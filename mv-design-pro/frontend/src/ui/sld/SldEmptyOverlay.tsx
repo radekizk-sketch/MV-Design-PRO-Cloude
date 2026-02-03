@@ -1,19 +1,20 @@
 /**
- * SLD Empty Overlay — PowerFactory/ETAP Style Empty State
+ * SLD Empty Overlay — PowerFactory/ETAP Style Empty State Banner
  *
  * CANONICAL ALIGNMENT:
  * - powerfactory_ui_parity.md: Layout narzędziowy ZAWSZE renderowany
  * - wizard_screens.md § 2.2: Empty state handling
  *
  * POWERFACTORY/ETAP RULE:
- * > SLD Canvas jest ZAWSZE widoczny (z overlayem jeśli brak modelu)
- * > Brak "pustych ekranów" — widoczne są narzędzia, siatka, toolbar
+ * > SLD Canvas jest ZAWSZE widoczny i DOSTEPNY
+ * > Baner informacyjny NIE BLOKUJE canvasa
+ * > Zoom, pan, zaznaczanie dzialaja pod banerem
  *
  * FEATURES:
- * - Semi-transparent overlay over empty canvas
- * - Informational message in Polish
- * - Hints for user actions
- * - Does NOT hide the canvas, toolbar, or other controls
+ * - Non-blocking informational banner at top of canvas
+ * - Canvas remains fully interactive (zoom, pan, selection)
+ * - Action buttons for case selection/creation
+ * - Polish labels
  *
  * 100% POLISH UI
  */
@@ -37,60 +38,46 @@ export type SldEmptyState =
 // =============================================================================
 
 const EMPTY_STATE_CONFIG: Record<SldEmptyState, {
-  icon: React.ReactNode;
   title: string;
   description: string;
-  hint?: string;
+  bgColor: string;
+  borderColor: string;
+  textColor: string;
 }> = {
   NO_PROJECT: {
-    icon: (
-      <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
-      </svg>
-    ),
     title: 'Brak aktywnego projektu',
-    description: 'Utwórz lub otwórz projekt, aby rozpocząć modelowanie sieci.',
-    hint: 'Przejdź do Plik → Nowy projekt lub Plik → Otwórz projekt',
+    description: 'Utworz lub otworz projekt, aby rozpoczac modelowanie sieci.',
+    bgColor: 'bg-amber-50',
+    borderColor: 'border-amber-200',
+    textColor: 'text-amber-900',
   },
   NO_CASE: {
-    icon: (
-      <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-      </svg>
-    ),
-    title: 'Brak aktywnego przypadku',
-    description: 'Wybierz lub utwórz przypadek obliczeniowy.',
-    hint: 'Kliknij "Zmień przypadek" na pasku narzędzi',
+    title: 'Nie wybrano przypadku obliczeniowego',
+    description: 'Wybierz istniejacy lub utworz nowy przypadek, aby uruchomic obliczenia.',
+    bgColor: 'bg-blue-50',
+    borderColor: 'border-blue-200',
+    textColor: 'text-blue-900',
   },
   NO_SNAPSHOT: {
-    icon: (
-      <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-      </svg>
-    ),
     title: 'Brak aktywnego snapshotu',
-    description: 'Snapshot modelu nie jest aktywny.',
-    hint: 'Wybierz snapshot w drzewie projektu lub utwórz nowy',
+    description: 'Wybierz snapshot w drzewie projektu lub utworz nowy.',
+    bgColor: 'bg-purple-50',
+    borderColor: 'border-purple-200',
+    textColor: 'text-purple-900',
   },
   NO_MODEL: {
-    icon: (
-      <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M13 10V3L4 14h7v7l9-11h-7z" />
-      </svg>
-    ),
     title: 'Pusty model sieci',
-    description: 'Model sieci jest pusty. Dodaj elementy, aby rozpocząć.',
-    hint: 'Użyj paska narzędzi, aby dodać szyny, linie i inne elementy',
+    description: 'Dodaj elementy za pomoca paska narzedzi, aby rozpoczac.',
+    bgColor: 'bg-gray-50',
+    borderColor: 'border-gray-200',
+    textColor: 'text-gray-700',
   },
   LOADING: {
-    icon: (
-      <svg className="w-10 h-10 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-      </svg>
-    ),
-    title: 'Ładowanie...',
-    description: 'Trwa ładowanie danych modelu.',
+    title: 'Ladowanie...',
+    description: 'Trwa ladowanie danych modelu.',
+    bgColor: 'bg-gray-50',
+    borderColor: 'border-gray-200',
+    textColor: 'text-gray-600',
   },
 };
 
@@ -111,19 +98,19 @@ export interface SldEmptyOverlayProps {
   forceShow?: boolean;
 
   /**
-   * Show action button.
+   * Whether there are existing cases to select from.
    */
-  showAction?: boolean;
+  hasCases?: boolean;
 
   /**
-   * Action button label.
+   * Callback to open case selector.
    */
-  actionLabel?: string;
+  onSelectCase?: () => void;
 
   /**
-   * Action button callback.
+   * Callback to create a new case.
    */
-  onAction?: () => void;
+  onCreateCase?: () => void;
 
   /**
    * Additional CSS classes.
@@ -138,9 +125,9 @@ export interface SldEmptyOverlayProps {
 export function SldEmptyOverlay({
   state,
   forceShow = false,
-  showAction = false,
-  actionLabel,
-  onAction,
+  hasCases = false,
+  onSelectCase,
+  onCreateCase,
   className,
 }: SldEmptyOverlayProps) {
   const hasActiveCase = useHasActiveCase();
@@ -162,76 +149,110 @@ export function SldEmptyOverlay({
     return null;
   }
 
+  // For NO_CASE state, show action buttons
+  const showCaseActions = resolvedState === 'NO_CASE' && (onSelectCase || onCreateCase);
+
   return (
     <div
       className={clsx(
-        'absolute inset-0 z-10',
-        'flex items-center justify-center',
-        'bg-gray-100/80 backdrop-blur-[2px]',
-        'pointer-events-auto',
+        'absolute left-0 right-0 top-0 z-10',
+        'pointer-events-none',  // Container doesn't block canvas
+        'p-4',
         className
       )}
       data-testid="sld-empty-overlay"
       data-state={resolvedState}
     >
+      {/* Banner - pointer-events-auto so buttons work */}
       <div
         className={clsx(
-          'bg-white rounded-lg shadow-lg',
-          'px-8 py-6 max-w-md mx-4',
-          'text-center'
+          'pointer-events-auto',
+          'rounded-lg border shadow-sm',
+          'px-4 py-3',
+          'flex items-center justify-between gap-4',
+          config.bgColor,
+          config.borderColor
         )}
       >
-        {/* Icon */}
-        <div className="flex justify-center mb-4 text-gray-400">
-          {config.icon}
+        {/* Left: Message */}
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2">
+            <h3
+              className={clsx('text-sm font-medium', config.textColor)}
+              data-testid="sld-empty-overlay-title"
+            >
+              {config.title}
+            </h3>
+            {activeMode === 'RESULT_VIEW' && (
+              <span className="inline-flex items-center px-2 py-0.5 rounded text-xs bg-green-100 text-green-700">
+                Tryb wynikow
+              </span>
+            )}
+          </div>
+          <p className={clsx('text-sm mt-0.5', config.textColor, 'opacity-80')}>
+            {config.description}
+          </p>
         </div>
 
-        {/* Title */}
-        <h3
-          className="text-lg font-semibold text-gray-800 mb-2"
-          data-testid="sld-empty-overlay-title"
-        >
-          {config.title}
-        </h3>
-
-        {/* Description */}
-        <p className="text-sm text-gray-600 mb-4">
-          {config.description}
-        </p>
-
-        {/* Hint */}
-        {config.hint && (
-          <p className="text-xs text-gray-400 mb-4">
-            {config.hint}
-          </p>
-        )}
-
-        {/* Mode indicator */}
-        {activeMode === 'RESULT_VIEW' && (
-          <div className="mb-4 inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-green-50 text-green-700 text-xs">
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-            </svg>
-            <span>Tryb wyników — tylko do odczytu</span>
+        {/* Right: Action buttons */}
+        {showCaseActions && (
+          <div className="flex items-center gap-2 flex-shrink-0">
+            {hasCases && onSelectCase && (
+              <button
+                type="button"
+                onClick={onSelectCase}
+                className={clsx(
+                  'px-3 py-1.5 text-sm font-medium rounded',
+                  'bg-blue-600 text-white',
+                  'hover:bg-blue-700',
+                  'transition-colors'
+                )}
+                data-testid="sld-empty-overlay-select-case"
+              >
+                Wybierz przypadek
+              </button>
+            )}
+            {!hasCases && onCreateCase && (
+              <button
+                type="button"
+                onClick={onCreateCase}
+                className={clsx(
+                  'px-3 py-1.5 text-sm font-medium rounded',
+                  'bg-blue-600 text-white',
+                  'hover:bg-blue-700',
+                  'transition-colors'
+                )}
+                data-testid="sld-empty-overlay-create-case"
+              >
+                Utworz pierwszy przypadek
+              </button>
+            )}
+            {hasCases && onCreateCase && (
+              <button
+                type="button"
+                onClick={onCreateCase}
+                className={clsx(
+                  'px-3 py-1.5 text-sm font-medium rounded',
+                  'bg-white text-gray-700 border border-gray-300',
+                  'hover:bg-gray-50',
+                  'transition-colors'
+                )}
+                data-testid="sld-empty-overlay-create-new"
+              >
+                Nowy przypadek
+              </button>
+            )}
           </div>
         )}
 
-        {/* Action button */}
-        {showAction && actionLabel && onAction && (
-          <button
-            type="button"
-            onClick={onAction}
-            className={clsx(
-              'px-4 py-2 rounded-md text-sm font-medium',
-              'bg-blue-600 text-white',
-              'hover:bg-blue-700',
-              'focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2',
-              'transition-colors'
-            )}
-            data-testid="sld-empty-overlay-action"
-          >
-            {actionLabel}
-          </button>
+        {/* Loading indicator */}
+        {resolvedState === 'LOADING' && (
+          <div className="flex-shrink-0">
+            <svg className="w-5 h-5 animate-spin text-gray-500" fill="none" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+            </svg>
+          </div>
         )}
       </div>
     </div>

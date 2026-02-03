@@ -1,3 +1,47 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/**
+ * Project Tree Empty Node Styling
+ *
+ * These styles target tree nodes with zero count to display them
+ * in a grayed-out state. Applied via CSS attribute selectors.
+ *
+ * NOTE: These styles will work when tree nodes use data attributes:
+ * - data-empty="true" for nodes with count=0
+ * - Alternatively, using :has() pseudo-class for modern browsers
+ */
+
+@layer components {
+  /* Base tree node styling - nodes with data-empty attribute */
+  [data-testid="project-tree"] [data-empty="true"] {
+    @apply opacity-60;
+  }
+
+  [data-testid="project-tree"] [data-empty="true"] > * {
+    @apply text-gray-400;
+  }
+
+  /* Utility class for empty tree nodes (manual application) */
+  .tree-node-empty {
+    @apply opacity-60 text-gray-400;
+  }
+
+  .tree-node-empty .tree-node-label {
+    @apply text-gray-400;
+  }
+
+  .tree-node-empty .tree-node-count {
+    @apply text-gray-300;
+  }
+
+  /*
+   * CSS-only approach using :has() for nodes with "(0)" text
+   * This targets nodes where the count span contains "(0)"
+   * Browser support: Modern browsers (Chrome 105+, Safari 15.4+, Firefox 121+)
+   */
+  [data-testid^="tree-node-container-"]:has(span:where(:empty, [class*="text-gray-400"]):last-child) {
+    /* This selector is a placeholder - actual implementation depends on DOM structure */
+  }
+}

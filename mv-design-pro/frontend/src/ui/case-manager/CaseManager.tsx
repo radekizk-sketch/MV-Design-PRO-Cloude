@@ -46,10 +46,10 @@ interface CaseManagerProps {
 // Status Styling
 // =============================================================================
 
-const STATUS_ICONS: Record<StudyCaseResultStatus, string> = {
-  NONE: '[ ]',
-  FRESH: '[OK]',
-  OUTDATED: '[!]',
+const STATUS_DOT_COLORS: Record<StudyCaseResultStatus, string> = {
+  NONE: 'bg-gray-400',
+  FRESH: 'bg-green-500',
+  OUTDATED: 'bg-amber-500',
 };
 
 const STATUS_COLORS: Record<StudyCaseResultStatus, string> = {
@@ -569,11 +569,9 @@ function CaseRow({
       </div>
 
       {/* Status */}
-      <div className="w-24 flex items-center gap-1">
-        <span className={clsx('text-sm', STATUS_COLORS[caseItem.result_status])}>
-          {STATUS_ICONS[caseItem.result_status]}
-        </span>
-        <span className="text-xs text-gray-600">
+      <div className="w-24 flex items-center gap-1.5">
+        <span className={clsx('w-2 h-2 rounded-full flex-shrink-0', STATUS_DOT_COLORS[caseItem.result_status])} />
+        <span className={clsx('text-xs', STATUS_COLORS[caseItem.result_status])}>
           {RESULT_STATUS_LABELS[caseItem.result_status]}
         </span>
       </div>

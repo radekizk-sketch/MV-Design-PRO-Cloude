@@ -285,7 +285,7 @@ export function PropertyGridMultiEdit({
       {blockedMessage && mode !== 'RESULT_VIEW' && (
         <div className="bg-yellow-50 border-b border-yellow-200 px-4 py-3">
           <div className="flex items-center gap-2 text-xs text-yellow-800">
-            <span className="font-bold">[!]</span>
+            <span className="w-2 h-2 rounded-full bg-amber-500 flex-shrink-0" />
             <span>{blockedMessage}</span>
           </div>
         </div>
@@ -296,7 +296,7 @@ export function PropertyGridMultiEdit({
         <div className="bg-blue-50 border-b border-blue-200 px-4 py-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2 text-xs text-blue-800">
-              <span className="font-bold">[*]</span>
+              <span className="w-2 h-2 rounded-full bg-blue-500 flex-shrink-0" />
               <span>Niezapisane zmiany: {draftChanges.size} {
                 draftChanges.size === 1 ? 'pole' :
                 (draftChanges.size >= 2 && draftChanges.size <= 4) ? 'pola' : 'pól'

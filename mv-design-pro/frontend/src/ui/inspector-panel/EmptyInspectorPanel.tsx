@@ -48,6 +48,17 @@ export interface EmptyInspectorPanelProps {
   isReadOnly?: boolean;
 
   /**
+   * Network statistics for summary display.
+   */
+  networkStats?: {
+    nodeCount?: number;
+    branchCount?: number;
+    transformerCount?: number;
+    loadCount?: number;
+    sourceCount?: number;
+  };
+
+  /**
    * Additional CSS classes.
    */
   className?: string;
@@ -60,10 +71,19 @@ export interface EmptyInspectorPanelProps {
 export function EmptyInspectorPanel({
   selectedElement,
   isReadOnly = false,
+  networkStats,
   className,
 }: EmptyInspectorPanelProps) {
-  // No selection state
+  // No selection state - show network summary
   if (!selectedElement) {
+    const hasStats = networkStats && (
+      networkStats.nodeCount !== undefined ||
+      networkStats.branchCount !== undefined ||
+      networkStats.transformerCount !== undefined ||
+      networkStats.loadCount !== undefined ||
+      networkStats.sourceCount !== undefined
+    );
+
     return (
       <div
         className={clsx(
@@ -72,39 +92,59 @@ export function EmptyInspectorPanel({
         )}
         data-testid="inspector-panel-empty"
       >
-        {/* Header */}
-        <div className="px-4 py-3 border-b border-gray-200 bg-gray-50">
-          <p className="text-xs font-medium uppercase tracking-wide text-gray-400">
-            Właściwości
-          </p>
-        </div>
+        {/* Network summary content */}
+        <div className="flex-1 p-4 space-y-4">
+          {/* Section header */}
+          <h3 className="text-xs font-medium text-gray-500 uppercase tracking-wide">
+            Podsumowanie sieci
+          </h3>
 
-        {/* Empty state content */}
-        <div className="flex-1 flex flex-col items-center justify-center p-6 text-center">
-          {/* Icon */}
-          <div className="w-16 h-16 rounded-full bg-gray-100 flex items-center justify-center mb-4">
-            <svg
-              className="w-8 h-8 text-gray-400"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={1.5}
-                d="M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5M7.188 2.239l.777 2.897M5.136 7.965l-2.898-.777M13.95 4.05l-2.122 2.122m-5.657 5.656l-2.12 2.122"
-              />
-            </svg>
+          {/* Stats grid */}
+          {hasStats ? (
+            <div className="space-y-2 text-sm">
+              {networkStats.nodeCount !== undefined && (
+                <div className="flex justify-between items-center py-1 border-b border-gray-100">
+                  <span className="text-gray-500">Wezly</span>
+                  <span className="font-medium text-gray-900">{networkStats.nodeCount}</span>
+                </div>
+              )}
+              {networkStats.branchCount !== undefined && (
+                <div className="flex justify-between items-center py-1 border-b border-gray-100">
+                  <span className="text-gray-500">Galezie</span>
+                  <span className="font-medium text-gray-900">{networkStats.branchCount}</span>
+                </div>
+              )}
+              {networkStats.transformerCount !== undefined && (
+                <div className="flex justify-between items-center py-1 border-b border-gray-100">
+                  <span className="text-gray-500">Transformatory</span>
+                  <span className="font-medium text-gray-900">{networkStats.transformerCount}</span>
+                </div>
+              )}
+              {networkStats.loadCount !== undefined && (
+                <div className="flex justify-between items-center py-1 border-b border-gray-100">
+                  <span className="text-gray-500">Obciazenia</span>
+                  <span className="font-medium text-gray-900">{networkStats.loadCount}</span>
+                </div>
+              )}
+              {networkStats.sourceCount !== undefined && (
+                <div className="flex justify-between items-center py-1 border-b border-gray-100">
+                  <span className="text-gray-500">Zrodla</span>
+                  <span className="font-medium text-gray-900">{networkStats.sourceCount}</span>
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="text-sm text-gray-400 italic">
+              Brak elementow w sieci
+            </div>
+          )}
+
+          {/* Help text */}
+          <div className="pt-4 border-t border-gray-100">
+            <p className="text-xs text-gray-400">
+              Kliknij element na schemacie lub w drzewie projektu, aby zobaczyc jego wlasciwosci.
+            </p>
           </div>
-
-          {/* Message */}
-          <p className="text-sm font-medium text-gray-600 mb-2">
-            Brak zaznaczenia
-          </p>
-          <p className="text-xs text-gray-400 max-w-[200px]">
-            Kliknij element na schemacie lub w drzewie projektu, aby zobaczyć jego właściwości.
-          </p>
         </div>
 
         {/* Mode indicator */}
@@ -114,7 +154,7 @@ export function EmptyInspectorPanel({
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
               </svg>
-              <span>Tryb wyników — tylko do odczytu</span>
+              <span>Tryb wynikow — tylko do odczytu</span>
             </div>
           </div>
         )}
@@ -134,12 +174,9 @@ export function EmptyInspectorPanel({
       data-testid="inspector-panel-preview"
       data-selection-id={selectedElement.id}
     >
-      {/* Header */}
+      {/* Element name header */}
       <div className="px-4 py-3 border-b border-gray-200 bg-gray-50">
-        <p className="text-xs font-medium uppercase tracking-wide text-gray-400">
-          Właściwości
-        </p>
-        <h3 className="text-sm font-semibold text-gray-800 mt-1" data-testid="inspector-title">
+        <h3 className="text-sm font-semibold text-gray-800" data-testid="inspector-title">
           {selectedElement.name || selectedElement.id}
         </h3>
       </div>

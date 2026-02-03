@@ -23,16 +23,10 @@ import {
 // Status Icons and Colors
 // =============================================================================
 
-const STATUS_ICONS: Record<StudyCaseResultStatus, string> = {
-  NONE: '[ ]',
-  FRESH: '[OK]',
-  OUTDATED: '[!]',
-};
-
-const STATUS_COLORS: Record<StudyCaseResultStatus, string> = {
-  NONE: 'text-gray-400',
-  FRESH: 'text-green-500',
-  OUTDATED: 'text-amber-500',
+const STATUS_DOT_COLORS: Record<StudyCaseResultStatus, string> = {
+  NONE: 'bg-gray-400',
+  FRESH: 'bg-green-500',
+  OUTDATED: 'bg-amber-500',
 };
 
 // =============================================================================
@@ -201,13 +195,11 @@ function StudyCaseListItem({
         )}
       </span>
 
-      {/* Status icon */}
+      {/* Status dot */}
       <span
-        className={clsx('mr-2', STATUS_COLORS[caseItem.result_status])}
+        className={clsx('mr-2 w-2 h-2 rounded-full flex-shrink-0', STATUS_DOT_COLORS[caseItem.result_status])}
         title={RESULT_STATUS_TOOLTIPS[caseItem.result_status]}
-      >
-        {STATUS_ICONS[caseItem.result_status]}
-      </span>
+      />
 
       {/* Name */}
       <span className="flex-1 text-sm truncate" title={caseItem.name}>

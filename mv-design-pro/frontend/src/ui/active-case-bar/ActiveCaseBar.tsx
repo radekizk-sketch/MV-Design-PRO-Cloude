@@ -40,10 +40,10 @@ const RESULT_STATUS_COLORS: Record<ResultStatus, string> = {
   OUTDATED: 'text-amber-700 bg-amber-100',
 };
 
-const RESULT_STATUS_ICONS: Record<ResultStatus, string> = {
-  NONE: '[ ]',
-  FRESH: '[OK]',
-  OUTDATED: '[!]',
+const RESULT_STATUS_DOTS: Record<ResultStatus, string> = {
+  NONE: 'bg-gray-400',
+  FRESH: 'bg-green-500',
+  OUTDATED: 'bg-amber-500',
 };
 
 // =============================================================================
@@ -158,7 +158,7 @@ export function ActiveCaseBar({
               )}
               title={resultStatusLabel}
             >
-              <span>{RESULT_STATUS_ICONS[resultStatus]}</span>
+              <span className={clsx('w-2 h-2 rounded-full', RESULT_STATUS_DOTS[resultStatus])} />
               <span>{resultStatusLabel}</span>
             </div>
           </>
@@ -265,32 +265,28 @@ function ModeIndicator({ mode }: ModeIndicatorProps) {
     MODEL_EDIT: {
       label: 'Edycja modelu',
       color: 'text-blue-700 bg-blue-50 border-blue-200',
-      icon: '[E]',
     },
     CASE_CONFIG: {
       label: 'Konfiguracja',
       color: 'text-purple-700 bg-purple-50 border-purple-200',
-      icon: '[C]',
     },
     RESULT_VIEW: {
       label: 'Wyniki',
       color: 'text-green-700 bg-green-50 border-green-200',
-      icon: '[R]',
     },
   };
 
-  const { label, color, icon } = config[mode];
+  const { label, color } = config[mode];
 
   return (
     <div
       data-testid="mode-indicator"
       data-mode={mode}
       className={clsx(
-        'flex items-center gap-1.5 px-2 py-1 rounded border text-xs font-medium',
+        'flex items-center px-2 py-1 rounded border text-xs font-medium',
         color
       )}
     >
-      <span>{icon}</span>
       <span>{label}</span>
     </div>
   );

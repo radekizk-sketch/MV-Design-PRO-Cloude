@@ -122,6 +122,9 @@ export const SLDView: React.FC<SLDViewProps> = ({
   const [exportDialogOpen, setExportDialogOpen] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
 
+  // Legend visibility state (hidden by default, toggleable)
+  const [legendVisible, setLegendVisible] = useState(false);
+
   // Use external selection if provided, otherwise use store
   const selectedElement = externalSelectedElement !== undefined ? externalSelectedElement : storeSelectedElement;
 
@@ -778,8 +781,23 @@ export const SLDView: React.FC<SLDViewProps> = ({
           showLegend={true}
         />
 
-        {/* Switching state & energization legend (base layer) */}
-        <SwitchingStateLegend visible={true} />
+        {/* Switching state & energization legend (toggled via button) */}
+        <SwitchingStateLegend visible={legendVisible} />
+
+        {/* Legend toggle button (bottom-left corner) */}
+        <button
+          type="button"
+          onClick={() => setLegendVisible((prev) => !prev)}
+          className={`absolute bottom-3 left-3 z-10 px-3 py-1.5 text-xs font-medium rounded shadow-sm transition-colors ${
+            legendVisible
+              ? 'bg-blue-600 text-white hover:bg-blue-700'
+              : 'bg-white border border-gray-300 text-gray-700 hover:bg-gray-50'
+          }`}
+          title={legendVisible ? 'Ukryj legende' : 'Pokaz legende'}
+          data-testid="sld-legend-toggle"
+        >
+          {legendVisible ? 'Ukryj legende' : 'Legenda'}
+        </button>
 
         {/* PR-SLD-06: Diagnostic results layer (only in WYNIKI mode) */}
         {isResultsMode && (

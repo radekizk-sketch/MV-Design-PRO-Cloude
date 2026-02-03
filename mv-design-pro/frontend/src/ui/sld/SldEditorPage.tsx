@@ -275,9 +275,9 @@ export const SldEditorPage: React.FC<SldEditorPageProps> = ({
         {emptyState && (
           <SldEmptyOverlay
             state={emptyState}
-            showAction={emptyState === 'NO_CASE'}
-            actionLabel="Wybierz przypadek"
-            onAction={handleEmptyAction}
+            hasCases={false}  // TODO: Pass actual case count when available
+            onSelectCase={handleEmptyAction}
+            onCreateCase={handleEmptyAction}
           />
         )}
       </div>

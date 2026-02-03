@@ -731,9 +731,7 @@ function SummaryTab() {
           <ul className="space-y-1 text-sm text-amber-700">
             {networkVerdict.problems.slice(0, 10).map((problem, idx) => (
               <li key={`${problem.element_id}-${idx}`} className="flex items-start gap-2">
-                <span className={problem.severity === 'FAIL' ? 'text-rose-600' : 'text-amber-600'}>
-                  {problem.severity === 'FAIL' ? '[X]' : '[!]'}
-                </span>
+                <span className={`w-2 h-2 mt-1.5 rounded-full flex-shrink-0 ${problem.severity === 'FAIL' ? 'bg-rose-500' : 'bg-amber-500'}`} />
                 {problem.description}
               </li>
             ))}

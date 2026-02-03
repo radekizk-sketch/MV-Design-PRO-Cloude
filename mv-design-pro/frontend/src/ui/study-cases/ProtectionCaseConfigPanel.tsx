@@ -235,7 +235,7 @@ export function ProtectionCaseConfigPanel({
               : 'bg-amber-50 text-amber-700 border border-amber-200'
           )}
         >
-          {isLibraryConsistent ? 'Zgodne z biblioteka' : '[!] Biblioteka zmieniona'}
+          {isLibraryConsistent ? 'Zgodne z biblioteka' : 'Biblioteka zmieniona'}
         </div>
       )}
 
