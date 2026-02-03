@@ -132,7 +132,7 @@ export function BatchEditPreviewDialog({
           <div className="text-sm text-gray-600">
             {preview.hasErrors ? (
               <span className="text-red-600 font-medium">
-                [!] Nie mozna zastosowac zmian z bledami
+                Nie mozna zastosowac zmian z bledami
               </span>
             ) : (
               <span>

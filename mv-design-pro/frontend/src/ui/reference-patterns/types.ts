@@ -172,11 +172,11 @@ export const CHECK_STATUS_COLORS: Record<CheckStatus, string> = {
   INFO: 'bg-slate-100 text-slate-600',
 };
 
-export const CHECK_STATUS_ICONS: Record<CheckStatus, string> = {
-  PASS: '[OK]',
-  FAIL: '[X]',
-  WARN: '[!]',
-  INFO: '[i]',
+export const CHECK_STATUS_DOT_COLORS: Record<CheckStatus, string> = {
+  PASS: 'bg-emerald-500',
+  FAIL: 'bg-rose-500',
+  WARN: 'bg-amber-500',
+  INFO: 'bg-slate-400',
 };
 
 export const TAB_LABELS_PL: Record<ReferencePatternsTab, string> = {

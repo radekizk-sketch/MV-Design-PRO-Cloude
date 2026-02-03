@@ -28,7 +28,7 @@ import {
   VERDICT_LABELS_PL,
   VERDICT_COLORS,
   CHECK_STATUS_COLORS,
-  CHECK_STATUS_ICONS,
+  CHECK_STATUS_DOT_COLORS,
   TAB_LABELS_PL,
 } from './types';
 import {
@@ -509,8 +509,8 @@ function ChecksTable() {
                 {check.name_pl}
               </td>
               <td className="border-b border-slate-100 px-4 py-2">
-                <span className={`inline-flex items-center gap-1 rounded px-2 py-1 text-xs font-medium ${CHECK_STATUS_COLORS[check.status]}`}>
-                  <span>{CHECK_STATUS_ICONS[check.status]}</span>
+                <span className={`inline-flex items-center gap-1.5 rounded px-2 py-1 text-xs font-medium ${CHECK_STATUS_COLORS[check.status]}`}>
+                  <span className={`w-2 h-2 rounded-full ${CHECK_STATUS_DOT_COLORS[check.status]}`} />
                   {check.status_pl}
                 </span>
               </td>

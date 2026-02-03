@@ -36,21 +36,18 @@ import type { OperatingMode, ResultStatus } from '../types';
 // Status Styling
 // =============================================================================
 
-const MODE_STYLES: Record<OperatingMode, { bg: string; text: string; icon: string }> = {
+const MODE_STYLES: Record<OperatingMode, { bg: string; text: string }> = {
   MODEL_EDIT: {
     bg: 'bg-blue-600',
     text: 'text-white',
-    icon: '[E]',
   },
   CASE_CONFIG: {
     bg: 'bg-purple-600',
     text: 'text-white',
-    icon: '[C]',
   },
   RESULT_VIEW: {
     bg: 'bg-green-600',
     text: 'text-white',
-    icon: '[R]',
   },
 };
 
@@ -135,12 +132,11 @@ export function StatusBar({
           data-testid="status-bar-mode"
           data-mode={activeMode}
           className={clsx(
-            'flex items-center gap-1.5 px-2 py-0.5 rounded text-xs font-medium',
+            'flex items-center px-2 py-0.5 rounded text-xs font-medium',
             modeStyle.bg,
             modeStyle.text
           )}
         >
-          <span>{modeStyle.icon}</span>
           <span>{modeLabel}</span>
         </div>
 

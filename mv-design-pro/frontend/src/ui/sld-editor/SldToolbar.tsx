@@ -337,7 +337,7 @@ export const SldToolbar: React.FC = () => {
         <>
           <ToolbarDivider />
           <div className="text-xs text-amber-600 font-medium">
-            [!] Edycja niedostepna w trybie wynikow
+            Edycja niedostepna w trybie wynikow
           </div>
         </>
       )}
