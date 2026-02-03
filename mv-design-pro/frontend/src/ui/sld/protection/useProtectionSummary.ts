@@ -1,15 +1,15 @@
 /**
- * useProtectionSummary — Hook do pobierania danych zabezpieczen dla elementow SLD
+ * useProtectionSummary — Funkcja pomocnicza do pobierania danych zabezpieczen dla elementow SLD
  *
  * PR-SLD-09: Widok zabezpieczeniowy (nastawy i kryteria)
  *
  * CANONICAL ALIGNMENT:
- * - sld_rules.md § B: Read-only overlay
+ * - sld_rules.md § B: Warstwa nakladkowa tylko do odczytu
  * - Brak nowych obliczen — tylko interpretacja istniejacych danych
  *
- * FEATURES:
+ * CECHY:
  * - Pobiera dane zabezpieczen dla elementu
- * - Fixture data dla demonstracji (docelowo API)
+ * - Dane demonstracyjne (docelowo API)
  * - Deterministyczne mapowanie elementId -> ProtectionSummary
  *
  * 100% POLISH UI
@@ -23,11 +23,11 @@ import type {
 } from './types';
 
 // =============================================================================
-// FIXTURE DATA — dane demonstracyjne
+// DANE DEMONSTRACYJNE
 // =============================================================================
 
 /**
- * Fixture: nastawy nadpradowe dla linii SN.
+ * Dane demonstracyjne: nastawy nadpradowe dla linii SN.
  */
 const FIXTURE_LINE_OC_SETTINGS: OvercurrentProtectionSettings = {
   time_overcurrent: {
@@ -46,7 +46,7 @@ const FIXTURE_LINE_OC_SETTINGS: OvercurrentProtectionSettings = {
 };
 
 /**
- * Fixture: nastawy nadpradowe dla transformatora.
+ * Dane demonstracyjne: nastawy nadpradowe dla transformatora.
  */
 const FIXTURE_TRAFO_OC_SETTINGS: OvercurrentProtectionSettings = {
   time_overcurrent: {
@@ -65,7 +65,7 @@ const FIXTURE_TRAFO_OC_SETTINGS: OvercurrentProtectionSettings = {
 };
 
 /**
- * Fixture: przekladnik dla linii.
+ * Dane demonstracyjne: przekladnik dla linii.
  */
 const FIXTURE_LINE_CT: CurrentTransformerInfo = {
   primary_a: 200,
@@ -74,7 +74,7 @@ const FIXTURE_LINE_CT: CurrentTransformerInfo = {
 };
 
 /**
- * Fixture: przekladnik dla transformatora.
+ * Dane demonstracyjne: przekladnik dla transformatora.
  */
 const FIXTURE_TRAFO_CT: CurrentTransformerInfo = {
   primary_a: 400,
@@ -83,7 +83,7 @@ const FIXTURE_TRAFO_CT: CurrentTransformerInfo = {
 };
 
 /**
- * Mapa fixture danych zabezpieczen dla elementow.
+ * Mapa danych demonstracyjnych zabezpieczen dla elementow.
  * DETERMINISTYCZNE: staly zestaw dla powtarzalnosci.
  */
 const FIXTURE_PROTECTION_DATA: Map<string, ProtectionSummary> = new Map([
@@ -188,16 +188,16 @@ const FIXTURE_PROTECTION_DATA: Map<string, ProtectionSummary> = new Map([
 ]);
 
 // =============================================================================
-// HOOKS
+// FUNKCJE POMOCNICZE REACT
 // =============================================================================
 
 /**
- * Hook: Pobierz podsumowanie zabezpieczenia dla elementu.
+ * Funkcja pomocnicza: Pobierz podsumowanie zabezpieczenia dla elementu.
  *
  * @param elementId - ID elementu sieci
  * @returns ProtectionSummary lub null jesli brak danych
  *
- * BINDING: Read-only, brak mutacji.
+ * WIAZANIE: Tylko odczyt, brak mutacji.
  */
 export function useProtectionSummary(elementId: string | null): ProtectionSummary | null {
   return useMemo(() => {
@@ -207,18 +207,18 @@ export function useProtectionSummary(elementId: string | null): ProtectionSummar
 }
 
 /**
- * Hook: Pobierz wszystkie elementy z danymi zabezpieczen.
+ * Funkcja pomocnicza: Pobierz wszystkie elementy z danymi zabezpieczen.
  *
  * @returns Mapa elementId -> ProtectionSummary
  *
- * BINDING: Read-only, deterministyczne.
+ * WIAZANIE: Tylko odczyt, deterministyczne.
  */
 export function useAllProtectionSummaries(): Map<string, ProtectionSummary> {
   return useMemo(() => FIXTURE_PROTECTION_DATA, []);
 }
 
 /**
- * Hook: Sprawdz czy element ma dane zabezpieczen.
+ * Funkcja pomocnicza: Sprawdz czy element ma dane zabezpieczen.
  *
  * @param elementId - ID elementu sieci
  * @returns true jesli element ma dane zabezpieczen
@@ -232,7 +232,7 @@ export function useHasProtectionData(elementId: string | null): boolean {
 }
 
 /**
- * Hook: Pobierz statystyki zabezpieczen dla calego schematu.
+ * Funkcja pomocnicza: Pobierz statystyki zabezpieczen dla calego schematu.
  *
  * @returns Obiekt ze statystykami
  */
@@ -277,12 +277,12 @@ export function useProtectionStatistics(): {
 }
 
 // =============================================================================
-// SELEKTOR FUNKCJA
+// FUNKCJA WYBORU
 // =============================================================================
 
 /**
- * Selektor: Pobierz ProtectionSummary dla elementId.
- * Uzywany bezposrednio (bez hooka) gdy potrzebny w useMemo.
+ * Funkcja wyboru: Pobierz ProtectionSummary dla elementId.
+ * Uzywana bezposrednio (bez funkcji pomocniczej) gdy potrzebna w useMemo.
  *
  * @param elementId - ID elementu sieci
  * @returns ProtectionSummary lub null

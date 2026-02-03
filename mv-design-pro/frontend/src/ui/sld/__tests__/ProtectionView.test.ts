@@ -1,17 +1,17 @@
 /**
- * PROTECTION VIEW TESTS — PR-SLD-09
+ * TESTY WIDOKU ZABEZPIECZENIOWEGO — PR-SLD-09
  *
  * Testy widoku zabezpieczeniowego SLD.
  *
  * CANONICAL ALIGNMENT:
- * - sld_rules.md § B: Overlay as read-only layer
+ * - sld_rules.md § B: Warstwa nakladkowa tylko do odczytu
  * - 100% POLISH UI
  *
- * TEST COVERAGE:
+ * ZAKRES TESTOW:
  * - Tryb ZABEZPIECZENIA (przelaczanie, read-only)
  * - Warstwa zabezpieczen (widocznosc)
- * - URL persistence
- * - Dane zabezpieczen (selektory)
+ * - Utrwalanie stanu w adresie URL
+ * - Dane zabezpieczen (funkcje wyboru)
  * - Deterministycznosc
  */
 
@@ -238,10 +238,10 @@ describe('Protection View (PR-SLD-09)', () => {
   });
 
   // =============================================================================
-  // DERIVED HOOKS
+  // POCHODNE FUNKCJE POMOCNICZE
   // =============================================================================
 
-  describe('Derived Hooks', () => {
+  describe('Pochodne funkcje pomocnicze', () => {
     describe('useIsProtectionMode', () => {
       it('should return true when in ZABEZPIECZENIA mode', () => {
         const store = useSldModeStore.getState();
@@ -305,10 +305,10 @@ describe('Protection View (PR-SLD-09)', () => {
 });
 
 // =============================================================================
-// PROTECTION DATA SELECTORS
+// FUNKCJE WYBORU DANYCH ZABEZPIECZEN
 // =============================================================================
 
-describe('Protection Data Selectors', () => {
+describe('Funkcje wyboru danych zabezpieczen', () => {
   describe('useProtectionSummary', () => {
     it('should return null for null elementId', () => {
       const { result } = renderHook(() => useProtectionSummary(null));
@@ -408,10 +408,10 @@ describe('Protection Data Selectors', () => {
 });
 
 // =============================================================================
-// DETERMINISM TESTS
+// TESTY DETERMINISTYCZNOSCI
 // =============================================================================
 
-describe('Determinism', () => {
+describe('Deterministycznosc', () => {
   it('should return same protection data for same elementId', () => {
     const { result: result1 } = renderHook(() => useProtectionSummary('line-001'));
     const { result: result2 } = renderHook(() => useProtectionSummary('line-001'));
@@ -438,10 +438,10 @@ describe('Determinism', () => {
 });
 
 // =============================================================================
-// READ-ONLY ENFORCEMENT
+// WYMUSZENIE TRYBU TYLKO DO ODCZYTU
 // =============================================================================
 
-describe('Read-Only Enforcement', () => {
+describe('Wymuszenie trybu tylko do odczytu', () => {
   it('should not provide mutation methods in protection summary', () => {
     const { result } = renderHook(() => useProtectionSummary('line-001'));
 

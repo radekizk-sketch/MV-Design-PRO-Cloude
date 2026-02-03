@@ -1,19 +1,19 @@
 /**
  * ProtectionOverlayLayer — PR-SLD-09
  *
- * Warstwa overlay z nastawami zabezpieczen i statusem weryfikacji.
+ * Warstwa nakladkowa z nastawami zabezpieczen i stanem weryfikacji.
  *
  * CANONICAL ALIGNMENT:
- * - sld_rules.md § B: Overlay as separate layer (never modifies model)
- * - powerfactory_ui_parity.md: Presentation of protection settings
+ * - sld_rules.md § B: Warstwa nakladkowa jako osobna warstwa (nie modyfikuje modelu)
+ * - powerfactory_ui_parity.md: Prezentacja nastaw zabezpieczen
  *
- * FEATURES:
+ * CECHY:
  * - Etykiety nastaw nadpradowych (I>, I>>, czas)
- * - Status weryfikacji kryterium
+ * - Stan weryfikacji kryterium
  * - Przekladnik (jesli dostepny)
  * - Deterministyczne pozycjonowanie
  *
- * RULES:
+ * ZASADY:
  * - 100% READ-ONLY
  * - Brak edycji, brak formularzy
  * - Neutralne kolory (bez czerwieni/zieleni alarmowej)
@@ -33,7 +33,7 @@ import {
 } from './protection';
 
 // =============================================================================
-// Constants
+// STALE
 // =============================================================================
 
 /**
@@ -48,7 +48,7 @@ const LABEL_OFFSET_Y = -20;
 const LABEL_MAX_WIDTH = 180;
 
 // =============================================================================
-// ProtectionLabel Component
+// KOMPONENT ProtectionLabel
 // =============================================================================
 
 interface ProtectionLabelProps {
@@ -193,7 +193,7 @@ function ProtectionLabel({
         ))}
       </div>
 
-      {/* Status weryfikacji */}
+      {/* Stan weryfikacji */}
       <div
         className={`
           mt-1 pt-1 border-t border-slate-200
@@ -201,7 +201,7 @@ function ProtectionLabel({
           text-[9px] ${statusColors.text}
         `}
       >
-        {/* Ikona statusu */}
+        {/* Ikona stanu */}
         <span className={statusColors.icon}>
           {summary.verification_status === 'SPELNIONE' ? '✓' : summary.verification_status === 'NIESPELNIONE' ? '!' : '?'}
         </span>
@@ -217,7 +217,7 @@ function ProtectionLabel({
 }
 
 // =============================================================================
-// ProtectionOverlayLayer Component
+// KOMPONENT ProtectionOverlayLayer
 // =============================================================================
 
 export interface ProtectionOverlayLayerProps {
@@ -230,7 +230,7 @@ export interface ProtectionOverlayLayerProps {
   /** ID zaznaczonego elementu */
   selectedElementId?: string | null;
 
-  /** Czy overlay widoczny */
+  /** Czy warstwa widoczna */
   visible: boolean;
 
   /** Callback przy kliknieciu etykiety */
@@ -238,9 +238,9 @@ export interface ProtectionOverlayLayerProps {
 }
 
 /**
- * Warstwa overlay z nastawami zabezpieczen.
+ * Warstwa nakladkowa z nastawami zabezpieczen.
  *
- * BINDING:
+ * WIAZANIE:
  * - 100% READ-ONLY
  * - Deterministyczne pozycjonowanie
  * - Neutralne kolory
@@ -354,7 +354,7 @@ export function ProtectionOverlayLayer({
 }
 
 // =============================================================================
-// ProtectionLegend Component
+// KOMPONENT ProtectionLegend
 // =============================================================================
 
 /**

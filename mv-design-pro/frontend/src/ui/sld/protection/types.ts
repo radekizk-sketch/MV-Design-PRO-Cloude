@@ -1,11 +1,11 @@
 /**
- * Protection View Types — PR-SLD-09
+ * Typy widoku zabezpieczeniowego — PR-SLD-09
  *
  * Typy dla widoku zabezpieczeniowego SLD.
  * INTERPRETACJA DANYCH — brak nowych obliczen, tylko prezentacja.
  *
  * CANONICAL ALIGNMENT:
- * - sld_rules.md § B: Overlay as read-only layer
+ * - sld_rules.md § B: Warstwa nakladkowa tylko do odczytu
  * - Brak anglicyzmow w UI
  *
  * 100% POLISH UI
@@ -39,7 +39,7 @@ export const OC_CHARACTERISTIC_LABELS_PL: Record<OvercurrentCharacteristicType, 
 };
 
 // =============================================================================
-// STATUS WERYFIKACJI
+// STAN WERYFIKACJI
 // =============================================================================
 
 /**
@@ -149,14 +149,14 @@ export interface CurrentTransformerInfo {
 }
 
 // =============================================================================
-// SUMMARY DLA ELEMENTU
+// PODSUMOWANIE DLA ELEMENTU
 // =============================================================================
 
 /**
  * Podsumowanie zabezpieczenia dla elementu SLD.
- * Dane prezentowane na overlay i w inspektorze.
+ * Dane prezentowane na warstwie nakladkowej i w inspektorze.
  *
- * BINDING: Tylko interpretacja istniejacych danych.
+ * WIAZANIE: Tylko interpretacja istniejacych danych.
  */
 export interface ProtectionSummary {
   /** ID elementu sieci (bijection z SldSymbol.elementId) */
