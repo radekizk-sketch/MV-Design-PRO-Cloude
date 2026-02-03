@@ -7,7 +7,7 @@ services:
       dockerfile: Dockerfile
     container_name: mv-design-pro-backend
     ports:
-      - "8000:8000"
+      - "18000:8000"
     environment:
       - DATABASE_URL=postgresql+psycopg://mvdesign:mvdesign_secret@postgres:5432/mvdesign_db
       - MONGODB_URL=mongodb://mongodb:27017/mvdesign_db
