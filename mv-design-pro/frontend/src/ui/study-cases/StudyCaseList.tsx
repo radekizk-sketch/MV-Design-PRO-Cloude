@@ -29,12 +29,6 @@ const STATUS_DOT_COLORS: Record<StudyCaseResultStatus, string> = {
   OUTDATED: 'bg-amber-500',
 };
 
-const STATUS_COLORS: Record<StudyCaseResultStatus, string> = {
-  NONE: 'text-gray-400',
-  FRESH: 'text-green-500',
-  OUTDATED: 'text-amber-500',
-};
-
 // =============================================================================
 // Component Props
 // =============================================================================
