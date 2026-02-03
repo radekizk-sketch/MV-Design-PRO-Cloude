@@ -2,6 +2,7 @@
  * useSldInspectorSelection — Hook do zarządzania selekcją inspektora SLD
  *
  * PR-SLD-07: Inspektor elementu / połączenia (panel boczny, read-only)
+ * PR-SLD-09: Sekcja "Zabezpieczenia" w trybie ZABEZPIECZENIA
  *
  * CANONICAL ALIGNMENT:
  * - sld_rules.md § G.1: Synchronizacja selection SLD ↔ Tree ↔ Inspector
@@ -12,6 +13,7 @@
  * - Subskrypcja na SldEditorStore (symbole)
  * - Obsługa selekcji elementów i połączeń
  * - Dane tylko do odczytu (brak mutacji)
+ * - PR-SLD-09: Sekcja "Zabezpieczenia" gdy tryb ZABEZPIECZENIA
  *
  * 100% POLISH UI
  */
@@ -20,6 +22,12 @@ import { useMemo, useCallback } from 'react';
 import { useSelectionStore } from '../../selection/store';
 import { useSldEditorStore } from '../../sld-editor/SldEditorStore';
 import { useSldModeStore, type SldMode } from '../sldModeStore';
+import {
+  selectProtectionSummaryByElementId,
+  type ProtectionSummary,
+  OC_CHARACTERISTIC_LABELS_PL,
+  VERIFICATION_STATUS_LABELS_PL,
+} from '../protection';
 import type {
   InspectorSelection,
   InspectorElementSelection,
@@ -60,11 +68,14 @@ export interface UseSldInspectorSelectionResult {
   /** Sekcje właściwości do wyświetlenia */
   sections: InspectorPropertySection[];
 
-  /** Tryb SLD (EDYCJA / WYNIKI) */
+  /** Tryb SLD (EDYCJA / WYNIKI / ZABEZPIECZENIA) */
   mode: SldMode;
 
   /** Czy tryb WYNIKI */
   isResultsMode: boolean;
+
+  /** Czy tryb ZABEZPIECZENIA (PR-SLD-09) */
+  isProtectionMode: boolean;
 
   /** Zamknij inspektor (wyczyść selekcję) */
   closeInspector: () => void;
@@ -74,6 +85,9 @@ export interface UseSldInspectorSelectionResult {
 
   /** Dane wyników (dostępne w trybie WYNIKI) */
   results: InspectorResultData | null;
+
+  /** Dane zabezpieczeń (dostępne w trybie ZABEZPIECZENIA, PR-SLD-09) */
+  protection: ProtectionSummary | null;
 }
 
 // =============================================================================
@@ -564,6 +578,162 @@ function buildElementSections(
 }
 
 // =============================================================================
+// SEKCJE ZABEZPIECZEŃ (PR-SLD-09)
+// =============================================================================
+
+/**
+ * Buduje sekcje zabezpieczeń dla elementu.
+ * PR-SLD-09: Wyswietlane gdy tryb ZABEZPIECZENIA i dane istnieja.
+ */
+function buildProtectionSections(
+  protection: ProtectionSummary
+): InspectorPropertySection[] {
+  const sections: InspectorPropertySection[] = [];
+
+  // Sekcja: Zabezpieczenie nadpradowe I> (51)
+  if (protection.overcurrent?.time_overcurrent) {
+    const oc = protection.overcurrent.time_overcurrent;
+    const fields: InspectorPropertyField[] = [
+      {
+        key: 'pickup_a',
+        label: 'Prog pradowy',
+        value: oc.pickup_a !== null ? formatNumber(oc.pickup_a, 0) : '—',
+        unit: 'A',
+        source: 'instance',
+      },
+      {
+        key: 'trip_time_s',
+        label: 'Czas wyzwolenia',
+        value: oc.trip_time_s !== null ? formatNumber(oc.trip_time_s, 2) : '—',
+        unit: 's',
+        source: 'instance',
+      },
+      {
+        key: 'characteristic',
+        label: 'Charakterystyka',
+        value: OC_CHARACTERISTIC_LABELS_PL[oc.characteristic],
+        source: 'instance',
+      },
+    ];
+    if (oc.tms !== null && oc.tms !== undefined) {
+      fields.push({
+        key: 'tms',
+        label: 'Mnoznik TMS',
+        value: formatNumber(oc.tms, 2),
+        source: 'instance',
+      });
+    }
+    sections.push({
+      id: 'protection_oc_time',
+      label: INSPECTOR_SECTION_LABELS_PL.protection_oc_time,
+      fields,
+    });
+  }
+
+  // Sekcja: Zabezpieczenie nadpradowe I>> (50)
+  if (protection.overcurrent?.instant_overcurrent) {
+    const oc = protection.overcurrent.instant_overcurrent;
+    const fields: InspectorPropertyField[] = [
+      {
+        key: 'pickup_a',
+        label: 'Prog pradowy',
+        value: oc.pickup_a !== null ? formatNumber(oc.pickup_a, 0) : '—',
+        unit: 'A',
+        source: 'instance',
+      },
+      {
+        key: 'trip_time_s',
+        label: 'Czas wyzwolenia',
+        value: oc.instantaneous ? 'Bezzwlocznie' : (oc.trip_time_s !== null ? formatNumber(oc.trip_time_s, 2) + ' s' : '—'),
+        source: 'instance',
+      },
+      {
+        key: 'instantaneous',
+        label: 'Tryb bezzwloczny',
+        value: oc.instantaneous ? 'Tak' : 'Nie',
+        source: 'instance',
+      },
+    ];
+    sections.push({
+      id: 'protection_oc_instant',
+      label: INSPECTOR_SECTION_LABELS_PL.protection_oc_instant,
+      fields,
+    });
+  }
+
+  // Sekcja: Przekladnik
+  if (protection.ct) {
+    sections.push({
+      id: 'protection_ct',
+      label: INSPECTOR_SECTION_LABELS_PL.protection_ct,
+      fields: [
+        {
+          key: 'ct_ratio',
+          label: 'Przekladnia',
+          value: protection.ct.label,
+          source: 'instance',
+        },
+        {
+          key: 'ct_primary',
+          label: 'Strona pierwotna',
+          value: formatNumber(protection.ct.primary_a, 0),
+          unit: 'A',
+          source: 'instance',
+        },
+        {
+          key: 'ct_secondary',
+          label: 'Strona wtorna',
+          value: formatNumber(protection.ct.secondary_a, 0),
+          unit: 'A',
+          source: 'instance',
+        },
+      ],
+    });
+  }
+
+  // Sekcja: Weryfikacja kryterium
+  const verificationFields: InspectorPropertyField[] = [
+    {
+      key: 'verification_status',
+      label: 'Status',
+      value: VERIFICATION_STATUS_LABELS_PL[protection.verification_status],
+      highlight:
+        protection.verification_status === 'NIESPELNIONE'
+          ? 'warning'
+          : protection.verification_status === 'SPELNIONE'
+          ? 'primary'
+          : undefined,
+      source: 'analysis',
+    },
+  ];
+  if (protection.verification_reason) {
+    verificationFields.push({
+      key: 'verification_reason',
+      label: 'Powod',
+      value: protection.verification_reason,
+      source: 'analysis',
+    });
+  }
+  if (protection.margin_pct !== null && protection.margin_pct !== undefined) {
+    verificationFields.push({
+      key: 'margin_pct',
+      label: 'Margines',
+      value: `${protection.margin_pct > 0 ? '+' : ''}${formatNumber(protection.margin_pct, 0)}`,
+      unit: '%',
+      source: 'analysis',
+      highlight: protection.margin_pct < 0 ? 'warning' : undefined,
+    });
+  }
+  sections.push({
+    id: 'protection_verification',
+    label: INSPECTOR_SECTION_LABELS_PL.protection_verification,
+    fields: verificationFields,
+  });
+
+  return sections;
+}
+
+// =============================================================================
 // GŁÓWNY HOOK
 // =============================================================================
 
@@ -594,6 +764,7 @@ export function useSldInspectorSelection(): UseSldInspectorSelectionResult {
   // Subskrypcja na SldModeStore (tryb SLD)
   const mode = useSldModeStore((state) => state.mode);
   const isResultsMode = mode === 'WYNIKI';
+  const isProtectionMode = mode === 'ZABEZPIECZENIA';
 
   // Oblicz selekcję inspektora
   const selection = useMemo<InspectorSelection>(() => {
@@ -643,6 +814,16 @@ export function useSldInspectorSelection(): UseSldInspectorSelectionResult {
     return null;
   }, [isResultsMode, selection]);
 
+  // PR-SLD-09: Dane zabezpieczeń dla elementu
+  const protection = useMemo<ProtectionSummary | null>(() => {
+    if (selection.type !== 'element') {
+      return null;
+    }
+
+    // Pobierz dane zabezpieczeń dla elementu (fixture)
+    return selectProtectionSummaryByElementId(selection.elementId);
+  }, [selection]);
+
   // Buduj sekcje właściwości
   const sections = useMemo<InspectorPropertySection[]>(() => {
     if (selection.type === 'none') {
@@ -684,6 +865,12 @@ export function useSldInspectorSelection(): UseSldInspectorSelectionResult {
         });
       }
 
+      // PR-SLD-09: Dodaj sekcje zabezpieczeń jeśli dostępne (tryb ZABEZPIECZENIA lub gdy dane istnieją)
+      if (protection && (isProtectionMode || protection.has_complete_data)) {
+        const protectionSections = buildProtectionSections(protection);
+        elementSections.push(...protectionSections);
+      }
+
       return elementSections;
     }
 
@@ -697,7 +884,7 @@ export function useSldInspectorSelection(): UseSldInspectorSelectionResult {
     }
 
     return [];
-  }, [selection, results, diagnostics]);
+  }, [selection, results, diagnostics, protection, isProtectionMode]);
 
   // Funkcja zamykania inspektora
   const closeInspector = useCallback(() => {
@@ -709,9 +896,11 @@ export function useSldInspectorSelection(): UseSldInspectorSelectionResult {
     sections,
     mode,
     isResultsMode,
+    isProtectionMode,
     closeInspector,
     diagnostics,
     results,
+    protection,
   };
 }
 

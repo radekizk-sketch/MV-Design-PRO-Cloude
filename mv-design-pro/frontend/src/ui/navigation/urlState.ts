@@ -30,10 +30,12 @@ export const URL_PARAMS = {
   DIAGNOSTICS_VISIBLE: 'diag',
   /** Diagnostics severity filter (all|err|errwarn) */
   DIAGNOSTICS_SEVERITY: 'diag_sev',
-  /** SLD mode (edit|results) */
+  /** SLD mode (edit|results|protection) */
   SLD_MODE: 'sld_mode',
   /** Diagnostic layer visibility (1|0) */
   DIAGNOSTIC_LAYER: 'diag_layer',
+  /** Protection layer visibility (1|0) (PR-SLD-09) */
+  PROTECTION_LAYER: 'prot_layer',
 } as const;
 
 /**
@@ -334,38 +336,55 @@ export function updateUrlWithSelectionAndDiagnostics(
 // =============================================================================
 
 /**
- * SLD Mode URL values.
+ * SLD Mode URL values (PR-SLD-09: added protection).
  */
 export const SLD_MODE_URL_VALUES = {
   EDYCJA: 'edit',
   WYNIKI: 'results',
+  ZABEZPIECZENIA: 'protection',
 } as const;
 
 export type SldModeUrlValue = typeof SLD_MODE_URL_VALUES[keyof typeof SLD_MODE_URL_VALUES];
 
 export interface SldModeUrlState {
   /** Tryb SLD */
-  mode: 'EDYCJA' | 'WYNIKI';
+  mode: 'EDYCJA' | 'WYNIKI' | 'ZABEZPIECZENIA';
   /** Widocznosc warstwy diagnostycznej */
   diagnosticLayerVisible: boolean;
+  /** Widocznosc warstwy zabezpieczen (PR-SLD-09) */
+  protectionLayerVisible: boolean;
 }
 
 /**
  * Convert SldMode to URL value.
  */
-export function sldModeToUrlValue(mode: 'EDYCJA' | 'WYNIKI'): SldModeUrlValue {
-  return mode === 'WYNIKI' ? SLD_MODE_URL_VALUES.WYNIKI : SLD_MODE_URL_VALUES.EDYCJA;
+export function sldModeToUrlValue(mode: 'EDYCJA' | 'WYNIKI' | 'ZABEZPIECZENIA'): SldModeUrlValue {
+  switch (mode) {
+    case 'WYNIKI':
+      return SLD_MODE_URL_VALUES.WYNIKI;
+    case 'ZABEZPIECZENIA':
+      return SLD_MODE_URL_VALUES.ZABEZPIECZENIA;
+    default:
+      return SLD_MODE_URL_VALUES.EDYCJA;
+  }
 }
 
 /**
  * Convert URL value to SldMode.
  */
-export function urlValueToSldMode(value: string | null): 'EDYCJA' | 'WYNIKI' {
-  return value === SLD_MODE_URL_VALUES.WYNIKI ? 'WYNIKI' : 'EDYCJA';
+export function urlValueToSldMode(value: string | null): 'EDYCJA' | 'WYNIKI' | 'ZABEZPIECZENIA' {
+  switch (value) {
+    case SLD_MODE_URL_VALUES.WYNIKI:
+      return 'WYNIKI';
+    case SLD_MODE_URL_VALUES.ZABEZPIECZENIA:
+      return 'ZABEZPIECZENIA';
+    default:
+      return 'EDYCJA';
+  }
 }
 
 /**
- * Read SLD mode state from URL.
+ * Read SLD mode state from URL (PR-SLD-09: added protection layer).
  *
  * @returns SldModeUrlState with current values from URL
  */
@@ -373,15 +392,17 @@ export function readSldModeFromUrl(): SldModeUrlState {
   const params = getCurrentSearchParams();
   const sldMode = params.get(URL_PARAMS.SLD_MODE);
   const diagLayer = params.get(URL_PARAMS.DIAGNOSTIC_LAYER);
+  const protLayer = params.get(URL_PARAMS.PROTECTION_LAYER);
 
   return {
     mode: urlValueToSldMode(sldMode),
     diagnosticLayerVisible: diagLayer === '1',
+    protectionLayerVisible: protLayer === '1',
   };
 }
 
 /**
- * Update URL with SLD mode state.
+ * Update URL with SLD mode state (PR-SLD-09: added protection layer).
  * Preserves existing selection and diagnostics params.
  *
  * @param state - SLD mode state to encode
@@ -402,9 +423,19 @@ export function updateUrlWithSldMode(state: SldModeUrlState): void {
     } else {
       params.delete(URL_PARAMS.DIAGNOSTIC_LAYER);
     }
+    params.delete(URL_PARAMS.PROTECTION_LAYER);
+  } else if (state.mode === 'ZABEZPIECZENIA') {
+    params.set(URL_PARAMS.SLD_MODE, SLD_MODE_URL_VALUES.ZABEZPIECZENIA);
+    if (state.protectionLayerVisible) {
+      params.set(URL_PARAMS.PROTECTION_LAYER, '1');
+    } else {
+      params.delete(URL_PARAMS.PROTECTION_LAYER);
+    }
+    params.delete(URL_PARAMS.DIAGNOSTIC_LAYER);
   } else {
     params.delete(URL_PARAMS.SLD_MODE);
     params.delete(URL_PARAMS.DIAGNOSTIC_LAYER);
+    params.delete(URL_PARAMS.PROTECTION_LAYER);
   }
 
   const queryString = params.toString();
