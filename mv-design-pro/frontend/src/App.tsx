@@ -1,16 +1,20 @@
 /**
- * App Root — UI_INTEGRATION_E2E + PROJECT_TREE_PARITY_V1 + SLD_READ_ONLY_UI
+ * App Root — POWERFACTORY_LAYOUT + UI_INTEGRATION_E2E + PROJECT_TREE_PARITY_V1
  *
  * CANONICAL ALIGNMENT:
+ * - powerfactory_ui_parity.md: Layout narzędziowy ZAWSZE renderowany
  * - wizard_screens.md § 1.3: Active case bar (always visible)
- * - powerfactory_ui_parity.md § A: Operating modes, Project Tree
  * - UI_CORE_ARCHITECTURE.md § 4.1: Navigation structure
  *
+ * POWERFACTORY/ETAP RULE:
+ * > Layout narzędziowy ZAWSZE jest renderowany.
+ * > Brak danych = komunikat w obszarze roboczym, a NIE brak UI.
+ *
  * Main application entry with:
+ * - PowerFactoryLayout with ALWAYS visible Project Tree, Inspector, Status Bar
  * - Hash-based routing with Polish labels
- * - MainLayout with Active Case Bar
- * - Project Tree (left sidebar) for navigation
  * - Mode-aware page rendering
+ * - Empty state overlays (NOT empty screens)
  *
  * Routes (Polish):
  * - "" / "#sld" → Schemat jednokreskowy (SLD Editor)
@@ -23,14 +27,13 @@
 
 import { useEffect, useState, useCallback, useMemo } from 'react';
 
-import { DesignerPage } from './designer/DesignerPage';
 import { ProofInspectorPage } from './proof-inspector';
 import { ProtectionResultsInspectorPage } from './ui/protection-results';
 import { PowerFlowResultsInspectorPage } from './ui/power-flow-results';
 import { ReferencePatternsPage } from './ui/reference-patterns';
 import { ResultsInspectorPage } from './ui/results-inspector';
-import { SLDViewPage } from './ui/sld';
-import { MainLayout } from './ui/layout';
+import { SLDViewPage, SldEditorPage } from './ui/sld';
+import { PowerFactoryLayout } from './ui/layout';
 import { useAppStateStore } from './ui/app-state';
 import { ROUTES, useUrlSelectionSync, getCurrentHashRoute } from './ui/navigation';
 import { useSelectionStore } from './ui/selection';
@@ -162,98 +165,77 @@ function App() {
     </div>
   );
 
+  // Common layout props for PowerFactoryLayout
+  const layoutProps = {
+    onCalculate: handleCalculate,
+    onViewResults: handleViewResults,
+    projectName: projectName ?? 'Nowy projekt',
+    treeElements: treeElements,
+    onTreeNodeClick: handleTreeNodeClick,
+    onTreeCategoryClick: handleTreeCategoryClick,
+    onTreeRunClick: handleTreeRunClick,
+  };
+
   // UI_INTEGRATION_E2E + PROJECT_TREE_PARITY_V1: Przegląd wyników (Results Browser)
   if (route === '#results') {
     return wrapWithReadyIndicator(
-      <MainLayout
-        onCalculate={handleCalculate}
-        onViewResults={handleViewResults}
-        showProjectTree={true}
-        projectName={projectName ?? 'Nowy projekt'}
-        treeElements={treeElements}
-        onTreeNodeClick={handleTreeNodeClick}
-        onTreeCategoryClick={handleTreeCategoryClick}
-        onTreeRunClick={handleTreeRunClick}
-      >
+      <PowerFactoryLayout {...layoutProps}>
         <ResultsInspectorPage />
-      </MainLayout>
+      </PowerFactoryLayout>
     );
   }
 
   // Ślad obliczeń (Proof Inspector)
   if (route === '#proof') {
     return wrapWithReadyIndicator(
-      <MainLayout
-        onCalculate={handleCalculate}
-        onViewResults={handleViewResults}
-      >
+      <PowerFactoryLayout {...layoutProps} hideInspector={true}>
         <ProofInspectorPage />
-      </MainLayout>
+      </PowerFactoryLayout>
     );
   }
 
   // Protection Results Inspector
   if (route === '#protection-results') {
     return wrapWithReadyIndicator(
-      <MainLayout
-        onCalculate={handleCalculate}
-        onViewResults={handleViewResults}
-      >
+      <PowerFactoryLayout {...layoutProps}>
         <ProtectionResultsInspectorPage />
-      </MainLayout>
+      </PowerFactoryLayout>
     );
   }
 
   // P20b: Power Flow Results Inspector
   if (route === '#power-flow-results') {
     return wrapWithReadyIndicator(
-      <MainLayout
-        onCalculate={handleCalculate}
-        onViewResults={handleViewResults}
-      >
+      <PowerFactoryLayout {...layoutProps}>
         <PowerFlowResultsInspectorPage />
-      </MainLayout>
+      </PowerFactoryLayout>
     );
   }
 
   // Wzorce odniesienia (Reference Patterns)
   if (route === '#reference-patterns') {
     return wrapWithReadyIndicator(
-      <MainLayout
-        onCalculate={handleCalculate}
-        onViewResults={handleViewResults}
-      >
+      <PowerFactoryLayout {...layoutProps} hideInspector={true}>
         <ReferencePatternsPage />
-      </MainLayout>
+      </PowerFactoryLayout>
     );
   }
 
   // SLD_READ_ONLY_UI: Podglad schematu jednokreskowego (tylko odczyt)
   if (route === '#sld-view') {
     return wrapWithReadyIndicator(
-      <MainLayout
-        onCalculate={handleCalculate}
-        onViewResults={handleViewResults}
-        showProjectTree={true}
-        projectName={projectName ?? 'Nowy projekt'}
-        treeElements={treeElements}
-        onTreeNodeClick={handleTreeNodeClick}
-        onTreeCategoryClick={handleTreeCategoryClick}
-        onTreeRunClick={handleTreeRunClick}
-      >
+      <PowerFactoryLayout {...layoutProps}>
         <SLDViewPage useDemo={true} />
-      </MainLayout>
+      </PowerFactoryLayout>
     );
   }
 
-  // Default: Designer page with full layout
+  // POWERFACTORY_LAYOUT: Default — SLD Editor Page (ALWAYS shows tools)
+  // This replaces the old DesignerPage with proper PowerFactory-style layout
   return wrapWithReadyIndicator(
-    <MainLayout
-      onCalculate={handleCalculate}
-      onViewResults={handleViewResults}
-    >
-      <DesignerPage />
-    </MainLayout>
+    <PowerFactoryLayout {...layoutProps}>
+      <SldEditorPage useDemo={true} />
+    </PowerFactoryLayout>
   );
 }
 

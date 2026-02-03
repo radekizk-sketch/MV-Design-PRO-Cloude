@@ -168,10 +168,20 @@ export function CaseManager({
       );
       setIsCreating(false);
       setNewCaseName('');
+
+      // POWERFACTORY_FLOW: After creating a case, close the panel
+      // User is automatically taken to SLD view (default route) with the new active case
+      onClose?.();
+
+      // Navigate to SLD (default route) to ensure user is in edit mode
+      // This handles case where user was on results or other routes
+      if (window.location.hash !== '' && window.location.hash !== '#sld') {
+        window.location.hash = '';
+      }
     } catch (e) {
       // Error handled in store
     }
-  }, [projectId, newCaseName, createKind, createCase, setActiveCase]);
+  }, [projectId, newCaseName, createKind, createCase, setActiveCase, onClose]);
 
   const handleDelete = useCallback(
     async (caseId: string) => {
@@ -205,11 +215,20 @@ export function CaseManager({
         const kind: CaseKind = 'ShortCircuitCase'; // TODO: Get from backend
         setActiveCase(activated.id, activated.name, kind, activated.result_status);
         onCaseSelected?.(caseId);
+
+        // POWERFACTORY_FLOW: After activating a case, close the panel
+        // User is automatically taken to SLD view (default route) with the activated case
+        onClose?.();
+
+        // Navigate to SLD (default route) to ensure user is in edit mode
+        if (window.location.hash !== '' && window.location.hash !== '#sld') {
+          window.location.hash = '';
+        }
       } catch (e) {
         // Error handled in store
       }
     },
-    [activateCase, setActiveCase, onCaseSelected]
+    [activateCase, setActiveCase, onCaseSelected, onClose]
   );
 
   const handleRename = useCallback(

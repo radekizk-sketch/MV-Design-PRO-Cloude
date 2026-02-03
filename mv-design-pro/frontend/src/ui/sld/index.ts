@@ -13,6 +13,8 @@
 export { SLDView } from './SLDView';
 export { SLDViewCanvas } from './SLDViewCanvas';
 export { SLDViewPage } from './SLDViewPage';
+export { SldEditorPage } from './SldEditorPage';
+export type { SldEditorPageProps } from './SldEditorPage';
 
 // Overlay components
 export { ResultsOverlay } from './ResultsOverlay';
@@ -81,6 +83,10 @@ export {
 // Legend components
 export { LegendPanel } from './LegendPanel';
 export type { LegendPanelProps } from './LegendPanel';
+
+// Empty state overlay (PowerFactory/ETAP style)
+export { SldEmptyOverlay } from './SldEmptyOverlay';
+export type { SldEmptyOverlayProps, SldEmptyState } from './SldEmptyOverlay';
 
 // Scale utilities
 export {
