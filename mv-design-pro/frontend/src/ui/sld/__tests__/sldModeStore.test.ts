@@ -20,6 +20,7 @@ vi.mock('../../navigation/urlState', () => ({
   readSldModeFromUrl: () => ({
     mode: 'EDYCJA' as const,
     diagnosticLayerVisible: false,
+    protectionLayerVisible: false,
   }),
   updateUrlWithSldMode: vi.fn(),
 }));
@@ -212,6 +213,7 @@ describe('sldModeStore', () => {
       expect(mockUpdateUrlWithSldMode).toHaveBeenCalledWith({
         mode: 'WYNIKI',
         diagnosticLayerVisible: true,
+        protectionLayerVisible: false,
       });
     });
 
@@ -231,6 +233,7 @@ describe('sldModeStore', () => {
       expect(mockUpdateUrlWithSldMode).toHaveBeenCalledWith({
         mode: 'WYNIKI',
         diagnosticLayerVisible: false,
+        protectionLayerVisible: false,
       });
     });
 
@@ -250,6 +253,7 @@ describe('sldModeStore', () => {
       expect(mockUpdateUrlWithSldMode).toHaveBeenCalledWith({
         mode: 'EDYCJA',
         diagnosticLayerVisible: false,
+        protectionLayerVisible: false,
       });
     });
   });

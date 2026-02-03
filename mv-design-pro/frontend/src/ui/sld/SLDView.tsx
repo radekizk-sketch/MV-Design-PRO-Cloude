@@ -20,8 +20,10 @@ import { SLDViewCanvas } from './SLDViewCanvas';
 import { ResultsOverlay } from './ResultsOverlay';
 import { DiagnosticsOverlay } from './DiagnosticsOverlay';
 import { DiagnosticResultsLayer } from './DiagnosticResultsLayer';
+import { ProtectionOverlayLayer } from './ProtectionOverlayLayer';
 import { SwitchingStateLegend } from './SwitchingStateLegend';
-import { useSldModeStore, SLD_MODE_LABELS_PL } from './sldModeStore';
+import { useSldModeStore, SLD_MODE_LABELS_PL, type SldMode } from './sldModeStore';
+import { useProtectionStatistics } from './protection';
 import {
   DEFAULT_VIEWPORT,
   ZOOM_MIN,
@@ -101,12 +103,20 @@ export const SLDView: React.FC<SLDViewProps> = ({
   // Check if there are any diagnostics results (fixture for now)
   const { hasResults: hasDiagnostics } = useSanityChecks('demo-project', 'demo-diagram');
 
-  // SLD mode store integration (PR-SLD-06)
+  // SLD mode store integration (PR-SLD-06, PR-SLD-09)
   const sldMode = useSldModeStore((state) => state.mode);
   const diagnosticLayerVisible = useSldModeStore((state) => state.diagnosticLayerVisible);
+  const protectionLayerVisible = useSldModeStore((state) => state.protectionLayerVisible);
   const setMode = useSldModeStore((state) => state.setMode);
   const toggleDiagnosticLayer = useSldModeStore((state) => state.toggleDiagnosticLayer);
+  const toggleProtectionLayer = useSldModeStore((state) => state.toggleProtectionLayer);
   const isResultsMode = sldMode === 'WYNIKI';
+  const isProtectionMode = sldMode === 'ZABEZPIECZENIA';
+  const isReadOnlyMode = isResultsMode || isProtectionMode;
+
+  // PR-SLD-09: Protection statistics
+  const protectionStats = useProtectionStatistics();
+  const hasProtectionData = protectionStats.total > 0;
 
   // Export dialog state
   const [exportDialogOpen, setExportDialogOpen] = useState(false);
@@ -318,12 +328,12 @@ export const SLDView: React.FC<SLDViewProps> = ({
   );
 
   /**
-   * Handle SLD mode toggle (PR-SLD-06).
+   * Handle SLD mode change (PR-SLD-06, PR-SLD-09).
+   * Cycles through: EDYCJA -> WYNIKI -> ZABEZPIECZENIA -> EDYCJA
    */
-  const handleModeToggle = useCallback(() => {
-    const newMode = sldMode === 'EDYCJA' ? 'WYNIKI' : 'EDYCJA';
+  const handleModeChange = useCallback((newMode: SldMode) => {
     setMode(newMode);
-  }, [sldMode, setMode]);
+  }, [setMode]);
 
   /**
    * Handle diagnostic layer toggle (PR-SLD-06).
@@ -331,6 +341,35 @@ export const SLDView: React.FC<SLDViewProps> = ({
   const handleDiagnosticLayerToggle = useCallback(() => {
     toggleDiagnosticLayer();
   }, [toggleDiagnosticLayer]);
+
+  /**
+   * Handle protection layer toggle (PR-SLD-09).
+   */
+  const handleProtectionLayerToggle = useCallback(() => {
+    toggleProtectionLayer();
+  }, [toggleProtectionLayer]);
+
+  /**
+   * Handle protection label click (PR-SLD-09).
+   */
+  const handleProtectionLabelClick = useCallback(
+    (element: SelectedElement) => {
+      // Update selection store
+      selectElement(element);
+
+      // Sync to URL
+      updateUrlWithSelection(element);
+
+      // Center SLD on the element
+      centerSldOnElement(element.id);
+
+      // Call external handler if provided
+      if (onElementClick) {
+        onElementClick(element);
+      }
+    },
+    [selectElement, centerSldOnElement, onElementClick]
+  );
 
   /**
    * Handle export dialog open.
@@ -580,21 +619,51 @@ export const SLDView: React.FC<SLDViewProps> = ({
             </>
           )}
 
-          {/* PR-SLD-06: Mode toggle */}
+          {/* PR-SLD-06, PR-SLD-09: Mode selector */}
           <div className="w-px h-4 bg-gray-300 mx-1" />
-          <button
-            type="button"
-            onClick={handleModeToggle}
-            className={`px-2 py-1 text-xs rounded ${
-              isResultsMode
-                ? 'bg-gray-800 text-white hover:bg-gray-700'
-                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-            }`}
-            title={isResultsMode ? 'Przelacz na tryb Edycja' : 'Przelacz na tryb Wyniki'}
-            data-testid="sld-mode-toggle"
-          >
-            {isResultsMode ? 'Tryb: Wyniki' : 'Tryb: Edycja'}
-          </button>
+          <div className="flex items-center rounded border border-gray-300 overflow-hidden" data-testid="sld-mode-selector">
+            <button
+              type="button"
+              onClick={() => handleModeChange('EDYCJA')}
+              className={`px-2 py-1 text-xs ${
+                sldMode === 'EDYCJA'
+                  ? 'bg-gray-700 text-white'
+                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              }`}
+              title="Tryb Edycja"
+              data-testid="sld-mode-edit"
+            >
+              Edycja
+            </button>
+            <button
+              type="button"
+              onClick={() => handleModeChange('WYNIKI')}
+              className={`px-2 py-1 text-xs border-l border-gray-300 ${
+                sldMode === 'WYNIKI'
+                  ? 'bg-gray-700 text-white'
+                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              }`}
+              title="Tryb Wyniki"
+              data-testid="sld-mode-results"
+            >
+              Wyniki
+            </button>
+            {hasProtectionData && (
+              <button
+                type="button"
+                onClick={() => handleModeChange('ZABEZPIECZENIA')}
+                className={`px-2 py-1 text-xs border-l border-gray-300 ${
+                  sldMode === 'ZABEZPIECZENIA'
+                    ? 'bg-emerald-700 text-white'
+                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                }`}
+                title="Tryb Zabezpieczenia"
+                data-testid="sld-mode-protection"
+              >
+                Zabezpieczenia
+              </button>
+            )}
+          </div>
 
           {/* PR-SLD-06: Diagnostic layer toggle (only in WYNIKI mode) */}
           {isResultsMode && (
@@ -610,6 +679,23 @@ export const SLDView: React.FC<SLDViewProps> = ({
               data-testid="sld-diagnostic-layer-toggle"
             >
               {diagnosticLayerVisible ? 'Warstwa: Wl.' : 'Warstwa: Wyl.'}
+            </button>
+          )}
+
+          {/* PR-SLD-09: Protection layer toggle (only in ZABEZPIECZENIA mode) */}
+          {isProtectionMode && (
+            <button
+              type="button"
+              onClick={handleProtectionLayerToggle}
+              className={`px-2 py-1 text-xs rounded ${
+                protectionLayerVisible
+                  ? 'bg-emerald-700 text-white hover:bg-emerald-600'
+                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              }`}
+              title={protectionLayerVisible ? 'Ukryj warstwe zabezpieczen' : 'Pokaz warstwe zabezpieczen'}
+              data-testid="sld-protection-layer-toggle"
+            >
+              {protectionLayerVisible ? 'Nastawy: Wl.' : 'Nastawy: Wyl.'}
             </button>
           )}
 
@@ -703,6 +789,17 @@ export const SLDView: React.FC<SLDViewProps> = ({
             visible={diagnosticLayerVisible}
           />
         )}
+
+        {/* PR-SLD-09: Protection overlay layer (only in ZABEZPIECZENIA mode) */}
+        {isProtectionMode && (
+          <ProtectionOverlayLayer
+            symbols={symbols}
+            viewport={viewport}
+            selectedElementId={selectedElement?.id}
+            visible={protectionLayerVisible}
+            onLabelClick={handleProtectionLabelClick}
+          />
+        )}
       </div>
 
       {/* Status bar */}
@@ -720,13 +817,13 @@ export const SLDView: React.FC<SLDViewProps> = ({
           )}
         </div>
         <div className="flex items-center gap-4">
-          {/* PR-SLD-06: Mode status in status bar */}
-          {isResultsMode && (
+          {/* PR-SLD-06, PR-SLD-09: Mode status in status bar */}
+          {isReadOnlyMode && (
             <span
-              data-testid="sld-status-results-mode"
+              data-testid={isResultsMode ? 'sld-status-results-mode' : 'sld-status-protection-mode'}
               className="font-medium text-gray-700"
             >
-              Tryb WYNIKI (tylko odczyt)
+              {isResultsMode ? 'Tryb WYNIKI (tylko odczyt)' : 'Tryb ZABEZPIECZENIA (tylko odczyt)'}
             </span>
           )}
           <span>Przeciagaj srodkowym/prawym przyciskiem myszy | Scroll: zoom</span>

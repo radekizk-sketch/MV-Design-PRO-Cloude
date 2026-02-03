@@ -181,6 +181,11 @@ export const INSPECTOR_SECTION_LABELS_PL: Record<string, string> = {
   technical: 'Parametry techniczne',
   diagnostics: 'Diagnostyka',
   connection: 'Dane połączenia',
+  protection: 'Zabezpieczenia',
+  protection_oc_time: 'Zabezpieczenie nadpradowe I> (51)',
+  protection_oc_instant: 'Zabezpieczenie nadpradowe I>> (50)',
+  protection_ct: 'Przekladnik',
+  protection_verification: 'Weryfikacja kryterium',
 };
 
 /**
