@@ -215,41 +215,61 @@ function getVoltageVerdict(v_pu: number): {
 }
 
 /**
- * UI-02: Oblicza werdykt dla obciążenia gałęzi.
- * PASS: obciążenie ≤ 80%
- * MARGINAL: 80% < obciążenie ≤ 100%
- * FAIL: obciążenie > 100%
+ * UI-02: Oblicza werdykt operacyjny dla obciążenia gałęzi.
+ * Werdykt zawiera: STATUS + DLACZEGO + CO DALEJ
+ *
+ * Kryteria (gdy dostępne loading_pct):
+ * - PASS: obciążenie ≤ 80%
+ * - MARGINAL: 80% < obciążenie ≤ 100%
+ * - FAIL: obciążenie > 100%
  *
  * Uwaga: Jeśli brak danych obciążenia, używamy strat jako proxy.
+ * Zgodnie z wymaganiami UI-02, dla braku danych:
+ * - Werdykt = PASS (z zastrzeżeniem)
+ * - DLACZEGO: informacja o braku danych
+ * - CO DALEJ: zalecenie uzupełnienia danych
  */
 function getBranchLoadingVerdict(
   loading_pct: number | null | undefined,
   losses_p_mw: number
-): { verdict: CoordinationVerdict; notes: string } {
+): { verdict: CoordinationVerdict; notes: string; recommendation: string } {
   // Jeśli brak danych obciążenia, szacujemy na podstawie strat
   if (loading_pct === null || loading_pct === undefined) {
-    // Wysokie straty mogą wskazywać na przeciążenie
+    // Wysokie straty mogą wskazywać na przeciążenie (heurystyka)
     if (losses_p_mw > 0.1) {
       return {
         verdict: 'MARGINAL',
-        notes: 'Brak danych obciazenia. Wysokie straty mogą wskazywać na przeciążenie.',
+        notes: 'Brak danych obciazenia. Wysokie straty moga wskazywac na przeciazenie.',
+        recommendation: 'Uzupelnij parametry dopuszczalnego obciazenia typu/elementu i zweryfikuj warunki pracy galezi.',
       };
     }
-    return { verdict: 'PASS', notes: 'Brak danych obciazenia procentowego' };
+    // Brak danych - werdykt PASS z zastrzeżeniem (zgodnie z wymaganiami UI-02)
+    return {
+      verdict: 'PASS',
+      notes: 'Brak danych o dopuszczalnym obciazeniu - nie mozna ocenic marginesu',
+      recommendation: 'Uzupelnij parametry dopuszczalnego obciazenia typu/elementu.',
+    };
   }
 
+  // Pełne dane - ocena na podstawie loading_pct
   if (loading_pct <= 80) {
-    return { verdict: 'PASS', notes: '' };
+    return {
+      verdict: 'PASS',
+      notes: '',
+      recommendation: '',
+    };
   }
   if (loading_pct <= 100) {
     return {
       verdict: 'MARGINAL',
       notes: `Obciazenie ${loading_pct.toFixed(1)}% - blisko granicy dopuszczalnej`,
+      recommendation: 'Rozwaz przelaczenia/rekonfiguracje, aby odciazyc galaz, lub zweryfikuj nastawy/regulacje zrodla.',
     };
   }
   return {
     verdict: 'FAIL',
     notes: `Przeciazenie: ${loading_pct.toFixed(1)}% > 100%. Wymagana korekta.`,
+    recommendation: 'Odciaz galaz (przelaczenia), zwieksz przekroj/dodaj rownoleglą galaz lub ogranicz obciazenie; zweryfikuj parametry typu i zabezpieczenia.',
   };
 }
 
@@ -479,7 +499,7 @@ function BranchResultsTable() {
           </thead>
           <tbody>
             {filteredRows.map((row: PowerFlowBranchResult) => {
-              // UI-02: Werdykt dla obciążenia gałęzi (używamy strat jako proxy)
+              // UI-02: Werdykt operacyjny dla obciążenia gałęzi (używamy strat jako proxy)
               const loadingResult = getBranchLoadingVerdict(null, row.losses_p_mw);
               return (
                 <tr key={row.branch_id} className="border-t border-slate-100 hover:bg-slate-50">
@@ -505,7 +525,11 @@ function BranchResultsTable() {
                     {formatNumber(row.losses_q_mvar, 4)}
                   </td>
                   <td className="px-3 py-2 text-center">
-                    <VerdictBadge verdict={loadingResult.verdict} notesPl={loadingResult.notes} />
+                    <VerdictBadge
+                      verdict={loadingResult.verdict}
+                      notesPl={loadingResult.notes}
+                      recommendationPl={loadingResult.recommendation}
+                    />
                   </td>
                 </tr>
               );
