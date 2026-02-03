@@ -22,8 +22,8 @@ import type { ContextMenuAction, ElementType, OperatingMode, SwitchState } from 
  */
 export function buildContextMenuActions(
   elementType: ElementType,
-  elementId: string,
-  elementName: string,
+  _elementId: string,
+  _elementName: string,
   mode: OperatingMode,
   options: {
     inService?: boolean;
@@ -59,7 +59,6 @@ export function buildContextMenuActions(
 
   const isModelEdit = mode === 'MODEL_EDIT';
   const isResultView = mode === 'RESULT_VIEW';
-  const isCaseConfig = mode === 'CASE_CONFIG';
 
   const actions: ContextMenuAction[] = [];
 

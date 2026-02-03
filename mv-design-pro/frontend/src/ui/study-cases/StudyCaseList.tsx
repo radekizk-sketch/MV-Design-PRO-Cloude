@@ -17,7 +17,6 @@ import { RESULT_STATUS_TOOLTIPS } from './types';
 import {
   useStudyCasesStore,
   useSortedCases,
-  useHasActiveCase,
 } from './store';
 
 // =============================================================================
@@ -60,7 +59,6 @@ export function StudyCaseList({
   onCreateCase,
 }: StudyCaseListProps) {
   const cases = useSortedCases();
-  const hasActiveCase = useHasActiveCase();
   const isLoading = useStudyCasesStore((state) => state.isLoading);
   const [contextMenu, setContextMenu] = useState<{
     caseId: string;
@@ -246,7 +244,7 @@ function StudyCaseContextMenu({
   x,
   y,
   cases,
-  onClose,
+  onClose: _onClose,
   onActivate,
   onClone,
   onDelete,

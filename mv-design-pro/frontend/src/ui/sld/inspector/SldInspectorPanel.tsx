@@ -21,13 +21,12 @@
  * 100% POLISH UI - BRAK ANGLICYZMÓW
  */
 
-import React, { useState, useCallback } from 'react';
+import { useState, useCallback } from 'react';
 import { useSldInspectorSelection } from './useSldInspectorSelection';
 import { useSldCompareSelection, SldInspectorComparePanel } from './compare';
 import type {
   InspectorPropertySection,
   InspectorPropertyField,
-  InspectorSelection,
 } from './types';
 import {
   ELEMENT_TYPE_LABELS_PL,

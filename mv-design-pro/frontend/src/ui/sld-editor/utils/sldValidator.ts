@@ -20,7 +20,7 @@
  * - G-03: Pozycje na siatce
  */
 
-import type { AnySldSymbol, BranchSymbol, SwitchSymbol, Position, BoundingBox } from '../types';
+import type { AnySldSymbol, BranchSymbol, SwitchSymbol } from '../types';
 import { getSymbolBoundingBox, doBoundingBoxesIntersect } from './geometry';
 
 // =============================================================================

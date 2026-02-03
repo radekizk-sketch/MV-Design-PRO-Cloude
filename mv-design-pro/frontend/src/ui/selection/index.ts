@@ -7,6 +7,8 @@ export {
   useIsMutationBlocked,
   useModeLabel,
   useResultStatusLabel,
+  useMultiSelection,
+  useBlockedActionMessage,
 } from './store';
 
 export {

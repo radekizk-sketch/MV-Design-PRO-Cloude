@@ -508,7 +508,7 @@ interface ImportContentProps {
   importResult: ImportResponse | null;
   loading: boolean;
   isDragging: boolean;
-  fileInputRef: React.RefObject<HTMLInputElement | null>;
+  fileInputRef: React.RefObject<HTMLInputElement>;
   canPreview: boolean;
   canImport: boolean;
   onFileInputChange: (e: ChangeEvent<HTMLInputElement>) => void;

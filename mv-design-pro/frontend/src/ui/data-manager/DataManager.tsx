@@ -111,7 +111,7 @@ const COLUMNS_BY_TYPE: Record<string, DataManagerColumn[]> = {
  */
 function getColumnsForPreset(
   elementType: ElementType,
-  preset: ColumnViewPreset
+  _preset: ColumnViewPreset
 ): DataManagerColumn[] {
   const allColumns = COLUMNS_BY_TYPE[elementType] ?? COLUMNS_BY_TYPE.Bus;
 
@@ -480,11 +480,11 @@ export function DataManager({
 
         // Validate change
         const col = columns.find((c) => c.key === field);
-        let validation = { valid: true };
+        let validation: { valid: boolean; error?: string } = { valid: true };
         if (col?.validation) {
-          const error = col.validation(newValue);
-          if (error) {
-            validation = { valid: false, error };
+          const validationError = col.validation(newValue);
+          if (validationError) {
+            validation = { valid: false, error: validationError };
           }
         }
 

@@ -28,7 +28,7 @@ import React, { useCallback, useRef, useMemo, useEffect } from 'react';
 import { useSldEditorStore } from './SldEditorStore';
 import { useSldDrag } from './hooks/useSldDrag';
 import { useAutoLayout } from './hooks/useAutoLayout';
-import type { AnySldSymbol, Position, PortName } from './types';
+import type { AnySldSymbol, Position } from './types';
 import type { IssueSeverity } from '../types';
 import { useIsMutationBlocked } from '../selection/store';
 import { generateConnections } from './utils/connectionRouting';
@@ -41,10 +41,8 @@ import {
   StatusBar,
 } from './components/PortRenderer';
 import {
-  findPortAtPoint,
   findNearestPort,
   validateConnection,
-  calculateSnapPosition,
   SNAP_CONFIG,
   type PortInfo,
 } from './utils/portUtils';

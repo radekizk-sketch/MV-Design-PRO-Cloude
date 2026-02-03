@@ -151,23 +151,6 @@ function positiveNumber(value: unknown): ValidationResult {
   return { valid: true };
 }
 
-/**
- * Non-negative number validator (>= 0).
- */
-function nonNegativeNumber(value: unknown): ValidationResult {
-  if (value === null || value === undefined) {
-    return { valid: true };
-  }
-  if (typeof value === 'number' && value < 0) {
-    return {
-      valid: false,
-      message: 'Wartość nie może być ujemna',
-      code: 'E-RANGE-02',
-      severity: 'ERROR',
-    };
-  }
-  return { valid: true };
-}
 
 /**
  * Integer value validator.

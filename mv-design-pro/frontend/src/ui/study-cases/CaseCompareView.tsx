@@ -10,9 +10,9 @@
  * - Polish labels throughout
  */
 
-import { useState, useCallback, useMemo } from 'react';
+import { useState, useCallback } from 'react';
 import { clsx } from 'clsx';
-import type { StudyCaseComparison, StudyCaseListItem } from './types';
+import type { StudyCaseComparison } from './types';
 import { CONFIG_FIELD_LABELS, RESULT_STATUS_LABELS } from './types';
 import { useStudyCasesStore, useSortedCases } from './store';
 

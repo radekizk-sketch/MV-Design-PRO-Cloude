@@ -24,7 +24,6 @@ import {
   useFilteredBusResults,
   useFilteredBranchResults,
   useHasShortCircuitResults,
-  useIsAnyLoading,
 } from './store';
 import type { ResultsInspectorTab, BusResultRow, BranchResultRow, ShortCircuitRow } from './types';
 import {
@@ -483,7 +482,6 @@ export function ResultsInspectorPage({ runId, onClose }: ResultsInspectorPagePro
   const selectElement = useSelectionStore((state) => state.selectElement);
   const globalSelectedElement = useSelectionStore((state) => state.selectedElement);
   const hasShortCircuit = useHasShortCircuitResults();
-  const isLoading = useIsAnyLoading();
 
   // Filtered results for export
   const filteredBusRows = useFilteredBusResults();

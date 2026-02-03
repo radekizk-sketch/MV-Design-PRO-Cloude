@@ -24,8 +24,9 @@ import { clsx } from 'clsx';
 import type { StudyCaseListItem, StudyCaseResultStatus } from '../study-cases/types';
 import { RESULT_STATUS_LABELS } from '../study-cases/types';
 import { useStudyCasesStore, useSortedCases } from '../study-cases/store';
-import { useAppStateStore, useActiveMode, type CaseKind } from '../app-state';
+import { useAppStateStore, type CaseKind } from '../app-state';
 import { useModeGating } from './useModeGating';
+import { createProject } from '../projects/api';
 
 // =============================================================================
 // Types
@@ -154,11 +155,23 @@ export function CaseManager({
   const handleCreate = useCallback(async () => {
     if (!newCaseName.trim()) return;
 
-    // Auto-create default project if none exists
+    // Auto-create default project via API if none exists
     let pid = projectId;
     if (!pid) {
-      pid = crypto.randomUUID();
-      setActiveProject(pid, 'Projekt 1');
+      try {
+        const project = await createProject({ name: 'Projekt 1' });
+        pid = project.id;
+        setActiveProject(pid, project.name);
+      } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : 'Nie udało się utworzyć projektu';
+        console.error('[CaseManager] Błąd tworzenia projektu:', message);
+        // Kontynuuj mimo błędu - store pokaże błąd przy tworzeniu przypadku
+      }
+    }
+
+    if (!pid) {
+      console.error('[CaseManager] Brak project_id po próbie utworzenia projektu');
+      return;
     }
 
     try {
@@ -480,7 +493,7 @@ interface CaseRowProps {
   onDelete: () => void;
   onCalculate: () => void;
   onViewResults: () => void;
-  getBlockedReason: (action: string) => string | null;
+  getBlockedReason: (action: 'create' | 'rename' | 'delete' | 'clone' | 'activate' | 'edit_config' | 'calculate') => string | null;
 }
 
 function CaseRow({
@@ -507,8 +520,8 @@ function CaseRow({
   onConfirmDelete,
   onCancelDelete,
   onDelete,
-  onCalculate,
-  onViewResults,
+  onCalculate: _onCalculate,
+  onViewResults: _onViewResults,
   getBlockedReason,
 }: CaseRowProps) {
   return (

@@ -93,7 +93,7 @@ export const IssuePanelContainer: React.FC<IssuePanelContainerProps> = ({ caseId
   const handleIssueClick = (issue: Issue) => {
     if (!issue.object_ref) return;
 
-    const { id, type } = issue.object_ref;
+    const { id, type: _type } = issue.object_ref;
 
     // Highlight on SLD with severity-based color
     sldStore.highlightSymbols([id], issue.severity);

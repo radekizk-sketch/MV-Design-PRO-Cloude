@@ -51,7 +51,7 @@ export function CurveSettings({ curve, onUpdate, onRemove }: CurveSettingsProps)
     pickup_current_a: 100,
     time_multiplier: 0.5,
     definite_time_s: 0.5,
-    color: CURVE_COLORS[0],
+    color: CURVE_COLORS[0] as string,
     enabled: true,
   });
 
