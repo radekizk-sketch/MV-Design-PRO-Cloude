@@ -1,7 +1,8 @@
 /**
- * SLD Inspector Panel — PR-SLD-07
+ * SLD Inspector Panel — PR-SLD-07 + PR-SLD-08
  *
  * Panel boczny inspektora elementu / połączenia (READ-ONLY)
+ * Z obsługą trybu porównania (PR-SLD-08)
  *
  * CANONICAL ALIGNMENT:
  * - powerfactory_ui_parity.md: Property grid w stylu PowerFactory / ETAP
@@ -15,12 +16,14 @@
  * - Sekcje składane (accordion), DOMYŚLNIE ROZWINIĘTE
  * - 100% READ-ONLY (brak przycisków akcji)
  * - Działa w trybach EDYCJA i WYNIKI
+ * - PR-SLD-08: Tryb porównania gdy zaznaczone są 2 elementy
  *
  * 100% POLISH UI - BRAK ANGLICYZMÓW
  */
 
 import React, { useState, useCallback } from 'react';
 import { useSldInspectorSelection } from './useSldInspectorSelection';
+import { useSldCompareSelection, SldInspectorComparePanel } from './compare';
 import type {
   InspectorPropertySection,
   InspectorPropertyField,
@@ -216,6 +219,9 @@ export interface SldInspectorPanelProps {
  * - Pola: label | value | unit
  * - 100% READ-ONLY (brak edycji, brak akcji)
  *
+ * PR-SLD-08: Automatycznie przełącza się w tryb porównania
+ * gdy zaznaczone są dokładnie 2 elementy.
+ *
  * @example
  * ```tsx
  * <SldInspectorPanel onClose={() => console.log('closed')} />
@@ -223,6 +229,12 @@ export interface SldInspectorPanelProps {
  */
 export function SldInspectorPanel({ className = '', onClose }: SldInspectorPanelProps) {
   const { selection, sections, mode, isResultsMode, closeInspector } = useSldInspectorSelection();
+  const { isCompareMode } = useSldCompareSelection();
+
+  // PR-SLD-08: Jeśli tryb porównania (2 elementy), renderuj panel porównania
+  if (isCompareMode) {
+    return <SldInspectorComparePanel className={className} onClose={onClose} />;
+  }
 
   // Obsługa zamknięcia
   const handleClose = useCallback(() => {

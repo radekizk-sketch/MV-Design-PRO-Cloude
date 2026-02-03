@@ -1,7 +1,8 @@
 /**
- * SLD Inspector Module — PR-SLD-07
+ * SLD Inspector Module — PR-SLD-07 + PR-SLD-08
  *
  * Eksport komponentów i hooków inspektora elementu / połączenia SLD.
+ * PR-SLD-08: Dodany moduł porównania (compare)
  *
  * @example
  * ```tsx
@@ -46,3 +47,43 @@ export {
   DATA_SOURCE_LABELS_PL,
   PORT_LABELS_PL,
 } from './types';
+
+// =============================================================================
+// PR-SLD-08: Moduł porównania
+// =============================================================================
+
+// Komponent porównania
+export { SldInspectorComparePanel } from './compare';
+export type { SldInspectorComparePanelProps } from './compare';
+
+// Hook porównania
+export { useSldCompareSelection } from './compare';
+
+// Narzędzia porównania
+export {
+  compareValues,
+  compareSections,
+  compareAllSections,
+  sortElementsForCompare,
+  countTotalDifferences,
+  areAllFieldsEqual,
+  isDifferent,
+  formatValue,
+  getDifferenceLabel,
+} from './compare';
+
+// Typy porównania
+export type {
+  CompareElement,
+  CompareConnection,
+  CompareSelection,
+  CompareConnectionSelection,
+  FieldDiffStatus,
+  ComparePropertyField,
+  ComparePropertySection,
+  CompareSelectionType,
+  UseSldCompareSelectionResult,
+} from './compare';
+
+// Etykiety porównania
+export { COMPARE_LABELS_PL, COMPARE_SECTION_LABELS_PL } from './compare';
