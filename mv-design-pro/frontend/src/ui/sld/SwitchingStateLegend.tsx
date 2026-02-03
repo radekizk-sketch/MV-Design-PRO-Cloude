@@ -156,7 +156,7 @@ export function SwitchingStateLegend({ visible = true }: SwitchingStateLegendPro
   return (
     <div
       data-testid="sld-switching-legend"
-      className="absolute bottom-3 left-3 z-20 rounded-lg border border-slate-300 bg-white/95 p-3 shadow-lg backdrop-blur-sm"
+      className="absolute bottom-12 left-3 z-20 rounded-lg border border-slate-300 bg-white/95 p-3 shadow-lg backdrop-blur-sm"
       style={{ minWidth: '200px', maxWidth: '280px' }}
     >
       {/* Header */}
