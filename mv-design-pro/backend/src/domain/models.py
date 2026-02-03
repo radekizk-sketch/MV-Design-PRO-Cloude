@@ -2,9 +2,17 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
+from enum import Enum
 from uuid import UUID, uuid4
 
 from domain.project_design_mode import ProjectDesignMode
+
+
+class ProjectMode(str, Enum):
+    """Tryb projektu - AS-IS (weryfikacja) vs TO-BE (projektowanie)."""
+    AS_IS = "AS-IS"
+    TO_BE = "TO-BE"
+
 
 @dataclass(frozen=True)
 class Project:
@@ -20,15 +28,34 @@ class Project:
     - Project holds reference to the active network snapshot
     - All StudyCases and Runs reference specific snapshots
     - Changing the network creates a new snapshot, invalidating results
+
+    Full target schema with:
+    - mode: AS-IS (weryfikacja istniejącej sieci) vs TO-BE (projektowanie nowej)
+    - voltage_level_kv: Poziom napięcia sieci
+    - frequency_hz: Częstotliwość sieci (50 lub 60 Hz)
+    - deleted_at: Soft delete (null = aktywny)
     """
     id: UUID
     name: str
     description: str | None = None
     schema_version: str = "1.0"
+    # Project mode: AS-IS vs TO-BE
+    mode: str = "AS-IS"
+    # Network parameters
+    voltage_level_kv: float = 15.0
+    frequency_hz: float = 50.0
+    # PCC (Point of Common Coupling)
+    pcc_node_id: UUID | None = None
+    pcc_description: str | None = None
+    # Ownership
+    owner_id: UUID | None = None
     # P10a: Reference to the active (current) network snapshot
     active_network_snapshot_id: str | None = None
+    # Timestamps
     created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
     updated_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    # Soft delete
+    deleted_at: datetime | None = None
 
 
 @dataclass(frozen=True)
@@ -107,6 +134,9 @@ class StudyRun:
 def new_project(
     name: str,
     description: str | None = None,
+    mode: str = "AS-IS",
+    voltage_level_kv: float = 15.0,
+    frequency_hz: float = 50.0,
     active_network_snapshot_id: str | None = None,
 ) -> Project:
     """Create a new Project (P10a)."""
@@ -114,6 +144,9 @@ def new_project(
         id=uuid4(),
         name=name,
         description=description,
+        mode=mode,
+        voltage_level_kv=voltage_level_kv,
+        frequency_hz=frequency_hz,
         active_network_snapshot_id=active_network_snapshot_id,
     )
 

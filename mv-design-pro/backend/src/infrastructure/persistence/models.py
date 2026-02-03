@@ -5,9 +5,21 @@ from datetime import datetime
 from typing import Any
 from uuid import UUID
 
-from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Index, String, Text, UniqueConstraint
+from sqlalchemy import (
+    Boolean,
+    CheckConstraint,
+    DateTime,
+    Float,
+    ForeignKey,
+    Index,
+    Numeric,
+    String,
+    Text,
+    UniqueConstraint,
+)
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
+from sqlalchemy.sql import func
 from sqlalchemy.types import TypeDecorator
 
 
@@ -96,23 +108,69 @@ class ProjectORM(Base):
     Project ORM model — P10a root aggregate.
 
     P10a: active_network_snapshot_id tracks the current state of the network.
+
+    Full target schema with:
+    - mode: AS-IS (weryfikacja istniejącej sieci) vs TO-BE (projektowanie nowej)
+    - voltage_level_kv: Poziom napięcia sieci
+    - frequency_hz: Częstotliwość sieci (50 lub 60 Hz)
+    - deleted_at: Soft delete (null = aktywny)
     """
     __tablename__ = "projects"
 
+    # Primary key
     id: Mapped[UUID] = mapped_column(GUID(), primary_key=True)
+
+    # Basic information
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
-    schema_version: Mapped[str] = mapped_column(String(50), nullable=False)
-    # P10a: Reference to the active (current) network snapshot
-    active_network_snapshot_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    schema_version: Mapped[str] = mapped_column(String(50), nullable=False, default="1.0")
+
+    # Project mode: AS-IS vs TO-BE
+    mode: Mapped[str] = mapped_column(String(10), nullable=False, default="AS-IS")
+
+    # Point of Common Coupling (wymagany dla TO-BE z OZE, NC RfG)
     pcc_node_id: Mapped[UUID | None] = mapped_column(
         GUID(), ForeignKey("network_nodes.id", use_alter=True, name="fk_projects_pcc_node")
     )
+    pcc_description: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    # Network parameters
+    voltage_level_kv: Mapped[float] = mapped_column(
+        Numeric(6, 2), nullable=False, default=15.0
+    )
+    frequency_hz: Mapped[float] = mapped_column(
+        Numeric(4, 1), nullable=False, default=50.0
+    )
+
+    # Ownership (nullable - FK to users added in future PR)
+    owner_id: Mapped[UUID | None] = mapped_column(GUID(), nullable=True)
+
+    # P10a: Reference to the active (current) network snapshot
+    active_network_snapshot_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+
     sources_jsonb: Mapped[list[dict[str, Any]]] = mapped_column(
         DeterministicJSON(), nullable=False, default=list
     )
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
-    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+    # Timestamps (UTC)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now()
+    )
+
+    # Soft delete
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    # Table-level constraints (applied for PostgreSQL, SQLite ignores CHECK)
+    __table_args__ = (
+        CheckConstraint("mode IN ('AS-IS', 'TO-BE')", name="ck_projects_mode"),
+        CheckConstraint("voltage_level_kv > 0", name="ck_projects_voltage_positive"),
+        CheckConstraint("frequency_hz IN (50.0, 60.0)", name="ck_projects_frequency_valid"),
+        Index("ix_projects_mode", "mode"),
+        Index("ix_projects_created", "created_at"),
+    )
 
 
 class NetworkSnapshotORM(Base):

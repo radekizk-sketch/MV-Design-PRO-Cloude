@@ -2,23 +2,30 @@
 Projects API — zarządzanie projektami MV-DESIGN PRO.
 
 Endpointy:
-  GET  /api/projects           - lista projektów
-  POST /api/projects           - utwórz projekt
-  GET  /api/projects/{id}      - pobierz projekt
+  GET    /api/projects           - lista projektów
+  POST   /api/projects           - utwórz projekt
+  GET    /api/projects/{id}      - pobierz projekt
+  DELETE /api/projects/{id}      - usuń projekt (soft delete)
 
-UWAGA: Tymczasowo używa in-memory storage.
-Docelowo należy zintegrować z ProjectORM i SQLAlchemy session.
+Persistencja SQLAlchemy z pełnym docelowym schematem:
+- mode: AS-IS (weryfikacja) vs TO-BE (projektowanie)
+- voltage_level_kv: Poziom napięcia sieci
+- frequency_hz: Częstotliwość sieci (50/60 Hz)
+- Soft delete (deleted_at)
 """
 from __future__ import annotations
 
-from datetime import datetime, timezone
-from typing import Any
-from uuid import UUID, uuid4
+from datetime import datetime
+from enum import Enum
+from typing import Callable
+from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from api.dependencies import get_uow_factory
+from domain.models import new_project
+from infrastructure.persistence.unit_of_work import UnitOfWork
 
 router = APIRouter(prefix="/api/projects", tags=["projects"])
 
@@ -28,34 +35,82 @@ router = APIRouter(prefix="/api/projects", tags=["projects"])
 # =============================================================================
 
 
+class ProjectMode(str, Enum):
+    """Tryb projektu - AS-IS (weryfikacja) vs TO-BE (projektowanie)."""
+    AS_IS = "AS-IS"
+    TO_BE = "TO-BE"
+
+
 class ProjectCreate(BaseModel):
-    """Request do tworzenia projektu."""
+    """Request body for POST /api/projects"""
     name: str = Field(..., min_length=1, max_length=255, description="Nazwa projektu")
     description: str | None = Field(None, max_length=1000, description="Opis projektu")
+    mode: ProjectMode = Field(default=ProjectMode.AS_IS, description="Tryb projektu")
+    voltage_level_kv: float = Field(
+        default=15.0, gt=0, description="Poziom napięcia sieci [kV]"
+    )
+    frequency_hz: float = Field(
+        default=50.0, description="Częstotliwość sieci [Hz]"
+    )
+
+    @field_validator("frequency_hz")
+    @classmethod
+    def frequency_must_be_valid(cls, v: float) -> float:
+        if v not in (50.0, 60.0):
+            raise ValueError("Częstotliwość musi wynosić 50.0 lub 60.0 Hz")
+        return v
+
+    @field_validator("name")
+    @classmethod
+    def name_not_blank(cls, v: str) -> str:
+        if not v.strip():
+            raise ValueError("Nazwa projektu nie może być pusta")
+        return v.strip()
 
 
 class ProjectResponse(BaseModel):
-    """Odpowiedź z danymi projektu."""
-    id: str
+    """Response body — pojedynczy projekt"""
+    id: UUID
     name: str
     description: str | None = None
-    created_at: str
-    updated_at: str
+    mode: str
+    voltage_level_kv: float
+    frequency_hz: float
+    pcc_node_id: UUID | None = None
+    pcc_description: str | None = None
+    owner_id: UUID | None = None
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = {"from_attributes": True}
 
 
 class ProjectListResponse(BaseModel):
-    """Lista projektów."""
+    """Response body — lista projektów"""
     projects: list[ProjectResponse]
     total: int
 
 
 # =============================================================================
-# In-memory storage (tymczasowe rozwiązanie)
+# Exceptions
 # =============================================================================
 
-# UWAGA: To tymczasowe rozwiązanie. Docelowo użyj SQLAlchemy + ProjectORM.
-# Słownik przechowuje projekty w pamięci - dane znikają po restarcie serwera.
-_projects: dict[str, dict[str, Any]] = {}
+
+class ProjectNotFoundError(Exception):
+    """Projekt nie został znaleziony."""
+    def __init__(self, project_id: UUID):
+        self.project_id = project_id
+        super().__init__(f"Projekt {project_id} nie został znaleziony")
+
+
+class ProjectHasDependenciesError(Exception):
+    """Projekt ma zależne obiekty i nie może być usunięty."""
+    def __init__(self, project_id: UUID):
+        self.project_id = project_id
+        super().__init__(
+            f"Projekt {project_id} posiada zależne obiekty "
+            f"(warianty/przypadki/obliczenia). Usuń je najpierw."
+        )
 
 
 # =============================================================================
@@ -64,86 +119,132 @@ _projects: dict[str, dict[str, Any]] = {}
 
 
 @router.get("", response_model=ProjectListResponse)
-def list_projects() -> dict[str, Any]:
+def list_projects(
+    uow_factory: Callable[[], UnitOfWork] = Depends(get_uow_factory),
+) -> ProjectListResponse:
     """
-    Zwraca listę wszystkich projektów.
+    Zwraca listę wszystkich aktywnych projektów.
 
     GET /api/projects
     """
-    projects = [
-        ProjectResponse(**p) for p in _projects.values()
-    ]
-    # Sortowanie po nazwie (deterministyczne)
-    projects.sort(key=lambda p: (p.name.lower(), p.id))
-    return {"projects": projects, "total": len(projects)}
+    with uow_factory() as uow:
+        projects_orm = uow.projects.list_all_orm()
+        projects = [
+            ProjectResponse(
+                id=p.id,
+                name=p.name,
+                description=p.description,
+                mode=p.mode,
+                voltage_level_kv=float(p.voltage_level_kv),
+                frequency_hz=float(p.frequency_hz),
+                pcc_node_id=p.pcc_node_id,
+                pcc_description=p.pcc_description,
+                owner_id=p.owner_id,
+                created_at=p.created_at,
+                updated_at=p.updated_at,
+            )
+            for p in projects_orm
+        ]
+        return ProjectListResponse(projects=projects, total=len(projects))
 
 
 @router.post("", response_model=ProjectResponse, status_code=status.HTTP_201_CREATED)
-def create_project(request: ProjectCreate) -> dict[str, Any]:
+def create_project(
+    body: ProjectCreate,
+    uow_factory: Callable[[], UnitOfWork] = Depends(get_uow_factory),
+) -> ProjectResponse:
     """
     Tworzy nowy projekt.
 
     POST /api/projects
     """
-    now = datetime.now(timezone.utc).isoformat()
-    project_id = str(uuid4())
+    with uow_factory() as uow:
+        project = new_project(
+            name=body.name,
+            description=body.description,
+            mode=body.mode.value,
+            voltage_level_kv=body.voltage_level_kv,
+            frequency_hz=body.frequency_hz,
+        )
+        orm = uow.projects.add(project, commit=False)
+        uow.commit()
 
-    project = {
-        "id": project_id,
-        "name": request.name,
-        "description": request.description,
-        "created_at": now,
-        "updated_at": now,
-    }
-    _projects[project_id] = project
-    return project
+        return ProjectResponse(
+            id=orm.id,
+            name=orm.name,
+            description=orm.description,
+            mode=orm.mode,
+            voltage_level_kv=float(orm.voltage_level_kv),
+            frequency_hz=float(orm.frequency_hz),
+            pcc_node_id=orm.pcc_node_id,
+            pcc_description=orm.pcc_description,
+            owner_id=orm.owner_id,
+            created_at=orm.created_at,
+            updated_at=orm.updated_at,
+        )
 
 
 @router.get("/{project_id}", response_model=ProjectResponse)
-def get_project(project_id: str) -> dict[str, Any]:
+def get_project(
+    project_id: UUID,
+    uow_factory: Callable[[], UnitOfWork] = Depends(get_uow_factory),
+) -> ProjectResponse:
     """
     Pobiera projekt po ID.
 
     GET /api/projects/{project_id}
     """
-    # Walidacja UUID
-    try:
-        UUID(project_id)
-    except ValueError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="project_id musi być poprawnym UUID",
-        ) from exc
-
-    project = _projects.get(project_id)
-    if not project:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Projekt nie istnieje: {project_id}",
+    with uow_factory() as uow:
+        orm = uow.projects.get_orm(project_id)
+        if orm is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Projekt nie istnieje: {project_id}",
+            )
+        return ProjectResponse(
+            id=orm.id,
+            name=orm.name,
+            description=orm.description,
+            mode=orm.mode,
+            voltage_level_kv=float(orm.voltage_level_kv),
+            frequency_hz=float(orm.frequency_hz),
+            pcc_node_id=orm.pcc_node_id,
+            pcc_description=orm.pcc_description,
+            owner_id=orm.owner_id,
+            created_at=orm.created_at,
+            updated_at=orm.updated_at,
         )
-    return project
 
 
 @router.delete("/{project_id}", status_code=status.HTTP_204_NO_CONTENT, response_model=None)
-def delete_project(project_id: str):
+def delete_project(
+    project_id: UUID,
+    uow_factory: Callable[[], UnitOfWork] = Depends(get_uow_factory),
+):
     """
-    Usuwa projekt.
+    Usuwa projekt (soft delete).
 
     DELETE /api/projects/{project_id}
+
+    Jeśli projekt ma zależne obiekty (przypadki, obliczenia), zwraca 409 Conflict.
     """
-    # Walidacja UUID
-    try:
-        UUID(project_id)
-    except ValueError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="project_id musi być poprawnym UUID",
-        ) from exc
+    with uow_factory() as uow:
+        # Check if project exists
+        orm = uow.projects.get_orm(project_id)
+        if orm is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Projekt nie istnieje: {project_id}",
+            )
 
-    if project_id not in _projects:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Projekt nie istnieje: {project_id}",
-        )
+        # Check for dependencies
+        if uow.projects.has_dependencies(project_id):
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=f"Projekt {project_id} posiada zależne obiekty "
+                       f"(warianty/przypadki/obliczenia). Usuń je najpierw.",
+            )
 
-    del _projects[project_id]
+        # Soft delete
+        uow.projects.soft_delete(project_id, commit=False)
+        uow.commit()
