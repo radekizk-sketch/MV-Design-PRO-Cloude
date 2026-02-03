@@ -440,6 +440,15 @@ class NetworkGraph:
 - [x] Use `uow.cases` for repositories (no direct CaseRepository construction)
 - [x] Rely on UnitOfWork.__exit__ for commit/rollback
 
+### 6.6 Task 4.6: UoW lifecycle scan across backend (DONE)
+
+**Location:** `backend/src/api/`, `backend/src/application/`, `backend/src/infrastructure/`
+
+**Actions (DONE - 2025-03):**
+- [x] Scan for UnitOfWork usage without context manager (uow_factory / self._uow_factory)
+- [x] Verify all uow.session and uow.<repo> accesses occur inside `with ... as uow`
+- [x] No fixes required (0 BUG findings)
+
 ---
 
 ## 7. Phase 5: Interpretation Layer (DONE)
