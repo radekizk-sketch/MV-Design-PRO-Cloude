@@ -124,6 +124,7 @@ This plan describes the complete refactoring of MV-DESIGN-PRO to align with DIgS
 - [x] Update README.md with architecture overview
 - [x] Docs consolidation & audit report (`docs/audit/spec_vs_code_gap_report.md`)
 - [x] Audyt PF + indeks dokumentacji + plan czyszczenia docs (`docs/audit/STATE_OF_PROJECT.md`, `docs/audit/ROADMAP.md`, `docs/DOCS_INDEX.md`, `docs/audit/DOC_CLEANUP_PLAN.md`)
+- [x] Error scan report (backend/frontend/CI) (`docs/audit/ERROR_SCAN_REPORT.md`)
 
 ---
 
