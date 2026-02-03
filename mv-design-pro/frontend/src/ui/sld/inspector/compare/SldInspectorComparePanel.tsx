@@ -146,7 +146,7 @@ function CompareSection({
         data-testid={`compare-section-header-${section.id}`}
       >
         <span className="text-xs font-medium text-slate-700 flex items-center gap-2">
-          <span className="text-slate-400">{expanded ? '▼' : '▶'}</span>
+          <span className="text-slate-400">{expanded ? '[-]' : '[+]'}</span>
           {section.label}
           {section.hasDifferences && (
             <span className="text-amber-600 text-[10px] font-normal">

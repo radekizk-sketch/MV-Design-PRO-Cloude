@@ -153,7 +153,7 @@ describe('ResultsTable', () => {
       />
     );
 
-    expect(screen.getByText('▲')).toBeInTheDocument();
+    expect(screen.getByText('ASC')).toBeInTheDocument();
   });
 
   it('shows empty state when data is empty', () => {

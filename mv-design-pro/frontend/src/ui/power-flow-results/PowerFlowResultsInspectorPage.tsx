@@ -732,7 +732,7 @@ function SummaryTab() {
             {networkVerdict.problems.slice(0, 10).map((problem, idx) => (
               <li key={`${problem.element_id}-${idx}`} className="flex items-start gap-2">
                 <span className={problem.severity === 'FAIL' ? 'text-rose-600' : 'text-amber-600'}>
-                  {problem.severity === 'FAIL' ? '✗' : '⚠'}
+                  {problem.severity === 'FAIL' ? '[X]' : '[!]'}
                 </span>
                 {problem.description}
               </li>

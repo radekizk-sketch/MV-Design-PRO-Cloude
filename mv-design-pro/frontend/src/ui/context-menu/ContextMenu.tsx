@@ -170,7 +170,7 @@ function ContextMenuItem({ action, onClick }: ContextMenuItemProps) {
           {action.icon && <span>{action.icon}</span>}
           <span>{action.label}</span>
         </span>
-        {hasSubmenu && <span className="text-gray-400">▶</span>}
+        {hasSubmenu && <span className="text-gray-400">&gt;</span>}
       </button>
 
       {/* Submenu */}

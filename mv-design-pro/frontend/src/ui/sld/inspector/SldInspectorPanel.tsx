@@ -143,7 +143,7 @@ function PropertySection({ section, defaultExpanded = true }: PropertySectionPro
         data-testid={`inspector-section-header-${section.id}`}
       >
         <span className="text-xs font-medium text-slate-700 flex items-center gap-2">
-          <span className="text-slate-400">{expanded ? '▼' : '▶'}</span>
+          <span className="text-slate-400">{expanded ? '[-]' : '[+]'}</span>
           {section.label}
         </span>
         <span className="text-[10px] text-slate-400">

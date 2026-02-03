@@ -173,10 +173,10 @@ export const CHECK_STATUS_COLORS: Record<CheckStatus, string> = {
 };
 
 export const CHECK_STATUS_ICONS: Record<CheckStatus, string> = {
-  PASS: '✓',
-  FAIL: '✗',
-  WARN: '⚠',
-  INFO: 'ℹ',
+  PASS: '[OK]',
+  FAIL: '[X]',
+  WARN: '[!]',
+  INFO: '[i]',
 };
 
 export const TAB_LABELS_PL: Record<ReferencePatternsTab, string> = {

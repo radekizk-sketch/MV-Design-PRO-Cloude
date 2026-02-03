@@ -39,9 +39,9 @@ interface Tab {
 }
 
 const TABS: Tab[] = [
-  { id: 'DEVICE', label: 'Urządzenia', icon: '🛡️' },
-  { id: 'CURVE', label: 'Krzywe', icon: '📈' },
-  { id: 'TEMPLATE', label: 'Szablony nastaw', icon: '⚙️' },
+  { id: 'DEVICE', label: 'Urzadzenia', icon: '[DEV]' },
+  { id: 'CURVE', label: 'Krzywe', icon: '[CRV]' },
+  { id: 'TEMPLATE', label: 'Szablony nastaw', icon: '[TPL]' },
 ];
 
 interface ProtectionLibraryBrowserProps {
@@ -212,20 +212,20 @@ export function ProtectionLibraryBrowser({
               disabled={loading}
               className="rounded bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
             >
-              📤 Eksportuj
+              Eksportuj
             </button>
             <button
               onClick={handleImportClick}
               disabled={loading}
               className="rounded bg-green-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-50"
             >
-              📥 Importuj
+              Importuj
             </button>
             <button
               onClick={() => setShowManifestPanel(!showManifestPanel)}
               className="rounded bg-gray-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-gray-700"
             >
-              📋 Manifest
+              Manifest
             </button>
             <input
               ref={fileInputRef}
@@ -534,13 +534,13 @@ function ProtectionImportReportDialog({
           {report.success ? (
             <div className="bg-green-50 border border-green-200 rounded-md px-4 py-3">
               <p className="text-green-800 font-medium">
-                ✓ Import zakończony sukcesem
+                Import zakonczony sukcesem
               </p>
             </div>
           ) : (
             <div className="bg-red-50 border border-red-200 rounded-md px-4 py-3">
               <p className="text-red-800 font-medium">
-                ✗ Import zakończony błędami
+                Import zakonczony bledami
               </p>
             </div>
           )}

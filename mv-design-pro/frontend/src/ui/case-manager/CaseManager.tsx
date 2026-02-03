@@ -46,9 +46,9 @@ interface CaseManagerProps {
 // =============================================================================
 
 const STATUS_ICONS: Record<StudyCaseResultStatus, string> = {
-  NONE: '○',
-  FRESH: '●',
-  OUTDATED: '◐',
+  NONE: '[ ]',
+  FRESH: '[OK]',
+  OUTDATED: '[!]',
 };
 
 const STATUS_COLORS: Record<StudyCaseResultStatus, string> = {
@@ -518,8 +518,8 @@ function CaseRow({
       {/* Name */}
       <div className="flex items-center gap-2 min-w-0">
         {caseItem.is_active && (
-          <span className="text-green-600 text-sm" title="Aktywny przypadek">
-            ▸
+          <span className="text-green-600 text-sm font-bold" title="Aktywny przypadek">
+            &gt;
           </span>
         )}
         {isRenaming ? (
@@ -630,7 +630,7 @@ function CaseRow({
                 )}
                 title={getBlockedReason('activate') || 'Ustaw jako aktywny'}
               >
-                {isActivating ? '...' : '▸'}
+                {isActivating ? '...' : '>'}
               </button>
             )}
             <button
@@ -647,7 +647,7 @@ function CaseRow({
               )}
               title={getBlockedReason('rename') || 'Zmień nazwę'}
             >
-              ✏️
+              Ed
             </button>
             <button
               onClick={(e) => {

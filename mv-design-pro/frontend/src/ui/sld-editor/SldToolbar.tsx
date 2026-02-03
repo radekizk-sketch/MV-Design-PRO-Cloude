@@ -258,37 +258,37 @@ export const SldToolbar: React.FC = () => {
       <div className="flex items-center gap-1">
         <span className="text-xs text-gray-500 mr-1">Wyrównaj:</span>
         <ToolbarButton
-          label="◀"
+          label="L"
           title="Wyrównaj do lewej"
           onClick={() => handleAlign('left')}
           disabled={!canAlign}
         />
         <ToolbarButton
-          label="▶"
+          label="P"
           title="Wyrównaj do prawej"
           onClick={() => handleAlign('right')}
           disabled={!canAlign}
         />
         <ToolbarButton
-          label="▲"
+          label="G"
           title="Wyrównaj do góry"
           onClick={() => handleAlign('top')}
           disabled={!canAlign}
         />
         <ToolbarButton
-          label="▼"
+          label="D"
           title="Wyrównaj do dołu"
           onClick={() => handleAlign('bottom')}
           disabled={!canAlign}
         />
         <ToolbarButton
-          label="⬌"
+          label="H"
           title="Wyśrodkuj poziomo"
           onClick={() => handleAlign('center-horizontal')}
           disabled={!canAlign}
         />
         <ToolbarButton
-          label="⬍"
+          label="V"
           title="Wyśrodkuj pionowo"
           onClick={() => handleAlign('center-vertical')}
           disabled={!canAlign}
@@ -337,7 +337,7 @@ export const SldToolbar: React.FC = () => {
         <>
           <ToolbarDivider />
           <div className="text-xs text-amber-600 font-medium">
-            ⚠️ Edycja niedostępna w trybie wyników
+            [!] Edycja niedostepna w trybie wynikow
           </div>
         </>
       )}

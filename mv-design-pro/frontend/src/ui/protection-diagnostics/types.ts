@@ -41,9 +41,9 @@ export const SEVERITY_COLORS: Record<DiagnosticSeverity, string> = {
  * Ikony dla severity.
  */
 export const SEVERITY_ICONS: Record<DiagnosticSeverity, string> = {
-  ERROR: '✕',
-  WARN: '⚠',
-  INFO: 'ℹ',
+  ERROR: '[E]',
+  WARN: '[W]',
+  INFO: '[i]',
 };
 
 // =============================================================================

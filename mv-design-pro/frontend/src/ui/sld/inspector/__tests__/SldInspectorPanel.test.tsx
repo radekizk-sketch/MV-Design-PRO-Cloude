@@ -461,13 +461,13 @@ describe('SldInspectorPanel - Collapsible Sections', () => {
 
     const sectionHeader = screen.getByTestId('inspector-section-header-basic');
 
-    // Expanded state should show down arrow
-    expect(sectionHeader.textContent).toContain('▼');
+    // Expanded state should show collapse indicator
+    expect(sectionHeader.textContent).toContain('[-]');
 
     fireEvent.click(sectionHeader);
 
-    // Collapsed state should show right arrow
-    expect(sectionHeader.textContent).toContain('▶');
+    // Collapsed state should show expand indicator
+    expect(sectionHeader.textContent).toContain('[+]');
   });
 });
 

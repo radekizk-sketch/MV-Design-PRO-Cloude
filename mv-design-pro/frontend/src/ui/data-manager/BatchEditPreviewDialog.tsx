@@ -132,7 +132,7 @@ export function BatchEditPreviewDialog({
           <div className="text-sm text-gray-600">
             {preview.hasErrors ? (
               <span className="text-red-600 font-medium">
-                ⚠ Nie można zastosować zmian z błędami
+                [!] Nie mozna zastosowac zmian z bledami
               </span>
             ) : (
               <span>
@@ -237,7 +237,7 @@ function formatValue(value: unknown): string {
     return '—';
   }
   if (typeof value === 'boolean') {
-    return value ? '✓' : '✗';
+    return value ? 'TAK' : 'NIE';
   }
   if (typeof value === 'number') {
     return value.toFixed(3);

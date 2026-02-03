@@ -143,7 +143,7 @@ function PropertySection({ section, defaultCollapsed = false }: PropertySectionP
         data-testid={`inspector-section-header-${section.id}`}
       >
         <span className="text-xs font-medium text-slate-700 flex items-center gap-2">
-          <span className="text-slate-400">{collapsed ? '▶' : '▼'}</span>
+          <span className="text-slate-400">{collapsed ? '[+]' : '[-]'}</span>
           {section.label}
         </span>
         <span className="text-xs text-slate-400">

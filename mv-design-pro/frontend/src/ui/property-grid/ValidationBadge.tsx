@@ -46,13 +46,13 @@ const SEVERITY_STYLES: Record<ValidationSeverity, {
     badge: 'bg-red-100 text-red-800 border-red-200',
     text: 'text-red-700',
     bg: 'bg-red-50',
-    icon: '✕',
+    icon: 'E',
   },
   WARNING: {
     badge: 'bg-yellow-100 text-yellow-800 border-yellow-200',
     text: 'text-yellow-700',
     bg: 'bg-yellow-50',
-    icon: '⚠',
+    icon: 'W',
   },
 };
 
@@ -174,7 +174,7 @@ export function ValidationSummary({
   if (messages.length === 0) {
     return (
       <div className={clsx('text-xs text-green-600 flex items-center gap-1', className)}>
-        <span className="text-green-500">✓</span>
+        <span className="text-green-500 font-bold">OK</span>
         Brak błędów walidacji
       </div>
     );

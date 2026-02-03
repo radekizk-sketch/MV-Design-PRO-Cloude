@@ -290,10 +290,10 @@ describe('TypeLibraryBrowser', () => {
     expect(tabs).toHaveLength(4);
 
     // Check icons are present (they're rendered as text)
-    expect(screen.getByText('─')).toBeInTheDocument(); // Line icon
-    expect(screen.getByText('═')).toBeInTheDocument(); // Cable icon
-    expect(screen.getByText('⚡')).toBeInTheDocument(); // Transformer icon
-    expect(screen.getByText('⚙️')).toBeInTheDocument(); // Switch icon
+    expect(screen.getByText('[LN]')).toBeInTheDocument(); // Line icon
+    expect(screen.getByText('[CB]')).toBeInTheDocument(); // Cable icon
+    expect(screen.getByText('[TR]')).toBeInTheDocument(); // Transformer icon
+    expect(screen.getByText('[SW]')).toBeInTheDocument(); // Switch icon
   });
 
   it('displays manufacturer in type list', async () => {

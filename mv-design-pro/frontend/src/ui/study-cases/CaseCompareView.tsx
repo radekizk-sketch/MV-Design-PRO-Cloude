@@ -218,7 +218,7 @@ function ComparisonResultView({ comparison }: ComparisonResultViewProps) {
         </div>
       ) : (
         <div className="text-center py-8 text-gray-500">
-          <div className="text-4xl mb-2">✓</div>
+          <div className="text-4xl mb-2 font-bold text-green-600">OK</div>
           <div className="text-sm">Konfiguracje są identyczne.</div>
         </div>
       )}

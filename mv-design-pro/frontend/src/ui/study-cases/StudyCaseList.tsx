@@ -25,9 +25,9 @@ import {
 // =============================================================================
 
 const STATUS_ICONS: Record<StudyCaseResultStatus, string> = {
-  NONE: '○',
-  FRESH: '●',
-  OUTDATED: '◐',
+  NONE: '[ ]',
+  FRESH: '[OK]',
+  OUTDATED: '[!]',
 };
 
 const STATUS_COLORS: Record<StudyCaseResultStatus, string> = {
@@ -197,8 +197,8 @@ function StudyCaseListItem({
       {/* Active indicator */}
       <span className="w-4 text-center mr-2">
         {caseItem.is_active && (
-          <span className="text-blue-600" title="Aktywny przypadek">
-            ▸
+          <span className="text-blue-600 font-bold" title="Aktywny przypadek">
+            &gt;
           </span>
         )}
       </span>
@@ -266,7 +266,7 @@ function StudyCaseContextMenu({
           className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100"
           onClick={() => onActivate(caseId)}
         >
-          ▸ Ustaw jako aktywny
+          Ustaw jako aktywny
         </button>
       )}
 
@@ -275,7 +275,7 @@ function StudyCaseContextMenu({
         className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100"
         onClick={() => onClone(caseId)}
       >
-        ⎘ Klonuj przypadek
+        Klonuj przypadek
       </button>
 
       {/* Separator */}
@@ -286,7 +286,7 @@ function StudyCaseContextMenu({
         className="w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50"
         onClick={() => onDelete(caseId)}
       >
-        ✕ Usuń przypadek
+        Usun przypadek
       </button>
     </div>
   );

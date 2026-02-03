@@ -203,8 +203,8 @@ export function PropertyGrid({
       {mode === 'RESULT_VIEW' && (
         <div className="bg-green-50 border-b border-green-200 px-4 py-3">
           <div className="flex items-center gap-2 text-xs text-green-800">
-            <span>🔒</span>
-            <span>Tryb wyników — edycja niedostępna. Wszystkie pola są tylko do odczytu.</span>
+            <span className="font-bold">[RO]</span>
+            <span>Tryb wyników — edycja niedostępna. Wszystkie pola sa tylko do odczytu.</span>
           </div>
         </div>
       )}
@@ -231,7 +231,7 @@ export function PropertyGrid({
             className="w-full flex items-center justify-between px-4 py-2 bg-gray-50 hover:bg-gray-100 transition-colors"
           >
             <span className="text-xs font-medium text-gray-700 flex items-center gap-2">
-              {collapsedSections.has('validation_summary') ? '▶' : '▼'} {SECTION_LABELS.validation || 'Stan walidacji'}
+              {collapsedSections.has('validation_summary') ? '[+]' : '[-]'} {SECTION_LABELS.validation || 'Stan walidacji'}
               {allValidationMessages.length > 0 && (
                 <span className={clsx(
                   'px-1.5 py-0.5 rounded text-xs',
@@ -305,7 +305,7 @@ function PropertySection({
         className="w-full flex items-center justify-between px-4 py-2 bg-gray-50 hover:bg-gray-100 transition-colors"
       >
         <span className="text-xs font-medium text-gray-700 flex items-center gap-2">
-          {collapsed ? '▶' : '▼'} {section.label}
+          {collapsed ? '[+]' : '[-]'} {section.label}
           {errorCount > 0 && (
             <ValidationIcon severity="ERROR" />
           )}
@@ -519,7 +519,7 @@ function PropertyFieldRow({
         {/* Read-only indicator */}
         {isReadOnly && field.editable && (
           <span className="text-xs text-gray-400 ml-1" title="Tylko do odczytu w tym trybie">
-            🔒
+            [RO]
           </span>
         )}
       </div>
