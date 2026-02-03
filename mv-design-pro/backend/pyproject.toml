@@ -26,6 +26,7 @@ networkx = "^3.2.1"
 pydantic = "^2.5.0"
 pydantic-settings = "^2.1.0"
 asyncpg = "^0.29.0"
+psycopg = {extras = ["binary"], version = "^3.1.18"}
 motor = "^3.3.2"
 redis = "^5.0.1"
 python-multipart = "^0.0.6"
