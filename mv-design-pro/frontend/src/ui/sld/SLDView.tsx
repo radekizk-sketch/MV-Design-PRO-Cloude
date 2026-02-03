@@ -19,7 +19,9 @@ import React, { useState, useCallback, useRef, useEffect, useMemo } from 'react'
 import { SLDViewCanvas } from './SLDViewCanvas';
 import { ResultsOverlay } from './ResultsOverlay';
 import { DiagnosticsOverlay } from './DiagnosticsOverlay';
+import { DiagnosticResultsLayer } from './DiagnosticResultsLayer';
 import { SwitchingStateLegend } from './SwitchingStateLegend';
+import { useSldModeStore, SLD_MODE_LABELS_PL } from './sldModeStore';
 import {
   DEFAULT_VIEWPORT,
   ZOOM_MIN,
@@ -98,6 +100,13 @@ export const SLDView: React.FC<SLDViewProps> = ({
 
   // Check if there are any diagnostics results (fixture for now)
   const { hasResults: hasDiagnostics } = useSanityChecks('demo-project', 'demo-diagram');
+
+  // SLD mode store integration (PR-SLD-06)
+  const sldMode = useSldModeStore((state) => state.mode);
+  const diagnosticLayerVisible = useSldModeStore((state) => state.diagnosticLayerVisible);
+  const setMode = useSldModeStore((state) => state.setMode);
+  const toggleDiagnosticLayer = useSldModeStore((state) => state.toggleDiagnosticLayer);
+  const isResultsMode = sldMode === 'WYNIKI';
 
   // Export dialog state
   const [exportDialogOpen, setExportDialogOpen] = useState(false);
@@ -309,6 +318,21 @@ export const SLDView: React.FC<SLDViewProps> = ({
   );
 
   /**
+   * Handle SLD mode toggle (PR-SLD-06).
+   */
+  const handleModeToggle = useCallback(() => {
+    const newMode = sldMode === 'EDYCJA' ? 'WYNIKI' : 'EDYCJA';
+    setMode(newMode);
+  }, [sldMode, setMode]);
+
+  /**
+   * Handle diagnostic layer toggle (PR-SLD-06).
+   */
+  const handleDiagnosticLayerToggle = useCallback(() => {
+    toggleDiagnosticLayer();
+  }, [toggleDiagnosticLayer]);
+
+  /**
    * Handle export dialog open.
    */
   const handleExportClick = useCallback(() => {
@@ -435,6 +459,17 @@ export const SLDView: React.FC<SLDViewProps> = ({
           <span className="text-xs text-gray-500">
             (tylko podglad)
           </span>
+          {/* PR-SLD-06: Mode indicator */}
+          <span
+            data-testid="sld-mode-indicator"
+            className={`ml-2 rounded px-2 py-0.5 text-xs font-medium ${
+              isResultsMode
+                ? 'bg-gray-800 text-white'
+                : 'bg-gray-200 text-gray-700'
+            }`}
+          >
+            {SLD_MODE_LABELS_PL[sldMode]}
+          </span>
         </div>
 
         <div className="flex items-center gap-2">
@@ -545,6 +580,39 @@ export const SLDView: React.FC<SLDViewProps> = ({
             </>
           )}
 
+          {/* PR-SLD-06: Mode toggle */}
+          <div className="w-px h-4 bg-gray-300 mx-1" />
+          <button
+            type="button"
+            onClick={handleModeToggle}
+            className={`px-2 py-1 text-xs rounded ${
+              isResultsMode
+                ? 'bg-gray-800 text-white hover:bg-gray-700'
+                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+            }`}
+            title={isResultsMode ? 'Przelacz na tryb Edycja' : 'Przelacz na tryb Wyniki'}
+            data-testid="sld-mode-toggle"
+          >
+            {isResultsMode ? 'Tryb: Wyniki' : 'Tryb: Edycja'}
+          </button>
+
+          {/* PR-SLD-06: Diagnostic layer toggle (only in WYNIKI mode) */}
+          {isResultsMode && (
+            <button
+              type="button"
+              onClick={handleDiagnosticLayerToggle}
+              className={`px-2 py-1 text-xs rounded ${
+                diagnosticLayerVisible
+                  ? 'bg-gray-700 text-white hover:bg-gray-600'
+                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              }`}
+              title={diagnosticLayerVisible ? 'Ukryj warstwe diagnostyczna' : 'Pokaz warstwe diagnostyczna'}
+              data-testid="sld-diagnostic-layer-toggle"
+            >
+              {diagnosticLayerVisible ? 'Warstwa: Wl.' : 'Warstwa: Wyl.'}
+            </button>
+          )}
+
           {/* Export button */}
           <div className="w-px h-4 bg-gray-300 mx-1" />
           <button
@@ -626,6 +694,15 @@ export const SLDView: React.FC<SLDViewProps> = ({
 
         {/* Switching state & energization legend (base layer) */}
         <SwitchingStateLegend visible={true} />
+
+        {/* PR-SLD-06: Diagnostic results layer (only in WYNIKI mode) */}
+        {isResultsMode && (
+          <DiagnosticResultsLayer
+            symbols={symbols}
+            viewport={viewport}
+            visible={diagnosticLayerVisible}
+          />
+        )}
       </div>
 
       {/* Status bar */}
@@ -642,8 +719,17 @@ export const SLDView: React.FC<SLDViewProps> = ({
             </span>
           )}
         </div>
-        <div>
-          Przeciagaj srodkowym/prawym przyciskiem myszy | Scroll: zoom
+        <div className="flex items-center gap-4">
+          {/* PR-SLD-06: Mode status in status bar */}
+          {isResultsMode && (
+            <span
+              data-testid="sld-status-results-mode"
+              className="font-medium text-gray-700"
+            >
+              Tryb WYNIKI (tylko odczyt)
+            </span>
+          )}
+          <span>Przeciagaj srodkowym/prawym przyciskiem myszy | Scroll: zoom</span>
         </div>
       </div>
 

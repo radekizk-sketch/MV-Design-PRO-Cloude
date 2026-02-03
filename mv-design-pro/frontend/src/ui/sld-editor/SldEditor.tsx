@@ -24,6 +24,8 @@ import { useSldEditorStore } from './SldEditorStore';
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
 import { useIsMutationBlocked, useModeLabel } from '../selection/store';
 import { UndoRedoButtons } from '../history/UndoRedoButtons';
+import { useSldModeStore, SLD_MODE_LABELS_PL } from '../sld/sldModeStore';
+import { DiagnosticResultsLayer } from '../sld/DiagnosticResultsLayer';
 import type { AnySldSymbol } from './types';
 
 /**
@@ -64,6 +66,15 @@ export const SldEditor: React.FC<SldEditorProps> = ({
   const isMutationBlocked = useIsMutationBlocked();
   const modeLabel = useModeLabel();
 
+  // PR-SLD-06: SLD Mode integration
+  const sldMode = useSldModeStore((state) => state.mode);
+  const diagnosticLayerVisible = useSldModeStore((state) => state.diagnosticLayerVisible);
+  const setMode = useSldModeStore((state) => state.setMode);
+  const isResultsMode = sldMode === 'WYNIKI';
+
+  // Combine mutation blocking with results mode
+  const isEditBlocked = isMutationBlocked || isResultsMode;
+
   // Initialize symbols
   useEffect(() => {
     if (initialSymbols.length > 0) {
@@ -88,11 +99,11 @@ export const SldEditor: React.FC<SldEditorProps> = ({
     }
   }, [sldStore.symbols, onSymbolsChange]);
 
-  // Setup keyboard shortcuts
+  // Setup keyboard shortcuts (disabled in WYNIKI mode)
   useKeyboardShortcuts({
-    enableCopyPaste: true,
-    enableUndoRedo: true,
-    enableSelection: true,
+    enableCopyPaste: !isResultsMode,
+    enableUndoRedo: !isResultsMode,
+    enableSelection: !isResultsMode,
   });
 
   return (
@@ -101,36 +112,85 @@ export const SldEditor: React.FC<SldEditorProps> = ({
       <div className="flex items-center justify-between px-4 py-2 bg-white border-b border-gray-300">
         <div>
           <h2 className="text-lg font-semibold text-gray-800">Edytor SLD</h2>
-          <p className="text-xs text-gray-500">
-            Tryb: <span className="font-medium">{modeLabel}</span>
-          </p>
-        </div>
-        {showUndoRedo && (
-          <div className="flex items-center gap-2">
-            <UndoRedoButtons />
+          <div className="flex items-center gap-2 text-xs text-gray-500">
+            <span>
+              Tryb: <span className="font-medium">{modeLabel}</span>
+            </span>
+            {/* PR-SLD-06: Mode indicator */}
+            <span
+              data-testid="sld-editor-mode-indicator"
+              className={`rounded px-2 py-0.5 font-medium ${
+                isResultsMode
+                  ? 'bg-gray-800 text-white'
+                  : 'bg-gray-200 text-gray-700'
+              }`}
+            >
+              {SLD_MODE_LABELS_PL[sldMode]}
+            </span>
           </div>
-        )}
+        </div>
+        <div className="flex items-center gap-2">
+          {/* PR-SLD-06: Mode toggle button */}
+          <button
+            type="button"
+            onClick={() => setMode(isResultsMode ? 'EDYCJA' : 'WYNIKI')}
+            className={`px-3 py-1 text-xs rounded ${
+              isResultsMode
+                ? 'bg-gray-800 text-white hover:bg-gray-700'
+                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+            }`}
+            title={isResultsMode ? 'Przelacz na tryb Edycja' : 'Przelacz na tryb Wyniki'}
+            data-testid="sld-editor-mode-toggle"
+          >
+            {isResultsMode ? 'Tryb: Wyniki' : 'Tryb: Edycja'}
+          </button>
+          {showUndoRedo && !isResultsMode && (
+            <UndoRedoButtons />
+          )}
+        </div>
       </div>
 
-      {/* Toolbar */}
-      {showToolbar && <SldToolbar />}
+      {/* Toolbar (hidden in WYNIKI mode) */}
+      {showToolbar && !isResultsMode && <SldToolbar />}
 
       {/* Canvas */}
-      <div className="flex-1 overflow-auto p-4">
+      <div className="flex-1 overflow-auto p-4 relative">
         <SldCanvas />
+        {/* PR-SLD-06: Diagnostic layer overlay in WYNIKI mode */}
+        {isResultsMode && diagnosticLayerVisible && (
+          <DiagnosticResultsLayer
+            symbols={Array.from(sldStore.symbols.values())}
+            viewport={{ offsetX: 0, offsetY: 0, zoom: 1 }}
+            visible={diagnosticLayerVisible}
+          />
+        )}
       </div>
 
       {/* Footer / Status bar */}
       <div className="px-4 py-2 bg-white border-t border-gray-300">
         <div className="flex items-center justify-between text-xs text-gray-600">
           <div>
-            Siatka: {sldStore.gridConfig.visible ? 'Widoczna' : 'Ukryta'} | Przyciąganie:{' '}
-            {sldStore.gridConfig.snapEnabled ? 'Włączone' : 'Wyłączone'}
+            {!isResultsMode && (
+              <>
+                Siatka: {sldStore.gridConfig.visible ? 'Widoczna' : 'Ukryta'} | Przyciąganie:{' '}
+                {sldStore.gridConfig.snapEnabled ? 'Włączone' : 'Wyłączone'}
+              </>
+            )}
+            {isResultsMode && (
+              <span data-testid="sld-editor-results-mode-status">
+                Tryb WYNIKI: schemat w trybie tylko do odczytu
+              </span>
+            )}
           </div>
           <div>
-            {isMutationBlocked && (
-              <span className="text-amber-600 font-medium">
-                ⚠️ Edycja zablokowana (tryb tylko do odczytu)
+            {isEditBlocked && (
+              <span
+                data-testid="sld-editor-edit-blocked"
+                className="text-gray-700 font-medium"
+              >
+                {isResultsMode
+                  ? 'Tryb WYNIKI - edycja zablokowana'
+                  : 'Edycja zablokowana (tryb tylko do odczytu)'}
               </span>
             )}
           </div>
