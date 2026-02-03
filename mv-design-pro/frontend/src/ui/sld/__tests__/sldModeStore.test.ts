@@ -1,15 +1,15 @@
 /**
- * SLD MODE STORE TESTS — Testy store trybu SLD (PR-SLD-06)
+ * TESTY MAGAZYNU TRYBU SLD — Testy magazynu trybu SLD (PR-SLD-06)
  *
  * CANONICAL ALIGNMENT:
- * - sld_rules.md § C.2: RESULT_VIEW mode
- * - powerfactory_ui_parity.md § A.3: URL reflects navigation state
+ * - sld_rules.md § C.2: Tryb RESULT_VIEW
+ * - powerfactory_ui_parity.md § A.3: URL odzwierciedla stan nawigacji
  *
- * TEST COVERAGE:
+ * ZAKRES TESTOW:
  * - Przelaczanie trybow EDYCJA/WYNIKI
  * - Automatyczne wlaczanie warstwy diagnostycznej w trybie WYNIKI
- * - Persistence URL state
- * - Derived hooks
+ * - Utrwalanie stanu w adresie URL
+ * - Pochodne funkcje pomocnicze
  */
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
@@ -279,10 +279,10 @@ describe('sldModeStore', () => {
 });
 
 // =============================================================================
-// DERIVED HOOKS TESTS
+// TESTY POCHODNYCH FUNKCJI POMOCNICZYCH
 // =============================================================================
 
-describe('Derived Hooks', () => {
+describe('Pochodne funkcje pomocnicze', () => {
   beforeEach(() => {
     const store = useSldModeStore.getState();
     store.resetMode();
