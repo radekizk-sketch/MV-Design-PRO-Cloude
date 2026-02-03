@@ -49,7 +49,7 @@ interface PropertyGridProps {
  * Respects operating mode for edit/read-only state.
  */
 export function PropertyGrid({
-  elementId,
+  elementId: _elementId,
   elementType,
   elementName,
   elementData = {},
@@ -544,7 +544,7 @@ interface FieldInputProps {
   elementType: ElementType;
 }
 
-function FieldInput({ field, onChange, elementType }: FieldInputProps) {
+function FieldInput({ field, onChange, elementType: _elementType }: FieldInputProps) {
   const [localValue, setLocalValue] = useState<string>(
     field.value !== null && field.value !== undefined ? String(field.value) : ''
   );

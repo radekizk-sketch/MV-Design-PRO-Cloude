@@ -22,7 +22,6 @@ import { clsx } from 'clsx';
 import {
   useAppStateStore,
   useActiveCaseName,
-  useActiveCaseKind,
   useCaseKindLabel,
   useResultStatusLabel,
   useHasActiveCase,

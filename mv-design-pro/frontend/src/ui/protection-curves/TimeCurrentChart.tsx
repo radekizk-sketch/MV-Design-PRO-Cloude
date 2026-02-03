@@ -155,7 +155,6 @@ function interpolateTripTime(
 function CustomTooltip({ active, payload, label, curves }: CustomTooltipProps) {
   if (!active || !payload?.length || !label) return null;
 
-  const labels = PROTECTION_CURVES_LABELS.chart;
   const current = label;
 
   return (

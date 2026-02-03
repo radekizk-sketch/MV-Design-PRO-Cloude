@@ -26,7 +26,6 @@ import type {
 import {
   PROTECTION_CURVES_LABELS,
   DEFAULT_CHART_CONFIG,
-  CURVE_COLORS,
 } from './types';
 import { TimeCurrentChart } from './TimeCurrentChart';
 import { CurveLibrary } from './CurveLibrary';

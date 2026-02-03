@@ -107,7 +107,7 @@ export function useNavigationWithSelection() {
    * Per PROOF_UI_ARCHITECTURE.md § 6.4: Navigation preserves context.
    */
   const goToProofForElement = useCallback(
-    (elementId: string, analysisType?: 'SHORT_CIRCUIT' | 'LOAD_FLOW' | 'PROTECTION') => {
+    (_elementId: string, analysisType?: 'SHORT_CIRCUIT' | 'LOAD_FLOW' | 'PROTECTION') => {
       if (analysisType) {
         setActiveAnalysisType(analysisType);
       }

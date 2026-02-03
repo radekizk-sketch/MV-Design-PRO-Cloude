@@ -17,8 +17,6 @@ import { useState, useCallback } from 'react';
 import type { CurveStandard, IECCurveType, IEEECurveType, ProtectionCurve } from './types';
 import {
   PROTECTION_CURVES_LABELS,
-  IEC_CURVE_OPTIONS,
-  IEEE_CURVE_OPTIONS,
   CURVE_COLORS,
 } from './types';
 

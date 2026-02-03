@@ -13,7 +13,7 @@
  * - Polish labels for UI display
  */
 
-import type { ResultStatus } from '../types';
+import type { ResultStatus as _ResultStatus } from '../types';
 
 // =============================================================================
 // Run Header

@@ -62,7 +62,7 @@ interface ResultsState {
  * const { status, markFresh, markOutdated } = useResultsStore();
  * ```
  */
-export const useResultsStore = create<ResultsState>((set, get) => ({
+export const useResultsStore = create<ResultsState>((set, _get) => ({
   // Initial state: no results
   status: 'NONE',
   lastResult: null,

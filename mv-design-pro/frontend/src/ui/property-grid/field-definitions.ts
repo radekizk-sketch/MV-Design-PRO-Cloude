@@ -600,7 +600,7 @@ function applyModeRules(
  * - Edytowalne: instance fields (nie type, calculated, audit)
  */
 function applyModelEditRules(
-  elementType: ElementType,
+  _elementType: ElementType,
   sections: PropertySection[]
 ): PropertySection[] {
   // Include: identification, state, topology, type_reference, type_params, local_params, electrical_params (for some), nameplate, short_circuit, power_flow, oltc, audit
@@ -708,7 +708,7 @@ function applyCaseConfigRules(
  * - All fields are READ-ONLY
  */
 function applyResultViewRules(
-  elementType: ElementType,
+  _elementType: ElementType,
   sections: PropertySection[]
 ): PropertySection[] {
   const allowedSections = [

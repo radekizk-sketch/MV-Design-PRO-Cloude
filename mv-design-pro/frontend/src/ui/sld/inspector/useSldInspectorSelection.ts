@@ -31,8 +31,6 @@ import {
 import type {
   InspectorSelection,
   InspectorElementSelection,
-  InspectorConnectionSelection,
-  InspectorNoSelection,
   InspectorPropertySection,
   InspectorPropertyField,
   InspectorResultData,
@@ -46,7 +44,6 @@ import {
   INSPECTOR_SECTION_LABELS_PL,
   PORT_LABELS_PL,
 } from './types';
-import type { ElementType, SelectedElement } from '../../types';
 import type {
   AnySldSymbol,
   Connection,

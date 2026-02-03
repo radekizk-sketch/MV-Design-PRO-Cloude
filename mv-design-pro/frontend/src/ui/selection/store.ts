@@ -13,7 +13,7 @@
 
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import type { ElementType, OperatingMode, ResultStatus, SelectedElement, MultiSelection } from '../types';
+import type { OperatingMode, ResultStatus, SelectedElement, MultiSelection } from '../types';
 
 /**
  * Selection state interface.
@@ -154,7 +154,6 @@ export const useSelectionStore = create<SelectionState>()(
     }),
     {
       name: 'mv-design-selection-store',
-      partialState: true,
       // Only persist UI state, not runtime state
       partialize: (state) => ({
         treeExpandedNodes: state.treeExpandedNodes,

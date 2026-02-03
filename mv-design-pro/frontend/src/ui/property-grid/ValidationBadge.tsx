@@ -167,7 +167,7 @@ interface ValidationSummaryProps {
  */
 export function ValidationSummary({
   messages,
-  title = 'Błędy walidacji',
+  title: _title = 'Błędy walidacji',
   maxVisible = 5,
   className,
 }: ValidationSummaryProps) {

@@ -96,7 +96,7 @@ export function getCommonFields(elements: ElementData[], mode: OperatingMode = '
  * @returns MultiEditFieldValue (uniform or mixed)
  */
 export function mergeFieldValues(
-  fieldKey: string,
+  _fieldKey: string,
   values: unknown[]
 ): MultiEditFieldValue {
   if (values.length === 0) {
@@ -193,7 +193,7 @@ export function formatMultiEditValue(value: MultiEditFieldValue): string {
  */
 export function isMultiEditFieldEditable(
   field: PropertyField,
-  value: MultiEditFieldValue
+  _value: MultiEditFieldValue
 ): boolean {
   // Must be editable field
   if (!field.editable) return false;

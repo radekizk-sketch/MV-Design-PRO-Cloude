@@ -71,7 +71,7 @@ export function PropertyGridContainer({
   onFieldChangeMulti,
   onDataRefresh,
 }: PropertyGridContainerProps) {
-  const multiSelection = useMultiSelection();
+  useMultiSelection();
   const [isTypePickerOpen, setIsTypePickerOpen] = useState(false);
   const [typePickerCategory, setTypePickerCategory] = useState<TypeCategory | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -113,6 +113,8 @@ export function PropertyGridContainer({
 
   // Handle "Clear Type" button click
   const handleClearType = useCallback(async () => {
+    if (!elementId) return;
+
     setIsProcessing(true);
     setError(null);
 
@@ -146,7 +148,9 @@ export function PropertyGridContainer({
 
   // Handle type selection from TypePicker
   const handleSelectType = useCallback(
-    async (typeId: string, typeName: string) => {
+    async (typeId: string, _typeName: string) => {
+      if (!elementId) return;
+
       setIsProcessing(true);
       setError(null);
 

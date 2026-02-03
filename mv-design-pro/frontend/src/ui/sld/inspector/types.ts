@@ -13,7 +13,7 @@
  * 100% POLISH UI - BRAK ANGLICYZMÓW
  */
 
-import type { ElementType, IssueSeverity } from '../../types';
+import type { ElementType } from '../../types';
 import type { Connection, AnySldSymbol, PortName } from '../../sld-editor/types';
 
 // =============================================================================

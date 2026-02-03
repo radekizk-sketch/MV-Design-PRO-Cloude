@@ -22,7 +22,7 @@ import type { OperatingMode, PropertyField, ValidationMessage, MultiEditFieldVal
 import { useSelectionStore, useCanEdit, useBlockedActionMessage } from '../selection';
 import { useHistoryStore } from '../history/HistoryStore';
 import { PropertyBatchEditCommand, type ElementChange } from '../history/commands/PropertyBatchEditCommand';
-import { ValidationBadge, ValidationSummary, ValidationIcon } from './ValidationBadge';
+import { ValidationSummary, ValidationIcon } from './ValidationBadge';
 import { UnitLabel } from './UnitLabel';
 import { validateField } from './validation';
 import { SECTION_LABELS } from './field-definitions';
@@ -62,7 +62,7 @@ export function PropertyGridMultiEdit({
   const mode = useSelectionStore((state) => state.mode);
   const canEdit = useCanEdit();
   const blockedMessage = useBlockedActionMessage();
-  const executeCommand = useHistoryStore((state) => state.executeCommand);
+  const push = useHistoryStore((state) => state.push);
 
   // Draft state (field → new value)
   const [draftChanges, setDraftChanges] = useState<Map<string, unknown>>(new Map());
@@ -199,7 +199,7 @@ export function PropertyGridMultiEdit({
       applyFn: onApplyChange,
     });
 
-    await executeCommand(command);
+    await push(command);
 
     // Clear draft
     setDraftChanges(new Map());
@@ -212,7 +212,7 @@ export function PropertyGridMultiEdit({
     draftChanges,
     elements,
     commonSections,
-    executeCommand,
+    push,
   ]);
 
   // Cancel changes (discard draft)

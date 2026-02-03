@@ -36,7 +36,7 @@ function formatPower(p_mw: number, q_mvar: number): string {
   return `${p_mw.toFixed(2)} MW / ${q_mvar.toFixed(2)} Mvar`;
 }
 
-function formatLosses(p_mw: number, q_mvar: number): string {
+function formatLosses(p_mw: number, _q_mvar: number): string {
   return `Straty: ${(p_mw * 1000).toFixed(1)} kW`;
 }
 
