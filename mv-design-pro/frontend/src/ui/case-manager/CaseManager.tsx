@@ -96,6 +96,7 @@ export function CaseManager({
   } = useStudyCasesStore();
 
   const projectId = useAppStateStore((state) => state.activeProjectId);
+  const setActiveProject = useAppStateStore((state) => state.setActiveProject);
   const setActiveCase = useAppStateStore((state) => state.setActiveCase);
 
   // Mode gating
@@ -151,11 +152,18 @@ export function CaseManager({
   }, []);
 
   const handleCreate = useCallback(async () => {
-    if (!projectId || !newCaseName.trim()) return;
+    if (!newCaseName.trim()) return;
+
+    // Auto-create default project if none exists
+    let pid = projectId;
+    if (!pid) {
+      pid = crypto.randomUUID();
+      setActiveProject(pid, 'Projekt 1');
+    }
 
     try {
       const created = await createCase({
-        project_id: projectId,
+        project_id: pid,
         name: newCaseName.trim(),
         description: '',
         set_active: true,
@@ -181,7 +189,7 @@ export function CaseManager({
     } catch (e) {
       // Error handled in store
     }
-  }, [projectId, newCaseName, createKind, createCase, setActiveCase, onClose]);
+  }, [projectId, newCaseName, createKind, createCase, setActiveProject, setActiveCase, onClose]);
 
   const handleDelete = useCallback(
     async (caseId: string) => {
