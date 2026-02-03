@@ -8,7 +8,7 @@
  *
  * ETAP PARITY:
  * - Wszystkie symbole mają viewBox 0 0 100 100
- * - Stroke: #000000, stroke-width: 3 (main), 2 (details)
+ * - Stroke: currentColor (dziedziczy z CSS), stroke-width: 3 (main), 2 (details)
  * - Kolory mogą być nadpisywane przez props (stroke, fill)
  */
 
@@ -30,7 +30,7 @@ export type SwitchState = 'OPEN' | 'CLOSED' | 'UNKNOWN';
 export interface EtapSymbolProps {
   /** ID symbolu ETAP */
   symbolId: EtapSymbolId;
-  /** Kolor obrysu (domyślnie #000000) */
+  /** Kolor obrysu (domyślnie currentColor - dziedziczy z CSS) */
   stroke?: string;
   /** Kolor wypełnienia (domyślnie none) */
   fill?: string;
@@ -51,7 +51,7 @@ export interface EtapSymbolProps {
  * Horizontal thick bar representing electrical busbar.
  */
 const BusbarSymbol: React.FC<Omit<EtapSymbolProps, 'symbolId'>> = ({
-  stroke = '#000000',
+  stroke = 'currentColor',
   fill = 'none',
   strokeWidth = 3,
   opacity = 1,
@@ -78,7 +78,7 @@ const BusbarSymbol: React.FC<Omit<EtapSymbolProps, 'symbolId'>> = ({
  * - UNKNOWN: Dashed outline indicating indeterminate state
  */
 const CircuitBreakerSymbol: React.FC<Omit<EtapSymbolProps, 'symbolId'>> = ({
-  stroke = '#000000',
+  stroke = 'currentColor',
   fill = 'none',
   strokeWidth = 3,
   opacity = 1,
@@ -133,7 +133,7 @@ const CircuitBreakerSymbol: React.FC<Omit<EtapSymbolProps, 'symbolId'>> = ({
  * - UNKNOWN: Dashed blade indicating indeterminate state
  */
 const DisconnectorSymbol: React.FC<Omit<EtapSymbolProps, 'symbolId'>> = ({
-  stroke = '#000000',
+  stroke = 'currentColor',
   strokeWidth = 3,
   opacity = 1,
   switchState = 'CLOSED',
@@ -188,7 +188,7 @@ const DisconnectorSymbol: React.FC<Omit<EtapSymbolProps, 'symbolId'>> = ({
  * Solid continuous line.
  */
 const LineOverheadSymbol: React.FC<Omit<EtapSymbolProps, 'symbolId'>> = ({
-  stroke = '#000000',
+  stroke = 'currentColor',
   strokeWidth = 3,
   opacity = 1,
 }) => (
@@ -202,7 +202,7 @@ const LineOverheadSymbol: React.FC<Omit<EtapSymbolProps, 'symbolId'>> = ({
  * Dashed line pattern.
  */
 const LineCableSymbol: React.FC<Omit<EtapSymbolProps, 'symbolId'>> = ({
-  stroke = '#000000',
+  stroke = 'currentColor',
   strokeWidth = 3,
   opacity = 1,
 }) => (
@@ -225,7 +225,7 @@ const LineCableSymbol: React.FC<Omit<EtapSymbolProps, 'symbolId'>> = ({
  * Two overlapping circles (primary and secondary windings).
  */
 const Transformer2wSymbol: React.FC<Omit<EtapSymbolProps, 'symbolId'>> = ({
-  stroke = '#000000',
+  stroke = 'currentColor',
   fill = 'none',
   strokeWidth = 3,
   opacity = 1,
@@ -244,7 +244,7 @@ const Transformer2wSymbol: React.FC<Omit<EtapSymbolProps, 'symbolId'>> = ({
  * Three overlapping circles.
  */
 const Transformer3wSymbol: React.FC<Omit<EtapSymbolProps, 'symbolId'>> = ({
-  stroke = '#000000',
+  stroke = 'currentColor',
   fill = 'none',
   strokeWidth = 3,
   opacity = 1,
@@ -265,7 +265,7 @@ const Transformer3wSymbol: React.FC<Omit<EtapSymbolProps, 'symbolId'>> = ({
  * Circle with G letter inside.
  */
 const GeneratorSymbol: React.FC<Omit<EtapSymbolProps, 'symbolId'>> = ({
-  stroke = '#000000',
+  stroke = 'currentColor',
   fill = 'none',
   strokeWidth = 3,
   opacity = 1,
@@ -285,7 +285,7 @@ const GeneratorSymbol: React.FC<Omit<EtapSymbolProps, 'symbolId'>> = ({
  * Solar panel symbol with sun rays.
  */
 const PvSymbol: React.FC<Omit<EtapSymbolProps, 'symbolId'>> = ({
-  stroke = '#000000',
+  stroke = 'currentColor',
   fill = 'none',
   strokeWidth = 3,
   opacity = 1,
@@ -310,7 +310,7 @@ const PvSymbol: React.FC<Omit<EtapSymbolProps, 'symbolId'>> = ({
  * Wind turbine symbol.
  */
 const FwSymbol: React.FC<Omit<EtapSymbolProps, 'symbolId'>> = ({
-  stroke = '#000000',
+  stroke = 'currentColor',
   fill = 'none',
   strokeWidth = 3,
   opacity = 1,
@@ -336,7 +336,7 @@ const FwSymbol: React.FC<Omit<EtapSymbolProps, 'symbolId'>> = ({
  * Battery symbol.
  */
 const BessSymbol: React.FC<Omit<EtapSymbolProps, 'symbolId'>> = ({
-  stroke = '#000000',
+  stroke = 'currentColor',
   fill = 'none',
   strokeWidth = 3,
   opacity = 1,
@@ -363,7 +363,7 @@ const BessSymbol: React.FC<Omit<EtapSymbolProps, 'symbolId'>> = ({
  * Grid symbol with arrows pointing down.
  */
 const UtilityFeederSymbol: React.FC<Omit<EtapSymbolProps, 'symbolId'>> = ({
-  stroke = '#000000',
+  stroke = 'currentColor',
   strokeWidth = 3,
   opacity = 1,
 }) => (
@@ -388,7 +388,7 @@ const UtilityFeederSymbol: React.FC<Omit<EtapSymbolProps, 'symbolId'>> = ({
  * Standard ground symbol.
  */
 const GroundSymbol: React.FC<Omit<EtapSymbolProps, 'symbolId'>> = ({
-  stroke = '#000000',
+  stroke = 'currentColor',
   strokeWidth = 3,
   opacity = 1,
 }) => (
@@ -407,7 +407,7 @@ const GroundSymbol: React.FC<Omit<EtapSymbolProps, 'symbolId'>> = ({
  * CT symbol (circle with CT marking).
  */
 const CtSymbol: React.FC<Omit<EtapSymbolProps, 'symbolId'>> = ({
-  stroke = '#000000',
+  stroke = 'currentColor',
   fill = 'none',
   strokeWidth = 3,
   opacity = 1,
@@ -430,7 +430,7 @@ const CtSymbol: React.FC<Omit<EtapSymbolProps, 'symbolId'>> = ({
  * VT symbol (circle with VT marking).
  */
 const VtSymbol: React.FC<Omit<EtapSymbolProps, 'symbolId'>> = ({
-  stroke = '#000000',
+  stroke = 'currentColor',
   fill = 'none',
   strokeWidth = 3,
   opacity = 1,
@@ -445,6 +445,149 @@ const VtSymbol: React.FC<Omit<EtapSymbolProps, 'symbolId'>> = ({
     {/* Connection stubs */}
     <line x1="0" y1="50" x2="25" y2="50" stroke={stroke} strokeWidth={strokeWidth} opacity={opacity} />
     <line x1="75" y1="50" x2="100" y2="50" stroke={stroke} strokeWidth={strokeWidth} opacity={opacity} />
+  </>
+);
+
+// ============================================================================
+// Tree-specific symbols (P9 Project Tree ETAP parity)
+// ============================================================================
+
+/**
+ * Load / Odbiornik
+ * Triangle pointing down (standard load symbol).
+ */
+const LoadSymbol: React.FC<Omit<EtapSymbolProps, 'symbolId'>> = ({
+  stroke = 'currentColor',
+  fill = 'none',
+  strokeWidth = 3,
+  opacity = 1,
+}) => (
+  <>
+    {/* Connection stub from top */}
+    <line x1="50" y1="0" x2="50" y2="25" stroke={stroke} strokeWidth={strokeWidth} opacity={opacity} />
+    {/* Triangle pointing down */}
+    <polygon
+      points="50,25 25,70 75,70"
+      fill={fill}
+      stroke={stroke}
+      strokeWidth={strokeWidth}
+      strokeLinejoin="round"
+      opacity={opacity}
+    />
+    {/* Horizontal line at bottom */}
+    <line x1="25" y1="85" x2="75" y2="85" stroke={stroke} strokeWidth={strokeWidth} opacity={opacity} />
+  </>
+);
+
+/**
+ * Project / Projekt
+ * Grid/network symbol representing the project root.
+ */
+const ProjectSymbol: React.FC<Omit<EtapSymbolProps, 'symbolId'>> = ({
+  stroke = 'currentColor',
+  fill = 'none',
+  strokeWidth = 3,
+  opacity = 1,
+}) => (
+  <>
+    {/* Outer frame */}
+    <rect x="10" y="15" width="80" height="70" fill={fill} stroke={stroke} strokeWidth={strokeWidth} opacity={opacity} />
+    {/* Top bar (title area) */}
+    <line x1="10" y1="30" x2="90" y2="30" stroke={stroke} strokeWidth={strokeWidth} opacity={opacity} />
+    {/* Grid inside */}
+    <line x1="35" y1="30" x2="35" y2="85" stroke={stroke} strokeWidth={2} opacity={opacity} />
+    <line x1="65" y1="30" x2="65" y2="85" stroke={stroke} strokeWidth={2} opacity={opacity} />
+    <line x1="10" y1="55" x2="90" y2="55" stroke={stroke} strokeWidth={2} opacity={opacity} />
+  </>
+);
+
+/**
+ * Catalog / Katalog typów
+ * Book/library symbol.
+ */
+const CatalogSymbol: React.FC<Omit<EtapSymbolProps, 'symbolId'>> = ({
+  stroke = 'currentColor',
+  fill = 'none',
+  strokeWidth = 3,
+  opacity = 1,
+}) => (
+  <>
+    {/* Book outline */}
+    <rect x="20" y="15" width="60" height="70" fill={fill} stroke={stroke} strokeWidth={strokeWidth} opacity={opacity} />
+    {/* Spine */}
+    <line x1="30" y1="15" x2="30" y2="85" stroke={stroke} strokeWidth={strokeWidth} opacity={opacity} />
+    {/* Page lines */}
+    <line x1="40" y1="30" x2="70" y2="30" stroke={stroke} strokeWidth={2} opacity={opacity} />
+    <line x1="40" y1="45" x2="70" y2="45" stroke={stroke} strokeWidth={2} opacity={opacity} />
+    <line x1="40" y1="60" x2="70" y2="60" stroke={stroke} strokeWidth={2} opacity={opacity} />
+  </>
+);
+
+/**
+ * Study Case / Przypadek obliczeniowy
+ * Calculator/document with sigma symbol.
+ */
+const StudyCaseSymbol: React.FC<Omit<EtapSymbolProps, 'symbolId'>> = ({
+  stroke = 'currentColor',
+  fill = 'none',
+  strokeWidth = 3,
+  opacity = 1,
+}) => (
+  <>
+    {/* Document outline */}
+    <rect x="20" y="10" width="60" height="80" fill={fill} stroke={stroke} strokeWidth={strokeWidth} opacity={opacity} />
+    {/* Sigma symbol (Σ) for calculations */}
+    <text x="50" y="60" textAnchor="middle" fontSize="36" fontWeight="bold" fill={stroke} opacity={opacity}>
+      Σ
+    </text>
+  </>
+);
+
+/**
+ * Results / Wyniki
+ * Bar chart symbol representing calculation results.
+ */
+const ResultsSymbol: React.FC<Omit<EtapSymbolProps, 'symbolId'>> = ({
+  stroke = 'currentColor',
+  fill = 'none',
+  strokeWidth = 3,
+  opacity = 1,
+}) => (
+  <>
+    {/* Chart frame */}
+    <line x1="15" y1="15" x2="15" y2="85" stroke={stroke} strokeWidth={strokeWidth} opacity={opacity} />
+    <line x1="15" y1="85" x2="85" y2="85" stroke={stroke} strokeWidth={strokeWidth} opacity={opacity} />
+    {/* Bar 1 */}
+    <rect x="25" y="50" width="12" height="30" fill={fill} stroke={stroke} strokeWidth={2} opacity={opacity} />
+    {/* Bar 2 (taller) */}
+    <rect x="45" y="30" width="12" height="50" fill={fill} stroke={stroke} strokeWidth={2} opacity={opacity} />
+    {/* Bar 3 */}
+    <rect x="65" y="45" width="12" height="35" fill={fill} stroke={stroke} strokeWidth={2} opacity={opacity} />
+  </>
+);
+
+/**
+ * Folder / Folder container
+ * Simple folder icon for generic containers.
+ */
+const FolderSymbol: React.FC<Omit<EtapSymbolProps, 'symbolId'>> = ({
+  stroke = 'currentColor',
+  fill = 'none',
+  strokeWidth = 3,
+  opacity = 1,
+}) => (
+  <>
+    {/* Folder tab */}
+    <path
+      d="M 10 25 L 10 20 L 35 20 L 45 30 L 90 30 L 90 25"
+      fill={fill}
+      stroke={stroke}
+      strokeWidth={strokeWidth}
+      strokeLinejoin="round"
+      opacity={opacity}
+    />
+    {/* Folder body */}
+    <rect x="10" y="30" width="80" height="55" fill={fill} stroke={stroke} strokeWidth={strokeWidth} opacity={opacity} />
   </>
 );
 
@@ -467,6 +610,13 @@ const SYMBOL_COMPONENTS: Record<EtapSymbolId, React.FC<Omit<EtapSymbolProps, 'sy
   ground: GroundSymbol,
   ct: CtSymbol,
   vt: VtSymbol,
+  // Tree-specific symbols
+  load: LoadSymbol,
+  project: ProjectSymbol,
+  catalog: CatalogSymbol,
+  study_case: StudyCaseSymbol,
+  results: ResultsSymbol,
+  folder: FolderSymbol,
 };
 
 /**
@@ -481,7 +631,7 @@ const SYMBOL_COMPONENTS: Record<EtapSymbolId, React.FC<Omit<EtapSymbolProps, 'sy
  */
 export const EtapSymbol: React.FC<EtapSymbolProps> = ({
   symbolId,
-  stroke = '#000000',
+  stroke = 'currentColor',
   fill = 'none',
   strokeWidth = 3,
   opacity = 1,
@@ -590,6 +740,29 @@ export function renderSymbolToString(symbolId: EtapSymbolId): string | null {
       <text x="50" y="56" text-anchor="middle" font-size="16" font-weight="bold" fill="#000000">VT</text>
       <line x1="0" y1="50" x2="25" y2="50" stroke="#000000" stroke-width="3"/>
       <line x1="75" y1="50" x2="100" y2="50" stroke="#000000" stroke-width="3"/>`,
+    // Tree-specific symbols
+    load: `<line x1="50" y1="0" x2="50" y2="25" stroke="#000000" stroke-width="3"/>
+      <polygon points="50,25 25,70 75,70" fill="none" stroke="#000000" stroke-width="3" stroke-linejoin="round"/>
+      <line x1="25" y1="85" x2="75" y2="85" stroke="#000000" stroke-width="3"/>`,
+    project: `<rect x="10" y="15" width="80" height="70" fill="none" stroke="#000000" stroke-width="3"/>
+      <line x1="10" y1="30" x2="90" y2="30" stroke="#000000" stroke-width="3"/>
+      <line x1="35" y1="30" x2="35" y2="85" stroke="#000000" stroke-width="2"/>
+      <line x1="65" y1="30" x2="65" y2="85" stroke="#000000" stroke-width="2"/>
+      <line x1="10" y1="55" x2="90" y2="55" stroke="#000000" stroke-width="2"/>`,
+    catalog: `<rect x="20" y="15" width="60" height="70" fill="none" stroke="#000000" stroke-width="3"/>
+      <line x1="30" y1="15" x2="30" y2="85" stroke="#000000" stroke-width="3"/>
+      <line x1="40" y1="30" x2="70" y2="30" stroke="#000000" stroke-width="2"/>
+      <line x1="40" y1="45" x2="70" y2="45" stroke="#000000" stroke-width="2"/>
+      <line x1="40" y1="60" x2="70" y2="60" stroke="#000000" stroke-width="2"/>`,
+    study_case: `<rect x="20" y="10" width="60" height="80" fill="none" stroke="#000000" stroke-width="3"/>
+      <text x="50" y="60" text-anchor="middle" font-size="36" font-weight="bold" fill="#000000">Σ</text>`,
+    results: `<line x1="15" y1="15" x2="15" y2="85" stroke="#000000" stroke-width="3"/>
+      <line x1="15" y1="85" x2="85" y2="85" stroke="#000000" stroke-width="3"/>
+      <rect x="25" y="50" width="12" height="30" fill="none" stroke="#000000" stroke-width="2"/>
+      <rect x="45" y="30" width="12" height="50" fill="none" stroke="#000000" stroke-width="2"/>
+      <rect x="65" y="45" width="12" height="35" fill="none" stroke="#000000" stroke-width="2"/>`,
+    folder: `<path d="M 10 25 L 10 20 L 35 20 L 45 30 L 90 30 L 90 25" fill="none" stroke="#000000" stroke-width="3" stroke-linejoin="round"/>
+      <rect x="10" y="30" width="80" height="55" fill="none" stroke="#000000" stroke-width="3"/>`,
   };
 
   return svgContent[symbolId] || null;

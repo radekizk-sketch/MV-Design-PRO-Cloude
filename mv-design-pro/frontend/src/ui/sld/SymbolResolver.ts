@@ -36,7 +36,14 @@ export type EtapSymbolId =
   | 'utility_feeder'
   | 'ground'
   | 'ct'
-  | 'vt';
+  | 'vt'
+  // Tree-specific symbols (P9 Project Tree ETAP parity)
+  | 'load'
+  | 'project'
+  | 'catalog'
+  | 'study_case'
+  | 'results'
+  | 'folder';
 
 /**
  * Port definition (x,y w układzie viewBox 100x100).
@@ -240,6 +247,51 @@ const SYMBOL_DEFINITIONS: Record<EtapSymbolId, Omit<ResolvedSymbol, 'symbolId'>>
       right: { x: 100, y: 50 },
     },
     allowedRotations: [0, 90],
+    defaultRotation: 0,
+  },
+  // Tree-specific symbols (P9 Project Tree ETAP parity)
+  load: {
+    description: 'Odbiornik / Load',
+    viewBox: '0 0 100 100',
+    ports: {
+      top: { x: 50, y: 0 },
+    },
+    allowedRotations: [0, 180],
+    defaultRotation: 0,
+  },
+  project: {
+    description: 'Projekt / Project',
+    viewBox: '0 0 100 100',
+    ports: {},
+    allowedRotations: [0],
+    defaultRotation: 0,
+  },
+  catalog: {
+    description: 'Katalog typów / Type Catalog',
+    viewBox: '0 0 100 100',
+    ports: {},
+    allowedRotations: [0],
+    defaultRotation: 0,
+  },
+  study_case: {
+    description: 'Przypadek obliczeniowy / Study Case',
+    viewBox: '0 0 100 100',
+    ports: {},
+    allowedRotations: [0],
+    defaultRotation: 0,
+  },
+  results: {
+    description: 'Wyniki / Results',
+    viewBox: '0 0 100 100',
+    ports: {},
+    allowedRotations: [0],
+    defaultRotation: 0,
+  },
+  folder: {
+    description: 'Folder / Container',
+    viewBox: '0 0 100 100',
+    ports: {},
+    allowedRotations: [0],
     defaultRotation: 0,
   },
 };

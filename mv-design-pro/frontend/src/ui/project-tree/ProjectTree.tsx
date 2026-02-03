@@ -27,43 +27,16 @@
 
 import { useCallback, useMemo } from 'react';
 import { clsx } from 'clsx';
-import type { TreeNode, TreeNodeType, ElementType, OperatingMode } from '../types';
+import type { TreeNode, TreeNodeType, ElementType, OperatingMode, ResultStatus } from '../types';
 import type { RunHistoryItem } from '../comparison/types';
 import { useSelectionStore } from '../selection/store';
 import { useTreeSelection } from '../selection/hooks';
+import { TreeEtapSymbolIcon } from './TreeEtapSymbolIcon';
+import { getTreeSymbol, getResultStatusTooltip } from './treeSymbolMap';
 
 // ============================================================================
-// Tree Node Icons (Polish labels)
+// Tree Node Labels (Polish)
 // ============================================================================
-
-const TREE_NODE_ICONS: Record<TreeNodeType, string> = {
-  PROJECT: '[P]',
-  NETWORK: '[N]',
-  STATION: '[ST]',           // FIX-05: Station container icon
-  VOLTAGE_LEVEL: '[VL]',     // FIX-05: Voltage level icon
-  BUSES: '---',
-  LINES: '---',
-  CABLES: '===',
-  TRANSFORMERS: '[T]',
-  SWITCHES: '[S]',
-  SOURCES: '[SRC]',
-  LOADS: '[L]',
-  TYPE_CATALOG: '[CAT]',
-  LINE_TYPES: '[LT]',
-  CABLE_TYPES: '[CT]',
-  TRANSFORMER_TYPES: '[TT]',
-  SWITCH_EQUIPMENT_TYPES: '[SW]',
-  CASES: '[C]',
-  STUDY_CASE: '[SC]',  // P10: Study case icon
-  RESULTS: '[R]',
-  RUN_ITEM: '>',  // P11c: Analysis run icon
-  PROTECTION_RESULTS: '[PR]',  // P15c: Protection results category
-  PROTECTION_RUNS: '>',      // P15c: Protection runs
-  PROTECTION_COMPARISONS: '[CMP]',  // P15c: Protection comparisons
-  POWER_FLOW_RESULTS: '[PF]',  // P20b: Power flow results category
-  POWER_FLOW_RUNS: '>',      // P20b: Power flow runs
-  ELEMENT: '-',
-};
 
 const TREE_NODE_LABELS: Record<TreeNodeType, string> = {
   PROJECT: 'Projekt',
@@ -502,16 +475,10 @@ interface TreeNodeComponentProps {
   onDoubleClick: (node: TreeNode) => void;
 }
 
-// P10: Status icons and colors for study cases
-const RESULT_STATUS_ICONS: Record<string, string> = {
-  NONE: '[ ]',
-  FRESH: '[OK]',
-  OUTDATED: '[!]',
-};
-
-const RESULT_STATUS_COLORS: Record<string, string> = {
+// P10: Status colors for study cases and run items
+const RESULT_STATUS_COLORS: Record<ResultStatus, string> = {
   NONE: 'text-gray-400',
-  FRESH: 'text-green-500',
+  FRESH: 'text-green-600',
   OUTDATED: 'text-amber-500',
 };
 
@@ -533,19 +500,18 @@ function TreeNodeComponent({
   const isStation = node.nodeType === 'STATION'; // FIX-05
   const isVoltageLevel = node.nodeType === 'VOLTAGE_LEVEL'; // FIX-05
 
-  // P10/P11c: Get appropriate icon for study case or run item (status-based)
-  const getIcon = () => {
-    if ((isStudyCase || isRunItem) && node.resultStatus) {
-      return RESULT_STATUS_ICONS[node.resultStatus] || TREE_NODE_ICONS[node.nodeType];
-    }
-    return node.icon ?? TREE_NODE_ICONS[node.nodeType];
-  };
+  // Get symbol definition from map
+  const symbolDef = getTreeSymbol(node.nodeType);
 
-  const icon = getIcon();
   // FIX-05: Station and VoltageLevel use node.label (dynamic name)
   const label = isElement || isStudyCase || isRunItem || isStation || isVoltageLevel
     ? node.label
     : TREE_NODE_LABELS[node.nodeType];
+
+  // Get status color class for study cases and run items
+  const statusColorClass = (isStudyCase || isRunItem) && node.resultStatus
+    ? RESULT_STATUS_COLORS[node.resultStatus]
+    : 'text-gray-600';
 
   // PROJECT_TREE_PARITY_V1: Deterministic data-testid for E2E testing
   const getTestId = (): string => {
@@ -589,7 +555,7 @@ function TreeNodeComponent({
         {/* Expand/collapse toggle */}
         {hasChildren ? (
           <button
-            className="w-4 h-4 flex items-center justify-center text-gray-400 hover:text-gray-600 mr-1"
+            className="w-4 h-4 flex items-center justify-center text-gray-400 hover:text-gray-600 mr-1 flex-shrink-0"
             data-testid={`tree-toggle-${node.id}`}
             aria-expanded={isExpanded}
             aria-label={isExpanded ? 'Zwiń węzeł' : 'Rozwiń węzeł'}
@@ -598,26 +564,37 @@ function TreeNodeComponent({
               onToggle(node.id);
             }}
           >
-            {isExpanded ? '[-]' : '[+]'}
+            <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.5">
+              {isExpanded ? (
+                <path d="M2 4 L5 7 L8 4" />
+              ) : (
+                <path d="M4 2 L7 5 L4 8" />
+              )}
+            </svg>
           </button>
         ) : (
-          <span className="w-4 h-4 mr-1" aria-hidden="true" />
+          <span className="w-4 h-4 mr-1 flex-shrink-0" aria-hidden="true" />
         )}
 
         {/* P10: Active case indicator */}
         {isStudyCase && node.isActive && (
-          <span className="text-blue-600 mr-1 font-bold" title="Aktywny przypadek">&gt;</span>
+          <span
+            className="w-2 h-2 bg-blue-500 rounded-full mr-1 flex-shrink-0"
+            title="Aktywny przypadek"
+            aria-label="Aktywny przypadek"
+          />
         )}
 
-        {/* Icon with status color for study cases and run items */}
+        {/* ETAP Symbol Icon */}
         <span
-          className={clsx(
-            'text-xs mr-2',
-            (isStudyCase || isRunItem) && node.resultStatus && RESULT_STATUS_COLORS[node.resultStatus]
-          )}
-          title={(isStudyCase || isRunItem) ? getStatusTooltip(node.resultStatus) : undefined}
+          className={clsx('mr-2 flex-shrink-0', statusColorClass)}
+          title={(isStudyCase || isRunItem) ? getResultStatusTooltip(node.resultStatus) : symbolDef.ariaLabel}
         >
-          {icon}
+          <TreeEtapSymbolIcon
+            symbolId={symbolDef.symbolId}
+            size={14}
+            title={symbolDef.ariaLabel}
+          />
         </span>
 
         {/* Label */}
@@ -663,19 +640,6 @@ function TreeNodeComponent({
       )}
     </div>
   );
-}
-
-// P10: Get tooltip for result status
-function getStatusTooltip(status: string | undefined): string {
-  switch (status) {
-    case 'FRESH':
-      return 'Wyniki aktualne';
-    case 'OUTDATED':
-      return 'Wyniki nieaktualne — wymagane przeliczenie';
-    case 'NONE':
-    default:
-      return 'Brak wyników';
-  }
 }
 
 // ============================================================================
