@@ -165,30 +165,52 @@ function getStatusBadgeClass(severity: 'info' | 'success' | 'warning'): string {
 // =============================================================================
 
 /**
- * UI-01: Oblicza werdykt dla napięcia szyny.
- * PASS: 0.95 ≤ U_pu ≤ 1.05
- * MARGINAL: 0.90 ≤ U_pu < 0.95 lub 1.05 < U_pu ≤ 1.10
- * FAIL: U_pu < 0.90 lub U_pu > 1.10
+ * UI-01: Oblicza werdykt operacyjny dla napięcia szyny.
+ * Werdykt zawiera: STATUS + DLACZEGO + CO DALEJ
+ *
+ * Kryteria:
+ * - PASS (OK): 0.95 ≤ U_pu ≤ 1.05
+ * - MARGINAL (NA GRANICY): 0.90 ≤ U_pu < 0.95 lub 1.05 < U_pu ≤ 1.10
+ * - FAIL (NIE OK): U_pu < 0.90 lub U_pu > 1.10
+ *
+ * Każdy werdykt zawiera:
+ * - verdict: status (PASS/MARGINAL/FAIL)
+ * - notes: DLACZEGO (przyczyna)
+ * - recommendation: CO DALEJ (zalecenie operacyjne)
  */
 function getVoltageVerdict(v_pu: number): {
   verdict: CoordinationVerdict;
   notes: string;
+  recommendation: string;
 } {
   if (v_pu >= 0.95 && v_pu <= 1.05) {
-    return { verdict: 'PASS', notes: '' };
-  }
-  if ((v_pu >= 0.90 && v_pu < 0.95) || (v_pu > 1.05 && v_pu <= 1.10)) {
-    const deviation = v_pu < 1.0 ? 'zanizone' : 'zawyzone';
     return {
-      verdict: 'MARGINAL',
-      notes: `Napiecie ${deviation} o ${Math.abs((v_pu - 1.0) * 100).toFixed(1)}%`,
+      verdict: 'PASS',
+      notes: '',
+      recommendation: '',
     };
   }
-  const deviation = v_pu < 1.0 ? 'ponizej' : 'powyzej';
-  const limit = v_pu < 1.0 ? '0.90 p.u.' : '1.10 p.u.';
+  if ((v_pu >= 0.90 && v_pu < 0.95) || (v_pu > 1.05 && v_pu <= 1.10)) {
+    const isLow = v_pu < 1.0;
+    const deviation = isLow ? 'zanizone' : 'zawyzone';
+    const deviationPct = Math.abs((v_pu - 1.0) * 100).toFixed(1);
+    return {
+      verdict: 'MARGINAL',
+      notes: `Napiecie ${deviation} o ${deviationPct}%`,
+      recommendation: isLow
+        ? 'Zweryfikuj mozliwosc podwyzszenia napiecia zrodla lub redukcji obciazenia.'
+        : 'Zweryfikuj mozliwosc obnizenia napiecia zrodla lub zwiekszenia obciazenia.',
+    };
+  }
+  const isLow = v_pu < 1.0;
+  const deviation = isLow ? 'ponizej' : 'powyzej';
+  const limit = isLow ? '0.90 p.u.' : '1.10 p.u.';
   return {
     verdict: 'FAIL',
-    notes: `Napiecie ${deviation} granicy ${limit}. Wymagana korekta.`,
+    notes: `Napiecie ${deviation} granicy ${limit}.`,
+    recommendation: isLow
+      ? 'Podwyz napiecie zrodla, zmniejsz obciazenie lub wzmocnij siec (przekroj, skrocenie trasy).'
+      : 'Obniz napiecie zrodla, zwieksz obciazenie lub zweryfikuj regulacje transformatora.',
   };
 }
 
@@ -390,7 +412,11 @@ function BusResultsTable() {
                     {formatNumber(row.q_injected_mvar, 3)}
                   </td>
                   <td className="px-3 py-2 text-center">
-                    <VerdictBadge verdict={voltageResult.verdict} notesPl={voltageResult.notes} />
+                    <VerdictBadge
+                      verdict={voltageResult.verdict}
+                      notesPl={voltageResult.notes}
+                      recommendationPl={voltageResult.recommendation}
+                    />
                   </td>
                 </tr>
               );

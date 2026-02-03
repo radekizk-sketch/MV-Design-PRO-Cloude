@@ -34,8 +34,10 @@ import {
 interface VerdictBadgeProps {
   verdict: CoordinationVerdict;
   size?: 'sm' | 'md';
-  /** Notatki z analizy do wyświetlenia w tooltipie */
+  /** Notatki z analizy do wyświetlenia w tooltipie (DLACZEGO) */
   notesPl?: string | null;
+  /** Opcjonalne zalecenie operacyjne do wyświetlenia w tooltipie (CO DALEJ) */
+  recommendationPl?: string | null;
 }
 
 /**
@@ -43,11 +45,11 @@ interface VerdictBadgeProps {
  *
  * Wyświetla status werdyktu z tooltipem zawierającym:
  * - Status (etykieta)
- * - Przyczyna (jeśli dostępna)
+ * - Przyczyna (jeśli dostępna) - DLACZEGO
  * - Skutek (dla MARGINAL i FAIL)
- * - Zalecenie (dla MARGINAL i FAIL)
+ * - Zalecenie (dla MARGINAL i FAIL) - CO DALEJ
  */
-export function VerdictBadge({ verdict, size = 'sm', notesPl }: VerdictBadgeProps) {
+export function VerdictBadge({ verdict, size = 'sm', notesPl, recommendationPl }: VerdictBadgeProps) {
   const style = VERDICT_STYLES[verdict];
   const label = LABELS.verdict[verdict];
   const sizeClasses = size === 'sm'
@@ -61,7 +63,9 @@ export function VerdictBadge({ verdict, size = 'sm', notesPl }: VerdictBadgeProp
     const parts: string[] = [];
     if (message.cause) parts.push(`Przyczyna: ${message.cause}`);
     if (message.effect) parts.push(`Skutek: ${message.effect}`);
-    if (message.recommendation) parts.push(`Zalecenie: ${message.recommendation}`);
+    // Use custom recommendation if provided, otherwise use default from message builder
+    const recommendation = recommendationPl ?? message.recommendation;
+    if (recommendation) parts.push(`Zalecenie: ${recommendation}`);
     tooltipText = parts.join('\n');
   }
 
