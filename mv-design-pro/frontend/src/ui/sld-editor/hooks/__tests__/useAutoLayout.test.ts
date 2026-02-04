@@ -304,6 +304,19 @@ const filterCriticalCollisions = (collisions: ReturnType<typeof detectCollisions
 const getCollisionKind = (symbol: AnySldSymbol): 'node' | 'edge' =>
   symbol.elementType === 'LineBranch' ? 'edge' : 'node';
 
+const generateResolvedLayout = (model: AnySldSymbol[]) => {
+  const layout = generateAutoLayout(model);
+  const { positions: resolvedPositions } = resolveCollisions(
+    model,
+    layout.positions,
+    layout.positions,
+    layout.debug,
+    DEFAULT_LAYOUT_CONFIG
+  );
+
+  return { layout, resolvedPositions };
+};
+
 // =============================================================================
 // TESTY: DETERMINIZM
 // =============================================================================
@@ -312,14 +325,14 @@ describe('Auto-Layout Determinism', () => {
   it('generates identical layout for the same model', () => {
     const model = createSimpleModel();
 
-    const result1 = generateAutoLayout(model);
-    const result2 = generateAutoLayout(model);
+    const result1 = generateResolvedLayout(model);
+    const result2 = generateResolvedLayout(model);
 
     // Porownaj pozycje
-    expect(result1.positions.size).toBe(result2.positions.size);
+    expect(result1.resolvedPositions.size).toBe(result2.resolvedPositions.size);
 
-    for (const [id, pos1] of result1.positions) {
-      const pos2 = result2.positions.get(id);
+    for (const [id, pos1] of result1.resolvedPositions) {
+      const pos2 = result2.resolvedPositions.get(id);
       expect(pos2).toBeDefined();
       expect(pos1.x).toBe(pos2!.x);
       expect(pos1.y).toBe(pos2!.y);
@@ -337,14 +350,14 @@ describe('Auto-Layout Determinism', () => {
     const reversed = [...model].reverse();
     const shuffled = [model[2], model[0], model[4], model[1], model[3]];
 
-    const result1 = generateAutoLayout(model);
-    const result2 = generateAutoLayout(reversed);
-    const result3 = generateAutoLayout(shuffled);
+    const result1 = generateResolvedLayout(model);
+    const result2 = generateResolvedLayout(reversed);
+    const result3 = generateResolvedLayout(shuffled);
 
     // Wszystkie powinny byc identyczne
-    for (const [id, pos1] of result1.positions) {
-      const pos2 = result2.positions.get(id);
-      const pos3 = result3.positions.get(id);
+    for (const [id, pos1] of result1.resolvedPositions) {
+      const pos2 = result2.resolvedPositions.get(id);
+      const pos3 = result3.resolvedPositions.get(id);
 
       expect(pos2).toBeDefined();
       expect(pos3).toBeDefined();
@@ -358,11 +371,11 @@ describe('Auto-Layout Determinism', () => {
   it('generates deterministic layout for large model', () => {
     const model = createLargeModel();
 
-    const result1 = generateAutoLayout(model);
-    const result2 = generateAutoLayout(model);
+    const result1 = generateResolvedLayout(model);
+    const result2 = generateResolvedLayout(model);
 
-    for (const [id, pos1] of result1.positions) {
-      const pos2 = result2.positions.get(id);
+    for (const [id, pos1] of result1.resolvedPositions) {
+      const pos2 = result2.resolvedPositions.get(id);
       expect(pos2).toBeDefined();
       expect(pos1.x).toBe(pos2!.x);
       expect(pos1.y).toBe(pos2!.y);
@@ -379,7 +392,7 @@ describe('Auto-Layout Stability', () => {
     const model = createSimpleModel();
 
     // Layout przed dodaniem elementu
-    const resultBefore = generateAutoLayout(model);
+    const resultBefore = generateResolvedLayout(model);
 
     // Dodaj nowy Load
     const extendedModel: AnySldSymbol[] = [
@@ -395,14 +408,14 @@ describe('Auto-Layout Stability', () => {
       } as LoadSymbol,
     ];
 
-    const resultAfter = generateAutoLayout(extendedModel);
+    const resultAfter = generateResolvedLayout(extendedModel);
 
     // Policz ile warstw (Y-koordynat) sie nie zmienilo
     // W algorytmie Sugiyama, X moze sie zmieniac przy dodaniu elementu do warstwy
     // Ale Y (warstwa) powinno pozostac stabilne dla wiekszosci elementow
     let stableYCount = 0;
-    for (const [id, posBefore] of resultBefore.positions) {
-      const posAfter = resultAfter.positions.get(id);
+    for (const [id, posBefore] of resultBefore.resolvedPositions) {
+      const posAfter = resultAfter.resolvedPositions.get(id);
       if (posAfter && posBefore.y === posAfter.y) {
         stableYCount++;
       }
@@ -410,7 +423,7 @@ describe('Auto-Layout Stability', () => {
 
     // Warstwy (Y) powinny byc stabilne dla wiekszosci elementow
     // (w tym przypadku dodajemy element do tej samej warstwy co Load)
-    const stabilityRatio = stableYCount / resultBefore.positions.size;
+    const stabilityRatio = stableYCount / resultBefore.resolvedPositions.size;
     // Algorytm Sugiyama moze przesunac elementy w X przy rebalansowaniu,
     // ale warstwy powinny pozostac stabilne (co najmniej 50%)
     expect(stabilityRatio).toBeGreaterThanOrEqual(0.5);
@@ -418,7 +431,7 @@ describe('Auto-Layout Stability', () => {
 
   it('layers remain stable when adding sibling element', () => {
     const model = createSimpleModel();
-    const resultBefore = generateAutoLayout(model);
+    const resultBefore = generateResolvedLayout(model);
 
     // Dodaj drugi Load do tego samego Bus
     const extendedModel: AnySldSymbol[] = [
@@ -434,11 +447,11 @@ describe('Auto-Layout Stability', () => {
       } as LoadSymbol,
     ];
 
-    const resultAfter = generateAutoLayout(extendedModel);
+    const resultAfter = generateResolvedLayout(extendedModel);
 
     // Bus i Source powinny miec te same warstwy
-    expect(resultBefore.debug.layers.get(0)).toContain('sym-source-1');
-    expect(resultAfter.debug.layers.get(0)).toContain('sym-source-1');
+    expect(resultBefore.layout.debug.layers.get(0)).toContain('sym-source-1');
+    expect(resultAfter.layout.debug.layers.get(0)).toContain('sym-source-1');
   });
 });
 
@@ -1152,10 +1165,10 @@ describe('Layout Hierarchy', () => {
 
   it('Source position is higher (lower Y) than Load position', () => {
     const model = createSimpleModel();
-    const result = generateAutoLayout(model);
+    const result = generateResolvedLayout(model);
 
-    const sourcePos = result.positions.get('sym-source-1');
-    const loadPos = result.positions.get('sym-load-1');
+    const sourcePos = result.resolvedPositions.get('sym-source-1');
+    const loadPos = result.resolvedPositions.get('sym-load-1');
 
     expect(sourcePos).toBeDefined();
     expect(loadPos).toBeDefined();
