@@ -10,7 +10,8 @@
  */
 
 import type { ElementType, SelectedElement } from '../types';
-import type { AnySldSymbol } from '../sld-editor/types';
+import type { AnySldSymbol, Position } from '../sld-editor/types';
+import { ETAP_GEOMETRY } from './sldEtapStyle';
 
 /**
  * Viewport state for pan/zoom.
@@ -113,16 +114,26 @@ export function calculateSymbolsBounds(symbols: AnySldSymbol[]): {
   let maxX = -Infinity;
   let maxY = -Infinity;
 
+  const includePoint = (point: Position, paddingX: number, paddingY: number) => {
+    minX = Math.min(minX, point.x - paddingX);
+    minY = Math.min(minY, point.y - paddingY);
+    maxX = Math.max(maxX, point.x + paddingX);
+    maxY = Math.max(maxY, point.y + paddingY);
+  };
+
   for (const symbol of symbols) {
     const { x, y } = symbol.position;
     // Account for symbol size (approximate)
     const halfWidth = symbol.elementType === 'Bus' ? 40 : 20;
     const halfHeight = symbol.elementType === 'Bus' ? 10 : 20;
 
-    minX = Math.min(minX, x - halfWidth);
-    minY = Math.min(minY, y - halfHeight);
-    maxX = Math.max(maxX, x + halfWidth);
-    maxY = Math.max(maxY, y + halfHeight);
+    includePoint({ x, y }, halfWidth, halfHeight);
+
+    if ('points' in symbol && Array.isArray(symbol.points)) {
+      for (const point of symbol.points) {
+        includePoint(point, 0, 0);
+      }
+    }
   }
 
   return {
@@ -142,26 +153,29 @@ export function fitToContent(
   symbols: AnySldSymbol[],
   canvasWidth: number,
   canvasHeight: number,
-  padding: number = 40
+  padding: number = ETAP_GEOMETRY.view.fitPaddingPx
 ): ViewportState {
   const bounds = calculateSymbolsBounds(symbols);
   if (!bounds) return DEFAULT_VIEWPORT;
 
-  const { minX, minY, width, height } = bounds;
+  const { minX, minY } = bounds;
+  const width = Math.max(bounds.width, 1);
+  const height = Math.max(bounds.height, 1);
 
   // Calculate zoom to fit content
   const scaleX = (canvasWidth - 2 * padding) / width;
   const scaleY = (canvasHeight - 2 * padding) / height;
   const zoom = Math.min(scaleX, scaleY, ZOOM_MAX);
   const clampedZoom = Math.max(zoom, ZOOM_MIN);
+  const roundedZoom = Math.round(clampedZoom * 100) / 100;
 
   // Calculate offset to center content
-  const offsetX = padding - minX * clampedZoom + (canvasWidth - width * clampedZoom - 2 * padding) / 2;
-  const offsetY = padding - minY * clampedZoom + (canvasHeight - height * clampedZoom - 2 * padding) / 2;
+  const offsetX = padding - minX * roundedZoom + (canvasWidth - width * roundedZoom - 2 * padding) / 2;
+  const offsetY = padding - minY * roundedZoom + (canvasHeight - height * roundedZoom - 2 * padding) / 2;
 
   return {
-    offsetX,
-    offsetY,
-    zoom: clampedZoom,
+    offsetX: Math.round(offsetX),
+    offsetY: Math.round(offsetY),
+    zoom: roundedZoom,
   };
 }
