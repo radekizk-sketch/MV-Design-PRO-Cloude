@@ -35,6 +35,14 @@ import {
   getEtapLabelAnchor,
   getEtapSymbolSize,
   getEtapStrokeWidth,
+  // Line label placement (PR-SLD-ETAP-LABELS-01)
+  parsePathSegments,
+  selectLabelSegment,
+  calculateLineLabelPosition,
+  checkLabelSymbolCollision,
+  nudgeLabelPosition,
+  type LineSegment,
+  type LineLabelPosition,
 } from '../sldEtapStyle';
 
 describe('sldEtapStyle', () => {
@@ -413,6 +421,361 @@ describe('sldEtapStyle', () => {
       it('returns correct stroke for feeder', () => {
         expect(getEtapStrokeWidth('feeder')).toBe(ETAP_STROKE.feeder);
         expect(getEtapStrokeWidth('feeder', true)).toBe(ETAP_STROKE_SELECTED.feeder);
+      });
+    });
+  });
+
+  // ==========================================================================
+  // LINE LABEL PLACEMENT (PR-SLD-ETAP-LABELS-01)
+  // ==========================================================================
+
+  describe('Line Label Placement', () => {
+    describe('ETAP_LINE_LABEL tokens', () => {
+      it('has correct offset value', () => {
+        expect(ETAP_LINE_LABEL.offset).toBe(8);
+      });
+
+      it('has correct halo settings', () => {
+        expect(ETAP_LINE_LABEL.haloPadding).toBe(2);
+        expect(ETAP_LINE_LABEL.haloColor).toBe('#FFFFFF');
+        expect(ETAP_LINE_LABEL.haloOpacity).toBe(0.9);
+      });
+    });
+
+    describe('parsePathSegments', () => {
+      it('returns empty array for empty path', () => {
+        expect(parsePathSegments([])).toEqual([]);
+        expect(parsePathSegments([{ x: 0, y: 0 }])).toEqual([]);
+      });
+
+      it('parses single horizontal segment', () => {
+        const path = [
+          { x: 0, y: 100 },
+          { x: 200, y: 100 },
+        ];
+        const segments = parsePathSegments(path);
+
+        expect(segments).toHaveLength(1);
+        expect(segments[0].orientation).toBe('horizontal');
+        expect(segments[0].length).toBe(200);
+        expect(segments[0].midpoint).toEqual({ x: 100, y: 100 });
+        expect(segments[0].perpendicular).toEqual({ x: 0, y: -1 }); // above
+      });
+
+      it('parses single vertical segment', () => {
+        const path = [
+          { x: 100, y: 0 },
+          { x: 100, y: 200 },
+        ];
+        const segments = parsePathSegments(path);
+
+        expect(segments).toHaveLength(1);
+        expect(segments[0].orientation).toBe('vertical');
+        expect(segments[0].length).toBe(200);
+        expect(segments[0].midpoint).toEqual({ x: 100, y: 100 });
+        expect(segments[0].perpendicular).toEqual({ x: -1, y: 0 }); // left
+      });
+
+      it('parses multi-segment orthogonal path', () => {
+        // L-shaped path: horizontal then vertical
+        const path = [
+          { x: 0, y: 0 },
+          { x: 100, y: 0 },
+          { x: 100, y: 50 },
+        ];
+        const segments = parsePathSegments(path);
+
+        expect(segments).toHaveLength(2);
+        expect(segments[0].orientation).toBe('horizontal');
+        expect(segments[0].length).toBe(100);
+        expect(segments[1].orientation).toBe('vertical');
+        expect(segments[1].length).toBe(50);
+      });
+
+      it('assigns correct indices to segments', () => {
+        const path = [
+          { x: 0, y: 0 },
+          { x: 100, y: 0 },
+          { x: 100, y: 100 },
+          { x: 200, y: 100 },
+        ];
+        const segments = parsePathSegments(path);
+
+        expect(segments[0].index).toBe(0);
+        expect(segments[1].index).toBe(1);
+        expect(segments[2].index).toBe(2);
+      });
+    });
+
+    describe('selectLabelSegment', () => {
+      it('returns null for empty segments', () => {
+        expect(selectLabelSegment([])).toBeNull();
+      });
+
+      it('selects longest segment', () => {
+        const segments: LineSegment[] = [
+          {
+            start: { x: 0, y: 0 },
+            end: { x: 50, y: 0 },
+            index: 0,
+            length: 50,
+            orientation: 'horizontal',
+            midpoint: { x: 25, y: 0 },
+            perpendicular: { x: 0, y: -1 },
+          },
+          {
+            start: { x: 50, y: 0 },
+            end: { x: 50, y: 100 },
+            index: 1,
+            length: 100, // longest
+            orientation: 'vertical',
+            midpoint: { x: 50, y: 50 },
+            perpendicular: { x: -1, y: 0 },
+          },
+        ];
+
+        const selected = selectLabelSegment(segments);
+        expect(selected?.index).toBe(1);
+        expect(selected?.length).toBe(100);
+      });
+
+      it('prefers horizontal over vertical when lengths are equal (tie-break)', () => {
+        const segments: LineSegment[] = [
+          {
+            start: { x: 0, y: 0 },
+            end: { x: 0, y: 100 },
+            index: 0,
+            length: 100,
+            orientation: 'vertical',
+            midpoint: { x: 0, y: 50 },
+            perpendicular: { x: -1, y: 0 },
+          },
+          {
+            start: { x: 0, y: 100 },
+            end: { x: 100, y: 100 },
+            index: 1,
+            length: 100, // same length
+            orientation: 'horizontal', // preferred
+            midpoint: { x: 50, y: 100 },
+            perpendicular: { x: 0, y: -1 },
+          },
+        ];
+
+        const selected = selectLabelSegment(segments);
+        expect(selected?.orientation).toBe('horizontal');
+        expect(selected?.index).toBe(1);
+      });
+
+      it('prefers lower index when everything else is equal (tie-break)', () => {
+        const segments: LineSegment[] = [
+          {
+            start: { x: 0, y: 0 },
+            end: { x: 100, y: 0 },
+            index: 0,
+            length: 100,
+            orientation: 'horizontal',
+            midpoint: { x: 50, y: 0 },
+            perpendicular: { x: 0, y: -1 },
+          },
+          {
+            start: { x: 100, y: 0 },
+            end: { x: 200, y: 0 },
+            index: 1,
+            length: 100, // same length, same orientation
+            orientation: 'horizontal',
+            midpoint: { x: 150, y: 0 },
+            perpendicular: { x: 0, y: -1 },
+          },
+        ];
+
+        const selected = selectLabelSegment(segments);
+        expect(selected?.index).toBe(0); // lower index wins
+      });
+    });
+
+    describe('calculateLineLabelPosition', () => {
+      it('returns null for path with fewer than 2 points', () => {
+        expect(calculateLineLabelPosition([])).toBeNull();
+        expect(calculateLineLabelPosition([{ x: 0, y: 0 }])).toBeNull();
+      });
+
+      it('places label above horizontal segment', () => {
+        const path = [
+          { x: 0, y: 100 },
+          { x: 200, y: 100 },
+        ];
+        const result = calculateLineLabelPosition(path);
+
+        expect(result).not.toBeNull();
+        expect(result?.position.x).toBe(100); // midpoint x
+        expect(result?.position.y).toBe(100 - ETAP_LINE_LABEL.offset); // above
+        expect(result?.offsetDirection).toBe('above');
+        expect(result?.textAnchor).toBe('middle');
+      });
+
+      it('places label to the left of vertical segment', () => {
+        const path = [
+          { x: 100, y: 0 },
+          { x: 100, y: 200 },
+        ];
+        const result = calculateLineLabelPosition(path);
+
+        expect(result).not.toBeNull();
+        expect(result?.position.x).toBe(100 - ETAP_LINE_LABEL.offset); // left
+        expect(result?.position.y).toBe(100); // midpoint y
+        expect(result?.offsetDirection).toBe('left');
+      });
+
+      it('selects longest segment for multi-segment path', () => {
+        const path = [
+          { x: 0, y: 0 },
+          { x: 50, y: 0 }, // short horizontal (50px)
+          { x: 50, y: 150 }, // long vertical (150px) — should be selected
+          { x: 100, y: 150 }, // short horizontal (50px)
+        ];
+        const result = calculateLineLabelPosition(path);
+
+        expect(result).not.toBeNull();
+        expect(result?.segmentIndex).toBe(1); // the long vertical segment
+        expect(result?.offsetDirection).toBe('left');
+      });
+    });
+
+    describe('DETERMINISM', () => {
+      it('produces identical output for identical input (single segment)', () => {
+        const path = [
+          { x: 100, y: 200 },
+          { x: 300, y: 200 },
+        ];
+
+        const result1 = calculateLineLabelPosition(path, 'conn-1');
+        const result2 = calculateLineLabelPosition(path, 'conn-1');
+
+        expect(result1).toEqual(result2);
+      });
+
+      it('produces identical output for identical input (multi-segment)', () => {
+        const path = [
+          { x: 0, y: 0 },
+          { x: 100, y: 0 },
+          { x: 100, y: 100 },
+          { x: 200, y: 100 },
+        ];
+
+        const result1 = calculateLineLabelPosition(path, 'conn-complex');
+        const result2 = calculateLineLabelPosition(path, 'conn-complex');
+
+        expect(result1).toEqual(result2);
+      });
+
+      it('produces consistent segment selection across multiple runs', () => {
+        const path = [
+          { x: 0, y: 0 },
+          { x: 80, y: 0 }, // 80px horizontal
+          { x: 80, y: 80 }, // 80px vertical (tie with first, but horizontal preferred)
+          { x: 160, y: 80 }, // 80px horizontal (tie, but lower index wins)
+        ];
+
+        // Run 100 times to ensure no randomness
+        const results = Array.from({ length: 100 }, () =>
+          calculateLineLabelPosition(path, 'conn-tie')
+        );
+
+        // All results should be identical
+        for (const result of results) {
+          expect(result?.segmentIndex).toBe(0); // first horizontal wins
+          expect(result?.offsetDirection).toBe('above');
+        }
+      });
+    });
+
+    describe('checkLabelSymbolCollision', () => {
+      it('detects collision when label overlaps symbol', () => {
+        const labelPos = { x: 100, y: 100 };
+        const labelWidth = 50;
+        const labelHeight = 12;
+        const symbolBounds = { x: 80, y: 90, width: 40, height: 40 };
+
+        expect(checkLabelSymbolCollision(labelPos, labelWidth, labelHeight, symbolBounds)).toBe(true);
+      });
+
+      it('returns false when label is far from symbol', () => {
+        const labelPos = { x: 100, y: 100 };
+        const labelWidth = 50;
+        const labelHeight = 12;
+        const symbolBounds = { x: 200, y: 200, width: 40, height: 40 };
+
+        expect(checkLabelSymbolCollision(labelPos, labelWidth, labelHeight, symbolBounds)).toBe(false);
+      });
+
+      it('respects clearance parameter', () => {
+        const labelPos = { x: 100, y: 100 };
+        const labelWidth = 40;
+        const labelHeight = 12;
+        // Symbol just outside label bounds
+        const symbolBounds = { x: 125, y: 90, width: 40, height: 40 };
+
+        // Without clearance, no collision
+        expect(checkLabelSymbolCollision(labelPos, labelWidth, labelHeight, symbolBounds, 0)).toBe(false);
+
+        // With clearance, collision detected
+        expect(checkLabelSymbolCollision(labelPos, labelWidth, labelHeight, symbolBounds, 10)).toBe(true);
+      });
+    });
+
+    describe('nudgeLabelPosition', () => {
+      it('nudges label further in perpendicular direction', () => {
+        const labelPos = { x: 100, y: 92 }; // 8px above line at y=100
+        const segment: LineSegment = {
+          start: { x: 0, y: 100 },
+          end: { x: 200, y: 100 },
+          index: 0,
+          length: 200,
+          orientation: 'horizontal',
+          midpoint: { x: 100, y: 100 },
+          perpendicular: { x: 0, y: -1 }, // above
+        };
+
+        const nudged = nudgeLabelPosition(labelPos, segment);
+
+        // Should move further up (negative y)
+        expect(nudged.y).toBeLessThan(labelPos.y);
+        expect(nudged.x).toBe(labelPos.x); // no horizontal change
+      });
+
+      it('uses default nudge distance of 2x offset', () => {
+        const labelPos = { x: 100, y: 92 };
+        const segment: LineSegment = {
+          start: { x: 0, y: 100 },
+          end: { x: 200, y: 100 },
+          index: 0,
+          length: 200,
+          orientation: 'horizontal',
+          midpoint: { x: 100, y: 100 },
+          perpendicular: { x: 0, y: -1 },
+        };
+
+        const nudged = nudgeLabelPosition(labelPos, segment);
+        const expectedY = labelPos.y - ETAP_LINE_LABEL.offset * 2;
+
+        expect(nudged.y).toBe(expectedY);
+      });
+
+      it('allows custom nudge distance', () => {
+        const labelPos = { x: 100, y: 92 };
+        const segment: LineSegment = {
+          start: { x: 0, y: 100 },
+          end: { x: 200, y: 100 },
+          index: 0,
+          length: 200,
+          orientation: 'horizontal',
+          midpoint: { x: 100, y: 100 },
+          perpendicular: { x: 0, y: -1 },
+        };
+
+        const nudged = nudgeLabelPosition(labelPos, segment, 30);
+
+        expect(nudged.y).toBe(labelPos.y - 30);
       });
     });
   });

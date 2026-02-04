@@ -359,6 +359,331 @@ export const ETAP_GRID = {
 } as const;
 
 // =============================================================================
+// LINE LABEL PLACEMENT (ETAP 1:1 — ON-LINE LABELS)
+// =============================================================================
+
+/**
+ * Segment of a connection polyline.
+ * Used for deterministic label placement selection.
+ */
+export interface LineSegment {
+  /** Start point */
+  start: { x: number; y: number };
+  /** End point */
+  end: { x: number; y: number };
+  /** Segment index in original path */
+  index: number;
+  /** Segment length (pixels) */
+  length: number;
+  /** Orientation: 'horizontal' | 'vertical' | 'diagonal' */
+  orientation: 'horizontal' | 'vertical' | 'diagonal';
+  /** Midpoint of segment */
+  midpoint: { x: number; y: number };
+  /** Perpendicular direction for label offset (normalized) */
+  perpendicular: { x: number; y: number };
+}
+
+/**
+ * Label position result from placement calculation.
+ */
+export interface LineLabelPosition {
+  /** Label anchor point (on or near the line) */
+  position: { x: number; y: number };
+  /** Text anchor for SVG text element */
+  textAnchor: 'start' | 'middle' | 'end';
+  /** Rotation angle (degrees) — 0 for horizontal, 90 for vertical */
+  rotation: number;
+  /** Selected segment index */
+  segmentIndex: number;
+  /** Offset direction applied */
+  offsetDirection: 'above' | 'below' | 'left' | 'right';
+}
+
+/**
+ * Calculate length of a segment.
+ */
+function segmentLength(
+  start: { x: number; y: number },
+  end: { x: number; y: number }
+): number {
+  const dx = end.x - start.x;
+  const dy = end.y - start.y;
+  return Math.sqrt(dx * dx + dy * dy);
+}
+
+/**
+ * Determine segment orientation.
+ * DETERMINISTIC: Uses exact threshold (1px tolerance).
+ */
+function getSegmentOrientation(
+  start: { x: number; y: number },
+  end: { x: number; y: number }
+): 'horizontal' | 'vertical' | 'diagonal' {
+  const dx = Math.abs(end.x - start.x);
+  const dy = Math.abs(end.y - start.y);
+  const tolerance = 1; // 1px tolerance for orthogonal detection
+
+  if (dy <= tolerance && dx > tolerance) {
+    return 'horizontal';
+  }
+  if (dx <= tolerance && dy > tolerance) {
+    return 'vertical';
+  }
+  return 'diagonal';
+}
+
+/**
+ * Calculate midpoint of a segment.
+ */
+function segmentMidpoint(
+  start: { x: number; y: number },
+  end: { x: number; y: number }
+): { x: number; y: number } {
+  return {
+    x: (start.x + end.x) / 2,
+    y: (start.y + end.y) / 2,
+  };
+}
+
+/**
+ * Calculate perpendicular direction for label offset.
+ * DETERMINISTIC: Always returns consistent direction (normalized).
+ *
+ * For horizontal segments: perpendicular is (0, -1) or (0, 1) — prefer above
+ * For vertical segments: perpendicular is (-1, 0) or (1, 0) — prefer left
+ * For diagonal: perpendicular is computed, prefer upper-left quadrant
+ */
+function getPerpendicularDirection(
+  start: { x: number; y: number },
+  end: { x: number; y: number },
+  orientation: 'horizontal' | 'vertical' | 'diagonal'
+): { x: number; y: number } {
+  if (orientation === 'horizontal') {
+    // Perpendicular to horizontal is vertical — prefer ABOVE (negative Y)
+    return { x: 0, y: -1 };
+  }
+
+  if (orientation === 'vertical') {
+    // Perpendicular to vertical is horizontal — prefer LEFT (negative X)
+    return { x: -1, y: 0 };
+  }
+
+  // Diagonal: compute actual perpendicular
+  const dx = end.x - start.x;
+  const dy = end.y - start.y;
+  const len = Math.sqrt(dx * dx + dy * dy);
+
+  if (len === 0) {
+    return { x: 0, y: -1 }; // Fallback for zero-length
+  }
+
+  // Perpendicular: rotate 90° counterclockwise
+  let perpX = -dy / len;
+  let perpY = dx / len;
+
+  // DETERMINISTIC: Always prefer the direction that is more "up" or "left"
+  // (upper-left quadrant preference)
+  if (perpY > 0 || (perpY === 0 && perpX > 0)) {
+    perpX = -perpX;
+    perpY = -perpY;
+  }
+
+  return { x: perpX, y: perpY };
+}
+
+/**
+ * Parse path into segments with computed properties.
+ */
+export function parsePathSegments(
+  path: { x: number; y: number }[]
+): LineSegment[] {
+  if (!path || path.length < 2) {
+    return [];
+  }
+
+  const segments: LineSegment[] = [];
+
+  for (let i = 0; i < path.length - 1; i++) {
+    const start = path[i];
+    const end = path[i + 1];
+    const length = segmentLength(start, end);
+    const orientation = getSegmentOrientation(start, end);
+    const midpoint = segmentMidpoint(start, end);
+    const perpendicular = getPerpendicularDirection(start, end, orientation);
+
+    segments.push({
+      start,
+      end,
+      index: i,
+      length,
+      orientation,
+      midpoint,
+      perpendicular,
+    });
+  }
+
+  return segments;
+}
+
+/**
+ * Select best segment for label placement.
+ * DETERMINISTIC: Longest segment wins, with tie-breaks.
+ *
+ * Tie-break rules (in order):
+ * 1. Longest segment
+ * 2. Prefer horizontal over vertical over diagonal
+ * 3. Lower segment index
+ */
+export function selectLabelSegment(segments: LineSegment[]): LineSegment | null {
+  if (!segments || segments.length === 0) {
+    return null;
+  }
+
+  // Sort with deterministic tie-breaking
+  const sorted = [...segments].sort((a, b) => {
+    // Primary: longest segment first
+    const lengthDiff = b.length - a.length;
+    if (Math.abs(lengthDiff) > 0.1) {
+      return lengthDiff;
+    }
+
+    // Tie-break 1: orientation priority (horizontal > vertical > diagonal)
+    const orientationPriority = {
+      horizontal: 0,
+      vertical: 1,
+      diagonal: 2,
+    };
+    const orientDiff =
+      orientationPriority[a.orientation] - orientationPriority[b.orientation];
+    if (orientDiff !== 0) {
+      return orientDiff;
+    }
+
+    // Tie-break 2: lower index
+    return a.index - b.index;
+  });
+
+  return sorted[0];
+}
+
+/**
+ * Calculate label position for a line/cable connection.
+ * Uses ETAP_LINE_LABEL tokens for offset and placement.
+ *
+ * @param path - Connection path (polyline points)
+ * @param connectionId - Connection ID (for determinism in edge cases)
+ * @returns Label position or null if path is too short
+ */
+export function calculateLineLabelPosition(
+  path: { x: number; y: number }[],
+  _connectionId?: string
+): LineLabelPosition | null {
+  const segments = parsePathSegments(path);
+
+  if (segments.length === 0) {
+    return null;
+  }
+
+  const selectedSegment = selectLabelSegment(segments);
+
+  if (!selectedSegment) {
+    return null;
+  }
+
+  // Apply offset perpendicular to the line
+  const offset = ETAP_LINE_LABEL.offset;
+  const labelX = selectedSegment.midpoint.x + selectedSegment.perpendicular.x * offset;
+  const labelY = selectedSegment.midpoint.y + selectedSegment.perpendicular.y * offset;
+
+  // Determine offset direction for debugging/testing
+  let offsetDirection: 'above' | 'below' | 'left' | 'right';
+  if (selectedSegment.orientation === 'horizontal') {
+    offsetDirection = selectedSegment.perpendicular.y < 0 ? 'above' : 'below';
+  } else if (selectedSegment.orientation === 'vertical') {
+    offsetDirection = selectedSegment.perpendicular.x < 0 ? 'left' : 'right';
+  } else {
+    // Diagonal: use primary direction
+    offsetDirection =
+      Math.abs(selectedSegment.perpendicular.y) > Math.abs(selectedSegment.perpendicular.x)
+        ? selectedSegment.perpendicular.y < 0
+          ? 'above'
+          : 'below'
+        : selectedSegment.perpendicular.x < 0
+          ? 'left'
+          : 'right';
+  }
+
+  // Calculate rotation (0 for horizontal labels, may extend for rotated labels later)
+  // ETAP standard: labels are always horizontal for readability
+  const rotation = 0;
+
+  return {
+    position: { x: labelX, y: labelY },
+    textAnchor: 'middle',
+    rotation,
+    segmentIndex: selectedSegment.index,
+    offsetDirection,
+  };
+}
+
+/**
+ * Check if a label position would collide with a symbol bounding box.
+ * Used for collision detection in auto-layout.
+ *
+ * @param labelPosition - Label anchor position
+ * @param labelWidth - Estimated label width
+ * @param labelHeight - Estimated label height
+ * @param symbolBounds - Symbol bounding box { x, y, width, height }
+ * @param clearance - Minimum clearance (pixels)
+ */
+export function checkLabelSymbolCollision(
+  labelPosition: { x: number; y: number },
+  labelWidth: number,
+  labelHeight: number,
+  symbolBounds: { x: number; y: number; width: number; height: number },
+  clearance: number = ETAP_LINE_LABEL.haloPadding * 2
+): boolean {
+  // Label bounding box (centered at position)
+  const labelLeft = labelPosition.x - labelWidth / 2 - clearance;
+  const labelRight = labelPosition.x + labelWidth / 2 + clearance;
+  const labelTop = labelPosition.y - labelHeight / 2 - clearance;
+  const labelBottom = labelPosition.y + labelHeight / 2 + clearance;
+
+  // Symbol bounding box
+  const symbolLeft = symbolBounds.x;
+  const symbolRight = symbolBounds.x + symbolBounds.width;
+  const symbolTop = symbolBounds.y;
+  const symbolBottom = symbolBounds.y + symbolBounds.height;
+
+  // Check AABB intersection
+  const overlapsX = labelLeft < symbolRight && labelRight > symbolLeft;
+  const overlapsY = labelTop < symbolBottom && labelBottom > symbolTop;
+
+  return overlapsX && overlapsY;
+}
+
+/**
+ * Apply minimal nudge to avoid collision.
+ * DETERMINISTIC: Uses fixed direction preference.
+ *
+ * @param labelPosition - Original label position
+ * @param segment - Selected segment (for direction preference)
+ * @param nudgeDistance - Distance to nudge (default: 2x offset)
+ * @returns Nudged position
+ */
+export function nudgeLabelPosition(
+  labelPosition: { x: number; y: number },
+  segment: LineSegment,
+  nudgeDistance: number = ETAP_LINE_LABEL.offset * 2
+): { x: number; y: number } {
+  // Nudge further in the perpendicular direction
+  return {
+    x: labelPosition.x + segment.perpendicular.x * nudgeDistance,
+    y: labelPosition.y + segment.perpendicular.y * nudgeDistance,
+  };
+}
+
+// =============================================================================
 // HELPER FUNCTIONS
 // =============================================================================
 
@@ -523,4 +848,10 @@ export default {
   getLabelAnchor: getEtapLabelAnchor,
   getSymbolSize: getEtapSymbolSize,
   getStrokeWidth: getEtapStrokeWidth,
+  // Line label placement (ETAP 1:1)
+  parsePathSegments,
+  selectLabelSegment,
+  calculateLineLabelPosition,
+  checkLabelSymbolCollision,
+  nudgeLabelPosition,
 };
