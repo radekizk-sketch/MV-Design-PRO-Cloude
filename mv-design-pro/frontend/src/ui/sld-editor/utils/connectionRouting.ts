@@ -26,6 +26,11 @@
 import type { AnySldSymbol, BranchSymbol, Position, SwitchSymbol, SourceSymbol, LoadSymbol, NodeSymbol } from '../types';
 import { getPortPoint, selectBestPorts, getSymbolBoundingBox, type PortName } from './portUtils';
 import { ETAP_GEOMETRY } from '../../sld/sldEtapStyle';
+import {
+  routeWithObstacles,
+  type RoutingObstacle,
+  type ObstacleRouterConfig,
+} from './obstacleAwareRouter';
 
 // =============================================================================
 // AUTO-LAYOUT V1 INTEGRATION — BUSBAR FEEDER ROUTING (DEFAULT ON)
@@ -118,6 +123,17 @@ export function buildRoutingObstacles(symbols: AnySldSymbol[], config: RoutingCo
     }
     return a.id.localeCompare(b.id);
   });
+}
+
+/**
+ * Convert internal Obstacle[] to RoutingObstacle[] for obstacle-aware router.
+ * DETERMINISTIC: Preserves sorted order from buildRoutingObstacles.
+ */
+function toRoutingObstacles(obstacles: Obstacle[]): RoutingObstacle[] {
+  return obstacles.map((obs) => ({
+    id: obs.id,
+    bbox: obs.bbox,
+  }));
 }
 
 // =============================================================================
@@ -506,6 +522,50 @@ function routeOrthogonal(
   }
 
   // NON-BUSBAR CONNECTIONS: Standard routing logic
+  // =============================================================================
+  // OBSTACLE-AWARE A* ROUTING (DEFAULT ON for non-busbar connections)
+  // Provides PowerFactory/ETAP-grade orthogonal routing with obstacle avoidance.
+  // FALLBACK: If A* fails, use standard L/Z routing below.
+  // =============================================================================
+  const excludeIds = new Set([fromSymbol.id, toSymbol.id]);
+  const routingObstacles = toRoutingObstacles(obstacles);
+
+  // Build config for obstacle-aware router
+  const obstacleRouterConfig: Partial<ObstacleRouterConfig> = {
+    gridStep: config.gridSnap,
+    obstacleMargin: config.obstacleMargin,
+  };
+
+  try {
+    const aStarPath = routeWithObstacles(
+      snapStart,
+      snapEnd,
+      routingObstacles,
+      excludeIds,
+      obstacleRouterConfig
+    );
+
+    if (aStarPath && aStarPath.length >= 2) {
+      // Normalize and validate A* result
+      const normalizedPath = normalizePath(aStarPath, config.gridSnap);
+
+      if (
+        normalizedPath.length >= 2 &&
+        isPathClear(normalizedPath, obstacles) &&
+        pathMeetsMinBendLength(normalizedPath, config.minBendLength)
+      ) {
+        return normalizedPath;
+      }
+    }
+    // A* returned no valid path — fall through to standard routing
+  } catch {
+    // A* threw an exception — fall through to standard routing (local fallback)
+  }
+
+  // =============================================================================
+  // STANDARD ROUTING FALLBACK (existing L/Z routing)
+  // =============================================================================
+
   // Preferuj PROSTE linie
   if (snapStart.x === snapEnd.x || snapStart.y === snapEnd.y) {
     const iPath = normalizePath([snapStart, snapEnd], config.gridSnap);
