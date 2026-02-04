@@ -25,6 +25,8 @@ import {
   ETAP_STROKE_SELECTED,
   ETAP_STATE_COLORS,
   ETAP_TYPOGRAPHY,
+  ETAP_LINE_LABEL,
+  calculateLineLabelPosition,
 } from './sldEtapStyle';
 
 // =============================================================================
@@ -59,6 +61,10 @@ export interface ConnectionRendererProps {
   selected?: boolean;
   /** Czy polaczenie jest aktywne (pod napieciem) */
   energized?: boolean;
+  /** Etykieta polaczenia (nazwa linii/kabla) */
+  label?: string;
+  /** Czy pokazywac etykiete */
+  showLabel?: boolean;
   /** Callback przy kliknieciu */
   onClick?: (connectionId: string, event: React.MouseEvent) => void;
   /** Callback przy najechaniu */
@@ -76,11 +82,14 @@ function pathToPoints(path: Position[]): string {
 
 /**
  * Komponent renderowania polaczenia.
+ * PR-SLD-ETAP-LABELS-01: Etykiety na linii z halo/white-box.
  */
 export const ConnectionRenderer: React.FC<ConnectionRendererProps> = ({
   connection,
   selected = false,
   energized = true,
+  label,
+  showLabel = true,
   onClick,
   onMouseEnter,
   onMouseLeave,
@@ -108,6 +117,16 @@ export const ConnectionRenderer: React.FC<ConnectionRendererProps> = ({
   // Punkty dla polyline
   const points = useMemo(() => pathToPoints(path), [path]);
 
+  // Oblicz pozycje etykiety (deterministycznie)
+  const labelPosition = useMemo(() => {
+    if (!showLabel || !label) return null;
+    return calculateLineLabelPosition(path, id);
+  }, [path, id, showLabel, label]);
+
+  // Szacowana szerokosc etykiety (7px na znak — przemyslowy standard)
+  const estimatedLabelWidth = label ? Math.max(30, label.length * 7) : 0;
+  const labelHeight = ETAP_TYPOGRAPHY.fontSize.medium;
+
   // Handlery
   const handleClick = useCallback(
     (e: React.MouseEvent) => {
@@ -131,6 +150,7 @@ export const ConnectionRenderer: React.FC<ConnectionRendererProps> = ({
       data-connection-type={connectionType}
       data-connection-selected={selected}
       data-connection-energized={energized}
+      data-has-label={!!(showLabel && label && labelPosition)}
     >
       {/* Niewidoczna strefa klikniecia (hitbox) */}
       <polyline
@@ -157,6 +177,43 @@ export const ConnectionRenderer: React.FC<ConnectionRendererProps> = ({
         opacity={opacity}
         style={{ pointerEvents: 'none' }}
       />
+
+      {/* Etykieta na linii z halo/white-box */}
+      {showLabel && label && labelPosition && (
+        <g
+          data-testid={`sld-connection-label-${id}`}
+          data-label-segment={labelPosition.segmentIndex}
+          data-label-offset={labelPosition.offsetDirection}
+        >
+          {/* Halo/white-box — tlo dla czytelnosci */}
+          <rect
+            x={labelPosition.position.x - estimatedLabelWidth / 2 - ETAP_LINE_LABEL.haloPadding}
+            y={labelPosition.position.y - labelHeight / 2 - ETAP_LINE_LABEL.haloPadding}
+            width={estimatedLabelWidth + ETAP_LINE_LABEL.haloPadding * 2}
+            height={labelHeight + ETAP_LINE_LABEL.haloPadding * 2}
+            fill={ETAP_LINE_LABEL.haloColor}
+            opacity={ETAP_LINE_LABEL.haloOpacity}
+            rx={1}
+            ry={1}
+            style={{ pointerEvents: 'none' }}
+            data-testid={`sld-connection-label-halo-${id}`}
+          />
+          {/* Tekst etykiety */}
+          <text
+            x={labelPosition.position.x}
+            y={labelPosition.position.y}
+            textAnchor={labelPosition.textAnchor}
+            dominantBaseline="central"
+            fontFamily={ETAP_TYPOGRAPHY.fontFamily}
+            fontSize={ETAP_TYPOGRAPHY.fontSize.medium}
+            fontWeight={selected ? ETAP_TYPOGRAPHY.fontWeight.semibold : ETAP_TYPOGRAPHY.fontWeight.normal}
+            fill={ETAP_TYPOGRAPHY.labelColor}
+            style={{ pointerEvents: 'none' }}
+          >
+            {label}
+          </text>
+        </g>
+      )}
     </g>
   );
 };
@@ -172,6 +229,10 @@ export interface ConnectionsLayerProps {
   selectedConnectionId?: string | null;
   /** Mapa energizacji (connectionId -> boolean) */
   energizationMap?: Map<string, boolean>;
+  /** Mapa etykiet (connectionId -> label) */
+  labelMap?: Map<string, string>;
+  /** Czy pokazywac etykiety na polaczeniach */
+  showLabels?: boolean;
   /** Callback przy kliknieciu polaczenia */
   onConnectionClick?: (connectionId: string, event: React.MouseEvent) => void;
   /** Callback przy najechaniu na polaczenie */
@@ -181,11 +242,14 @@ export interface ConnectionsLayerProps {
 /**
  * Warstwa renderowania wszystkich polaczen.
  * Polaczenia sa renderowane pod symbolami.
+ * PR-SLD-ETAP-LABELS-01: Etykiety na liniach z halo.
  */
 export const ConnectionsLayer: React.FC<ConnectionsLayerProps> = ({
   connections,
   selectedConnectionId,
   energizationMap,
+  labelMap,
+  showLabels = true,
   onConnectionClick,
   onConnectionHover,
 }) => {
@@ -214,6 +278,8 @@ export const ConnectionsLayer: React.FC<ConnectionsLayerProps> = ({
           connection={connection}
           selected={connection.id === selectedConnectionId}
           energized={energizationMap?.get(connection.id) ?? true}
+          label={labelMap?.get(connection.id)}
+          showLabel={showLabels}
           onClick={onConnectionClick}
           onMouseEnter={handleMouseEnter}
           onMouseLeave={handleMouseLeave}
