@@ -40,7 +40,9 @@ import type {
   PortName,
 } from './types';
 import type { IssueSeverity } from '../types';
+import type { CadOverridesDocument, CadOverridesStatusReport, GeometryMode } from './cad/geometryContract';
 import { generatePasteIdentifiers } from './utils/deterministicId';
+import { featureFlags } from '../config/featureFlags';
 
 /**
  * Default grid configuration.
@@ -100,6 +102,14 @@ interface SldEditorState {
   // ===== HOVER STATE (PR-SLD-05) =====
   /** ID portu pod kursorem (dla podswietlenia) */
   hoveredPortId: string | null;
+
+  // ===== CAD OVERRIDES =====
+  /** Tryb geometrii (AUTO / CAD / HYBRID) */
+  geometryMode: GeometryMode;
+  /** Dokument overrides CAD */
+  cadOverridesDocument: CadOverridesDocument | null;
+  /** Status audytu overrides */
+  cadOverridesStatus: CadOverridesStatusReport | null;
 
   // ===== ACTIONS: SYMBOLS =====
   setSymbols: (symbols: AnySldSymbol[]) => void;
@@ -178,6 +188,11 @@ interface SldEditorState {
   /** Ustaw port pod kursorem */
   setHoveredPort: (portId: string | null) => void;
 
+  // ===== ACTIONS: CAD OVERRIDES =====
+  setGeometryMode: (mode: GeometryMode) => void;
+  setCadOverridesDocument: (doc: CadOverridesDocument | null) => void;
+  setCadOverridesStatus: (report: CadOverridesStatusReport | null) => void;
+
   // ===== HELPERS =====
   getSymbol: (symbolId: string) => AnySldSymbol | undefined;
   hasSelection: () => boolean;
@@ -202,6 +217,9 @@ export const useSldEditorStore = create<SldEditorState>()((set, get) => ({
   portSnapState: null,
   statusMessage: null,
   hoveredPortId: null,
+  geometryMode: 'AUTO',
+  cadOverridesDocument: null,
+  cadOverridesStatus: null,
 
   // ===== SYMBOLS =====
 
@@ -748,6 +766,24 @@ export const useSldEditorStore = create<SldEditorState>()((set, get) => ({
 
   setHoveredPort: (portId: string | null) => {
     set({ hoveredPortId: portId });
+  },
+
+  // ===== CAD OVERRIDES =====
+
+  setGeometryMode: (mode: GeometryMode) => {
+    if (!featureFlags.sldCadEditingEnabled) {
+      set({ geometryMode: 'AUTO' });
+      return;
+    }
+    set({ geometryMode: mode });
+  },
+
+  setCadOverridesDocument: (doc: CadOverridesDocument | null) => {
+    set({ cadOverridesDocument: doc });
+  },
+
+  setCadOverridesStatus: (report: CadOverridesStatusReport | null) => {
+    set({ cadOverridesStatus: report });
   },
 
   // ===== HELPERS =====
