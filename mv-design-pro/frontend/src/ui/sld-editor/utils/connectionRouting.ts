@@ -1,26 +1,31 @@
 /**
- * CONNECTION ROUTING — Algorytm prowadzenia polaczen (PLANS STYLE)
+ * CONNECTION ROUTING — ETAP-grade algorytm prowadzenia polaczen
+ *
+ * PR-SLD-ETAP-GEOMETRY-01: ETAP-grade geometria SLD
  *
  * CANONICAL ALIGNMENT:
  * - SLD_KANONICZNA_SPECYFIKACJA.md § 4: Polaczenia
- * - AUDYT_SLD_ETAP.md: N-01, N-05
- * - Plans: proste linie pionowe na spine
+ * - sldEtapStyle.ts: ETAP_GEOMETRY (single source of truth)
+ * - ETAP software visual standards
  *
  * FEATURES:
  * - Deterministyczny routing (ten sam input -> ta sama sciezka)
- * - PLANS STYLE: proste linie pionowe (spine layout)
- * - L-route dla galezi bocznych
+ * - ETAP STYLE: pola SN wychodzą PIONOWO z szyny
+ * - Brak ukosnych polaczen z szyn (busbar)
+ * - Preferuj pion/poziom (I/L routes)
  * - Snap do siatki
  *
- * ALGORYTM (PLANS STYLE):
- * 1. Prosta linia: dla elementow na tej samej osi
- * 2. L-route: dla galezi bocznych
- * 3. Z-route: fallback dla kolizji
+ * ETAP ROUTING RULES:
+ * 1. Connections FROM busbar → ALWAYS vertical first
+ * 2. No diagonal segments from busbars
+ * 3. Prefer straight vertical lines for feeders
+ * 4. L-route when horizontal offset needed
+ * 5. Z-route as fallback for collision avoidance
  */
 
 import type { AnySldSymbol, BranchSymbol, Position, SwitchSymbol, SourceSymbol, LoadSymbol } from '../types';
 import { getPortPoint, selectBestPorts, getSymbolBoundingBox, type PortName } from './portUtils';
-import { DEFAULT_LAYOUT_CONFIG } from './autoLayout';
+import { ETAP_GEOMETRY } from '../../sld/sldEtapStyle';
 
 // =============================================================================
 // TYPY
@@ -62,14 +67,14 @@ export interface RoutingConfig {
   gridSnap: number;
 }
 
-/** Centralna konfiguracja routingu (PL) */
+/** Centralna konfiguracja routingu (ETAP-grade, uses ETAP_GEOMETRY tokens) */
 export const ROUTING_GEOMETRY_CONFIG: RoutingConfig = {
-  corridorOffsetFromSpine: 40,
-  corridorOffsetFromBusbar: 24,
+  corridorOffsetFromSpine: ETAP_GEOMETRY.routing.corridorOffset,
+  corridorOffsetFromBusbar: ETAP_GEOMETRY.routing.minBusbarExitLength,
   obstacleMargin: 8,
   minBendLength: 18,
   maxStepOutAttempts: 6,
-  gridSnap: DEFAULT_LAYOUT_CONFIG.gridSize,
+  gridSnap: ETAP_GEOMETRY.layout.gridSize,
 };
 
 /** Domyslna konfiguracja routingu */
@@ -89,12 +94,12 @@ type Obstacle = {
 };
 
 export function buildRoutingObstacles(symbols: AnySldSymbol[], config: RoutingConfig): Obstacle[] {
-  const obstacles = symbols.map((symbol) => {
+  const obstacles: Obstacle[] = symbols.map((symbol) => {
     const bbox = expandAabb(getSymbolBoundingBox(symbol), config.obstacleMargin);
     const isBusbar = symbol.elementType === 'Bus';
     return {
       id: symbol.id,
-      type: isBusbar ? 'busbar' : 'symbol',
+      type: (isBusbar ? 'busbar' : 'symbol') as 'busbar' | 'symbol',
       typePriority: isBusbar ? 0 : 1,
       bbox,
     };
@@ -313,10 +318,11 @@ function createConnection(
 /**
  * Wygeneruj sciezke miedzy dwoma punktami.
  *
- * PLANS STYLE SPINE LAYOUT:
- * - Preferuj PROSTE linie pionowe (spine)
- * - Dla elementow na tej samej osi X: prosta linia
- * - Dla elementow na roznych osiach: prosty L-route
+ * ETAP-GRADE ROUTING:
+ * - Polaczenia z szyny (busbar) → ZAWSZE pionowo najpierw
+ * - Brak ukosnych polaczen z szyn
+ * - Preferuj proste linie pionowe (feeders)
+ * - L-route gdy potrzebne przesuniecie poziome
  *
  * DETERMINIZM: Te same punkty -> ta sama sciezka
  */
@@ -338,10 +344,91 @@ function routeOrthogonal(
     return [snapStart];
   }
 
+  // ETAP RULE: Check if connection involves a busbar
+  const fromIsBus = fromSymbol.elementType === 'Bus';
+  const toIsBus = toSymbol.elementType === 'Bus';
+  const involveBusbar = fromIsBus || toIsBus;
+
   const corridor = resolveCorridor(fromSymbol, toSymbol, snapStart, snapEnd, spineX, config);
 
-  // PLANS STYLE: Preferuj PROSTE linie
-  // Jesli punkty sa na tej samej linii pionowej lub poziomej, zwroc prosta linie
+  // ETAP STYLE: For busbar connections, enforce vertical-first routing
+  // This ensures feeders exit VERTICALLY from the busbar
+  if (involveBusbar && ETAP_GEOMETRY.routing.busbarOrthogonal) {
+    // If on same X axis → straight vertical line (PERFECT for feeders)
+    if (snapStart.x === snapEnd.x) {
+      const iPath = normalizePath([snapStart, snapEnd], config.gridSnap);
+      if (isPathClear(iPath, obstacles) && pathMeetsMinBendLength(iPath, config.minBendLength)) {
+        return iPath;
+      }
+    }
+
+    // If horizontal offset exists → L-route with VERTICAL first (from busbar)
+    // This ensures the connection leaves the busbar vertically
+    const busbarEnd = fromIsBus ? snapStart : snapEnd;
+    const otherEnd = fromIsBus ? snapEnd : snapStart;
+
+    // Calculate intermediate point: vertical from busbar, then horizontal
+    const minVerticalLength = ETAP_GEOMETRY.routing.minBusbarExitLength;
+    const verticalDirection = otherEnd.y > busbarEnd.y ? 1 : -1;
+
+    // Intermediate point: same X as busbar, Y offset by minimum vertical length
+    const intermediateY = busbarEnd.y + verticalDirection * Math.max(
+      minVerticalLength,
+      Math.abs(otherEnd.y - busbarEnd.y) / 2
+    );
+
+    const intermediatePoint = snapToGrid({ x: busbarEnd.x, y: intermediateY }, config.gridSnap);
+
+    // Build L-path: busbar → vertical → horizontal → target
+    let lPath: Position[];
+    if (fromIsBus) {
+      // From busbar: start → intermediate (vertical) → end (horizontal)
+      if (intermediatePoint.y === snapEnd.y) {
+        // Can do simple L-route
+        lPath = normalizePath([snapStart, intermediatePoint, snapEnd], config.gridSnap);
+      } else {
+        // Need Z-route: start → vertical → horizontal → vertical → end
+        const midX = snapEnd.x;
+        const midY = intermediatePoint.y;
+        lPath = normalizePath([
+          snapStart,
+          { x: snapStart.x, y: midY },
+          { x: midX, y: midY },
+          snapEnd,
+        ], config.gridSnap);
+      }
+    } else {
+      // To busbar: start → horizontal → vertical → busbar
+      if (intermediatePoint.y === snapStart.y) {
+        lPath = normalizePath([snapStart, intermediatePoint, snapEnd], config.gridSnap);
+      } else {
+        const midX = snapStart.x;
+        const midY = intermediatePoint.y;
+        lPath = normalizePath([
+          snapStart,
+          { x: midX, y: midY },
+          { x: snapEnd.x, y: midY },
+          snapEnd,
+        ], config.gridSnap);
+      }
+    }
+
+    if (isPathClear(lPath, obstacles) && pathMeetsMinBendLength(lPath, config.minBendLength)) {
+      return lPath;
+    }
+
+    // Fallback: try standard L-route with vertical preference
+    const lPathVertical = normalizePath(
+      tryLRoute(snapStart, snapEnd, 'vertical', config.gridSnap),
+      config.gridSnap
+    );
+    if (isPathClear(lPathVertical, obstacles) && pathMeetsMinBendLength(lPathVertical, config.minBendLength)) {
+      return lPathVertical;
+    }
+  }
+
+  // NON-BUSBAR CONNECTIONS: Standard routing logic
+  // Preferuj PROSTE linie
   if (snapStart.x === snapEnd.x || snapStart.y === snapEnd.y) {
     const iPath = normalizePath([snapStart, snapEnd], config.gridSnap);
     if (isPathClear(iPath, obstacles) && pathMeetsMinBendLength(iPath, config.minBendLength)) {
@@ -349,11 +436,15 @@ function routeOrthogonal(
     }
   }
 
-  // PLANS STYLE: Dla elementow na roznych osiach uzyj prostego L-route
-  // Najpierw pion (preferowany dla spine layout), potem poziom
-  const lPath = normalizePath(tryLRoute(snapStart, snapEnd, 'vertical', config.gridSnap), config.gridSnap);
+  // Dla elementow na roznych osiach uzyj prostego L-route
+  // Preferuj pion dla spine layout
+  const preferVertical = ETAP_GEOMETRY.routing.preferVertical;
+  const lPath = normalizePath(
+    tryLRoute(snapStart, snapEnd, preferVertical ? 'vertical' : 'horizontal', config.gridSnap),
+    config.gridSnap
+  );
   const lPathAlt = normalizePath(
-    tryLRoute(snapStart, snapEnd, 'horizontal', config.gridSnap),
+    tryLRoute(snapStart, snapEnd, preferVertical ? 'horizontal' : 'vertical', config.gridSnap),
     config.gridSnap
   );
 
@@ -371,8 +462,12 @@ function routeOrthogonal(
     return zPath;
   }
 
-  // Ostateczny fallback: prosta linia (ignoruj kolizje dla czytelnosci)
-  return normalizePath([snapStart, snapEnd], config.gridSnap);
+  // Ostateczny fallback: L-route (ignoruj kolizje dla czytelnosci)
+  // ETAP: NEVER use diagonal for busbar connections
+  return normalizePath(
+    tryLRoute(snapStart, snapEnd, 'vertical', config.gridSnap),
+    config.gridSnap
+  );
 }
 
 /**

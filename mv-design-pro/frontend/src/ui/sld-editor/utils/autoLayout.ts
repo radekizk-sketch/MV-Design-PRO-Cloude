@@ -1,25 +1,35 @@
 /**
- * AUTO-LAYOUT — Hierarchiczny algorytm rozmieszczania SLD (ETAP-style)
+ * AUTO-LAYOUT — ETAP-grade hierarchiczny algorytm rozmieszczania SLD
+ *
+ * PR-SLD-ETAP-GEOMETRY-01: ETAP-grade geometria SLD
  *
  * CANONICAL ALIGNMENT:
  * - SLD_KANONICZNA_SPECYFIKACJA.md § 5: Auto-Layout
- * - Sugiyama framework (layer-based graph drawing)
+ * - sldEtapStyle.ts: ETAP_GEOMETRY (single source of truth)
+ * - ETAP software visual standards
  *
  * FEATURES:
  * - Deterministyczny (ten sam model → ten sam układ)
- * - Hierarchiczny (zasilanie góra→dół)
- * - Layered (szyny na poziomach)
- * - Minimalizacja skrzyżowań
+ * - Hierarchiczny WN → Trafo → SN → Feeders
+ * - Szyny auto-expandujące (width based on bay count)
+ * - Pola SN pionowo z szyny z równym odstępem
+ * - Transformator osiowo między WN i SN
+ * - Brak ukośnych przyłączy z szyn
  *
- * ALGORYTM:
- * 1. Budowa grafu z topologii
- * 2. Identyfikacja źródeł (roots)
- * 3. Przypisanie warstw (BFS od źródeł)
- * 4. Sortowanie w warstwach (minimalizacja skrzyżowań)
- * 5. Przypisanie współrzędnych X/Y
+ * ALGORYTM (ETAP-GRADE):
+ * 1. Identyfikacja typów szyn (WN/SN) i transformatorów
+ * 2. Budowa hierarchii: Source → WN → Trafo → SN → Feeders/Loads
+ * 3. Obliczenie szerokości szyn (auto-expansion)
+ * 4. Pozycjonowanie warstwowe z ETAP_GEOMETRY tokens
+ * 5. Pozycjonowanie feeders pionowo pod SN
  */
 
 import type { AnySldSymbol, BranchSymbol, Position, SwitchSymbol, NodeSymbol } from '../types';
+import {
+  ETAP_GEOMETRY,
+  calculateBusbarWidth,
+  calculateBayPositions,
+} from '../../sld/sldEtapStyle';
 
 // =============================================================================
 // STAŁE KONFIGURACYJNE
@@ -45,16 +55,16 @@ export interface AutoLayoutConfig {
   padding: number;
 }
 
-/** Domyślna konfiguracja — PLANS STYLE SPINE LAYOUT */
+/** Domyślna konfiguracja — ETAP-GRADE LAYOUT (uses ETAP_GEOMETRY tokens) */
 export const DEFAULT_LAYOUT_CONFIG: AutoLayoutConfig = {
-  gridSize: 20,
-  layerSpacing: 140,      // Duży odstęp jak w Plans
-  nodeSpacing: 100,
-  busMinWidth: 200,       // Szeroka szyna jak w Plans
+  gridSize: ETAP_GEOMETRY.layout.gridSize,
+  layerSpacing: ETAP_GEOMETRY.layout.layerSpacing,
+  nodeSpacing: ETAP_GEOMETRY.layout.nodeSpacing,
+  busMinWidth: ETAP_GEOMETRY.busbar.minWidth,
   symbolWidth: 60,
   symbolHeight: 40,
   direction: 'top-down',
-  padding: 80,            // Większy padding dla czytelności
+  padding: ETAP_GEOMETRY.layout.padding,
 };
 
 /** Konfiguracja clearances dla czytelności SLD (łatwa do korekty). */
@@ -134,13 +144,211 @@ export interface AutoLayoutResult {
 }
 
 // =============================================================================
-// GŁÓWNA FUNKCJA AUTO-LAYOUT
+// ETAP-GRADE LAYOUT — VOLTAGE LEVEL DETECTION
 // =============================================================================
 
 /**
- * Wygeneruj deterministyczny layout dla symboli SLD.
+ * Voltage level classification for ETAP layout.
+ */
+type VoltageLevel = 'WN' | 'SN' | 'nN' | 'unknown';
+
+/**
+ * Detect voltage level from bus name or voltage attribute.
+ * DETERMINISTIC: Same name → same classification.
+ *
+ * WN (High Voltage): 110kV+
+ * SN (Medium Voltage): 6-30kV
+ * nN (Low Voltage): <1kV
+ */
+function detectBusVoltageLevel(symbol: AnySldSymbol): VoltageLevel {
+  const name = symbol.elementName.toLowerCase();
+  const voltage = (symbol as any).voltage || (symbol as any).voltageKV;
+
+  // Check explicit voltage attribute
+  if (voltage !== undefined) {
+    const v = typeof voltage === 'string' ? parseFloat(voltage) : voltage;
+    if (v >= 110) return 'WN';
+    if (v >= 6) return 'SN';
+    if (v > 0 && v < 1) return 'nN';
+  }
+
+  // Check name patterns (Polish naming conventions)
+  if (name.includes('110') || name.includes('wn') || name.includes('wysokie')) {
+    return 'WN';
+  }
+  if (
+    name.includes('15') ||
+    name.includes('20') ||
+    name.includes('sn') ||
+    name.includes('średnie') ||
+    name.includes('srednie')
+  ) {
+    return 'SN';
+  }
+  if (name.includes('0.4') || name.includes('nn') || name.includes('niskie')) {
+    return 'nN';
+  }
+
+  // Default to SN for most MV networks
+  return 'SN';
+}
+
+/**
+ * Check if a symbol is connected to a transformer.
+ * Used to identify WN/SN busbar hierarchy.
+ */
+function isConnectedToTransformer(
+  symbol: AnySldSymbol,
+  transformers: AnySldSymbol[],
+  elementToSymbol: Map<string, string>
+): { connected: boolean; side: 'primary' | 'secondary' | null } {
+  for (const trafo of transformers) {
+    const branch = trafo as BranchSymbol;
+    const fromSymbolId = elementToSymbol.get(branch.fromNodeId);
+    const toSymbolId = elementToSymbol.get(branch.toNodeId);
+
+    if (fromSymbolId === symbol.id) {
+      return { connected: true, side: 'primary' };
+    }
+    if (toSymbolId === symbol.id) {
+      return { connected: true, side: 'secondary' };
+    }
+  }
+  return { connected: false, side: null };
+}
+
+// =============================================================================
+// ETAP-GRADE LAYOUT — BAY IDENTIFICATION
+// =============================================================================
+
+/**
+ * A "bay" is a feeder position on a busbar (switch + line/load).
+ */
+interface EtapBay {
+  /** Busbar this bay connects to */
+  busbarId: string;
+  /** Switch symbol in the bay (if any) */
+  switchId: string | null;
+  /** Branch/line symbol in the bay (if any) */
+  branchId: string | null;
+  /** Load symbol in the bay (if any) */
+  loadId: string | null;
+  /** All symbols that are part of this bay */
+  symbolIds: string[];
+  /** Bay index for positioning */
+  index: number;
+}
+
+/**
+ * Identify bays (feeders) connected to a busbar.
+ * A bay typically consists of: busbar → switch → line/load
+ */
+function identifyBays(
+  busbarSymbol: AnySldSymbol,
+  symbols: AnySldSymbol[],
+  _elementToSymbol: Map<string, string>
+): EtapBay[] {
+  const bays: EtapBay[] = [];
+  const busbarElementId = busbarSymbol.elementId;
+
+  // Find all switches connected to this busbar
+  const connectedSwitches = symbols.filter((s) => {
+    if (s.elementType !== 'Switch') return false;
+    const sw = s as SwitchSymbol;
+    return sw.fromNodeId === busbarElementId || sw.toNodeId === busbarElementId;
+  });
+
+  // For each switch, find what it connects to (line/load)
+  connectedSwitches.forEach((switchSymbol, index) => {
+    const sw = switchSymbol as SwitchSymbol;
+    const otherNodeId = sw.fromNodeId === busbarElementId ? sw.toNodeId : sw.fromNodeId;
+
+    const bay: EtapBay = {
+      busbarId: busbarSymbol.id,
+      switchId: switchSymbol.id,
+      branchId: null,
+      loadId: null,
+      symbolIds: [switchSymbol.id],
+      index,
+    };
+
+    // Find what the switch connects to
+    const connectedBranch = symbols.find((s) => {
+      if (s.elementType !== 'LineBranch') return false;
+      const branch = s as BranchSymbol;
+      return branch.fromNodeId === otherNodeId || branch.toNodeId === otherNodeId;
+    });
+
+    if (connectedBranch) {
+      bay.branchId = connectedBranch.id;
+      bay.symbolIds.push(connectedBranch.id);
+    }
+
+    const connectedLoad = symbols.find((s) => {
+      if (s.elementType !== 'Load') return false;
+      return (s as any).connectedToNodeId === otherNodeId;
+    });
+
+    if (connectedLoad) {
+      bay.loadId = connectedLoad.id;
+      bay.symbolIds.push(connectedLoad.id);
+    }
+
+    bays.push(bay);
+  });
+
+  // Also find direct branch connections (without switch)
+  const directBranches = symbols.filter((s) => {
+    if (s.elementType !== 'LineBranch' && s.elementType !== 'TransformerBranch') return false;
+    const branch = s as BranchSymbol;
+    // Check if directly connected to busbar and not already in a bay
+    const isConnected = branch.fromNodeId === busbarElementId || branch.toNodeId === busbarElementId;
+    if (!isConnected) return false;
+    // Check if already covered by a switch bay
+    return !bays.some((b) => b.branchId === s.id);
+  });
+
+  directBranches.forEach((branch) => {
+    bays.push({
+      busbarId: busbarSymbol.id,
+      switchId: null,
+      branchId: branch.id,
+      loadId: null,
+      symbolIds: [branch.id],
+      index: bays.length,
+    });
+  });
+
+  // Sort bays by switch ID for determinism
+  bays.sort((a, b) => {
+    const aKey = a.switchId || a.branchId || '';
+    const bKey = b.switchId || b.branchId || '';
+    return aKey.localeCompare(bKey);
+  });
+
+  // Re-index after sorting
+  bays.forEach((bay, i) => (bay.index = i));
+
+  return bays;
+}
+
+// =============================================================================
+// GŁÓWNA FUNKCJA AUTO-LAYOUT (ETAP-GRADE)
+// =============================================================================
+
+/**
+ * Wygeneruj deterministyczny ETAP-grade layout dla symboli SLD.
+ *
+ * PR-SLD-ETAP-GEOMETRY-01: ETAP-grade geometria SLD
  *
  * DETERMINIZM: Ten sam zestaw symboli → ten sam układ
+ *
+ * ETAP RULES:
+ * - WN busbar at top
+ * - Transformer between WN and SN
+ * - SN busbar below transformer
+ * - Feeders exit VERTICALLY from SN busbar
+ * - Busbars auto-expand based on bay count
  *
  * @param symbols - Symbole SLD do rozmieszczenia
  * @param config - Konfiguracja layoutu (opcjonalna)
@@ -152,48 +360,291 @@ export function generateAutoLayout(
 ): AutoLayoutResult {
   const cfg: AutoLayoutConfig = { ...DEFAULT_LAYOUT_CONFIG, ...config };
 
-  // 1. Buduj graf z symboli
-  const graph = buildLayoutGraph(symbols);
+  // If no symbols, return empty result
+  if (symbols.length === 0) {
+    return {
+      positions: new Map(),
+      debug: {
+        layers: new Map(),
+        totalLayers: 0,
+        totalNodes: 0,
+      },
+    };
+  }
 
-  // 2. Znajdź źródła (węzły bez krawędzi wchodzących lub Source/Generator)
-  const roots = findRoots(graph, symbols);
+  // Build element ID to symbol ID mapping
+  const elementToSymbol = new Map<string, string>();
+  symbols.forEach((s) => elementToSymbol.set(s.elementId, s.id));
 
-  // 3. Przypisz warstwy (BFS od źródeł)
-  assignLayers(graph, roots);
+  // Build symbol ID to symbol mapping
+  const symbolById = new Map<string, AnySldSymbol>();
+  symbols.forEach((s) => symbolById.set(s.id, s));
 
-  // 4. Sortuj węzły w warstwach (minimalizacja skrzyżowań)
-  sortWithinLayers(graph);
+  // Classify symbols
+  const busbars = symbols.filter((s) => s.elementType === 'Bus');
+  const transformers = symbols.filter((s) => s.elementType === 'TransformerBranch');
+  const sources = symbols.filter((s) => s.elementType === 'Source');
+  const switches = symbols.filter((s) => s.elementType === 'Switch');
+  const lineBranches = symbols.filter((s) => s.elementType === 'LineBranch');
+  const loads = symbols.filter((s) => s.elementType === 'Load');
 
-  // 5. Oblicz współrzędne X/Y
-  const positions = computeCoordinates(graph, cfg);
+  // Detect voltage levels for busbars
+  const busbarVoltages = new Map<string, VoltageLevel>();
+  busbars.forEach((bus) => {
+    let level = detectBusVoltageLevel(bus);
 
-  // Zbierz informacje debugowe
-  const layers = new Map<number, string[]>();
-  graph.nodes.forEach((node) => {
-    if (!layers.has(node.layer)) {
-      layers.set(node.layer, []);
+    // If connected to transformer primary side, it's likely WN
+    const trafoConnection = isConnectedToTransformer(bus, transformers, elementToSymbol);
+    if (trafoConnection.connected) {
+      if (trafoConnection.side === 'primary') {
+        level = 'WN';
+      } else if (trafoConnection.side === 'secondary') {
+        level = 'SN';
+      }
     }
-    layers.get(node.layer)!.push(node.symbolId);
+
+    busbarVoltages.set(bus.id, level);
   });
+
+  // Find WN and SN busbars
+  const wnBusbars = busbars.filter((b) => busbarVoltages.get(b.id) === 'WN');
+  const snBusbars = busbars.filter((b) => busbarVoltages.get(b.id) === 'SN');
+  // Note: nN busbars support can be added later if needed
+  // const nnBusbars = busbars.filter((b) => busbarVoltages.get(b.id) === 'nN');
+
+  // If no clear hierarchy, treat all busbars as SN
+  const hasHierarchy = wnBusbars.length > 0 && snBusbars.length > 0;
+
+  // Identify bays for each SN busbar
+  const baysByBusbar = new Map<string, EtapBay[]>();
+  const targetBusbars = hasHierarchy ? snBusbars : busbars;
+  targetBusbars.forEach((bus) => {
+    const bays = identifyBays(bus, symbols, elementToSymbol);
+    baysByBusbar.set(bus.id, bays);
+  });
+
+  // Calculate positions
+  const positions = new Map<string, Position>();
+  const { gridSize, padding } = cfg;
+
+  // Calculate canvas center X
+  const maxBayCount = Math.max(
+    1,
+    ...Array.from(baysByBusbar.values()).map((bays) => bays.length)
+  );
+  const maxBusbarWidth = calculateBusbarWidth(maxBayCount);
+  const centerX = Math.round((padding + maxBusbarWidth / 2) / gridSize) * gridSize;
+
+  // Track Y position as we build layers
+  let currentY = padding;
+
+  // LAYER 0: Sources (above WN busbar)
+  if (sources.length > 0) {
+    const sourceSpacing = cfg.nodeSpacing;
+    const totalSourceWidth = (sources.length - 1) * sourceSpacing;
+    const startX = centerX - totalSourceWidth / 2;
+
+    sources.sort((a, b) => a.id.localeCompare(b.id)); // Determinism
+    sources.forEach((source, i) => {
+      const x = Math.round((startX + i * sourceSpacing) / gridSize) * gridSize;
+      const y = Math.round(currentY / gridSize) * gridSize;
+      positions.set(source.id, { x, y });
+    });
+    currentY += ETAP_GEOMETRY.source.symbolHeight + ETAP_GEOMETRY.source.offsetAboveBusbar;
+  }
+
+  // LAYER 1: WN Busbar (if present)
+  if (hasHierarchy && wnBusbars.length > 0) {
+    const wnBusbar = wnBusbars[0]; // Assume single WN busbar
+    const wnBays = baysByBusbar.get(wnBusbar.id) || [];
+    const wnBusbarWidth = calculateBusbarWidth(Math.max(1, wnBays.length, transformers.length));
+
+    const wnY = Math.round(currentY / gridSize) * gridSize;
+    positions.set(wnBusbar.id, { x: centerX, y: wnY });
+
+    // Store busbar width for later use
+    const wnNodeSymbol = wnBusbar as NodeSymbol;
+    if ('width' in wnNodeSymbol) {
+      (wnNodeSymbol as any).width = wnBusbarWidth;
+    }
+
+    currentY = wnY + ETAP_GEOMETRY.transformer.offsetFromWN;
+  }
+
+  // LAYER 2: Transformers (between WN and SN)
+  if (transformers.length > 0) {
+    const trafoSpacing = cfg.nodeSpacing;
+    const totalTrafoWidth = (transformers.length - 1) * trafoSpacing;
+    const startX = centerX - totalTrafoWidth / 2;
+
+    transformers.sort((a, b) => a.id.localeCompare(b.id)); // Determinism
+    transformers.forEach((trafo, i) => {
+      const x = Math.round((startX + i * trafoSpacing) / gridSize) * gridSize;
+      const y = Math.round(currentY / gridSize) * gridSize;
+      positions.set(trafo.id, { x, y });
+    });
+    currentY += ETAP_GEOMETRY.transformer.symbolHeight + ETAP_GEOMETRY.transformer.offsetToSN;
+  }
+
+  // LAYER 3: SN Busbar
+  const snY = Math.round(currentY / gridSize) * gridSize;
+  targetBusbars.forEach((bus) => {
+    const bays = baysByBusbar.get(bus.id) || [];
+    const busbarWidth = calculateBusbarWidth(bays.length);
+
+    // Position busbar
+    const busX = centerX;
+    positions.set(bus.id, { x: busX, y: snY });
+
+    // Store busbar width
+    const nodeSymbol = bus as NodeSymbol;
+    if ('width' in nodeSymbol) {
+      (nodeSymbol as any).width = busbarWidth;
+    }
+
+    // LAYER 4+: Bays (feeders) — VERTICAL from SN busbar
+    if (bays.length > 0) {
+      const bayPositions = calculateBayPositions(bays.length, busX, busbarWidth);
+
+      bays.forEach((bay, bayIndex) => {
+        const bayX = bayPositions[bayIndex];
+        let bayY = snY + ETAP_GEOMETRY.bay.verticalOffset;
+
+        // Position switch (if present)
+        if (bay.switchId) {
+          const switchY = Math.round(bayY / gridSize) * gridSize;
+          positions.set(bay.switchId, { x: bayX, y: switchY });
+          bayY += ETAP_GEOMETRY.bay.elementSpacing;
+        }
+
+        // Position branch (if present)
+        if (bay.branchId) {
+          const branchY = Math.round(bayY / gridSize) * gridSize;
+          positions.set(bay.branchId, { x: bayX, y: branchY });
+          bayY += ETAP_GEOMETRY.bay.elementSpacing;
+        }
+
+        // Position load (if present)
+        if (bay.loadId) {
+          const loadY = Math.round(bayY / gridSize) * gridSize;
+          positions.set(bay.loadId, { x: bayX, y: loadY });
+        }
+      });
+    }
+  });
+
+  // Position any remaining unpositioned symbols using fallback layout
+  const unpositioned = symbols.filter((s) => !positions.has(s.id));
+  if (unpositioned.length > 0) {
+    // Use legacy BFS layout for unpositioned symbols
+    const legacyResult = generateLegacyLayout(unpositioned, cfg, positions);
+    legacyResult.forEach((pos, id) => {
+      if (!positions.has(id)) {
+        positions.set(id, pos);
+      }
+    });
+  }
+
+  // Build debug info
+  const layers = new Map<number, string[]>();
+  let layerIndex = 0;
+
+  // Add sources to layer 0
+  if (sources.length > 0) {
+    layers.set(layerIndex++, sources.map((s) => s.id));
+  }
+
+  // Add WN busbars to next layer
+  if (wnBusbars.length > 0) {
+    layers.set(layerIndex++, wnBusbars.map((s) => s.id));
+  }
+
+  // Add transformers
+  if (transformers.length > 0) {
+    layers.set(layerIndex++, transformers.map((s) => s.id));
+  }
+
+  // Add SN busbars
+  if (targetBusbars.length > 0) {
+    layers.set(layerIndex++, targetBusbars.map((s) => s.id));
+  }
+
+  // Add switches
+  if (switches.length > 0) {
+    layers.set(layerIndex++, switches.map((s) => s.id));
+  }
+
+  // Add line branches
+  if (lineBranches.length > 0) {
+    layers.set(layerIndex++, lineBranches.map((s) => s.id));
+  }
+
+  // Add loads
+  if (loads.length > 0) {
+    layers.set(layerIndex++, loads.map((s) => s.id));
+  }
 
   return {
     positions,
     debug: {
       layers,
-      totalLayers: Math.max(...Array.from(graph.nodes.values()).map((n) => n.layer)) + 1,
-      totalNodes: graph.nodes.size,
+      totalLayers: layerIndex,
+      totalNodes: symbols.length,
     },
   };
 }
 
+/**
+ * Legacy BFS-based layout for unpositioned symbols.
+ * Used as fallback for symbols not covered by ETAP-grade layout.
+ */
+function generateLegacyLayout(
+  symbols: AnySldSymbol[],
+  config: AutoLayoutConfig,
+  existingPositions: Map<string, Position>
+): Map<string, Position> {
+  const positions = new Map<string, Position>();
+
+  // Find the maximum Y from existing positions
+  let maxY = config.padding;
+  existingPositions.forEach((pos) => {
+    maxY = Math.max(maxY, pos.y);
+  });
+
+  // Position unpositioned symbols below existing ones
+  const startY = maxY + config.layerSpacing;
+  const centerX = config.padding + config.busMinWidth / 2;
+
+  symbols.sort((a, b) => a.id.localeCompare(b.id)); // Determinism
+  symbols.forEach((symbol, i) => {
+    const row = Math.floor(i / 4);
+    const col = i % 4;
+
+    const x = Math.round((centerX + (col - 1.5) * config.nodeSpacing) / config.gridSize) * config.gridSize;
+    const y = Math.round((startY + row * config.layerSpacing) / config.gridSize) * config.gridSize;
+
+    positions.set(symbol.id, { x, y });
+  });
+
+  return positions;
+}
+
 // =============================================================================
-// KROK 1: BUDOWA GRAFU
+// LEGACY FUNCTIONS (kept for reference, not used by ETAP-grade layout)
+// PR-SLD-ETAP-GEOMETRY-01: These functions are from the original BFS-based layout
+// algorithm. The new ETAP-grade layout uses a different approach based on
+// voltage level hierarchy and bay identification.
+// These functions can be removed once the ETAP-grade layout is fully validated.
 // =============================================================================
 
+/* eslint-disable @typescript-eslint/no-unused-vars */
+// @ts-ignore - Legacy functions kept for reference
+
 /**
- * Buduj graf layoutu z symboli SLD.
+ * [LEGACY] Buduj graf layoutu z symboli SLD.
  */
-function buildLayoutGraph(symbols: AnySldSymbol[]): LayoutGraph {
+// @ts-ignore - Legacy function, kept for reference
+function _buildLayoutGraph(symbols: AnySldSymbol[]): LayoutGraph {
   const nodes = new Map<string, LayoutNode>();
   const edges: LayoutEdge[] = [];
 
@@ -293,9 +744,10 @@ function buildLayoutGraph(symbols: AnySldSymbol[]): LayoutGraph {
 // =============================================================================
 
 /**
- * Znajdź węzły źródłowe (Source, lub węzły bez krawędzi wchodzących).
+ * [LEGACY] Znajdź węzły źródłowe (Source, lub węzły bez krawędzi wchodzących).
  */
-function findRoots(graph: LayoutGraph, _symbols: AnySldSymbol[]): string[] {
+// @ts-ignore - Legacy function, kept for reference
+function _findRoots(graph: LayoutGraph, _symbols: AnySldSymbol[]): string[] {
   const roots: string[] = [];
 
   // Priorytet 1: Source (utility_feeder, generator, pv, fw, bess)
@@ -340,10 +792,11 @@ function findRoots(graph: LayoutGraph, _symbols: AnySldSymbol[]): string[] {
 // =============================================================================
 
 /**
- * Przypisz warstwy węzłom (BFS od źródeł).
+ * [LEGACY] Przypisz warstwy węzłom (BFS od źródeł).
  * Źródła mają layer=0, sąsiedzi layer=1, itd.
  */
-function assignLayers(graph: LayoutGraph, roots: string[]): void {
+// @ts-ignore - Legacy function, kept for reference
+function _assignLayers(graph: LayoutGraph, roots: string[]): void {
   const visited = new Set<string>();
   const queue: Array<{ id: string; layer: number }> = [];
 
@@ -384,10 +837,11 @@ function assignLayers(graph: LayoutGraph, roots: string[]): void {
 // =============================================================================
 
 /**
- * Sortuj węzły w każdej warstwie, minimalizując skrzyżowania.
+ * [LEGACY] Sortuj węzły w każdej warstwie, minimalizując skrzyżowania.
  * Używa heurystyki barycentric (średnia pozycja sąsiadów).
  */
-function sortWithinLayers(graph: LayoutGraph): void {
+// @ts-ignore - Legacy function, kept for reference
+function _sortWithinLayers(graph: LayoutGraph): void {
   // Grupuj węzły po warstwach
   const layers = new Map<number, LayoutNode[]>();
   graph.nodes.forEach((node) => {
@@ -444,7 +898,7 @@ function sortWithinLayers(graph: LayoutGraph): void {
 // =============================================================================
 
 /**
- * Oblicz finalne współrzędne X/Y dla każdego węzła.
+ * [LEGACY] Oblicz finalne współrzędne X/Y dla każdego węzła.
  *
  * SPINE LAYOUT (inspiracja Plans):
  * - Główna ścieżka (spine) na jednej osi X
@@ -452,7 +906,8 @@ function sortWithinLayers(graph: LayoutGraph): void {
  * - Szyny poziome w wyznaczonych miejscach
  * - Odbiory i źródła jako gałęzie boczne
  */
-function computeCoordinates(
+// @ts-ignore - Legacy function, kept for reference
+function _computeCoordinates(
   graph: LayoutGraph,
   config: AutoLayoutConfig
 ): Map<string, Position> {
@@ -524,6 +979,8 @@ function computeCoordinates(
 
   return positions;
 }
+
+/* eslint-enable @typescript-eslint/no-unused-vars */
 
 // =============================================================================
 // FUNKCJE POMOCNICZE

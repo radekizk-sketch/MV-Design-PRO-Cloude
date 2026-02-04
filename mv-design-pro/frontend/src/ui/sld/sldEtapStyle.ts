@@ -359,6 +359,309 @@ export const ETAP_GRID = {
 } as const;
 
 // =============================================================================
+// ETAP GEOMETRY — SLD Layout Configuration (CANONICAL)
+// =============================================================================
+
+/**
+ * ETAP-grade SLD geometry configuration.
+ * Defines spacing, sizing, and positioning rules for professional SLD rendering.
+ *
+ * PR-SLD-ETAP-GEOMETRY-01: ETAP-grade geometria SLD
+ *
+ * RULES:
+ * - WN (HV) busbar at top
+ * - Transformer between WN and SN
+ * - SN (MV) busbar below transformer
+ * - Feeders exit VERTICALLY from SN busbar with constant spacing
+ * - No diagonal connections from busbars
+ * - All values in pixels, snap to grid
+ */
+export const ETAP_GEOMETRY = {
+  // ---------------------------------------------------------------------------
+  // BUSBAR CONFIGURATION
+  // ---------------------------------------------------------------------------
+
+  /** Busbar vertical layer configuration (top to bottom) */
+  busbarLayers: {
+    /** WN (110kV) busbar layer offset from top */
+    WN: 100,
+    /** SN (15/20kV) busbar layer offset from WN */
+    SN: 280,
+    /** nN (0.4kV) busbar layer offset from SN (if present) */
+    nN: 200,
+  },
+
+  /** Busbar dimensions */
+  busbar: {
+    /** Minimum busbar width (px) */
+    minWidth: 200,
+    /** Busbar height/thickness (px) */
+    height: 8,
+    /** Padding on each side for bay connections (px) */
+    sidePadding: 40,
+    /** Per-bay width increment (px) — busbar expands by this for each bay */
+    bayWidthIncrement: 100,
+  },
+
+  // ---------------------------------------------------------------------------
+  // BAY/FEEDER CONFIGURATION (SN FEEDERS)
+  // ---------------------------------------------------------------------------
+
+  /** Bay (pola SN) spacing and layout */
+  bay: {
+    /** Horizontal spacing between bay center lines (px) */
+    spacing: 100,
+    /** Minimum horizontal spacing (px) */
+    minSpacing: 80,
+    /** Vertical offset from SN busbar to first bay element (px) */
+    verticalOffset: 60,
+    /** Vertical spacing between bay elements (switch → line/load) (px) */
+    elementSpacing: 80,
+  },
+
+  // ---------------------------------------------------------------------------
+  // TRANSFORMER CONFIGURATION
+  // ---------------------------------------------------------------------------
+
+  /** Transformer positioning */
+  transformer: {
+    /** Vertical offset below WN busbar to transformer top (px) */
+    offsetFromWN: 80,
+    /** Vertical offset from transformer bottom to SN busbar (px) */
+    offsetToSN: 80,
+    /** Transformer symbol height (px) — for calculating connections */
+    symbolHeight: 56,
+  },
+
+  // ---------------------------------------------------------------------------
+  // SOURCE CONFIGURATION (INFEED)
+  // ---------------------------------------------------------------------------
+
+  /** Source (utility feeder / generator) positioning */
+  source: {
+    /** Vertical offset above WN busbar (px) */
+    offsetAboveBusbar: 80,
+    /** Source symbol height (px) */
+    symbolHeight: 60,
+  },
+
+  // ---------------------------------------------------------------------------
+  // LOAD CONFIGURATION
+  // ---------------------------------------------------------------------------
+
+  /** Load positioning */
+  load: {
+    /** Vertical offset below feeder/switch (px) */
+    offsetBelowFeeder: 60,
+    /** Load symbol height (px) */
+    symbolHeight: 44,
+  },
+
+  // ---------------------------------------------------------------------------
+  // CONNECTION ROUTING
+  // ---------------------------------------------------------------------------
+
+  /** Connection routing rules */
+  routing: {
+    /** Connections from busbar must be orthogonal (vertical/horizontal) */
+    busbarOrthogonal: true,
+    /** Minimum vertical segment length from busbar (px) */
+    minBusbarExitLength: 40,
+    /** Corridor offset from spine for L/Z routes (px) */
+    corridorOffset: 40,
+    /** Prefer vertical-first routing */
+    preferVertical: true,
+  },
+
+  // ---------------------------------------------------------------------------
+  // LABEL COLLISION HANDLING
+  // ---------------------------------------------------------------------------
+
+  /** Label collision detection and resolution */
+  labelCollision: {
+    /** Minimum clearance between labels (px) */
+    labelLabelClearance: 12,
+    /** Minimum clearance between label and symbol (px) */
+    labelSymbolClearance: 8,
+    /** Maximum nudge distance for collision resolution (px) */
+    maxNudgeDistance: 40,
+    /** Nudge step size (px) */
+    nudgeStep: 8,
+    /** Prefer horizontal nudge for label collisions */
+    preferHorizontalNudge: true,
+  },
+
+  // ---------------------------------------------------------------------------
+  // GLOBAL LAYOUT
+  // ---------------------------------------------------------------------------
+
+  /** Global layout parameters */
+  layout: {
+    /** Grid snap size (px) — all positions snap to this */
+    gridSize: 20,
+    /** Canvas padding from edges (px) */
+    padding: 80,
+    /** Vertical layer spacing for hierarchical layout (px) */
+    layerSpacing: 140,
+    /** Horizontal node spacing within a layer (px) */
+    nodeSpacing: 100,
+  },
+} as const;
+
+/**
+ * Calculate busbar width based on number of bays.
+ * DETERMINISTIC: Same bay count → same width.
+ *
+ * @param bayCount - Number of bays/feeders connected to the busbar
+ * @returns Busbar width in pixels
+ */
+export function calculateBusbarWidth(bayCount: number): number {
+  const { minWidth, sidePadding, bayWidthIncrement } = ETAP_GEOMETRY.busbar;
+
+  // Minimum width + padding on each side + increment per bay
+  const calculatedWidth = sidePadding * 2 + Math.max(1, bayCount) * bayWidthIncrement;
+
+  // Return max of calculated and minimum
+  return Math.max(minWidth, calculatedWidth);
+}
+
+/**
+ * Calculate bay positions along a busbar.
+ * DETERMINISTIC: Same bay count → same positions.
+ *
+ * @param bayCount - Number of bays
+ * @param busbarCenterX - X coordinate of busbar center
+ * @param busbarWidth - Width of the busbar
+ * @returns Array of X positions for each bay
+ */
+export function calculateBayPositions(
+  bayCount: number,
+  busbarCenterX: number,
+  busbarWidth: number
+): number[] {
+  if (bayCount === 0) return [];
+
+  const { sidePadding } = ETAP_GEOMETRY.busbar;
+  const usableWidth = busbarWidth - 2 * sidePadding;
+
+  if (bayCount === 1) {
+    // Single bay centered
+    return [busbarCenterX];
+  }
+
+  // Multiple bays: evenly distributed
+  const positions: number[] = [];
+  const startX = busbarCenterX - usableWidth / 2;
+  const spacing = usableWidth / (bayCount - 1);
+
+  for (let i = 0; i < bayCount; i++) {
+    const x = startX + i * spacing;
+    // Snap to grid
+    const snapped = Math.round(x / ETAP_GEOMETRY.layout.gridSize) * ETAP_GEOMETRY.layout.gridSize;
+    positions.push(snapped);
+  }
+
+  return positions;
+}
+
+/**
+ * Label bounding box for collision detection.
+ */
+export interface LabelBoundingBox {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  ownerId: string;
+}
+
+/**
+ * Check if two bounding boxes collide with given clearance.
+ */
+export function checkBoundingBoxCollision(
+  a: { x: number; y: number; width: number; height: number },
+  b: { x: number; y: number; width: number; height: number },
+  clearance: number
+): boolean {
+  const aLeft = a.x - a.width / 2 - clearance;
+  const aRight = a.x + a.width / 2 + clearance;
+  const aTop = a.y - a.height / 2 - clearance;
+  const aBottom = a.y + a.height / 2 + clearance;
+
+  const bLeft = b.x - b.width / 2;
+  const bRight = b.x + b.width / 2;
+  const bTop = b.y - b.height / 2;
+  const bBottom = b.y + b.height / 2;
+
+  return aLeft < bRight && aRight > bLeft && aTop < bBottom && aBottom > bTop;
+}
+
+/**
+ * Resolve label-label collisions deterministically.
+ * Returns adjusted positions for labels that collide.
+ *
+ * DETERMINISTIC: Labels sorted by owner ID, then nudged in consistent direction.
+ *
+ * @param labels - Array of label bounding boxes
+ * @returns Map of ownerId → adjusted position
+ */
+export function resolveLabelCollisions(
+  labels: LabelBoundingBox[]
+): Map<string, { x: number; y: number }> {
+  const adjustments = new Map<string, { x: number; y: number }>();
+  const { labelLabelClearance, maxNudgeDistance, nudgeStep, preferHorizontalNudge } =
+    ETAP_GEOMETRY.labelCollision;
+
+  // Sort by owner ID for determinism
+  const sortedLabels = [...labels].sort((a, b) => a.ownerId.localeCompare(b.ownerId));
+
+  // Track adjusted positions
+  const adjusted: LabelBoundingBox[] = [];
+
+  for (const label of sortedLabels) {
+    let currentPos = { x: label.x, y: label.y };
+    let hasCollision = true;
+    let nudgeCount = 0;
+
+    while (hasCollision && nudgeCount * nudgeStep < maxNudgeDistance) {
+      hasCollision = false;
+
+      for (const existing of adjusted) {
+        if (
+          checkBoundingBoxCollision(
+            { ...label, x: currentPos.x, y: currentPos.y },
+            existing,
+            labelLabelClearance
+          )
+        ) {
+          hasCollision = true;
+          // Nudge away from collision
+          nudgeCount++;
+          if (preferHorizontalNudge) {
+            // Alternate left/right based on nudge count
+            currentPos.x = label.x + (nudgeCount % 2 === 0 ? -1 : 1) * Math.ceil(nudgeCount / 2) * nudgeStep;
+          } else {
+            // Nudge down
+            currentPos.y = label.y + nudgeCount * nudgeStep;
+          }
+          break;
+        }
+      }
+    }
+
+    // Store adjustment if position changed
+    if (currentPos.x !== label.x || currentPos.y !== label.y) {
+      adjustments.set(label.ownerId, currentPos);
+    }
+
+    // Add to adjusted list with current position
+    adjusted.push({ ...label, x: currentPos.x, y: currentPos.y });
+  }
+
+  return adjustments;
+}
+
+// =============================================================================
 // LINE LABEL PLACEMENT (ETAP 1:1 — ON-LINE LABELS)
 // =============================================================================
 
@@ -840,6 +1143,8 @@ export default {
   SYMBOL_SIZES: ETAP_SYMBOL_SIZES,
   // Grid
   GRID: ETAP_GRID,
+  // Geometry (PR-SLD-ETAP-GEOMETRY-01)
+  GEOMETRY: ETAP_GEOMETRY,
   // Helpers
   getVoltageColor: getEtapVoltageColor,
   getStrokeColor: getEtapStrokeColor,
@@ -854,4 +1159,9 @@ export default {
   calculateLineLabelPosition,
   checkLabelSymbolCollision,
   nudgeLabelPosition,
+  // Geometry helpers (PR-SLD-ETAP-GEOMETRY-01)
+  calculateBusbarWidth,
+  calculateBayPositions,
+  checkBoundingBoxCollision,
+  resolveLabelCollisions,
 };
