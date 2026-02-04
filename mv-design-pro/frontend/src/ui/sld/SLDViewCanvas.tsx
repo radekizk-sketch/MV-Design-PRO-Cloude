@@ -38,6 +38,7 @@ import { ConnectionsLayer } from './ConnectionRenderer';
 import { generateConnections } from '../sld-editor/utils/connectionRouting';
 import { useAutoLayout } from '../sld-editor/hooks/useAutoLayout';
 import { UnifiedSymbolRenderer, type SymbolVisualState, type SymbolInteractionHandlers } from './symbols';
+import { ETAP_GRID, ETAP_TYPOGRAPHY } from './sldEtapStyle';
 
 /**
  * Read-only symbol renderer using UnifiedSymbolRenderer.
@@ -89,6 +90,7 @@ const Symbol: React.FC<SymbolProps> = ({ symbol, selected, onClick, energized })
 
 /**
  * Grid background for canvas.
+ * ETAP style: subdued, not dominant. Major grid every N cells.
  */
 interface GridProps {
   width: number;
@@ -107,10 +109,14 @@ const Grid: React.FC<GridProps> = ({ width, height, gridSize, viewport }) => {
   const endX = width;
   const endY = height;
 
+  // Calculate which lines are major (every N cells)
+  const getMajorIndex = (value: number) => Math.round(value / scaledGridSize);
+
   // Vertical lines
   for (let x = startX; x <= endX; x += scaledGridSize) {
     const screenX = x + viewport.offsetX;
     if (screenX >= 0 && screenX <= width) {
+      const isMajor = getMajorIndex(x) % ETAP_GRID.majorEvery === 0;
       lines.push(
         <line
           key={`v-${x}`}
@@ -118,8 +124,8 @@ const Grid: React.FC<GridProps> = ({ width, height, gridSize, viewport }) => {
           y1={0}
           x2={screenX}
           y2={height}
-          stroke="#e5e7eb"
-          strokeWidth="0.5"
+          stroke={isMajor ? ETAP_GRID.majorColor : ETAP_GRID.minorColor}
+          strokeWidth={isMajor ? ETAP_GRID.majorStrokeWidth : ETAP_GRID.minorStrokeWidth}
         />
       );
     }
@@ -129,6 +135,7 @@ const Grid: React.FC<GridProps> = ({ width, height, gridSize, viewport }) => {
   for (let y = startY; y <= endY; y += scaledGridSize) {
     const screenY = y + viewport.offsetY;
     if (screenY >= 0 && screenY <= height) {
+      const isMajor = getMajorIndex(y) % ETAP_GRID.majorEvery === 0;
       lines.push(
         <line
           key={`h-${y}`}
@@ -136,8 +143,8 @@ const Grid: React.FC<GridProps> = ({ width, height, gridSize, viewport }) => {
           y1={screenY}
           x2={width}
           y2={screenY}
-          stroke="#e5e7eb"
-          strokeWidth="0.5"
+          stroke={isMajor ? ETAP_GRID.majorColor : ETAP_GRID.minorColor}
+          strokeWidth={isMajor ? ETAP_GRID.majorStrokeWidth : ETAP_GRID.minorStrokeWidth}
         />
       );
     }
@@ -202,8 +209,8 @@ export const SLDViewCanvas: React.FC<SLDViewCanvasProps> = ({
       className="bg-white"
       style={{ display: 'block' }}
     >
-      {/* Grid background */}
-      {showGrid && <Grid width={width} height={height} gridSize={20} viewport={viewport} />}
+      {/* Grid background — ETAP subdued grid */}
+      {showGrid && <Grid width={width} height={height} gridSize={ETAP_GRID.size} viewport={viewport} />}
 
       {/* Transformed content group */}
       <g
@@ -229,14 +236,15 @@ export const SLDViewCanvas: React.FC<SLDViewCanvasProps> = ({
         ))}
       </g>
 
-      {/* Empty state */}
+      {/* Empty state — ETAP typography */}
       {symbols.length === 0 && (
         <text
           x={width / 2}
           y={height / 2}
           textAnchor="middle"
-          fontSize="14"
-          fill="#9ca3af"
+          fontFamily={ETAP_TYPOGRAPHY.fontFamily}
+          fontSize={ETAP_TYPOGRAPHY.fontSize.large}
+          fill={ETAP_TYPOGRAPHY.secondaryColor}
           data-testid="sld-empty-state"
         >
           Brak elementow do wyswietlenia

@@ -2,8 +2,10 @@
  * UnifiedSymbolRenderer — Wspólny renderer symboli dla edytora i podglądu SLD
  *
  * PR-SLD-04: Unifikacja symboli w edytorze do standardu ETAP
+ * PR-SLD-ETAP-STYLE-02: ETAP 1:1 Visual Parity
  *
  * CANONICAL ALIGNMENT:
+ * - sldEtapStyle.ts: Single source of truth for visual styling
  * - etap_symbols/*: Źródło prawdy dla kształtów symboli
  * - SymbolResolver.ts: Mapowanie element → symbol
  * - EtapSymbolRenderer.tsx: Komponenty SVG dla symboli ETAP
@@ -15,7 +17,8 @@
  *
  * ETAP PARITY:
  * - Wszystkie symbole mają viewBox 0 0 100 100
- * - Stroke: #000000, stroke-width: 3 (main), 2 (details)
+ * - Stroke hierarchy: busbar > feeder > symbol > aux > leader
+ * - Colors: voltage-based (WN/SN/nN) with state modifiers
  * - Symbole renderowane ze skalą względem docelowego rozmiaru
  */
 
@@ -25,18 +28,28 @@ import type { ElementType } from '../../types';
 import type { IssueSeverity } from '../../types';
 import { resolveSymbol, type ResolvedSymbol } from '../SymbolResolver';
 import { EtapSymbol, type SwitchState } from '../EtapSymbolRenderer';
+import {
+  ETAP_STROKE,
+  ETAP_STROKE_SELECTED,
+  ETAP_SYMBOL_SIZES,
+  ETAP_TYPOGRAPHY,
+  ETAP_STATE_COLORS,
+  ETAP_FILL_COLORS,
+  getEtapLabelAnchor,
+} from '../sldEtapStyle';
 
 /**
  * Symbol size configuration.
  * ETAP symbols use viewBox 100x100, scaled to these sizes.
+ * Uses ETAP_SYMBOL_SIZES from sldEtapStyle.ts as source of truth.
  */
 export const SYMBOL_SIZES: Record<ElementType, { width: number; height: number }> = {
-  Bus: { width: 80, height: 40 },
-  LineBranch: { width: 60, height: 40 },
-  TransformerBranch: { width: 40, height: 50 },
-  Switch: { width: 40, height: 50 },
-  Source: { width: 50, height: 60 },
-  Load: { width: 30, height: 30 }, // Fallback only
+  Bus: ETAP_SYMBOL_SIZES.Bus,
+  LineBranch: ETAP_SYMBOL_SIZES.LineBranch,
+  TransformerBranch: ETAP_SYMBOL_SIZES.TransformerBranch,
+  Switch: ETAP_SYMBOL_SIZES.Switch,
+  Source: ETAP_SYMBOL_SIZES.Source,
+  Load: ETAP_SYMBOL_SIZES.Load,
 };
 
 /**
@@ -81,43 +94,73 @@ export interface UnifiedSymbolRendererProps {
 
 /**
  * Calculate stroke color based on visual state.
+ * Uses ETAP_STATE_COLORS from sldEtapStyle.ts.
  */
 function getStrokeColor(state: SymbolVisualState): string {
   const { selected, inService, energized = true, highlighted, highlightSeverity } = state;
 
-  // Highlight takes priority
+  // Highlight takes priority (validation issues)
   if (highlighted && highlightSeverity) {
     switch (highlightSeverity) {
       case 'HIGH':
-        return '#dc2626'; // red-600
+        return ETAP_STATE_COLORS.error;
       case 'WARN':
-        return '#f59e0b'; // amber-500
+        return ETAP_STATE_COLORS.warning;
       case 'INFO':
-        return '#3b82f6'; // blue-500
+        return ETAP_STATE_COLORS.info;
     }
   }
 
   // Selection
   if (selected) {
-    return '#3b82f6'; // blue-500
+    return ETAP_STATE_COLORS.selected;
   }
 
-  // Energization
-  const isEnergized = energized && inService;
-  return isEnergized ? '#1f2937' : '#9ca3af';
+  // Out of service
+  if (!inService) {
+    return ETAP_STATE_COLORS.outOfService;
+  }
+
+  // De-energized
+  if (!energized) {
+    return ETAP_STATE_COLORS.deenergized;
+  }
+
+  // Normal energized — use default symbol color
+  return ETAP_TYPOGRAPHY.labelColor;
 }
 
 /**
- * Calculate stroke width based on visual state.
+ * Calculate stroke width based on visual state and element type.
+ * Uses ETAP_STROKE hierarchy from sldEtapStyle.ts.
  */
-function getStrokeWidth(state: SymbolVisualState): number {
+function getStrokeWidth(state: SymbolVisualState, elementType?: ElementType): number {
   const { selected, highlighted, highlightSeverity } = state;
 
-  if (highlighted && highlightSeverity) {
-    return highlightSeverity === 'INFO' ? 2 : 3;
+  // Determine base stroke by element type
+  let baseStroke: number = ETAP_STROKE.symbol;
+  if (elementType === 'Bus') {
+    baseStroke = ETAP_STROKE.busbar;
+  } else if (elementType === 'LineBranch') {
+    baseStroke = ETAP_STROKE.feeder;
   }
 
-  return selected ? 3.5 : 3;
+  // Highlight overrides
+  if (highlighted && highlightSeverity) {
+    return highlightSeverity === 'INFO' ? ETAP_STROKE.aux : baseStroke;
+  }
+
+  // Selected gets slightly thicker stroke
+  if (selected) {
+    if (elementType === 'Bus') {
+      return ETAP_STROKE_SELECTED.busbar;
+    } else if (elementType === 'LineBranch') {
+      return ETAP_STROKE_SELECTED.feeder;
+    }
+    return ETAP_STROKE_SELECTED.symbol;
+  }
+
+  return baseStroke;
 }
 
 /**
@@ -130,27 +173,40 @@ function getOpacity(state: SymbolVisualState): number {
     return 0.5;
   }
 
-  return energized ? 1 : 0.6;
+  return energized ? 1 : 0.7;
 }
 
 /**
  * Calculate fill color based on visual state.
+ * Uses ETAP_FILL_COLORS from sldEtapStyle.ts.
  */
 function getFillColor(state: SymbolVisualState): string {
-  return state.selected ? '#dbeafe' : '#ffffff';
+  const { selected, energized = true, inService = true } = state;
+
+  if (selected) {
+    return ETAP_FILL_COLORS.selected;
+  }
+
+  if (!energized || !inService) {
+    return ETAP_FILL_COLORS.deenergized;
+  }
+
+  return ETAP_FILL_COLORS.normal;
 }
 
 /**
  * ETAP Symbol Wrapper — applies styling and scaling.
+ * Uses ETAP stroke hierarchy for proper visual weight.
  */
 const EtapSymbolWrapper: React.FC<{
   resolvedSymbol: ResolvedSymbol;
   visualState: SymbolVisualState;
   size: { width: number; height: number };
+  elementType: ElementType;
   switchState?: SwitchState;
-}> = ({ resolvedSymbol, visualState, size, switchState }) => {
+}> = ({ resolvedSymbol, visualState, size, elementType, switchState }) => {
   const stroke = getStrokeColor(visualState);
-  const strokeWidth = getStrokeWidth(visualState);
+  const strokeWidth = getStrokeWidth(visualState, elementType);
   const opacity = getOpacity(visualState);
   const fill = getFillColor(visualState);
 
@@ -170,15 +226,17 @@ const EtapSymbolWrapper: React.FC<{
 /**
  * Load Fallback — triangle symbol for Load elements (no ETAP symbol).
  * Marked as FALLBACK per PR-SLD-04.
+ * Uses ETAP typography and stroke hierarchy.
  */
 const LoadFallback: React.FC<{
   visualState: SymbolVisualState;
   elementName: string;
 }> = ({ visualState, elementName }) => {
   const stroke = getStrokeColor(visualState);
-  const strokeWidth = visualState.selected ? 2.5 : 1.5;
+  const strokeWidth = visualState.selected ? ETAP_STROKE_SELECTED.symbol : ETAP_STROKE.symbol;
   const opacity = getOpacity(visualState);
   const fill = getFillColor(visualState);
+  const labelAnchor = getEtapLabelAnchor('Load');
 
   return (
     <>
@@ -193,12 +251,13 @@ const LoadFallback: React.FC<{
         data-fallback="true"
       />
       <text
-        x={0}
-        y={-20}
-        textAnchor="middle"
-        fontSize="10"
-        fontWeight={visualState.selected ? 600 : 400}
-        fill="#1f2937"
+        x={labelAnchor.offsetX}
+        y={labelAnchor.offsetY + 10}
+        textAnchor={labelAnchor.textAnchor}
+        fontFamily={ETAP_TYPOGRAPHY.fontFamily}
+        fontSize={ETAP_TYPOGRAPHY.fontSize.medium}
+        fontWeight={visualState.selected ? ETAP_TYPOGRAPHY.fontWeight.semibold : ETAP_TYPOGRAPHY.fontWeight.normal}
+        fill={ETAP_TYPOGRAPHY.labelColor}
       >
         {elementName}
       </text>
@@ -209,13 +268,18 @@ const LoadFallback: React.FC<{
 /**
  * Unknown Symbol Fallback — minimal indicator for unsupported element types.
  * Marked as FALLBACK per PR-SLD-04.
+ * Uses ETAP colors and typography.
  */
 const UnknownSymbolFallback: React.FC<{
   elementType: ElementType;
   elementName: string;
   visualState: SymbolVisualState;
 }> = ({ elementType, elementName, visualState }) => {
-  const stroke = visualState.selected ? '#3b82f6' : visualState.inService ? '#ef4444' : '#9ca3af';
+  const stroke = visualState.selected
+    ? ETAP_STATE_COLORS.selected
+    : visualState.inService
+      ? ETAP_STATE_COLORS.error
+      : ETAP_STATE_COLORS.outOfService;
   const opacity = getOpacity(visualState);
 
   return (
@@ -227,7 +291,7 @@ const UnknownSymbolFallback: React.FC<{
         r={12}
         fill="none"
         stroke={stroke}
-        strokeWidth={2}
+        strokeWidth={ETAP_STROKE.aux}
         opacity={opacity}
         strokeDasharray="4,2"
         data-testid="sld-fallback-unknown"
@@ -237,8 +301,9 @@ const UnknownSymbolFallback: React.FC<{
         x={0}
         y={5}
         textAnchor="middle"
-        fontSize="14"
-        fontWeight="bold"
+        fontFamily={ETAP_TYPOGRAPHY.fontFamily}
+        fontSize={ETAP_TYPOGRAPHY.fontSize.medium}
+        fontWeight={ETAP_TYPOGRAPHY.fontWeight.bold}
         fill={stroke}
         opacity={opacity}
       >
@@ -248,8 +313,9 @@ const UnknownSymbolFallback: React.FC<{
         x={0}
         y={-18}
         textAnchor="middle"
-        fontSize="8"
-        fill="#6b7280"
+        fontFamily={ETAP_TYPOGRAPHY.fontFamily}
+        fontSize={ETAP_TYPOGRAPHY.fontSize.xsmall}
+        fill={ETAP_TYPOGRAPHY.secondaryColor}
       >
         {elementType}
       </text>
@@ -257,8 +323,9 @@ const UnknownSymbolFallback: React.FC<{
         x={0}
         y={22}
         textAnchor="middle"
-        fontSize="9"
-        fill="#1f2937"
+        fontFamily={ETAP_TYPOGRAPHY.fontFamily}
+        fontSize={ETAP_TYPOGRAPHY.fontSize.small}
+        fill={ETAP_TYPOGRAPHY.labelColor}
       >
         {elementName}
       </text>
@@ -300,9 +367,11 @@ export const UnifiedSymbolRenderer: React.FC<UnifiedSymbolRendererProps> = ({
   const offsetX = -size.width / 2;
   const offsetY = -size.height / 2;
 
-  // Label position
-  const defaultLabelOffsetY = elementType === 'Bus' ? -size.height / 2 - 8 : -size.height / 2 - 5;
+  // Label position — uses ETAP anchor rules
+  const labelAnchor = getEtapLabelAnchor(elementType);
+  const defaultLabelOffsetY = -size.height / 2 + labelAnchor.offsetY;
   const finalLabelOffsetY = labelOffsetY ?? defaultLabelOffsetY;
+  const finalLabelOffsetX = labelAnchor.offsetX;
 
   // Mouse handlers
   const handleMouseDown = useCallback(
@@ -416,19 +485,21 @@ export const UnifiedSymbolRenderer: React.FC<UnifiedSymbolRendererProps> = ({
           resolvedSymbol={resolvedSymbol}
           visualState={visualState}
           size={size}
+          elementType={elementType}
           switchState={switchState}
         />
       </g>
 
-      {/* Label */}
+      {/* Label — ETAP typography */}
       {showLabel && (
         <text
-          x={0}
+          x={finalLabelOffsetX}
           y={finalLabelOffsetY}
-          textAnchor="middle"
-          fontSize={elementType === 'Bus' ? '11' : '10'}
-          fontWeight={visualState.selected ? 600 : 400}
-          fill="#1f2937"
+          textAnchor={labelAnchor.textAnchor}
+          fontFamily={ETAP_TYPOGRAPHY.fontFamily}
+          fontSize={elementType === 'Bus' ? ETAP_TYPOGRAPHY.fontSize.large : ETAP_TYPOGRAPHY.fontSize.medium}
+          fontWeight={visualState.selected ? ETAP_TYPOGRAPHY.fontWeight.semibold : ETAP_TYPOGRAPHY.fontWeight.normal}
+          fill={ETAP_TYPOGRAPHY.labelColor}
         >
           {elementName}
         </text>

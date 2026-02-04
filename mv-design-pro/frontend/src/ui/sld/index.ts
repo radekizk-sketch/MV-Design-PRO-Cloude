@@ -102,7 +102,7 @@ export {
 } from './scale';
 export type { ValueRange, OverlayRanges } from './scale';
 
-// Voltage colors (PLANS STYLE)
+// Voltage colors (PLANS STYLE) — legacy, prefer sldEtapStyle
 export {
   VOLTAGE_COLORS,
   DEFAULT_VOLTAGE_COLOR,
@@ -113,3 +113,37 @@ export {
   getVoltageLevel,
   getVoltageLevelLabel,
 } from './voltageColors';
+
+// PR-SLD-ETAP-STYLE-02: ETAP Visual Style System (canonical)
+export {
+  ETAP_STROKE,
+  ETAP_STROKE_SELECTED,
+  ETAP_VOLTAGE_COLORS,
+  ETAP_VOLTAGE_MAP,
+  ETAP_STATE_COLORS,
+  ETAP_FILL_COLORS,
+  ETAP_TYPOGRAPHY,
+  ETAP_LABEL_ANCHORS,
+  ETAP_LINE_LABEL,
+  ETAP_CALLOUT,
+  ETAP_CALLOUT_ANCHORS,
+  ETAP_SYMBOL_SIZES,
+  ETAP_GRID,
+  getEtapVoltageColor,
+  getEtapStrokeColor,
+  getEtapFillColor,
+  getEtapOpacity,
+  getEtapLabelAnchor,
+  getEtapSymbolSize,
+  getEtapStrokeWidth,
+} from './sldEtapStyle';
+export type { EtapLabelAnchor } from './sldEtapStyle';
+
+// PR-SLD-ETAP-STYLE-02: ETAP Callout Components
+export { EtapCallout, EtapCalloutLayer } from './EtapCallout';
+export type {
+  CalloutResultData,
+  CalloutPosition,
+  EtapCalloutProps,
+  EtapCalloutLayerProps,
+} from './EtapCallout';

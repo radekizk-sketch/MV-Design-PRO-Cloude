@@ -1,39 +1,51 @@
 /**
  * CONNECTION RENDERER — Komponent renderowania polaczen SLD (ETAP-style)
  *
+ * PR-SLD-ETAP-STYLE-02: ETAP 1:1 Visual Parity
+ *
  * CANONICAL ALIGNMENT:
+ * - sldEtapStyle.ts: Single source of truth for visual styling
  * - SLD_KANONICZNA_SPECYFIKACJA.md § 4: Polaczenia
  * - AUDYT_SLD_ETAP.md: N-01, N-05
  *
  * FEATURES:
  * - Renderowanie polaczen jako polyline SVG
- * - Styl ETAP: jednolita grubosc, czyste zakonczenia
+ * - Styl ETAP: hierarchia grubosci (feeder stroke)
  * - Podswietlenie przy kliknieciu
  * - Powiekszona strefa klikniecia (hitbox)
+ *
+ * STROKE HIERARCHY:
+ * - Connections use ETAP_STROKE.feeder (subordinate to busbar)
  */
 
 import React, { useCallback, useMemo } from 'react';
 import type { Connection, Position } from '../sld-editor/types';
+import {
+  ETAP_STROKE,
+  ETAP_STROKE_SELECTED,
+  ETAP_STATE_COLORS,
+  ETAP_TYPOGRAPHY,
+} from './sldEtapStyle';
 
 // =============================================================================
-// STALE STYLIZACJI
+// STALE STYLIZACJI — using ETAP tokens
 // =============================================================================
 
-/** Grubosc linii polaczenia (px) */
-const CONNECTION_STROKE_WIDTH = 2;
+/** Grubosc linii polaczenia (px) — uses ETAP feeder stroke */
+const CONNECTION_STROKE_WIDTH = ETAP_STROKE.feeder;
 
-/** Grubosc linii podswietlonej (px) */
-const CONNECTION_STROKE_WIDTH_SELECTED = 3.5;
+/** Grubosc linii podswietlonej (px) — uses ETAP selected feeder stroke */
+const CONNECTION_STROKE_WIDTH_SELECTED = ETAP_STROKE_SELECTED.feeder;
 
 /** Grubosc niewidocznej strefy klikniecia (px) */
 const HITBOX_STROKE_WIDTH = 12;
 
-/** Kolory polaczen */
+/** Kolory polaczen — using ETAP state colors */
 const CONNECTION_COLORS = {
-  default: '#1f2937',       // gray-800
-  deenergized: '#9ca3af',   // gray-400
-  selected: '#3b82f6',      // blue-500
-  hover: '#60a5fa',         // blue-400
+  default: ETAP_TYPOGRAPHY.labelColor,     // same as symbol default
+  deenergized: ETAP_STATE_COLORS.deenergized,
+  selected: ETAP_STATE_COLORS.selected,
+  hover: ETAP_STATE_COLORS.info,
 } as const;
 
 // =============================================================================
