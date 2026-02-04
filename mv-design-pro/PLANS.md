@@ -3772,6 +3772,7 @@ POST /projects/import/preview
 - `GET /api/health` zwraca `{ "status": "ok" }` bez UoW/DB.
 - Vite dev używa `VITE_API_URL_DEV`, build/compose używa `VITE_API_URL`.
 - `docker-compose.yml`: ustawione `VITE_API_URL` + `VITE_API_URL_DEV` oraz healthcheck backendu.
+- Testy FE (Vitest) nie wymagają ręcznego ustawiania `VITE_API_URL_*` (fallback tylko w trybie testowym).
 
 ---
 
