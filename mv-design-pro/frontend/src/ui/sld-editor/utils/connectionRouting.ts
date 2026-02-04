@@ -23,9 +23,17 @@
  * 5. Z-route as fallback for collision avoidance
  */
 
-import type { AnySldSymbol, BranchSymbol, Position, SwitchSymbol, SourceSymbol, LoadSymbol } from '../types';
+import type { AnySldSymbol, BranchSymbol, Position, SwitchSymbol, SourceSymbol, LoadSymbol, NodeSymbol } from '../types';
 import { getPortPoint, selectBestPorts, getSymbolBoundingBox, type PortName } from './portUtils';
 import { ETAP_GEOMETRY } from '../../sld/sldEtapStyle';
+
+// =============================================================================
+// AUTO-LAYOUT V1 INTEGRATION (FEATURE FLAG: SLD_AUTO_LAYOUT_V1)
+// =============================================================================
+import {
+  isAutoLayoutV1Enabled,
+  generateBusbarFeederPaths,
+} from '../../sld/layout-integration';
 
 // =============================================================================
 // TYPY
@@ -136,6 +144,26 @@ export function generateConnections(
   const obstacles = buildRoutingObstacles(symbols, cfg);
   const spineX = computeSpineX(symbols, cfg.gridSnap);
 
+  // =============================================================================
+  // AUTO-LAYOUT V1: Pre-compute busbar feeder paths when flag is enabled
+  // Feature flag: SLD_AUTO_LAYOUT_V1 (domyślnie OFF)
+  // Włącz przez: VITE_SLD_AUTO_LAYOUT_V1=true w .env.local
+  // =============================================================================
+  const autoLayoutPaths = new Map<string, Position[]>();
+  if (isAutoLayoutV1Enabled()) {
+    // Find all busbars and compute auto-layout for each
+    const busbars = symbols.filter((s) => s.elementType === 'Bus') as NodeSymbol[];
+    for (const busbar of busbars) {
+      const feederPaths = generateBusbarFeederPaths(busbar, symbols);
+      if (feederPaths) {
+        // Merge into autoLayoutPaths
+        for (const [connectionId, path] of feederPaths) {
+          autoLayoutPaths.set(connectionId, path);
+        }
+      }
+    }
+  }
+
   // Mapa ID elementu -> symbol
   const elementToSymbol = new Map<string, AnySldSymbol>();
   symbols.forEach((s) => elementToSymbol.set(s.elementId, s));
@@ -245,7 +273,8 @@ export function generateConnections(
       cfg,
       edgeBendOverrides?.[request.id],
       request.elementId,
-      request.connectionType
+      request.connectionType,
+      autoLayoutPaths // AUTO-LAYOUT V1: pass pre-computed paths
     );
     connections.push(connection);
   });
@@ -272,7 +301,8 @@ function createConnection(
   config: RoutingConfig,
   edgeBends?: Position[],
   elementId?: string,
-  connectionType?: 'branch' | 'switch' | 'source' | 'load'
+  connectionType?: 'branch' | 'switch' | 'source' | 'load',
+  autoLayoutPaths?: Map<string, Position[]> // AUTO-LAYOUT V1: pre-computed paths
 ): Connection {
   // Wybierz najlepsze porty
   const { fromPort, toPort } = selectBestPorts(fromSymbol, toSymbol);
@@ -280,6 +310,28 @@ function createConnection(
   // Pobierz punkty portow
   const startPoint = getPortPoint(fromSymbol, fromPort);
   const endPoint = getPortPoint(toSymbol, toPort);
+
+  // =============================================================================
+  // AUTO-LAYOUT V1: Check for pre-computed path (busbar feeders)
+  // When flag ON: uses orthogonal paths with stub from auto-layout algorithm
+  // When flag OFF: falls through to standard routing below
+  // =============================================================================
+  const autoLayoutPath = autoLayoutPaths?.get(connectionId);
+  if (autoLayoutPath && autoLayoutPath.length >= 2) {
+    // Use auto-layout path with proper start/end points from ports
+    // The auto-layout path provides the geometry; we ensure port alignment
+    const alignedPath = alignPathToEndpoints(autoLayoutPath, startPoint, endPoint, config.gridSnap);
+    return {
+      id: connectionId,
+      fromSymbolId: fromSymbol.id,
+      fromPortName: fromPort,
+      toSymbolId: toSymbol.id,
+      toPortName: toPort,
+      path: alignedPath,
+      elementId,
+      connectionType,
+    };
+  }
 
   // Wygeneruj sciezke (CAD bends mają pierwszeństwo)
   const overridePath =
@@ -772,6 +824,68 @@ function pathHasCorridorSegment(path: Position[], corridor: Corridor): boolean {
 
 function pathKey(path: Position[]): string {
   return path.map((point) => `${point.x},${point.y}`).join('|');
+}
+
+// =============================================================================
+// AUTO-LAYOUT V1: PATH ALIGNMENT HELPER
+// =============================================================================
+
+/**
+ * Wyrównaj ścieżkę auto-layout do punktów końcowych portów.
+ *
+ * Auto-layout generuje ścieżki od anchor na busbar. Ta funkcja zapewnia,
+ * że ścieżka zaczyna się i kończy na dokładnych współrzędnych portów.
+ *
+ * DETERMINISTIC: Pure function
+ *
+ * @param autoPath - Ścieżka z auto-layout
+ * @param startPoint - Punkt startu (port źródłowy)
+ * @param endPoint - Punkt końca (port docelowy)
+ * @param gridSnap - Rozmiar siatki dla snap
+ * @returns Wyrównana ścieżka
+ */
+function alignPathToEndpoints(
+  autoPath: Position[],
+  startPoint: Position,
+  endPoint: Position,
+  gridSnap: number
+): Position[] {
+  if (autoPath.length === 0) {
+    // Fallback: direct line (shouldn't happen)
+    return [startPoint, endPoint];
+  }
+
+  if (autoPath.length === 1) {
+    // Single point path: connect through it
+    return normalizePath([startPoint, autoPath[0], endPoint], gridSnap);
+  }
+
+  // Build aligned path:
+  // 1. Start from port start point
+  // 2. Connect to first auto-layout point (if different)
+  // 3. Include intermediate auto-layout points
+  // 4. Connect to last auto-layout point (if different from end)
+  // 5. End at port end point
+
+  const aligned: Position[] = [startPoint];
+
+  // Add auto-layout path points
+  for (const point of autoPath) {
+    const lastPoint = aligned[aligned.length - 1];
+    // Skip duplicate points
+    if (point.x !== lastPoint.x || point.y !== lastPoint.y) {
+      aligned.push(point);
+    }
+  }
+
+  // Add end point if different
+  const lastAligned = aligned[aligned.length - 1];
+  if (endPoint.x !== lastAligned.x || endPoint.y !== lastAligned.y) {
+    aligned.push(endPoint);
+  }
+
+  // Normalize: snap and reduce collinear points
+  return normalizePath(aligned, gridSnap);
 }
 
 // =============================================================================
