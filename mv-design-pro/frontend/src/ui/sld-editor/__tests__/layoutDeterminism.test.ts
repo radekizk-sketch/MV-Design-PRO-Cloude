@@ -392,8 +392,8 @@ describe('SLD Layout + Routing Determinism', () => {
 
         connections.forEach((connection) => {
           connection.path.forEach((point) => {
-            expect(isOnGrid(point.x, DEFAULT_ROUTING_CONFIG.gridSize)).toBe(true);
-            expect(isOnGrid(point.y, DEFAULT_ROUTING_CONFIG.gridSize)).toBe(true);
+            expect(isOnGrid(point.x, DEFAULT_ROUTING_CONFIG.gridSnap)).toBe(true);
+            expect(isOnGrid(point.y, DEFAULT_ROUTING_CONFIG.gridSnap)).toBe(true);
           });
         });
       });

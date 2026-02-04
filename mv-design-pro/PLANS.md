@@ -3558,6 +3558,40 @@ dla SLD (spine layout), niezależnie od kolejności wejściowej.
 
 ---
 
+## 27c. PR-SLD-ROUTING-01 Routing korytarze + przeszkody — DONE
+
+### 27c.1 Cel
+
+Ulepszenie routingu SLD (PowerFactory/ETAP-grade):
+- omijanie symboli i busbarów,
+- stałe korytarze routingu,
+- minimalna liczba załamań (I/L/Z + step-out),
+- deterministyczny wynik niezależny od kolejności wejścia.
+
+### 27c.2 Zakres (MUST)
+
+- Model przeszkód AABB z marginesem (busbar + symbole)
+- Deterministyczne sprawdzanie kolizji segmentów
+- Planner I → L → Z → step-out bez losowości
+- Normalizacja trasy (snap do siatki, redukcja współliniowych punktów)
+- Testy deterministyczności + kolizji (3 nowe fixtures)
+
+### 27c.3 Implementacja
+
+**Frontend**:
+- `frontend/src/ui/sld-editor/utils/connectionRouting.ts`
+- `frontend/src/ui/sld-editor/__tests__/routingObstacleDeterminism.test.ts`
+
+### 27c.4 DoD (Definition of Done)
+
+- [x] Korytarze routingu + step-out bez losowości
+- [x] Brak kolizji z AABB (z marginesem)
+- [x] Determinism + permutation invariance
+- [x] Grid snapping + brak NaN/Infinity
+- [x] Jeden mały PR (routing + testy)
+
+---
+
 ## 28. P31 PROJECT IMPORT / EXPORT (ROLA BINDING) — DONE
 
 ### 28.1 Context

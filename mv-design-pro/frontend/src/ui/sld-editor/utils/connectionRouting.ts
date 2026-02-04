@@ -19,13 +19,7 @@
  */
 
 import type { AnySldSymbol, BranchSymbol, Position, SwitchSymbol, SourceSymbol, LoadSymbol } from '../types';
-import {
-  getPortPoint,
-  selectBestPorts,
-  getSymbolBoundingBox,
-  lineIntersectsBoundingBox,
-  type PortName,
-} from './portUtils';
+import { getPortPoint, selectBestPorts, getSymbolBoundingBox, type PortName } from './portUtils';
 import { DEFAULT_LAYOUT_CONFIG } from './autoLayout';
 
 // =============================================================================
@@ -54,23 +48,65 @@ export interface Connection {
 
 /** Konfiguracja routingu */
 export interface RoutingConfig {
-  /** Rozmiar siatki (px) */
-  gridSize: number;
-  /** Margines od symboli (px) */
-  symbolMargin: number;
-  /** Preferencja kierunku: najpierw pion ('vertical') lub poziom ('horizontal') */
-  preferDirection: 'vertical' | 'horizontal';
-  /** Offset dla kanalu przewodow (px) */
-  channelOffset: number;
+  /** Offset korytarza od spine (px) */
+  corridorOffsetFromSpine: number;
+  /** Offset korytarza od busbar (px) */
+  corridorOffsetFromBusbar: number;
+  /** Margines przeszkod (px) */
+  obstacleMargin: number;
+  /** Minimalna dlugosc odcinka (px) */
+  minBendLength: number;
+  /** Maksymalna liczba prob step-out */
+  maxStepOutAttempts: number;
+  /** Snap do siatki (px) */
+  gridSnap: number;
 }
 
-/** Domyslna konfiguracja routingu */
-export const DEFAULT_ROUTING_CONFIG: RoutingConfig = {
-  gridSize: DEFAULT_LAYOUT_CONFIG.gridSize,
-  symbolMargin: 10,
-  preferDirection: 'vertical',
-  channelOffset: 20,
+/** Centralna konfiguracja routingu (PL) */
+export const ROUTING_GEOMETRY_CONFIG: RoutingConfig = {
+  corridorOffsetFromSpine: 40,
+  corridorOffsetFromBusbar: 24,
+  obstacleMargin: 8,
+  minBendLength: 18,
+  maxStepOutAttempts: 6,
+  gridSnap: DEFAULT_LAYOUT_CONFIG.gridSize,
 };
+
+/** Domyslna konfiguracja routingu */
+export const DEFAULT_ROUTING_CONFIG: RoutingConfig = ROUTING_GEOMETRY_CONFIG;
+
+// =============================================================================
+// OBSTACLES (AABB)
+// =============================================================================
+
+type Aabb = { x: number; y: number; width: number; height: number };
+
+type Obstacle = {
+  id: string;
+  type: 'busbar' | 'symbol';
+  typePriority: number;
+  bbox: Aabb;
+};
+
+export function buildRoutingObstacles(symbols: AnySldSymbol[], config: RoutingConfig): Obstacle[] {
+  const obstacles = symbols.map((symbol) => {
+    const bbox = expandAabb(getSymbolBoundingBox(symbol), config.obstacleMargin);
+    const isBusbar = symbol.elementType === 'Bus';
+    return {
+      id: symbol.id,
+      type: isBusbar ? 'busbar' : 'symbol',
+      typePriority: isBusbar ? 0 : 1,
+      bbox,
+    };
+  });
+
+  return obstacles.sort((a, b) => {
+    if (a.typePriority !== b.typePriority) {
+      return a.typePriority - b.typePriority;
+    }
+    return a.id.localeCompare(b.id);
+  });
+}
 
 // =============================================================================
 // GLOWNA FUNKCJA: GENERUJ POLACZENIA
@@ -91,6 +127,8 @@ export function generateConnections(
 ): Connection[] {
   const cfg: RoutingConfig = { ...DEFAULT_ROUTING_CONFIG, ...config };
   const connections: Connection[] = [];
+  const obstacles = buildRoutingObstacles(symbols, cfg);
+  const spineX = computeSpineX(symbols, cfg.gridSnap);
 
   // Mapa ID elementu -> symbol
   const elementToSymbol = new Map<string, AnySldSymbol>();
@@ -100,11 +138,13 @@ export function generateConnections(
   const symbolById = new Map<string, AnySldSymbol>();
   symbols.forEach((s) => symbolById.set(s.id, s));
 
-  // Zbierz wszystkie bounding boxy symboli (dla detekcji kolizji)
-  const allBoundingBoxes = symbols.map((s) => ({
-    symbolId: s.id,
-    bbox: getSymbolBoundingBox(s),
-  }));
+  const connectionRequests: Array<{
+    id: string;
+    fromSymbol: AnySldSymbol;
+    toSymbol: AnySldSymbol;
+    elementId?: string;
+    connectionType?: 'branch' | 'switch' | 'source' | 'load';
+  }> = [];
 
   // Przetworz Branch i Switch (maja fromNodeId/toNodeId)
   symbols.forEach((symbol) => {
@@ -114,16 +154,13 @@ export function generateConnections(
       const toSymbol = elementToSymbol.get(branch.toNodeId);
 
       if (fromSymbol && toSymbol) {
-        const connection = createConnection(
-          symbol.id,
+        connectionRequests.push({
+          id: symbol.id,
           fromSymbol,
           toSymbol,
-          allBoundingBoxes,
-          cfg,
-          branch.elementId,
-          'branch'
-        );
-        connections.push(connection);
+          elementId: branch.elementId,
+          connectionType: 'branch',
+        });
       }
     }
 
@@ -139,28 +176,22 @@ export function generateConnections(
 
         if (switchSymbol) {
           // Polaczenie 1: from -> switch
-          const conn1 = createConnection(
-            `${symbol.id}_in`,
+          connectionRequests.push({
+            id: `${symbol.id}_in`,
             fromSymbol,
-            switchSymbol,
-            allBoundingBoxes.filter((b) => b.symbolId !== symbol.id),
-            cfg,
-            sw.elementId,
-            'switch'
-          );
-          connections.push(conn1);
+            toSymbol: switchSymbol,
+            elementId: sw.elementId,
+            connectionType: 'switch',
+          });
 
           // Polaczenie 2: switch -> to
-          const conn2 = createConnection(
-            `${symbol.id}_out`,
-            switchSymbol,
+          connectionRequests.push({
+            id: `${symbol.id}_out`,
+            fromSymbol: switchSymbol,
             toSymbol,
-            allBoundingBoxes.filter((b) => b.symbolId !== symbol.id),
-            cfg,
-            sw.elementId,
-            'switch'
-          );
-          connections.push(conn2);
+            elementId: sw.elementId,
+            connectionType: 'switch',
+          });
         }
       }
     }
@@ -170,16 +201,13 @@ export function generateConnections(
       const connectedSymbol = elementToSymbol.get(source.connectedToNodeId);
 
       if (connectedSymbol) {
-        const connection = createConnection(
-          `${symbol.id}_conn`,
-          symbol,
-          connectedSymbol,
-          allBoundingBoxes,
-          cfg,
-          source.elementId,
-          'source'
-        );
-        connections.push(connection);
+        connectionRequests.push({
+          id: `${symbol.id}_conn`,
+          fromSymbol: symbol,
+          toSymbol: connectedSymbol,
+          elementId: source.elementId,
+          connectionType: 'source',
+        });
       }
     }
 
@@ -188,18 +216,31 @@ export function generateConnections(
       const connectedSymbol = elementToSymbol.get(load.connectedToNodeId);
 
       if (connectedSymbol) {
-        const connection = createConnection(
-          `${symbol.id}_conn`,
-          connectedSymbol, // Od szyny do obciazenia
-          symbol,
-          allBoundingBoxes,
-          cfg,
-          load.elementId,
-          'load'
-        );
-        connections.push(connection);
+        connectionRequests.push({
+          id: `${symbol.id}_conn`,
+          fromSymbol: connectedSymbol,
+          toSymbol: symbol,
+          elementId: load.elementId,
+          connectionType: 'load',
+        });
       }
     }
+  });
+
+  connectionRequests.sort((a, b) => a.id.localeCompare(b.id));
+
+  connectionRequests.forEach((request) => {
+    const connection = createConnection(
+      request.id,
+      request.fromSymbol,
+      request.toSymbol,
+      obstacles,
+      spineX,
+      cfg,
+      request.elementId,
+      request.connectionType
+    );
+    connections.push(connection);
   });
 
   // DETERMINIZM: Sortuj polaczenia po ID
@@ -219,7 +260,8 @@ function createConnection(
   connectionId: string,
   fromSymbol: AnySldSymbol,
   toSymbol: AnySldSymbol,
-  obstacles: Array<{ symbolId: string; bbox: { x: number; y: number; width: number; height: number } }>,
+  obstacles: Obstacle[],
+  spineX: number,
   config: RoutingConfig,
   elementId?: string,
   connectionType?: 'branch' | 'switch' | 'source' | 'load'
@@ -235,11 +277,10 @@ function createConnection(
   const path = routeOrthogonal(
     startPoint,
     endPoint,
-    fromPort,
-    toPort,
-    obstacles.filter(
-      (o) => o.symbolId !== fromSymbol.id && o.symbolId !== toSymbol.id
-    ),
+    fromSymbol,
+    toSymbol,
+    obstacles.filter((o) => o.id !== fromSymbol.id && o.id !== toSymbol.id),
+    spineX,
     config
   );
 
@@ -272,49 +313,56 @@ function createConnection(
 function routeOrthogonal(
   start: Position,
   end: Position,
-  fromPort: PortName,
-  toPort: PortName,
-  obstacles: Array<{ symbolId: string; bbox: { x: number; y: number; width: number; height: number } }>,
+  fromSymbol: AnySldSymbol,
+  toSymbol: AnySldSymbol,
+  obstacles: Obstacle[],
+  spineX: number,
   config: RoutingConfig
 ): Position[] {
   // Snap do siatki
-  const snapStart = snapToGrid(start, config.gridSize);
-  const snapEnd = snapToGrid(end, config.gridSize);
+  const snapStart = snapToGrid(start, config.gridSnap);
+  const snapEnd = snapToGrid(end, config.gridSnap);
 
   // Jesli punkty sa takie same, zwroc pojedynczy punkt
   if (snapStart.x === snapEnd.x && snapStart.y === snapEnd.y) {
     return [snapStart];
   }
 
+  const corridor = resolveCorridor(fromSymbol, toSymbol, snapStart, snapEnd, spineX, config);
+
   // PLANS STYLE: Preferuj PROSTE linie
   // Jesli punkty sa na tej samej linii pionowej lub poziomej, zwroc prosta linie
   if (snapStart.x === snapEnd.x || snapStart.y === snapEnd.y) {
-    return [snapStart, snapEnd];
+    const iPath = normalizePath([snapStart, snapEnd], config.gridSnap);
+    if (isPathClear(iPath, obstacles) && pathMeetsMinBendLength(iPath, config.minBendLength)) {
+      return iPath;
+    }
   }
 
   // PLANS STYLE: Dla elementow na roznych osiach uzyj prostego L-route
   // Najpierw pion (preferowany dla spine layout), potem poziom
-  const lPath = tryLRoute(snapStart, snapEnd, 'vertical', config.gridSize);
+  const lPath = normalizePath(tryLRoute(snapStart, snapEnd, 'vertical', config.gridSnap), config.gridSnap);
+  const lPathAlt = normalizePath(
+    tryLRoute(snapStart, snapEnd, 'horizontal', config.gridSnap),
+    config.gridSnap
+  );
 
-  // Sprawdz kolizje tylko jesli sa przeszkody
-  if (obstacles.length === 0 || !pathHasCollision(lPath, obstacles, config.symbolMargin)) {
-    return lPath;
+  const lCandidates = [lPath, lPathAlt].filter((path) =>
+    isPathClear(path, obstacles) && pathMeetsMinBendLength(path, config.minBendLength)
+  );
+
+  if (lCandidates.length > 0) {
+    return selectBestLRoute(lCandidates, corridor);
   }
 
-  // Alternatywny L-route (najpierw poziom, potem pion)
-  const lPathAlt = tryLRoute(snapStart, snapEnd, 'horizontal', config.gridSize);
-  if (!pathHasCollision(lPathAlt, obstacles, config.symbolMargin)) {
-    return lPathAlt;
-  }
-
-  // Fallback: prosty Z-route
-  const zPath = tryZRoute(snapStart, snapEnd, fromPort, toPort, config);
-  if (!pathHasCollision(zPath, obstacles, config.symbolMargin)) {
+  // Fallback: Z-route w korytarzu + step-out
+  const zPath = findZRouteWithStepOut(snapStart, snapEnd, corridor, obstacles, config);
+  if (zPath) {
     return zPath;
   }
 
   // Ostateczny fallback: prosta linia (ignoruj kolizje dla czytelnosci)
-  return [snapStart, snapEnd];
+  return normalizePath([snapStart, snapEnd], config.gridSnap);
 }
 
 /**
@@ -324,178 +372,158 @@ function tryLRoute(
   start: Position,
   end: Position,
   preferDirection: 'vertical' | 'horizontal',
-  gridSize: number
+  gridSnap: number
 ): Position[] {
   let midPoint: Position;
 
   if (preferDirection === 'vertical') {
     // Najpierw pion, potem poziom
-    midPoint = snapToGrid({ x: start.x, y: end.y }, gridSize);
+    midPoint = snapToGrid({ x: start.x, y: end.y }, gridSnap);
   } else {
     // Najpierw poziom, potem pion
-    midPoint = snapToGrid({ x: end.x, y: start.y }, gridSize);
+    midPoint = snapToGrid({ x: end.x, y: start.y }, gridSnap);
   }
 
   return [start, midPoint, end];
 }
 
-/**
- * Wariant Z: trzy odcinki z punktem posrednim.
- */
-function tryZRoute(
+type Corridor =
+  | { kind: 'vertical'; baseCoordinate: number; direction: 1 | -1 }
+  | { kind: 'horizontal'; baseCoordinate: number; direction: 1 | -1 };
+
+function resolveCorridor(
+  fromSymbol: AnySldSymbol,
+  toSymbol: AnySldSymbol,
   start: Position,
   end: Position,
-  fromPort: PortName,
-  toPort: PortName,
+  spineX: number,
   config: RoutingConfig
-): Position[] {
-  const { gridSize } = config;
-  const midY = snapToGrid({ x: 0, y: (start.y + end.y) / 2 }, gridSize).y;
+): Corridor {
+  const fromIsBus = fromSymbol.elementType === 'Bus';
+  const toIsBus = toSymbol.elementType === 'Bus';
 
-  // Dla polaczen pionowych (top/bottom ports)
-  if (
-    (fromPort === 'top' || fromPort === 'bottom') &&
-    (toPort === 'top' || toPort === 'bottom')
-  ) {
-    const mid1: Position = { x: start.x, y: midY };
-    const mid2: Position = { x: end.x, y: midY };
-    return [start, mid1, mid2, end];
+  if (fromIsBus !== toIsBus) {
+    const busSymbol = fromIsBus ? fromSymbol : toSymbol;
+    const otherSymbol = fromIsBus ? toSymbol : fromSymbol;
+    const direction = chooseSignedDirection(
+      otherSymbol.position.y,
+      busSymbol.position.y,
+      fromSymbol.id,
+      toSymbol.id
+    );
+    const base = snapToGrid(
+      { x: 0, y: busSymbol.position.y + direction * config.corridorOffsetFromBusbar },
+      config.gridSnap
+    ).y;
+    return { kind: 'horizontal', baseCoordinate: base, direction };
   }
 
-  // Dla polaczen poziomych (left/right ports)
-  if (
-    (fromPort === 'left' || fromPort === 'right') &&
-    (toPort === 'left' || toPort === 'right')
-  ) {
-    const midX = snapToGrid({ x: (start.x + end.x) / 2, y: 0 }, gridSize).x;
-    const mid1: Position = { x: midX, y: start.y };
-    const mid2: Position = { x: midX, y: end.y };
-    return [start, mid1, mid2, end];
-  }
-
-  // Mieszane: L-shape
-  const mid1: Position = snapToGrid({ x: start.x, y: midY }, gridSize);
-  const mid2: Position = snapToGrid({ x: end.x, y: midY }, gridSize);
-  return [start, mid1, mid2, end];
+  const avgX = (start.x + end.x) / 2;
+  const direction = chooseSignedDirection(avgX, spineX, fromSymbol.id, toSymbol.id);
+  const base = snapToGrid(
+    { x: spineX + direction * config.corridorOffsetFromSpine, y: 0 },
+    config.gridSnap
+  ).x;
+  return { kind: 'vertical', baseCoordinate: base, direction };
 }
 
-/**
- * Wariant Z alternatywny z innym kierunkiem.
- */
-function tryZRouteAlternative(
-  start: Position,
-  end: Position,
-  _fromPort: PortName,
-  _toPort: PortName,
-  config: RoutingConfig
-): Position[] {
-  const { gridSize } = config;
-
-  // Uzyj srodka X zamiast Y
-  const midX = snapToGrid({ x: (start.x + end.x) / 2, y: 0 }, gridSize).x;
-
-  const mid1: Position = { x: midX, y: start.y };
-  const mid2: Position = { x: midX, y: end.y };
-
-  return [start, mid1, mid2, end];
+function chooseSignedDirection(
+  primaryValue: number,
+  referenceValue: number,
+  fromId: string,
+  toId: string
+): 1 | -1 {
+  if (primaryValue > referenceValue) return 1;
+  if (primaryValue < referenceValue) return -1;
+  return fromId <= toId ? 1 : -1;
 }
 
-/**
- * Routing przez kanal przewodow (fallback).
- * Zawsze deterministyczny, unika kolizji poprzez offset.
- */
-function routeViaChannel(
+function findZRouteWithStepOut(
   start: Position,
   end: Position,
-  fromPort: PortName,
-  toPort: PortName,
+  corridor: Corridor,
+  obstacles: Obstacle[],
   config: RoutingConfig
-): Position[] {
-  const { gridSize, channelOffset } = config;
+): Position[] | null {
+  for (let attempt = 0; attempt < config.maxStepOutAttempts; attempt += 1) {
+    const corridorCoordinate =
+      corridor.baseCoordinate + corridor.direction * attempt * config.gridSnap;
+    const candidate =
+      corridor.kind === 'vertical'
+        ? normalizePath(
+            [
+              start,
+              { x: corridorCoordinate, y: start.y },
+              { x: corridorCoordinate, y: end.y },
+              end,
+            ],
+            config.gridSnap
+          )
+        : normalizePath(
+            [
+              start,
+              { x: start.x, y: corridorCoordinate },
+              { x: end.x, y: corridorCoordinate },
+              end,
+            ],
+            config.gridSnap
+          );
 
-  // Kanal: wyjdz z portu, skrecaj do kanalu, idz do celu
-  let exit1: Position;
-  let channelEntry: Position;
-  let channelExit: Position;
-  let entry2: Position;
-
-  // Wyznacz offset wyjscia z portu
-  const exitOffset = channelOffset * 2;
-
-  switch (fromPort) {
-    case 'top':
-      exit1 = snapToGrid({ x: start.x, y: start.y - exitOffset }, gridSize);
-      break;
-    case 'bottom':
-      exit1 = snapToGrid({ x: start.x, y: start.y + exitOffset }, gridSize);
-      break;
-    case 'left':
-      exit1 = snapToGrid({ x: start.x - exitOffset, y: start.y }, gridSize);
-      break;
-    case 'right':
-      exit1 = snapToGrid({ x: start.x + exitOffset, y: start.y }, gridSize);
-      break;
-    default:
-      exit1 = start;
+    if (isPathClear(candidate, obstacles) && pathMeetsMinBendLength(candidate, config.minBendLength)) {
+      return candidate;
+    }
   }
 
-  switch (toPort) {
-    case 'top':
-      entry2 = snapToGrid({ x: end.x, y: end.y - exitOffset }, gridSize);
-      break;
-    case 'bottom':
-      entry2 = snapToGrid({ x: end.x, y: end.y + exitOffset }, gridSize);
-      break;
-    case 'left':
-      entry2 = snapToGrid({ x: end.x - exitOffset, y: end.y }, gridSize);
-      break;
-    case 'right':
-      entry2 = snapToGrid({ x: end.x + exitOffset, y: end.y }, gridSize);
-      break;
-    default:
-      entry2 = end;
-  }
+  return null;
+}
 
-  // Polacz exit1 z entry2 poprzez kanal
-  // Uzyj deterministycznego punktu posredniego
-  const channelY = snapToGrid(
-    { x: 0, y: Math.min(exit1.y, entry2.y) - channelOffset },
-    gridSize
-  ).y;
+function selectBestLRoute(paths: Position[][], corridor: Corridor): Position[] {
+  const scored = paths.map((path) => ({
+    path,
+    corridorHit: pathHasCorridorSegment(path, corridor),
+    length: totalPathLength(path),
+    key: pathKey(path),
+  }));
 
-  channelEntry = snapToGrid({ x: exit1.x, y: channelY }, gridSize);
-  channelExit = snapToGrid({ x: entry2.x, y: channelY }, gridSize);
+  scored.sort((a, b) => {
+    if (a.corridorHit !== b.corridorHit) {
+      return a.corridorHit ? -1 : 1;
+    }
+    if (a.length !== b.length) {
+      return a.length - b.length;
+    }
+    return a.key.localeCompare(b.key);
+  });
 
-  // Zbuduj sciezke
-  const path: Position[] = [start];
-
-  if (exit1.x !== start.x || exit1.y !== start.y) {
-    path.push(exit1);
-  }
-
-  if (channelEntry.x !== exit1.x || channelEntry.y !== exit1.y) {
-    path.push(channelEntry);
-  }
-
-  if (channelExit.x !== channelEntry.x || channelExit.y !== channelEntry.y) {
-    path.push(channelExit);
-  }
-
-  if (entry2.x !== channelExit.x || entry2.y !== channelExit.y) {
-    path.push(entry2);
-  }
-
-  if (end.x !== entry2.x || end.y !== entry2.y) {
-    path.push(end);
-  }
-
-  // Usun duplikaty
-  return removeDuplicatePoints(path);
+  return scored[0].path;
 }
 
 // =============================================================================
 // FUNKCJE POMOCNICZE
 // =============================================================================
+
+function expandAabb(bbox: Aabb, margin: number): Aabb {
+  return {
+    x: bbox.x - margin,
+    y: bbox.y - margin,
+    width: bbox.width + 2 * margin,
+    height: bbox.height + 2 * margin,
+  };
+}
+
+function computeSpineX(symbols: AnySldSymbol[], gridSnap: number): number {
+  const busbars = symbols.filter((symbol) => symbol.elementType === 'Bus');
+  const candidates = (busbars.length > 0 ? busbars : symbols)
+    .map((symbol) => symbol.position.x)
+    .sort((a, b) => a - b);
+
+  if (candidates.length === 0) {
+    return 0;
+  }
+
+  const median = candidates[Math.floor((candidates.length - 1) / 2)];
+  return snapToGrid({ x: median, y: 0 }, gridSnap).x;
+}
 
 /**
  * Snap punkt do siatki.
@@ -508,47 +536,137 @@ function snapToGrid(point: Position, gridSize: number): Position {
 }
 
 /**
- * Sprawdz czy sciezka koliduje z przeszkodami.
+ * Sprawdz czy odcinek osiowo wyrównany przecina AABB.
  */
-function pathHasCollision(
-  path: Position[],
-  obstacles: Array<{ symbolId: string; bbox: { x: number; y: number; width: number; height: number } }>,
-  margin: number
+export function segmentIntersectsAabb(
+  segment: { start: Position; end: Position },
+  bbox: Aabb
 ): boolean {
-  if (path.length < 2) return false;
+  const { start, end } = segment;
+  const left = bbox.x;
+  const right = bbox.x + bbox.width;
+  const top = bbox.y;
+  const bottom = bbox.y + bbox.height;
 
-  for (let i = 0; i < path.length - 1; i++) {
-    const p1 = path[i];
-    const p2 = path[i + 1];
+  if (start.x === end.x && start.y === end.y) {
+    return start.x >= left && start.x <= right && start.y >= top && start.y <= bottom;
+  }
 
-    for (const obstacle of obstacles) {
-      if (lineIntersectsBoundingBox(p1, p2, obstacle.bbox, margin)) {
-        return true;
-      }
+  if (start.y === end.y) {
+    const y = start.y;
+    if (y < top || y > bottom) {
+      return false;
     }
+    const minX = Math.min(start.x, end.x);
+    const maxX = Math.max(start.x, end.x);
+    return minX <= right && maxX >= left;
+  }
+
+  if (start.x === end.x) {
+    const x = start.x;
+    if (x < left || x > right) {
+      return false;
+    }
+    const minY = Math.min(start.y, end.y);
+    const maxY = Math.max(start.y, end.y);
+    return minY <= bottom && maxY >= top;
   }
 
   return false;
 }
 
-/**
- * Usun kolejne duplikaty punktow.
- */
-function removeDuplicatePoints(path: Position[]): Position[] {
-  if (path.length === 0) return [];
+function isPathClear(path: Position[], obstacles: Obstacle[]): boolean {
+  if (path.length < 2) return true;
 
-  const result: Position[] = [path[0]];
+  for (let i = 0; i < path.length - 1; i += 1) {
+    const start = path[i];
+    const end = path[i + 1];
 
-  for (let i = 1; i < path.length; i++) {
-    const prev = result[result.length - 1];
-    const curr = path[i];
-
-    if (curr.x !== prev.x || curr.y !== prev.y) {
-      result.push(curr);
+    for (const obstacle of obstacles) {
+      if (segmentIntersectsAabb({ start, end }, obstacle.bbox)) {
+        return false;
+      }
     }
   }
 
-  return result;
+  return true;
+}
+
+function pathMeetsMinBendLength(path: Position[], minBendLength: number): boolean {
+  if (path.length <= 2) {
+    return true;
+  }
+
+  for (let i = 0; i < path.length - 1; i += 1) {
+    const segmentLength = Math.abs(path[i + 1].x - path[i].x) + Math.abs(path[i + 1].y - path[i].y);
+    if (segmentLength > 0 && segmentLength < minBendLength) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+/**
+ * Normalizacja trasy: snap + redukcja współliniowych punktów.
+ */
+function normalizePath(path: Position[], gridSnap: number): Position[] {
+  if (path.length === 0) return [];
+
+  const snapped = path.map((point) => snapToGrid(point, gridSnap));
+  const deduped: Position[] = [snapped[0]];
+
+  for (let i = 1; i < snapped.length; i += 1) {
+    const prev = deduped[deduped.length - 1];
+    const curr = snapped[i];
+    if (curr.x !== prev.x || curr.y !== prev.y) {
+      deduped.push(curr);
+    }
+  }
+
+  const reduced: Position[] = [];
+  for (const point of deduped) {
+    reduced.push(point);
+    while (reduced.length >= 3) {
+      const c = reduced[reduced.length - 1];
+      const b = reduced[reduced.length - 2];
+      const a = reduced[reduced.length - 3];
+      const collinear = (a.x === b.x && b.x === c.x) || (a.y === b.y && b.y === c.y);
+      if (collinear) {
+        reduced.splice(reduced.length - 2, 1);
+      } else {
+        break;
+      }
+    }
+  }
+
+  return reduced;
+}
+
+function totalPathLength(path: Position[]): number {
+  let total = 0;
+  for (let i = 0; i < path.length - 1; i += 1) {
+    total += Math.abs(path[i + 1].x - path[i].x) + Math.abs(path[i + 1].y - path[i].y);
+  }
+  return total;
+}
+
+function pathHasCorridorSegment(path: Position[], corridor: Corridor): boolean {
+  for (let i = 0; i < path.length - 1; i += 1) {
+    const start = path[i];
+    const end = path[i + 1];
+    if (corridor.kind === 'vertical' && start.x === end.x && start.x === corridor.baseCoordinate) {
+      return true;
+    }
+    if (corridor.kind === 'horizontal' && start.y === end.y && start.y === corridor.baseCoordinate) {
+      return true;
+    }
+  }
+  return false;
+}
+
+function pathKey(path: Position[]): string {
+  return path.map((point) => `${point.x},${point.y}`).join('|');
 }
 
 // =============================================================================
