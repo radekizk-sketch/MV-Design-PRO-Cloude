@@ -3560,6 +3560,7 @@ dla SLD (spine layout), niezależnie od kolejności wejściowej.
 ### 27b.5 Maintenance Notes
 
 - [x] PR-SLD-ETAP-GEOMETRY-FULL (#322): prefer coupler/topology-based busbar section detection, guarded name fallback, false-positive tests.
+- [x] PR-SLD-ETAP-AUTO-LAYOUT-TESTS (#328): test-only update to assert no critical (symbol-symbol) collisions while allowing label/aux overlaps.
 
 ---
 
