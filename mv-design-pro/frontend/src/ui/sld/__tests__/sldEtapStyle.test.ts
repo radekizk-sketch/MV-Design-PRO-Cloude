@@ -174,12 +174,15 @@ describe('sldEtapStyle', () => {
     it('ETAP_GRID settings are stable', () => {
       expect(ETAP_GRID).toMatchInlineSnapshot(`
         {
+          "axisColor": "#C4C3C1",
+          "axisStrokeWidth": 1,
           "defaultVisible": true,
-          "majorColor": "#E5E7EB",
+          "majorColor": "#DDDCDA",
           "majorEvery": 5,
           "majorStrokeWidth": 0.75,
-          "minorColor": "#F3F4F6",
+          "minorColor": "#EBEBEA",
           "minorStrokeWidth": 0.5,
+          "opacity": 0.8,
           "size": 20,
         }
       `);

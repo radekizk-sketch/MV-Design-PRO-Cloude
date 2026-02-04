@@ -335,27 +335,56 @@ export const ETAP_SYMBOL_SIZES = {
 } as const;
 
 // =============================================================================
+// CANVAS BACKGROUND (ETAP INDUSTRIAL)
+// =============================================================================
+
+/**
+ * Canvas background configuration (ETAP: technical drawing paper feel).
+ * Professional, calm, engineered appearance.
+ */
+export const ETAP_CANVAS = {
+  /** Primary background color — warm off-white like technical paper */
+  backgroundColor: '#FAFAF8', // warm gray-50
+  /** Subtle paper texture gradient (top to bottom) */
+  gradientStart: '#FAFAFA', // neutral gray-50
+  gradientEnd: '#F5F5F4', // stone-100
+  /** Border around canvas area */
+  borderColor: '#E7E5E4', // stone-300
+  /** Shadow for depth */
+  shadowColor: 'rgba(0, 0, 0, 0.04)',
+  /** Canvas inner glow for depth */
+  innerGlowColor: 'rgba(255, 255, 255, 0.6)',
+} as const;
+
+// =============================================================================
 // GRID SETTINGS (SUBDUED)
 // =============================================================================
 
 /**
  * Grid configuration (ETAP: subdued, not dominant).
+ * Technical drawing style — visible but not distracting.
  */
 export const ETAP_GRID = {
   /** Grid cell size (px) */
   size: 20,
   /** Major grid every N cells */
   majorEvery: 5,
-  /** Minor grid color — very subtle */
-  minorColor: '#F3F4F6', // gray-100
-  /** Major grid color — slightly visible */
-  majorColor: '#E5E7EB', // gray-200
+  /** Minor grid color — very subtle, warm tone */
+  minorColor: '#EBEBEA', // warm gray-200
+  /** Major grid color — slightly visible, cool accent */
+  majorColor: '#DDDCDA', // warm gray-300
+  /** Axis/origin color — distinctive but not dominant */
+  axisColor: '#C4C3C1', // warm gray-400
   /** Minor stroke width */
   minorStrokeWidth: 0.5,
   /** Major stroke width */
   majorStrokeWidth: 0.75,
+  /** Axis stroke width */
+  axisStrokeWidth: 1,
   /** Default visibility */
   defaultVisible: true,
+  /** Grid opacity (allows canvas background to show through) */
+  opacity: 0.8,
 } as const;
 
 // =============================================================================
@@ -1544,6 +1573,8 @@ export default {
   CALLOUT_ANCHORS: ETAP_CALLOUT_ANCHORS,
   // Symbols
   SYMBOL_SIZES: ETAP_SYMBOL_SIZES,
+  // Canvas (ETAP industrial background)
+  CANVAS: ETAP_CANVAS,
   // Grid
   GRID: ETAP_GRID,
   // Geometry (PR-SLD-ETAP-GEOMETRY-01)
