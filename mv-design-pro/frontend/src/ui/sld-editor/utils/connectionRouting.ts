@@ -123,7 +123,8 @@ export function buildRoutingObstacles(symbols: AnySldSymbol[], config: RoutingCo
  */
 export function generateConnections(
   symbols: AnySldSymbol[],
-  config: Partial<RoutingConfig> = {}
+  config: Partial<RoutingConfig> = {},
+  edgeBendOverrides?: Record<string, Position[] | undefined>
 ): Connection[] {
   const cfg: RoutingConfig = { ...DEFAULT_ROUTING_CONFIG, ...config };
   const connections: Connection[] = [];
@@ -237,6 +238,7 @@ export function generateConnections(
       obstacles,
       spineX,
       cfg,
+      edgeBendOverrides?.[request.id],
       request.elementId,
       request.connectionType
     );
@@ -263,6 +265,7 @@ function createConnection(
   obstacles: Obstacle[],
   spineX: number,
   config: RoutingConfig,
+  edgeBends?: Position[],
   elementId?: string,
   connectionType?: 'branch' | 'switch' | 'source' | 'load'
 ): Connection {
@@ -273,16 +276,23 @@ function createConnection(
   const startPoint = getPortPoint(fromSymbol, fromPort);
   const endPoint = getPortPoint(toSymbol, toPort);
 
-  // Wygeneruj sciezke
-  const path = routeOrthogonal(
-    startPoint,
-    endPoint,
-    fromSymbol,
-    toSymbol,
-    obstacles.filter((o) => o.id !== fromSymbol.id && o.id !== toSymbol.id),
-    spineX,
-    config
-  );
+  // Wygeneruj sciezke (CAD bends mają pierwszeństwo)
+  const overridePath =
+    edgeBends && edgeBends.length > 0
+      ? normalizePath([startPoint, ...edgeBends, endPoint], config.gridSnap)
+      : null;
+
+  const path = overridePath && overridePath.length >= 2
+    ? overridePath
+    : routeOrthogonal(
+      startPoint,
+      endPoint,
+      fromSymbol,
+      toSymbol,
+      obstacles.filter((o) => o.id !== fromSymbol.id && o.id !== toSymbol.id),
+      spineX,
+      config
+    );
 
   return {
     id: connectionId,

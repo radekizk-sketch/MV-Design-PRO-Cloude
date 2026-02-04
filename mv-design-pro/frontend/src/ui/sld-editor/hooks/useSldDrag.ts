@@ -23,6 +23,8 @@ import { useIsMutationBlocked } from '../../selection/store';
 import { useSldEditorStore } from '../SldEditorStore';
 import { MultiSymbolMoveCommand, type SymbolPositionChange } from '../commands/MultiSymbolMoveCommand';
 import { calculateSnapPosition, SNAP_CONFIG } from '../utils/portUtils';
+import { featureFlags } from '../../config/featureFlags';
+import type { Position } from '../types';
 
 export interface UseSldDragOptions {
   /** Callback when drag starts */
@@ -44,6 +46,7 @@ export function useSldDrag(options: UseSldDragOptions = {}) {
   const sldStore = useSldEditorStore();
   const historyStore = useHistoryStore();
   const isMutationBlocked = useIsMutationBlocked();
+  const canEditCadGeometry = featureFlags.sldCadEditingEnabled && sldStore.geometryMode !== 'AUTO';
 
   /**
    * Start drag operation.
@@ -52,7 +55,7 @@ export function useSldDrag(options: UseSldDragOptions = {}) {
    */
   const startDrag = useCallback(
     (symbolId: string, startPosition: { x: number; y: number }) => {
-      if (isMutationBlocked) return;
+      if (isMutationBlocked || !canEditCadGeometry) return;
 
       const { selectedIds } = sldStore;
 
@@ -73,7 +76,7 @@ export function useSldDrag(options: UseSldDragOptions = {}) {
         onDragStart(symbolsToDrag);
       }
     },
-    [sldStore, isMutationBlocked, onDragStart]
+    [sldStore, isMutationBlocked, onDragStart, canEditCadGeometry]
   );
 
   /**
@@ -148,6 +151,14 @@ export function useSldDrag(options: UseSldDragOptions = {}) {
         onDragEnd();
       }
       return;
+    }
+
+    if (changes) {
+      const updates = new Map<string, Position>();
+      changes.forEach((change, symbolId) => {
+        updates.set(symbolId, change.new);
+      });
+      sldStore.updateCadNodeOverrides(updates);
     }
 
     // Create command for UNDO/REDO

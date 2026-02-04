@@ -48,7 +48,7 @@ export interface ConnectionRendererProps {
   /** Czy polaczenie jest aktywne (pod napieciem) */
   energized?: boolean;
   /** Callback przy kliknieciu */
-  onClick?: (connectionId: string) => void;
+  onClick?: (connectionId: string, event: React.MouseEvent) => void;
   /** Callback przy najechaniu */
   onMouseEnter?: (connectionId: string) => void;
   /** Callback przy zjechaniu */
@@ -100,7 +100,7 @@ export const ConnectionRenderer: React.FC<ConnectionRendererProps> = ({
   const handleClick = useCallback(
     (e: React.MouseEvent) => {
       e.stopPropagation();
-      onClick?.(id);
+      onClick?.(id, e);
     },
     [id, onClick]
   );
@@ -161,7 +161,7 @@ export interface ConnectionsLayerProps {
   /** Mapa energizacji (connectionId -> boolean) */
   energizationMap?: Map<string, boolean>;
   /** Callback przy kliknieciu polaczenia */
-  onConnectionClick?: (connectionId: string) => void;
+  onConnectionClick?: (connectionId: string, event: React.MouseEvent) => void;
   /** Callback przy najechaniu na polaczenie */
   onConnectionHover?: (connectionId: string | null) => void;
 }

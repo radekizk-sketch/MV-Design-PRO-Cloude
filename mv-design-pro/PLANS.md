@@ -3800,3 +3800,54 @@ Zalegalizowanie geometrii CAD w SLD jako kontraktu danych (bez narzedzi edycji i
 - ❌ Brak narzedzi edycji w UI
 - ❌ Brak zmian w algorytmach auto‑layoutu lub routingu
 - ❌ Brak migracji backendu
+
+---
+
+## 30a. PR-SLD-CAD-TOOLS-01 Minimalne narzędzia CAD w SLD — DONE
+
+### 30a.1 Cel
+
+Wdrożenie minimalnych narzędzi edycji CAD geometrii w SLD (drag, bends, reset, status)
+z zachowaniem deterministyczności i bez zmian topologii oraz backendu.
+
+### 30a.2 Zakres (MUST)
+
+- Drag & drop symboli z snap-to-grid (tylko geometria)
+- Edycja łamań połączeń (dodaj/usuń/przesuń punkt)
+- Reset do AUTO (element i globalnie)
+- Widoczny status overrides: VALID/STALE/CONFLICT (PL)
+
+### 30a.3 Implementacja
+
+**Frontend:**
+
+| Plik | Opis |
+|------|------|
+| `frontend/src/ui/sld-editor/SldCanvas.tsx` | Integracja CAD geometrii, bend handles, status overrides |
+| `frontend/src/ui/sld-editor/SldToolbar.tsx` | Akcje CAD: dodaj/usuń bend, reset element/global |
+| `frontend/src/ui/sld-editor/SldEditor.tsx` | Widoczny status CAD w nagłówku |
+| `frontend/src/ui/sld-editor/SldEditorStore.ts` | Akcje i stan overrides, reset, status |
+| `frontend/src/ui/sld-editor/utils/connectionRouting.ts` | Obsługa bends overrides w routingu |
+
+**Testy:**
+
+| Plik | Opis |
+|------|------|
+| `frontend/src/ui/sld-editor/__tests__/SldEditorStore.test.ts` | Testy overrides (drag/bends/reset) |
+| `frontend/src/ui/sld-editor/__tests__/useSldDragCad.test.tsx` | Test drag end + zapis overrides |
+
+### 30a.4 DoD (Definition of Done)
+
+- [x] CAD działa tylko przy `sldCadEditingEnabled` i trybie != AUTO
+- [x] Snap-to-grid zawsze aktywny dla CAD
+- [x] Drag node zapisuje overrides + status
+- [x] Bends edytowalne i deterministyczne
+- [x] Reset elementu i globalny
+- [x] Status VALID/STALE/CONFLICT widoczny w UI (PL)
+- [x] Testy jednostkowe + test interakcji drag end
+
+### 30a.5 Wykluczenia
+
+- ❌ Brak persistence do backendu
+- ❌ Brak edycji topologii
+- ❌ Brak zmian w solverach

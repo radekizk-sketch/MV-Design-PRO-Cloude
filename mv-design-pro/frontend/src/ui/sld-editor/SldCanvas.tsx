@@ -24,7 +24,7 @@
  * - Porty spójne z definicjami w SymbolResolver.ts
  */
 
-import React, { useCallback, useRef, useMemo, useEffect } from 'react';
+import React, { useCallback, useRef, useMemo, useEffect, useState } from 'react';
 import { useSldEditorStore } from './SldEditorStore';
 import { useSldDrag } from './hooks/useSldDrag';
 import { useAutoLayout } from './hooks/useAutoLayout';
@@ -46,6 +46,9 @@ import {
   SNAP_CONFIG,
   type PortInfo,
 } from './utils/portUtils';
+import { applyGeometryMode, evaluateCadOverridesStatus } from './cad/geometryContract';
+import { featureFlags } from '../config/featureFlags';
+import { computeTopologyHash } from './hooks/useAutoLayout';
 
 /**
  * Symbol rendering component using unified ETAP renderer.
@@ -190,6 +193,7 @@ export const SldCanvas: React.FC = () => {
   const sldStore = useSldEditorStore();
   const isMutationBlocked = useIsMutationBlocked();
   const { startDrag, updateDrag, endDrag } = useSldDrag();
+  const [activeBendDrag, setActiveBendDrag] = useState<{ edgeId: string; bendIndex: number } | null>(null);
 
   const svgRef = useRef<SVGSVGElement>(null);
   const isDragging = useRef(false);
@@ -201,6 +205,10 @@ export const SldCanvas: React.FC = () => {
   const highlightSeverity = sldStore.highlightSeverity;
   const gridConfig = sldStore.gridConfig;
   const lassoState = sldStore.lassoState;
+  const cadOverridesDocument = sldStore.cadOverridesDocument;
+  const selectedConnectionId = sldStore.selectedConnectionId;
+  const selectedBendIndex = sldStore.selectedBendIndex;
+  const canEditCadGeometry = featureFlags.sldCadEditingEnabled && sldStore.geometryMode !== 'AUTO' && !isMutationBlocked;
 
   // PR-SLD-05: Stan tworzenia polaczen i portow
   const connectionCreationState = sldStore.connectionCreationState;
@@ -212,21 +220,38 @@ export const SldCanvas: React.FC = () => {
   // DETERMINISM: Ten sam model -> ten sam uklad
   // STABILNOSC: Mala zmiana = mala zmiana ukladu
   const {
-    layoutSymbols,
     positions: autoLayoutPositions,
     // addOverride - dostepne do implementacji recznego przesuwania
     // debug - dostepne do debugowania
   } = useAutoLayout(rawSymbols, { gridSize: gridConfig.size });
 
-  // Uzyj symboli z auto-layoutem
-  const symbols = layoutSymbols;
+  const autoGeometry = useMemo(() => {
+    const nodes: Record<string, { pos: Position }> = {};
+    autoLayoutPositions.forEach((pos, symbolId) => {
+      nodes[symbolId] = { pos };
+    });
+    return { nodes, edges: {}, labels: {} };
+  }, [autoLayoutPositions]);
+
+  const effectiveGeometry = useMemo(
+    () => applyGeometryMode(autoGeometry, cadOverridesDocument),
+    [autoGeometry, cadOverridesDocument]
+  );
+
+  // Uzyj symboli z efektywna geometria
+  const symbols = rawSymbols;
 
   // Synchronizuj pozycje z auto-layoutu do store (jednorazowo przy zmianie topologii)
   useEffect(() => {
     if (autoLayoutPositions.size > 0 && rawSymbols.length > 0) {
+      const effectivePositions = new Map<string, Position>();
+      Object.entries(effectiveGeometry.nodes).forEach(([symbolId, node]) => {
+        effectivePositions.set(symbolId, node.pos);
+      });
+
       // Sprawdz czy pozycje sie zmienily
       let needsUpdate = false;
-      for (const [symbolId, pos] of autoLayoutPositions) {
+      for (const [symbolId, pos] of effectivePositions) {
         const existingSymbol = sldStore.symbols.get(symbolId);
         if (existingSymbol && (existingSymbol.position.x !== pos.x || existingSymbol.position.y !== pos.y)) {
           needsUpdate = true;
@@ -235,14 +260,26 @@ export const SldCanvas: React.FC = () => {
       }
 
       if (needsUpdate) {
-        sldStore.updateSymbolsPositions(autoLayoutPositions);
+        sldStore.updateSymbolsPositions(effectivePositions);
       }
     }
-  }, [autoLayoutPositions, rawSymbols.length]); // Reaguj na zmiany topologii (nie na same pozycje)
+  }, [autoLayoutPositions, rawSymbols.length, effectiveGeometry, sldStore]); // Reaguj na zmiany topologii (nie na same pozycje)
 
   // Generate connections (N-01: port-to-port, N-05: orthogonal routing)
   // DETERMINISM: Same symbols -> same connections
-  const connections = useMemo(() => generateConnections(symbols), [symbols]);
+  const edgeBendOverrides = useMemo(() => {
+    if (sldStore.geometryMode === 'AUTO') return undefined;
+    if (!cadOverridesDocument?.edges) return undefined;
+    const overrides: Record<string, Position[] | undefined> = {};
+    Object.entries(cadOverridesDocument.edges).forEach(([edgeId, override]) => {
+      if (override.bends && override.bends.length > 0) {
+        overrides[edgeId] = override.bends.map((bend) => ({ ...bend }));
+      }
+    });
+    return overrides;
+  }, [cadOverridesDocument, sldStore.geometryMode]);
+
+  const connections = useMemo(() => generateConnections(symbols, {}, edgeBendOverrides), [symbols, edgeBendOverrides]);
 
   // Canvas size (fixed for now, could be dynamic)
   const CANVAS_WIDTH = 1200;
@@ -262,6 +299,30 @@ export const SldCanvas: React.FC = () => {
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [connectionCreationState, sldStore]);
+
+  // ==========================================================================
+  // CAD: Aktualizacja statusu overrides
+  // ==========================================================================
+  useEffect(() => {
+    if (!featureFlags.sldCadEditingEnabled || !cadOverridesDocument) {
+      sldStore.setCadOverridesStatus(null);
+      return;
+    }
+
+    const baseFingerprintCurrent = computeTopologyHash(rawSymbols);
+    const report = evaluateCadOverridesStatus(
+      baseFingerprintCurrent,
+      cadOverridesDocument.baseFingerprint,
+      cadOverridesDocument,
+      {
+        nodes: rawSymbols.map((symbol) => symbol.id),
+        edges: connections.map((connection) => connection.id),
+        labels: [],
+      }
+    );
+
+    sldStore.setCadOverridesStatus(report);
+  }, [cadOverridesDocument, rawSymbols, connections, sldStore]);
 
   // ==========================================================================
   // PR-SLD-05: Walidacja polaczenia dla portu docelowego
@@ -372,6 +433,7 @@ export const SldCanvas: React.FC = () => {
       if (e.target === svgRef.current) {
         if (!e.shiftKey && !e.ctrlKey && !e.metaKey) {
           sldStore.clearSelection();
+          sldStore.setSelectedConnection(null);
         }
         // Start lasso
         sldStore.startLasso(position);
@@ -466,9 +528,65 @@ export const SldCanvas: React.FC = () => {
       if (connectionCreationState) return;
 
       sldStore.selectSymbol(symbolId, mode);
+      if (mode === 'single') {
+        sldStore.setSelectedConnection(null);
+      }
     },
     [sldStore, connectionCreationState]
   );
+
+  const handleConnectionClick = useCallback(
+    (connectionId: string, event: React.MouseEvent) => {
+      if (!canEditCadGeometry || !svgRef.current || connectionCreationState) return;
+      const rect = svgRef.current.getBoundingClientRect();
+      const position = {
+        x: event.clientX - rect.left,
+        y: event.clientY - rect.top,
+      };
+      const connection = connections.find((item) => item.id === connectionId);
+      sldStore.setSelectedConnection(
+        connectionId,
+        position,
+        connection ? connection.path : null
+      );
+    },
+    [canEditCadGeometry, connections, sldStore, connectionCreationState]
+  );
+
+  const handleBendMouseDown = useCallback(
+    (edgeId: string, bendIndex: number) => (event: React.MouseEvent) => {
+      if (!canEditCadGeometry) return;
+      event.stopPropagation();
+      sldStore.setSelectedBendIndex(bendIndex);
+      setActiveBendDrag({ edgeId, bendIndex });
+    },
+    [canEditCadGeometry, sldStore]
+  );
+
+  useEffect(() => {
+    if (!activeBendDrag || !svgRef.current) return;
+
+    const handleMouseMove = (event: MouseEvent) => {
+      if (!svgRef.current) return;
+      const rect = svgRef.current.getBoundingClientRect();
+      const position = {
+        x: event.clientX - rect.left,
+        y: event.clientY - rect.top,
+      };
+      sldStore.updateCadEdgeBend(activeBendDrag.edgeId, activeBendDrag.bendIndex, position);
+    };
+
+    const handleMouseUp = () => {
+      setActiveBendDrag(null);
+    };
+
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [activeBendDrag, sldStore]);
 
   // PR-SLD-05: Czy jest aktywny tryb tworzenia polaczenia
   const isConnectionCreationActive = connectionCreationState !== null;
@@ -483,6 +601,11 @@ export const SldCanvas: React.FC = () => {
 
   // PR-SLD-05: Czy podglad polaczenia jest poprawny (ma port docelowy)
   const isConnectionPreviewValid = connectionCreationState?.targetPort !== null;
+
+  const selectedConnectionBends =
+    selectedConnectionId && cadOverridesDocument?.edges[selectedConnectionId]?.bends
+      ? cadOverridesDocument.edges[selectedConnectionId]!.bends!
+      : [];
 
   return (
     <div className="relative">
@@ -508,8 +631,30 @@ export const SldCanvas: React.FC = () => {
         {/* Connections layer (rendered UNDER symbols) - N-01, N-05 */}
         <ConnectionsLayer
           connections={connections}
-          selectedConnectionId={null}
+          selectedConnectionId={selectedConnectionId}
+          onConnectionClick={handleConnectionClick}
         />
+
+        {/* CAD: Punkty lamane dla zaznaczonego polaczenia */}
+        {canEditCadGeometry && selectedConnectionId && selectedConnectionBends.length > 0 && (
+          <g data-testid="sld-connection-bends">
+            {selectedConnectionBends.map((bend, index) => {
+              const isSelected = selectedBendIndex === index;
+              return (
+                <circle
+                  key={`${selectedConnectionId}-bend-${index}`}
+                  cx={bend.x}
+                  cy={bend.y}
+                  r={isSelected ? 6 : 5}
+                  fill={isSelected ? '#2563eb' : '#93c5fd'}
+                  stroke="#1d4ed8"
+                  strokeWidth={1}
+                  onMouseDown={handleBendMouseDown(selectedConnectionId, index)}
+                />
+              );
+            })}
+          </g>
+        )}
 
         {/* Symbols */}
         {symbols.map((symbol) => (

@@ -126,6 +126,7 @@ export function useKeyboardShortcuts(options: UseKeyboardShortcutsOptions = {}) 
         if (e.key === 'Escape') {
           e.preventDefault();
           sldStore.clearSelection();
+          sldStore.setSelectedConnection(null);
           // Cancel drag if active
           if (sldStore.dragState) {
             sldStore.cancelDrag();

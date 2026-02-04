@@ -27,6 +27,7 @@ import { UndoRedoButtons } from '../history/UndoRedoButtons';
 import { useSldModeStore, SLD_MODE_LABELS_PL } from '../sld/sldModeStore';
 import { DiagnosticResultsLayer } from '../sld/DiagnosticResultsLayer';
 import type { AnySldSymbol } from './types';
+import { featureFlags } from '../config/featureFlags';
 
 /**
  * SLD Editor props.
@@ -65,12 +66,22 @@ export const SldEditor: React.FC<SldEditorProps> = ({
   const sldStore = useSldEditorStore();
   const isMutationBlocked = useIsMutationBlocked();
   const modeLabel = useModeLabel();
+  const cadOverridesStatus = useSldEditorStore((state) => state.cadOverridesStatus);
+  const geometryMode = useSldEditorStore((state) => state.geometryMode);
+  const setGeometryMode = useSldEditorStore((state) => state.setGeometryMode);
 
   // PR-SLD-06: SLD Mode integration
   const sldMode = useSldModeStore((state) => state.mode);
   const diagnosticLayerVisible = useSldModeStore((state) => state.diagnosticLayerVisible);
   const setMode = useSldModeStore((state) => state.setMode);
   const isResultsMode = sldMode === 'WYNIKI';
+  const cadStatusLabel = cadOverridesStatus?.status
+    ? {
+      VALID: 'Geometria CAD zgodna z modelem',
+      STALE: 'Geometria CAD może być nieaktualna względem modelu',
+      CONFLICT: 'Konflikt geometrii CAD — część nadpisań nie pasuje do modelu',
+    }[cadOverridesStatus.status]
+    : null;
 
   // Combine mutation blocking with results mode
   const isEditBlocked = isMutationBlocked || isResultsMode;
@@ -112,7 +123,7 @@ export const SldEditor: React.FC<SldEditorProps> = ({
       <div className="flex items-center justify-between px-4 py-2 bg-white border-b border-gray-300">
         <div>
           <h2 className="text-lg font-semibold text-gray-800">Edytor SLD</h2>
-          <div className="flex items-center gap-2 text-xs text-gray-500">
+          <div className="flex flex-wrap items-center gap-2 text-xs text-gray-500">
             <span>
               Tryb: <span className="font-medium">{modeLabel}</span>
             </span>
@@ -127,9 +138,37 @@ export const SldEditor: React.FC<SldEditorProps> = ({
             >
               {SLD_MODE_LABELS_PL[sldMode]}
             </span>
+            {featureFlags.sldCadEditingEnabled && cadStatusLabel && (
+              <span
+                data-testid="sld-editor-cad-status"
+                className={`rounded px-2 py-0.5 font-medium ${
+                  cadOverridesStatus?.status === 'VALID'
+                    ? 'bg-emerald-100 text-emerald-700'
+                    : cadOverridesStatus?.status === 'STALE'
+                    ? 'bg-amber-100 text-amber-700'
+                    : 'bg-red-100 text-red-700'
+                }`}
+              >
+                {cadStatusLabel}
+              </span>
+            )}
           </div>
         </div>
         <div className="flex items-center gap-2">
+          {featureFlags.sldCadEditingEnabled && (
+            <label className="flex items-center gap-2 text-xs text-gray-600">
+              Tryb geometrii
+              <select
+                className="border border-gray-300 rounded px-2 py-1 text-xs"
+                value={geometryMode}
+                onChange={(event) => setGeometryMode(event.target.value as typeof geometryMode)}
+              >
+                <option value="AUTO">AUTO</option>
+                <option value="CAD">CAD</option>
+                <option value="HYBRID">HYBRID</option>
+              </select>
+            </label>
+          )}
           {/* PR-SLD-06: Mode toggle button */}
           <button
             type="button"

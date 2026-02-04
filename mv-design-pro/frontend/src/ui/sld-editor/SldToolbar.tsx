@@ -22,6 +22,7 @@ import { AlignDistributeCommand } from './commands/AlignDistributeCommand';
 import { CopyPasteCommand } from './commands/CopyPasteCommand';
 import { alignSymbols, distributeSymbols } from './utils/geometry';
 import type { AlignDirection, DistributeDirection } from './types';
+import { featureFlags } from '../config/featureFlags';
 
 /**
  * Toolbar button component.
@@ -78,6 +79,10 @@ export const SldToolbar: React.FC = () => {
   const isMutationBlocked = useIsMutationBlocked();
   const selectionCount = useSelectionCount();
   const gridConfig = useGridConfig();
+  const selectedConnectionId = sldStore.selectedConnectionId;
+  const selectedBendIndex = sldStore.selectedBendIndex;
+  const lastConnectionClickPosition = sldStore.lastConnectionClickPosition;
+  const selectedConnectionPath = sldStore.selectedConnectionPath;
 
   const hasSelection = selectionCount > 0;
   const canAlign = selectionCount > 1 && !isMutationBlocked;
@@ -85,6 +90,11 @@ export const SldToolbar: React.FC = () => {
   const canCopy = hasSelection;
   const canPaste = sldStore.clipboard !== null && !isMutationBlocked;
   const canDuplicate = hasSelection && !isMutationBlocked;
+  const canEditCadGeometry = featureFlags.sldCadEditingEnabled && sldStore.geometryMode !== 'AUTO' && !isMutationBlocked;
+  const canEditBends = canEditCadGeometry && selectedConnectionId !== null;
+  const canRemoveBend = canEditBends && selectedBendIndex !== null;
+  const canResetElement = canEditCadGeometry && (hasSelection || selectedConnectionId !== null);
+  const canResetAll = canEditCadGeometry && sldStore.cadOverridesDocument !== null;
 
   // ===== ALIGN HANDLERS =====
 
@@ -215,6 +225,40 @@ export const SldToolbar: React.FC = () => {
     sldStore.toggleSnapEnabled();
   }, [sldStore]);
 
+  const handleAddBend = useCallback(() => {
+    if (!selectedConnectionId) return;
+
+    let position = lastConnectionClickPosition ?? null;
+    if (!position && selectedConnectionPath && selectedConnectionPath.length >= 2) {
+      const start = selectedConnectionPath[0];
+      const end = selectedConnectionPath[selectedConnectionPath.length - 1];
+      position = { x: (start.x + end.x) / 2, y: (start.y + end.y) / 2 };
+    }
+
+    if (!position) return;
+    sldStore.addCadEdgeBend(selectedConnectionId, position, selectedConnectionPath);
+  }, [selectedConnectionId, lastConnectionClickPosition, selectedConnectionPath, sldStore]);
+
+  const handleRemoveBend = useCallback(() => {
+    if (!selectedConnectionId || selectedBendIndex === null) return;
+    sldStore.removeCadEdgeBend(selectedConnectionId, selectedBendIndex);
+  }, [selectedConnectionId, selectedBendIndex, sldStore]);
+
+  const handleResetElement = useCallback(() => {
+    if (selectedConnectionId) {
+      sldStore.resetCadOverrideForEdge(selectedConnectionId);
+    }
+    if (hasSelection) {
+      sldStore.selectedIds.forEach((symbolId) => {
+        sldStore.resetCadOverrideForNode(symbolId);
+      });
+    }
+  }, [selectedConnectionId, hasSelection, sldStore]);
+
+  const handleResetAll = useCallback(() => {
+    sldStore.resetAllCadOverrides();
+  }, [sldStore]);
+
   return (
     <div className="flex items-center gap-2 px-4 py-2 bg-gray-50 border-b border-gray-300">
       {/* Selection count */}
@@ -331,6 +375,40 @@ export const SldToolbar: React.FC = () => {
           active={gridConfig.snapEnabled}
         />
       </div>
+
+      {/* CAD */}
+      {featureFlags.sldCadEditingEnabled && (
+        <>
+          <ToolbarDivider />
+          <div className="flex items-center gap-1">
+            <span className="text-xs text-gray-500 mr-1">CAD:</span>
+            <ToolbarButton
+              label="Dodaj punkt"
+              title="Dodaj punkt łamania (kliknij krawędź, potem dodaj punkt)"
+              onClick={handleAddBend}
+              disabled={!canEditBends}
+            />
+            <ToolbarButton
+              label="Usuń punkt"
+              title="Usuń zaznaczony punkt łamania"
+              onClick={handleRemoveBend}
+              disabled={!canRemoveBend}
+            />
+            <ToolbarButton
+              label="Reset elementu"
+              title="Usuń nadpisanie CAD dla zaznaczonego elementu"
+              onClick={handleResetElement}
+              disabled={!canResetElement}
+            />
+            <ToolbarButton
+              label="Reset wszystko"
+              title="Wyczyść wszystkie nadpisania CAD"
+              onClick={handleResetAll}
+              disabled={!canResetAll}
+            />
+          </div>
+        </>
+      )}
 
       {/* Mode warning */}
       {isMutationBlocked && (
