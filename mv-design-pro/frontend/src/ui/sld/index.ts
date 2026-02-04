@@ -88,6 +88,10 @@ export type { LegendPanelProps } from './LegendPanel';
 export { SldEmptyOverlay } from './SldEmptyOverlay';
 export type { SldEmptyOverlayProps, SldEmptyState } from './SldEmptyOverlay';
 
+// Diagnostics panel (ETAP-grade topology diagnostics)
+export { SldDiagnosticsPanel } from './SldDiagnosticsPanel';
+export type { SldDiagnosticsPanelProps } from './SldDiagnosticsPanel';
+
 // Scale utilities
 export {
   calculateOverlayRanges,
@@ -128,6 +132,7 @@ export {
   ETAP_CALLOUT,
   ETAP_CALLOUT_ANCHORS,
   ETAP_SYMBOL_SIZES,
+  ETAP_CANVAS,
   ETAP_GRID,
   getEtapVoltageColor,
   getEtapStrokeColor,

@@ -268,21 +268,21 @@ export function SldInspectorPanel({ className = '', onClose }: SldInspectorPanel
 
   return (
     <div
-      className={`flex flex-col h-full bg-white border-l border-slate-200 ${className}`}
+      className={`flex flex-col h-full bg-white border-l border-slate-300 shadow-lg ${className}`}
       style={{ width: `${INSPECTOR_WIDTH}px`, minWidth: `${INSPECTOR_WIDTH}px` }}
       data-testid="sld-inspector-panel"
       data-selection-id={getSelectionId()}
       data-selection-type={selection.type}
       data-sld-mode={mode}
     >
-      {/* Nagłówek */}
-      <div className="flex items-center justify-between border-b border-slate-200 bg-slate-50 px-4 py-3 flex-shrink-0">
+      {/* Nagłówek — ETAP-grade dark header */}
+      <div className="flex items-center justify-between bg-slate-800 px-4 py-3 flex-shrink-0">
         <div className="min-w-0 flex-1">
-          <p className="text-[10px] font-medium uppercase tracking-wide text-slate-400">
+          <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">
             Inspektor
           </p>
           <h3
-            className="text-sm font-semibold text-slate-800 truncate"
+            className="text-sm font-semibold text-slate-100 truncate"
             data-testid="inspector-title"
             title={getTitle()}
           >
@@ -292,7 +292,7 @@ export function SldInspectorPanel({ className = '', onClose }: SldInspectorPanel
         <button
           type="button"
           onClick={handleClose}
-          className="ml-2 rounded p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors flex-shrink-0"
+          className="ml-2 rounded p-1.5 text-slate-400 hover:bg-slate-700 hover:text-slate-200 transition-colors flex-shrink-0"
           aria-label="Zamknij inspektor"
           data-testid="inspector-close-button"
         >
@@ -302,18 +302,18 @@ export function SldInspectorPanel({ className = '', onClose }: SldInspectorPanel
         </button>
       </div>
 
-      {/* Znacznik trybu read-only */}
-      <div className="border-b border-slate-100 bg-green-50 px-4 py-2 flex-shrink-0">
+      {/* Znacznik trybu read-only — ETAP-grade subtle */}
+      <div className="border-b border-slate-200 bg-slate-50 px-4 py-2 flex-shrink-0">
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2 text-xs text-green-700">
-            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <div className="flex items-center gap-2 text-xs text-slate-600">
+            <svg className="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
             </svg>
-            <span>Tylko do odczytu</span>
+            <span className="font-medium">Tylko do odczytu</span>
           </div>
           <span
-            className={`text-[10px] px-1.5 py-0.5 rounded ${
-              isResultsMode ? 'bg-slate-700 text-white' : 'bg-slate-200 text-slate-600'
+            className={`text-[10px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded ${
+              isResultsMode ? 'bg-blue-600 text-white' : 'bg-slate-600 text-slate-100'
             }`}
             data-testid="inspector-mode-badge"
           >
@@ -335,15 +335,16 @@ export function SldInspectorPanel({ className = '', onClose }: SldInspectorPanel
         )}
       </div>
 
-      {/* Stopka (opcjonalna informacja o trybie) */}
+      {/* Stopka — ETAP-grade professional */}
       {selection.type !== 'none' && (
-        <div className="border-t border-slate-200 bg-slate-50 px-4 py-2 text-[10px] text-slate-500 flex-shrink-0">
+        <div className="border-t border-slate-200 bg-slate-100 px-4 py-2 text-[10px] text-slate-500 flex-shrink-0">
           <div className="flex items-center justify-between">
-            <span>
-              Tryb: {SLD_MODE_LABELS_PL[mode]}
-            </span>
-            <span>
+            <span className="flex items-center gap-1.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-slate-400" />
               {sections.reduce((acc, s) => acc + s.fields.length, 0)} właściwości
+            </span>
+            <span className="font-mono text-slate-400">
+              v1.0
             </span>
           </div>
         </div>

@@ -693,9 +693,9 @@ describe('SldInspectorPanel - Styling', () => {
     const { container } = render(<SldInspectorPanel />);
     const html = container.innerHTML;
 
-    // Should contain slate/gray colors
+    // Should contain slate/gray colors (ETAP-grade professional)
     expect(html).toContain('slate');
-    // Green is used for read-only badge, that's OK
-    expect(html).toContain('green');
+    // No alarm colors (red/green) should appear in normal state
+    // Read-only badge now uses slate instead of green
   });
 });

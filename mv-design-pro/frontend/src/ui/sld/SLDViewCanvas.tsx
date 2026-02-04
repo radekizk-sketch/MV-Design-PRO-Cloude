@@ -38,7 +38,7 @@ import { ConnectionsLayer } from './ConnectionRenderer';
 import { generateConnections } from '../sld-editor/utils/connectionRouting';
 import { useAutoLayout } from '../sld-editor/hooks/useAutoLayout';
 import { UnifiedSymbolRenderer, type SymbolVisualState, type SymbolInteractionHandlers } from './symbols';
-import { ETAP_GRID, ETAP_TYPOGRAPHY } from './sldEtapStyle';
+import { ETAP_GRID, ETAP_TYPOGRAPHY, ETAP_CANVAS } from './sldEtapStyle';
 
 /**
  * Read-only symbol renderer using UnifiedSymbolRenderer.
@@ -91,6 +91,7 @@ const Symbol: React.FC<SymbolProps> = ({ symbol, selected, onClick, energized })
 /**
  * Grid background for canvas.
  * ETAP style: subdued, not dominant. Major grid every N cells.
+ * Technical drawing paper aesthetic — warm, professional.
  */
 interface GridProps {
   width: number;
@@ -116,7 +117,9 @@ const Grid: React.FC<GridProps> = ({ width, height, gridSize, viewport }) => {
   for (let x = startX; x <= endX; x += scaledGridSize) {
     const screenX = x + viewport.offsetX;
     if (screenX >= 0 && screenX <= width) {
-      const isMajor = getMajorIndex(x) % ETAP_GRID.majorEvery === 0;
+      const gridIndex = getMajorIndex(x);
+      const isMajor = gridIndex % ETAP_GRID.majorEvery === 0;
+      const isAxis = gridIndex === 0;
       lines.push(
         <line
           key={`v-${x}`}
@@ -124,8 +127,9 @@ const Grid: React.FC<GridProps> = ({ width, height, gridSize, viewport }) => {
           y1={0}
           x2={screenX}
           y2={height}
-          stroke={isMajor ? ETAP_GRID.majorColor : ETAP_GRID.minorColor}
-          strokeWidth={isMajor ? ETAP_GRID.majorStrokeWidth : ETAP_GRID.minorStrokeWidth}
+          stroke={isAxis ? ETAP_GRID.axisColor : isMajor ? ETAP_GRID.majorColor : ETAP_GRID.minorColor}
+          strokeWidth={isAxis ? ETAP_GRID.axisStrokeWidth : isMajor ? ETAP_GRID.majorStrokeWidth : ETAP_GRID.minorStrokeWidth}
+          opacity={ETAP_GRID.opacity}
         />
       );
     }
@@ -135,7 +139,9 @@ const Grid: React.FC<GridProps> = ({ width, height, gridSize, viewport }) => {
   for (let y = startY; y <= endY; y += scaledGridSize) {
     const screenY = y + viewport.offsetY;
     if (screenY >= 0 && screenY <= height) {
-      const isMajor = getMajorIndex(y) % ETAP_GRID.majorEvery === 0;
+      const gridIndex = getMajorIndex(y);
+      const isMajor = gridIndex % ETAP_GRID.majorEvery === 0;
+      const isAxis = gridIndex === 0;
       lines.push(
         <line
           key={`h-${y}`}
@@ -143,8 +149,9 @@ const Grid: React.FC<GridProps> = ({ width, height, gridSize, viewport }) => {
           y1={screenY}
           x2={width}
           y2={screenY}
-          stroke={isMajor ? ETAP_GRID.majorColor : ETAP_GRID.minorColor}
-          strokeWidth={isMajor ? ETAP_GRID.majorStrokeWidth : ETAP_GRID.minorStrokeWidth}
+          stroke={isAxis ? ETAP_GRID.axisColor : isMajor ? ETAP_GRID.majorColor : ETAP_GRID.minorColor}
+          strokeWidth={isAxis ? ETAP_GRID.axisStrokeWidth : isMajor ? ETAP_GRID.majorStrokeWidth : ETAP_GRID.minorStrokeWidth}
+          opacity={ETAP_GRID.opacity}
         />
       );
     }
@@ -206,9 +213,31 @@ export const SLDViewCanvas: React.FC<SLDViewCanvasProps> = ({
       data-testid="sld-view-canvas"
       width={width}
       height={height}
-      className="bg-white"
       style={{ display: 'block' }}
     >
+      {/* Defs for gradients and patterns */}
+      <defs>
+        {/* ETAP-style canvas background gradient (technical drawing paper) */}
+        <linearGradient id="etap-canvas-bg" x1="0%" y1="0%" x2="0%" y2="100%">
+          <stop offset="0%" stopColor={ETAP_CANVAS.gradientStart} />
+          <stop offset="100%" stopColor={ETAP_CANVAS.gradientEnd} />
+        </linearGradient>
+        {/* Subtle inner shadow for depth */}
+        <filter id="etap-canvas-shadow" x="-5%" y="-5%" width="110%" height="110%">
+          <feDropShadow dx="0" dy="1" stdDeviation="1" floodColor={ETAP_CANVAS.shadowColor} floodOpacity="1" />
+        </filter>
+      </defs>
+
+      {/* Canvas background — ETAP technical drawing paper */}
+      <rect
+        x={0}
+        y={0}
+        width={width}
+        height={height}
+        fill="url(#etap-canvas-bg)"
+        data-testid="sld-canvas-background"
+      />
+
       {/* Grid background — ETAP subdued grid */}
       {showGrid && <Grid width={width} height={height} gridSize={ETAP_GRID.size} viewport={viewport} />}
 

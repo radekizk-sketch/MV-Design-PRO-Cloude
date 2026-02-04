@@ -507,77 +507,91 @@ export const SLDView: React.FC<SLDViewProps> = ({
   return (
     <div
       data-testid="sld-view"
-      className="flex flex-col h-full bg-gray-50"
+      className="flex flex-col h-full bg-stone-100"
     >
-      {/* Toolbar */}
+      {/* Toolbar — ETAP-grade professional */}
       <div
         data-testid="sld-view-toolbar"
-        className="flex items-center justify-between px-4 py-2 bg-white border-b border-gray-200"
+        className="flex items-center justify-between px-4 py-2.5 bg-slate-800 border-b border-slate-700"
       >
-        <div className="flex items-center gap-2">
-          <h3 className="text-sm font-medium text-gray-700">Schemat jednokreskowy</h3>
-          <span className="text-xs text-gray-500">
-            (tylko podglad)
+        <div className="flex items-center gap-3">
+          {/* Logo/Icon */}
+          <div className="flex items-center gap-2">
+            <svg className="w-5 h-5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6A2.25 2.25 0 016 3.75h2.25A2.25 2.25 0 0110.5 6v2.25a2.25 2.25 0 01-2.25 2.25H6a2.25 2.25 0 01-2.25-2.25V6zM3.75 15.75A2.25 2.25 0 016 13.5h2.25a2.25 2.25 0 012.25 2.25V18a2.25 2.25 0 01-2.25 2.25H6A2.25 2.25 0 013.75 18v-2.25zM13.5 6a2.25 2.25 0 012.25-2.25H18A2.25 2.25 0 0120.25 6v2.25A2.25 2.25 0 0118 10.5h-2.25a2.25 2.25 0 01-2.25-2.25V6zM13.5 15.75a2.25 2.25 0 012.25-2.25H18a2.25 2.25 0 012.25 2.25V18A2.25 2.25 0 0118 20.25h-2.25A2.25 2.25 0 0113.5 18v-2.25z" />
+            </svg>
+            <h3 className="text-sm font-semibold text-slate-100 tracking-wide">Schemat jednokreskowy</h3>
+          </div>
+          <span className="text-xs text-slate-400 font-medium">
+            SLD
           </span>
           {/* PR-SLD-06: Mode indicator */}
           <span
             data-testid="sld-mode-indicator"
-            className={`ml-2 rounded px-2 py-0.5 text-xs font-medium ${
+            className={`rounded px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wider ${
               isResultsMode
-                ? 'bg-gray-800 text-white'
-                : 'bg-gray-200 text-gray-700'
+                ? 'bg-blue-600 text-white'
+                : isProtectionMode
+                ? 'bg-emerald-600 text-white'
+                : 'bg-slate-600 text-slate-200'
             }`}
           >
             {SLD_MODE_LABELS_PL[sldMode]}
           </span>
         </div>
 
-        <div className="flex items-center gap-2">
-          {/* Zoom controls */}
-          <button
-            type="button"
-            onClick={handleZoomOut}
-            disabled={viewport.zoom <= ZOOM_MIN}
-            className="px-2 py-1 text-sm bg-gray-100 hover:bg-gray-200 rounded disabled:opacity-50 disabled:cursor-not-allowed"
-            title="Pomniejsz"
-            data-testid="sld-zoom-out"
-          >
-            -
-          </button>
-          <span
-            className="text-xs text-gray-600 w-12 text-center"
-            data-testid="sld-zoom-level"
-          >
-            {zoomPercent}%
-          </span>
-          <button
-            type="button"
-            onClick={handleZoomIn}
-            disabled={viewport.zoom >= ZOOM_MAX}
-            className="px-2 py-1 text-sm bg-gray-100 hover:bg-gray-200 rounded disabled:opacity-50 disabled:cursor-not-allowed"
-            title="Powieksz"
-            data-testid="sld-zoom-in"
-          >
-            +
-          </button>
+        <div className="flex items-center gap-1.5">
+          {/* Zoom controls — ETAP-grade */}
+          <div className="flex items-center bg-slate-700 rounded overflow-hidden">
+            <button
+              type="button"
+              onClick={handleZoomOut}
+              disabled={viewport.zoom <= ZOOM_MIN}
+              className="px-2.5 py-1.5 text-sm text-slate-200 hover:bg-slate-600 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+              title="Pomniejsz"
+              data-testid="sld-zoom-out"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M20 12H4" />
+              </svg>
+            </button>
+            <span
+              className="text-xs text-slate-100 w-12 text-center font-mono bg-slate-600 py-1.5"
+              data-testid="sld-zoom-level"
+            >
+              {zoomPercent}%
+            </span>
+            <button
+              type="button"
+              onClick={handleZoomIn}
+              disabled={viewport.zoom >= ZOOM_MAX}
+              className="px-2.5 py-1.5 text-sm text-slate-200 hover:bg-slate-600 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+              title="Powiększ"
+              data-testid="sld-zoom-in"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+              </svg>
+            </button>
+          </div>
 
-          <div className="w-px h-4 bg-gray-300 mx-1" />
+          <div className="w-px h-5 bg-slate-600 mx-1" />
 
-          {/* Fit & Reset */}
+          {/* Fit & Reset — ETAP-grade buttons */}
           <button
             type="button"
             onClick={handleFitToContent}
-            className="px-2 py-1 text-xs bg-gray-100 hover:bg-gray-200 rounded"
-            title="Dopasuj do schematu"
+            className="px-3 py-1.5 text-xs font-medium text-slate-200 bg-slate-700 hover:bg-slate-600 rounded transition-colors"
+            title="Dopasuj do schematu (F)"
             aria-label="Dopasuj do schematu"
             data-testid="sld-fit-content"
           >
-            Dopasuj do schematu
+            Dopasuj
           </button>
           <button
             type="button"
             onClick={handleResetView}
-            className="px-2 py-1 text-xs bg-gray-100 hover:bg-gray-200 rounded"
+            className="px-3 py-1.5 text-xs font-medium text-slate-300 hover:text-slate-100 hover:bg-slate-700 rounded transition-colors"
             title="Resetuj widok"
             data-testid="sld-reset-view"
           >
@@ -587,19 +601,19 @@ export const SLDView: React.FC<SLDViewProps> = ({
           {/* Results overlay toggle */}
           {hasResults && (
             <>
-              <div className="w-px h-4 bg-gray-300 mx-1" />
+              <div className="w-px h-5 bg-slate-600 mx-1" />
               <button
                 type="button"
                 onClick={() => toggleOverlay()}
-                className={`px-2 py-1 text-xs rounded ${
+                className={`px-3 py-1.5 text-xs font-medium rounded transition-colors ${
                   overlayVisible
-                    ? 'bg-blue-100 text-blue-700 hover:bg-blue-200'
-                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                    ? 'bg-blue-600 text-white'
+                    : 'text-slate-300 hover:text-slate-100 hover:bg-slate-700'
                 }`}
-                title={overlayVisible ? 'Ukryj nakladke wynikow' : 'Pokaz nakladke wynikow'}
+                title={overlayVisible ? 'Ukryj nakładkę wyników' : 'Pokaż nakładkę wyników'}
                 data-testid="sld-overlay-toggle"
               >
-                {overlayVisible ? 'Nakladka: Wl.' : 'Nakladka: Wyl.'}
+                Wyniki
               </button>
             </>
           )}
@@ -607,19 +621,19 @@ export const SLDView: React.FC<SLDViewProps> = ({
           {/* Diagnostics overlay toggle and filter */}
           {hasDiagnostics && (
             <>
-              <div className="w-px h-4 bg-gray-300 mx-1" />
+              <div className="w-px h-5 bg-slate-600 mx-1" />
               <button
                 type="button"
                 onClick={() => toggleDiagnostics()}
-                className={`px-2 py-1 text-xs rounded ${
+                className={`px-3 py-1.5 text-xs font-medium rounded transition-colors ${
                   diagnosticsVisible
-                    ? 'bg-rose-100 text-rose-700 hover:bg-rose-200'
-                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                    ? 'bg-rose-600 text-white'
+                    : 'text-slate-300 hover:text-slate-100 hover:bg-slate-700'
                 }`}
-                title={diagnosticsVisible ? 'Ukryj diagnostyke' : 'Pokaz diagnostyke'}
+                title={diagnosticsVisible ? 'Ukryj diagnostykę' : 'Pokaż diagnostykę'}
                 data-testid="sld-diagnostics-toggle"
               >
-                {diagnosticsVisible ? 'Diagnostyka: Wl.' : 'Diagnostyka: Wyl.'}
+                Diagnostyka
               </button>
 
               {/* Severity filter (visible only when diagnostics visible) */}
@@ -627,8 +641,8 @@ export const SLDView: React.FC<SLDViewProps> = ({
                 <select
                   value={diagnosticsFilter}
                   onChange={handleFilterChange}
-                  className="px-2 py-1 text-xs rounded border border-gray-300 bg-white hover:border-gray-400 focus:outline-none focus:ring-1 focus:ring-rose-500"
-                  title="Filtr severity"
+                  className="px-2 py-1.5 text-xs rounded bg-slate-700 text-slate-200 border border-slate-600 hover:border-slate-500 focus:outline-none focus:ring-1 focus:ring-rose-500"
+                  title="Filtr"
                   data-testid="sld-diagnostics-filter"
                 >
                   {Object.entries(SEVERITY_FILTER_LABELS_PL).map(([value, label]) => (
@@ -641,16 +655,16 @@ export const SLDView: React.FC<SLDViewProps> = ({
             </>
           )}
 
-          {/* PR-SLD-06, PR-SLD-09: Mode selector */}
-          <div className="w-px h-4 bg-gray-300 mx-1" />
-          <div className="flex items-center rounded border border-gray-300 overflow-hidden" data-testid="sld-mode-selector">
+          {/* PR-SLD-06, PR-SLD-09: Mode selector — ETAP-grade tab bar */}
+          <div className="w-px h-5 bg-slate-600 mx-2" />
+          <div className="flex items-center bg-slate-700 rounded overflow-hidden" data-testid="sld-mode-selector">
             <button
               type="button"
               onClick={() => handleModeChange('EDYCJA')}
-              className={`px-2 py-1 text-xs ${
+              className={`px-3 py-1.5 text-xs font-medium transition-colors ${
                 sldMode === 'EDYCJA'
-                  ? 'bg-gray-700 text-white'
-                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                  ? 'bg-slate-500 text-white'
+                  : 'text-slate-300 hover:bg-slate-600 hover:text-slate-100'
               }`}
               title="Tryb Edycja"
               data-testid="sld-mode-edit"
@@ -660,10 +674,10 @@ export const SLDView: React.FC<SLDViewProps> = ({
             <button
               type="button"
               onClick={() => handleModeChange('WYNIKI')}
-              className={`px-2 py-1 text-xs border-l border-gray-300 ${
+              className={`px-3 py-1.5 text-xs font-medium transition-colors ${
                 sldMode === 'WYNIKI'
-                  ? 'bg-gray-700 text-white'
-                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                  ? 'bg-blue-600 text-white'
+                  : 'text-slate-300 hover:bg-slate-600 hover:text-slate-100'
               }`}
               title="Tryb Wyniki"
               data-testid="sld-mode-results"
@@ -674,10 +688,10 @@ export const SLDView: React.FC<SLDViewProps> = ({
               <button
                 type="button"
                 onClick={() => handleModeChange('ZABEZPIECZENIA')}
-                className={`px-2 py-1 text-xs border-l border-gray-300 ${
+                className={`px-3 py-1.5 text-xs font-medium transition-colors ${
                   sldMode === 'ZABEZPIECZENIA'
-                    ? 'bg-emerald-700 text-white'
-                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                    ? 'bg-emerald-600 text-white'
+                    : 'text-slate-300 hover:bg-slate-600 hover:text-slate-100'
                 }`}
                 title="Tryb Zabezpieczenia"
                 data-testid="sld-mode-protection"
@@ -692,15 +706,15 @@ export const SLDView: React.FC<SLDViewProps> = ({
             <button
               type="button"
               onClick={handleDiagnosticLayerToggle}
-              className={`px-2 py-1 text-xs rounded ${
+              className={`px-3 py-1.5 text-xs font-medium rounded transition-colors ${
                 diagnosticLayerVisible
-                  ? 'bg-gray-700 text-white hover:bg-gray-600'
-                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                  ? 'bg-blue-500 text-white'
+                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700'
               }`}
-              title={diagnosticLayerVisible ? 'Ukryj warstwe diagnostyczna' : 'Pokaz warstwe diagnostyczna'}
+              title={diagnosticLayerVisible ? 'Ukryj warstwę diagnostyczną' : 'Pokaż warstwę diagnostyczną'}
               data-testid="sld-diagnostic-layer-toggle"
             >
-              {diagnosticLayerVisible ? 'Warstwa: Wl.' : 'Warstwa: Wyl.'}
+              Warstwa
             </button>
           )}
 
@@ -709,28 +723,30 @@ export const SLDView: React.FC<SLDViewProps> = ({
             <button
               type="button"
               onClick={handleProtectionLayerToggle}
-              className={`px-2 py-1 text-xs rounded ${
+              className={`px-3 py-1.5 text-xs font-medium rounded transition-colors ${
                 protectionLayerVisible
-                  ? 'bg-emerald-700 text-white hover:bg-emerald-600'
-                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                  ? 'bg-emerald-500 text-white'
+                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700'
               }`}
-              title={protectionLayerVisible ? 'Ukryj warstwe zabezpieczen' : 'Pokaz warstwe zabezpieczen'}
+              title={protectionLayerVisible ? 'Ukryj warstwę zabezpieczeń' : 'Pokaż warstwę zabezpieczeń'}
               data-testid="sld-protection-layer-toggle"
             >
-              {protectionLayerVisible ? 'Nastawy: Wl.' : 'Nastawy: Wyl.'}
+              Nastawy
             </button>
           )}
 
           {/* Export button */}
-          <div className="w-px h-4 bg-gray-300 mx-1" />
+          <div className="w-px h-5 bg-slate-600 mx-1" />
           <button
             type="button"
             onClick={handleExportClick}
-            className="px-2 py-1 text-xs bg-gray-100 hover:bg-gray-200 rounded"
+            className="px-3 py-1.5 text-xs font-medium text-slate-300 hover:text-slate-100 hover:bg-slate-700 rounded transition-colors"
             title="Eksportuj schemat"
             data-testid="sld-export-btn"
           >
-            Eksportuj
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
+            </svg>
           </button>
         </div>
       </div>
@@ -764,7 +780,7 @@ export const SLDView: React.FC<SLDViewProps> = ({
           selectedElementId={selectedElement?.id}
         />
 
-        {/* Focus indicator (for jump-to-element visual feedback) */}
+        {/* Focus indicator (for jump-to-element visual feedback) — ETAP-grade */}
         {focusIndicatorPosition && (
           <div
             data-testid={`sld-focus-${focusIndicatorPosition.elementId}`}
@@ -776,13 +792,15 @@ export const SLDView: React.FC<SLDViewProps> = ({
             }}
             onAnimationEnd={handleFocusPulseAnimationEnd}
           >
-            {/* Pulsing ring - animation clears state on end */}
+            {/* Professional pulsing ring — subtle, not distracting */}
             <div
-              className="w-16 h-16 rounded-full border-4 border-blue-500 animate-ping opacity-75"
-              style={{ animationIterationCount: 2 }}
+              className="w-20 h-20 rounded-full border-2 border-blue-400 animate-ping opacity-60"
+              style={{ animationIterationCount: 2, animationDuration: '1.5s' }}
               onAnimationEnd={handleFocusPulseAnimationEnd}
             />
-            <div className="absolute inset-0 w-16 h-16 rounded-full border-2 border-blue-400" />
+            <div className="absolute inset-0 w-20 h-20 rounded-full border border-blue-300 opacity-40" />
+            {/* Center dot */}
+            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-2 h-2 rounded-full bg-blue-500" />
           </div>
         )}
 
@@ -803,19 +821,22 @@ export const SLDView: React.FC<SLDViewProps> = ({
         {/* Switching state & energization legend (toggled via button) */}
         <SwitchingStateLegend visible={legendVisible} />
 
-        {/* Legend toggle button (bottom-left corner) */}
+        {/* Legend toggle button (bottom-left corner) — ETAP-grade */}
         <button
           type="button"
           onClick={() => setLegendVisible((prev) => !prev)}
-          className={`absolute bottom-3 left-3 z-10 px-3 py-1.5 text-xs font-medium rounded shadow-sm transition-colors ${
+          className={`absolute bottom-4 left-4 z-10 flex items-center gap-1.5 px-3 py-2 text-xs font-medium rounded-lg shadow-md transition-all duration-150 ${
             legendVisible
-              ? 'bg-blue-600 text-white hover:bg-blue-700'
-              : 'bg-white border border-gray-300 text-gray-700 hover:bg-gray-50'
+              ? 'bg-slate-800 text-white hover:bg-slate-700'
+              : 'bg-white/95 backdrop-blur-sm border border-slate-300 text-slate-700 hover:bg-white hover:border-slate-400'
           }`}
-          title={legendVisible ? 'Ukryj legende' : 'Pokaz legende'}
+          title={legendVisible ? 'Ukryj legendę' : 'Pokaż legendę'}
           data-testid="sld-legend-toggle"
         >
-          {legendVisible ? 'Ukryj legende' : 'Legenda'}
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 6.75h12M8.25 12h12m-12 5.25h12M3.75 6.75h.007v.008H3.75V6.75zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zM3.75 12h.007v.008H3.75V12zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm-.375 5.25h.007v.008H3.75v-.008zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z" />
+          </svg>
+          {legendVisible ? 'Ukryj legendę' : 'Legenda'}
         </button>
 
         {/* PR-SLD-06: Diagnostic results layer (only in WYNIKI mode) */}
@@ -839,31 +860,44 @@ export const SLDView: React.FC<SLDViewProps> = ({
         )}
       </div>
 
-      {/* Status bar */}
+      {/* Status bar — ETAP-grade professional */}
       <div
         data-testid="sld-view-status"
-        className="flex items-center justify-between px-4 py-1 bg-white border-t border-gray-200 text-xs text-gray-500"
+        className="flex items-center justify-between px-4 py-1.5 bg-slate-800 border-t border-slate-700 text-xs"
       >
-        <div>
-          Elementow: {symbols.length}
+        <div className="flex items-center gap-4 text-slate-300">
+          <span className="flex items-center gap-1.5">
+            <svg className="w-3.5 h-3.5 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6A2.25 2.25 0 016 3.75h2.25A2.25 2.25 0 0110.5 6v2.25a2.25 2.25 0 01-2.25 2.25H6a2.25 2.25 0 01-2.25-2.25V6z" />
+            </svg>
+            <span className="font-mono">{symbols.length}</span> elementów
+          </span>
           {selectedElement && (
-            <span className="ml-4">
-              Zaznaczono: <span className="font-medium text-gray-700">{selectedElement.name}</span>
-              {' '}({selectedElement.type})
+            <span className="flex items-center gap-1.5 border-l border-slate-600 pl-4">
+              <svg className="w-3.5 h-3.5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M15 15l-2 5L9 9l11 4-5 2z" />
+              </svg>
+              <span className="font-medium text-slate-100">{selectedElement.name}</span>
+              <span className="text-slate-500">({selectedElement.type})</span>
             </span>
           )}
         </div>
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-4 text-slate-400">
           {/* PR-SLD-06, PR-SLD-09: Mode status in status bar */}
           {isReadOnlyMode && (
             <span
               data-testid={isResultsMode ? 'sld-status-results-mode' : 'sld-status-protection-mode'}
-              className="font-medium text-gray-700"
+              className={`flex items-center gap-1.5 font-medium ${isResultsMode ? 'text-blue-400' : 'text-emerald-400'}`}
             >
-              {isResultsMode ? 'Tryb WYNIKI (tylko odczyt)' : 'Tryb ZABEZPIECZENIA (tylko odczyt)'}
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
+              </svg>
+              {isResultsMode ? 'Tylko odczyt' : 'Tylko odczyt'}
             </span>
           )}
-          <span>Przeciagaj srodkowym/prawym przyciskiem myszy | Scroll: zoom</span>
+          <span className="text-slate-500">
+            Środkowy/prawy przycisk myszy: przesuwanie • Scroll: powiększanie • F: dopasuj
+          </span>
         </div>
       </div>
 
