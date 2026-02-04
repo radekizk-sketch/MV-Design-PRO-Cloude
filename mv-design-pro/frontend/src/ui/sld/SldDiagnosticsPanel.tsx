@@ -24,7 +24,6 @@ import {
   type SanityCheckSeverity,
   SEVERITY_LABELS_PL,
   SEVERITY_COLORS,
-  SEVERITY_ORDER,
   SEVERITY_FILTER_LABELS_PL,
   SANITY_CHECK_CODE_LABELS_PL,
   matchesSeverityFilter,
@@ -206,7 +205,7 @@ interface DiagnosticsStatsProps {
   totalCount: number;
 }
 
-function DiagnosticsStats({ errorCount, warnCount, infoCount, totalCount }: DiagnosticsStatsProps) {
+function DiagnosticsStats({ errorCount, warnCount, infoCount, totalCount: _totalCount }: DiagnosticsStatsProps) {
   return (
     <div className="flex items-center gap-4 px-3 py-2 bg-white border-b border-slate-200">
       <div className="flex items-center gap-1.5">

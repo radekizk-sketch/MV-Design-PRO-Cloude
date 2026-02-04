@@ -66,6 +66,8 @@ export interface AutoLayoutConfig {
   direction: 'top-down' | 'left-right';
   /** Padding od krawędzi (px) */
   padding: number;
+  /** Środek canvasa (px) - używany jako fallback dla spine X */
+  canvasCenter: { x: number; y: number };
 }
 
 /** Domyślna konfiguracja — ETAP-GRADE LAYOUT (uses ETAP_GEOMETRY tokens) */
@@ -78,6 +80,7 @@ export const DEFAULT_LAYOUT_CONFIG: AutoLayoutConfig = {
   symbolHeight: 40,
   direction: 'top-down',
   padding: ETAP_GEOMETRY.layout.padding,
+  canvasCenter: { x: 500, y: 400 },
 };
 
 /** Konfiguracja clearances dla czytelności SLD (łatwa do korekty). */
@@ -390,14 +393,6 @@ function assignCanonicalLayer(
   return 'L4_SN_BAY';
 }
 
-/**
- * Get Y offset for a canonical layer.
- */
-function getCanonicalLayerY(layerName: CanonicalLayerName, baseY: number): number {
-  const layer = ETAP_GEOMETRY.canonicalLayers[layerName];
-  return baseY + layer.yOffset;
-}
-
 // =============================================================================
 // PR-SLD-ETAP-TOPOLOGY-LAYOUT-FINAL: STATION STACK IDENTIFICATION
 // =============================================================================
@@ -434,7 +429,7 @@ interface StationStack {
  */
 function identifyStationStacks(
   symbols: AnySldSymbol[],
-  elementToSymbol: Map<string, string>
+  _elementToSymbol: Map<string, string>
 ): StationStack[] {
   const stacks: StationStack[] = [];
 

@@ -48,8 +48,8 @@ export default defineConfig({
   },
 
   use: {
-    // Base URL for the app
-    baseURL: 'http://localhost:3000',
+    // Base URL for the app (matches vite dev server port)
+    baseURL: 'http://localhost:5173',
 
     // Action timeout (clicks, fills, etc.)
     actionTimeout: 10000,
@@ -92,7 +92,7 @@ export default defineConfig({
   // Web server configuration
   webServer: {
     command: 'npm run dev',
-    url: 'http://localhost:3000',
+    url: 'http://localhost:5173',
     reuseExistingServer: !process.env.CI,
     timeout: 120000,
     // Capture server output for debugging
