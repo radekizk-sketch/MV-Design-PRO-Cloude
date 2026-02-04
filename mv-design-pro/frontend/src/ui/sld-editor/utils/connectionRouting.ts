@@ -1,20 +1,21 @@
 /**
- * CONNECTION ROUTING — Algorytm prowadzenia polaczen ortogonalnych (ETAP-style)
+ * CONNECTION ROUTING — Algorytm prowadzenia polaczen (PLANS STYLE)
  *
  * CANONICAL ALIGNMENT:
  * - SLD_KANONICZNA_SPECYFIKACJA.md § 4: Polaczenia
  * - AUDYT_SLD_ETAP.md: N-01, N-05
+ * - Plans: proste linie pionowe na spine
  *
  * FEATURES:
  * - Deterministyczny routing (ten sam input -> ta sama sciezka)
- * - Prowadzenie ortogonalne (tylko katy 0 i 90 stopni)
- * - Unikanie przechodzenia przez symbole
+ * - PLANS STYLE: proste linie pionowe (spine layout)
+ * - L-route dla galezi bocznych
  * - Snap do siatki
  *
- * ALGORYTM:
- * 1. Wariant L (2 odcinki): najpierw pion, potem poziom
- * 2. Wariant Z (3 odcinki): jesli L koliduje
- * 3. Kanal przewodow: jesli Z koliduje
+ * ALGORYTM (PLANS STYLE):
+ * 1. Prosta linia: dla elementow na tej samej osi
+ * 2. L-route: dla galezi bocznych
+ * 3. Z-route: fallback dla kolizji
  */
 
 import type { AnySldSymbol, BranchSymbol, Position, SwitchSymbol, SourceSymbol, LoadSymbol } from '../types';
@@ -255,16 +256,16 @@ function createConnection(
 }
 
 // =============================================================================
-// ROUTING ORTOGONALNY
+// ROUTING — PLANS STYLE (PROSTE LINIE)
 // =============================================================================
 
 /**
- * Wygeneruj ortogonalna sciezke miedzy dwoma punktami.
+ * Wygeneruj sciezke miedzy dwoma punktami.
  *
- * ALGORYTM:
- * 1. Probuj wariant L (2 odcinki)
- * 2. Jesli L koliduje, probuj wariant Z (3 odcinki)
- * 3. Jesli Z koliduje, uzyj kanalu przewodow
+ * PLANS STYLE SPINE LAYOUT:
+ * - Preferuj PROSTE linie pionowe (spine)
+ * - Dla elementow na tej samej osi X: prosta linia
+ * - Dla elementow na roznych osiach: prosty L-route
  *
  * DETERMINIZM: Te same punkty -> ta sama sciezka
  */
@@ -285,40 +286,35 @@ function routeOrthogonal(
     return [snapStart];
   }
 
-  // Jesli punkty sa na tej samej linii poziomej lub pionowej, zwroc prosta linie
+  // PLANS STYLE: Preferuj PROSTE linie
+  // Jesli punkty sa na tej samej linii pionowej lub poziomej, zwroc prosta linie
   if (snapStart.x === snapEnd.x || snapStart.y === snapEnd.y) {
-    if (!pathHasCollision([snapStart, snapEnd], obstacles, config.symbolMargin)) {
-      return [snapStart, snapEnd];
-    }
+    return [snapStart, snapEnd];
   }
 
-  // Wariant L (2 odcinki)
-  const lPath = tryLRoute(snapStart, snapEnd, config.preferDirection, config.gridSize);
-  if (!pathHasCollision(lPath, obstacles, config.symbolMargin)) {
+  // PLANS STYLE: Dla elementow na roznych osiach uzyj prostego L-route
+  // Najpierw pion (preferowany dla spine layout), potem poziom
+  const lPath = tryLRoute(snapStart, snapEnd, 'vertical', config.gridSize);
+
+  // Sprawdz kolizje tylko jesli sa przeszkody
+  if (obstacles.length === 0 || !pathHasCollision(lPath, obstacles, config.symbolMargin)) {
     return lPath;
   }
 
-  // Wariant L alternatywny (przeciwny kierunek)
-  const altDirection = config.preferDirection === 'vertical' ? 'horizontal' : 'vertical';
-  const lPathAlt = tryLRoute(snapStart, snapEnd, altDirection, config.gridSize);
+  // Alternatywny L-route (najpierw poziom, potem pion)
+  const lPathAlt = tryLRoute(snapStart, snapEnd, 'horizontal', config.gridSize);
   if (!pathHasCollision(lPathAlt, obstacles, config.symbolMargin)) {
     return lPathAlt;
   }
 
-  // Wariant Z (3 odcinki)
+  // Fallback: prosty Z-route
   const zPath = tryZRoute(snapStart, snapEnd, fromPort, toPort, config);
   if (!pathHasCollision(zPath, obstacles, config.symbolMargin)) {
     return zPath;
   }
 
-  // Wariant Z alternatywny
-  const zPathAlt = tryZRouteAlternative(snapStart, snapEnd, fromPort, toPort, config);
-  if (!pathHasCollision(zPathAlt, obstacles, config.symbolMargin)) {
-    return zPathAlt;
-  }
-
-  // Fallback: kanal przewodow (zawsze deterministyczny)
-  return routeViaChannel(snapStart, snapEnd, fromPort, toPort, config);
+  // Ostateczny fallback: prosta linia (ignoruj kolizje dla czytelnosci)
+  return [snapStart, snapEnd];
 }
 
 /**

@@ -101,3 +101,15 @@ export {
   formatIkssRange,
 } from './scale';
 export type { ValueRange, OverlayRanges } from './scale';
+
+// Voltage colors (PLANS STYLE)
+export {
+  VOLTAGE_COLORS,
+  DEFAULT_VOLTAGE_COLOR,
+  DEENERGIZED_COLOR,
+  SELECTED_COLOR,
+  getVoltageColor,
+  getVoltageColorWithState,
+  getVoltageLevel,
+  getVoltageLevelLabel,
+} from './voltageColors';
