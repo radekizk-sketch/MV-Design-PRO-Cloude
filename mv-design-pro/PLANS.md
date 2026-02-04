@@ -588,6 +588,7 @@ class NetworkGraph:
 | 2025-03 | 2.8 | P6: Power Flow solver relocated to solver layer (PowerFactory boundary compliance) |
 | 2025-03 | 2.9 | Static inverter support (catalog + case setpoints) |
 | 2025-03 | 2.10 | Static converter sources (PV/WIND/BESS) – catalog + case setpoints |
+| 2025-03 | 2.10.1 | Frontend tests: TSX transform error fix for catalog/protection browser specs |
 | 2026-01 | 2.11 | Phase 1.y: UI Contracts (SLD_UI_CONTRACT.md) – DOC LOCKED |
 | 2026-01 | 2.12 | Phase 1.z: UI Eksploracji Wyników i Inspekcji Elementów – DOC LOCKED |
 | 2026-01 | 2.13 | Phase 2.x: UI PF++ (PowerFactory++ Parity) – DOC LOCKED |
