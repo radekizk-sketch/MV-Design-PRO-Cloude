@@ -26,6 +26,11 @@ import {
   DEFAULT_COLLISION_CONFIG,
 } from '../utils/autoLayout';
 import { generateConnections } from '../utils/connectionRouting';
+import {
+  ETAP_GEOMETRY,
+  resolveLabelCollisions,
+  type LabelBoundingBox,
+} from '../../sld/sldEtapStyle';
 
 // =============================================================================
 // TYPY
@@ -84,6 +89,8 @@ export interface UseAutoLayoutResult {
   clearOverrides: () => void;
   /** Informacje debugowe */
   debug: AutoLayoutState['debug'];
+  /** PR-SLD-ETAP-GEOMETRY-01: Label position adjustments for collision avoidance */
+  labelAdjustments: Map<string, { x: number; y: number }>;
 }
 
 // =============================================================================
@@ -443,7 +450,7 @@ function buildCollisionItems(
   const symbolSizes = getSymbolSizes(symbols);
   const positionedSymbols = applyPositionsToSymbols(symbols, positions);
   const connections = generateConnections(positionedSymbols, {
-    gridSize: config.gridSize,
+    gridSnap: config.gridSize,
   });
 
   for (const symbol of symbols) {
@@ -554,9 +561,50 @@ function getPairClearance(
   if (a.kind === 'node' && b.kind === 'label') return collisionConfig.labelSymbolClearance;
   if (a.kind === 'label' && b.kind === 'edge') return collisionConfig.labelEdgeClearance;
   if (a.kind === 'edge' && b.kind === 'label') return collisionConfig.labelEdgeClearance;
-  if (a.kind === 'label' && b.kind === 'label') return collisionConfig.labelSymbolClearance;
+  // PR-SLD-ETAP-GEOMETRY-01: Use ETAP_GEOMETRY for label-label clearance
+  if (a.kind === 'label' && b.kind === 'label') return ETAP_GEOMETRY.labelCollision.labelLabelClearance;
   return null;
 }
+
+// =============================================================================
+// LABEL COLLISION RESOLUTION (PR-SLD-ETAP-GEOMETRY-01)
+// =============================================================================
+
+/**
+ * Build label bounding boxes for collision detection.
+ * Uses ETAP_GEOMETRY tokens for consistent clearances.
+ */
+function buildLabelBoundingBoxes(
+  symbols: AnySldSymbol[],
+  positions: Map<string, Position>,
+  collisionConfig: CollisionConfig
+): LabelBoundingBox[] {
+  const labels: LabelBoundingBox[] = [];
+
+  for (const symbol of symbols) {
+    if (!symbol.elementName) continue;
+
+    const pos = positions.get(symbol.id);
+    if (!pos) continue;
+
+    const size = getSymbolSizes([symbol]).get(symbol.id) ?? { width: 60, height: 40 };
+    const labelBox = buildLabelBoundingBox(symbol, pos, size, collisionConfig);
+
+    labels.push({
+      x: labelBox.x,
+      y: labelBox.y,
+      width: labelBox.width,
+      height: labelBox.height,
+      ownerId: symbol.id,
+    });
+  }
+
+  return labels;
+}
+
+// Note: Label collision resolution is now handled directly in the hook using
+// buildLabelBoundingBoxes and resolveLabelCollisions from sldEtapStyle.ts.
+// The adjustments are passed to the renderer via labelAdjustments in the result.
 
 function compareCollisionItems(a: CollisionItem, b: CollisionItem): number {
   if (a.layerIndex !== b.layerIndex) return a.layerIndex - b.layerIndex;
@@ -730,6 +778,15 @@ export function useAutoLayout(
     });
   }, [symbols, layoutState.finalPositions]);
 
+  // PR-SLD-ETAP-GEOMETRY-01: Calculate label position adjustments for collision avoidance
+  const labelAdjustments = useMemo<Map<string, { x: number; y: number }>>(() => {
+    // Build label bounding boxes
+    const labelBoxes = buildLabelBoundingBoxes(symbols, layoutState.finalPositions, DEFAULT_COLLISION_CONFIG);
+
+    // Resolve label collisions deterministically
+    return resolveLabelCollisions(labelBoxes);
+  }, [symbols, layoutState.finalPositions]);
+
   // Akcje
   const addOverride = useCallback((symbolId: string, delta: Position) => {
     const basePos = layoutState.basePositions.get(symbolId);
@@ -759,6 +816,7 @@ export function useAutoLayout(
     removeOverride,
     clearOverrides,
     debug: layoutState.debug,
+    labelAdjustments,
   };
 }
 
