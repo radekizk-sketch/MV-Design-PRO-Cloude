@@ -403,6 +403,18 @@ export const ETAP_GEOMETRY = {
     bayWidthIncrement: 100,
   },
 
+  /** Sectioned busbar configuration (ETAP-grade) */
+  busbarSection: {
+    /** Gap between busbar sections for coupler/sprzęgło (px) */
+    sectionGap: 60,
+    /** Coupler symbol width (px) */
+    couplerWidth: 40,
+    /** Minimum section width (px) */
+    minSectionWidth: 120,
+    /** Section side padding (px) */
+    sectionPadding: 30,
+  },
+
   // ---------------------------------------------------------------------------
   // BAY/FEEDER CONFIGURATION (SN FEEDERS)
   // ---------------------------------------------------------------------------
@@ -420,7 +432,7 @@ export const ETAP_GEOMETRY = {
   },
 
   // ---------------------------------------------------------------------------
-  // TRANSFORMER CONFIGURATION
+  // TRANSFORMER CONFIGURATION (MULTI-TRANSFORMER ETAP-GRADE)
   // ---------------------------------------------------------------------------
 
   /** Transformer positioning */
@@ -431,6 +443,10 @@ export const ETAP_GEOMETRY = {
     offsetToSN: 80,
     /** Transformer symbol height (px) — for calculating connections */
     symbolHeight: 56,
+    /** Horizontal spacing between parallel transformers (px) — ETAP-grade */
+    parallelSpacing: 120,
+    /** Minimum spacing between transformer centers (px) */
+    minSpacing: 100,
   },
 
   // ---------------------------------------------------------------------------
@@ -506,6 +522,34 @@ export const ETAP_GEOMETRY = {
     /** Horizontal node spacing within a layer (px) */
     nodeSpacing: 100,
   },
+
+  // ---------------------------------------------------------------------------
+  // CANONICAL ETAP SPINE (PION GŁÓWNY)
+  // ---------------------------------------------------------------------------
+
+  /** Canonical spine configuration for ETAP-grade layout */
+  spine: {
+    /** Enforce strict vertical spine (no L/Z on main path) */
+    strictVertical: true,
+    /** Main spine elements: Source → WN → Trafo → SN (in order) */
+    mainPathElements: ['Source', 'Bus', 'TransformerBranch', 'Bus'] as const,
+    /** Spine tolerance for alignment check (px) */
+    alignmentTolerance: 10,
+  },
+
+  // ---------------------------------------------------------------------------
+  // GEOMETRY VALIDATION (NO FLOATING SYMBOL)
+  // ---------------------------------------------------------------------------
+
+  /** Validation rules for ETAP geometry compliance */
+  validation: {
+    /** Enable NO FLOATING SYMBOL rule (G-04) */
+    noFloatingSymbol: true,
+    /** Require every symbol to have connection to bus/trafo/source */
+    requireConnection: true,
+    /** Show warning banner in UI for floating symbols */
+    showFloatingWarning: true,
+  },
 } as const;
 
 /**
@@ -562,6 +606,192 @@ export function calculateBayPositions(
   }
 
   return positions;
+}
+
+/**
+ * Calculate transformer positions for parallel transformers.
+ * DETERMINISTIC: Same transformer count → same positions.
+ *
+ * @param transformerCount - Number of parallel transformers
+ * @param centerX - X coordinate of the spine center
+ * @returns Array of X positions for each transformer
+ */
+export function calculateTransformerPositions(
+  transformerCount: number,
+  centerX: number
+): number[] {
+  if (transformerCount === 0) return [];
+
+  const { parallelSpacing, minSpacing } = ETAP_GEOMETRY.transformer;
+  const gridSize = ETAP_GEOMETRY.layout.gridSize;
+  const spacing = Math.max(parallelSpacing, minSpacing);
+
+  if (transformerCount === 1) {
+    // Single transformer centered on spine
+    return [Math.round(centerX / gridSize) * gridSize];
+  }
+
+  // Multiple transformers: evenly distributed around center
+  const positions: number[] = [];
+  const totalWidth = (transformerCount - 1) * spacing;
+  const startX = centerX - totalWidth / 2;
+
+  for (let i = 0; i < transformerCount; i++) {
+    const x = startX + i * spacing;
+    const snapped = Math.round(x / gridSize) * gridSize;
+    positions.push(snapped);
+  }
+
+  return positions;
+}
+
+/**
+ * Busbar section definition for sectioned busbars.
+ */
+export interface BusbarSection {
+  /** Section identifier (e.g., 'A', 'B') */
+  sectionId: string;
+  /** Start X position of this section */
+  startX: number;
+  /** End X position of this section */
+  endX: number;
+  /** Width of this section */
+  width: number;
+  /** Bay indices assigned to this section */
+  bayIndices: number[];
+}
+
+/**
+ * Calculate sectioned busbar layout.
+ * DETERMINISTIC: Same bay count and section count → same layout.
+ *
+ * @param totalBayCount - Total number of bays across all sections
+ * @param sectionCount - Number of sections (1 = no sectioning)
+ * @param centerX - X coordinate of the busbar center
+ * @returns Object with sections and total width
+ */
+export function calculateSectionedBusbar(
+  totalBayCount: number,
+  sectionCount: number,
+  centerX: number
+): { sections: BusbarSection[]; totalWidth: number; couplerPositions: number[] } {
+  const gridSize = ETAP_GEOMETRY.layout.gridSize;
+  // Note: couplerWidth is available in ETAP_GEOMETRY.busbarSection for future rendering enhancements
+  const { sectionGap, minSectionWidth, sectionPadding } = ETAP_GEOMETRY.busbarSection;
+  const { bayWidthIncrement } = ETAP_GEOMETRY.busbar;
+
+  // No sectioning case
+  if (sectionCount <= 1) {
+    const width = calculateBusbarWidth(totalBayCount);
+    return {
+      sections: [{
+        sectionId: 'A',
+        startX: centerX - width / 2,
+        endX: centerX + width / 2,
+        width,
+        bayIndices: Array.from({ length: totalBayCount }, (_, i) => i),
+      }],
+      totalWidth: width,
+      couplerPositions: [],
+    };
+  }
+
+  // Distribute bays across sections
+  const baysPerSection = Math.ceil(totalBayCount / sectionCount);
+  const sections: BusbarSection[] = [];
+  const couplerPositions: number[] = [];
+
+  let currentBayIndex = 0;
+  let currentX = 0;
+
+  for (let s = 0; s < sectionCount; s++) {
+    const sectionBayCount = Math.min(baysPerSection, totalBayCount - currentBayIndex);
+    const sectionWidth = Math.max(
+      minSectionWidth,
+      sectionPadding * 2 + sectionBayCount * bayWidthIncrement
+    );
+
+    const bayIndices: number[] = [];
+    for (let b = 0; b < sectionBayCount; b++) {
+      bayIndices.push(currentBayIndex++);
+    }
+
+    sections.push({
+      sectionId: String.fromCharCode(65 + s), // 'A', 'B', 'C', ...
+      startX: currentX,
+      endX: currentX + sectionWidth,
+      width: sectionWidth,
+      bayIndices,
+    });
+
+    currentX += sectionWidth;
+
+    // Add coupler position between sections (except after last section)
+    if (s < sectionCount - 1) {
+      couplerPositions.push(currentX + sectionGap / 2);
+      currentX += sectionGap;
+    }
+  }
+
+  const totalWidth = currentX;
+
+  // Center the entire busbar around centerX
+  const offsetX = centerX - totalWidth / 2;
+  for (const section of sections) {
+    section.startX = Math.round((section.startX + offsetX) / gridSize) * gridSize;
+    section.endX = Math.round((section.endX + offsetX) / gridSize) * gridSize;
+  }
+  for (let i = 0; i < couplerPositions.length; i++) {
+    couplerPositions[i] = Math.round((couplerPositions[i] + offsetX) / gridSize) * gridSize;
+  }
+
+  return { sections, totalWidth, couplerPositions };
+}
+
+/**
+ * Calculate bay positions within a busbar section.
+ * DETERMINISTIC: Same section → same bay positions.
+ *
+ * @param section - The busbar section
+ * @returns Array of X positions for each bay in the section
+ */
+export function calculateSectionBayPositions(section: BusbarSection): number[] {
+  const { sectionPadding } = ETAP_GEOMETRY.busbarSection;
+  const gridSize = ETAP_GEOMETRY.layout.gridSize;
+  const bayCount = section.bayIndices.length;
+
+  if (bayCount === 0) return [];
+
+  const usableWidth = section.width - 2 * sectionPadding;
+  const sectionCenterX = (section.startX + section.endX) / 2;
+
+  if (bayCount === 1) {
+    return [Math.round(sectionCenterX / gridSize) * gridSize];
+  }
+
+  const positions: number[] = [];
+  const startX = section.startX + sectionPadding;
+  const spacing = usableWidth / (bayCount - 1);
+
+  for (let i = 0; i < bayCount; i++) {
+    const x = startX + i * spacing;
+    positions.push(Math.round(x / gridSize) * gridSize);
+  }
+
+  return positions;
+}
+
+/**
+ * Check if a symbol is on the canonical spine.
+ * DETERMINISTIC: Position-based check with tolerance.
+ *
+ * @param symbolX - X position of the symbol
+ * @param spineX - X position of the spine
+ * @returns true if the symbol is on the spine
+ */
+export function isOnSpine(symbolX: number, spineX: number): boolean {
+  const tolerance = ETAP_GEOMETRY.spine.alignmentTolerance;
+  return Math.abs(symbolX - spineX) <= tolerance;
 }
 
 /**
@@ -1164,4 +1394,9 @@ export default {
   calculateBayPositions,
   checkBoundingBoxCollision,
   resolveLabelCollisions,
+  // Multi-transformer and sectioned busbar (PR-SLD-ETAP-GEOMETRY-FULL)
+  calculateTransformerPositions,
+  calculateSectionedBusbar,
+  calculateSectionBayPositions,
+  isOnSpine,
 };

@@ -28,7 +28,9 @@ import type { AnySldSymbol, BranchSymbol, Position, SwitchSymbol, NodeSymbol } f
 import {
   ETAP_GEOMETRY,
   calculateBusbarWidth,
-  calculateBayPositions,
+  calculateTransformerPositions,
+  calculateSectionedBusbar,
+  calculateSectionBayPositions,
 } from '../../sld/sldEtapStyle';
 
 // =============================================================================
@@ -140,6 +142,12 @@ export interface AutoLayoutResult {
     layers: Map<number, string[]>;
     totalLayers: number;
     totalNodes: number;
+    /** PR-SLD-ETAP-GEOMETRY-FULL: Floating symbols (ETAP violation) */
+    floatingSymbols: string[];
+    /** Number of transformers in parallel */
+    transformerCount: number;
+    /** Busbar section info */
+    busbarSections: Map<string, number>;
   };
 }
 
@@ -237,6 +245,57 @@ interface EtapBay {
   symbolIds: string[];
   /** Bay index for positioning */
   index: number;
+  /** Section assignment (for sectioned busbars) */
+  sectionId?: string;
+}
+
+// EtapBusbarInfo interface reserved for future use with enhanced busbar metadata
+// Currently, busbar info is tracked via separate Maps for simplicity
+
+/**
+ * Detect if a busbar is sectioned based on name patterns or coupler presence.
+ * DETERMINISTIC: Same busbar name → same section detection.
+ *
+ * Patterns recognized:
+ * - "SN-A" / "SN-B" → separate sections
+ * - "SN sekcja 1" / "SN sekcja 2" → separate sections
+ * - Single busbar with "sekcja" in name → 2 sections
+ * - Busbar with coupler switch → 2 sections
+ */
+function detectBusbarSections(
+  busbar: AnySldSymbol,
+  symbols: AnySldSymbol[]
+): number {
+  const name = busbar.elementName.toLowerCase();
+
+  // Check for section indicators in name
+  if (name.includes('sekcja') || name.includes('section') || name.includes('system')) {
+    // If name indicates multi-section, return 2
+    if (/sekcj[ai]\s*[12ab]/i.test(name) || /section\s*[12ab]/i.test(name)) {
+      return 1; // This is one section of a multi-section system
+    }
+    // Generic "sekcja" without number → assume 2 sections
+    return 2;
+  }
+
+  // Check for coupler switch connected to busbar
+  const hasCoupler = symbols.some((s) => {
+    if (s.elementType !== 'Switch') return false;
+    const sw = s as SwitchSymbol;
+    const isCoupler =
+      s.elementName.toLowerCase().includes('sprze') ||
+      s.elementName.toLowerCase().includes('coupler') ||
+      s.elementName.toLowerCase().includes('tie');
+    const connectedToBus =
+      sw.fromNodeId === busbar.elementId || sw.toNodeId === busbar.elementId;
+    return isCoupler && connectedToBus;
+  });
+
+  if (hasCoupler) {
+    return 2;
+  }
+
+  return 1; // No sectioning
 }
 
 /**
@@ -333,6 +392,158 @@ function identifyBays(
 }
 
 // =============================================================================
+// NO FLOATING SYMBOL HELPERS (PR-SLD-ETAP-GEOMETRY-FULL)
+// =============================================================================
+
+/**
+ * Check if a symbol has any connection to positioned elements.
+ * DETERMINISTIC: Connection check based on topology, not position.
+ */
+function checkSymbolConnection(
+  symbol: AnySldSymbol,
+  allSymbols: AnySldSymbol[],
+  positions: Map<string, Position>,
+  elementToSymbol: Map<string, string>
+): boolean {
+  // Branch has fromNodeId/toNodeId
+  if (symbol.elementType === 'LineBranch' || symbol.elementType === 'TransformerBranch') {
+    const branch = symbol as BranchSymbol;
+    const fromSymbolId = elementToSymbol.get(branch.fromNodeId);
+    const toSymbolId = elementToSymbol.get(branch.toNodeId);
+    return (
+      (fromSymbolId !== undefined && positions.has(fromSymbolId)) ||
+      (toSymbolId !== undefined && positions.has(toSymbolId))
+    );
+  }
+
+  // Switch has fromNodeId/toNodeId
+  if (symbol.elementType === 'Switch') {
+    const sw = symbol as SwitchSymbol;
+    const fromSymbolId = elementToSymbol.get(sw.fromNodeId);
+    const toSymbolId = elementToSymbol.get(sw.toNodeId);
+    return (
+      (fromSymbolId !== undefined && positions.has(fromSymbolId)) ||
+      (toSymbolId !== undefined && positions.has(toSymbolId))
+    );
+  }
+
+  // Source/Load has connectedToNodeId
+  if (symbol.elementType === 'Source' || symbol.elementType === 'Load') {
+    const connectedNodeId = (symbol as any).connectedToNodeId;
+    if (connectedNodeId) {
+      const connectedSymbolId = elementToSymbol.get(connectedNodeId);
+      return connectedSymbolId !== undefined && positions.has(connectedSymbolId);
+    }
+  }
+
+  // Bus: check if any element references this bus
+  if (symbol.elementType === 'Bus') {
+    // A bus is connected if any positioned element references it
+    return allSymbols.some((s) => {
+      if (!positions.has(s.id)) return false;
+
+      if (s.elementType === 'LineBranch' || s.elementType === 'TransformerBranch') {
+        const branch = s as BranchSymbol;
+        return branch.fromNodeId === symbol.elementId || branch.toNodeId === symbol.elementId;
+      }
+      if (s.elementType === 'Switch') {
+        const sw = s as SwitchSymbol;
+        return sw.fromNodeId === symbol.elementId || sw.toNodeId === symbol.elementId;
+      }
+      if (s.elementType === 'Source' || s.elementType === 'Load') {
+        return (s as any).connectedToNodeId === symbol.elementId;
+      }
+      return false;
+    });
+  }
+
+  return false;
+}
+
+/**
+ * Find a position for a symbol relative to its connected elements.
+ * DETERMINISTIC: Same connections → same position.
+ */
+function findConnectedPosition(
+  symbol: AnySldSymbol,
+  _allSymbols: AnySldSymbol[], // Reserved for future topology-aware positioning
+  positions: Map<string, Position>,
+  elementToSymbol: Map<string, string>,
+  config: AutoLayoutConfig
+): Position | null {
+  const { gridSize } = config;
+
+  // Find connected positioned symbol
+  let connectedSymbolId: string | undefined;
+  let connectionOffset: { x: number; y: number } = { x: 0, y: ETAP_GEOMETRY.bay.elementSpacing };
+
+  if (symbol.elementType === 'LineBranch' || symbol.elementType === 'TransformerBranch') {
+    const branch = symbol as BranchSymbol;
+    const fromSymbolId = elementToSymbol.get(branch.fromNodeId);
+    const toSymbolId = elementToSymbol.get(branch.toNodeId);
+    connectedSymbolId = fromSymbolId && positions.has(fromSymbolId) ? fromSymbolId : toSymbolId;
+  } else if (symbol.elementType === 'Switch') {
+    const sw = symbol as SwitchSymbol;
+    const fromSymbolId = elementToSymbol.get(sw.fromNodeId);
+    const toSymbolId = elementToSymbol.get(sw.toNodeId);
+    connectedSymbolId = fromSymbolId && positions.has(fromSymbolId) ? fromSymbolId : toSymbolId;
+  } else if (symbol.elementType === 'Source') {
+    const connectedNodeId = (symbol as any).connectedToNodeId;
+    connectedSymbolId = connectedNodeId ? elementToSymbol.get(connectedNodeId) : undefined;
+    connectionOffset = { x: 0, y: -ETAP_GEOMETRY.source.offsetAboveBusbar }; // Source above busbar
+  } else if (symbol.elementType === 'Load') {
+    const connectedNodeId = (symbol as any).connectedToNodeId;
+    connectedSymbolId = connectedNodeId ? elementToSymbol.get(connectedNodeId) : undefined;
+    connectionOffset = { x: 0, y: ETAP_GEOMETRY.bay.elementSpacing }; // Load below
+  }
+
+  if (connectedSymbolId && positions.has(connectedSymbolId)) {
+    const connectedPos = positions.get(connectedSymbolId)!;
+    return {
+      x: Math.round((connectedPos.x + connectionOffset.x) / gridSize) * gridSize,
+      y: Math.round((connectedPos.y + connectionOffset.y) / gridSize) * gridSize,
+    };
+  }
+
+  return null;
+}
+
+/**
+ * Generate fallback positions for symbols that couldn't be positioned.
+ * These symbols will be marked as "floating" (ETAP violation).
+ */
+function generateFallbackPositions(
+  symbols: AnySldSymbol[],
+  config: AutoLayoutConfig,
+  existingPositions: Map<string, Position>
+): Map<string, Position> {
+  const positions = new Map<string, Position>();
+
+  // Find the maximum Y from existing positions
+  let maxY = config.padding;
+  existingPositions.forEach((pos) => {
+    maxY = Math.max(maxY, pos.y);
+  });
+
+  // Position unpositioned symbols below existing ones (with warning indicator offset)
+  const startY = maxY + config.layerSpacing * 2; // Extra offset to visually indicate issue
+  const centerX = config.padding + config.busMinWidth / 2;
+
+  symbols.sort((a, b) => a.id.localeCompare(b.id)); // Determinism
+  symbols.forEach((symbol, i) => {
+    const row = Math.floor(i / 4);
+    const col = i % 4;
+
+    const x = Math.round((centerX + (col - 1.5) * config.nodeSpacing) / config.gridSize) * config.gridSize;
+    const y = Math.round((startY + row * config.layerSpacing) / config.gridSize) * config.gridSize;
+
+    positions.set(symbol.id, { x, y });
+  });
+
+  return positions;
+}
+
+// =============================================================================
 // GŁÓWNA FUNKCJA AUTO-LAYOUT (ETAP-GRADE)
 // =============================================================================
 
@@ -368,6 +579,9 @@ export function generateAutoLayout(
         layers: new Map(),
         totalLayers: 0,
         totalNodes: 0,
+        floatingSymbols: [],
+        transformerCount: 0,
+        busbarSections: new Map(),
       },
     };
   }
@@ -380,13 +594,15 @@ export function generateAutoLayout(
   const symbolById = new Map<string, AnySldSymbol>();
   symbols.forEach((s) => symbolById.set(s.id, s));
 
-  // Classify symbols
-  const busbars = symbols.filter((s) => s.elementType === 'Bus');
-  const transformers = symbols.filter((s) => s.elementType === 'TransformerBranch');
-  const sources = symbols.filter((s) => s.elementType === 'Source');
-  const switches = symbols.filter((s) => s.elementType === 'Switch');
-  const lineBranches = symbols.filter((s) => s.elementType === 'LineBranch');
-  const loads = symbols.filter((s) => s.elementType === 'Load');
+  // Classify symbols — SORT BY ID FOR DETERMINISM
+  // This ensures that the same set of symbols always produces the same layout
+  // regardless of input order
+  const busbars = symbols.filter((s) => s.elementType === 'Bus').sort((a, b) => a.id.localeCompare(b.id));
+  const transformers = symbols.filter((s) => s.elementType === 'TransformerBranch').sort((a, b) => a.id.localeCompare(b.id));
+  const sources = symbols.filter((s) => s.elementType === 'Source').sort((a, b) => a.id.localeCompare(b.id));
+  const switches = symbols.filter((s) => s.elementType === 'Switch').sort((a, b) => a.id.localeCompare(b.id));
+  const lineBranches = symbols.filter((s) => s.elementType === 'LineBranch').sort((a, b) => a.id.localeCompare(b.id));
+  const loads = symbols.filter((s) => s.elementType === 'Load').sort((a, b) => a.id.localeCompare(b.id));
 
   // Detect voltage levels for busbars
   const busbarVoltages = new Map<string, VoltageLevel>();
@@ -406,17 +622,18 @@ export function generateAutoLayout(
     busbarVoltages.set(bus.id, level);
   });
 
-  // Find WN and SN busbars
+  // Find WN and SN busbars (already sorted by ID from busbars array)
   const wnBusbars = busbars.filter((b) => busbarVoltages.get(b.id) === 'WN');
   const snBusbars = busbars.filter((b) => busbarVoltages.get(b.id) === 'SN');
   // Note: nN busbars support can be added later if needed
   // const nnBusbars = busbars.filter((b) => busbarVoltages.get(b.id) === 'nN');
 
-  // If no clear hierarchy, treat all busbars as SN
+  // If no clear hierarchy, treat all busbars as SN (already sorted)
   const hasHierarchy = wnBusbars.length > 0 && snBusbars.length > 0;
 
   // Identify bays for each SN busbar
   const baysByBusbar = new Map<string, EtapBay[]>();
+  // targetBusbars is already sorted since busbars is sorted
   const targetBusbars = hasHierarchy ? snBusbars : busbars;
   targetBusbars.forEach((bus) => {
     const bays = identifyBays(bus, symbols, elementToSymbol);
@@ -471,73 +688,135 @@ export function generateAutoLayout(
     currentY = wnY + ETAP_GEOMETRY.transformer.offsetFromWN;
   }
 
-  // LAYER 2: Transformers (between WN and SN)
+  // LAYER 2: Transformers (between WN and SN) — MULTI-TRANSFORMER ETAP-GRADE
   if (transformers.length > 0) {
-    const trafoSpacing = cfg.nodeSpacing;
-    const totalTrafoWidth = (transformers.length - 1) * trafoSpacing;
-    const startX = centerX - totalTrafoWidth / 2;
+    // Sort transformers by ID for determinism
+    transformers.sort((a, b) => a.id.localeCompare(b.id));
 
-    transformers.sort((a, b) => a.id.localeCompare(b.id)); // Determinism
+    // Use ETAP-grade transformer positioning
+    const trafoPositions = calculateTransformerPositions(transformers.length, centerX);
+    const trafoY = Math.round(currentY / gridSize) * gridSize;
+
     transformers.forEach((trafo, i) => {
-      const x = Math.round((startX + i * trafoSpacing) / gridSize) * gridSize;
-      const y = Math.round(currentY / gridSize) * gridSize;
-      positions.set(trafo.id, { x, y });
+      const x = trafoPositions[i];
+      positions.set(trafo.id, { x, y: trafoY });
     });
+
     currentY += ETAP_GEOMETRY.transformer.symbolHeight + ETAP_GEOMETRY.transformer.offsetToSN;
   }
 
-  // LAYER 3: SN Busbar
+  // LAYER 3: SN Busbar — WITH SECTIONED BUSBAR SUPPORT (ETAP-GRADE)
   const snY = Math.round(currentY / gridSize) * gridSize;
   targetBusbars.forEach((bus) => {
     const bays = baysByBusbar.get(bus.id) || [];
-    const busbarWidth = calculateBusbarWidth(bays.length);
 
-    // Position busbar
+    // Detect if busbar should be sectioned
+    const sectionCount = detectBusbarSections(bus, symbols);
+
+    // Calculate sectioned busbar layout
+    // Note: couplerPositions can be used for coupler switch positioning in future enhancements
+    const { sections, totalWidth } = calculateSectionedBusbar(
+      bays.length,
+      sectionCount,
+      centerX
+    );
+
+    // Position busbar at center
     const busX = centerX;
     positions.set(bus.id, { x: busX, y: snY });
 
-    // Store busbar width
+    // Store busbar width (use total width for sectioned busbars)
     const nodeSymbol = bus as NodeSymbol;
     if ('width' in nodeSymbol) {
-      (nodeSymbol as any).width = busbarWidth;
+      (nodeSymbol as any).width = totalWidth;
     }
 
-    // LAYER 4+: Bays (feeders) — VERTICAL from SN busbar
-    if (bays.length > 0) {
-      const bayPositions = calculateBayPositions(bays.length, busX, busbarWidth);
+    // Assign bays to sections and position them
+    if (bays.length > 0 && sections.length > 0) {
+      // Position bays within each section
+      sections.forEach((section) => {
+        const sectionBayPositions = calculateSectionBayPositions(section);
 
-      bays.forEach((bay, bayIndex) => {
-        const bayX = bayPositions[bayIndex];
-        let bayY = snY + ETAP_GEOMETRY.bay.verticalOffset;
+        section.bayIndices.forEach((bayIndex, posIndex) => {
+          if (bayIndex >= bays.length) return;
 
-        // Position switch (if present)
-        if (bay.switchId) {
-          const switchY = Math.round(bayY / gridSize) * gridSize;
-          positions.set(bay.switchId, { x: bayX, y: switchY });
-          bayY += ETAP_GEOMETRY.bay.elementSpacing;
+          const bay = bays[bayIndex];
+          const bayX = sectionBayPositions[posIndex] ?? centerX;
+          let bayY = snY + ETAP_GEOMETRY.bay.verticalOffset;
+
+          // Assign section ID to bay
+          bay.sectionId = section.sectionId;
+
+          // Position switch (if present)
+          if (bay.switchId) {
+            const switchY = Math.round(bayY / gridSize) * gridSize;
+            positions.set(bay.switchId, { x: bayX, y: switchY });
+            bayY += ETAP_GEOMETRY.bay.elementSpacing;
+          }
+
+          // Position branch (if present)
+          if (bay.branchId) {
+            const branchY = Math.round(bayY / gridSize) * gridSize;
+            positions.set(bay.branchId, { x: bayX, y: branchY });
+            bayY += ETAP_GEOMETRY.bay.elementSpacing;
+          }
+
+          // Position load (if present)
+          if (bay.loadId) {
+            const loadY = Math.round(bayY / gridSize) * gridSize;
+            positions.set(bay.loadId, { x: bayX, y: loadY });
+          }
+        });
+      });
+    }
+
+    // Note: Coupler switches would be positioned at couplerPositions if present
+    // This is handled by the normal bay positioning when the coupler is detected
+  });
+
+  // PR-SLD-ETAP-GEOMETRY-FULL: NO FLOATING SYMBOL RULE
+  // ETAP Rule: Every symbol must be connected to the main topology
+  // Instead of using legacy fallback (which creates floating symbols),
+  // we now track unpositioned symbols and report them as validation warnings.
+  const unpositioned = symbols.filter((s) => !positions.has(s.id));
+  const floatingSymbols: string[] = [];
+
+  if (unpositioned.length > 0 && ETAP_GEOMETRY.validation.noFloatingSymbol) {
+    // Categorize unpositioned symbols
+    unpositioned.forEach((symbol) => {
+      // Check if symbol has any connection to positioned elements
+      const hasConnection = checkSymbolConnection(symbol, symbols, positions, elementToSymbol);
+
+      if (hasConnection) {
+        // Symbol has connection but wasn't positioned - try to position it relative to connected element
+        const connectedPos = findConnectedPosition(symbol, symbols, positions, elementToSymbol, cfg);
+        if (connectedPos) {
+          positions.set(symbol.id, connectedPos);
+        } else {
+          // Cannot find valid position - mark as floating
+          floatingSymbols.push(symbol.id);
         }
+      } else {
+        // Symbol has NO connection - this is a floating symbol (ETAP violation)
+        floatingSymbols.push(symbol.id);
+      }
+    });
 
-        // Position branch (if present)
-        if (bay.branchId) {
-          const branchY = Math.round(bayY / gridSize) * gridSize;
-          positions.set(bay.branchId, { x: bayX, y: branchY });
-          bayY += ETAP_GEOMETRY.bay.elementSpacing;
-        }
-
-        // Position load (if present)
-        if (bay.loadId) {
-          const loadY = Math.round(bayY / gridSize) * gridSize;
-          positions.set(bay.loadId, { x: bayX, y: loadY });
+    // For any remaining unpositioned symbols, place them but mark as floating
+    // This allows the validator to highlight them instead of having invisible symbols
+    const stillUnpositioned = symbols.filter((s) => !positions.has(s.id));
+    if (stillUnpositioned.length > 0) {
+      const fallbackResult = generateFallbackPositions(stillUnpositioned, cfg, positions);
+      fallbackResult.forEach((pos, id) => {
+        if (!positions.has(id)) {
+          positions.set(id, pos);
+          floatingSymbols.push(id);
         }
       });
     }
-  });
-
-  // Position any remaining unpositioned symbols using fallback layout
-  const unpositioned = symbols.filter((s) => !positions.has(s.id));
-  if (unpositioned.length > 0) {
-    // Use legacy BFS layout for unpositioned symbols
-    const legacyResult = generateLegacyLayout(unpositioned, cfg, positions);
+  } else if (unpositioned.length > 0) {
+    // Legacy mode: use fallback layout (disabled by default in ETAP_GEOMETRY.validation)
+    const legacyResult = generateFallbackPositions(unpositioned, cfg, positions);
     legacyResult.forEach((pos, id) => {
       if (!positions.has(id)) {
         positions.set(id, pos);
@@ -584,49 +863,24 @@ export function generateAutoLayout(
     layers.set(layerIndex++, loads.map((s) => s.id));
   }
 
+  // Build busbar section info for debug
+  const busbarSections = new Map<string, number>();
+  targetBusbars.forEach((bus) => {
+    const sectionCount = detectBusbarSections(bus, symbols);
+    busbarSections.set(bus.id, sectionCount);
+  });
+
   return {
     positions,
     debug: {
       layers,
       totalLayers: layerIndex,
       totalNodes: symbols.length,
+      floatingSymbols,
+      transformerCount: transformers.length,
+      busbarSections,
     },
   };
-}
-
-/**
- * Legacy BFS-based layout for unpositioned symbols.
- * Used as fallback for symbols not covered by ETAP-grade layout.
- */
-function generateLegacyLayout(
-  symbols: AnySldSymbol[],
-  config: AutoLayoutConfig,
-  existingPositions: Map<string, Position>
-): Map<string, Position> {
-  const positions = new Map<string, Position>();
-
-  // Find the maximum Y from existing positions
-  let maxY = config.padding;
-  existingPositions.forEach((pos) => {
-    maxY = Math.max(maxY, pos.y);
-  });
-
-  // Position unpositioned symbols below existing ones
-  const startY = maxY + config.layerSpacing;
-  const centerX = config.padding + config.busMinWidth / 2;
-
-  symbols.sort((a, b) => a.id.localeCompare(b.id)); // Determinism
-  symbols.forEach((symbol, i) => {
-    const row = Math.floor(i / 4);
-    const col = i % 4;
-
-    const x = Math.round((centerX + (col - 1.5) * config.nodeSpacing) / config.gridSize) * config.gridSize;
-    const y = Math.round((startY + row * config.layerSpacing) / config.gridSize) * config.gridSize;
-
-    positions.set(symbol.id, { x, y });
-  });
-
-  return positions;
 }
 
 // =============================================================================

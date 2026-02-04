@@ -4,11 +4,13 @@
  * CANONICAL ALIGNMENT:
  * - SLD_KANONICZNA_SPECYFIKACJA.md § 8: Walidacja
  * - AUDYT_SLD_ETAP.md: Wymagania naprawcze
+ * - PR-SLD-ETAP-GEOMETRY-FULL: NO FLOATING SYMBOL validation
  *
  * REGUŁY WALIDACJI:
  *
  * TOPOLOGICZNE:
  * - V-01: Każdy symbol ma elementId (brak orphan symbols)
+ * - V-01b: Brak zduplikowanych elementId (N-03 ETAP)
  * - V-02: Każdy element ma symbol (brak hidden elements)
  * - V-03: Połączenia port↔port są poprawne
  * - V-04: Brak izolowanych wysp bez źródła
@@ -18,10 +20,12 @@
  * - G-01: Symbole nie nakładają się
  * - G-02: Połączenia nie przechodzą przez symbole (opcjonalne)
  * - G-03: Pozycje na siatce
+ * - G-04: NO FLOATING SYMBOL — żaden symbol nie może wisieć w powietrzu (ETAP rule)
  */
 
 import type { AnySldSymbol, BranchSymbol, SwitchSymbol } from '../types';
 import { getSymbolBoundingBox, doBoundingBoxesIntersect } from './geometry';
+import { ETAP_GEOMETRY } from '../../sld/sldEtapStyle';
 
 // =============================================================================
 // TYPY
@@ -77,6 +81,10 @@ export interface ValidationOptions {
   checkCollisions?: boolean;
   /** Sprawdzaj pozycje na siatce (G-03) */
   checkGridAlignment?: boolean;
+  /** PR-SLD-ETAP-GEOMETRY-FULL: Sprawdzaj floating symbols (G-04) */
+  checkFloatingSymbols?: boolean;
+  /** PR-SLD-ETAP-GEOMETRY-FULL: Lista floating symbols z layout engine */
+  floatingSymbolIds?: string[];
   /** Rozmiar siatki dla G-03 */
   gridSize?: number;
   /** Lista ID elementów modelu (dla V-02) */
@@ -93,6 +101,7 @@ const DEFAULT_OPTIONS: ValidationOptions = {
   checkSources: true,
   checkCollisions: true,
   checkGridAlignment: true,
+  checkFloatingSymbols: ETAP_GEOMETRY.validation.noFloatingSymbol, // PR-SLD-ETAP-GEOMETRY-FULL
   gridSize: 20,
 };
 
@@ -152,6 +161,11 @@ export function validateSld(
   // G-03: Grid alignment
   if (opts.checkGridAlignment && opts.gridSize) {
     issues.push(...checkGridAlignment(symbols, opts.gridSize));
+  }
+
+  // G-04: Floating symbols (PR-SLD-ETAP-GEOMETRY-FULL)
+  if (opts.checkFloatingSymbols) {
+    issues.push(...checkFloatingSymbols(symbols, opts.floatingSymbolIds));
   }
 
   // Oblicz statystyki
@@ -525,6 +539,140 @@ function checkGridAlignment(symbols: AnySldSymbol[], gridSize: number): Validati
       });
     }
   });
+
+  return issues;
+}
+
+// =============================================================================
+// G-04: FLOATING SYMBOLS (PR-SLD-ETAP-GEOMETRY-FULL)
+// =============================================================================
+
+/**
+ * PR-SLD-ETAP-GEOMETRY-FULL: Sprawdź czy są symbole "wiszące w powietrzu".
+ *
+ * ETAP RULE: Żaden symbol nie może wisieć — każdy musi być połączony
+ * do głównej topologii (szyny, transformatora, źródła).
+ *
+ * This function checks:
+ * 1. Symbols reported as floating by the layout engine (floatingSymbolIds)
+ * 2. Symbols with no connections to any other element
+ *
+ * @param symbols - All symbols in the SLD
+ * @param floatingSymbolIds - Symbol IDs marked as floating by layout engine
+ */
+function checkFloatingSymbols(
+  symbols: AnySldSymbol[],
+  floatingSymbolIds?: string[]
+): ValidationIssue[] {
+  const issues: ValidationIssue[] = [];
+
+  // Check symbols reported by layout engine
+  if (floatingSymbolIds && floatingSymbolIds.length > 0) {
+    const floatingNames = floatingSymbolIds
+      .map((id) => {
+        const symbol = symbols.find((s) => s.id === id);
+        return symbol ? `"${symbol.elementName}"` : id;
+      })
+      .join(', ');
+
+    issues.push({
+      ruleId: 'G-04',
+      severity: 'WARNING',
+      message: `Wykryto ${floatingSymbolIds.length} symboli wiszących w powietrzu (ETAP violation): ${floatingNames}`,
+      symbolIds: floatingSymbolIds,
+      suggestion: 'Połącz symbole z główną topologią (szyną, transformatorem lub źródłem) lub usuń je',
+    });
+
+    // Add individual warnings for each floating symbol (for UI highlighting)
+    floatingSymbolIds.forEach((symbolId) => {
+      const symbol = symbols.find((s) => s.id === symbolId);
+      if (symbol) {
+        issues.push({
+          ruleId: 'G-04a',
+          severity: 'WARNING',
+          message: `Symbol "${symbol.elementName}" wisi w powietrzu — brak połączenia z topologią`,
+          symbolIds: [symbolId],
+          suggestion: 'Połącz symbol z szyną, transformatorem lub źródłem',
+        });
+      }
+    });
+  }
+
+  // Additional check: symbols with no connections at all (not connected to any element)
+  const elementIds = new Set(symbols.map((s) => s.elementId));
+  const connectedSymbolIds = new Set<string>();
+
+  // Find all symbols that are connected to something
+  symbols.forEach((symbol) => {
+    // Branch has fromNodeId/toNodeId
+    if (symbol.elementType === 'LineBranch' || symbol.elementType === 'TransformerBranch') {
+      const branch = symbol as BranchSymbol;
+      if (elementIds.has(branch.fromNodeId) || elementIds.has(branch.toNodeId)) {
+        connectedSymbolIds.add(symbol.id);
+        // Mark the connected nodes as well
+        symbols.forEach((s) => {
+          if (s.elementId === branch.fromNodeId || s.elementId === branch.toNodeId) {
+            connectedSymbolIds.add(s.id);
+          }
+        });
+      }
+    }
+
+    // Switch has fromNodeId/toNodeId
+    if (symbol.elementType === 'Switch') {
+      const sw = symbol as SwitchSymbol;
+      if (elementIds.has(sw.fromNodeId) || elementIds.has(sw.toNodeId)) {
+        connectedSymbolIds.add(symbol.id);
+        symbols.forEach((s) => {
+          if (s.elementId === sw.fromNodeId || s.elementId === sw.toNodeId) {
+            connectedSymbolIds.add(s.id);
+          }
+        });
+      }
+    }
+
+    // Source/Load has connectedToNodeId
+    if (symbol.elementType === 'Source' || symbol.elementType === 'Load') {
+      const connectedNodeId = (symbol as any).connectedToNodeId;
+      if (connectedNodeId && elementIds.has(connectedNodeId)) {
+        connectedSymbolIds.add(symbol.id);
+        symbols.forEach((s) => {
+          if (s.elementId === connectedNodeId) {
+            connectedSymbolIds.add(s.id);
+          }
+        });
+      }
+    }
+  });
+
+  // Find unconnected symbols (excluding those already reported by layout engine)
+  const reportedFloating = new Set(floatingSymbolIds || []);
+  const unconnectedSymbols = symbols.filter(
+    (s) => !connectedSymbolIds.has(s.id) && !reportedFloating.has(s.id)
+  );
+
+  if (unconnectedSymbols.length > 0) {
+    unconnectedSymbols.forEach((symbol) => {
+      // Bus without connections is a floating bus
+      if (symbol.elementType === 'Bus') {
+        issues.push({
+          ruleId: 'G-04b',
+          severity: 'WARNING',
+          message: `Szyna "${symbol.elementName}" nie ma żadnych przyłączeń`,
+          symbolIds: [symbol.id],
+          suggestion: 'Dodaj przyłączenia do szyny lub usuń ją',
+        });
+      } else {
+        issues.push({
+          ruleId: 'G-04c',
+          severity: 'WARNING',
+          message: `Symbol "${symbol.elementName}" nie jest połączony z żadnym elementem`,
+          symbolIds: [symbol.id],
+          suggestion: 'Połącz symbol z topologią sieci',
+        });
+      }
+    });
+  }
 
   return issues;
 }
