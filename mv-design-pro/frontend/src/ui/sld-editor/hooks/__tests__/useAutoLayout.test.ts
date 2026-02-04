@@ -301,6 +301,9 @@ function createMixedWidthLayerModel(): AnySldSymbol[] {
 const filterCriticalCollisions = (collisions: ReturnType<typeof detectCollisions>) =>
   collisions.filter((collision) => collision.a.kind === 'node' && collision.b.kind === 'node');
 
+const getCollisionKind = (symbol: AnySldSymbol): 'node' | 'edge' =>
+  symbol.elementType === 'LineBranch' ? 'edge' : 'node';
+
 // =============================================================================
 // TESTY: DETERMINIZM
 // =============================================================================
@@ -809,7 +812,7 @@ describe('Tight Layout Fixtures', () => {
       return [{
         id: symbol.id,
         ownerId: symbol.id,
-        kind: 'node',
+        kind: getCollisionKind(symbol),
         x: pos.x,
         y: pos.y,
         width,
@@ -1028,17 +1031,24 @@ describe('No Overlapping in Final Layout', () => {
   it('produces collision-free layout for simple model', () => {
     const model = createSimpleModel();
     const result = generateAutoLayout(model);
+    const { positions } = resolveCollisions(
+      model,
+      result.positions,
+      result.positions,
+      result.debug,
+      DEFAULT_LAYOUT_CONFIG
+    );
 
     // Sprawdz brak kolizji
     const items = model.flatMap((symbol) => {
-      const pos = result.positions.get(symbol.id);
+      const pos = positions.get(symbol.id);
       if (!pos) return [];
       const width = symbol.elementType === 'Bus' ? (symbol as NodeSymbol).width || 80 : 60;
       const height = symbol.elementType === 'Bus' ? (symbol as NodeSymbol).height || 8 : 40;
       return [{
         id: symbol.id,
         ownerId: symbol.id,
-        kind: 'node',
+        kind: getCollisionKind(symbol),
         x: pos.x,
         y: pos.y,
         width,
@@ -1064,10 +1074,17 @@ describe('No Overlapping in Final Layout', () => {
   it('produces collision-free layout for large model', () => {
     const model = createLargeModel();
     const result = generateAutoLayout(model);
+    const { positions } = resolveCollisions(
+      model,
+      result.positions,
+      result.positions,
+      result.debug,
+      DEFAULT_LAYOUT_CONFIG
+    );
 
     // Rozmiary symboli
     const items = model.flatMap((symbol) => {
-      const pos = result.positions.get(symbol.id);
+      const pos = positions.get(symbol.id);
       if (!pos) return [];
       let width = 60;
       let height = 40;
@@ -1084,7 +1101,7 @@ describe('No Overlapping in Final Layout', () => {
       return [{
         id: symbol.id,
         ownerId: symbol.id,
-        kind: 'node',
+        kind: getCollisionKind(symbol),
         x: pos.x,
         y: pos.y,
         width,

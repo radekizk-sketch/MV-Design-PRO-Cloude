@@ -21,6 +21,7 @@ import { UnifiedSymbolRenderer, SYMBOL_SIZES, renderSymbol } from '../UnifiedSym
 import type { NodeSymbol, BranchSymbol, SwitchSymbol, SourceSymbol, LoadSymbol } from '../../../sld-editor/types';
 import type { SymbolVisualState } from '../UnifiedSymbolRenderer';
 import { resolveSymbol, transformPort } from '../../SymbolResolver';
+import { ETAP_STATE_COLORS } from '../../sldEtapStyle';
 
 // =============================================================================
 // TEST DATA: Symbole testowe dla każdego typu elementu
@@ -405,8 +406,8 @@ describe('UnifiedSymbolRenderer - Visual States', () => {
       </svg>
     );
 
-    // Selection should be reflected in SVG (blue color #3b82f6)
-    expect(container.innerHTML).toContain('#3b82f6');
+    // Selection should be reflected in SVG (ETAP token)
+    expect(container.innerHTML).toContain(ETAP_STATE_COLORS.selected);
   });
 
   it('should apply de-energized styling when not energized', () => {
@@ -422,8 +423,8 @@ describe('UnifiedSymbolRenderer - Visual States', () => {
       </svg>
     );
 
-    // De-energized should use gray color #9ca3af
-    expect(container.innerHTML).toContain('#9ca3af');
+    // De-energized should use ETAP token
+    expect(container.innerHTML).toContain(ETAP_STATE_COLORS.deenergized);
   });
 
   it('should apply out-of-service styling when not in service', () => {

@@ -65,13 +65,21 @@ async function waitForRouteChange(page: Page, expectedHash: string): Promise<voi
 /**
  * Seed localStorage with test fixtures for deterministic state.
  */
-async function seedTestState(page: Page): Promise<void> {
+type SeedStateOverrides = {
+  appState?: typeof TEST_APP_STATE;
+  selectionState?: typeof TEST_SELECTION_STATE;
+};
+
+async function seedTestState(page: Page, overrides: SeedStateOverrides = {}): Promise<void> {
+  const appState = overrides.appState ?? TEST_APP_STATE;
+  const selectionState = overrides.selectionState ?? TEST_SELECTION_STATE;
+
   await page.addInitScript((fixtures) => {
     localStorage.setItem('mv-design-app-state', JSON.stringify(fixtures.appState));
     localStorage.setItem('mv-design-selection-store', JSON.stringify(fixtures.selectionState));
   }, {
-    appState: TEST_APP_STATE,
-    selectionState: TEST_SELECTION_STATE,
+    appState,
+    selectionState,
   });
 }
 
@@ -289,6 +297,28 @@ test.describe('Context Bar Synchronization', () => {
     await expect(modeIndicator).toHaveAttribute('data-mode', 'MODEL_EDIT');
   });
 
+  test('should disable configure when no active case is selected', async ({ page }) => {
+    const noCaseAppState = {
+      ...TEST_APP_STATE,
+      state: {
+        ...TEST_APP_STATE.state,
+        activeCaseId: null,
+        activeCaseName: null,
+        activeCaseKind: null,
+        activeCaseResultStatus: 'NONE',
+      },
+    };
+
+    await seedTestState(page, { appState: noCaseAppState });
+    await page.goto('/');
+    await waitForAppReady(page);
+
+    const configureBtn = page.locator('[data-testid="btn-configure"]');
+
+    await expect(configureBtn).toBeDisabled();
+    await expect(configureBtn).toHaveAttribute('title', 'Wybierz przypadek, aby skonfigurować');
+  });
+
   test('should show correct button states based on app state', async ({ page }) => {
     await seedTestState(page);
     await page.goto('/');
@@ -297,13 +327,11 @@ test.describe('Context Bar Synchronization', () => {
     // With seeded state, buttons should have expected states
     const changeCaseBtn = page.locator('[data-testid="btn-change-case"]');
     const configureBtn = page.locator('[data-testid="btn-configure"]');
-    const calculateBtn = page.locator('[data-testid="btn-calculate"]');
     const resultsBtn = page.locator('[data-testid="btn-results"]');
 
     // Change case button should always be enabled
     await expect(changeCaseBtn).toBeEnabled();
 
-    // Other buttons depend on seeded state
     // Configure requires active case (seeded)
     await expect(configureBtn).toBeEnabled();
 
