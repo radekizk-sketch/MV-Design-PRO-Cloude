@@ -3515,6 +3515,7 @@ export function getCommonFields(
 - Zmiana selekcji → `useMultiSelection()` → Property Grid aktualizuje się
 - PropertyGridContainer routing: single → PropertyGrid, multi → PropertyGridMultiEdit
 - Multi-edit draft: Apply/Cancel działa jak single-edit
+- SLD auto-layout: warstwa clearances i anti-overlap (deterministyczna, bez edycji)
 
 ### 27a.9 Next Steps
 

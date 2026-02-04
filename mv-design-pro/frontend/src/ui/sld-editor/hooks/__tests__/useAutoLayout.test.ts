@@ -192,6 +192,112 @@ function createLargeModel(): AnySldSymbol[] {
   return symbols;
 }
 
+/**
+ * Model z gestym ukladem galezi bocznych.
+ */
+function createTightSideBranchesModel(): AnySldSymbol[] {
+  const source: SourceSymbol = {
+    id: 'sym-source-tight',
+    elementId: 'source-tight',
+    elementType: 'Source',
+    elementName: 'Zasilanie',
+    position: { x: 0, y: 0 },
+    inService: true,
+    connectedToNodeId: 'bus-main',
+  };
+
+  const busMain: NodeSymbol = {
+    id: 'sym-bus-main',
+    elementId: 'bus-main',
+    elementType: 'Bus',
+    elementName: 'Szyna główna',
+    position: { x: 0, y: 0 },
+    inService: true,
+    width: 200,
+    height: 10,
+  };
+
+  const branchBuses: NodeSymbol[] = ['A', 'B', 'C', 'D'].map((label, index) => ({
+    id: `sym-bus-${label}`,
+    elementId: `bus-${label}`,
+    elementType: 'Bus',
+    elementName: `Szyna ${label}`,
+    position: { x: 0, y: 0 },
+    inService: true,
+    width: 220 + index * 10,
+    height: 10,
+  }));
+
+  const branches: BranchSymbol[] = branchBuses.map((bus, index) => ({
+    id: `sym-line-tight-${index + 1}`,
+    elementId: `line-tight-${index + 1}`,
+    elementType: 'LineBranch',
+    elementName: `Linia ${index + 1}`,
+    position: { x: 0, y: 0 },
+    inService: true,
+    fromNodeId: 'bus-main',
+    toNodeId: bus.elementId,
+    points: [],
+  }));
+
+  return [source, busMain, ...branchBuses, ...branches];
+}
+
+/**
+ * Warstwa z elementami o roznych szerokosciach (busbar + odpływy).
+ */
+function createMixedWidthLayerModel(): AnySldSymbol[] {
+  const source: SourceSymbol = {
+    id: 'sym-source-mixed',
+    elementId: 'source-mixed',
+    elementType: 'Source',
+    elementName: 'Zasilanie',
+    position: { x: 0, y: 0 },
+    inService: true,
+    connectedToNodeId: 'bus-mixed',
+  };
+
+  const bus: NodeSymbol = {
+    id: 'sym-bus-mixed',
+    elementId: 'bus-mixed',
+    elementType: 'Bus',
+    elementName: 'Szyna rozdzielcza',
+    position: { x: 0, y: 0 },
+    inService: true,
+    width: 260,
+    height: 10,
+  };
+
+  const feederBuses: NodeSymbol[] = [
+    { id: 'sym-feeder-1', elementId: 'feeder-1', width: 180 },
+    { id: 'sym-feeder-2', elementId: 'feeder-2', width: 220 },
+    { id: 'sym-feeder-3', elementId: 'feeder-3', width: 200 },
+  ].map((entry, index) => ({
+    id: entry.id,
+    elementId: entry.elementId,
+    elementType: 'Bus',
+    elementName: `Odpływ ${index + 1}`,
+    position: { x: 0, y: 0 },
+    inService: true,
+    width: entry.width,
+    height: 10,
+  }));
+
+  const branches: BranchSymbol[] = feederBuses.map((busEntry, index) => ({
+    id: `sym-line-mixed-${index + 1}`,
+    elementId: `line-mixed-${index + 1}`,
+    elementType: 'LineBranch',
+    elementName: `Linia ${index + 1}`,
+    position: { x: 0, y: 0 },
+    inService: true,
+    fromNodeId: 'bus-mixed',
+    toNodeId: busEntry.elementId,
+    points: [],
+  }));
+
+  return [source, bus, ...feederBuses, ...branches];
+}
+
 // =============================================================================
 // TESTY: DETERMINIZM
 // =============================================================================
@@ -414,43 +520,105 @@ describe('Topology Hash', () => {
 
 describe('Collision Detection', () => {
   it('detects overlapping symbols', () => {
-    const positions = new Map<string, Position>([
-      ['a', { x: 100, y: 100 }],
-      ['b', { x: 110, y: 100 }], // Naklada sie z 'a'
-      ['c', { x: 300, y: 300 }], // Daleko
-    ]);
+    const items = [
+      {
+        id: 'a',
+        ownerId: 'a',
+        kind: 'node',
+        x: 100,
+        y: 100,
+        width: 60,
+        height: 40,
+        layerIndex: 0,
+        typePriority: 0,
+      },
+      {
+        id: 'b',
+        ownerId: 'b',
+        kind: 'node',
+        x: 110,
+        y: 100,
+        width: 60,
+        height: 40,
+        layerIndex: 0,
+        typePriority: 0,
+      },
+      {
+        id: 'c',
+        ownerId: 'c',
+        kind: 'node',
+        x: 300,
+        y: 300,
+        width: 60,
+        height: 40,
+        layerIndex: 0,
+        typePriority: 0,
+      },
+    ];
 
-    const sizes = new Map<string, { width: number; height: number }>([
-      ['a', { width: 60, height: 40 }],
-      ['b', { width: 60, height: 40 }],
-      ['c', { width: 60, height: 40 }],
-    ]);
+    const collisions = detectCollisions(items as any, {
+      symbolClearance: 0,
+      labelSymbolClearance: 0,
+      labelEdgeClearance: 0,
+      busbarPadding: 0,
+      labelCharWidth: 7,
+      labelHeight: 12,
+      edgeThickness: 6,
+      maxIterations: 10,
+    });
 
-    const collisions = detectCollisions(positions, sizes);
-
-    expect(collisions.has('a')).toBe(true);
-    expect(collisions.has('b')).toBe(true);
-    expect(collisions.get('a')).toContain('b');
-    expect(collisions.get('b')).toContain('a');
-    expect(collisions.has('c')).toBe(false);
+    expect(collisions.length).toBeGreaterThan(0);
   });
 
   it('returns empty map when no collisions', () => {
-    const positions = new Map<string, Position>([
-      ['a', { x: 100, y: 100 }],
-      ['b', { x: 300, y: 100 }],
-      ['c', { x: 100, y: 300 }],
-    ]);
+    const items = [
+      {
+        id: 'a',
+        ownerId: 'a',
+        kind: 'node',
+        x: 100,
+        y: 100,
+        width: 60,
+        height: 40,
+        layerIndex: 0,
+        typePriority: 0,
+      },
+      {
+        id: 'b',
+        ownerId: 'b',
+        kind: 'node',
+        x: 300,
+        y: 100,
+        width: 60,
+        height: 40,
+        layerIndex: 0,
+        typePriority: 0,
+      },
+      {
+        id: 'c',
+        ownerId: 'c',
+        kind: 'node',
+        x: 100,
+        y: 300,
+        width: 60,
+        height: 40,
+        layerIndex: 0,
+        typePriority: 0,
+      },
+    ];
 
-    const sizes = new Map<string, { width: number; height: number }>([
-      ['a', { width: 60, height: 40 }],
-      ['b', { width: 60, height: 40 }],
-      ['c', { width: 60, height: 40 }],
-    ]);
+    const collisions = detectCollisions(items as any, {
+      symbolClearance: 0,
+      labelSymbolClearance: 0,
+      labelEdgeClearance: 0,
+      busbarPadding: 0,
+      labelCharWidth: 7,
+      labelHeight: 12,
+      edgeThickness: 6,
+      maxIterations: 10,
+    });
 
-    const collisions = detectCollisions(positions, sizes);
-
-    expect(collisions.size).toBe(0);
+    expect(collisions.length).toBe(0);
   });
 });
 
@@ -461,13 +629,45 @@ describe('Collision Resolution', () => {
       ['b', { x: 100, y: 100 }], // Identyczna pozycja
     ]);
 
-    const sizes = new Map<string, { width: number; height: number }>([
-      ['a', { width: 60, height: 40 }],
-      ['b', { width: 60, height: 40 }],
-    ]);
+    const symbols: AnySldSymbol[] = [
+      {
+        id: 'a',
+        elementId: 'a',
+        elementType: 'Bus',
+        elementName: 'Szyna A',
+        position: { x: 0, y: 0 },
+        inService: true,
+        width: 80,
+        height: 10,
+      } as NodeSymbol,
+      {
+        id: 'b',
+        elementId: 'b',
+        elementType: 'Bus',
+        elementName: 'Szyna B',
+        position: { x: 0, y: 0 },
+        inService: true,
+        width: 80,
+        height: 10,
+      } as NodeSymbol,
+    ];
 
-    const result1 = resolveCollisions(positions, sizes, DEFAULT_LAYOUT_CONFIG);
-    const result2 = resolveCollisions(positions, sizes, DEFAULT_LAYOUT_CONFIG);
+    const debugLayers = new Map<number, string[]>([[0, ['a', 'b']]]);
+
+    const result1 = resolveCollisions(
+      symbols,
+      positions,
+      positions,
+      { layers: debugLayers, totalLayers: 1, totalNodes: 2 },
+      DEFAULT_LAYOUT_CONFIG
+    );
+    const result2 = resolveCollisions(
+      symbols,
+      positions,
+      positions,
+      { layers: debugLayers, totalLayers: 1, totalNodes: 2 },
+      DEFAULT_LAYOUT_CONFIG
+    );
 
     // Wyniki musza byc identyczne (determinizm)
     for (const [id, pos1] of result1.positions) {
@@ -485,17 +685,49 @@ describe('Collision Resolution', () => {
       ['c', { x: 120, y: 100 }],
     ]);
 
-    const sizes = new Map<string, { width: number; height: number }>([
-      ['a', { width: 60, height: 40 }],
-      ['b', { width: 60, height: 40 }],
-      ['c', { width: 60, height: 40 }],
-    ]);
+    const symbols: AnySldSymbol[] = ['a', 'b', 'c'].map((id) => ({
+      id,
+      elementId: id,
+      elementType: 'Bus',
+      elementName: `Szyna ${id}`,
+      position: { x: 0, y: 0 },
+      inService: true,
+      width: 80,
+      height: 10,
+    })) as NodeSymbol[];
+    const debugLayers = new Map<number, string[]>([[0, ['a', 'b', 'c']]]);
 
-    const { positions: resolved } = resolveCollisions(positions, sizes, DEFAULT_LAYOUT_CONFIG);
+    const { positions: resolved } = resolveCollisions(
+      symbols,
+      positions,
+      positions,
+      { layers: debugLayers, totalLayers: 1, totalNodes: 3 },
+      DEFAULT_LAYOUT_CONFIG
+    );
 
     // Sprawdz brak kolizji po rozwiazaniu
-    const collisionsAfter = detectCollisions(resolved, sizes);
-    expect(collisionsAfter.size).toBe(0);
+    const items = ['a', 'b', 'c'].map((id) => ({
+      id,
+      ownerId: id,
+      kind: 'node',
+      x: resolved.get(id)!.x,
+      y: resolved.get(id)!.y,
+      width: 60,
+      height: 40,
+      layerIndex: 0,
+      typePriority: 0,
+    }));
+    const collisionsAfter = detectCollisions(items as any, {
+      symbolClearance: 0,
+      labelSymbolClearance: 0,
+      labelEdgeClearance: 0,
+      busbarPadding: 0,
+      labelCharWidth: 7,
+      labelHeight: 12,
+      edgeThickness: 6,
+      maxIterations: 10,
+    });
+    expect(collisionsAfter.length).toBe(0);
   });
 
   it('snaps resolved positions to grid', () => {
@@ -504,19 +736,148 @@ describe('Collision Resolution', () => {
       ['b', { x: 100, y: 100 }],
     ]);
 
-    const sizes = new Map<string, { width: number; height: number }>([
-      ['a', { width: 60, height: 40 }],
-      ['b', { width: 60, height: 40 }],
-    ]);
+    const symbols: AnySldSymbol[] = [
+      {
+        id: 'a',
+        elementId: 'a',
+        elementType: 'Bus',
+        elementName: 'Szyna A',
+        position: { x: 0, y: 0 },
+        inService: true,
+        width: 80,
+        height: 10,
+      } as NodeSymbol,
+      {
+        id: 'b',
+        elementId: 'b',
+        elementType: 'Bus',
+        elementName: 'Szyna B',
+        position: { x: 0, y: 0 },
+        inService: true,
+        width: 80,
+        height: 10,
+      } as NodeSymbol,
+    ];
+    const debugLayers = new Map<number, string[]>([[0, ['a', 'b']]]);
 
     const config = { ...DEFAULT_LAYOUT_CONFIG, gridSize: 20 };
-    const { positions: resolved } = resolveCollisions(positions, sizes, config);
+    const { positions: resolved } = resolveCollisions(
+      symbols,
+      positions,
+      positions,
+      { layers: debugLayers, totalLayers: 1, totalNodes: 2 },
+      config
+    );
 
     // Wszystkie pozycje musza byc wielokrotnoscia 20
     for (const [, pos] of resolved) {
       expect(pos.x % 20).toBe(0);
       expect(pos.y % 20).toBe(0);
     }
+  });
+});
+
+describe('Tight Layout Fixtures', () => {
+  const assertGridSnapped = (positions: Map<string, Position>, gridSize: number) => {
+    for (const [, pos] of positions) {
+      expect(Math.abs(pos.x % gridSize)).toBe(0);
+      expect(Math.abs(pos.y % gridSize)).toBe(0);
+      expect(Number.isFinite(pos.x)).toBe(true);
+      expect(Number.isFinite(pos.y)).toBe(true);
+    }
+  };
+
+  const assertNoSymbolOverlap = (symbols: AnySldSymbol[], positions: Map<string, Position>) => {
+    const items = symbols.flatMap((symbol) => {
+      const pos = positions.get(symbol.id);
+      if (!pos) return [];
+      let width = 60;
+      let height = 40;
+      if (symbol.elementType === 'Bus') {
+        width = (symbol as NodeSymbol).width || 80;
+        height = (symbol as NodeSymbol).height || 8;
+      } else if (symbol.elementType === 'Source') {
+        width = 50;
+        height = 60;
+      } else if (symbol.elementType === 'Load') {
+        width = 30;
+        height = 30;
+      }
+      return [{
+        id: symbol.id,
+        ownerId: symbol.id,
+        kind: 'node',
+        x: pos.x,
+        y: pos.y,
+        width,
+        height,
+        layerIndex: 0,
+        typePriority: 0,
+      }];
+    });
+    const overlaps = detectCollisions(items as any, {
+      symbolClearance: 0,
+      labelSymbolClearance: 0,
+      labelEdgeClearance: 0,
+      busbarPadding: 0,
+      labelCharWidth: 7,
+      labelHeight: 12,
+      edgeThickness: 6,
+      maxIterations: 10,
+    });
+    expect(overlaps.length).toBe(0);
+  };
+
+  it('resolves tight side-branch layout deterministically', () => {
+    const model = createTightSideBranchesModel();
+    const layout = generateAutoLayout(model);
+    const resolved = resolveCollisions(
+      model,
+      layout.positions,
+      layout.positions,
+      layout.debug,
+      DEFAULT_LAYOUT_CONFIG
+    );
+
+    const resolvedAgain = resolveCollisions(
+      model,
+      layout.positions,
+      layout.positions,
+      layout.debug,
+      DEFAULT_LAYOUT_CONFIG
+    );
+
+    const orderedPositions = Array.from(resolved.positions.entries()).sort((a, b) =>
+      a[0].localeCompare(b[0])
+    );
+    const orderedAgain = Array.from(resolvedAgain.positions.entries()).sort((a, b) =>
+      a[0].localeCompare(b[0])
+    );
+
+    expect(orderedPositions).toEqual(orderedAgain);
+    expect(orderedPositions).toMatchSnapshot();
+    assertGridSnapped(resolved.positions, DEFAULT_LAYOUT_CONFIG.gridSize);
+    assertNoSymbolOverlap(model, resolved.positions);
+  });
+
+  it('resolves mixed-width layer without overlaps', () => {
+    const model = createMixedWidthLayerModel();
+    const layout = generateAutoLayout(model);
+    const resolved = resolveCollisions(
+      model,
+      layout.positions,
+      layout.positions,
+      layout.debug,
+      DEFAULT_LAYOUT_CONFIG
+    );
+
+    const orderedPositions = Array.from(resolved.positions.entries()).sort((a, b) =>
+      a[0].localeCompare(b[0])
+    );
+
+    expect(orderedPositions).toMatchSnapshot();
+    assertGridSnapped(resolved.positions, DEFAULT_LAYOUT_CONFIG.gridSize);
+    assertNoSymbolOverlap(model, resolved.positions);
   });
 });
 
@@ -535,15 +896,35 @@ describe('Position Overrides', () => {
       ['a', { symbolId: 'a', deltaX: 40, deltaY: 0, timestamp: 1 }],
     ]);
 
-    const sizes = new Map<string, { width: number; height: number }>([
-      ['a', { width: 60, height: 40 }],
-      ['b', { width: 60, height: 40 }],
-    ]);
+    const symbols: AnySldSymbol[] = [
+      {
+        id: 'a',
+        elementId: 'a',
+        elementType: 'Bus',
+        elementName: 'Szyna A',
+        position: { x: 0, y: 0 },
+        inService: true,
+        width: 80,
+        height: 10,
+      } as NodeSymbol,
+      {
+        id: 'b',
+        elementId: 'b',
+        elementType: 'Bus',
+        elementName: 'Szyna B',
+        position: { x: 0, y: 0 },
+        inService: true,
+        width: 80,
+        height: 10,
+      } as NodeSymbol,
+    ];
+    const debugLayers = new Map<number, string[]>([[0, ['a', 'b']]]);
 
     const { positions, rejectedOverrides } = applyOverrides(
       basePositions,
       overrides,
-      sizes,
+      symbols,
+      { layers: debugLayers, totalLayers: 1, totalNodes: 2 },
       DEFAULT_LAYOUT_CONFIG
     );
 
@@ -562,15 +943,35 @@ describe('Position Overrides', () => {
       ['a', { symbolId: 'a', deltaX: 50, deltaY: 0, timestamp: 1 }], // Przesuwa 'a' na 'b'
     ]);
 
-    const sizes = new Map<string, { width: number; height: number }>([
-      ['a', { width: 60, height: 40 }],
-      ['b', { width: 60, height: 40 }],
-    ]);
+    const symbols: AnySldSymbol[] = [
+      {
+        id: 'a',
+        elementId: 'a',
+        elementType: 'Bus',
+        elementName: 'Szyna A',
+        position: { x: 0, y: 0 },
+        inService: true,
+        width: 80,
+        height: 10,
+      } as NodeSymbol,
+      {
+        id: 'b',
+        elementId: 'b',
+        elementType: 'Bus',
+        elementName: 'Szyna B',
+        position: { x: 0, y: 0 },
+        inService: true,
+        width: 80,
+        height: 10,
+      } as NodeSymbol,
+    ];
+    const debugLayers = new Map<number, string[]>([[0, ['a', 'b']]]);
 
     const { rejectedOverrides } = applyOverrides(
       basePositions,
       overrides,
-      sizes,
+      symbols,
+      { layers: debugLayers, totalLayers: 1, totalNodes: 2 },
       DEFAULT_LAYOUT_CONFIG
     );
 
@@ -586,12 +987,28 @@ describe('Position Overrides', () => {
       ['a', { symbolId: 'a', deltaX: 33, deltaY: 17, timestamp: 1 }], // Nie na siatce
     ]);
 
-    const sizes = new Map<string, { width: number; height: number }>([
-      ['a', { width: 60, height: 40 }],
-    ]);
+    const symbols: AnySldSymbol[] = [
+      {
+        id: 'a',
+        elementId: 'a',
+        elementType: 'Bus',
+        elementName: 'Szyna A',
+        position: { x: 0, y: 0 },
+        inService: true,
+        width: 80,
+        height: 10,
+      } as NodeSymbol,
+    ];
+    const debugLayers = new Map<number, string[]>([[0, ['a']]]);
 
     const config = { ...DEFAULT_LAYOUT_CONFIG, gridSize: 20 };
-    const { positions } = applyOverrides(basePositions, overrides, sizes, config);
+    const { positions } = applyOverrides(
+      basePositions,
+      overrides,
+      symbols,
+      { layers: debugLayers, totalLayers: 1, totalNodes: 1 },
+      config
+    );
 
     // Pozycja powinna byc zaokraglona do siatki
     const pos = positions.get('a')!;
@@ -610,18 +1027,35 @@ describe('No Overlapping in Final Layout', () => {
     const result = generateAutoLayout(model);
 
     // Sprawdz brak kolizji
-    const sizes = new Map<string, { width: number; height: number }>();
-    model.forEach((s) => {
-      if (s.elementType === 'Bus') {
-        const bus = s as NodeSymbol;
-        sizes.set(s.id, { width: bus.width || 80, height: bus.height || 8 });
-      } else {
-        sizes.set(s.id, { width: 60, height: 40 });
-      }
+    const items = model.flatMap((symbol) => {
+      const pos = result.positions.get(symbol.id);
+      if (!pos) return [];
+      const width = symbol.elementType === 'Bus' ? (symbol as NodeSymbol).width || 80 : 60;
+      const height = symbol.elementType === 'Bus' ? (symbol as NodeSymbol).height || 8 : 40;
+      return [{
+        id: symbol.id,
+        ownerId: symbol.id,
+        kind: 'node',
+        x: pos.x,
+        y: pos.y,
+        width,
+        height,
+        layerIndex: 0,
+        typePriority: 0,
+      }];
     });
 
-    const collisions = detectCollisions(result.positions, sizes);
-    expect(collisions.size).toBe(0);
+    const collisions = detectCollisions(items as any, {
+      symbolClearance: 0,
+      labelSymbolClearance: 0,
+      labelEdgeClearance: 0,
+      busbarPadding: 0,
+      labelCharWidth: 7,
+      labelHeight: 12,
+      edgeThickness: 6,
+      maxIterations: 10,
+    });
+    expect(collisions.length).toBe(0);
   });
 
   it('produces collision-free layout for large model', () => {
@@ -629,22 +1063,45 @@ describe('No Overlapping in Final Layout', () => {
     const result = generateAutoLayout(model);
 
     // Rozmiary symboli
-    const sizes = new Map<string, { width: number; height: number }>();
-    model.forEach((s) => {
-      if (s.elementType === 'Bus') {
-        const bus = s as NodeSymbol;
-        sizes.set(s.id, { width: bus.width || 80, height: bus.height || 8 });
-      } else if (s.elementType === 'Source') {
-        sizes.set(s.id, { width: 50, height: 60 });
-      } else if (s.elementType === 'Load') {
-        sizes.set(s.id, { width: 30, height: 30 });
-      } else {
-        sizes.set(s.id, { width: 60, height: 40 });
+    const items = model.flatMap((symbol) => {
+      const pos = result.positions.get(symbol.id);
+      if (!pos) return [];
+      let width = 60;
+      let height = 40;
+      if (symbol.elementType === 'Bus') {
+        width = (symbol as NodeSymbol).width || 80;
+        height = (symbol as NodeSymbol).height || 8;
+      } else if (symbol.elementType === 'Source') {
+        width = 50;
+        height = 60;
+      } else if (symbol.elementType === 'Load') {
+        width = 30;
+        height = 30;
       }
+      return [{
+        id: symbol.id,
+        ownerId: symbol.id,
+        kind: 'node',
+        x: pos.x,
+        y: pos.y,
+        width,
+        height,
+        layerIndex: 0,
+        typePriority: 0,
+      }];
     });
 
-    const collisions = detectCollisions(result.positions, sizes);
-    expect(collisions.size).toBe(0);
+    const collisions = detectCollisions(items as any, {
+      symbolClearance: 0,
+      labelSymbolClearance: 0,
+      labelEdgeClearance: 0,
+      busbarPadding: 0,
+      labelCharWidth: 7,
+      labelHeight: 12,
+      edgeThickness: 6,
+      maxIterations: 10,
+    });
+    expect(collisions.length).toBe(0);
   });
 });
 

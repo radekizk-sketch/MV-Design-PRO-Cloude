@@ -57,6 +57,38 @@ export const DEFAULT_LAYOUT_CONFIG: AutoLayoutConfig = {
   padding: 80,            // Większy padding dla czytelności
 };
 
+/** Konfiguracja clearances dla czytelności SLD (łatwa do korekty). */
+export interface CollisionConfig {
+  /** Minimalny odstęp symbol↔symbol (px) */
+  symbolClearance: number;
+  /** Minimalny odstęp label↔symbol (px) */
+  labelSymbolClearance: number;
+  /** Minimalny odstęp label↔edge (px) */
+  labelEdgeClearance: number;
+  /** Wewnętrzny padding busbar (px) */
+  busbarPadding: number;
+  /** Przybliżona szerokość znaku w etykiecie (px) */
+  labelCharWidth: number;
+  /** Wysokość etykiety (px) */
+  labelHeight: number;
+  /** Grubość korytarza dla krawędzi (px) */
+  edgeThickness: number;
+  /** Maksymalna liczba iteracji korekt */
+  maxIterations: number;
+}
+
+/** Domyślne clearances (PowerFactory/ETAP-grade). */
+export const DEFAULT_COLLISION_CONFIG: CollisionConfig = {
+  symbolClearance: 24,
+  labelSymbolClearance: 16,
+  labelEdgeClearance: 12,
+  busbarPadding: 20,
+  labelCharWidth: 7,
+  labelHeight: 12,
+  edgeThickness: 6,
+  maxIterations: 20,
+};
+
 // =============================================================================
 // TYPY WEWNĘTRZNE
 // =============================================================================
