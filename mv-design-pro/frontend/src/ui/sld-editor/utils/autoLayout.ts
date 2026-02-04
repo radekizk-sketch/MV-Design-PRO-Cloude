@@ -45,16 +45,16 @@ export interface AutoLayoutConfig {
   padding: number;
 }
 
-/** Domyślna konfiguracja */
+/** Domyślna konfiguracja — PLANS STYLE SPINE LAYOUT */
 export const DEFAULT_LAYOUT_CONFIG: AutoLayoutConfig = {
   gridSize: 20,
-  layerSpacing: 120,
+  layerSpacing: 140,      // Duży odstęp jak w Plans
   nodeSpacing: 100,
-  busMinWidth: 80,
+  busMinWidth: 200,       // Szeroka szyna jak w Plans
   symbolWidth: 60,
   symbolHeight: 40,
   direction: 'top-down',
-  padding: 60,
+  padding: 80,            // Większy padding dla czytelności
 };
 
 // =============================================================================
@@ -408,11 +408,17 @@ function sortWithinLayers(graph: LayoutGraph): void {
 }
 
 // =============================================================================
-// KROK 5: OBLICZ WSPÓŁRZĘDNE X/Y
+// KROK 5: OBLICZ WSPÓŁRZĘDNE X/Y — SPINE LAYOUT (PLANS STYLE)
 // =============================================================================
 
 /**
  * Oblicz finalne współrzędne X/Y dla każdego węzła.
+ *
+ * SPINE LAYOUT (inspiracja Plans):
+ * - Główna ścieżka (spine) na jednej osi X
+ * - Elementy ułożone PIONOWO (góra → dół)
+ * - Szyny poziome w wyznaczonych miejscach
+ * - Odbiory i źródła jako gałęzie boczne
  */
 function computeCoordinates(
   graph: LayoutGraph,
@@ -429,12 +435,13 @@ function computeCoordinates(
     layers.get(node.layer)!.push(node);
   });
 
-  // Oblicz max szerokość warstwy (dla centrowania)
-  let maxLayerWidth = 0;
-  layers.forEach((nodesInLayer) => {
-    const layerWidth = nodesInLayer.length * config.nodeSpacing;
-    maxLayerWidth = Math.max(maxLayerWidth, layerWidth);
-  });
+  // SPINE LAYOUT: Oblicz centralną oś X
+  // Dla większości topologii sieci SN/nN używamy jednej osi pionowej
+  const maxNodesInLayer = Math.max(...Array.from(layers.values()).map(l => l.length), 1);
+
+  // Oblicz szerokość canvas potrzebną dla bocznych gałęzi
+  const canvasWidth = config.padding * 2 + maxNodesInLayer * config.nodeSpacing;
+  const SPINE_X = Math.round(canvasWidth / 2 / config.gridSize) * config.gridSize;
 
   // Oblicz pozycje
   const sortedLayerNums = Array.from(layers.keys()).sort((a, b) => a - b);
@@ -444,20 +451,32 @@ function computeCoordinates(
     // Sortuj po order
     nodesInLayer.sort((a, b) => a.order - b.order);
 
-    const layerWidth = nodesInLayer.length * config.nodeSpacing;
-    const layerOffset = (maxLayerWidth - layerWidth) / 2; // Centrowanie
-
     nodesInLayer.forEach((node, idx) => {
       let x: number;
       let y: number;
 
       if (config.direction === 'top-down') {
-        x = config.padding + layerOffset + idx * config.nodeSpacing;
+        // SPINE LAYOUT: Główna oś na środku
+        if (nodesInLayer.length === 1) {
+          // Pojedynczy węzeł na warstwie → na spine
+          x = SPINE_X;
+        } else {
+          // Wiele węzłów na warstwie → rozłóż wokół spine
+          const layerWidth = (nodesInLayer.length - 1) * config.nodeSpacing;
+          const startX = SPINE_X - layerWidth / 2;
+          x = startX + idx * config.nodeSpacing;
+        }
         y = config.padding + layerNum * config.layerSpacing;
       } else {
-        // left-right
+        // left-right (rzadko używane dla SLD)
         x = config.padding + layerNum * config.layerSpacing;
-        y = config.padding + layerOffset + idx * config.nodeSpacing;
+        if (nodesInLayer.length === 1) {
+          y = SPINE_X;
+        } else {
+          const layerHeight = (nodesInLayer.length - 1) * config.nodeSpacing;
+          const startY = SPINE_X - layerHeight / 2;
+          y = startY + idx * config.nodeSpacing;
+        }
       }
 
       // Snap to grid
