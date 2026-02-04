@@ -22,7 +22,10 @@ import {
   type AutoLayoutConfig,
   DEFAULT_LAYOUT_CONFIG,
   type AutoLayoutResult,
+  type CollisionConfig,
+  DEFAULT_COLLISION_CONFIG,
 } from '../utils/autoLayout';
+import { generateConnections } from '../utils/connectionRouting';
 
 // =============================================================================
 // TYPY
@@ -87,6 +90,32 @@ export interface UseAutoLayoutResult {
 // FUNKCJE POMOCNICZE
 // =============================================================================
 
+type CollisionKind = 'node' | 'label' | 'edge';
+
+interface CollisionItem {
+  id: string;
+  ownerId: string;
+  kind: CollisionKind;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  layerIndex: number;
+  typePriority: number;
+}
+
+interface CollisionPair {
+  a: CollisionItem;
+  b: CollisionItem;
+  clearance: number;
+}
+
+const KIND_PRIORITY: Record<CollisionKind, number> = {
+  node: 0,
+  label: 1,
+  edge: 2,
+};
+
 /**
  * Oblicz deterministyczny hash topologii.
  * DETERMINIZM: sortowanie po ID gwarantuje ten sam hash dla tej samej topologii.
@@ -143,41 +172,37 @@ export function computeTopologyHash(symbols: AnySldSymbol[]): string {
  * @returns Mapa: symbolId -> tablica kolidujacych symbolIds
  */
 export function detectCollisions(
-  positions: Map<string, Position>,
-  symbolSizes: Map<string, { width: number; height: number }>
-): Map<string, string[]> {
-  const collisions = new Map<string, string[]>();
-  const ids = Array.from(positions.keys());
+  items: CollisionItem[],
+  collisionConfig: CollisionConfig
+): CollisionPair[] {
+  const pairs: CollisionPair[] = [];
 
-  for (let i = 0; i < ids.length; i++) {
-    for (let j = i + 1; j < ids.length; j++) {
-      const id1 = ids[i];
-      const id2 = ids[j];
-      const pos1 = positions.get(id1)!;
-      const pos2 = positions.get(id2)!;
-      const size1 = symbolSizes.get(id1) || { width: 60, height: 40 };
-      const size2 = symbolSizes.get(id2) || { width: 60, height: 40 };
+  for (let i = 0; i < items.length; i++) {
+    for (let j = i + 1; j < items.length; j++) {
+      const a = items[i];
+      const b = items[j];
 
-      // AABB collision detection (Axis-Aligned Bounding Box)
-      const halfW1 = size1.width / 2;
-      const halfH1 = size1.height / 2;
-      const halfW2 = size2.width / 2;
-      const halfH2 = size2.height / 2;
+      if (a.kind === 'label' && b.kind === 'node' && a.ownerId === b.ownerId) continue;
+      if (b.kind === 'label' && a.kind === 'node' && a.ownerId === b.ownerId) continue;
 
-      const overlapX = Math.abs(pos1.x - pos2.x) < (halfW1 + halfW2);
-      const overlapY = Math.abs(pos1.y - pos2.y) < (halfH1 + halfH2);
+      const clearance = getPairClearance(a, b, collisionConfig);
+      if (clearance === null) continue;
+
+      const halfW1 = a.width / 2;
+      const halfH1 = a.height / 2;
+      const halfW2 = b.width / 2;
+      const halfH2 = b.height / 2;
+
+      const overlapX = Math.abs(a.x - b.x) < (halfW1 + halfW2 + clearance);
+      const overlapY = Math.abs(a.y - b.y) < (halfH1 + halfH2 + clearance);
 
       if (overlapX && overlapY) {
-        // Kolizja wykryta
-        if (!collisions.has(id1)) collisions.set(id1, []);
-        if (!collisions.has(id2)) collisions.set(id2, []);
-        collisions.get(id1)!.push(id2);
-        collisions.get(id2)!.push(id1);
+        pairs.push({ a, b, clearance });
       }
     }
   }
 
-  return collisions;
+  return pairs;
 }
 
 /**
@@ -189,65 +214,87 @@ export function detectCollisions(
  * - Priorytet: symbol o nizszym ID zostaje w miejscu
  */
 export function resolveCollisions(
+  symbols: AnySldSymbol[],
   positions: Map<string, Position>,
-  symbolSizes: Map<string, { width: number; height: number }>,
-  config: AutoLayoutConfig
+  basePositions: Map<string, Position>,
+  layoutDebug: AutoLayoutResult['debug'],
+  config: AutoLayoutConfig,
+  collisionConfig: CollisionConfig = DEFAULT_COLLISION_CONFIG
 ): { positions: Map<string, Position>; resolvedCount: number } {
   const resolved = new Map(positions);
   let resolvedCount = 0;
-  const maxIterations = 10; // Unikaj nieskonczonej petli
+  const maxIterations = collisionConfig.maxIterations;
+  const layerIndexBySymbol = buildLayerIndexMap(layoutDebug.layers);
+  const symbolById = new Map(symbols.map((symbol) => [symbol.id, symbol]));
+  const spineX = computeSpineX(symbols, resolved, config.gridSize);
 
   for (let iter = 0; iter < maxIterations; iter++) {
-    const collisions = detectCollisions(resolved, symbolSizes);
-    if (collisions.size === 0) break;
+    const items = buildCollisionItems(
+      symbols,
+      resolved,
+      layerIndexBySymbol,
+      config,
+      collisionConfig
+    );
+    const collisions = detectCollisions(items, collisionConfig);
+    if (collisions.length === 0) break;
 
-    // Sortuj kolidujace symbole po ID (determinizm)
-    const collidingIds = Array.from(collisions.keys()).sort();
+    const sortedItems = [...items].sort(compareCollisionItems);
+    const orderIndex = new Map(sortedItems.map((item, index) => [item.id, index]));
 
-    for (const id of collidingIds) {
-      const collidingWith = collisions.get(id) || [];
-      if (collidingWith.length === 0) continue;
+    for (const collision of collisions) {
+      const { a, b, clearance } = collision;
+      const moveCandidate = selectMoverItem(
+        a,
+        b,
+        orderIndex,
+        symbolById,
+        resolved,
+        spineX,
+        config.gridSize
+      );
+      if (!moveCandidate) continue;
 
-      const myPos = resolved.get(id)!;
-      const mySize = symbolSizes.get(id) || { width: 60, height: 40 };
+      const other = moveCandidate.id === a.id ? b : a;
+      const ownerId = moveCandidate.ownerId;
+      const ownerPos = resolved.get(ownerId);
+      if (!ownerPos) continue;
 
-      for (const otherId of collidingWith.sort()) {
-        // Symbol o nizszym ID ma priorytet (zostaje)
-        if (id.localeCompare(otherId) < 0) continue;
+      const dx = moveCandidate.x - other.x;
+      const dy = moveCandidate.y - other.y;
+      const minDistX = (moveCandidate.width + other.width) / 2 + clearance;
+      const minDistY = (moveCandidate.height + other.height) / 2 + clearance;
+      const neededX = minDistX - Math.abs(dx);
+      const neededY = minDistY - Math.abs(dy);
 
-        const otherPos = resolved.get(otherId)!;
-        const otherSize = symbolSizes.get(otherId) || { width: 60, height: 40 };
+      const spineLocked = isSpineLocked(ownerId, symbolById, resolved, spineX, config.gridSize);
+      const preferHorizontal = !spineLocked;
 
-        // Oblicz minimalne przesuniecie
-        const dx = myPos.x - otherPos.x;
-        const dy = myPos.y - otherPos.y;
-        const minDistX = (mySize.width + otherSize.width) / 2 + config.gridSize;
-        const minDistY = (mySize.height + otherSize.height) / 2 + config.gridSize;
+      const shift = calculateShift(
+        neededX,
+        neededY,
+        dx,
+        dy,
+        ownerId,
+        other.ownerId,
+        preferHorizontal
+      );
 
-        // Przesun w kierunku mniejszego nakladania
-        let newX = myPos.x;
-        let newY = myPos.y;
+      if (!shift) continue;
 
-        if (Math.abs(dx) < minDistX) {
-          const shiftX = (minDistX - Math.abs(dx)) * (dx >= 0 ? 1 : -1);
-          newX = myPos.x + shiftX;
-        }
+      let newX = ownerPos.x + shift.x;
+      let newY = ownerPos.y + shift.y;
+      const baseY = basePositions.get(ownerId)?.y ?? ownerPos.y;
+      if (newY < baseY) {
+        newY = baseY;
+      }
 
-        if (Math.abs(dy) < minDistY && Math.abs(dx) >= minDistX) {
-          // Przesun tylko jesli nie przesunieto w X
-        } else if (Math.abs(dy) < minDistY) {
-          const shiftY = (minDistY - Math.abs(dy)) * (dy >= 0 ? 1 : -1);
-          newY = myPos.y + shiftY;
-        }
+      newX = Math.round(newX / config.gridSize) * config.gridSize;
+      newY = Math.round(newY / config.gridSize) * config.gridSize;
 
-        // Snap to grid
-        newX = Math.round(newX / config.gridSize) * config.gridSize;
-        newY = Math.round(newY / config.gridSize) * config.gridSize;
-
-        if (newX !== myPos.x || newY !== myPos.y) {
-          resolved.set(id, { x: newX, y: newY });
-          resolvedCount++;
-        }
+      if (newX !== ownerPos.x || newY !== ownerPos.y) {
+        resolved.set(ownerId, { x: newX, y: newY });
+        resolvedCount++;
       }
     }
   }
@@ -264,11 +311,14 @@ export function resolveCollisions(
 export function applyOverrides(
   basePositions: Map<string, Position>,
   overrides: Map<string, PositionOverride>,
-  symbolSizes: Map<string, { width: number; height: number }>,
-  config: AutoLayoutConfig
+  symbols: AnySldSymbol[],
+  layoutDebug: AutoLayoutResult['debug'],
+  config: AutoLayoutConfig,
+  collisionConfig: CollisionConfig = DEFAULT_COLLISION_CONFIG
 ): { positions: Map<string, Position>; rejectedOverrides: string[] } {
   const positions = new Map(basePositions);
   const rejectedOverrides: string[] = [];
+  const layerIndexBySymbol = buildLayerIndexMap(layoutDebug.layers);
 
   // Sortuj nadpisania po timestamp (determinizm)
   const sortedOverrides = Array.from(overrides.values()).sort((a, b) => a.timestamp - b.timestamp);
@@ -289,8 +339,17 @@ export function applyOverrides(
     const testPositions = new Map(positions);
     testPositions.set(override.symbolId, { x: newX, y: newY });
 
-    const collisions = detectCollisions(testPositions, symbolSizes);
-    const hasCollision = collisions.has(override.symbolId);
+    const items = buildCollisionItems(
+      symbols,
+      testPositions,
+      layerIndexBySymbol,
+      config,
+      collisionConfig
+    );
+    const collisions = detectCollisions(items, collisionConfig);
+    const hasCollision = collisions.some(
+      ({ a, b }) => a.ownerId === override.symbolId || b.ownerId === override.symbolId
+    );
 
     if (hasCollision) {
       // Odrzuc nadpisanie - kolizja
@@ -338,6 +397,248 @@ function getSymbolSizes(symbols: AnySldSymbol[]): Map<string, { width: number; h
   return sizes;
 }
 
+function buildLayerIndexMap(layers: Map<number, string[]>): Map<string, number> {
+  const map = new Map<string, number>();
+  layers.forEach((symbolIds, layerIndex) => {
+    symbolIds.forEach((symbolId) => map.set(symbolId, layerIndex));
+  });
+  return map;
+}
+
+function computeSpineX(
+  symbols: AnySldSymbol[],
+  positions: Map<string, Position>,
+  gridSize: number
+): number {
+  const counts = new Map<number, number>();
+  symbols.forEach((symbol) => {
+    if (symbol.elementType !== 'Bus' && symbol.elementType !== 'Source') return;
+    const pos = positions.get(symbol.id);
+    if (!pos) return;
+    const snapped = Math.round(pos.x / gridSize) * gridSize;
+    counts.set(snapped, (counts.get(snapped) ?? 0) + 1);
+  });
+
+  let bestX = 0;
+  let bestCount = -1;
+  const entries = Array.from(counts.entries()).sort((a, b) => a[0] - b[0]);
+  for (const [x, count] of entries) {
+    if (count > bestCount) {
+      bestCount = count;
+      bestX = x;
+    }
+  }
+
+  return bestCount >= 0 ? bestX : 0;
+}
+
+function buildCollisionItems(
+  symbols: AnySldSymbol[],
+  positions: Map<string, Position>,
+  layerIndexBySymbol: Map<string, number>,
+  config: AutoLayoutConfig,
+  collisionConfig: CollisionConfig
+): CollisionItem[] {
+  const items: CollisionItem[] = [];
+  const symbolSizes = getSymbolSizes(symbols);
+  const positionedSymbols = applyPositionsToSymbols(symbols, positions);
+  const connections = generateConnections(positionedSymbols, {
+    gridSize: config.gridSize,
+  });
+
+  for (const symbol of symbols) {
+    const pos = positions.get(symbol.id);
+    if (!pos) continue;
+    const size = symbolSizes.get(symbol.id) ?? { width: 60, height: 40 };
+    const isBus = symbol.elementType === 'Bus';
+    const width = isBus ? size.width + collisionConfig.busbarPadding * 2 : size.width;
+    const height = isBus ? size.height + collisionConfig.busbarPadding * 2 : size.height;
+
+    items.push({
+      id: symbol.id,
+      ownerId: symbol.id,
+      kind: 'node',
+      x: pos.x,
+      y: pos.y,
+      width,
+      height,
+      layerIndex: layerIndexBySymbol.get(symbol.id) ?? 0,
+      typePriority: KIND_PRIORITY.node,
+    });
+
+    if (symbol.elementName) {
+      const labelBox = buildLabelBoundingBox(symbol, pos, size, collisionConfig);
+      items.push({
+        id: `${symbol.id}__label`,
+        ownerId: symbol.id,
+        kind: 'label',
+        x: labelBox.x,
+        y: labelBox.y,
+        width: labelBox.width,
+        height: labelBox.height,
+        layerIndex: layerIndexBySymbol.get(symbol.id) ?? 0,
+        typePriority: KIND_PRIORITY.label,
+      });
+    }
+  }
+
+  for (const connection of connections) {
+    for (let i = 0; i < connection.path.length - 1; i++) {
+      const from = connection.path[i];
+      const to = connection.path[i + 1];
+      const minX = Math.min(from.x, to.x);
+      const maxX = Math.max(from.x, to.x);
+      const minY = Math.min(from.y, to.y);
+      const maxY = Math.max(from.y, to.y);
+      const width = Math.max(maxX - minX, collisionConfig.edgeThickness);
+      const height = Math.max(maxY - minY, collisionConfig.edgeThickness);
+
+      items.push({
+        id: `${connection.id}__seg_${i}`,
+        ownerId: connection.id,
+        kind: 'edge',
+        x: (minX + maxX) / 2,
+        y: (minY + maxY) / 2,
+        width,
+        height,
+        layerIndex: Math.min(
+          layerIndexBySymbol.get(connection.fromSymbolId) ?? 0,
+          layerIndexBySymbol.get(connection.toSymbolId) ?? 0
+        ),
+        typePriority: KIND_PRIORITY.edge,
+      });
+    }
+  }
+
+  return items;
+}
+
+function buildLabelBoundingBox(
+  symbol: AnySldSymbol,
+  position: Position,
+  size: { width: number; height: number },
+  collisionConfig: CollisionConfig
+): { x: number; y: number; width: number; height: number } {
+  const labelWidth = Math.max(30, symbol.elementName.length * collisionConfig.labelCharWidth);
+  const labelHeight = collisionConfig.labelHeight;
+  const offsetY = symbol.elementType === 'Bus' ? -size.height / 2 - 8 : -size.height / 2 - 5;
+  const centerX = position.x;
+  const centerY = position.y + offsetY - labelHeight / 2;
+
+  return {
+    x: centerX,
+    y: centerY,
+    width: labelWidth,
+    height: labelHeight,
+  };
+}
+
+function applyPositionsToSymbols(
+  symbols: AnySldSymbol[],
+  positions: Map<string, Position>
+): AnySldSymbol[] {
+  return symbols.map((symbol) => {
+    const pos = positions.get(symbol.id);
+    if (!pos) return symbol;
+    return { ...symbol, position: pos };
+  });
+}
+
+function getPairClearance(
+  a: CollisionItem,
+  b: CollisionItem,
+  collisionConfig: CollisionConfig
+): number | null {
+  if (a.kind === 'node' && b.kind === 'node') return collisionConfig.symbolClearance;
+  if (a.kind === 'label' && b.kind === 'node') return collisionConfig.labelSymbolClearance;
+  if (a.kind === 'node' && b.kind === 'label') return collisionConfig.labelSymbolClearance;
+  if (a.kind === 'label' && b.kind === 'edge') return collisionConfig.labelEdgeClearance;
+  if (a.kind === 'edge' && b.kind === 'label') return collisionConfig.labelEdgeClearance;
+  if (a.kind === 'label' && b.kind === 'label') return collisionConfig.labelSymbolClearance;
+  return null;
+}
+
+function compareCollisionItems(a: CollisionItem, b: CollisionItem): number {
+  if (a.layerIndex !== b.layerIndex) return a.layerIndex - b.layerIndex;
+  if (a.typePriority !== b.typePriority) return a.typePriority - b.typePriority;
+  return a.id.localeCompare(b.id);
+}
+
+function isSpineLocked(
+  symbolId: string,
+  symbolById: Map<string, AnySldSymbol>,
+  positions: Map<string, Position>,
+  spineX: number,
+  gridSize: number
+): boolean {
+  const symbol = symbolById.get(symbolId);
+  if (!symbol) return false;
+  if (symbol.elementType !== 'Bus' && symbol.elementType !== 'Source') return false;
+  const pos = positions.get(symbolId);
+  if (!pos) return false;
+  return Math.abs(pos.x - spineX) <= gridSize / 2;
+}
+
+function selectMoverItem(
+  a: CollisionItem,
+  b: CollisionItem,
+  orderIndex: Map<string, number>,
+  symbolById: Map<string, AnySldSymbol>,
+  positions: Map<string, Position>,
+  spineX: number,
+  gridSize: number
+): CollisionItem | null {
+  let mover = orderIndex.get(a.id)! > orderIndex.get(b.id)! ? a : b;
+  let other = mover.id === a.id ? b : a;
+
+  if (mover.kind === 'edge' && other.kind !== 'edge') {
+    mover = other;
+    other = mover.id === a.id ? b : a;
+  }
+
+  const moverOwnerId = mover.ownerId;
+  const otherOwnerId = other.ownerId;
+  const moverSpineLocked = isSpineLocked(moverOwnerId, symbolById, positions, spineX, gridSize);
+  const otherSpineLocked = isSpineLocked(otherOwnerId, symbolById, positions, spineX, gridSize);
+
+  if (moverSpineLocked && !otherSpineLocked) {
+    return other;
+  }
+
+  if (mover.kind === 'edge') return null;
+  return mover;
+}
+
+function calculateShift(
+  neededX: number,
+  neededY: number,
+  dx: number,
+  dy: number,
+  moverId: string,
+  otherId: string,
+  preferHorizontal: boolean
+): { x: number; y: number } | null {
+  if (neededX <= 0 && neededY <= 0) return null;
+
+  const directionX = dx !== 0 ? Math.sign(dx) : moverId.localeCompare(otherId) < 0 ? -1 : 1;
+  const directionY = dy !== 0 ? Math.sign(dy) : moverId.localeCompare(otherId) < 0 ? -1 : 1;
+
+  if (preferHorizontal && neededX > 0) {
+    return { x: neededX * directionX, y: 0 };
+  }
+
+  if (neededY > 0) {
+    const safeDirectionY = directionY < 0 ? 1 : directionY;
+    return { x: 0, y: neededY * safeDirectionY };
+  }
+
+  if (neededX > 0) {
+    return { x: neededX * directionX, y: 0 };
+  }
+
+  return null;
+}
+
 // =============================================================================
 // HOOK: useAutoLayout
 // =============================================================================
@@ -370,8 +671,6 @@ export function useAutoLayout(
   const topologyHash = useMemo(() => computeTopologyHash(symbols), [symbols]);
 
   // Rozmiary symboli
-  const symbolSizes = useMemo(() => getSymbolSizes(symbols), [symbols]);
-
   // Oblicz layout (AUTOMATYCZNIE przy zmianie topologii)
   const layoutState = useMemo<AutoLayoutState>(() => {
     // Generuj bazowy layout
@@ -381,8 +680,10 @@ export function useAutoLayout(
     const { positions: withOverrides, rejectedOverrides } = applyOverrides(
       layoutResult.positions,
       overridesRef.current,
-      symbolSizes,
-      cfg
+      symbols,
+      layoutResult.debug,
+      cfg,
+      DEFAULT_COLLISION_CONFIG
     );
 
     // Usun odrzucone nadpisania
@@ -392,9 +693,12 @@ export function useAutoLayout(
 
     // Rozwiaz pozostale kolizje
     const { positions: finalPositions, resolvedCount } = resolveCollisions(
+      symbols,
       withOverrides,
-      symbolSizes,
-      cfg
+      layoutResult.positions,
+      layoutResult.debug,
+      cfg,
+      DEFAULT_COLLISION_CONFIG
     );
 
     return {
@@ -409,7 +713,7 @@ export function useAutoLayout(
         collisionsResolved: resolvedCount,
       },
     };
-  }, [symbols, topologyHash, symbolSizes, cfg]);
+  }, [symbols, topologyHash, cfg]);
 
   // Sprawdz czy topologia sie zmienila
   const isLayoutCurrent = previousHashRef.current === topologyHash;
