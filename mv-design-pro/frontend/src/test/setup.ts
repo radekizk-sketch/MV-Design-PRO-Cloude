@@ -5,6 +5,7 @@
  */
 
 import '@testing-library/jest-dom/vitest';
+import { vi } from 'vitest';
 
 class ResizeObserverMock {
   observe(): void {}
@@ -49,43 +50,41 @@ if (!('matchMedia' in globalThis)) {
   });
 }
 
-if (!('DOMMatrix' in globalThis)) {
-  class DOMMatrixMock {
-    a = 1;
-    b = 0;
-    c = 0;
-    d = 1;
-    e = 0;
-    f = 0;
-  }
-
-  (globalThis as typeof globalThis & { DOMMatrix: typeof DOMMatrixMock }).DOMMatrix = DOMMatrixMock;
+const DOMMatrixCtor = (globalThis as { DOMMatrix?: typeof DOMMatrix }).DOMMatrix;
+if (!DOMMatrixCtor) {
+  (globalThis as { DOMMatrix?: typeof DOMMatrix }).DOMMatrix = class {
+    constructor(..._args: any[]) {}
+  } as unknown as typeof DOMMatrix;
 }
 
-if (!HTMLCanvasElement.prototype.getContext) {
-  HTMLCanvasElement.prototype.getContext = () =>
-    ({
-      fillRect: () => {},
-      clearRect: () => {},
-      drawImage: () => {},
-      getImageData: () => ({ data: [] }),
-      putImageData: () => {},
-      createImageData: () => [],
-      setTransform: () => {},
-      resetTransform: () => {},
-      save: () => {},
-      restore: () => {},
-      beginPath: () => {},
-      moveTo: () => {},
-      lineTo: () => {},
-      closePath: () => {},
-      stroke: () => {},
-      translate: () => {},
-      scale: () => {},
-      rotate: () => {},
-      arc: () => {},
-      fill: () => {},
-      measureText: () => ({ width: 0 }),
-      canvas: document.createElement('canvas'),
-    }) as unknown as CanvasRenderingContext2D;
-}
+const canvasContextMock = {
+  fillRect: () => {},
+  clearRect: () => {},
+  drawImage: () => {},
+  getImageData: () => ({ data: [] }),
+  putImageData: () => {},
+  createImageData: () => [],
+  setTransform: () => {},
+  resetTransform: () => {},
+  save: () => {},
+  restore: () => {},
+  beginPath: () => {},
+  moveTo: () => {},
+  lineTo: () => {},
+  closePath: () => {},
+  stroke: () => {},
+  translate: () => {},
+  scale: () => {},
+  rotate: () => {},
+  arc: () => {},
+  fill: () => {},
+  measureText: () => ({ width: 0 }),
+  canvas: document.createElement('canvas'),
+};
+
+const getContextMock = vi.fn((type: string) =>
+  type === '2d' ? (canvasContextMock as unknown as CanvasRenderingContext2D) : null,
+);
+
+HTMLCanvasElement.prototype.getContext =
+  getContextMock as unknown as typeof HTMLCanvasElement.prototype.getContext;

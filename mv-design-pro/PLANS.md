@@ -3790,6 +3790,7 @@ POST /projects/import/preview
 - `CI Gate` odporny na `cancelled/skipped`, failuje tylko na `failure`.
 - Frontend unit tests: `vitest` w trybie single-thread + stabilny `jsdom` setup (ResizeObserver, IntersectionObserver, matchMedia, DOMMatrix, canvas).
 - Build/E2E: ustawione minimalne `VITE_API_URL(_DEV)` dla deterministycznego uruchomienia.
+- (2025-02) Stabilizacja: doprecyzowane shimy DOMMatrix/canvas, dołożony `@testing-library/user-event`, poprawione rozszerzenia testów TSX.
 
 ---
 
