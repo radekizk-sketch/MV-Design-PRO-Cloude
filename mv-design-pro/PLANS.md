@@ -3524,6 +3524,38 @@ export function getCommonFields(
 
 ---
 
+## 27b. P30f SLD Layout Determinism Tests (ROLA BINDING) — DONE
+
+### 27b.1 Cel
+
+Zapewnienie deterministycznego układu (auto-layout) i routingu połączeń
+dla SLD (spine layout), niezależnie od kolejności wejściowej.
+
+### 27b.2 Zakres (MUST)
+
+- Testy deterministyczności auto-layoutu (2× identyczny input)
+- Testy deterministyczności routingu (2× identyczny input)
+- Niezmienność wyniku względem permutacji wejścia (nodes/edges)
+- Snap do siatki (grid) dla layoutu i routingu
+- Brak NaN/Infinity w wynikach
+- 3 topologie: radialna, gwiazda, mała siatka
+
+### 27b.3 Implementacja
+
+**Frontend Tests**:
+
+- `frontend/src/ui/sld-editor/__tests__/layoutDeterminism.test.ts`
+
+### 27b.4 DoD (Definition of Done)
+
+- [x] Deterministyczny wynik dla powtórzeń
+- [x] Permutacje nie wpływają na wynik
+- [x] Wszystkie współrzędne na siatce
+- [x] Brak NaN/Infinity
+- [x] Jeden mały PR (tylko testy)
+
+---
+
 ## 28. P31 PROJECT IMPORT / EXPORT (ROLA BINDING) — DONE
 
 ### 28.1 Context
