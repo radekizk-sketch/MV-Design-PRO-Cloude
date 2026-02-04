@@ -40,8 +40,16 @@ import type {
   PortName,
 } from './types';
 import type { IssueSeverity } from '../types';
-import type { CadOverridesDocument, CadOverridesStatusReport, GeometryMode } from './cad/geometryContract';
+import type {
+  CadOverridesDocument,
+  CadOverridesIdSet,
+  CadOverridesStatusReport,
+  GeometryMode
+} from './cad/geometryContract';
+import { evaluateCadOverridesStatus } from './cad/geometryContract';
 import { generatePasteIdentifiers } from './utils/deterministicId';
+import { computeTopologyHash } from './hooks/useAutoLayout';
+import { generateConnections } from './utils/connectionRouting';
 import { featureFlags } from '../config/featureFlags';
 
 /**
@@ -52,6 +60,89 @@ const DEFAULT_GRID_CONFIG: GridConfig = {
   visible: true,
   snapEnabled: true,
 };
+
+function snapToGridRaw(position: Position, size: number): Position {
+  return {
+    x: Math.round(position.x / size) * size,
+    y: Math.round(position.y / size) * size,
+  };
+}
+
+function sortRecordKeys<T>(record: Record<string, T>): Record<string, T> {
+  return Object.keys(record)
+    .sort()
+    .reduce<Record<string, T>>((acc, key) => {
+      acc[key] = record[key];
+      return acc;
+    }, {});
+}
+
+function buildCadIdSet(symbols: AnySldSymbol[]): CadOverridesIdSet {
+  const connections = generateConnections(symbols);
+  return {
+    nodes: symbols.map((symbol) => symbol.id),
+    edges: connections.map((connection) => connection.id),
+    labels: [],
+  };
+}
+
+function buildCadOverridesDocument(
+  mode: GeometryMode,
+  baseFingerprint: string,
+  existing?: CadOverridesDocument | null
+): CadOverridesDocument {
+  if (existing) {
+    return {
+      ...existing,
+      mode,
+      updatedAt: new Date().toISOString(),
+    };
+  }
+
+  const now = new Date().toISOString();
+  return {
+    schemaVersion: 1,
+    mode,
+    baseFingerprint,
+    createdAt: now,
+    updatedAt: now,
+    nodes: {},
+    edges: {},
+    labels: {},
+  };
+}
+
+function findInsertIndexForBend(path: Position[], point: Position): number {
+  if (path.length < 2) return 0;
+  let bestIndex = path.length - 1;
+  let bestDistance = Number.POSITIVE_INFINITY;
+
+  for (let i = 0; i < path.length - 1; i += 1) {
+    const a = path[i];
+    const b = path[i + 1];
+    const distance = distancePointToSegment(point, a, b);
+    if (distance < bestDistance) {
+      bestDistance = distance;
+      bestIndex = i + 1;
+    }
+  }
+
+  return Math.max(0, bestIndex - 1);
+}
+
+function distancePointToSegment(point: Position, a: Position, b: Position): number {
+  const dx = b.x - a.x;
+  const dy = b.y - a.y;
+  if (dx === 0 && dy === 0) {
+    return Math.hypot(point.x - a.x, point.y - a.y);
+  }
+
+  const t = ((point.x - a.x) * dx + (point.y - a.y) * dy) / (dx * dx + dy * dy);
+  const clamped = Math.max(0, Math.min(1, t));
+  const projX = a.x + clamped * dx;
+  const projY = a.y + clamped * dy;
+  return Math.hypot(point.x - projX, point.y - projY);
+}
 
 /**
  * SLD Editor state interface.
@@ -102,6 +193,16 @@ interface SldEditorState {
   // ===== HOVER STATE (PR-SLD-05) =====
   /** ID portu pod kursorem (dla podswietlenia) */
   hoveredPortId: string | null;
+
+  // ===== CONNECTION SELECTION (CAD) =====
+  /** Zaznaczone polaczenie (dla edycji lamanych) */
+  selectedConnectionId: string | null;
+  /** Ostatnia pozycja klikniecia na polaczeniu */
+  lastConnectionClickPosition: Position | null;
+  /** Sciezka zaznaczonego polaczenia */
+  selectedConnectionPath: Position[] | null;
+  /** Zaznaczony indeks punktu lamanej */
+  selectedBendIndex: number | null;
 
   // ===== CAD OVERRIDES =====
   /** Tryb geometrii (AUTO / CAD / HYBRID) */
@@ -188,10 +289,22 @@ interface SldEditorState {
   /** Ustaw port pod kursorem */
   setHoveredPort: (portId: string | null) => void;
 
+  // ===== ACTIONS: CONNECTION SELECTION (CAD) =====
+  setSelectedConnection: (connectionId: string | null, clickPosition?: Position | null, path?: Position[] | null) => void;
+  setSelectedBendIndex: (index: number | null) => void;
+
   // ===== ACTIONS: CAD OVERRIDES =====
   setGeometryMode: (mode: GeometryMode) => void;
   setCadOverridesDocument: (doc: CadOverridesDocument | null) => void;
   setCadOverridesStatus: (report: CadOverridesStatusReport | null) => void;
+  updateCadNodeOverride: (symbolId: string, position: Position) => void;
+  updateCadNodeOverrides: (updates: Map<string, Position>) => void;
+  addCadEdgeBend: (edgeId: string, position: Position, path?: Position[] | null) => void;
+  updateCadEdgeBend: (edgeId: string, index: number, position: Position) => void;
+  removeCadEdgeBend: (edgeId: string, index: number) => void;
+  resetCadOverrideForNode: (symbolId: string) => void;
+  resetCadOverrideForEdge: (edgeId: string) => void;
+  resetAllCadOverrides: () => void;
 
   // ===== HELPERS =====
   getSymbol: (symbolId: string) => AnySldSymbol | undefined;
@@ -217,6 +330,10 @@ export const useSldEditorStore = create<SldEditorState>()((set, get) => ({
   portSnapState: null,
   statusMessage: null,
   hoveredPortId: null,
+  selectedConnectionId: null,
+  lastConnectionClickPosition: null,
+  selectedConnectionPath: null,
+  selectedBendIndex: null,
   geometryMode: 'AUTO',
   cadOverridesDocument: null,
   cadOverridesStatus: null,
@@ -374,7 +491,9 @@ export const useSldEditorStore = create<SldEditorState>()((set, get) => ({
         y: currentPosition.y - state.dragState.startPosition.y,
       };
 
-      // Update positions with snap-to-grid if enabled
+      const shouldForceSnap = featureFlags.sldCadEditingEnabled && state.geometryMode !== 'AUTO';
+
+      // Update positions with snap-to-grid if enabled (CAD zawsze przyciaga)
       const newSymbols = new Map(state.symbols);
       state.dragState.symbolIds.forEach((id) => {
         const originalPos = state.dragState!.originalPositions.get(id);
@@ -385,8 +504,8 @@ export const useSldEditorStore = create<SldEditorState>()((set, get) => ({
           };
 
           // Apply snap-to-grid if enabled
-          if (state.gridConfig.snapEnabled) {
-            newPos = get().snapToGrid(newPos);
+          if (state.gridConfig.snapEnabled || shouldForceSnap) {
+            newPos = snapToGridRaw(newPos, state.gridConfig.size);
           }
 
           const symbol = state.symbols.get(id);
@@ -768,6 +887,22 @@ export const useSldEditorStore = create<SldEditorState>()((set, get) => ({
     set({ hoveredPortId: portId });
   },
 
+  // ===== CONNECTION SELECTION (CAD) =====
+
+  setSelectedConnection: (connectionId: string | null, clickPosition?: Position | null, path?: Position[] | null) => {
+    const normalizedPath = path ? path.map((point) => ({ ...point })) : null;
+    set({
+      selectedConnectionId: connectionId,
+      lastConnectionClickPosition: clickPosition ?? null,
+      selectedConnectionPath: normalizedPath,
+      selectedBendIndex: null,
+    });
+  },
+
+  setSelectedBendIndex: (index: number | null) => {
+    set({ selectedBendIndex: index });
+  },
+
   // ===== CAD OVERRIDES =====
 
   setGeometryMode: (mode: GeometryMode) => {
@@ -775,7 +910,30 @@ export const useSldEditorStore = create<SldEditorState>()((set, get) => ({
       set({ geometryMode: 'AUTO' });
       return;
     }
-    set({ geometryMode: mode });
+    set((state) => {
+      if (!state.cadOverridesDocument && mode !== 'AUTO') {
+        const baseFingerprintCurrent = computeTopologyHash(Array.from(state.symbols.values()));
+        const doc = buildCadOverridesDocument(mode, baseFingerprintCurrent, null);
+        return {
+          geometryMode: mode,
+          cadOverridesDocument: doc,
+        };
+      }
+      if (!state.cadOverridesDocument) {
+        return { geometryMode: mode };
+      }
+
+      const updatedDoc: CadOverridesDocument = {
+        ...state.cadOverridesDocument,
+        mode,
+        updatedAt: new Date().toISOString(),
+      };
+
+      return {
+        geometryMode: mode,
+        cadOverridesDocument: updatedDoc,
+      };
+    });
   },
 
   setCadOverridesDocument: (doc: CadOverridesDocument | null) => {
@@ -784,6 +942,324 @@ export const useSldEditorStore = create<SldEditorState>()((set, get) => ({
 
   setCadOverridesStatus: (report: CadOverridesStatusReport | null) => {
     set({ cadOverridesStatus: report });
+  },
+
+  updateCadNodeOverride: (symbolId: string, position: Position) => {
+    set((state) => {
+      if (!featureFlags.sldCadEditingEnabled || state.geometryMode === 'AUTO') {
+        return state;
+      }
+
+      const baseFingerprintCurrent = computeTopologyHash(Array.from(state.symbols.values()));
+      const doc = buildCadOverridesDocument(state.geometryMode, baseFingerprintCurrent, state.cadOverridesDocument);
+      const snapped = snapToGridRaw(position, state.gridConfig.size);
+
+      const nodes = sortRecordKeys({
+        ...doc.nodes,
+        [symbolId]: { pos: snapped },
+      });
+
+      const updatedDoc: CadOverridesDocument = {
+        ...doc,
+        nodes,
+        updatedAt: new Date().toISOString(),
+      };
+
+      const report = evaluateCadOverridesStatus(
+        baseFingerprintCurrent,
+        updatedDoc.baseFingerprint,
+        updatedDoc,
+        buildCadIdSet(Array.from(state.symbols.values()))
+      );
+
+      return {
+        cadOverridesDocument: updatedDoc,
+        cadOverridesStatus: report,
+      };
+    });
+  },
+
+  updateCadNodeOverrides: (updates: Map<string, Position>) => {
+    set((state) => {
+      if (!featureFlags.sldCadEditingEnabled || state.geometryMode === 'AUTO') {
+        return state;
+      }
+
+      const baseFingerprintCurrent = computeTopologyHash(Array.from(state.symbols.values()));
+      const doc = buildCadOverridesDocument(state.geometryMode, baseFingerprintCurrent, state.cadOverridesDocument);
+
+      const updatedNodes: Record<string, { pos: Position; locked?: boolean }> = {
+        ...doc.nodes,
+      };
+
+      updates.forEach((pos, symbolId) => {
+        updatedNodes[symbolId] = {
+          ...(updatedNodes[symbolId] ?? {}),
+          pos: snapToGridRaw(pos, state.gridConfig.size),
+        };
+      });
+
+      const updatedDoc: CadOverridesDocument = {
+        ...doc,
+        nodes: sortRecordKeys(updatedNodes),
+        updatedAt: new Date().toISOString(),
+      };
+
+      const report = evaluateCadOverridesStatus(
+        baseFingerprintCurrent,
+        updatedDoc.baseFingerprint,
+        updatedDoc,
+        buildCadIdSet(Array.from(state.symbols.values()))
+      );
+
+      return {
+        cadOverridesDocument: updatedDoc,
+        cadOverridesStatus: report,
+      };
+    });
+  },
+
+  addCadEdgeBend: (edgeId: string, position: Position, path?: Position[] | null) => {
+    set((state) => {
+      if (!featureFlags.sldCadEditingEnabled || state.geometryMode === 'AUTO') {
+        return state;
+      }
+
+      const baseFingerprintCurrent = computeTopologyHash(Array.from(state.symbols.values()));
+      const doc = buildCadOverridesDocument(state.geometryMode, baseFingerprintCurrent, state.cadOverridesDocument);
+      const snapped = snapToGridRaw(position, state.gridConfig.size);
+      const existing = doc.edges[edgeId]?.bends ? [...doc.edges[edgeId]!.bends!] : [];
+
+      let insertIndex = existing.length;
+      if (path && path.length >= 2) {
+        insertIndex = findInsertIndexForBend(path, snapped);
+      }
+
+      const nextBends = [
+        ...existing.slice(0, insertIndex),
+        snapped,
+        ...existing.slice(insertIndex),
+      ];
+
+      const edges = sortRecordKeys({
+        ...doc.edges,
+        [edgeId]: {
+          ...doc.edges[edgeId],
+          bends: nextBends,
+        },
+      });
+
+      const updatedDoc: CadOverridesDocument = {
+        ...doc,
+        edges,
+        updatedAt: new Date().toISOString(),
+      };
+
+      const report = evaluateCadOverridesStatus(
+        baseFingerprintCurrent,
+        updatedDoc.baseFingerprint,
+        updatedDoc,
+        buildCadIdSet(Array.from(state.symbols.values()))
+      );
+
+      return {
+        cadOverridesDocument: updatedDoc,
+        cadOverridesStatus: report,
+        selectedBendIndex: insertIndex,
+      };
+    });
+  },
+
+  updateCadEdgeBend: (edgeId: string, index: number, position: Position) => {
+    set((state) => {
+      if (!featureFlags.sldCadEditingEnabled || state.geometryMode === 'AUTO') {
+        return state;
+      }
+
+      const doc = state.cadOverridesDocument;
+      if (!doc || !doc.edges[edgeId]?.bends) {
+        return state;
+      }
+
+      const baseFingerprintCurrent = computeTopologyHash(Array.from(state.symbols.values()));
+      const snapped = snapToGridRaw(position, state.gridConfig.size);
+      const bends = [...doc.edges[edgeId]!.bends!];
+      if (index < 0 || index >= bends.length) {
+        return state;
+      }
+
+      bends[index] = snapped;
+
+      const edges = sortRecordKeys({
+        ...doc.edges,
+        [edgeId]: {
+          ...doc.edges[edgeId],
+          bends,
+        },
+      });
+
+      const updatedDoc: CadOverridesDocument = {
+        ...doc,
+        edges,
+        updatedAt: new Date().toISOString(),
+      };
+
+      const report = evaluateCadOverridesStatus(
+        baseFingerprintCurrent,
+        updatedDoc.baseFingerprint,
+        updatedDoc,
+        buildCadIdSet(Array.from(state.symbols.values()))
+      );
+
+      return {
+        cadOverridesDocument: updatedDoc,
+        cadOverridesStatus: report,
+      };
+    });
+  },
+
+  removeCadEdgeBend: (edgeId: string, index: number) => {
+    set((state) => {
+      if (!featureFlags.sldCadEditingEnabled || state.geometryMode === 'AUTO') {
+        return state;
+      }
+
+      const doc = state.cadOverridesDocument;
+      if (!doc || !doc.edges[edgeId]?.bends) {
+        return state;
+      }
+
+      const baseFingerprintCurrent = computeTopologyHash(Array.from(state.symbols.values()));
+      const bends = [...doc.edges[edgeId]!.bends!];
+      if (index < 0 || index >= bends.length) {
+        return state;
+      }
+
+      bends.splice(index, 1);
+
+      const edges = { ...doc.edges };
+      if (bends.length === 0) {
+        delete edges[edgeId];
+      } else {
+        edges[edgeId] = {
+          ...doc.edges[edgeId],
+          bends,
+        };
+      }
+
+      const updatedDoc: CadOverridesDocument = {
+        ...doc,
+        edges: sortRecordKeys(edges),
+        updatedAt: new Date().toISOString(),
+      };
+
+      const report = evaluateCadOverridesStatus(
+        baseFingerprintCurrent,
+        updatedDoc.baseFingerprint,
+        updatedDoc,
+        buildCadIdSet(Array.from(state.symbols.values()))
+      );
+
+      return {
+        cadOverridesDocument: updatedDoc,
+        cadOverridesStatus: report,
+        selectedBendIndex: null,
+      };
+    });
+  },
+
+  resetCadOverrideForNode: (symbolId: string) => {
+    set((state) => {
+      if (!featureFlags.sldCadEditingEnabled || state.geometryMode === 'AUTO') {
+        return state;
+      }
+      if (!state.cadOverridesDocument) return state;
+      const { [symbolId]: _, ...remainingNodes } = state.cadOverridesDocument.nodes;
+
+      const updatedDoc: CadOverridesDocument = {
+        ...state.cadOverridesDocument,
+        nodes: sortRecordKeys(remainingNodes),
+        updatedAt: new Date().toISOString(),
+      };
+
+      const baseFingerprintCurrent = computeTopologyHash(Array.from(state.symbols.values()));
+      const report = evaluateCadOverridesStatus(
+        baseFingerprintCurrent,
+        updatedDoc.baseFingerprint,
+        updatedDoc,
+        buildCadIdSet(Array.from(state.symbols.values()))
+      );
+
+      return {
+        cadOverridesDocument: updatedDoc,
+        cadOverridesStatus: report,
+      };
+    });
+  },
+
+  resetCadOverrideForEdge: (edgeId: string) => {
+    set((state) => {
+      if (!featureFlags.sldCadEditingEnabled || state.geometryMode === 'AUTO') {
+        return state;
+      }
+      if (!state.cadOverridesDocument) return state;
+      const { [edgeId]: _, ...remainingEdges } = state.cadOverridesDocument.edges;
+
+      const updatedDoc: CadOverridesDocument = {
+        ...state.cadOverridesDocument,
+        edges: sortRecordKeys(remainingEdges),
+        updatedAt: new Date().toISOString(),
+      };
+
+      const baseFingerprintCurrent = computeTopologyHash(Array.from(state.symbols.values()));
+      const report = evaluateCadOverridesStatus(
+        baseFingerprintCurrent,
+        updatedDoc.baseFingerprint,
+        updatedDoc,
+        buildCadIdSet(Array.from(state.symbols.values()))
+      );
+
+      return {
+        cadOverridesDocument: updatedDoc,
+        cadOverridesStatus: report,
+        selectedConnectionId: state.selectedConnectionId === edgeId ? null : state.selectedConnectionId,
+        selectedBendIndex: null,
+      };
+    });
+  },
+
+  resetAllCadOverrides: () => {
+    set((state) => {
+      if (!featureFlags.sldCadEditingEnabled || state.geometryMode === 'AUTO') {
+        return state;
+      }
+      if (!state.cadOverridesDocument) return state;
+
+      const updatedDoc: CadOverridesDocument = {
+        ...state.cadOverridesDocument,
+        nodes: {},
+        edges: {},
+        labels: {},
+        updatedAt: new Date().toISOString(),
+      };
+
+      const baseFingerprintCurrent = computeTopologyHash(Array.from(state.symbols.values()));
+      const report = evaluateCadOverridesStatus(
+        baseFingerprintCurrent,
+        updatedDoc.baseFingerprint,
+        updatedDoc,
+        buildCadIdSet(Array.from(state.symbols.values()))
+      );
+
+      return {
+        cadOverridesDocument: updatedDoc,
+        cadOverridesStatus: report,
+        selectedConnectionId: null,
+        selectedBendIndex: null,
+        lastConnectionClickPosition: null,
+        selectedConnectionPath: null,
+      };
+    });
   },
 
   // ===== HELPERS =====

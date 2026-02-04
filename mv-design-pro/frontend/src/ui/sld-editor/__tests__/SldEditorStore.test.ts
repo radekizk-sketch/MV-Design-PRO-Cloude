@@ -15,9 +15,21 @@
  * 7. Lasso selection: selects symbols in rectangle
  */
 
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { useSldEditorStore } from '../SldEditorStore';
-import type { NodeSymbol, Position } from '../types';
+import type { NodeSymbol, Position, BranchSymbol } from '../types';
+
+vi.mock('../../config/featureFlags', () => ({
+  featureFlags: Object.freeze({
+    ENABLE_MATH_RENDERING: true,
+    sldCadEditingEnabled: true,
+  }),
+  useFeatureFlags: () => ({
+    ENABLE_MATH_RENDERING: true,
+    sldCadEditingEnabled: true,
+  }),
+  isFeatureEnabled: () => true,
+}));
 
 describe('SldEditorStore', () => {
   // Reset store before each test
@@ -41,6 +53,13 @@ describe('SldEditorStore', () => {
       portSnapState: null,
       statusMessage: null,
       hoveredPortId: null,
+      selectedConnectionId: null,
+      lastConnectionClickPosition: null,
+      selectedConnectionPath: null,
+      selectedBendIndex: null,
+      geometryMode: 'AUTO',
+      cadOverridesDocument: null,
+      cadOverridesStatus: null,
     });
   });
 
@@ -54,6 +73,19 @@ describe('SldEditorStore', () => {
     inService: true,
     width: 60,
     height: 8,
+  });
+
+  const createTestBranch = (id: string, fromNodeId: string, toNodeId: string): BranchSymbol => ({
+    id,
+    elementId: `elem_${id}`,
+    elementType: 'LineBranch',
+    elementName: `Linia ${id}`,
+    position: { x: 0, y: 0 },
+    inService: true,
+    fromNodeId,
+    toNodeId,
+    points: [],
+    branchType: 'LINE',
   });
 
   // =============================================================================
@@ -614,6 +646,69 @@ describe('SldEditorStore', () => {
 
       useSldEditorStore.getState().setHoveredPort(null);
       expect(useSldEditorStore.getState().hoveredPortId).toBeNull();
+    });
+  });
+
+  // =============================================================================
+  // TEST 13: CAD overrides for geometry
+  // =============================================================================
+  describe('CAD overrides: geometria', () => {
+    it('should store snapped node override and update status', () => {
+      const store = useSldEditorStore.getState();
+      const symbol = createTestSymbol('sym1', 103, 98);
+      store.setSymbols([symbol]);
+      store.setGeometryMode('CAD');
+
+      const updates = new Map<string, Position>([['sym1', { x: 103, y: 98 }]]);
+      store.updateCadNodeOverrides(updates);
+
+      const doc = store.cadOverridesDocument!;
+      expect(doc.nodes.sym1.pos).toEqual({ x: 100, y: 100 });
+      expect(store.cadOverridesStatus?.status).toBe('VALID');
+    });
+
+    it('should add bend override with snap and keep status valid', () => {
+      const store = useSldEditorStore.getState();
+      const bus1 = createTestSymbol('sym1', 100, 100);
+      const bus2 = createTestSymbol('sym2', 300, 100);
+      const branch = createTestBranch('edge-1', bus1.elementId, bus2.elementId);
+      store.setSymbols([bus1, bus2, branch]);
+      store.setGeometryMode('CAD');
+
+      store.addCadEdgeBend('edge-1', { x: 155, y: 101 }, [
+        { x: 100, y: 100 },
+        { x: 300, y: 100 },
+      ]);
+
+      const doc = store.cadOverridesDocument!;
+      expect(doc.edges['edge-1']?.bends?.[0]).toEqual({ x: 160, y: 100 });
+      expect(store.cadOverridesStatus?.status).toBe('VALID');
+    });
+
+    it('should reset node, edge, and global overrides', () => {
+      const store = useSldEditorStore.getState();
+      const bus1 = createTestSymbol('sym1', 100, 100);
+      const bus2 = createTestSymbol('sym2', 300, 100);
+      const branch = createTestBranch('edge-1', bus1.elementId, bus2.elementId);
+      store.setSymbols([bus1, bus2, branch]);
+      store.setGeometryMode('CAD');
+
+      store.updateCadNodeOverride('sym1', { x: 120, y: 120 });
+      store.addCadEdgeBend('edge-1', { x: 200, y: 120 }, [
+        { x: 100, y: 100 },
+        { x: 300, y: 100 },
+      ]);
+
+      store.resetCadOverrideForNode('sym1');
+      expect(store.cadOverridesDocument?.nodes.sym1).toBeUndefined();
+
+      store.resetCadOverrideForEdge('edge-1');
+      expect(store.cadOverridesDocument?.edges['edge-1']).toBeUndefined();
+
+      store.updateCadNodeOverride('sym2', { x: 140, y: 140 });
+      store.resetAllCadOverrides();
+      expect(store.cadOverridesDocument?.nodes).toEqual({});
+      expect(store.cadOverridesDocument?.edges).toEqual({});
     });
   });
 });
