@@ -2,26 +2,37 @@
  * AUTO-LAYOUT — ETAP-grade hierarchiczny algorytm rozmieszczania SLD
  *
  * PR-SLD-ETAP-GEOMETRY-01: ETAP-grade geometria SLD
+ * PR-SLD-ETAP-TOPOLOGY-LAYOUT-FINAL: ETAP/PowerFactory-grade topology layout
  *
  * CANONICAL ALIGNMENT:
  * - SLD_KANONICZNA_SPECYFIKACJA.md § 5: Auto-Layout
  * - sldEtapStyle.ts: ETAP_GEOMETRY (single source of truth)
  * - ETAP software visual standards
+ * - PowerFactory layout principles
  *
  * FEATURES:
- * - Deterministyczny (ten sam model → ten sam układ)
+ * - Deterministyczny 100% (ten sam model → identyczny SLD)
  * - Hierarchiczny WN → Trafo → SN → Feeders
  * - Szyny auto-expandujące (width based on bay count)
  * - Pola SN pionowo z szyny z równym odstępem
  * - Transformator osiowo między WN i SN
  * - Brak ukośnych przyłączy z szyn
+ * - PCC filtering (PCC NIE JEST RYSOWANE)
+ * - Quarantine zone dla niepoprawnych elementów
+ * - Station stack layout dla PV/BESS/FW
  *
- * ALGORYTM (ETAP-GRADE):
- * 1. Identyfikacja typów szyn (WN/SN) i transformatorów
- * 2. Budowa hierarchii: Source → WN → Trafo → SN → Feeders/Loads
- * 3. Obliczenie szerokości szyn (auto-expansion)
- * 4. Pozycjonowanie warstwowe z ETAP_GEOMETRY tokens
- * 5. Pozycjonowanie feeders pionowo pod SN
+ * ALGORYTM (PR-SLD-ETAP-TOPOLOGY-LAYOUT-FINAL):
+ * 1. FILTER: Usuń PCC nodes z render graph
+ * 2. VALIDATE: Sprawdź łączniki SN i wyłączniki transformatorów
+ * 3. CLASSIFY: Klasyfikuj węzły wg poziomu napięcia i funkcji
+ * 4. BUILD SPINE: Znajdź główny backbone WN/SN
+ * 5. PLACE WN: Szyny WN na L1, transformatory WN/SN na L2
+ * 6. PLACE SN: Szyny SN na L3 z sekcjami
+ * 7. PLACE SN FIELDS: Pola liniowe SN pionowo z szyny (L4 → L5)
+ * 8. PLACE STATIONS: Stacje SN/nn w układzie pionowym (L7 → L12)
+ * 9. ROUTING: Spine = vertical only, busbar exits = vertical only
+ * 10. NO FLOATING CHECK: Elementy bez połączenia → QUARANTINE
+ * 11. FIT VIEW: Auto-fit przy pierwszym poprawnym layoutcie
  */
 
 import type { AnySldSymbol, BranchSymbol, Position, SwitchSymbol, NodeSymbol } from '../types';
@@ -148,6 +159,18 @@ export interface AutoLayoutResult {
     transformerCount: number;
     /** Busbar section info */
     busbarSections: Map<string, number>;
+    /** PR-SLD-ETAP-TOPOLOGY-LAYOUT-FINAL: PCC nodes filtered from render */
+    filteredPccNodes: string[];
+    /** PR-SLD-ETAP-TOPOLOGY-LAYOUT-FINAL: Symbols in quarantine zone */
+    quarantinedSymbols: string[];
+    /** PR-SLD-ETAP-TOPOLOGY-LAYOUT-FINAL: Station stacks identified */
+    stationStacks: Map<string, string[]>;
+    /** PR-SLD-ETAP-TOPOLOGY-LAYOUT-FINAL: Canonical layer assignments */
+    canonicalLayerAssignments: Map<string, string>;
+    /** PR-SLD-ETAP-TOPOLOGY-LAYOUT-FINAL: SPINE X coordinate */
+    spineX: number;
+    /** PR-SLD-ETAP-TOPOLOGY-LAYOUT-FINAL: Is empty state (no valid topology) */
+    isEmptyState: boolean;
   };
 }
 
@@ -223,6 +246,297 @@ function isConnectedToTransformer(
     }
   }
   return { connected: false, side: null };
+}
+
+// =============================================================================
+// PR-SLD-ETAP-TOPOLOGY-LAYOUT-FINAL: PCC FILTERING
+// =============================================================================
+
+/**
+ * Check if a symbol is a PCC (Point of Common Coupling) node.
+ * PCC nodes are filtered from render graph per canonical rules.
+ *
+ * CANON: PCC NIE JEST RYSOWANE w SLD.
+ */
+function isPccNode(symbol: AnySldSymbol): boolean {
+  const { pccFiltering } = ETAP_GEOMETRY;
+  if (!pccFiltering.filterPccNodes) return false;
+
+  const nameLower = symbol.elementName.toLowerCase();
+  const elementType = symbol.elementType.toLowerCase();
+
+  // Check name patterns
+  for (const pattern of pccFiltering.pccNamePatterns) {
+    if (nameLower.includes(pattern.toLowerCase())) {
+      return true;
+    }
+  }
+
+  // Check type patterns
+  for (const pattern of pccFiltering.pccTypePatterns) {
+    if (elementType.includes(pattern.toLowerCase())) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+/**
+ * Filter PCC nodes from symbol list.
+ * Returns filtered symbols and list of filtered PCC node IDs.
+ *
+ * DETERMINISTIC: Same input → same filtered output.
+ */
+function filterPccNodes(symbols: AnySldSymbol[]): {
+  filteredSymbols: AnySldSymbol[];
+  filteredPccIds: string[];
+} {
+  const filteredPccIds: string[] = [];
+  const filteredSymbols: AnySldSymbol[] = [];
+
+  // Sort for determinism
+  const sorted = [...symbols].sort((a, b) => a.id.localeCompare(b.id));
+
+  for (const symbol of sorted) {
+    if (isPccNode(symbol)) {
+      filteredPccIds.push(symbol.id);
+    } else {
+      filteredSymbols.push(symbol);
+    }
+  }
+
+  return { filteredSymbols, filteredPccIds };
+}
+
+// =============================================================================
+// PR-SLD-ETAP-TOPOLOGY-LAYOUT-FINAL: CANONICAL LAYER ASSIGNMENT
+// =============================================================================
+
+/** Canonical layer names */
+type CanonicalLayerName =
+  | 'L0_SOURCE'
+  | 'L1_WN_BUSBAR'
+  | 'L2_WN_SN_TRANSFORMER'
+  | 'L3_SN_BUSBAR'
+  | 'L4_SN_BAY'
+  | 'L5_SN_BRANCH_SWITCH'
+  | 'L6_SN_CABLE'
+  | 'L7_STATION_SN_SWITCHGEAR'
+  | 'L8_STATION_SN_BREAKER'
+  | 'L9_SN_NN_TRANSFORMER'
+  | 'L10_NN_BUSBAR'
+  | 'L11_NN_SWITCHGEAR'
+  | 'L12_INVERTER_LOAD';
+
+/**
+ * Assign canonical layer to a symbol based on its type and topology context.
+ * DETERMINISTIC: Same symbol properties → same layer assignment.
+ */
+function assignCanonicalLayer(
+  symbol: AnySldSymbol,
+  voltageLevel: VoltageLevel,
+  isStationElement: boolean,
+  connectedTransformer: AnySldSymbol | null
+): CanonicalLayerName {
+  // Sources always at L0
+  if (symbol.elementType === 'Source') {
+    return 'L0_SOURCE';
+  }
+
+  // Busbars depend on voltage level
+  if (symbol.elementType === 'Bus') {
+    if (voltageLevel === 'WN') return 'L1_WN_BUSBAR';
+    if (voltageLevel === 'SN') return 'L3_SN_BUSBAR';
+    if (voltageLevel === 'nN') return 'L10_NN_BUSBAR';
+    return 'L3_SN_BUSBAR'; // Default to SN
+  }
+
+  // Transformers depend on voltage levels
+  if (symbol.elementType === 'TransformerBranch') {
+    // Check if this is a WN/SN or SN/nN transformer based on connected buses
+    if (isStationElement) {
+      return 'L9_SN_NN_TRANSFORMER';
+    }
+    return 'L2_WN_SN_TRANSFORMER';
+  }
+
+  // Switches depend on context
+  if (symbol.elementType === 'Switch') {
+    if (isStationElement) {
+      // Station switch - could be SN switchgear or SN breaker
+      if (connectedTransformer) {
+        return 'L8_STATION_SN_BREAKER';
+      }
+      return 'L7_STATION_SN_SWITCHGEAR';
+    }
+    // Main network switch
+    if (voltageLevel === 'nN') return 'L11_NN_SWITCHGEAR';
+    return 'L5_SN_BRANCH_SWITCH';
+  }
+
+  // Line branches
+  if (symbol.elementType === 'LineBranch') {
+    if (isStationElement) return 'L6_SN_CABLE';
+    return 'L4_SN_BAY';
+  }
+
+  // Loads and inverters
+  if (symbol.elementType === 'Load') {
+    return 'L12_INVERTER_LOAD';
+  }
+
+  // Default
+  return 'L4_SN_BAY';
+}
+
+/**
+ * Get Y offset for a canonical layer.
+ */
+function getCanonicalLayerY(layerName: CanonicalLayerName, baseY: number): number {
+  const layer = ETAP_GEOMETRY.canonicalLayers[layerName];
+  return baseY + layer.yOffset;
+}
+
+// =============================================================================
+// PR-SLD-ETAP-TOPOLOGY-LAYOUT-FINAL: STATION STACK IDENTIFICATION
+// =============================================================================
+
+/**
+ * Station stack info for PV/BESS/FW/Consumer stations.
+ */
+interface StationStack {
+  /** Station root ID (typically the SN/nn transformer) */
+  rootId: string;
+  /** Station name (from transformer or load) */
+  name: string;
+  /** All symbols in the station stack */
+  symbolIds: string[];
+  /** SN switchgear symbol */
+  snSwitchgear: string | null;
+  /** SN breaker symbol */
+  snBreaker: string | null;
+  /** SN/nn transformer symbol */
+  transformer: string | null;
+  /** nn busbar symbol */
+  nnBusbar: string | null;
+  /** nn switchgear symbols */
+  nnSwitchgear: string[];
+  /** Inverter/load symbols */
+  invertersLoads: string[];
+  /** Station type */
+  stationType: 'pv' | 'bess' | 'fw' | 'consumer' | 'unknown';
+}
+
+/**
+ * Identify station stacks from symbols.
+ * A station is identified by an SN/nn transformer with connected nN elements.
+ */
+function identifyStationStacks(
+  symbols: AnySldSymbol[],
+  elementToSymbol: Map<string, string>
+): StationStack[] {
+  const stacks: StationStack[] = [];
+
+  // Find all SN/nn transformers
+  const transformers = symbols
+    .filter((s) => s.elementType === 'TransformerBranch')
+    .sort((a, b) => a.id.localeCompare(b.id)); // Determinism
+
+  for (const trafo of transformers) {
+    const branch = trafo as BranchSymbol;
+
+    // Get connected buses
+    const fromBus = symbols.find((s) => s.elementId === branch.fromNodeId);
+    const toBus = symbols.find((s) => s.elementId === branch.toNodeId);
+
+    if (!fromBus || !toBus) continue;
+
+    const fromVoltage = detectBusVoltageLevel(fromBus);
+    const toVoltage = detectBusVoltageLevel(toBus);
+
+    // Check if this is an SN/nn transformer
+    const isSnNnTransformer =
+      (fromVoltage === 'SN' && toVoltage === 'nN') ||
+      (fromVoltage === 'nN' && toVoltage === 'SN');
+
+    if (!isSnNnTransformer) continue;
+
+    // Identify the nN side
+    const nnBusId = fromVoltage === 'nN' ? branch.fromNodeId : branch.toNodeId;
+    const snBusId = fromVoltage === 'SN' ? branch.fromNodeId : branch.toNodeId;
+
+    // Build the station stack
+    const stack: StationStack = {
+      rootId: trafo.id,
+      name: trafo.elementName,
+      symbolIds: [trafo.id],
+      snSwitchgear: null,
+      snBreaker: null,
+      transformer: trafo.id,
+      nnBusbar: null,
+      nnSwitchgear: [],
+      invertersLoads: [],
+      stationType: 'unknown',
+    };
+
+    // Find nn busbar
+    const nnBusSymbol = symbols.find((s) => s.elementId === nnBusId);
+    if (nnBusSymbol) {
+      stack.nnBusbar = nnBusSymbol.id;
+      stack.symbolIds.push(nnBusSymbol.id);
+    }
+
+    // Find SN breaker (switch connected to transformer's SN side)
+    const snBreaker = symbols.find((s) => {
+      if (s.elementType !== 'Switch') return false;
+      const sw = s as SwitchSymbol;
+      return sw.fromNodeId === snBusId || sw.toNodeId === snBusId;
+    });
+    if (snBreaker) {
+      stack.snBreaker = snBreaker.id;
+      stack.symbolIds.push(snBreaker.id);
+    }
+
+    // Find loads/sources connected to nn busbar
+    symbols.forEach((s) => {
+      if (s.elementType === 'Load' || s.elementType === 'Source') {
+        const connectedNodeId = (s as any).connectedToNodeId;
+        if (connectedNodeId === nnBusId) {
+          stack.invertersLoads.push(s.id);
+          stack.symbolIds.push(s.id);
+
+          // Detect station type from source name
+          const nameLower = s.elementName.toLowerCase();
+          if (nameLower.includes('pv') || nameLower.includes('fotowoltaik')) {
+            stack.stationType = 'pv';
+          } else if (nameLower.includes('bess') || nameLower.includes('magazyn')) {
+            stack.stationType = 'bess';
+          } else if (nameLower.includes('fw') || nameLower.includes('wiatr') || nameLower.includes('wind')) {
+            stack.stationType = 'fw';
+          } else if (s.elementType === 'Load') {
+            stack.stationType = 'consumer';
+          }
+        }
+      }
+    });
+
+    // Find nn switchgear (switches connected to nn busbar)
+    symbols.forEach((s) => {
+      if (s.elementType !== 'Switch') return;
+      const sw = s as SwitchSymbol;
+      if ((sw.fromNodeId === nnBusId || sw.toNodeId === nnBusId) && s.id !== stack.snBreaker) {
+        stack.nnSwitchgear.push(s.id);
+        if (!stack.symbolIds.includes(s.id)) {
+          stack.symbolIds.push(s.id);
+        }
+      }
+    });
+
+    stacks.push(stack);
+  }
+
+  return stacks;
 }
 
 // =============================================================================
@@ -571,7 +885,13 @@ export function generateAutoLayout(
 ): AutoLayoutResult {
   const cfg: AutoLayoutConfig = { ...DEFAULT_LAYOUT_CONFIG, ...config };
 
-  // If no symbols, return empty result
+  // Initialize debug info
+  const filteredPccNodes: string[] = [];
+  const quarantinedSymbols: string[] = [];
+  const stationStacksMap = new Map<string, string[]>();
+  const canonicalLayerAssignments = new Map<string, string>();
+
+  // If no symbols, return empty result (EMPTY STATE)
   if (symbols.length === 0) {
     return {
       positions: new Map(),
@@ -582,27 +902,66 @@ export function generateAutoLayout(
         floatingSymbols: [],
         transformerCount: 0,
         busbarSections: new Map(),
+        filteredPccNodes: [],
+        quarantinedSymbols: [],
+        stationStacks: new Map(),
+        canonicalLayerAssignments: new Map(),
+        spineX: 0,
+        isEmptyState: true,
+      },
+    };
+  }
+
+  // PR-SLD-ETAP-TOPOLOGY-LAYOUT-FINAL: STEP 1 — Filter PCC nodes
+  const { filteredSymbols: workingSymbols, filteredPccIds } = filterPccNodes(symbols);
+  filteredPccNodes.push(...filteredPccIds);
+
+  // If all symbols were filtered, return empty result
+  if (workingSymbols.length === 0) {
+    return {
+      positions: new Map(),
+      debug: {
+        layers: new Map(),
+        totalLayers: 0,
+        totalNodes: 0,
+        floatingSymbols: [],
+        transformerCount: 0,
+        busbarSections: new Map(),
+        filteredPccNodes,
+        quarantinedSymbols: [],
+        stationStacks: new Map(),
+        canonicalLayerAssignments: new Map(),
+        spineX: 0,
+        isEmptyState: true,
       },
     };
   }
 
   // Build element ID to symbol ID mapping
   const elementToSymbol = new Map<string, string>();
-  symbols.forEach((s) => elementToSymbol.set(s.elementId, s.id));
+  workingSymbols.forEach((s) => elementToSymbol.set(s.elementId, s.id));
 
   // Build symbol ID to symbol mapping
   const symbolById = new Map<string, AnySldSymbol>();
-  symbols.forEach((s) => symbolById.set(s.id, s));
+  workingSymbols.forEach((s) => symbolById.set(s.id, s));
+
+  // PR-SLD-ETAP-TOPOLOGY-LAYOUT-FINAL: STEP 2 — Identify station stacks
+  const stationStacks = identifyStationStacks(workingSymbols, elementToSymbol);
+  const stationSymbolIds = new Set<string>();
+  stationStacks.forEach((stack) => {
+    stationStacksMap.set(stack.rootId, stack.symbolIds);
+    stack.symbolIds.forEach((id) => stationSymbolIds.add(id));
+  });
 
   // Classify symbols — SORT BY ID FOR DETERMINISM
   // This ensures that the same set of symbols always produces the same layout
   // regardless of input order
-  const busbars = symbols.filter((s) => s.elementType === 'Bus').sort((a, b) => a.id.localeCompare(b.id));
-  const transformers = symbols.filter((s) => s.elementType === 'TransformerBranch').sort((a, b) => a.id.localeCompare(b.id));
-  const sources = symbols.filter((s) => s.elementType === 'Source').sort((a, b) => a.id.localeCompare(b.id));
-  const switches = symbols.filter((s) => s.elementType === 'Switch').sort((a, b) => a.id.localeCompare(b.id));
-  const lineBranches = symbols.filter((s) => s.elementType === 'LineBranch').sort((a, b) => a.id.localeCompare(b.id));
-  const loads = symbols.filter((s) => s.elementType === 'Load').sort((a, b) => a.id.localeCompare(b.id));
+  const busbars = workingSymbols.filter((s) => s.elementType === 'Bus').sort((a, b) => a.id.localeCompare(b.id));
+  const transformers = workingSymbols.filter((s) => s.elementType === 'TransformerBranch').sort((a, b) => a.id.localeCompare(b.id));
+  const sources = workingSymbols.filter((s) => s.elementType === 'Source').sort((a, b) => a.id.localeCompare(b.id));
+  const switches = workingSymbols.filter((s) => s.elementType === 'Switch').sort((a, b) => a.id.localeCompare(b.id));
+  const lineBranches = workingSymbols.filter((s) => s.elementType === 'LineBranch').sort((a, b) => a.id.localeCompare(b.id));
+  const loads = workingSymbols.filter((s) => s.elementType === 'Load').sort((a, b) => a.id.localeCompare(b.id));
 
   // Detect voltage levels for busbars
   const busbarVoltages = new Map<string, VoltageLevel>();
@@ -711,7 +1070,7 @@ export function generateAutoLayout(
     const bays = baysByBusbar.get(bus.id) || [];
 
     // Detect if busbar should be sectioned
-    const sectionCount = detectBusbarSections(bus, symbols);
+    const sectionCount = detectBusbarSections(bus, workingSymbols);
 
     // Calculate sectioned busbar layout
     // Note: couplerPositions can be used for coupler switch positioning in future enhancements
@@ -866,19 +1225,42 @@ export function generateAutoLayout(
   // Build busbar section info for debug
   const busbarSections = new Map<string, number>();
   targetBusbars.forEach((bus) => {
-    const sectionCount = detectBusbarSections(bus, symbols);
+    const sectionCount = detectBusbarSections(bus, workingSymbols);
     busbarSections.set(bus.id, sectionCount);
   });
+
+  // PR-SLD-ETAP-TOPOLOGY-LAYOUT-FINAL: Assign canonical layers
+  workingSymbols.forEach((symbol) => {
+    const voltageLevel = busbarVoltages.get(symbol.id) || 'SN';
+    const isStation = stationSymbolIds.has(symbol.id);
+    const connectedTrafo = null; // Simplified for now
+    const layer = assignCanonicalLayer(symbol, voltageLevel, isStation, connectedTrafo);
+    canonicalLayerAssignments.set(symbol.id, layer);
+  });
+
+  // Calculate SPINE X coordinate (most common X position for main busbars)
+  let spineX = cfg.canvasCenter.x;
+  if (wnBusbars.length > 0) {
+    spineX = positions.get(wnBusbars[0].id)?.x ?? cfg.canvasCenter.x;
+  } else if (snBusbars.length > 0) {
+    spineX = positions.get(snBusbars[0].id)?.x ?? cfg.canvasCenter.x;
+  }
 
   return {
     positions,
     debug: {
       layers,
       totalLayers: layerIndex,
-      totalNodes: symbols.length,
+      totalNodes: workingSymbols.length,
       floatingSymbols,
       transformerCount: transformers.length,
       busbarSections,
+      filteredPccNodes,
+      quarantinedSymbols,
+      stationStacks: stationStacksMap,
+      canonicalLayerAssignments,
+      spineX,
+      isEmptyState: false,
     },
   };
 }

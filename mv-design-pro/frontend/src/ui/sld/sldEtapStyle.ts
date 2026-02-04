@@ -378,10 +378,67 @@ export const ETAP_GRID = {
  */
 export const ETAP_GEOMETRY = {
   // ---------------------------------------------------------------------------
+  // CANONICAL 12-LAYER SYSTEM (PR-SLD-ETAP-TOPOLOGY-LAYOUT-FINAL)
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Canonical layer configuration for ETAP/PowerFactory-grade SLD layout.
+   *
+   * Układ pionowy od góry do dołu:
+   *
+   * L0  ŹRÓDŁO / SIEĆ WN
+   * L1  ROZDZIELNICA WN + SZYN WN (opcjonalnie)
+   * L2  TRANSFORMATORY WN/SN
+   * L3  ROZDZIELNICA SN + SZYN SN (sekcjonowana)
+   * L4  POLA LINIOWE SN (sieć, odgałęzienia)
+   * L5  ŁĄCZNIKI ODGAŁĘZIEŃ SN
+   * L6  PRZYŁĄCZA SN (kable)
+   * L7  ROZDZIELNICE SN STACJI
+   * L8  WYŁĄCZNIKI SN TRANSFORMATORÓW
+   * L9  TRANSFORMATORY SN/nn
+   * L10 SZYN nn (0,4 / 0,69 / 0,8 kV)
+   * L11 ROZDZIELNICE nn
+   * L12 FALOWNIKI PV / BESS / FW / ODBIORY
+   *
+   * Reguła: niższy poziom napięcia = niższa warstwa Y
+   */
+  canonicalLayers: {
+    /** L0: Źródło / Sieć WN — topmost layer */
+    L0_SOURCE: { index: 0, yOffset: 0, label: 'Źródło / Sieć WN' },
+    /** L1: Rozdzielnica WN + Szyny WN */
+    L1_WN_BUSBAR: { index: 1, yOffset: 100, label: 'Rozdzielnica WN' },
+    /** L2: Transformatory WN/SN */
+    L2_WN_SN_TRANSFORMER: { index: 2, yOffset: 180, label: 'Transformator WN/SN' },
+    /** L3: Rozdzielnica SN + Szyny SN */
+    L3_SN_BUSBAR: { index: 3, yOffset: 280, label: 'Rozdzielnica SN' },
+    /** L4: Pola liniowe SN */
+    L4_SN_BAY: { index: 4, yOffset: 340, label: 'Pole liniowe SN' },
+    /** L5: Łączniki odgałęzień SN */
+    L5_SN_BRANCH_SWITCH: { index: 5, yOffset: 420, label: 'Łącznik odgałęzienia SN' },
+    /** L6: Przyłącza SN (kable) */
+    L6_SN_CABLE: { index: 6, yOffset: 500, label: 'Przyłącze SN' },
+    /** L7: Rozdzielnice SN stacji */
+    L7_STATION_SN_SWITCHGEAR: { index: 7, yOffset: 580, label: 'Rozdzielnica SN stacji' },
+    /** L8: Wyłączniki SN transformatorów */
+    L8_STATION_SN_BREAKER: { index: 8, yOffset: 660, label: 'Wyłącznik SN transformatora' },
+    /** L9: Transformatory SN/nn */
+    L9_SN_NN_TRANSFORMER: { index: 9, yOffset: 740, label: 'Transformator SN/nn' },
+    /** L10: Szyny nn */
+    L10_NN_BUSBAR: { index: 10, yOffset: 840, label: 'Szyna nn' },
+    /** L11: Rozdzielnice nn */
+    L11_NN_SWITCHGEAR: { index: 11, yOffset: 920, label: 'Rozdzielnica nn' },
+    /** L12: Falowniki / Odbiory */
+    L12_INVERTER_LOAD: { index: 12, yOffset: 1000, label: 'Falownik / Odbior' },
+  },
+
+  /** Layer spacing between canonical layers (default) */
+  canonicalLayerSpacing: 80,
+
+  // ---------------------------------------------------------------------------
   // BUSBAR CONFIGURATION
   // ---------------------------------------------------------------------------
 
-  /** Busbar vertical layer configuration (top to bottom) */
+  /** Busbar vertical layer configuration (top to bottom) - LEGACY, use canonicalLayers */
   busbarLayers: {
     /** WN (110kV) busbar layer offset from top */
     WN: 100,
@@ -474,6 +531,42 @@ export const ETAP_GEOMETRY = {
   },
 
   // ---------------------------------------------------------------------------
+  // STATION STACK CONFIGURATION (PR-SLD-ETAP-TOPOLOGY-LAYOUT-FINAL)
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Station stack layout for PV/BESS/FW/Consumer stations.
+   *
+   * ETAP CANONICAL ORDER (top to bottom):
+   * 1. SN Switchgear (rozdzielnica SN stacji)
+   * 2. SN Breaker (wyłącznik SN transformatora)
+   * 3. SN/nn Transformer
+   * 4. nn Busbar (0,4 / 0,69 / 0,8 kV)
+   * 5. nn Switchgear (rozdzielnica nn)
+   * 6. Inverters / Loads (falowniki PV/BESS/FW / odbiory)
+   */
+  stationStack: {
+    /** Horizontal offset from spine for station branches (px) */
+    horizontalOffset: 120,
+    /** Vertical spacing between stack elements (px) */
+    elementSpacing: 80,
+    /** SN switchgear to SN breaker spacing (px) */
+    snSwitchgearToBreaker: 60,
+    /** SN breaker to transformer spacing (px) */
+    breakerToTransformer: 60,
+    /** Transformer to nn busbar spacing (px) */
+    transformerToNnBusbar: 80,
+    /** nn busbar to nn switchgear spacing (px) */
+    nnBusbarToSwitchgear: 60,
+    /** nn switchgear to inverter/load spacing (px) */
+    nnSwitchgearToInverter: 60,
+    /** Width of station stack (for bounding) (px) */
+    stackWidth: 200,
+    /** Minimum spacing between parallel station stacks (px) */
+    parallelStackSpacing: 160,
+  },
+
+  // ---------------------------------------------------------------------------
   // CONNECTION ROUTING
   // ---------------------------------------------------------------------------
 
@@ -559,6 +652,76 @@ export const ETAP_GEOMETRY = {
     requireConnection: true,
     /** Show warning banner in UI for floating symbols */
     showFloatingWarning: true,
+    /** Enable SN branch switching validation (V-06) */
+    requireSnBranchSwitching: true,
+    /** Enable transformer breaker validation (V-07) */
+    requireTransformerBreakers: true,
+  },
+
+  // ---------------------------------------------------------------------------
+  // QUARANTINE ZONE (PR-SLD-ETAP-TOPOLOGY-LAYOUT-FINAL)
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Quarantine zone configuration for invalid topology elements.
+   *
+   * ETAP RULE: Elementy niepoprawne → QUARANTINE ZONE + panel błędów.
+   * Nigdy "pół-schemat" — albo poprawna topologia, albo QUARANTINE.
+   */
+  quarantineZone: {
+    /** Enable quarantine zone for invalid elements */
+    enabled: true,
+    /** Quarantine zone Y offset from bottom of valid layout (px) */
+    yOffsetFromLayout: 200,
+    /** Quarantine zone label */
+    label: 'STREFA KWARANTANNY — elementy z błędami topologii',
+    /** Background color for quarantine zone */
+    backgroundColor: 'rgba(220, 38, 38, 0.05)', // red-600 with low opacity
+    /** Border color for quarantine zone */
+    borderColor: '#DC2626', // red-600
+    /** Spacing between quarantined elements (px) */
+    elementSpacing: 100,
+    /** Padding around quarantine zone (px) */
+    padding: 40,
+  },
+
+  // ---------------------------------------------------------------------------
+  // PCC FILTERING (PR-SLD-ETAP-TOPOLOGY-LAYOUT-FINAL)
+  // ---------------------------------------------------------------------------
+
+  /**
+   * PCC (Point of Common Coupling) filtering rules.
+   *
+   * CANON: PCC NIE JEST RYSOWANE w SLD.
+   * PCC jest koncepcją biznesową, nie fizyczną — należy do warstwy analizy.
+   */
+  pccFiltering: {
+    /** Enable PCC node filtering from render graph */
+    filterPccNodes: true,
+    /** PCC name patterns to filter (case-insensitive) */
+    pccNamePatterns: ['pcc', 'point of common coupling', 'punkt przyłączenia'],
+    /** PCC element type patterns to filter */
+    pccTypePatterns: ['pcc', 'connection_point', 'virtual_node'],
+  },
+
+  // ---------------------------------------------------------------------------
+  // EMPTY STATE (PR-SLD-ETAP-TOPOLOGY-LAYOUT-FINAL)
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Empty state configuration for when topology is invalid.
+   *
+   * ETAP RULE: Brak poprawnej topologii → EMPTY STATE.
+   */
+  emptyState: {
+    /** Enable empty state display */
+    enabled: true,
+    /** Empty state message */
+    message: 'Brak poprawnej topologii — dodaj elementy lub napraw błędy',
+    /** Empty state icon */
+    icon: 'grid_off',
+    /** Show validation errors in empty state */
+    showValidationErrors: true,
   },
 } as const;
 
