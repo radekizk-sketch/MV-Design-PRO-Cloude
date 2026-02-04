@@ -21,7 +21,7 @@ import type { OperatingMode, ResultStatus, SelectedElement, MultiSelection } fro
 interface SelectionState {
   // Current selection (P30c: multi-select support)
   selectedElements: SelectedElement[]; // Always sorted by ID (determinism)
-  selectedElement: SelectedElement | null; // Computed: first element (compatibility)
+  selectedElement: SelectedElement | null; // Single select (compatibility)
 
   // Operating mode (controls what actions are allowed)
   mode: OperatingMode;
@@ -62,9 +62,7 @@ export const useSelectionStore = create<SelectionState>()(
     (set, get) => ({
       // Initial state
       selectedElements: [],
-      get selectedElement() {
-        return get().selectedElements[0] ?? null;
-      },
+      selectedElement: null,
       mode: 'MODEL_EDIT',
       resultStatus: 'NONE',
       propertyGridOpen: false,
@@ -75,6 +73,7 @@ export const useSelectionStore = create<SelectionState>()(
       selectElement: (element) =>
         set((state) => ({
           selectedElements: element ? [element] : [],
+          selectedElement: element ?? null,
           // Auto-open property grid on selection
           propertyGridOpen: element !== null || state.propertyGridOpen,
         })),
@@ -85,6 +84,7 @@ export const useSelectionStore = create<SelectionState>()(
           const sorted = [...elements].sort((a, b) => a.id.localeCompare(b.id));
           return {
             selectedElements: sorted,
+            selectedElement: sorted[0] ?? null,
             // Auto-open property grid on selection
             propertyGridOpen: sorted.length > 0 || state.propertyGridOpen,
           };
@@ -149,6 +149,7 @@ export const useSelectionStore = create<SelectionState>()(
       clearSelection: () =>
         set(() => ({
           selectedElements: [],
+          selectedElement: null,
           sldCenterOnElement: null,
         })),
     }),

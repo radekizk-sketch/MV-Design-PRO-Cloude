@@ -595,6 +595,7 @@ class NetworkGraph:
 | 2026-07 | 2.15 | P20 merge + Proof Engine completion (P11–P20) |
 | 2026-08 | 2.23 | P21: Voltage Profile (BUS-centric) view + contract |
 | 2026-09 | 2.24 | SLD CAD geometry contract (AUTO/CAD/HYBRID + overrides) |
+| 2026-10 | 2.24.1 | FE CI stabilization: selection store sync, ETAP tokenized tests, E2E gating assertions |
 
 ---
 
