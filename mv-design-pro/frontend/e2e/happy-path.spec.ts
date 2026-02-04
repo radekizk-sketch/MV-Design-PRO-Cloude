@@ -319,6 +319,28 @@ test.describe('Context Bar Synchronization', () => {
     await expect(configureBtn).toHaveAttribute('title', 'Wybierz przypadek, aby skonfigurować');
   });
 
+  test('should disable configure when active case is not ready', async ({ page }) => {
+    const notReadyCaseAppState = {
+      ...TEST_APP_STATE,
+      state: {
+        ...TEST_APP_STATE.state,
+        activeCaseResultStatus: 'NONE',
+      },
+    };
+
+    await seedTestState(page, { appState: notReadyCaseAppState });
+    await page.goto('/');
+    await waitForAppReady(page);
+
+    const configureBtn = page.locator('[data-testid="btn-configure"]');
+
+    await expect(configureBtn).toBeDisabled();
+    await expect(configureBtn).toHaveAttribute(
+      'title',
+      'Przypadek nie jest gotowy do konfiguracji'
+    );
+  });
+
   test('should show correct button states based on app state', async ({ page }) => {
     await seedTestState(page);
     await page.goto('/');

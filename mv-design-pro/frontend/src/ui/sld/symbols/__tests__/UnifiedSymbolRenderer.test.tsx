@@ -596,7 +596,7 @@ describe('renderSymbol Function', () => {
   it('should pass all visual state properties correctly', () => {
     const symbol = createBusSymbol();
 
-    render(
+    const { container } = render(
       <svg>
         {renderSymbol({
           symbol,
@@ -609,8 +609,9 @@ describe('renderSymbol Function', () => {
       </svg>
     );
 
-    // Should render with highlight styling (red #dc2626)
+    // Should render with highlight styling (ETAP token)
     const symbolElement = screen.getByTestId(`sld-symbol-${symbol.id}`);
     expect(symbolElement).toBeInTheDocument();
+    expect(container.innerHTML).toContain(ETAP_STATE_COLORS.error);
   });
 });
