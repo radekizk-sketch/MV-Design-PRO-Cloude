@@ -2025,6 +2025,7 @@ P14a jest **warstwą foundation** dla przyszłych faz protection:
 - [x] UI ProtectionLibraryBrowser w 100% PL (Urządzenia, Krzywe, Szablony nastaw)
 - [x] Testy backend (immutability, determinism, get/list)
 - [x] Testy frontend (smoke render, filter/sort)
+- [x] Ustabilizowane testy ProtectionLibraryBrowser dla duplikowanych etykiet producenta
 - [x] PLANS.md zaktualizowany
 
 ---

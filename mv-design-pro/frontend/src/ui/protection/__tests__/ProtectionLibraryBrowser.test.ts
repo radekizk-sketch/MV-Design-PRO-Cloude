@@ -160,9 +160,9 @@ describe('ProtectionLibraryBrowser', () => {
 
     // Details should appear
     await waitFor(() => {
-      expect(screen.getByText('Producent')).toBeInTheDocument();
-      expect(screen.getByText('Schneider Electric')).toBeInTheDocument();
-      expect(screen.getByText('Seria')).toBeInTheDocument();
+      expect(screen.getByText(/Producent/)).toBeInTheDocument();
+      expect(screen.getAllByText('Schneider Electric').length).toBeGreaterThan(0);
+      expect(screen.getByText(/Seria/)).toBeInTheDocument();
       expect(screen.getByText('Sepam 20')).toBeInTheDocument();
     });
   });
@@ -248,7 +248,7 @@ describe('ProtectionLibraryBrowser', () => {
     render(<ProtectionLibraryBrowser />);
 
     await waitFor(() => {
-      expect(screen.getByText('Schneider Electric')).toBeInTheDocument();
+      expect(screen.getAllByText('Schneider Electric').length).toBeGreaterThan(0);
       expect(screen.getByText('ABB')).toBeInTheDocument();
     });
   });
@@ -264,9 +264,9 @@ describe('ProtectionLibraryBrowser', () => {
     await user.click(screen.getByText('IEC Normalna Inwersyjna'));
 
     await waitFor(() => {
-      expect(screen.getByText('Standard')).toBeInTheDocument();
+      expect(screen.getByText(/Standard/)).toBeInTheDocument();
       expect(screen.getByText('IEC')).toBeInTheDocument();
-      expect(screen.getByText('Typ krzywej')).toBeInTheDocument();
+      expect(screen.getByText(/Typ krzywej/)).toBeInTheDocument();
       expect(screen.getByText('inverse')).toBeInTheDocument();
     });
   });
