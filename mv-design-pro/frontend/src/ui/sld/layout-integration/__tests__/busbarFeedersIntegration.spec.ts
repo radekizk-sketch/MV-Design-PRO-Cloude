@@ -27,6 +27,7 @@ import {
   generateBusbarFeederPaths,
   determineBusbarAxis,
   determineFeederSide,
+  generateFeederOrderKey,
 } from '../index';
 
 // =============================================================================
@@ -237,29 +238,25 @@ describe('SLD Auto-Layout Integration', () => {
   });
 
   // ---------------------------------------------------------------------------
-  // TEST 1: Flag OFF → Standard Routing (No Changes)
+  // TEST 1: Auto-Layout Default ON
   // ---------------------------------------------------------------------------
 
-  describe('Test 1: Flag OFF → Standard Routing', () => {
-    it('should generate connections with standard routing when flag is OFF', () => {
-      // Ensure flag is OFF
-      expect(isAutoLayoutV1Enabled()).toBe(false);
-
+  describe('Test 1: Auto-Layout Default ON', () => {
+    it('should generate connections with auto-layout by default', () => {
+      // Auto-layout is now always ON for busbar feeders (no flag check needed)
       const symbols = createTestScenario();
       const connections = generateConnections(symbols);
 
       // Should generate connections for all feeders
       expect(connections.length).toBeGreaterThan(0);
 
-      // Connections should still be orthogonal (ETAP standard routing)
+      // Connections should have valid paths
       for (const conn of connections) {
-        expect(isPathOrthogonal(conn.path)).toBe(true);
+        expect(conn.path.length).toBeGreaterThanOrEqual(2);
       }
     });
 
-    it('should produce deterministic results when flag is OFF', () => {
-      expect(isAutoLayoutV1Enabled()).toBe(false);
-
+    it('should produce deterministic results', () => {
       const symbols = createTestScenario();
       const connections1 = generateConnections(symbols);
       const connections2 = generateConnections(symbols);
@@ -559,6 +556,159 @@ describe('SLD Auto-Layout Integration', () => {
       for (const conn of connections) {
         expect(isPathOrthogonal(conn.path)).toBe(true);
       }
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // Side + OrderKey Tie-Break Rules
+  // ---------------------------------------------------------------------------
+
+  describe('Side + OrderKey Tie-Break Rules', () => {
+    it('should use tie-break when target Y equals bus Y (horizontal busbar)', () => {
+      const busSymbol = createBusbarSymbol('bus-tie', 300, 200, 400, 8);
+
+      // Target at same Y as bus — should use element ID for tie-break
+      const targetSameY: NodeSymbol = {
+        id: 'target-same-y',
+        elementId: 'aaa-target', // Lexically smaller than bus elementId
+        elementType: 'Bus',
+        elementName: 'Target Same Y',
+        position: { x: 400, y: 200 }, // Same Y as bus
+        inService: true,
+        width: 50,
+        height: 8,
+      };
+
+      const side1 = determineFeederSide(busSymbol, targetSameY, 'H');
+      // 'aaa-target' < 'elem-bus-tie' → TOP
+      expect(side1).toBe('TOP');
+
+      // Now with element ID that is lexically larger
+      const targetSameY2: NodeSymbol = {
+        ...targetSameY,
+        elementId: 'zzz-target', // Lexically larger
+      };
+
+      const side2 = determineFeederSide(busSymbol, targetSameY2, 'H');
+      // 'zzz-target' > 'elem-bus-tie' → BOTTOM
+      expect(side2).toBe('BOTTOM');
+    });
+
+    it('should use tie-break when target X equals bus X (vertical busbar)', () => {
+      const busSymbol: NodeSymbol = {
+        id: 'v-bus-tie',
+        elementId: 'elem-v-bus-tie',
+        elementType: 'Bus',
+        elementName: 'Vertical Bus',
+        position: { x: 200, y: 300 },
+        inService: true,
+        width: 8,
+        height: 400,
+      };
+
+      // Target at same X as bus — should use element ID for tie-break
+      const targetSameX: NodeSymbol = {
+        id: 'target-same-x',
+        elementId: 'aaa-target', // Lexically smaller
+        elementType: 'Bus',
+        elementName: 'Target Same X',
+        position: { x: 200, y: 100 }, // Same X as bus
+        inService: true,
+        width: 50,
+        height: 8,
+      };
+
+      const side1 = determineFeederSide(busSymbol, targetSameX, 'V');
+      // 'aaa-target' < 'elem-v-bus-tie' → LEFT
+      expect(side1).toBe('LEFT');
+
+      // Now with element ID that is lexically larger
+      const targetSameX2: NodeSymbol = {
+        ...targetSameX,
+        elementId: 'zzz-target', // Lexically larger
+      };
+
+      const side2 = determineFeederSide(busSymbol, targetSameX2, 'V');
+      // 'zzz-target' > 'elem-v-bus-tie' → RIGHT
+      expect(side2).toBe('RIGHT');
+    });
+
+    it('should generate deterministic orderKey based on position and element ID', () => {
+      const target1: AnySldSymbol = {
+        id: 'load-1',
+        elementId: 'elem-load-1',
+        elementType: 'Load',
+        elementName: 'Load 1',
+        position: { x: 100, y: 300 },
+        inService: true,
+      };
+
+      const target2: AnySldSymbol = {
+        id: 'load-2',
+        elementId: 'elem-load-2',
+        elementType: 'Load',
+        elementName: 'Load 2',
+        position: { x: 200, y: 300 },
+        inService: true,
+      };
+
+      const key1 = generateFeederOrderKey(target1, 'BOTTOM', 0);
+      const key2 = generateFeederOrderKey(target2, 'BOTTOM', 1);
+
+      // key1 should sort before key2 (x=100 < x=200)
+      expect(key1.localeCompare(key2)).toBeLessThan(0);
+    });
+
+    it('should use element ID as final tie-break for same position', () => {
+      const targetA: AnySldSymbol = {
+        id: 'load-a',
+        elementId: 'aaa-load',
+        elementType: 'Load',
+        elementName: 'Load A',
+        position: { x: 150, y: 300 },
+        inService: true,
+      };
+
+      const targetB: AnySldSymbol = {
+        id: 'load-b',
+        elementId: 'zzz-load',
+        elementType: 'Load',
+        elementName: 'Load B',
+        position: { x: 150, y: 300 }, // Same position
+        inService: true,
+      };
+
+      const keyA = generateFeederOrderKey(targetA, 'BOTTOM', 0);
+      const keyB = generateFeederOrderKey(targetB, 'BOTTOM', 0);
+
+      // keyA should sort before keyB (same position, aaa < zzz)
+      expect(keyA.localeCompare(keyB)).toBeLessThan(0);
+    });
+
+    it('should handle negative positions in orderKey', () => {
+      const targetNeg: AnySldSymbol = {
+        id: 'load-neg',
+        elementId: 'elem-load-neg',
+        elementType: 'Load',
+        elementName: 'Load Neg',
+        position: { x: -100, y: 300 },
+        inService: true,
+      };
+
+      const targetPos: AnySldSymbol = {
+        id: 'load-pos',
+        elementId: 'elem-load-pos',
+        elementType: 'Load',
+        elementName: 'Load Pos',
+        position: { x: 100, y: 300 },
+        inService: true,
+      };
+
+      const keyNeg = generateFeederOrderKey(targetNeg, 'BOTTOM', 0);
+      const keyPos = generateFeederOrderKey(targetPos, 'BOTTOM', 0);
+
+      // keyNeg should sort before keyPos (x=-100 < x=100)
+      expect(keyNeg.localeCompare(keyPos)).toBeLessThan(0);
     });
   });
 });

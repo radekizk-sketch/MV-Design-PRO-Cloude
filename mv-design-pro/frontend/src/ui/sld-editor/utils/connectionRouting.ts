@@ -28,10 +28,9 @@ import { getPortPoint, selectBestPorts, getSymbolBoundingBox, type PortName } fr
 import { ETAP_GEOMETRY } from '../../sld/sldEtapStyle';
 
 // =============================================================================
-// AUTO-LAYOUT V1 INTEGRATION (FEATURE FLAG: SLD_AUTO_LAYOUT_V1)
+// AUTO-LAYOUT V1 INTEGRATION — BUSBAR FEEDER ROUTING (DEFAULT ON)
 // =============================================================================
 import {
-  isAutoLayoutV1Enabled,
   generateBusbarFeederPaths,
 } from '../../sld/layout-integration';
 
@@ -145,21 +144,36 @@ export function generateConnections(
   const spineX = computeSpineX(symbols, cfg.gridSnap);
 
   // =============================================================================
-  // AUTO-LAYOUT V1: Pre-compute busbar feeder paths when flag is enabled
-  // Feature flag: SLD_AUTO_LAYOUT_V1 (domyślnie OFF)
-  // Włącz przez: VITE_SLD_AUTO_LAYOUT_V1=true w .env.local
+  // AUTO-LAYOUT V1: Pre-compute busbar feeder paths (DEFAULT ON)
+  // Busbar feeders always use auto-layout for ETAP-grade orthogonal routing.
+  // AUTO-FALLBACK: If auto-layout fails for any edge, standard routing is used.
+  // DETERMINISM: Busbars processed in sorted order to ensure consistent results.
   // =============================================================================
   const autoLayoutPaths = new Map<string, Position[]>();
-  if (isAutoLayoutV1Enabled()) {
-    // Find all busbars and compute auto-layout for each
-    const busbars = symbols.filter((s) => s.elementType === 'Bus') as NodeSymbol[];
-    for (const busbar of busbars) {
+  // Find all busbars and sort by ID for deterministic processing order
+  const busbars = symbols
+    .filter((s) => s.elementType === 'Bus')
+    .sort((a, b) => a.id.localeCompare(b.id)) as NodeSymbol[];
+  for (const busbar of busbars) {
+    try {
       const feederPaths = generateBusbarFeederPaths(busbar, symbols);
       if (feederPaths) {
         // Merge into autoLayoutPaths
         for (const [connectionId, path] of feederPaths) {
-          autoLayoutPaths.set(connectionId, path);
+          // Only use auto-layout path if it has at least 2 valid points
+          if (path && path.length >= 2) {
+            autoLayoutPaths.set(connectionId, path);
+          }
+          // Fallback: if path is invalid, don't add to map - standard routing will be used
         }
+      }
+    } catch {
+      // AUTO-FALLBACK: If auto-layout throws for this busbar,
+      // standard routing will be used for its feeders (no crash, no empty paths)
+      // This is a local fallback - other busbars are unaffected
+      if (process.env.NODE_ENV === 'development') {
+        // eslint-disable-next-line no-console
+        console.debug(`[SLD] Auto-layout fallback for busbar ${busbar.id}`);
       }
     }
   }
@@ -311,27 +325,39 @@ function createConnection(
   const startPoint = getPortPoint(fromSymbol, fromPort);
   const endPoint = getPortPoint(toSymbol, toPort);
 
+  // Get obstacles excluding the connection endpoints (for collision detection)
+  const filteredObstacles = obstacles.filter(
+    (o) => o.id !== fromSymbol.id && o.id !== toSymbol.id
+  );
+
   // =============================================================================
   // AUTO-LAYOUT V1: Check for pre-computed path (busbar feeders)
-  // When flag ON: uses orthogonal paths with stub from auto-layout algorithm
-  // When flag OFF: falls through to standard routing below
+  // Default ON: busbar feeders use orthogonal paths with stub from auto-layout.
+  // FALLBACK: If path intersects obstacles or is invalid, use standard routing.
   // =============================================================================
   const autoLayoutPath = autoLayoutPaths?.get(connectionId);
   if (autoLayoutPath && autoLayoutPath.length >= 2) {
     // Use auto-layout path with proper start/end points from ports
     // The auto-layout path provides the geometry; we ensure port alignment
     const alignedPath = alignPathToEndpoints(autoLayoutPath, startPoint, endPoint, config.gridSnap);
-    return {
-      id: connectionId,
-      fromSymbolId: fromSymbol.id,
-      fromPortName: fromPort,
-      toSymbolId: toSymbol.id,
-      toPortName: toPort,
-      path: alignedPath,
-      elementId,
-      connectionType,
-    };
+
+    // Check if auto-layout path is clear of obstacles
+    // If path intersects obstacles, fall back to standard routing
+    if (isPathClear(alignedPath, filteredObstacles)) {
+      return {
+        id: connectionId,
+        fromSymbolId: fromSymbol.id,
+        fromPortName: fromPort,
+        toSymbolId: toSymbol.id,
+        toPortName: toPort,
+        path: alignedPath,
+        elementId,
+        connectionType,
+      };
+    }
+    // AUTO-FALLBACK: path intersects obstacles, use standard routing below
   }
+  // FALLBACK: No valid auto-layout path — use standard routing
 
   // Wygeneruj sciezke (CAD bends mają pierwszeństwo)
   const overridePath =
@@ -346,7 +372,7 @@ function createConnection(
       endPoint,
       fromSymbol,
       toSymbol,
-      obstacles.filter((o) => o.id !== fromSymbol.id && o.id !== toSymbol.id),
+      filteredObstacles, // Already filtered above
       spineX,
       config
     );

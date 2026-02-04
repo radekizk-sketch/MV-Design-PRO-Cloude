@@ -5,7 +5,7 @@
  * Ten moduł NIE modyfikuje domeny — buduje dane lokalnie na potrzeby layoutu.
  *
  * DETERMINIZM: Te same dane wejściowe → identyczny output
- * BEZPIECZEŃSTWO: Feature flag SLD_AUTO_LAYOUT_V1 (domyślnie OFF)
+ * AUTO-LAYOUT (DEFAULT ON): Busbar feeders zawsze używają auto-layout.
  *
  * CANONICAL ALIGNMENT:
  * - layout/types.ts: BusbarInput, FeederInput
@@ -13,13 +13,14 @@
  * - connectionRouting.ts: Connection types
  *
  * PUNKT INTEGRACJI:
- * Ten adapter jest wywoływany z connectionRouting.ts gdy:
- * - isAutoLayoutV1Enabled() === true
- * - połączenie dotyczy busbar feeder
+ * Ten adapter jest wywoływany z connectionRouting.ts dla każdego busbar.
+ * AUTO-FALLBACK: Jeśli adapter zwróci null lub wyjątek, connectionRouting
+ * automatycznie używa standard routing dla danej krawędzi (bez crash).
  *
- * JAK WŁĄCZYĆ LOKALNIE:
- * 1. Ustaw VITE_SLD_AUTO_LAYOUT_V1=true w pliku .env.local
- * 2. LUB wywołaj enableAutoLayoutV1() w konsoli dev tools
+ * SIDE + ORDERKEY RULES:
+ * - Side: TOP/BOTTOM dla H busbar, LEFT/RIGHT dla V busbar
+ * - Tie-break: gdy pozycja równa, używa elementId
+ * - OrderKey: side + position + elementId (deterministic sort)
  */
 
 import type {
@@ -140,7 +141,15 @@ export function calculateBusbarEndpoints(
  * Determine feeder side relative to busbar.
  * Uses target symbol position relative to busbar to determine TOP/BOTTOM/LEFT/RIGHT.
  *
- * DETERMINISTIC: Pure function
+ * DETERMINISTIC: Pure function with tie-break rules:
+ * - Horizontal busbar: TOP if targetY < busY, BOTTOM otherwise
+ * - Vertical busbar: LEFT if targetX < busX, RIGHT otherwise
+ * - Tie-break (equal position): use element ID comparison for determinism
+ *
+ * @param busSymbol - Busbar symbol
+ * @param targetSymbol - Target connected symbol
+ * @param axis - Busbar axis ('H' or 'V')
+ * @returns Feeder exit side
  */
 export function determineFeederSide(
   busSymbol: NodeSymbol,
@@ -157,31 +166,55 @@ export function determineFeederSide(
     if (targetY < busY) {
       return 'TOP';
     }
-    return 'BOTTOM';
+    if (targetY > busY) {
+      return 'BOTTOM';
+    }
+    // TIE-BREAK: targetY === busY — use element ID for deterministic choice
+    // Elements with lexically smaller ID go to TOP, others to BOTTOM
+    return targetSymbol.elementId.localeCompare(busSymbol.elementId) < 0 ? 'TOP' : 'BOTTOM';
   } else {
     // Vertical busbar: feeders exit LEFT or RIGHT
     if (targetX < busX) {
       return 'LEFT';
     }
-    return 'RIGHT';
+    if (targetX > busX) {
+      return 'RIGHT';
+    }
+    // TIE-BREAK: targetX === busX — use element ID for deterministic choice
+    return targetSymbol.elementId.localeCompare(busSymbol.elementId) < 0 ? 'LEFT' : 'RIGHT';
   }
 }
 
 /**
  * Generate deterministic order key for feeder.
- * Uses element name, element ID, and side for stable sorting.
+ * Uses side, X position, element ID for stable sorting.
  *
- * DETERMINISTIC: Pure function
+ * DETERMINISTIC: Pure function with tie-break chain:
+ * 1. Primary: side (grouped by exit side)
+ * 2. Secondary: target X position (for H bus) or Y position (for V bus)
+ * 3. Tertiary: element ID (final tie-break for identical positions)
+ *
+ * @param targetSymbol - Target connected symbol
+ * @param side - Feeder exit side
+ * @param _index - Index (unused, kept for API compat)
+ * @returns Deterministic order key string
  */
 export function generateFeederOrderKey(
   targetSymbol: AnySldSymbol,
   side: FeederSide,
-  index: number
+  _index: number
 ): string {
-  // Format: side + elementName + elementId + index
-  // This ensures deterministic ordering across runs
-  const safeName = targetSymbol.elementName.replace(/[^a-zA-Z0-9]/g, '_');
-  return `${side}_${safeName}_${targetSymbol.elementId}_${index.toString().padStart(4, '0')}`;
+  // Format: side + position (padded) + elementId
+  // Position as integer for proper lexical sorting
+  // Use X for TOP/BOTTOM (H busbar), Y for LEFT/RIGHT (V busbar)
+  const isHorizontalBusbar = side === 'TOP' || side === 'BOTTOM';
+  const posValue = isHorizontalBusbar ? targetSymbol.position.x : targetSymbol.position.y;
+
+  // Convert to padded integer string (supports negative and up to 99999)
+  // Add 100000 offset to handle negatives
+  const paddedPos = (Math.round(posValue) + 100000).toString().padStart(6, '0');
+
+  return `${side}_${paddedPos}_${targetSymbol.elementId}`;
 }
 
 /**

@@ -3,16 +3,14 @@
  *
  * Integracja modułu auto-layout z pipeline renderingu SLD.
  *
- * FEATURE FLAG: SLD_AUTO_LAYOUT_V1 (domyślnie OFF)
- *
- * JAK WŁĄCZYĆ LOKALNIE:
- * 1. Ustaw VITE_SLD_AUTO_LAYOUT_V1=true w pliku .env.local
- * 2. LUB wywołaj enableAutoLayoutV1() w konsoli dev tools
+ * AUTO-LAYOUT V1 (DEFAULT ON):
+ * Busbar feeders zawsze używają algorytmu auto-layout.
+ * Fallback do standard routing następuje automatycznie przy błędach.
  *
  * PUNKT INTEGRACJI:
  * - connectionRouting.ts wywołuje generateBusbarFeederPaths()
- * - Gdy flag ON, ścieżki busbar feeders używają algorytmu auto-layout
- * - Gdy flag OFF, zachowanie bez zmian
+ * - Ścieżki busbar feeders używają algorytmu auto-layout (default)
+ * - Przy błędach: automatyczny fallback do standard routing
  *
  * CANONICAL ALIGNMENT:
  * - layout/index.ts: algorytm auto-layout
@@ -20,7 +18,7 @@
  * - sldEtapStyle.ts: ETAP_GEOMETRY tokens
  */
 
-// Re-export feature flag controls from layout module
+// Re-export feature flag controls from layout module (kept for test compatibility)
 export { isAutoLayoutV1Enabled, enableAutoLayoutV1, disableAutoLayoutV1 } from '../layout';
 
 // Export adapter types
