@@ -14,6 +14,11 @@ services:
       - REDIS_URL=redis://redis:6379/0
       - SECRET_KEY=your-secret-key-change-in-production
       - DEBUG=true
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8000/api/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
     depends_on:
       postgres:
         condition: service_healthy
@@ -36,6 +41,7 @@ services:
       - "3000:3000"
     environment:
       - VITE_API_URL=http://backend:8000
+      - VITE_API_URL_DEV=http://backend:8000
     depends_on:
       - backend
     volumes:
