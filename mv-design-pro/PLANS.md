@@ -3556,6 +3556,10 @@ dla SLD (spine layout), niezależnie od kolejności wejściowej.
 - [x] Brak NaN/Infinity
 - [x] Jeden mały PR (tylko testy)
 
+### 27b.5 Maintenance Notes
+
+- [x] PR-SLD-ETAP-GEOMETRY-FULL (#322): prefer coupler/topology-based busbar section detection, guarded name fallback, false-positive tests.
+
 ---
 
 ## 27c. PR-SLD-ROUTING-01 Routing korytarze + przeszkody — DONE
