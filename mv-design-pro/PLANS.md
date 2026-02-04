@@ -3780,6 +3780,17 @@ POST /projects/import/preview
 
 ---
 
+## 29a. Infra: CI Reliability Gates + Frontend Unit Test Env (DONE)
+
+**Cel:** deterministyczne bramki CI oraz stabilne środowisko testów jednostkowych frontendu.
+
+**Zakres (zrealizowane):**
+- Kanoniczny workflow `ci.yml` uruchamiany na `pull_request` (main), z poprawnym `concurrency`.
+- Joby rozdzielone: backend tests, frontend build, frontend unit tests, frontend e2e.
+- `CI Gate` odporny na `cancelled/skipped`, failuje tylko na `failure`.
+- Frontend unit tests: `vitest` w trybie single-thread + stabilny `jsdom` setup (ResizeObserver, IntersectionObserver, matchMedia, DOMMatrix, canvas).
+- Build/E2E: ustawione minimalne `VITE_API_URL(_DEV)` dla deterministycznego uruchomienia.
+
 ---
 
 ## 30. SLD CAD Geometry Contract — DONE
