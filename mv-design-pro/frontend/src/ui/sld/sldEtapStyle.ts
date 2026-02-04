@@ -541,6 +541,16 @@ export const ETAP_GEOMETRY = {
   // GEOMETRY VALIDATION (NO FLOATING SYMBOL)
   // ---------------------------------------------------------------------------
 
+  // ---------------------------------------------------------------------------
+  // VIEWPORT (FIT-TO-CONTENT)
+  // ---------------------------------------------------------------------------
+
+  /** Viewport defaults for fit-to-content actions */
+  view: {
+    /** Padding around fitted content (px) */
+    fitPaddingPx: 40,
+  },
+
   /** Validation rules for ETAP geometry compliance */
   validation: {
     /** Enable NO FLOATING SYMBOL rule (G-04) */

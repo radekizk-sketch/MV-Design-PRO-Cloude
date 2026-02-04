@@ -225,6 +225,24 @@ export const SLDView: React.FC<SLDViewProps> = ({
   }, [symbols, width, height]);
 
   /**
+   * Keyboard shortcut: F = fit to content (deterministic).
+   */
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== 'f' && event.key !== 'F') return;
+      const target = event.target;
+      if (target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement || target instanceof HTMLSelectElement) {
+        return;
+      }
+      event.preventDefault();
+      handleFitToContent();
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [handleFitToContent]);
+
+  /**
    * Handle reset view.
    */
   const handleResetView = useCallback(() => {
@@ -550,10 +568,11 @@ export const SLDView: React.FC<SLDViewProps> = ({
             type="button"
             onClick={handleFitToContent}
             className="px-2 py-1 text-xs bg-gray-100 hover:bg-gray-200 rounded"
-            title="Dopasuj do zawartosci"
+            title="Dopasuj do schematu"
+            aria-label="Dopasuj do schematu"
             data-testid="sld-fit-content"
           >
-            Dopasuj
+            Dopasuj do schematu
           </button>
           <button
             type="button"

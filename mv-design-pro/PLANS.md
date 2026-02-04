@@ -3855,3 +3855,34 @@ z zachowaniem deterministyczności i bez zmian topologii oraz backendu.
 - ❌ Brak persistence do backendu
 - ❌ Brak edycji topologii
 - ❌ Brak zmian w solverach
+
+---
+
+## 30b. PR-SLD-FIT-VIEW-01 „Dopasuj do schematu” (fit-to-content) — DONE
+
+### 30b.1 Cel
+
+Zapewnić deterministyczną akcję **„Dopasuj do schematu”** w SLD (fit-to-content) — tylko sterowanie viewportem,
+bez zmian topologii/modelu.
+
+### 30b.2 Zakres (MUST)
+
+- Przycisk „Dopasuj do schematu” w toolbarze SLD (PL tooltip/aria).
+- Deterministyczne wyliczenie viewportu na podstawie bbox symboli + bendów połączeń.
+- Margines z tokenu `ETAP_GEOMETRY.view.fitPaddingPx`, zaokrąglanie zoom/pan.
+- (NICE) skrót klawiszowy: `F`.
+
+### 30b.3 Screenshot workflow (KANON)
+
+Przed wykonaniem screenshotu SLD **zawsze**:
+
+1. Kliknij „Dopasuj do schematu”.
+2. Następnie wykonaj screenshot.
+
+Przykład:
+
+```bash
+VITE_FF_SLD_CAD_EDITING_ENABLED=true npm run dev
+# ręcznie kliknij: "Dopasuj do schematu"
+npx playwright screenshot --viewport-size=2560,1440 http://localhost:5173 sld_screenshot_full_fit.png
+```
