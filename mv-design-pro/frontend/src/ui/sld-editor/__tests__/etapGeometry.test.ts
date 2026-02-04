@@ -147,7 +147,8 @@ const createSectionedBusbarFixture = (): AnySldSymbol[] => {
       inService: true,
       fromNodeId: 'bus-sn-sekcja',
       toNodeId: `load-node-${i}`,
-      switchState: 'closed',
+      switchState: 'CLOSED',
+      switchType: 'BREAKER',
     };
     switches.push(sw);
 
@@ -164,6 +165,66 @@ const createSectionedBusbarFixture = (): AnySldSymbol[] => {
   }
 
   return [snBus, source, ...switches, ...loads];
+};
+
+/**
+ * Sectioned busbar fixture based on coupler topology.
+ */
+const createCouplerSectionFixture = (): AnySldSymbol[] => {
+  const busA: NodeSymbol = {
+    id: 'bus-sn-a',
+    elementId: 'bus-sn-a',
+    elementType: 'Bus',
+    elementName: 'Szyna SN A',
+    position: { x: 0, y: 0 },
+    inService: true,
+    width: 200,
+    height: 8,
+  };
+
+  const busB: NodeSymbol = {
+    id: 'bus-sn-b',
+    elementId: 'bus-sn-b',
+    elementType: 'Bus',
+    elementName: 'Szyna SN B',
+    position: { x: 0, y: 0 },
+    inService: true,
+    width: 200,
+    height: 8,
+  };
+
+  const coupler: SwitchSymbol = {
+    id: 'switch-coupler',
+    elementId: 'switch-coupler',
+    elementType: 'Switch',
+    elementName: 'Łącznik sekcyjny',
+    position: { x: 0, y: 0 },
+    inService: true,
+    fromNodeId: 'bus-sn-a',
+    toNodeId: 'bus-sn-b',
+    switchState: 'CLOSED',
+    switchType: 'BREAKER',
+  };
+
+  return [busA, busB, coupler];
+};
+
+/**
+ * Sectioned busbar fixture based on strict name fallback.
+ */
+const createNamedSectionFixture = (): AnySldSymbol[] => {
+  const snBus: NodeSymbol = {
+    id: 'bus-sn-section-1',
+    elementId: 'bus-sn-section-1',
+    elementType: 'Bus',
+    elementName: 'Szyna SN sekcja 1',
+    position: { x: 0, y: 0 },
+    inService: true,
+    width: 200,
+    height: 8,
+  };
+
+  return [snBus];
 };
 
 /**
@@ -357,6 +418,34 @@ describe('ETAP Sectioned Busbar Layout', () => {
     expect(result1.sections).toEqual(result2.sections);
     expect(result1.couplerPositions).toEqual(result2.couplerPositions);
     expect(result1.totalWidth).toEqual(result2.totalWidth);
+  });
+});
+
+// =============================================================================
+// BUSBAR SECTION DETECTION TESTS
+// =============================================================================
+
+describe('ETAP Busbar Section Detection', () => {
+  it('should detect sections via coupler topology regardless of name', () => {
+    const symbols = createCouplerSectionFixture();
+    const result = generateAutoLayout(symbols);
+
+    expect(result.debug.busbarSections.get('bus-sn-a')).toBe(2);
+    expect(result.debug.busbarSections.get('bus-sn-b')).toBe(2);
+  });
+
+  it('should detect sections via strict name fallback when no coupler exists', () => {
+    const symbols = createNamedSectionFixture();
+    const result = generateAutoLayout(symbols);
+
+    expect(result.debug.busbarSections.get('bus-sn-section-1')).toBe(2);
+  });
+
+  it('should ignore generic "sekcja" without a structured suffix', () => {
+    const symbols = createSectionedBusbarFixture();
+    const result = generateAutoLayout(symbols);
+
+    expect(result.debug.busbarSections.get('bus-sn-sekcja')).toBe(1);
   });
 });
 

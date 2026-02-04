@@ -252,46 +252,46 @@ interface EtapBay {
 // EtapBusbarInfo interface reserved for future use with enhanced busbar metadata
 // Currently, busbar info is tracked via separate Maps for simplicity
 
+const BUSBAR_SECTION_NAME_PATTERN =
+  /\b(?:sekcj[ai]|section)\s*([12]|[ab])\b/i;
+const BUSBAR_SECTION_CODE_PATTERN = /\bSN\s*[-/]?\s*([12]|[ab])\b/i;
+
 /**
- * Detect if a busbar is sectioned based on name patterns or coupler presence.
- * DETERMINISTIC: Same busbar name → same section detection.
+ * Detect if a busbar is sectioned based on coupler topology or strict name patterns.
+ * DETERMINISTIC: Same input → same section detection.
  *
- * Patterns recognized:
- * - "SN-A" / "SN-B" → separate sections
- * - "SN sekcja 1" / "SN sekcja 2" → separate sections
- * - Single busbar with "sekcja" in name → 2 sections
- * - Busbar with coupler switch → 2 sections
+ * Priority:
+ * 1) Coupler topology (switch between two busbars) → sectioned.
+ * 2) Strict name fallback (SN-A/SN-B, sekcja 1/2) → sectioned.
  */
 function detectBusbarSections(
   busbar: AnySldSymbol,
   symbols: AnySldSymbol[]
 ): number {
-  const name = busbar.elementName.toLowerCase();
+  const busbarElementIds = new Set(
+    symbols.filter((s) => s.elementType === 'Bus').map((s) => s.elementId)
+  );
+  const hasCouplerTopology = symbols.some((s) => {
+    if (s.elementType !== 'Switch') return false;
+    const sw = s as SwitchSymbol;
+    const connectsBusbars =
+      sw.fromNodeId !== sw.toNodeId &&
+      busbarElementIds.has(sw.fromNodeId) &&
+      busbarElementIds.has(sw.toNodeId);
+    const connectedToBus =
+      sw.fromNodeId === busbar.elementId || sw.toNodeId === busbar.elementId;
+    return connectsBusbars && connectedToBus;
+  });
 
-  // Check for section indicators in name
-  if (name.includes('sekcja') || name.includes('section') || name.includes('system')) {
-    // If name indicates multi-section, return 2
-    if (/sekcj[ai]\s*[12ab]/i.test(name) || /section\s*[12ab]/i.test(name)) {
-      return 1; // This is one section of a multi-section system
-    }
-    // Generic "sekcja" without number → assume 2 sections
+  if (hasCouplerTopology) {
     return 2;
   }
 
-  // Check for coupler switch connected to busbar
-  const hasCoupler = symbols.some((s) => {
-    if (s.elementType !== 'Switch') return false;
-    const sw = s as SwitchSymbol;
-    const isCoupler =
-      s.elementName.toLowerCase().includes('sprze') ||
-      s.elementName.toLowerCase().includes('coupler') ||
-      s.elementName.toLowerCase().includes('tie');
-    const connectedToBus =
-      sw.fromNodeId === busbar.elementId || sw.toNodeId === busbar.elementId;
-    return isCoupler && connectedToBus;
-  });
-
-  if (hasCoupler) {
+  const name = busbar.elementName.toLowerCase();
+  const hasSectionName =
+    BUSBAR_SECTION_NAME_PATTERN.test(name) ||
+    BUSBAR_SECTION_CODE_PATTERN.test(name);
+  if (hasSectionName) {
     return 2;
   }
 
