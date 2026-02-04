@@ -3691,3 +3691,14 @@ POST /projects/import/preview
 - **Archive Diff**: Porównanie dwóch archiwów
 
 ---
+
+## 29. Infra: /api/health + rozdzielenie API URL (DONE)
+
+**Cel:** smoke checks i jednoznaczna konfiguracja API dla frontendów (dev vs docker).
+
+**Zakres (zrealizowane):**
+- `GET /api/health` zwraca `{ "status": "ok" }` bez UoW/DB.
+- Vite dev używa `VITE_API_URL_DEV`, build/compose używa `VITE_API_URL`.
+- `docker-compose.yml`: ustawione `VITE_API_URL` + `VITE_API_URL_DEV` oraz healthcheck backendu.
+
+---
