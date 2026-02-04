@@ -57,6 +57,17 @@ export interface FeatureFlags {
    * Env override: VITE_FF_ENABLE_MATH_RENDERING
    */
   ENABLE_MATH_RENDERING: boolean;
+
+  /**
+   * sldCadEditingEnabled
+   *
+   * Wlacza stan i kontrakty geometrii CAD dla SLD (AUTO/CAD/HYBRID).
+   * Nie dodaje narzedzi edycji w UI.
+   *
+   * Domyslnie: false (OFF)
+   * Env override: VITE_FF_SLD_CAD_EDITING_ENABLED
+   */
+  sldCadEditingEnabled: boolean;
 }
 
 /**
@@ -67,6 +78,10 @@ export const featureFlags: Readonly<FeatureFlags> = Object.freeze({
   ENABLE_MATH_RENDERING: parseEnvBoolean(
     getViteEnv('VITE_FF_ENABLE_MATH_RENDERING'),
     true // domyślnie ON
+  ),
+  sldCadEditingEnabled: parseEnvBoolean(
+    getViteEnv('VITE_FF_SLD_CAD_EDITING_ENABLED'),
+    false
   ),
 });
 

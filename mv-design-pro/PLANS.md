@@ -594,6 +594,7 @@ class NetworkGraph:
 | 2026-01 | 2.14 | Phase 2.x.2: TOPOLOGY TREE & SELECTION SYNC – DOC LOCKED |
 | 2026-07 | 2.15 | P20 merge + Proof Engine completion (P11–P20) |
 | 2026-08 | 2.23 | P21: Voltage Profile (BUS-centric) view + contract |
+| 2026-09 | 2.24 | SLD CAD geometry contract (AUTO/CAD/HYBRID + overrides) |
 
 ---
 
@@ -3734,3 +3735,33 @@ POST /projects/import/preview
 - `docker-compose.yml`: ustawione `VITE_API_URL` + `VITE_API_URL_DEV` oraz healthcheck backendu.
 
 ---
+
+---
+
+## 30. SLD CAD Geometry Contract — DONE
+
+### 30.1 Cel
+
+Zalegalizowanie geometrii CAD w SLD jako kontraktu danych (bez narzedzi edycji i bez zmian algorytmow layoutu/routingu).
+
+### 30.2 Zakres
+
+- Tryby geometrii: AUTO / CAD / HYBRID
+- Dwa zrodla geometrii: auto‑layout + overrides CAD
+- Status audytu overrides (VALID/STALE/CONFLICT)
+- Deterministyczna serializacja overrides
+- Feature flag dla trybu geometrii (bez UI)
+
+### 30.3 Zrealizowane elementy
+
+- [x] Kanoniczny kontrakt `CadOverridesDocument`
+- [x] Funkcje: applyGeometryMode, evaluateCadOverridesStatus, deterministyczna serializacja
+- [x] Stan UI: tryb geometrii + status overrides (bez narzedzi edycji)
+- [x] Testy jednostkowe kontraktu
+- [x] Dokumentacja: `docs/ui/SLD_CAD_KANON.md`
+
+### 30.4 Wykluczenia
+
+- ❌ Brak narzedzi edycji w UI
+- ❌ Brak zmian w algorytmach auto‑layoutu lub routingu
+- ❌ Brak migracji backendu
