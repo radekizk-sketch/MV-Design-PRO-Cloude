@@ -5,7 +5,10 @@ import react from '@vitejs/plugin-react';
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '');
   const isDev = mode === 'development';
-  const apiUrl = isDev ? env.VITE_API_URL_DEV : env.VITE_API_URL;
+  const isTest = mode === 'test' || process.env.VITEST === 'true';
+  const apiUrlDev = env.VITE_API_URL_DEV ?? (isTest ? 'http://localhost' : undefined);
+  const apiUrlProd = env.VITE_API_URL ?? (isTest ? 'http://localhost' : undefined);
+  const apiUrl = isDev ? apiUrlDev : apiUrlProd;
 
   if (!apiUrl) {
     throw new Error(
