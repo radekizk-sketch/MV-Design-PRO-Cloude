@@ -5,6 +5,7 @@
  * - SLD_KANONICZNA_SPECYFIKACJA.md § 8: Walidacja
  * - AUDYT_SLD_ETAP.md: Wymagania naprawcze
  * - PR-SLD-ETAP-GEOMETRY-FULL: NO FLOATING SYMBOL validation
+ * - PR-SLD-ETAP-TOPOLOGY-LAYOUT-FINAL: ETAP/PowerFactory-grade topology validation
  *
  * REGUŁY WALIDACJI:
  *
@@ -15,6 +16,8 @@
  * - V-03: Połączenia port↔port są poprawne
  * - V-04: Brak izolowanych wysp bez źródła
  * - V-05: Minimum 1 źródło
+ * - V-06: ETAP — Każde odgałęzienie SN MUSI mieć łącznik (wyłącznik/rozłącznik/reklozer)
+ * - V-07: ETAP — Transformator SN/nn MUSI mieć wyłącznik SN przed transformatorem
  *
  * GEOMETRYCZNE:
  * - G-01: Symbole nie nakładają się
@@ -77,6 +80,10 @@ export interface ValidationOptions {
   checkIslands?: boolean;
   /** Sprawdzaj źródła (V-05) */
   checkSources?: boolean;
+  /** PR-SLD-ETAP-TOPOLOGY-LAYOUT-FINAL: Sprawdzaj łączniki odgałęzień SN (V-06) */
+  checkSnBranchSwitching?: boolean;
+  /** PR-SLD-ETAP-TOPOLOGY-LAYOUT-FINAL: Sprawdzaj wyłączniki transformatorów (V-07) */
+  checkTransformerBreakers?: boolean;
   /** Sprawdzaj kolizje (G-01) */
   checkCollisions?: boolean;
   /** Sprawdzaj pozycje na siatce (G-03) */
@@ -99,6 +106,8 @@ const DEFAULT_OPTIONS: ValidationOptions = {
   checkConnections: true,
   checkIslands: true,
   checkSources: true,
+  checkSnBranchSwitching: true, // V-06: ETAP — odgałęzienia SN muszą mieć łącznik
+  checkTransformerBreakers: true, // V-07: ETAP — transformatory muszą mieć wyłącznik
   checkCollisions: true,
   checkGridAlignment: true,
   checkFloatingSymbols: ETAP_GEOMETRY.validation.noFloatingSymbol, // PR-SLD-ETAP-GEOMETRY-FULL
@@ -151,6 +160,16 @@ export function validateSld(
   // V-05: Źródła
   if (opts.checkSources) {
     issues.push(...checkSources(symbols));
+  }
+
+  // V-06: Odgałęzienia SN muszą mieć łącznik (PR-SLD-ETAP-TOPOLOGY-LAYOUT-FINAL)
+  if (opts.checkSnBranchSwitching) {
+    issues.push(...checkSnBranchSwitching(symbols));
+  }
+
+  // V-07: Transformatory SN/nn muszą mieć wyłącznik SN (PR-SLD-ETAP-TOPOLOGY-LAYOUT-FINAL)
+  if (opts.checkTransformerBreakers) {
+    issues.push(...checkTransformerBreakers(symbols));
   }
 
   // G-01: Kolizje
@@ -480,6 +499,238 @@ function checkSources(symbols: AnySldSymbol[]): ValidationIssue[] {
       suggestion: 'Dodaj źródło (utility_feeder, generator, PV, itp.)',
     });
   }
+
+  return issues;
+}
+
+// =============================================================================
+// V-06: ODGAŁĘZIENIA SN MUSZĄ MIEĆ ŁĄCZNIK (PR-SLD-ETAP-TOPOLOGY-LAYOUT-FINAL)
+// =============================================================================
+
+/**
+ * Voltage level type for ETAP topology validation.
+ */
+type VoltageLevel = 'WN' | 'SN' | 'nN' | 'unknown';
+
+/**
+ * Detect voltage level from bus name or voltage attribute.
+ * DETERMINISTIC: Same name → same classification.
+ */
+function detectBusVoltageLevel(symbol: AnySldSymbol): VoltageLevel {
+  const name = symbol.elementName.toLowerCase();
+  const voltage = (symbol as any).voltage || (symbol as any).voltageKV;
+
+  // Check explicit voltage attribute
+  if (voltage !== undefined) {
+    const v = typeof voltage === 'string' ? parseFloat(voltage) : voltage;
+    if (v >= 110) return 'WN';
+    if (v >= 6) return 'SN';
+    if (v > 0 && v < 1) return 'nN';
+  }
+
+  // Check name patterns (Polish naming conventions)
+  if (name.includes('110') || name.includes('wn') || name.includes('wysokie')) {
+    return 'WN';
+  }
+  if (
+    name.includes('15') ||
+    name.includes('20') ||
+    name.includes('sn') ||
+    name.includes('średnie') ||
+    name.includes('srednie')
+  ) {
+    return 'SN';
+  }
+  if (name.includes('0.4') || name.includes('nn') || name.includes('niskie')) {
+    return 'nN';
+  }
+
+  // Default to SN for most MV networks
+  return 'SN';
+}
+
+/**
+ * PR-SLD-ETAP-TOPOLOGY-LAYOUT-FINAL: Sprawdź czy każde odgałęzienie SN ma łącznik.
+ *
+ * ETAP RULE: Każde odgałęzienie od linii lub szyny SN MUSI mieć łącznik
+ * (wyłącznik / rozłącznik / reklozer). Brak łącznika = ERROR.
+ */
+function checkSnBranchSwitching(symbols: AnySldSymbol[]): ValidationIssue[] {
+  const issues: ValidationIssue[] = [];
+
+  // Find all SN busbars
+  const snBusbars = symbols.filter((s) => {
+    if (s.elementType !== 'Bus') return false;
+    return detectBusVoltageLevel(s) === 'SN';
+  });
+
+  if (snBusbars.length === 0) {
+    // No SN busbars - skip this check
+    return issues;
+  }
+
+  // Build element ID to symbol mapping
+  const elementToSymbol = new Map<string, AnySldSymbol>();
+  symbols.forEach((s) => elementToSymbol.set(s.elementId, s));
+
+  // Get all SN busbar element IDs
+  const snBusbarElementIds = new Set(snBusbars.map((s) => s.elementId));
+
+  // Find all switches connected to SN busbars
+  const switchesOnSnBusbars = new Map<string, Set<string>>(); // busbarElementId -> Set of connected element IDs via switch
+  symbols.forEach((s) => {
+    if (s.elementType !== 'Switch') return;
+    const sw = s as SwitchSymbol;
+
+    // Check if switch connects to an SN busbar
+    if (snBusbarElementIds.has(sw.fromNodeId)) {
+      if (!switchesOnSnBusbars.has(sw.fromNodeId)) {
+        switchesOnSnBusbars.set(sw.fromNodeId, new Set());
+      }
+      switchesOnSnBusbars.get(sw.fromNodeId)!.add(sw.toNodeId);
+    }
+    if (snBusbarElementIds.has(sw.toNodeId)) {
+      if (!switchesOnSnBusbars.has(sw.toNodeId)) {
+        switchesOnSnBusbars.set(sw.toNodeId, new Set());
+      }
+      switchesOnSnBusbars.get(sw.toNodeId)!.add(sw.fromNodeId);
+    }
+  });
+
+  // Check all branches (LineBranch, TransformerBranch) connected to SN busbars
+  symbols.forEach((symbol) => {
+    if (symbol.elementType !== 'LineBranch' && symbol.elementType !== 'TransformerBranch') return;
+
+    const branch = symbol as BranchSymbol;
+
+    // Check if branch connects directly to SN busbar
+    const connectsToSnBusbar =
+      snBusbarElementIds.has(branch.fromNodeId) || snBusbarElementIds.has(branch.toNodeId);
+
+    if (!connectsToSnBusbar) return;
+
+    // Determine which end is the SN busbar
+    const snBusbarId = snBusbarElementIds.has(branch.fromNodeId)
+      ? branch.fromNodeId
+      : branch.toNodeId;
+    const otherEndId = snBusbarId === branch.fromNodeId ? branch.toNodeId : branch.fromNodeId;
+
+    // Check if there's a switch between the busbar and this branch
+    const switchConnections = switchesOnSnBusbars.get(snBusbarId);
+    const hasSwitchProtection = switchConnections?.has(otherEndId) ?? false;
+
+    // For transformers, we check in V-07, so skip here
+    if (symbol.elementType === 'TransformerBranch') return;
+
+    // For lines/cables connecting to SN busbar without switch protection
+    if (!hasSwitchProtection) {
+      issues.push({
+        ruleId: 'V-06',
+        severity: 'ERROR',
+        message: `Odgałęzienie SN "${symbol.elementName}" nie ma łącznika — wymagany wyłącznik/rozłącznik/reklozer`,
+        symbolIds: [symbol.id],
+        suggestion: 'Dodaj łącznik (wyłącznik, rozłącznik lub reklozer) między szyną SN a odgałęzieniem',
+      });
+    }
+  });
+
+  return issues;
+}
+
+// =============================================================================
+// V-07: TRANSFORMATORY SN/nn MUSZĄ MIEĆ WYŁĄCZNIK SN (PR-SLD-ETAP-TOPOLOGY-LAYOUT-FINAL)
+// =============================================================================
+
+/**
+ * PR-SLD-ETAP-TOPOLOGY-LAYOUT-FINAL: Sprawdź czy transformatory SN/nn mają wyłącznik SN.
+ *
+ * ETAP RULE: Transformator SN/nn bez wyłącznika SN = ERROR.
+ * Każda stacja SN/nn (PV, BESS, FW, odbiorcza) MUSI zawierać wyłącznik SN transformatora.
+ */
+function checkTransformerBreakers(symbols: AnySldSymbol[]): ValidationIssue[] {
+  const issues: ValidationIssue[] = [];
+
+  // Find all transformers
+  const transformers = symbols.filter((s) => s.elementType === 'TransformerBranch');
+
+  if (transformers.length === 0) {
+    return issues;
+  }
+
+  // Build element ID to symbol mapping
+  const elementToSymbol = new Map<string, AnySldSymbol>();
+  symbols.forEach((s) => elementToSymbol.set(s.elementId, s));
+
+  // Find all switches (specifically breakers)
+  const switches = symbols.filter((s) => s.elementType === 'Switch') as SwitchSymbol[];
+
+  // For each transformer, check if there's a breaker on the SN side
+  transformers.forEach((trafo) => {
+    const branch = trafo as BranchSymbol;
+
+    // Identify which side is SN and which is nN
+    const fromBus = elementToSymbol.get(branch.fromNodeId);
+    const toBus = elementToSymbol.get(branch.toNodeId);
+
+    if (!fromBus || !toBus) return;
+
+    const fromVoltage = detectBusVoltageLevel(fromBus);
+    const toVoltage = detectBusVoltageLevel(toBus);
+
+    // Check if this is an SN/nN transformer
+    const isSnNnTransformer =
+      (fromVoltage === 'SN' && toVoltage === 'nN') ||
+      (fromVoltage === 'nN' && toVoltage === 'SN');
+
+    // Also check WN/SN transformers
+    const isWnSnTransformer =
+      (fromVoltage === 'WN' && toVoltage === 'SN') ||
+      (fromVoltage === 'SN' && toVoltage === 'WN');
+
+    if (!isSnNnTransformer && !isWnSnTransformer) return;
+
+    // Determine the SN side
+    let snSideId: string;
+    if (isSnNnTransformer) {
+      snSideId = fromVoltage === 'SN' ? branch.fromNodeId : branch.toNodeId;
+    } else {
+      // For WN/SN, the SN side needs the breaker
+      snSideId = fromVoltage === 'SN' ? branch.fromNodeId : branch.toNodeId;
+    }
+
+    // Check if there's a breaker between the SN busbar and the transformer
+    const hasSnBreaker = switches.some((sw) => {
+      // Check if switch connects to the transformer's SN side
+      const connectsToSnSide = sw.fromNodeId === snSideId || sw.toNodeId === snSideId;
+
+      // Check if switch connects to the transformer
+      const connectsToTrafo =
+        sw.fromNodeId === trafo.elementId || sw.toNodeId === trafo.elementId;
+
+      // For ETAP rule: breaker should be between SN bus and transformer
+      // This means the switch should connect the SN bus to an intermediate node
+      // that the transformer also connects to
+
+      // Simplified check: switch is on the path between SN bus and transformer
+      if (connectsToSnSide || connectsToTrafo) {
+        // Accept any switch type as protection (BREAKER, LOAD_SWITCH, etc.)
+        return true;
+      }
+
+      return false;
+    });
+
+    if (!hasSnBreaker) {
+      const voltageDesc = isSnNnTransformer ? 'SN/nn' : 'WN/SN';
+      issues.push({
+        ruleId: 'V-07',
+        severity: 'ERROR',
+        message: `Transformator ${voltageDesc} "${trafo.elementName}" nie ma wyłącznika SN — wymagana koordynacja zabezpieczeń`,
+        symbolIds: [trafo.id],
+        suggestion: 'Dodaj wyłącznik SN przed transformatorem dla zapewnienia koordynacji zabezpieczeń',
+      });
+    }
+  });
 
   return issues;
 }
