@@ -780,6 +780,38 @@ export const SLDView: React.FC<SLDViewProps> = ({
           selectedElementId={selectedElement?.id}
         />
 
+        {/* PR-SLD-UX-MAX: Mode indicator overlay (top-right corner of canvas) */}
+        <div
+          data-testid="sld-mode-overlay"
+          className={`absolute top-4 right-4 z-10 flex items-center gap-2 px-4 py-2.5 rounded-lg shadow-lg backdrop-blur-sm transition-all duration-200 ${
+            isResultsMode
+              ? 'bg-blue-600/95 text-white border border-blue-500'
+              : isProtectionMode
+              ? 'bg-emerald-600/95 text-white border border-emerald-500'
+              : 'bg-slate-700/90 text-slate-100 border border-slate-600'
+          }`}
+        >
+          {/* Mode icon */}
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
+            {isResultsMode ? (
+              <path strokeLinecap="round" strokeLinejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75zM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V8.625zM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V4.125z" />
+            ) : isProtectionMode ? (
+              <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z" />
+            ) : (
+              <path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125" />
+            )}
+          </svg>
+          {/* Mode label */}
+          <div className="flex flex-col">
+            <span className="text-xs font-semibold uppercase tracking-wider">
+              {SLD_MODE_LABELS_PL[sldMode]}
+            </span>
+            {isReadOnlyMode && (
+              <span className="text-[10px] opacity-80">Tylko odczyt</span>
+            )}
+          </div>
+        </div>
+
         {/* Focus indicator (for jump-to-element visual feedback) — ETAP-grade */}
         {focusIndicatorPosition && (
           <div

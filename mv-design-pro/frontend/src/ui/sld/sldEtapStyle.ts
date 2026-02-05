@@ -112,6 +112,204 @@ export const ETAP_STATE_COLORS = {
   info: '#2563EB', // blue-600
 } as const;
 
+// =============================================================================
+// VISUAL HIERARCHY LAYERS (PR-SLD-UX-MAX)
+// =============================================================================
+
+/**
+ * Three-level visual hierarchy for professional SLD readability.
+ * STRUCTURE → TOPOLOGY → DETAIL
+ *
+ * Design rule: Structure readable in 0.5s, Topology in 3s, Detail on demand.
+ */
+export const VISUAL_HIERARCHY = {
+  /** STRUCTURE level — busbars, voltage bands (dominant) */
+  structure: {
+    strokeWidth: 5,
+    strokeWidthSelected: 6.5,
+    opacity: 1,
+    labelFontSize: 13,
+    labelFontWeight: 600,
+  },
+  /** TOPOLOGY level — lines, bays, transformers (clearly subordinate) */
+  topology: {
+    strokeWidth: 2.5,
+    strokeWidthSelected: 3.5,
+    opacity: 1,
+    labelFontSize: 10,
+    labelFontWeight: 500,
+  },
+  /** DETAIL level — CT, VT, protection, measurements (finest) */
+  detail: {
+    strokeWidth: 1.5,
+    strokeWidthSelected: 2,
+    opacity: 0.85,
+    labelFontSize: 9,
+    labelFontWeight: 400,
+  },
+} as const;
+
+/**
+ * Map element types to visual hierarchy levels.
+ */
+export const ELEMENT_HIERARCHY_MAP: Record<string, keyof typeof VISUAL_HIERARCHY> = {
+  Bus: 'structure',
+  LineBranch: 'topology',
+  TransformerBranch: 'topology',
+  Switch: 'topology',
+  Source: 'structure',
+  Load: 'topology',
+  CT: 'detail',
+  VT: 'detail',
+  Protection: 'detail',
+  Measurement: 'detail',
+} as const;
+
+/**
+ * Get visual hierarchy level for element type.
+ */
+export function getVisualHierarchyLevel(
+  elementType: string
+): keyof typeof VISUAL_HIERARCHY {
+  return ELEMENT_HIERARCHY_MAP[elementType] ?? 'topology';
+}
+
+// =============================================================================
+// VOLTAGE BAND BACKGROUNDS (SUBTLE)
+// =============================================================================
+
+/**
+ * Subtle voltage band background colors for visual grouping.
+ * Very low opacity — enhances readability without distraction.
+ */
+export const VOLTAGE_BAND_COLORS = {
+  /** WN (High Voltage) — very subtle red tint */
+  WN: 'rgba(185, 28, 28, 0.03)', // red-700 @ 3%
+  /** SN (Medium Voltage) — very subtle blue tint */
+  SN: 'rgba(29, 78, 216, 0.03)', // blue-700 @ 3%
+  /** nN (Low Voltage) — very subtle amber tint */
+  nN: 'rgba(180, 83, 9, 0.03)', // amber-700 @ 3%
+  /** Default — neutral */
+  default: 'transparent',
+} as const;
+
+// =============================================================================
+// OZE/BESS DIFFERENTIATION (GENERATION vs LOAD)
+// =============================================================================
+
+/**
+ * Generation source differentiation colors.
+ * Sources are clearly marked as "power injectors" not "consumers".
+ */
+export const GENERATION_COLORS = {
+  /** PV (Photovoltaic) — solar gold */
+  pv: '#EAB308', // yellow-500 (solar)
+  /** Wind Farm — sky blue */
+  fw: '#0EA5E9', // sky-500 (wind)
+  /** BESS (Battery) — emerald green */
+  bess: '#10B981', // emerald-500 (energy storage)
+  /** Generator — industrial blue */
+  generator: '#3B82F6', // blue-500
+  /** Utility Feeder — deep red */
+  utility: '#B91C1C', // red-700
+} as const;
+
+/**
+ * Power flow direction indicator styles.
+ * Used to visually distinguish generation from consumption.
+ */
+export const POWER_FLOW_INDICATOR = {
+  /** Arrow size for power flow direction */
+  arrowSize: 8,
+  /** Arrow stroke width */
+  arrowStrokeWidth: 1.5,
+  /** Generation direction color (injection) */
+  generationColor: '#10B981', // emerald-500
+  /** Load direction color (consumption) */
+  loadColor: '#6B7280', // gray-500
+  /** Offset from symbol */
+  offset: 16,
+} as const;
+
+// =============================================================================
+// BAY TYPE VISUAL DIFFERENTIATION
+// =============================================================================
+
+/**
+ * Bay type visual differentiation (subtle, no aggressive colors).
+ * Uses line style and subtle accent to distinguish bay purposes.
+ */
+export const BAY_TYPE_STYLES = {
+  /** Feeder bay — standard line style */
+  feeder: {
+    accentColor: 'transparent',
+    strokeDasharray: undefined,
+    labelPrefix: '',
+  },
+  /** OZE bay (PV, Wind) — subtle green accent */
+  oze: {
+    accentColor: 'rgba(16, 185, 129, 0.08)', // emerald-500 @ 8%
+    strokeDasharray: undefined,
+    labelPrefix: '',
+  },
+  /** BESS bay — subtle teal accent */
+  bess: {
+    accentColor: 'rgba(20, 184, 166, 0.08)', // teal-500 @ 8%
+    strokeDasharray: undefined,
+    labelPrefix: '',
+  },
+  /** Measurement bay — dashed line */
+  measurement: {
+    accentColor: 'transparent',
+    strokeDasharray: '4,2',
+    labelPrefix: '',
+  },
+} as const;
+
+// =============================================================================
+// MICRO-INTERACTIONS
+// =============================================================================
+
+/**
+ * Hover interaction styles.
+ */
+export const HOVER_STYLES = {
+  /** Stroke width increase on hover */
+  strokeWidthIncrease: 0.5,
+  /** Opacity boost on hover */
+  opacityBoost: 0.1,
+  /** Transition duration (ms) */
+  transitionDuration: 150,
+  /** Cursor style */
+  cursor: 'pointer',
+} as const;
+
+/**
+ * Selection interaction styles.
+ */
+export const SELECTION_STYLES = {
+  /** Selection ring color */
+  ringColor: 'rgba(37, 99, 235, 0.3)', // blue-600 @ 30%
+  /** Selection ring width */
+  ringWidth: 3,
+  /** Selection ring offset */
+  ringOffset: 4,
+  /** Selection glow blur */
+  glowBlur: 4,
+} as const;
+
+/**
+ * Pinned/locked element styles.
+ */
+export const PINNED_STYLES = {
+  /** Pinned indicator color */
+  indicatorColor: '#6B7280', // gray-500
+  /** Pinned indicator size */
+  indicatorSize: 6,
+  /** Pinned indicator offset */
+  indicatorOffset: -8,
+} as const;
+
 /**
  * Fill colors for symbols.
  */
@@ -1579,6 +1777,16 @@ export default {
   GRID: ETAP_GRID,
   // Geometry (PR-SLD-ETAP-GEOMETRY-01)
   GEOMETRY: ETAP_GEOMETRY,
+  // Visual hierarchy (PR-SLD-UX-MAX)
+  VISUAL_HIERARCHY,
+  ELEMENT_HIERARCHY_MAP,
+  VOLTAGE_BAND_COLORS,
+  GENERATION_COLORS,
+  POWER_FLOW_INDICATOR,
+  BAY_TYPE_STYLES,
+  HOVER_STYLES,
+  SELECTION_STYLES,
+  PINNED_STYLES,
   // Helpers
   getVoltageColor: getEtapVoltageColor,
   getStrokeColor: getEtapStrokeColor,
@@ -1587,6 +1795,7 @@ export default {
   getLabelAnchor: getEtapLabelAnchor,
   getSymbolSize: getEtapSymbolSize,
   getStrokeWidth: getEtapStrokeWidth,
+  getVisualHierarchyLevel,
   // Line label placement (ETAP 1:1)
   parsePathSegments,
   selectLabelSegment,
