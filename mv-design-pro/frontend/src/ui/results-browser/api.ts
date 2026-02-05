@@ -11,7 +11,8 @@
  * - GET /api/power-flow-runs/{run_id}/results
  * - GET /api/power-flow-runs/{run_id}/trace
  * - GET /api/power-flow-runs/{run_id}/violations
- * - POST /api/results/export/{format}
+ * - GET /api/power-flow-runs/{run_id}/export/pdf
+ * - GET /api/power-flow-runs/{run_id}/export/xlsx
  */
 
 import type {
@@ -256,18 +257,10 @@ export function exportToCSV<T extends Record<string, unknown>>(
 export async function exportToPDF(
   runId: string,
   viewMode: ResultsViewMode,
-  projectName?: string,
-  caseName?: string
+  _projectName?: string,
+  _caseName?: string
 ): Promise<void> {
-  const response = await fetch(`${API_BASE}/power-flow-runs/${runId}/export/pdf`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      view_mode: viewMode,
-      project_name: projectName,
-      case_name: caseName,
-    }),
-  });
+  const response = await fetch(`${API_BASE}/power-flow-runs/${runId}/export/pdf`);
 
   if (!response.ok) {
     throw new Error(`Błąd eksportu PDF: ${response.statusText}`);
@@ -284,18 +277,10 @@ export async function exportToPDF(
 export async function exportToExcel(
   runId: string,
   viewMode: ResultsViewMode,
-  projectName?: string,
-  caseName?: string
+  _projectName?: string,
+  _caseName?: string
 ): Promise<void> {
-  const response = await fetch(`${API_BASE}/power-flow-runs/${runId}/export/xlsx`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      view_mode: viewMode,
-      project_name: projectName,
-      case_name: caseName,
-    }),
-  });
+  const response = await fetch(`${API_BASE}/power-flow-runs/${runId}/export/xlsx`);
 
   if (!response.ok) {
     throw new Error(`Błąd eksportu Excel: ${response.statusText}`);

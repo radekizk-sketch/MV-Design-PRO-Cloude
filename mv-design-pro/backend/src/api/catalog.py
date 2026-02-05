@@ -121,7 +121,7 @@ def import_type_library(
     except ValueError as exc:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Invalid mode: {mode}. Must be 'merge' or 'replace'.",
+            detail=f"Nieprawidłowy tryb: {mode}. Musi być 'merge' lub 'replace'.",
         ) from exc
 
     service = _build_governance_service(uow_factory)
@@ -219,7 +219,7 @@ def get_protection_device_type(
     if result is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Protection device type not found: {device_type_id}",
+            detail=f"Typ urządzenia zabezpieczającego nie znaleziony: {device_type_id}",
         )
     return result
 
@@ -235,7 +235,7 @@ def get_protection_curve(
     if result is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Protection curve not found: {curve_id}",
+            detail=f"Krzywa zabezpieczenia nie znaleziona: {curve_id}",
         )
     return result
 
@@ -251,7 +251,7 @@ def get_protection_setting_template(
     if result is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Protection setting template not found: {template_id}",
+            detail=f"Szablon nastaw zabezpieczenia nie znaleziony: {template_id}",
         )
     return result
 
@@ -318,7 +318,7 @@ def import_protection_library(
     except ValueError as exc:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Invalid mode: {mode}. Must be 'merge' or 'replace'.",
+            detail=f"Nieprawidłowy tryb: {mode}. Musi być 'merge' lub 'replace'.",
         ) from exc
 
     service = _build_governance_service(uow_factory)
@@ -357,7 +357,7 @@ def assign_type_to_branch(
     except ValueError as exc:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Invalid UUID format",
+            detail="Nieprawidłowy format UUID",
         ) from exc
 
     service = _build_service(uow_factory)
@@ -386,7 +386,7 @@ def assign_type_to_transformer(
     except ValueError as exc:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Invalid UUID format",
+            detail="Nieprawidłowy format UUID",
         ) from exc
 
     service = _build_service(uow_factory)
@@ -413,7 +413,7 @@ def assign_equipment_type_to_switch(
     except ValueError as exc:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Invalid UUID format",
+            detail="Nieprawidłowy format UUID",
         ) from exc
 
     service = _build_service(uow_factory)
@@ -443,7 +443,7 @@ def clear_type_from_branch(
     except ValueError as exc:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Invalid UUID format",
+            detail="Nieprawidłowy format UUID",
         ) from exc
 
     service = _build_service(uow_factory)
@@ -470,7 +470,7 @@ def clear_type_from_transformer(
     except ValueError as exc:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Invalid UUID format",
+            detail="Nieprawidłowy format UUID",
         ) from exc
 
     service = _build_service(uow_factory)
@@ -495,7 +495,7 @@ def clear_equipment_type_from_switch(
     except ValueError as exc:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Invalid UUID format",
+            detail="Nieprawidłowy format UUID",
         ) from exc
 
     service = _build_service(uow_factory)
