@@ -228,7 +228,7 @@ export function SldEmptyOverlay({
             'bg-white/50'
           )}
         >
-          {EmptyStateIcons[resolvedState]}
+          {resolvedState && EmptyStateIcons[resolvedState]}
         </div>
 
         {/* Middle: Message */}

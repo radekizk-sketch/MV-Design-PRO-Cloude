@@ -823,8 +823,9 @@ def compute_branch_flows(
             i_from = (v_from / (tap_ratio ** 2)) * y_series - (v_to / tap_ratio) * y_series
             i_to = -(v_from / tap_ratio) * y_series + v_to * y_series
         else:
-            i_from = (v_from - v_to) * y_series + v_from * y_shunt
-            i_to = (v_to - v_from) * y_series + v_to * y_shunt
+            y_shunt_val = y_shunt if y_shunt is not None else 0j
+            i_from = (v_from - v_to) * y_series + v_from * y_shunt_val
+            i_to = (v_to - v_from) * y_series + v_to * y_shunt_val
 
         s_from = v_from * np.conj(i_from)
         s_to = v_to * np.conj(i_to)

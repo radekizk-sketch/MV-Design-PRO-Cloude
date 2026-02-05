@@ -139,12 +139,18 @@ export function useKeyboardShortcuts(options: UseKeyboardShortcutsOptions = {}) 
         }
       }
 
-      // ===== DELETE (future P30d) =====
-      // TODO: Implement delete command
-      // if (e.key === 'Delete' || e.key === 'Backspace') {
-      //   e.preventDefault();
-      //   handleDelete();
-      // }
+      // ===== DELETE =====
+      if ((e.key === 'Delete' || e.key === 'Backspace') && !isMutationBlocked) {
+        e.preventDefault();
+        const selected = sldStore.selectedIds;
+        if (selected.length === 0) {
+          // No selection - nothing to delete
+          return;
+        }
+        // Delete selected symbols
+        selected.forEach((id: string) => sldStore.removeSymbol(id));
+        sldStore.clearSelection();
+      }
     };
 
     window.addEventListener('keydown', handleKeyDown);

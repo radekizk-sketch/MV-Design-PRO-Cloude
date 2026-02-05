@@ -390,14 +390,6 @@ function assignCanonicalLayer(
   return 'L4_SN_BAY';
 }
 
-/**
- * Get Y offset for a canonical layer.
- */
-function getCanonicalLayerY(layerName: CanonicalLayerName, baseY: number): number {
-  const layer = ETAP_GEOMETRY.canonicalLayers[layerName];
-  return baseY + layer.yOffset;
-}
-
 // =============================================================================
 // PR-SLD-ETAP-TOPOLOGY-LAYOUT-FINAL: STATION STACK IDENTIFICATION
 // =============================================================================
@@ -434,7 +426,7 @@ interface StationStack {
  */
 function identifyStationStacks(
   symbols: AnySldSymbol[],
-  elementToSymbol: Map<string, string>
+  _elementToSymbol: Map<string, string>
 ): StationStack[] {
   const stacks: StationStack[] = [];
 
@@ -1239,11 +1231,13 @@ export function generateAutoLayout(
   });
 
   // Calculate SPINE X coordinate (most common X position for main busbars)
-  let spineX = cfg.canvasCenter.x;
+  // Use default canvas center position (canvasCenter is not part of AutoLayoutConfig)
+  const defaultCanvasCenterX = 500;
+  let spineX = defaultCanvasCenterX;
   if (wnBusbars.length > 0) {
-    spineX = positions.get(wnBusbars[0].id)?.x ?? cfg.canvasCenter.x;
+    spineX = positions.get(wnBusbars[0].id)?.x ?? defaultCanvasCenterX;
   } else if (snBusbars.length > 0) {
-    spineX = positions.get(snBusbars[0].id)?.x ?? cfg.canvasCenter.x;
+    spineX = positions.get(snBusbars[0].id)?.x ?? defaultCanvasCenterX;
   }
 
   return {
