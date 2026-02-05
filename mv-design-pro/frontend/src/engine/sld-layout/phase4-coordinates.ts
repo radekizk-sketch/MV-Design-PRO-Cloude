@@ -31,6 +31,19 @@ import type {
 import { findVoltageBandForSymbol, getTransformersBetweenBands } from './phase1-voltage-bands';
 
 // =============================================================================
+// AESTHETICS CONFIG — PHASE 4/5 TUNING PARAMETERS
+// =============================================================================
+
+/** Gap between terminal elements along sub-busbar (horizontal spread) */
+export const SUBBUS_TERMINAL_SPREAD_GAP_X = 80;
+
+/** Step size for deterministic push-away collision resolution */
+export const PUSH_AWAY_STEP_X = 40;
+
+/** Maximum iterations for collision resolution */
+export const COLLISION_MAX_ITERATIONS = 20;
+
+// =============================================================================
 // GŁÓWNA FUNKCJA FAZY 4
 // =============================================================================
 
@@ -94,13 +107,24 @@ export function assignCoordinates(context: PipelineContext): PipelineContext {
     quarantinedSymbols
   );
 
+  // Krok 6b: PHASE4 AESTHETICS — Propagate bay X positions through the entire hierarchy
+  // This ensures that all elements in a bay chain inherit the correct horizontal position
+  propagateBayXPositions(orderedBays, positions, busbarGeometries, symbolById, config);
+
   // Krok 7: Zastosuj user overrides
   applyUserOverrides(positions, userOverrides, config);
 
-  // Krok 8: Rozwiąż kolizje
-  const collisionsResolved = resolveCollisions(positions, symbolById, config);
+  // Krok 8: Rozwiąż kolizje (pierwsza iteracja)
+  let collisionsResolved = resolveCollisions(positions, symbolById, config);
 
   // Krok 9: Snap all to grid
+  snapToGrid(positions, config.gridSize);
+
+  // Krok 10: Rozwiąż kolizje ponownie (po snap to grid)
+  // Grid snap może wprowadzić nowe kolizje
+  collisionsResolved += resolveCollisions(positions, symbolById, config);
+
+  // Krok 11: Snap again to ensure final positions are on grid
   snapToGrid(positions, config.gridSize);
 
   return {
@@ -374,6 +398,10 @@ function positionTransformers(
 
 /**
  * Pozycjonuj baye i ich elementy.
+ *
+ * PHASE4 AESTHETICS:
+ * - Sub-busbary są repozycjonowane na slotX ich parent baya
+ * - Zapewnia to prawidłowe rozłożenie poziome elementów na różnych poziomach napięcia
  */
 function positionBays(
   bays: Bay[],
@@ -404,6 +432,10 @@ function positionBays(
     busbarBays.forEach((bay, index) => {
       bay.slotX = bayXPositions[index];
 
+      // PHASE4 AESTHETICS: Reposition sub-busbars to follow bay slotX
+      // This ensures that elements under sub-busbars inherit the correct X spread
+      repositionSubBusbars(bay, symbolById, config, positions, busbarGeometries);
+
       // Pozycjonuj elementy w bayu
       positionBayElements(bay, symbolById, config, positions, busbarGeometry, voltageBands);
 
@@ -412,6 +444,156 @@ function positionBays(
         positionBays(bay.subBays, symbolById, config, positions, busbarGeometries, voltageBands);
       }
     });
+  }
+}
+
+/**
+ * Reposition sub-busbars and ALL bay elements to follow their parent bay's slotX.
+ *
+ * This ensures that the vertical chain of elements under each bay
+ * inherits the correct horizontal position from the bay's slot.
+ *
+ * PHASE4 AESTHETICS:
+ * - Sub-busbars are moved to bay.slotX
+ * - All bay elements (except parent busbar) are also moved to bay.slotX
+ * - This propagates horizontal spread through the entire bay chain
+ */
+function repositionSubBusbars(
+  bay: Bay,
+  symbolById: Map<string, LayoutSymbol>,
+  config: LayoutConfig,
+  positions: Map<string, ElementPosition>,
+  busbarGeometries: Map<string, BusbarGeometry>
+): void {
+  const newX = bay.slotX;
+
+  // Find sub-busbars in this bay and update their positions and geometries
+  for (const subBusbarId of bay.subBusbarIds) {
+    const subBusbarPos = positions.get(subBusbarId);
+    const subBusbarGeom = busbarGeometries.get(subBusbarId);
+
+    if (!subBusbarPos || !subBusbarGeom) continue;
+
+    const deltaX = newX - subBusbarPos.position.x;
+
+    if (Math.abs(deltaX) > 1) {
+      // Update position
+      subBusbarPos.position.x = newX;
+      subBusbarPos.bounds.x = newX - subBusbarPos.size.width / 2;
+
+      // Update geometry - this is critical for sub-bays to inherit correct X
+      subBusbarGeom.p0.x = newX - subBusbarGeom.width / 2;
+      subBusbarGeom.p1.x = newX + subBusbarGeom.width / 2;
+    }
+  }
+
+  // Also update ALL elements in this bay to follow slotX
+  // This ensures elements like switches, transformers, loads, generators
+  // all inherit the correct horizontal position
+  for (const element of bay.elements) {
+    const elementPos = positions.get(element.symbolId);
+    if (!elementPos) continue;
+
+    // Skip sub-busbars (already handled above)
+    if (bay.subBusbarIds.includes(element.symbolId)) continue;
+
+    // Update element X to follow bay slotX
+    const deltaX = newX - elementPos.position.x;
+    if (Math.abs(deltaX) > 1 && elementPos.autoPositioned) {
+      elementPos.position.x = newX;
+      elementPos.bounds.x = newX - elementPos.size.width / 2;
+    }
+  }
+}
+
+/**
+ * Propagate bay X positions through the entire bay hierarchy.
+ *
+ * PHASE4 AESTHETICS:
+ * This function ensures that all elements in a bay chain inherit the correct
+ * horizontal position from their top-level bay. It recursively traverses the
+ * bay hierarchy and updates element positions.
+ *
+ * For wind farms: gen_wt1, gen_wt2, gen_wt3 should inherit X positions from
+ * their respective top-level bays under bus_sn.
+ */
+function propagateBayXPositions(
+  bays: Bay[],
+  positions: Map<string, ElementPosition>,
+  busbarGeometries: Map<string, BusbarGeometry>,
+  symbolById: Map<string, LayoutSymbol>,
+  config: LayoutConfig
+): void {
+  // Process each top-level bay and propagate its slotX to all nested elements
+  for (const bay of bays) {
+    propagateBayX(bay, bay.slotX, positions, busbarGeometries, symbolById);
+  }
+}
+
+/**
+ * Recursively propagate the X position through a bay and its sub-bays.
+ *
+ * IMPORTANT: We NEVER move terminal elements (Load, Generator) - they keep their
+ * positions from positionBayElements which handles horizontal spreading.
+ *
+ * We only propagate X to:
+ * 1. Non-terminal elements (switches, transformers) in this bay
+ * 2. Sub-busbars in this bay (and their geometries)
+ *
+ * This ensures:
+ * - Multiple terminals in the same bay stay spread (e.g., loads under bus_nn)
+ * - Single terminals in deep sub-bays inherit correct X (via sub-busbar geometry)
+ */
+function propagateBayX(
+  bay: Bay,
+  inheritedX: number,
+  positions: Map<string, ElementPosition>,
+  busbarGeometries: Map<string, BusbarGeometry>,
+  symbolById: Map<string, LayoutSymbol>
+): void {
+  // Update non-terminal elements in this bay
+  for (const element of bay.elements) {
+    const elementPos = positions.get(element.symbolId);
+    if (!elementPos || !elementPos.autoPositioned) continue;
+
+    const symbol = symbolById.get(element.symbolId);
+    const isTerminal = symbol && (symbol.elementType === 'Load' || symbol.elementType === 'Generator');
+
+    // NEVER move terminals - they keep their spread from positionBayElements
+    if (isTerminal) continue;
+
+    // Move non-terminal element to inherited X position
+    const deltaX = inheritedX - elementPos.position.x;
+    if (Math.abs(deltaX) > 1) {
+      elementPos.position.x = inheritedX;
+      elementPos.bounds.x = inheritedX - elementPos.size.width / 2;
+    }
+  }
+
+  // Update sub-busbars to follow inherited X
+  // This is critical for sub-bays to calculate correct slotX
+  for (const subBusbarId of bay.subBusbarIds) {
+    const subBusbarPos = positions.get(subBusbarId);
+    const subBusbarGeom = busbarGeometries.get(subBusbarId);
+
+    if (!subBusbarPos) continue;
+
+    const deltaX = inheritedX - subBusbarPos.position.x;
+    if (Math.abs(deltaX) > 1) {
+      subBusbarPos.position.x = inheritedX;
+      subBusbarPos.bounds.x = inheritedX - subBusbarPos.size.width / 2;
+
+      // Update geometry - this allows sub-bays to use correct X
+      if (subBusbarGeom) {
+        subBusbarGeom.p0.x = inheritedX - subBusbarGeom.width / 2;
+        subBusbarGeom.p1.x = inheritedX + subBusbarGeom.width / 2;
+      }
+    }
+  }
+
+  // Recursively process sub-bays with the same inherited X
+  for (const subBay of bay.subBays) {
+    propagateBayX(subBay, inheritedX, positions, busbarGeometries, symbolById);
   }
 }
 
@@ -440,6 +622,11 @@ function calculateBayXPositions(
 
 /**
  * Pozycjonuj elementy w bayu.
+ *
+ * PHASE4 AESTHETICS:
+ * - Elementy terminalne (Generator, Load) na sub-busbarach są rozkładane poziomo
+ * - Używa SUBBUS_TERMINAL_SPREAD_GAP_X do rozłożenia terminali wzdłuż szerokości sub-busbara
+ * - Sort terminali po id dla determinizmu
  */
 function positionBayElements(
   bay: Bay,
@@ -455,7 +642,19 @@ function positionBayElements(
   // Sortuj elementy po orderInBay
   const sortedElements = [...bay.elements].sort((a, b) => a.orderInBay - b.orderInBay);
 
-  for (const element of sortedElements) {
+  // Separate terminal elements (Generators, Loads) for horizontal spreading
+  const terminalElements = sortedElements.filter((el) => {
+    const symbol = symbolById.get(el.symbolId);
+    return symbol && (symbol.elementType === 'Generator' || symbol.elementType === 'Load');
+  });
+
+  const nonTerminalElements = sortedElements.filter((el) => {
+    const symbol = symbolById.get(el.symbolId);
+    return symbol && symbol.elementType !== 'Generator' && symbol.elementType !== 'Load';
+  });
+
+  // Position non-terminal elements vertically
+  for (const element of nonTerminalElements) {
     const symbol = symbolById.get(element.symbolId);
     if (!symbol) continue;
 
@@ -501,6 +700,56 @@ function positionBayElements(
 
     // Następny element poniżej
     currentY += size.height + config.elementGapY;
+  }
+
+  // Position terminal elements with horizontal spreading (for sub-busbars)
+  if (terminalElements.length > 0) {
+    // Sort terminals by id for determinism
+    const sortedTerminals = [...terminalElements].sort((a, b) =>
+      a.symbolId.localeCompare(b.symbolId)
+    );
+
+    const terminalCount = sortedTerminals.length;
+    const terminalY = currentY;
+
+    // Calculate X spread: distribute terminals evenly across sub-busbar width
+    // or use SUBBUS_TERMINAL_SPREAD_GAP_X if bay is narrow
+    const spreadWidth = Math.max(
+      (terminalCount - 1) * SUBBUS_TERMINAL_SPREAD_GAP_X,
+      busbarGeometry.width * 0.5
+    );
+    const startX = terminalCount === 1 ? bayX : bayX - spreadWidth / 2;
+    const stepX = terminalCount > 1 ? spreadWidth / (terminalCount - 1) : 0;
+
+    sortedTerminals.forEach((element, index) => {
+      const symbol = symbolById.get(element.symbolId);
+      if (!symbol) return;
+
+      const size = getSymbolSize(symbol, config);
+
+      // Calculate X position with horizontal spread
+      const x = startX + index * stepX;
+      const y = terminalY;
+
+      const band = findVoltageBandForSymbol(symbol, voltageBands);
+
+      const position: ElementPosition = {
+        symbolId: symbol.id,
+        position: { x, y },
+        size,
+        bounds: {
+          x: x - size.width / 2,
+          y: y - size.height / 2,
+          width: size.width,
+          height: size.height,
+        },
+        voltageBandId: band?.id ?? bay.voltageBandId,
+        bayId: bay.id,
+        autoPositioned: true,
+        isQuarantined: false,
+      };
+      positions.set(symbol.id, position);
+    });
   }
 }
 
@@ -635,6 +884,12 @@ function applyUserOverrides(
 /**
  * Rozwiąż kolizje między elementami.
  *
+ * ALGORYTM DETERMINISTYCZNY (Phase4 Aesthetics):
+ * 1. Sortuj elementy po (y, x, id) dla stabilności
+ * 2. Dla każdej kolizji — push-away w osi X (stały krok)
+ * 3. Limit iteracji z COLLISION_MAX_ITERATIONS
+ * 4. Tiebreak po id (string sort)
+ *
  * @returns Liczba rozwiązanych kolizji
  */
 function resolveCollisions(
@@ -642,33 +897,68 @@ function resolveCollisions(
   symbolById: Map<string, LayoutSymbol>,
   config: LayoutConfig
 ): number {
-  const MAX_ITERATIONS = 20;
   let resolved = 0;
 
-  for (let iter = 0; iter < MAX_ITERATIONS; iter++) {
+  for (let iter = 0; iter < COLLISION_MAX_ITERATIONS; iter++) {
     const collisions = detectCollisions(positions);
 
     if (collisions.length === 0) break;
 
-    for (const [idA, idB] of collisions) {
-      const posA = positions.get(idA);
-      const posB = positions.get(idB);
+    // Sort collisions deterministically by (y, x, id) of first element
+    const sortedCollisions = collisions
+      .map(([idA, idB]): [string, string, ElementPosition, ElementPosition] => {
+        const posA = positions.get(idA)!;
+        const posB = positions.get(idB)!;
+        return [idA, idB, posA, posB];
+      })
+      .sort((a, b) => {
+        // Sort by Y first, then X, then ID
+        const yDiff = a[2].position.y - b[2].position.y;
+        if (Math.abs(yDiff) > 1) return yDiff;
+        const xDiff = a[2].position.x - b[2].position.x;
+        if (Math.abs(xDiff) > 1) return xDiff;
+        return a[0].localeCompare(b[0]);
+      });
 
-      if (!posA || !posB) continue;
+    for (const [idA, idB, posA, posB] of sortedCollisions) {
+      // Check if still colliding (may have been resolved by previous iteration)
+      if (!rectanglesOverlap(posA.bounds, posB.bounds)) continue;
 
-      // Przesuń element o większym ID (determinizm)
-      const toMove = idA.localeCompare(idB) > 0 ? posA : posB;
+      // Determine which element to move (deterministic: larger ID moves)
+      const [stableId, moveId] = idA.localeCompare(idB) < 0 ? [idA, idB] : [idB, idA];
+      const toMove = positions.get(moveId)!;
+      const stable = positions.get(stableId)!;
 
-      // Nie przesuwaj elementów, które nie są auto-pozycjonowane
+      // Don't move user-pinned elements
       if (!toMove.autoPositioned) continue;
 
-      // Nie przesuwaj busbarów
+      // Don't move busbars
       const symbol = symbolById.get(toMove.symbolId);
       if (symbol?.elementType === 'Bus') continue;
 
-      // Przesuń w dół
-      toMove.position.y += config.elementGapY;
-      toMove.bounds.y += config.elementGapY;
+      // Calculate push direction: push right if toMove is right of stable, else push left
+      // Then push down as fallback
+      const dx = toMove.position.x - stable.position.x;
+      const pushDirection = dx >= 0 ? 1 : -1;
+
+      // Try horizontal push first
+      const newX = toMove.position.x + pushDirection * PUSH_AWAY_STEP_X;
+      const testBounds: Rectangle = {
+        x: newX - toMove.size.width / 2,
+        y: toMove.bounds.y,
+        width: toMove.bounds.width,
+        height: toMove.bounds.height,
+      };
+
+      // Check if horizontal push resolves collision
+      if (!rectanglesOverlap(stable.bounds, testBounds)) {
+        toMove.position.x = newX;
+        toMove.bounds.x = newX - toMove.size.width / 2;
+      } else {
+        // Fallback: push down
+        toMove.position.y += config.elementGapY;
+        toMove.bounds.y += config.elementGapY;
+      }
 
       resolved++;
     }
