@@ -17,6 +17,7 @@
 
 import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { clsx } from 'clsx';
+import { notify } from '../notifications/store';
 import type {
   DataManagerColumn,
   DataManagerRow,
@@ -366,7 +367,7 @@ export function DataManager({
     if (col.validation) {
       const error = col.validation(editValue);
       if (error) {
-        alert(`Błąd walidacji: ${error}`);
+        notify(`Błąd walidacji: ${error}`, 'warning');
         return;
       }
     }
@@ -377,7 +378,7 @@ export function DataManager({
       await onCellEdit(editingCell.rowId, editingCell.columnKey, editValue);
       setEditingCell(null);
     } catch (err) {
-      alert(`Błąd zapisu: ${err instanceof Error ? err.message : String(err)}`);
+      notify(`Błąd zapisu: ${err instanceof Error ? err.message : String(err)}`);
     } finally {
       setInlineEditPending(false);
     }
@@ -521,7 +522,7 @@ export function DataManager({
         setSelectedIds(new Set());
         setBatchPreview(null);
       } catch (err) {
-        alert(`Błąd podczas operacji zbiorczej: ${err instanceof Error ? err.message : String(err)}`);
+        notify(`Błąd podczas operacji zbiorczej: ${err instanceof Error ? err.message : String(err)}`);
       } finally {
         setBatchEditPending(false);
       }

@@ -18,6 +18,7 @@
 import { type ReactNode } from 'react';
 import { clsx } from 'clsx';
 import { useActiveMode } from '../app-state';
+import { notify } from '../notifications/store';
 import type { OperatingMode } from '../types';
 
 // =============================================================================
@@ -122,7 +123,7 @@ export function BlockedOverlay({
     if (blocked && onBlockedClick) {
       onBlockedClick();
     } else if (blocked) {
-      alert(message);
+      notify(message, 'warning');
     }
   };
 

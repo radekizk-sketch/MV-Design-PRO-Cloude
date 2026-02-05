@@ -11,6 +11,7 @@
  */
 
 import { useEffect, useMemo } from 'react';
+import { notify } from '../notifications/store';
 import {
   usePowerFlowResultsStore,
   useFilteredBusResults,
@@ -93,7 +94,7 @@ function ExportButton({ runId, disabled, overallVerdict }: ExportButtonProps) {
       document.body.removeChild(a);
     } catch (error) {
       console.error('Export error:', error);
-      alert(`Blad eksportu: ${error instanceof Error ? error.message : 'Nieznany blad'}`);
+      notify(`Błąd eksportu: ${error instanceof Error ? error.message : 'Nieznany błąd'}`);
     } finally {
       setIsExporting(false);
     }

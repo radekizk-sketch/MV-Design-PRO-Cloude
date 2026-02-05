@@ -15,6 +15,7 @@
 
 import { useMemo, useCallback } from 'react';
 import { useActiveMode } from '../app-state';
+import { notify } from '../notifications/store';
 import type { OperatingMode } from '../types';
 
 /**
@@ -187,8 +188,7 @@ export function useBlockedActionHandler(): (action: CaseAction) => void {
     (action: CaseAction) => {
       const reason = getBlockedReason(action);
       if (reason) {
-        // TODO: Integrate with toast/notification system
-        alert(reason);
+        notify(reason, 'warning');
       }
     },
     [getBlockedReason]
