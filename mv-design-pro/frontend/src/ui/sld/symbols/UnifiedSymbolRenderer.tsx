@@ -35,7 +35,12 @@ import {
   ETAP_TYPOGRAPHY,
   ETAP_STATE_COLORS,
   ETAP_FILL_COLORS,
+  VISUAL_HIERARCHY,
+  GENERATION_COLORS,
+  HOVER_STYLES,
+  SELECTION_STYLES,
   getEtapLabelAnchor,
+  getVisualHierarchyLevel,
 } from '../sldEtapStyle';
 
 /**
@@ -66,6 +71,10 @@ export interface SymbolVisualState {
   highlightSeverity?: IssueSeverity | null;
   /** Whether the symbol is highlighted */
   highlighted?: boolean;
+  /** Whether the symbol is hovered (for micro-interactions) */
+  hovered?: boolean;
+  /** Whether the symbol position is pinned/locked */
+  pinned?: boolean;
 }
 
 /**
@@ -93,11 +102,30 @@ export interface UnifiedSymbolRendererProps {
 }
 
 /**
+ * Get generation source color based on symbol properties.
+ * Returns null if not a generation source.
+ */
+function getGenerationSourceColor(symbolId?: string): string | null {
+  if (!symbolId) return null;
+
+  const generationColorMap: Record<string, string> = {
+    pv: GENERATION_COLORS.pv,
+    fw: GENERATION_COLORS.fw,
+    bess: GENERATION_COLORS.bess,
+    generator: GENERATION_COLORS.generator,
+    utility_feeder: GENERATION_COLORS.utility,
+  };
+
+  return generationColorMap[symbolId] ?? null;
+}
+
+/**
  * Calculate stroke color based on visual state.
  * Uses ETAP_STATE_COLORS from sldEtapStyle.ts.
+ * PR-SLD-UX-MAX: Enhanced with generation source colors and hover state.
  */
-function getStrokeColor(state: SymbolVisualState): string {
-  const { selected, inService, energized = true, highlighted, highlightSeverity } = state;
+function getStrokeColor(state: SymbolVisualState, resolvedSymbolId?: string): string {
+  const { selected, inService, energized = true, highlighted, highlightSeverity, hovered } = state;
 
   // Highlight takes priority (validation issues)
   if (highlighted && highlightSeverity) {
@@ -126,38 +154,49 @@ function getStrokeColor(state: SymbolVisualState): string {
     return ETAP_STATE_COLORS.deenergized;
   }
 
+  // Check for generation source color (OZE/BESS differentiation)
+  const generationColor = getGenerationSourceColor(resolvedSymbolId);
+  if (generationColor) {
+    return generationColor;
+  }
+
+  // Hover state — slightly darker
+  if (hovered) {
+    return '#111827'; // gray-900
+  }
+
   // Normal energized — use default symbol color
   return ETAP_TYPOGRAPHY.labelColor;
 }
 
 /**
  * Calculate stroke width based on visual state and element type.
- * Uses ETAP_STROKE hierarchy from sldEtapStyle.ts.
+ * Uses VISUAL_HIERARCHY from sldEtapStyle.ts.
+ * PR-SLD-UX-MAX: Uses 3-level visual hierarchy (structure/topology/detail).
  */
 function getStrokeWidth(state: SymbolVisualState, elementType?: ElementType): number {
-  const { selected, highlighted, highlightSeverity } = state;
+  const { selected, highlighted, highlightSeverity, hovered } = state;
 
-  // Determine base stroke by element type
-  let baseStroke: number = ETAP_STROKE.symbol;
-  if (elementType === 'Bus') {
-    baseStroke = ETAP_STROKE.busbar;
-  } else if (elementType === 'LineBranch') {
-    baseStroke = ETAP_STROKE.feeder;
-  }
+  // Get visual hierarchy level for this element type
+  const hierarchyLevel = getVisualHierarchyLevel(elementType ?? 'Load');
+  const hierarchy = VISUAL_HIERARCHY[hierarchyLevel];
 
-  // Highlight overrides
+  // Base stroke from hierarchy
+  let baseStroke = hierarchy.strokeWidth;
+
+  // Highlight overrides (validation issues)
   if (highlighted && highlightSeverity) {
-    return highlightSeverity === 'INFO' ? ETAP_STROKE.aux : baseStroke;
+    return highlightSeverity === 'INFO' ? VISUAL_HIERARCHY.detail.strokeWidth : baseStroke;
   }
 
-  // Selected gets slightly thicker stroke
+  // Selected gets thicker stroke
   if (selected) {
-    if (elementType === 'Bus') {
-      return ETAP_STROKE_SELECTED.busbar;
-    } else if (elementType === 'LineBranch') {
-      return ETAP_STROKE_SELECTED.feeder;
-    }
-    return ETAP_STROKE_SELECTED.symbol;
+    return hierarchy.strokeWidthSelected;
+  }
+
+  // Hover gets slight increase
+  if (hovered) {
+    return baseStroke + HOVER_STYLES.strokeWidthIncrease;
   }
 
   return baseStroke;
@@ -165,15 +204,29 @@ function getStrokeWidth(state: SymbolVisualState, elementType?: ElementType): nu
 
 /**
  * Calculate opacity based on visual state.
+ * PR-SLD-UX-MAX: Includes hierarchy level opacity and hover boost.
  */
-function getOpacity(state: SymbolVisualState): number {
-  const { inService, energized = true } = state;
+function getOpacity(state: SymbolVisualState, elementType?: ElementType): number {
+  const { inService, energized = true, hovered } = state;
+
+  // Get hierarchy level opacity
+  const hierarchyLevel = getVisualHierarchyLevel(elementType ?? 'Load');
+  const baseOpacity = VISUAL_HIERARCHY[hierarchyLevel].opacity;
 
   if (!inService) {
     return 0.5;
   }
 
-  return energized ? 1 : 0.7;
+  if (!energized) {
+    return 0.7;
+  }
+
+  // Hover slightly boosts opacity (useful for detail level elements)
+  if (hovered && baseOpacity < 1) {
+    return Math.min(1, baseOpacity + HOVER_STYLES.opacityBoost);
+  }
+
+  return baseOpacity;
 }
 
 /**
@@ -196,7 +249,8 @@ function getFillColor(state: SymbolVisualState): string {
 
 /**
  * ETAP Symbol Wrapper — applies styling and scaling.
- * Uses ETAP stroke hierarchy for proper visual weight.
+ * Uses visual hierarchy for proper visual weight.
+ * PR-SLD-UX-MAX: Enhanced with generation colors and hover interactions.
  */
 const EtapSymbolWrapper: React.FC<{
   resolvedSymbol: ResolvedSymbol;
@@ -205,9 +259,9 @@ const EtapSymbolWrapper: React.FC<{
   elementType: ElementType;
   switchState?: SwitchState;
 }> = ({ resolvedSymbol, visualState, size, elementType, switchState }) => {
-  const stroke = getStrokeColor(visualState);
+  const stroke = getStrokeColor(visualState, resolvedSymbol.symbolId);
   const strokeWidth = getStrokeWidth(visualState, elementType);
-  const opacity = getOpacity(visualState);
+  const opacity = getOpacity(visualState, elementType);
   const fill = getFillColor(visualState);
 
   return (
@@ -334,10 +388,64 @@ const UnknownSymbolFallback: React.FC<{
 };
 
 /**
+ * Selection ring component for selected elements.
+ * PR-SLD-UX-MAX: Subtle selection indicator that doesn't obscure the symbol.
+ */
+const SelectionRing: React.FC<{
+  size: { width: number; height: number };
+}> = ({ size }) => {
+  const padding = SELECTION_STYLES.ringOffset;
+  return (
+    <rect
+      x={-size.width / 2 - padding}
+      y={-size.height / 2 - padding}
+      width={size.width + padding * 2}
+      height={size.height + padding * 2}
+      fill="none"
+      stroke={SELECTION_STYLES.ringColor}
+      strokeWidth={SELECTION_STYLES.ringWidth}
+      rx={3}
+      ry={3}
+      style={{ pointerEvents: 'none' }}
+      data-testid="selection-ring"
+    />
+  );
+};
+
+/**
+ * Pinned indicator for locked element positions.
+ * PR-SLD-UX-MAX: Discreet signal that element position is stable.
+ */
+const PinnedIndicator: React.FC<{
+  size: { width: number; height: number };
+}> = ({ size }) => {
+  const x = size.width / 2 + 4;
+  const y = -size.height / 2 - 4;
+  return (
+    <g transform={`translate(${x}, ${y})`} style={{ pointerEvents: 'none' }}>
+      <circle r={4} fill="#6B7280" />
+      <path
+        d="M0,-2 L0,2 M-1.5,-1 L0,-2 L1.5,-1"
+        stroke="#FFFFFF"
+        strokeWidth={1}
+        fill="none"
+      />
+    </g>
+  );
+};
+
+/**
  * Unified Symbol Renderer — renders any SLD symbol using ETAP standard.
  *
  * This is the single entry point for rendering symbols in both
  * the editor (SldCanvas) and the viewer (SLDViewCanvas).
+ *
+ * PR-SLD-UX-MAX: Enhanced with:
+ * - 3-level visual hierarchy (structure/topology/detail)
+ * - Generation source colors (OZE/BESS differentiation)
+ * - Hover micro-interactions
+ * - Selection ring indicator
+ * - Pinned position indicator
  *
  * @example
  * ```tsx
@@ -356,6 +464,7 @@ export const UnifiedSymbolRenderer: React.FC<UnifiedSymbolRendererProps> = ({
   labelOffsetY,
 }) => {
   const { position, elementType, elementName } = symbol;
+  const [isHovered, setIsHovered] = React.useState(false);
 
   // Resolve ETAP symbol
   const resolvedSymbol = resolveSymbol(symbol);
@@ -366,6 +475,16 @@ export const UnifiedSymbolRenderer: React.FC<UnifiedSymbolRendererProps> = ({
   // Calculate offset to center the symbol
   const offsetX = -size.width / 2;
   const offsetY = -size.height / 2;
+
+  // Get visual hierarchy level for typography
+  const hierarchyLevel = getVisualHierarchyLevel(elementType);
+  const hierarchy = VISUAL_HIERARCHY[hierarchyLevel];
+
+  // Merge hover state with visual state
+  const effectiveVisualState: SymbolVisualState = {
+    ...visualState,
+    hovered: isHovered || visualState.hovered,
+  };
 
   // Label position — uses ETAP anchor rules
   const labelAnchor = getEtapLabelAnchor(elementType);
@@ -398,10 +517,20 @@ export const UnifiedSymbolRenderer: React.FC<UnifiedSymbolRendererProps> = ({
     [handlers, symbol.id]
   );
 
+  // Hover handlers for micro-interactions
+  const handleMouseEnter = useCallback(() => {
+    setIsHovered(true);
+  }, []);
+
+  const handleMouseLeave = useCallback(() => {
+    setIsHovered(false);
+  }, []);
+
   // Build data-testid attributes
   const testIdAttrs: Record<string, string> = {
     'data-testid': `sld-symbol-${symbol.id}`,
     'data-element-type': elementType,
+    'data-hierarchy-level': hierarchyLevel,
   };
 
   if (resolvedSymbol) {
@@ -426,8 +555,19 @@ export const UnifiedSymbolRenderer: React.FC<UnifiedSymbolRendererProps> = ({
     testIdAttrs['data-energized'] = visualState.energized ? 'true' : 'false';
   }
 
+  // Add hover state
+  if (isHovered) {
+    testIdAttrs['data-hovered'] = 'true';
+  }
+
   const cursor = handlers?.onClick || handlers?.onMouseDown ? 'pointer' : 'default';
   const interactive = !!(handlers?.onClick || handlers?.onMouseDown);
+
+  // CSS transition for smooth hover effect
+  const transitionStyle = {
+    cursor,
+    transition: `all ${HOVER_STYLES.transitionDuration}ms ease-out`,
+  };
 
   // Handle Load fallback (no ETAP symbol)
   if (elementType === 'Load') {
@@ -437,9 +577,15 @@ export const UnifiedSymbolRenderer: React.FC<UnifiedSymbolRendererProps> = ({
         transform={`translate(${position.x}, ${position.y})`}
         onMouseDown={interactive ? handleMouseDown : undefined}
         onClick={interactive ? handleClick : undefined}
-        style={{ cursor }}
+        onMouseEnter={handleMouseEnter}
+        onMouseLeave={handleMouseLeave}
+        style={transitionStyle}
       >
-        <LoadFallback visualState={visualState} elementName={elementName} />
+        {/* Selection ring */}
+        {visualState.selected && <SelectionRing size={size} />}
+        <LoadFallback visualState={effectiveVisualState} elementName={elementName} />
+        {/* Pinned indicator */}
+        {visualState.pinned && <PinnedIndicator size={size} />}
       </g>
     );
   }
@@ -453,12 +599,14 @@ export const UnifiedSymbolRenderer: React.FC<UnifiedSymbolRendererProps> = ({
         transform={`translate(${position.x}, ${position.y})`}
         onMouseDown={interactive ? handleMouseDown : undefined}
         onClick={interactive ? handleClick : undefined}
-        style={{ cursor }}
+        onMouseEnter={handleMouseEnter}
+        onMouseLeave={handleMouseLeave}
+        style={transitionStyle}
       >
         <UnknownSymbolFallback
           elementType={elementType}
           elementName={elementName}
-          visualState={visualState}
+          visualState={effectiveVisualState}
         />
       </g>
     );
@@ -477,33 +625,42 @@ export const UnifiedSymbolRenderer: React.FC<UnifiedSymbolRendererProps> = ({
       transform={`translate(${position.x}, ${position.y})`}
       onMouseDown={interactive ? handleMouseDown : undefined}
       onClick={interactive ? handleClick : undefined}
-      style={{ cursor }}
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
+      style={transitionStyle}
     >
+      {/* Selection ring (behind symbol) */}
+      {visualState.selected && <SelectionRing size={size} />}
+
       {/* ETAP Symbol centered */}
       <g transform={`translate(${offsetX}, ${offsetY})`}>
         <EtapSymbolWrapper
           resolvedSymbol={resolvedSymbol}
-          visualState={visualState}
+          visualState={effectiveVisualState}
           size={size}
           elementType={elementType}
           switchState={switchState}
         />
       </g>
 
-      {/* Label — ETAP typography */}
+      {/* Label — uses visual hierarchy typography */}
       {showLabel && (
         <text
           x={finalLabelOffsetX}
           y={finalLabelOffsetY}
           textAnchor={labelAnchor.textAnchor}
           fontFamily={ETAP_TYPOGRAPHY.fontFamily}
-          fontSize={elementType === 'Bus' ? ETAP_TYPOGRAPHY.fontSize.large : ETAP_TYPOGRAPHY.fontSize.medium}
-          fontWeight={visualState.selected ? ETAP_TYPOGRAPHY.fontWeight.semibold : ETAP_TYPOGRAPHY.fontWeight.normal}
+          fontSize={hierarchy.labelFontSize}
+          fontWeight={visualState.selected ? ETAP_TYPOGRAPHY.fontWeight.semibold : hierarchy.labelFontWeight}
           fill={ETAP_TYPOGRAPHY.labelColor}
+          style={{ pointerEvents: 'none', transition: `all ${HOVER_STYLES.transitionDuration}ms ease-out` }}
         >
           {elementName}
         </text>
       )}
+
+      {/* Pinned indicator */}
+      {visualState.pinned && <PinnedIndicator size={size} />}
     </g>
   );
 };

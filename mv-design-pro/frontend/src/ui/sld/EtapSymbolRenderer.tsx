@@ -49,6 +49,7 @@ export interface EtapSymbolProps {
 /**
  * Busbar / Szyna zbiorcza
  * Horizontal thick bar representing electrical busbar.
+ * PR-SLD-UX-MAX: Enhanced with prominent visual weight and subtle fill.
  */
 const BusbarSymbol: React.FC<Omit<EtapSymbolProps, 'symbolId'>> = ({
   stroke = 'currentColor',
@@ -57,15 +58,28 @@ const BusbarSymbol: React.FC<Omit<EtapSymbolProps, 'symbolId'>> = ({
   opacity = 1,
 }) => (
   <>
+    {/* Main busbar body — thick, prominent */}
     <rect
-      x="5"
-      y="45"
-      width="90"
-      height="10"
-      fill={fill}
+      x="2"
+      y="44"
+      width="96"
+      height="12"
+      fill={fill === 'none' ? 'rgba(255,255,255,0.9)' : fill}
       stroke={stroke}
       strokeWidth={strokeWidth}
       opacity={opacity}
+      rx={1}
+      ry={1}
+    />
+    {/* Center line for visual emphasis */}
+    <line
+      x1="2"
+      y1="50"
+      x2="98"
+      y2="50"
+      stroke={stroke}
+      strokeWidth={strokeWidth * 0.4}
+      opacity={opacity * 0.5}
     />
   </>
 );
@@ -404,7 +418,8 @@ const GroundSymbol: React.FC<Omit<EtapSymbolProps, 'symbolId'>> = ({
 
 /**
  * Current Transformer / Przekładnik prądowy
- * CT symbol (circle with CT marking).
+ * CT symbol — inline donut style for placement on feeder lines.
+ * PR-SLD-UX-MAX: Compact inline design, detail hierarchy level.
  */
 const CtSymbol: React.FC<Omit<EtapSymbolProps, 'symbolId'>> = ({
   stroke = 'currentColor',
@@ -413,21 +428,23 @@ const CtSymbol: React.FC<Omit<EtapSymbolProps, 'symbolId'>> = ({
   opacity = 1,
 }) => (
   <>
-    {/* Main circle */}
-    <circle cx="50" cy="50" r="25" fill={fill} stroke={stroke} strokeWidth={strokeWidth} opacity={opacity} />
-    {/* CT label */}
-    <text x="50" y="56" textAnchor="middle" fontSize="16" fontWeight="bold" fill={stroke} opacity={opacity}>
+    {/* Through-line (the feeder passes through) */}
+    <line x1="0" y1="50" x2="35" y2="50" stroke={stroke} strokeWidth={strokeWidth * 0.8} opacity={opacity} />
+    <line x1="65" y1="50" x2="100" y2="50" stroke={stroke} strokeWidth={strokeWidth * 0.8} opacity={opacity} />
+    {/* CT donut — compact inline */}
+    <circle cx="50" cy="50" r="15" fill={fill === 'none' ? '#FFFFFF' : fill} stroke={stroke} strokeWidth={strokeWidth * 0.7} opacity={opacity} />
+    <circle cx="50" cy="50" r="8" fill="none" stroke={stroke} strokeWidth={strokeWidth * 0.5} opacity={opacity * 0.8} />
+    {/* CT marker — small text */}
+    <text x="50" y="75" textAnchor="middle" fontSize="10" fontWeight="500" fill={stroke} opacity={opacity * 0.9}>
       CT
     </text>
-    {/* Connection stubs */}
-    <line x1="0" y1="50" x2="25" y2="50" stroke={stroke} strokeWidth={strokeWidth} opacity={opacity} />
-    <line x1="75" y1="50" x2="100" y2="50" stroke={stroke} strokeWidth={strokeWidth} opacity={opacity} />
   </>
 );
 
 /**
  * Voltage Transformer / Przekładnik napięciowy
- * VT symbol (circle with VT marking).
+ * VT symbol — inline tap style for measurement points.
+ * PR-SLD-UX-MAX: Compact inline design, detail hierarchy level.
  */
 const VtSymbol: React.FC<Omit<EtapSymbolProps, 'symbolId'>> = ({
   stroke = 'currentColor',
@@ -436,15 +453,18 @@ const VtSymbol: React.FC<Omit<EtapSymbolProps, 'symbolId'>> = ({
   opacity = 1,
 }) => (
   <>
-    {/* Main circle */}
-    <circle cx="50" cy="50" r="25" fill={fill} stroke={stroke} strokeWidth={strokeWidth} opacity={opacity} />
-    {/* VT label */}
-    <text x="50" y="56" textAnchor="middle" fontSize="16" fontWeight="bold" fill={stroke} opacity={opacity}>
+    {/* Through-line */}
+    <line x1="0" y1="50" x2="35" y2="50" stroke={stroke} strokeWidth={strokeWidth * 0.8} opacity={opacity} />
+    <line x1="65" y1="50" x2="100" y2="50" stroke={stroke} strokeWidth={strokeWidth * 0.8} opacity={opacity} />
+    {/* VT symbol — two concentric circles with tap */}
+    <circle cx="50" cy="50" r="12" fill={fill === 'none' ? '#FFFFFF' : fill} stroke={stroke} strokeWidth={strokeWidth * 0.6} opacity={opacity} />
+    {/* Tap line (measurement point) */}
+    <line x1="50" y1="62" x2="50" y2="80" stroke={stroke} strokeWidth={strokeWidth * 0.5} opacity={opacity * 0.8} />
+    <line x1="42" y1="80" x2="58" y2="80" stroke={stroke} strokeWidth={strokeWidth * 0.5} opacity={opacity * 0.8} />
+    {/* VT marker — small text */}
+    <text x="50" y="93" textAnchor="middle" fontSize="10" fontWeight="500" fill={stroke} opacity={opacity * 0.9}>
       VT
     </text>
-    {/* Connection stubs */}
-    <line x1="0" y1="50" x2="25" y2="50" stroke={stroke} strokeWidth={strokeWidth} opacity={opacity} />
-    <line x1="75" y1="50" x2="100" y2="50" stroke={stroke} strokeWidth={strokeWidth} opacity={opacity} />
   </>
 );
 

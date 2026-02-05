@@ -405,8 +405,8 @@ describe('UnifiedSymbolRenderer - Visual States', () => {
       </svg>
     );
 
-    // Selection should be reflected in SVG (blue color #3b82f6)
-    expect(container.innerHTML).toContain('#3b82f6');
+    // Selection should be reflected in SVG (ETAP blue-600 #2563EB)
+    expect(container.innerHTML).toContain('#2563EB');
   });
 
   it('should apply de-energized styling when not energized', () => {
@@ -422,8 +422,8 @@ describe('UnifiedSymbolRenderer - Visual States', () => {
       </svg>
     );
 
-    // De-energized should use gray color #9ca3af
-    expect(container.innerHTML).toContain('#9ca3af');
+    // De-energized should use gray color #6B7280 (ETAP gray-500)
+    expect(container.innerHTML).toContain('#6B7280');
   });
 
   it('should apply out-of-service styling when not in service', () => {
