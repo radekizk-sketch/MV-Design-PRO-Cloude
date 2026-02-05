@@ -30,6 +30,13 @@ import type {
 } from './types';
 
 // =============================================================================
+// AESTHETICS CONFIG — PHASE 5 LABEL PLACEMENT PARAMETERS
+// =============================================================================
+
+/** Maximum distance from label to anchor element (px) */
+export const LABEL_MAX_DISTANCE_PX = 180;
+
+// =============================================================================
 // GŁÓWNA FUNKCJA FAZY 5
 // =============================================================================
 
@@ -399,6 +406,12 @@ function placeLabels(
 
 /**
  * Znajdź najlepszą pozycję dla etykiety.
+ *
+ * PHASE5 AESTHETICS:
+ * - Heurystyka kolejności: right → left → top → bottom
+ * - Unikaj kolizji label-symbol (twarde)
+ * - Clamp dystansu do LABEL_MAX_DISTANCE_PX
+ * - Deterministic tiebreak (sort kandydatów po placement order + id)
  */
 function findBestLabelPosition(
   symbol: LayoutSymbol,
@@ -406,36 +419,77 @@ function findBestLabelPosition(
   occupiedAreas: Rectangle[],
   config: LayoutConfig
 ): LabelPosition {
-  // Kolejność prób: prawo, lewo, góra, dół
+  // Kolejność prób: prawo, lewo, góra, dół (deterministic order)
   const placements: Array<'right' | 'left' | 'top' | 'bottom'> = ['right', 'left', 'top', 'bottom'];
 
   for (const placement of placements) {
     const labelPos = calculateLabelPosition(elementPos, placement, config);
     const labelBounds = estimateLabelBounds(symbol.elementName, labelPos);
 
-    // Sprawdź kolizje
+    // Sprawdź kolizje z symbolami (twarde)
     const hasCollision = occupiedAreas.some((area) => rectanglesOverlap(labelBounds, area));
 
     if (!hasCollision) {
-      return {
-        symbolId: symbol.id,
-        position: labelPos.position,
-        anchor: labelPos.anchor,
-        placement,
-        offset: labelPos.offset,
-        adjusted: false,
-      };
+      // Verify distance is within LABEL_MAX_DISTANCE_PX
+      const distance = Math.sqrt(
+        Math.pow(labelPos.position.x - elementPos.position.x, 2) +
+          Math.pow(labelPos.position.y - elementPos.position.y, 2)
+      );
+
+      if (distance <= LABEL_MAX_DISTANCE_PX) {
+        return {
+          symbolId: symbol.id,
+          position: labelPos.position,
+          anchor: labelPos.anchor,
+          placement,
+          offset: labelPos.offset,
+          adjusted: false,
+        };
+      }
     }
   }
 
-  // Fallback: prawo z większym offset
-  const fallbackPos = calculateLabelPosition(elementPos, 'right', config, 2);
+  // Fallback: try with smaller multiplier to stay within distance limit
+  for (const placement of placements) {
+    // Try multiplier 1.0 first, then 1.5 (clamped to max distance)
+    for (const multiplier of [1.0, 1.5]) {
+      const labelPos = calculateLabelPosition(elementPos, placement, config, multiplier);
+      const labelBounds = estimateLabelBounds(symbol.elementName, labelPos);
+
+      // Check distance constraint
+      const distance = Math.sqrt(
+        Math.pow(labelPos.position.x - elementPos.position.x, 2) +
+          Math.pow(labelPos.position.y - elementPos.position.y, 2)
+      );
+
+      if (distance > LABEL_MAX_DISTANCE_PX) continue;
+
+      // Check collision (soft for fallback)
+      const hasCollision = occupiedAreas.some((area) => rectanglesOverlap(labelBounds, area));
+
+      if (!hasCollision) {
+        return {
+          symbolId: symbol.id,
+          position: labelPos.position,
+          anchor: labelPos.anchor,
+          placement,
+          offset: labelPos.offset,
+          adjusted: true,
+        };
+      }
+    }
+  }
+
+  // Ultimate fallback: right with clamped distance
+  const clampedOffset = Math.min(config.labelOffsetX, LABEL_MAX_DISTANCE_PX - elementPos.size.width / 2);
+  const fallbackX = elementPos.position.x + elementPos.size.width / 2 + Math.max(10, clampedOffset);
+
   return {
     symbolId: symbol.id,
-    position: fallbackPos.position,
-    anchor: fallbackPos.anchor,
+    position: { x: fallbackX, y: elementPos.position.y },
+    anchor: 'start',
     placement: 'right',
-    offset: fallbackPos.offset,
+    offset: { x: Math.max(10, clampedOffset), y: 0 },
     adjusted: true,
   };
 }
