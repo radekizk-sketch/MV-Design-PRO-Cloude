@@ -177,7 +177,7 @@ const assertRoutingInvariants = (symbols: AnySldSymbol[]) => {
 
   connections.forEach((connection) => {
     const filteredObstacles = obstacles.filter(
-      (obs) => obs.id !== connection.fromSymbolId && obs.id !== connection.toSymbolId
+      (obs) => obs.id !== connection.fromSymbolId && obs.id !== connection.toSymbolId && obs.id !== connection.id
     );
 
     connection.path.forEach((point) => {

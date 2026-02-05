@@ -138,13 +138,13 @@ describe('P30e: field-definitions (mode-aware)', () => {
     describe('CASE_CONFIG mode', () => {
       const mode: OperatingMode = 'CASE_CONFIG';
 
-      it('Bus: includes identification, state, topology', () => {
+      it('Bus: includes identification, state, electrical_params', () => {
         const sections = getFieldDefinitionsForMode('Bus', mode);
         const sectionIds = sections.map((s) => s.id);
 
         expect(sectionIds).toContain('identification');
         expect(sectionIds).toContain('state');
-        expect(sectionIds).toContain('topology');
+        expect(sectionIds).toContain('electrical_params');
       });
 
       it('Bus: excludes audit and calculated sections', () => {

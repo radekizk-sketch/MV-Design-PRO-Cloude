@@ -17,7 +17,7 @@ import {
 describe('Protection Coordination Types', () => {
   describe('LABELS', () => {
     it('should have title defined', () => {
-      expect(LABELS.title).toBe('Koordynacja zabezpieczen nadpradowych');
+      expect(LABELS.title).toBe('Koordynacja zabezpieczeń nadprądowych');
     });
 
     it('should have all required sections', () => {
@@ -35,48 +35,48 @@ describe('Protection Coordination Types', () => {
     });
 
     it('should have PowerFactory-style verdict labels', () => {
-      expect(LABELS.verdict.PASS).toBe('ZGODNE');
-      expect(LABELS.verdict.MARGINAL).toBe('GRANICZNE');
-      expect(LABELS.verdict.FAIL).toBe('NIEZGODNE');
-      expect(LABELS.verdict.ERROR).toBe('BLAD');
+      expect(LABELS.verdict.PASS).toBe('Zgodne');
+      expect(LABELS.verdict.MARGINAL).toBe('Na granicy dopuszczalności');
+      expect(LABELS.verdict.FAIL).toBe('Wymaga korekty');
+      expect(LABELS.verdict.ERROR).toBe('Wystąpił błąd');
     });
 
     it('should have verbose verdict labels', () => {
-      expect(LABELS.verdictVerbose.PASS).toBe('Koordynacja prawidlowa');
-      expect(LABELS.verdictVerbose.MARGINAL).toBe('Koordynacja z niskim marginesem');
-      expect(LABELS.verdictVerbose.FAIL).toBe('Brak koordynacji');
-      expect(LABELS.verdictVerbose.ERROR).toBe('Blad podczas analizy');
+      expect(LABELS.verdictVerbose.PASS).toBe('Koordynacja prawidłowa, wszystkie kryteria spełnione.');
+      expect(LABELS.verdictVerbose.MARGINAL).toBe('Koordynacja z niskim marginesem. Zalecana weryfikacja parametrów.');
+      expect(LABELS.verdictVerbose.FAIL).toBe('Brak prawidłowej koordynacji. Wymagana korekta nastaw.');
+      expect(LABELS.verdictVerbose.ERROR).toBe('Wystąpił błąd podczas analizy. Sprawdź dane wejściowe.');
     });
 
     it('should have all device types in Polish', () => {
-      expect(LABELS.deviceTypes.RELAY).toBe('Przekaznik nadpradowy');
+      expect(LABELS.deviceTypes.RELAY).toBe('Przekaźnik nadprądowy');
       expect(LABELS.deviceTypes.FUSE).toBe('Bezpiecznik');
-      expect(LABELS.deviceTypes.RECLOSER).toBe('Wylacznik samoczynny');
-      expect(LABELS.deviceTypes.CIRCUIT_BREAKER).toBe('Wylacznik z wyzwalaczem');
+      expect(LABELS.deviceTypes.RECLOSER).toBe('Wyłącznik samoczynny');
+      expect(LABELS.deviceTypes.CIRCUIT_BREAKER).toBe('Wyłącznik z wyzwalaczem');
     });
 
     it('should have all curve types in Polish', () => {
       expect(LABELS.curveTypes.SI).toBe('Normalna odwrotna (SI)');
       expect(LABELS.curveTypes.VI).toBe('Bardzo odwrotna (VI)');
       expect(LABELS.curveTypes.EI).toBe('Ekstremalnie odwrotna (EI)');
-      expect(LABELS.curveTypes.LTI).toBe('Dlugoczasowa odwrotna (LTI)');
-      expect(LABELS.curveTypes.DT).toBe('Czas niezalezny (DT)');
+      expect(LABELS.curveTypes.LTI).toBe('Długoczasowa odwrotna (LTI)');
+      expect(LABELS.curveTypes.DT).toBe('Czas niezależny (DT)');
       expect(LABELS.curveTypes.MI).toBe('Umiarkowanie odwrotna (MI)');
-      expect(LABELS.curveTypes.STI).toBe('Krotkoczasowa odwrotna (STI)');
+      expect(LABELS.curveTypes.STI).toBe('Krótkoczasowa odwrotna (STI)');
     });
 
     it('should have all tab labels', () => {
       expect(LABELS.tabs.summary).toBe('Podsumowanie');
-      expect(LABELS.tabs.sensitivity).toBe('Czulosc');
-      expect(LABELS.tabs.selectivity).toBe('Selektywnosc');
-      expect(LABELS.tabs.overload).toBe('Przeciazalnosc');
+      expect(LABELS.tabs.sensitivity).toBe('Czułość');
+      expect(LABELS.tabs.selectivity).toBe('Selektywność');
+      expect(LABELS.tabs.overload).toBe('Przeciążalność');
       expect(LABELS.tabs.tcc).toBe('Wykres TCC');
-      expect(LABELS.tabs.trace).toBe('Slad obliczen');
+      expect(LABELS.tabs.trace).toBe('Ślad obliczeń');
     });
 
     it('should NOT contain project codenames (forbidden)', () => {
       const allLabels = JSON.stringify(LABELS);
-      const forbiddenCodenames = ['P7', 'P11', 'P14', 'P15', 'P17', 'P20', 'FIX-'];
+      const forbiddenCodenames = ['P7', 'P11', 'P14', 'P15', 'P17', 'P20', 'FIX-']; // no-codenames-ignore
 
       for (const codename of forbiddenCodenames) {
         expect(allLabels).not.toContain(codename);
@@ -91,10 +91,10 @@ describe('Protection Coordination Types', () => {
     });
 
     it('should have validation messages in Polish', () => {
-      expect(LABELS.validation.pickupPositive).toBe('Prad rozruchowy musi byc dodatni');
-      expect(LABELS.validation.tmsRange).toBe('TMS musi byc w zakresie 0.05-10.0');
-      expect(LABELS.validation.timePositive).toBe('Czas musi byc dodatni');
-      expect(LABELS.validation.minOneDevice).toBe('Dodaj przynajmniej jedno urzadzenie');
+      expect(LABELS.validation.pickupPositive).toBe('Prąd rozruchowy musi być dodatni');
+      expect(LABELS.validation.tmsRange).toBe('TMS musi być w zakresie 0.05-10.0');
+      expect(LABELS.validation.timePositive).toBe('Czas musi być dodatni');
+      expect(LABELS.validation.minOneDevice).toBe('Dodaj przynajmniej jedno urządzenie');
     });
   });
 
@@ -115,9 +115,9 @@ describe('Protection Coordination Types', () => {
       expect(VERDICT_STYLES.MARGINAL.bg).toContain('amber');
       expect(VERDICT_STYLES.MARGINAL.text).toContain('amber');
 
-      // FAIL = rose
-      expect(VERDICT_STYLES.FAIL.bg).toContain('rose');
-      expect(VERDICT_STYLES.FAIL.text).toContain('rose');
+      // FAIL = orange
+      expect(VERDICT_STYLES.FAIL.bg).toContain('orange');
+      expect(VERDICT_STYLES.FAIL.text).toContain('orange');
 
       // ERROR = slate
       expect(VERDICT_STYLES.ERROR.bg).toContain('slate');
@@ -212,7 +212,7 @@ describe('Protection Coordination Types', () => {
 
     it('should NOT contain project codenames', () => {
       const allTemplates = JSON.stringify(DEVICE_TEMPLATES);
-      const forbiddenCodenames = ['P7', 'P11', 'P14', 'P15', 'P17', 'P20', 'FIX-'];
+      const forbiddenCodenames = ['P7', 'P11', 'P14', 'P15', 'P17', 'P20', 'FIX-']; // no-codenames-ignore
 
       for (const codename of forbiddenCodenames) {
         expect(allTemplates).not.toContain(codename);

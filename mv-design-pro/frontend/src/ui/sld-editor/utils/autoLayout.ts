@@ -109,7 +109,7 @@ export const DEFAULT_COLLISION_CONFIG: CollisionConfig = {
   labelCharWidth: 7,
   labelHeight: 12,
   edgeThickness: 6,
-  maxIterations: 20,
+  maxIterations: 50,
 };
 
 // =============================================================================

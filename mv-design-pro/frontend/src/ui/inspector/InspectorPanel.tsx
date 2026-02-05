@@ -49,7 +49,7 @@ const TAB_LABELS: Record<InspectorTab, string> = {
   results: 'Wyniki',
   contributions: 'Kontrybutorzy',
   limits: 'Limity',
-  proof: 'Dowód (P11)',
+  proof: 'Dowód obliczeń',
 };
 
 /**
@@ -401,7 +401,7 @@ function buildProofSections(_type: string): InspectorSection[] {
   return [
     {
       id: 'proof_summary',
-      label: 'Dowód zgodności (P11)',
+      label: 'Dowód zgodności',
       fields: [
         { key: 'status', label: 'Status zgodności', value: 'COMPLIANT' },
         { key: 'audit_date', label: 'Data audytu', value: new Date().toLocaleDateString('pl-PL') },
@@ -412,7 +412,7 @@ function buildProofSections(_type: string): InspectorSection[] {
       id: 'proof_actions',
       label: 'Eksport',
       fields: [
-        { key: 'export_note', label: 'Uwaga', value: 'Kliknij "Eksportuj PDF" aby wygenerować pełny raport P11' },
+        { key: 'export_note', label: 'Uwaga', value: 'Kliknij "Eksportuj PDF" aby wygenerować pełny raport dowodu obliczeń' },
       ],
     },
   ];

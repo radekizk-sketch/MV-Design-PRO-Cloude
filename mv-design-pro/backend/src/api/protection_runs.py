@@ -115,7 +115,7 @@ def create_protection_run(
     except ValueError as exc:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Invalid protection_case_id: {exc}",
+            detail=f"Nieprawidłowy protection_case_id: {exc}",
         ) from exc
 
     try:
@@ -217,14 +217,14 @@ def get_protection_run_results(
     if run.status != ProtectionRunStatus.FINISHED:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Run is not finished (status: {run.status.value})",
+            detail=f"Przebieg nie jest zakończony (status: {run.status.value})",
         )
 
     result = service.get_result(run_id)
     if result is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Protection result not found",
+            detail="Wynik analizy zabezpieczeń nie znaleziony",
         )
 
     return {
@@ -267,14 +267,14 @@ def get_protection_run_trace(
     if run.status != ProtectionRunStatus.FINISHED:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Run is not finished (status: {run.status.value})",
+            detail=f"Przebieg nie jest zakończony (status: {run.status.value})",
         )
 
     trace = service.get_trace(run_id)
     if trace is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Protection trace not found",
+            detail="Ślad analizy zabezpieczeń nie znaleziony",
         )
 
     return {
@@ -334,14 +334,14 @@ def get_protection_sld_overlay(
     if run.status != ProtectionRunStatus.FINISHED:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Run is not finished (status: {run.status.value})",
+            detail=f"Przebieg nie jest zakończony (status: {run.status.value})",
         )
 
     # Verify project ID matches
     if run.project_id != project_id:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Run does not belong to this project",
+            detail="Przebieg nie należy do tego projektu",
         )
 
     # Get protection results
@@ -349,7 +349,7 @@ def get_protection_sld_overlay(
     if result is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Protection result not found",
+            detail="Wynik analizy zabezpieczeń nie znaleziony",
         )
 
     # Build overlay (simple version - maps evaluations to elements)

@@ -205,13 +205,14 @@ describe('Power Flow Results Inspector Store', () => {
 describe('Power Flow Results Polish Labels', () => {
   it('should have Polish tab labels', () => {
     expect(POWER_FLOW_TAB_LABELS.BUSES).toBe('Szyny');
-    expect(POWER_FLOW_TAB_LABELS.BRANCHES).toBe('Galezie');
+    expect(POWER_FLOW_TAB_LABELS.BRANCHES).toBe('Gałęzie');
     expect(POWER_FLOW_TAB_LABELS.SUMMARY).toBe('Podsumowanie');
-    expect(POWER_FLOW_TAB_LABELS.TRACE).toBe('Slad obliczen');
+    expect(POWER_FLOW_TAB_LABELS.TRACE).toBe('Ślad obliczeń');
+    expect(POWER_FLOW_TAB_LABELS.INTERPRETATION).toBe('Interpretacja');
   });
 
   it('should have Polish result status labels', () => {
-    expect(RESULT_STATUS_LABELS.NONE).toBe('Brak wynikow');
+    expect(RESULT_STATUS_LABELS.NONE).toBe('Brak wyników');
     expect(RESULT_STATUS_LABELS.FRESH).toBe('Wyniki aktualne');
     expect(RESULT_STATUS_LABELS.VALID).toBe('Wyniki aktualne');
     expect(RESULT_STATUS_LABELS.OUTDATED).toBe('Wyniki nieaktualne');
@@ -225,8 +226,8 @@ describe('Power Flow Results Polish Labels', () => {
   });
 
   it('should have Polish convergence labels', () => {
-    expect(CONVERGENCE_LABELS.true).toBe('Zbiezny');
-    expect(CONVERGENCE_LABELS.false).toBe('Niezbiezny');
+    expect(CONVERGENCE_LABELS.true).toBe('Zbieżny');
+    expect(CONVERGENCE_LABELS.false).toBe('Niezbieżny');
   });
 });
 
@@ -237,6 +238,6 @@ describe('Power Flow Results Polish Labels', () => {
 describe('Power Flow Results Determinism', () => {
   it('should have deterministic tab order', () => {
     const tabs = Object.keys(POWER_FLOW_TAB_LABELS);
-    expect(tabs).toEqual(['BUSES', 'BRANCHES', 'SUMMARY', 'TRACE']);
+    expect(tabs).toEqual(['BUSES', 'BRANCHES', 'SUMMARY', 'TRACE', 'INTERPRETATION']);
   });
 });

@@ -37,6 +37,7 @@ import { PowerFactoryLayout } from './ui/layout';
 import { useAppStateStore } from './ui/app-state';
 import { ROUTES, useUrlSelectionSync, getCurrentHashRoute } from './ui/navigation';
 import { useSelectionStore } from './ui/selection';
+import { NotificationToast } from './ui/notifications/NotificationToast';
 import type { TreeNode, TreeNodeType, ElementType } from './ui/types';
 
 // PROJECT_TREE_PARITY_V1: Get active project name from store
@@ -167,6 +168,7 @@ function App() {
   const wrapWithReadyIndicator = (content: React.ReactNode) => (
     <div data-testid="app-root" data-ready={appReady}>
       {appReady && <div data-testid="app-ready" style={{ display: 'none' }} />}
+      <NotificationToast />
       {content}
     </div>
   );

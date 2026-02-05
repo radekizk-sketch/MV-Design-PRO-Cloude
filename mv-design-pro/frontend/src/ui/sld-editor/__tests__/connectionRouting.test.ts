@@ -139,16 +139,16 @@ describe('Connection Routing - Orthogonality', () => {
 
       // Sprawdz kazdy odcinek sciezki
       for (let i = 0; i < path.length - 1; i++) {
-        const p1 = path[i];
-        const p2 = path[i + 1];
+        const pt1 = path[i];
+        const pt2 = path[i + 1];
 
         // Odcinek musi byc poziomy (y1 === y2) lub pionowy (x1 === x2)
-        const isHorizontal = p1.y === p2.y;
-        const isVertical = p1.x === p2.x;
+        const isHorizontal = pt1.y === pt2.y;
+        const isVertical = pt1.x === pt2.x;
 
         expect(
           isHorizontal || isVertical,
-          `Segment ${i} is not orthogonal: (${p1.x},${p1.y}) -> (${p2.x},${p2.y})`
+          `Segment ${i} is not orthogonal: (${pt1.x},${pt1.y}) -> (${pt2.x},${pt2.y})`
         ).toBe(true);
       }
     }

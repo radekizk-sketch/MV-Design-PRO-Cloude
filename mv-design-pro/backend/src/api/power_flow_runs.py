@@ -218,7 +218,7 @@ def get_power_flow_run(
     if run.analysis_type != "PF":
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Run {run_id} is not a power flow run (type={run.analysis_type})",
+            detail=f"Przebieg {run_id} nie jest przebiegiem rozpływu mocy (typ={run.analysis_type})",
         )
 
     result_summary = run.result_summary or {}
@@ -265,13 +265,13 @@ def get_power_flow_results(
     if run.analysis_type != "PF":
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Run {run_id} is not a power flow run",
+            detail=f"Przebieg {run_id} nie jest przebiegiem rozpływu mocy",
         )
 
     if run.status != "FINISHED":
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Run {run_id} is not finished (status={run.status})",
+            detail=f"Przebieg {run_id} nie jest zakończony (status={run.status})",
         )
 
     # Pobierz wyniki z results repository
@@ -285,7 +285,7 @@ def get_power_flow_results(
     if pf_result is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Power flow results not found for run {run_id}",
+            detail=f"Wyniki rozpływu mocy nie znalezione dla przebiegu {run_id}",
         )
 
     # P20a: Buduj PowerFlowResultV1-compatible response
@@ -383,7 +383,7 @@ def get_power_flow_trace(
     if run.analysis_type != "PF":
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Run {run_id} is not a power flow run",
+            detail=f"Przebieg {run_id} nie jest przebiegiem rozpływu mocy",
         )
 
     # Pobierz trace z run lub results
@@ -400,7 +400,7 @@ def get_power_flow_trace(
     if trace_payload is None and pf_result is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Trace not available for run {run_id}",
+            detail=f"Ślad obliczeniowy niedostępny dla przebiegu {run_id}",
         )
 
     # P20a: Buduj PowerFlowTrace-compatible response
@@ -630,7 +630,7 @@ def export_power_flow_run_docx(
     except ImportError:
         raise HTTPException(
             status_code=status.HTTP_501_NOT_IMPLEMENTED,
-            detail="DOCX export requires python-docx. Install with: pip install python-docx",
+            detail="Eksport DOCX wymaga python-docx. Zainstaluj: pip install python-docx",
         )
 
     service = _build_service(uow_factory)
@@ -754,7 +754,7 @@ def export_power_flow_run_pdf(
     except ImportError:
         raise HTTPException(
             status_code=status.HTTP_501_NOT_IMPLEMENTED,
-            detail="PDF export requires reportlab. Install with: pip install reportlab",
+            detail="Eksport PDF wymaga reportlab. Zainstaluj: pip install reportlab",
         )
 
     service = _build_service(uow_factory)
@@ -1202,13 +1202,13 @@ def get_power_flow_interpretation(
     if run.analysis_type != "PF":
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Run {run_id} is not a power flow run (type={run.analysis_type})",
+            detail=f"Przebieg {run_id} nie jest przebiegiem rozpływu mocy (typ={run.analysis_type})",
         )
 
     if run.status != "FINISHED":
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Run {run_id} is not finished (status={run.status})",
+            detail=f"Przebieg {run_id} nie jest zakończony (status={run.status})",
         )
 
     # Get power flow results
@@ -1222,7 +1222,7 @@ def get_power_flow_interpretation(
     if pf_result_payload is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Power flow results not found for run {run_id}",
+            detail=f"Wyniki rozpływu mocy nie znalezione dla przebiegu {run_id}",
         )
 
     # Build PowerFlowResult from payload

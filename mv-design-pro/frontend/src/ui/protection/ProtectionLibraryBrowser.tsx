@@ -39,7 +39,7 @@ interface Tab {
 }
 
 const TABS: Tab[] = [
-  { id: 'DEVICE', label: 'Urzadzenia', icon: '[DEV]' },
+  { id: 'DEVICE', label: 'Urządzenia', icon: '[DEV]' },
   { id: 'CURVE', label: 'Krzywe', icon: '[CRV]' },
   { id: 'TEMPLATE', label: 'Szablony nastaw', icon: '[TPL]' },
 ];

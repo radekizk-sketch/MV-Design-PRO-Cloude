@@ -742,7 +742,7 @@ export const useSldEditorStore = create<SldEditorState>()((set, get) => ({
    */
   duplicateSelection: () => {
     // Stały offset dla duplikacji (snap do siatki 20x20)
-    const DUPLICATE_OFFSET = { x: 40, y: 40 };
+    const DUPLICATE_OFFSET = { x: 20, y: 20 };
     get().copySelection();
     return get().pasteFromClipboard(DUPLICATE_OFFSET);
   },

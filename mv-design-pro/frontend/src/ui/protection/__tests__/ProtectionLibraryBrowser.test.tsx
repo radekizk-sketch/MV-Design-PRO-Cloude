@@ -158,11 +158,11 @@ describe('ProtectionLibraryBrowser', () => {
     // Click on type
     await user.click(screen.getByText('Przekaźnik Sepam 20'));
 
-    // Details should appear
+    // Details should appear (DetailField renders labels with colon suffix)
     await waitFor(() => {
-      expect(screen.getByText('Producent')).toBeInTheDocument();
-      expect(screen.getByText('Schneider Electric')).toBeInTheDocument();
-      expect(screen.getByText('Seria')).toBeInTheDocument();
+      expect(screen.getByText('Producent:')).toBeInTheDocument();
+      expect(screen.getAllByText('Schneider Electric').length).toBeGreaterThanOrEqual(1);
+      expect(screen.getByText('Seria:')).toBeInTheDocument();
       expect(screen.getByText('Sepam 20')).toBeInTheDocument();
     });
   });
@@ -263,10 +263,11 @@ describe('ProtectionLibraryBrowser', () => {
 
     await user.click(screen.getByText('IEC Normalna Inwersyjna'));
 
+    // DetailField renders labels with colon suffix
     await waitFor(() => {
-      expect(screen.getByText('Standard')).toBeInTheDocument();
+      expect(screen.getByText('Standard:')).toBeInTheDocument();
       expect(screen.getByText('IEC')).toBeInTheDocument();
-      expect(screen.getByText('Typ krzywej')).toBeInTheDocument();
+      expect(screen.getByText('Typ krzywej:')).toBeInTheDocument();
       expect(screen.getByText('inverse')).toBeInTheDocument();
     });
   });

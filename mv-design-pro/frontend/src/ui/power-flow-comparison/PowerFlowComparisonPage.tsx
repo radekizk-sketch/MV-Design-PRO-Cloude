@@ -16,6 +16,7 @@
  */
 
 import { useState, useMemo, useCallback } from 'react';
+import { notify } from '../notifications/store';
 import {
   createPowerFlowComparison,
   getPowerFlowComparisonTrace,
@@ -91,7 +92,7 @@ function ComparisonExportButton({ comparisonId, disabled }: ComparisonExportButt
       document.body.removeChild(a);
     } catch (error) {
       console.error('Export error:', error);
-      alert(`Blad eksportu: ${error instanceof Error ? error.message : 'Nieznany blad'}`);
+      notify(`Błąd eksportu: ${error instanceof Error ? error.message : 'Nieznany błąd'}`);
     } finally {
       setIsExporting(false);
     }

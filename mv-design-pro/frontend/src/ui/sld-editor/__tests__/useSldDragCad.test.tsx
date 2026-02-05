@@ -70,11 +70,17 @@ describe('useSldDrag (CAD)', () => {
 
     act(() => {
       result.current.startDrag('sym1', { x: 100, y: 100 });
+    });
+
+    act(() => {
       result.current.updateDrag({ x: 144, y: 144 });
+    });
+
+    act(() => {
       result.current.endDrag();
     });
 
-    const doc = store.cadOverridesDocument!;
+    const doc = useSldEditorStore.getState().cadOverridesDocument!;
     expect(doc.nodes.sym1.pos).toEqual({ x: 140, y: 140 });
   });
 });

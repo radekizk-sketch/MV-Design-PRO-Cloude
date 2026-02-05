@@ -191,7 +191,7 @@ def get_analysis_run_trace(
     if trace_payload is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Trace not available for this analysis run",
+            detail="Ślad obliczeniowy niedostępny dla tego przebiegu analizy",
         )
     return canonicalize_json(TraceDTO(trace=trace_payload).to_dict())
 
@@ -210,7 +210,7 @@ def get_analysis_run_trace_summary(
     if trace_payload is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Trace not available for this analysis run",
+            detail="Ślad obliczeniowy niedostępny dla tego przebiegu analizy",
         )
     summary = build_trace_summary(trace_payload)
     dto = TraceSummaryDTO(
@@ -238,7 +238,7 @@ def export_analysis_run_docx(
     if bundle.get("project", {}).get("id") != str(project_id):
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="AnalysisRun not found in project",
+            detail="Przebieg analizy nie znaleziony w projekcie",
         )
     try:
         payload = service._render_docx(bundle)
@@ -268,7 +268,7 @@ def export_analysis_run_pdf(
     if bundle.get("project", {}).get("id") != str(project_id):
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="AnalysisRun not found in project",
+            detail="Przebieg analizy nie znaleziony w projekcie",
         )
     try:
         payload = service._render_pdf(bundle)

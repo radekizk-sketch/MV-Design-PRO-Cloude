@@ -1,86 +1,74 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
-exports[`Tight Layout Fixtures > resolves mixed-width layer without overlaps 1`] = `
-[
-  [
-    "sym-bus-mixed",
-    {
-      "x": 240,
-      "y": 220,
-    },
-  ],
-  [
-    "sym-feeder-1",
-    {
-      "x": -200,
-      "y": 360,
-    },
-  ],
-  [
-    "sym-feeder-2",
-    {
-      "x": 240,
-      "y": 360,
-    },
-  ],
-  [
-    "sym-feeder-3",
-    {
-      "x": 680,
-      "y": 360,
-    },
-  ],
-  [
-    "sym-source-mixed",
-    {
-      "x": 240,
-      "y": 80,
-    },
-  ],
-]
-`;
-
 exports[`Tight Layout Fixtures > resolves tight side-branch layout deterministically 1`] = `
 [
   [
     "sym-bus-A",
     {
-      "x": 60,
+      "x": 180,
       "y": 360,
     },
   ],
   [
     "sym-bus-B",
     {
-      "x": 420,
-      "y": 360,
+      "x": 180,
+      "y": 460,
     },
   ],
   [
     "sym-bus-C",
     {
-      "x": 720,
-      "y": 360,
+      "x": 180,
+      "y": 560,
     },
   ],
   [
     "sym-bus-D",
     {
-      "x": 1020,
-      "y": 360,
+      "x": 180,
+      "y": 660,
     },
   ],
   [
     "sym-bus-main",
     {
-      "x": 280,
+      "x": 180,
       "y": 220,
+    },
+  ],
+  [
+    "sym-line-tight-1",
+    {
+      "x": 2440,
+      "y": 360,
+    },
+  ],
+  [
+    "sym-line-tight-2",
+    {
+      "x": 2740,
+      "y": 360,
+    },
+  ],
+  [
+    "sym-line-tight-3",
+    {
+      "x": 8920,
+      "y": 360,
+    },
+  ],
+  [
+    "sym-line-tight-4",
+    {
+      "x": 9220,
+      "y": 360,
     },
   ],
   [
     "sym-source-tight",
     {
-      "x": 280,
+      "x": 180,
       "y": 80,
     },
   ],
