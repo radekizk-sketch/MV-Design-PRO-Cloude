@@ -187,7 +187,7 @@ export function generateConnections(
       // AUTO-FALLBACK: If auto-layout throws for this busbar,
       // standard routing will be used for its feeders (no crash, no empty paths)
       // This is a local fallback - other busbars are unaffected
-      if (process.env.NODE_ENV === 'development') {
+      if (import.meta.env.DEV) {
         // eslint-disable-next-line no-console
         console.debug(`[SLD] Auto-layout fallback for busbar ${busbar.id}`);
       }
@@ -694,23 +694,23 @@ function findZRouteWithStepOut(
     const candidate =
       corridor.kind === 'vertical'
         ? normalizePath(
-            [
-              start,
-              { x: corridorCoordinate, y: start.y },
-              { x: corridorCoordinate, y: end.y },
-              end,
-            ],
-            config.gridSnap
-          )
+          [
+            start,
+            { x: corridorCoordinate, y: start.y },
+            { x: corridorCoordinate, y: end.y },
+            end,
+          ],
+          config.gridSnap
+        )
         : normalizePath(
-            [
-              start,
-              { x: start.x, y: corridorCoordinate },
-              { x: end.x, y: corridorCoordinate },
-              end,
-            ],
-            config.gridSnap
-          );
+          [
+            start,
+            { x: start.x, y: corridorCoordinate },
+            { x: end.x, y: corridorCoordinate },
+            end,
+          ],
+          config.gridSnap
+        );
 
     if (isPathClear(candidate, obstacles) && pathMeetsMinBendLength(candidate, config.minBendLength)) {
       return candidate;

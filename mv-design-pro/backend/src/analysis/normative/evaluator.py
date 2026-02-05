@@ -397,7 +397,6 @@ def _evaluate_earth_current_rule(
 
 def _evaluate_availability_rule(
     rule: NormativeRule,
-    proof: ProofDocument,
     key_results: dict[str, ProofValue],
     target_id: str,
 ) -> NormativeItem:

@@ -107,8 +107,11 @@ function App() {
   }, [route, setActiveMode]);
 
   const handleCalculate = useCallback(() => {
-    // TODO: Integrate with calculation service
-    console.log('Calculate triggered');
+    // TODO: Calculation requires an active case configured
+    // Silent no-op until case management flow is complete
+    if (import.meta.env.DEV) {
+      console.debug('[handleCalculate] No active case - calculation skipped');
+    }
   }, []);
 
   /**
@@ -135,8 +138,11 @@ function App() {
 
   // PROJECT_TREE_PARITY_V1: Tree category click handler
   const handleTreeCategoryClick = useCallback((_nodeType: TreeNodeType, _elementType?: ElementType) => {
-    // Category clicks could navigate to Data Manager or filter views
-    // For now, this is a no-op placeholder
+    // Category navigation not yet implemented - silent no-op
+    // Filter by category will be available in future version
+    if (import.meta.env.DEV) {
+      console.debug('[handleTreeCategoryClick] Category click - filter not yet implemented');
+    }
   }, []);
 
   // PROJECT_TREE_PARITY_V1: Tree run click handler

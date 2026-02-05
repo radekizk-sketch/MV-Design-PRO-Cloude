@@ -197,7 +197,6 @@ let _autoLayoutV1Enabled = false;
 export function isAutoLayoutV1Enabled(): boolean {
   // Check environment variable first (for build-time configuration)
   try {
-    // @ts-expect-error - Vite injects import.meta.env at build time
     const env = import.meta.env;
     if (env && env['VITE_SLD_AUTO_LAYOUT_V1'] === 'true') {
       return true;
