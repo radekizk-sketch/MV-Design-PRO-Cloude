@@ -20,6 +20,7 @@ import type {
   VoltageColorRule,
   UserPositionOverride,
   LayoutDebugInfo,
+  Bay,
 } from './types';
 import { DEFAULT_LAYOUT_CONFIG } from './types';
 import { DEFAULT_VOLTAGE_COLOR_MAP } from './config/voltage-colors';
@@ -95,13 +96,17 @@ export function computeFullLayout(input: LayoutInput): LayoutResult {
   // Zbuduj wynik
   const endTime = performance.now();
 
+  // Flatten all bays (including sub-bays) for the result
+  const topLevelBays = context.orderedBays ?? context.bays ?? [];
+  const allBays = flattenBays(topLevelBays);
+
   const result: LayoutResult = {
     positions: context.positions ?? new Map(),
     busbarGeometries: context.busbarGeometries ?? new Map(),
     routedEdges: context.routedEdges ?? new Map(),
     labelPositions: context.labelPositions ?? new Map(),
     voltageBands: context.voltageBands ?? [],
-    bays: context.orderedBays ?? context.bays ?? [],
+    bays: allBays,
     bounds,
     debug: finalizeDebugInfo(context, endTime - startTime),
   };
@@ -156,6 +161,31 @@ function createEmptyResult(): LayoutResult {
 function prepareSymbols(symbols: LayoutSymbol[]): LayoutSymbol[] {
   // Głęboka kopia
   return symbols.map((s) => ({ ...s }));
+}
+
+/**
+ * Flatten all bays including sub-bays into a single array.
+ * This ensures that nested bays (e.g., OZE bays under intermediate busbars)
+ * are included in the result.bays array.
+ */
+function flattenBays(bays: Bay[]): Bay[] {
+  const result: Bay[] = [];
+
+  function collectBays(bayList: Bay[]): void {
+    for (const bay of bayList) {
+      result.push(bay);
+      if (bay.subBays && bay.subBays.length > 0) {
+        collectBays(bay.subBays);
+      }
+    }
+  }
+
+  collectBays(bays);
+
+  // Sort for determinism
+  result.sort((a, b) => a.id.localeCompare(b.id));
+
+  return result;
 }
 
 /**

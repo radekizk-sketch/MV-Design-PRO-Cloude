@@ -462,6 +462,11 @@ function positionBayElements(
     // Pomiń busbary (już pozycjonowane)
     if (symbol.elementType === 'Bus') continue;
 
+    // Pomiń źródła (już pozycjonowane w positionSources)
+    if (symbol.elementType === 'Source' && positions.has(symbol.id)) {
+      continue;
+    }
+
     // Pomiń transformatory (już pozycjonowane)
     if (symbol.elementType === 'TransformerBranch' && positions.has(symbol.id)) {
       continue;

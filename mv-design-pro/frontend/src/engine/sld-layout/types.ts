@@ -352,6 +352,9 @@ export interface LayoutSymbol {
   busHeight?: number;
   /** Dla LineBranch: typ (LINE = napowietrzna, CABLE = kablowa) */
   branchType?: 'LINE' | 'CABLE';
+
+  /** Dla Generator: typ generatora (PV, WIND, BESS, etc.) */
+  generatorType?: 'PV' | 'WIND' | 'BESS' | 'DIESEL' | 'GAS' | 'HYDRO' | 'OTHER';
 }
 
 /**

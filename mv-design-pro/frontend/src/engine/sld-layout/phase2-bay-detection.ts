@@ -47,9 +47,31 @@ export function detectBays(context: PipelineContext): PipelineContext {
   }
 
   // Krok 1: Znajdź wszystkie busbary
+  // WAŻNE: Sortuj wg hierarchii - główne szyny (z Source) najpierw, potem wg napięcia (malejąco)
+  // To zapewnia że CB/transformatory są przypisane do bayów głównych szyn, nie pośrednich
+  const sourceConnectedBusbars = new Set(
+    symbols
+      .filter((s) => s.elementType === 'Source' && s.connectedToNodeId)
+      .map((s) => symbols.find((b) => b.elementType === 'Bus' && b.elementId === s.connectedToNodeId)?.id)
+      .filter((id): id is string => id !== undefined)
+  );
+
   const busbars = symbols
     .filter((s) => s.elementType === 'Bus')
-    .sort((a, b) => a.id.localeCompare(b.id)); // Determinizm
+    .sort((a, b) => {
+      // 1. Main busbars (connected to Source) first
+      const aIsMain = sourceConnectedBusbars.has(a.id) ? 0 : 1;
+      const bIsMain = sourceConnectedBusbars.has(b.id) ? 0 : 1;
+      if (aIsMain !== bIsMain) return aIsMain - bIsMain;
+
+      // 2. Higher voltage first
+      const aVoltage = a.voltageKV ?? 0;
+      const bVoltage = b.voltageKV ?? 0;
+      if (aVoltage !== bVoltage) return bVoltage - aVoltage;
+
+      // 3. By id for determinism
+      return a.id.localeCompare(b.id);
+    });
 
   // Krok 2: Buduj graf połączeń
   const connectionGraph = buildConnectionGraph(symbols);
@@ -144,13 +166,15 @@ function buildConnectionGraph(symbols: LayoutSymbol[]): ConnectionGraph {
       addEdge(symbol.fromNodeId, symbol.toNodeId, symbol.id);
     }
 
-    // Source/Load są połączone do węzła
+    // Source/Load/Generator są połączone do węzła
     if (
-      (symbol.elementType === 'Source' || symbol.elementType === 'Load') &&
+      (symbol.elementType === 'Source' ||
+        symbol.elementType === 'Load' ||
+        symbol.elementType === 'Generator') &&
       symbol.connectedToNodeId
     ) {
-      // Source/Load nie tworzą krawędzi w grafie — są terminalami
-      // Dodajemy tylko węzeł do adjacency
+      // Terminale nie tworzą krawędzi w grafie — są końcowymi elementami
+      // Dodajemy tylko węzeł do adjacency dla kompletności
       if (!adjacency.has(symbol.connectedToNodeId)) {
         adjacency.set(symbol.connectedToNodeId, new Set());
       }
@@ -210,7 +234,19 @@ function detectBaysFromBusbar(
   const busbarElementId = busbar.elementId;
 
   // Znajdź wszystkie elementy bezpośrednio połączone z busbarem
-  const connectedElementIds = graph.adjacency.get(busbarElementId) ?? new Set();
+  const connectedElementIds = new Set<string>(graph.adjacency.get(busbarElementId) ?? new Set());
+
+  // Znajdź też terminale (Source/Load/Generator) połączone z busbarElementId
+  for (const symbol of allSymbols) {
+    if (
+      (symbol.elementType === 'Source' ||
+        symbol.elementType === 'Load' ||
+        symbol.elementType === 'Generator') &&
+      symbol.connectedToNodeId === busbarElementId
+    ) {
+      connectedElementIds.add(symbol.elementId);
+    }
+  }
 
   // Sortuj dla determinizmu
   const sortedConnected = Array.from(connectedElementIds).sort();
@@ -390,6 +426,10 @@ function collectBayElements(
 
 /**
  * Znajdź sąsiadów symbolu w grafie.
+ *
+ * WAŻNE: Dla bay detection, traverse only DOWNSTREAM (from busbar toward terminal).
+ * For Switch/LineBranch: only look at toNodeId (downstream), not fromNodeId (upstream).
+ * This prevents finding sibling bays at the same busbar level.
  */
 function findSymbolNeighbors(
   symbol: LayoutSymbol,
@@ -400,28 +440,24 @@ function findSymbolNeighbors(
   const neighbors: LayoutSymbol[] = [];
   const symbolById = new Map(allSymbols.map((s) => [s.id, s]));
 
-  // Dla Branch/Switch — szukaj przez fromNodeId/toNodeId
-  if (symbol.fromNodeId) {
-    // Szukaj elementów połączonych z fromNodeId
-    const connected = graph.adjacency.get(symbol.fromNodeId) ?? new Set();
-    for (const elementId of connected) {
-      if (elementId !== symbol.toNodeId) {
-        const symbolId = elementToSymbol.get(elementId);
-        if (symbolId) {
-          const neighborSymbol = symbolById.get(symbolId);
-          if (neighborSymbol) {
-            neighbors.push(neighborSymbol);
-          }
-        }
-      }
-    }
-  }
+  // Dla wszystkich Branch/Switch — traverse tylko DOWNSTREAM (toNodeId)
+  // NIE szukamy na fromNodeId aby uniknąć cofania się do głównej szyny
+  // Transformatory też powinny iść tylko w jednym kierunku (HV → LV)
 
   if (symbol.toNodeId) {
-    // Szukaj elementów połączonych z toNodeId
+    // WAŻNE: Dodaj busbar AT toNodeId (element, którego elementId === toNodeId)
+    const toNodeSymbolId = elementToSymbol.get(symbol.toNodeId);
+    if (toNodeSymbolId) {
+      const toNodeSymbol = symbolById.get(toNodeSymbolId);
+      if (toNodeSymbol && toNodeSymbol.elementType === 'Bus') {
+        neighbors.push(toNodeSymbol);
+      }
+    }
+
+    // Szukaj elementów połączonych z toNodeId (ale nie samego busa - już dodaliśmy)
     const connected = graph.adjacency.get(symbol.toNodeId) ?? new Set();
     for (const elementId of connected) {
-      if (elementId !== symbol.fromNodeId) {
+      if (elementId !== symbol.fromNodeId && elementId !== symbol.toNodeId) {
         const symbolId = elementToSymbol.get(elementId);
         if (symbolId) {
           const neighborSymbol = symbolById.get(symbolId);
@@ -432,11 +468,32 @@ function findSymbolNeighbors(
       }
     }
 
-    // Szukaj Source/Load połączonych z toNodeId
+    // NIE szukamy terminali (Source/Load/Generator) tutaj
+    // Terminale są podłączone do BUSBARÓW, a nie do transformatorów/switchy
+    // Znajdowane są w głównej pętli detectBaysFromBusbar
+  }
+
+  // Dla Source/Load/Generator — szukaj elementów połączonych z connectedToNodeId
+  if (symbol.connectedToNodeId) {
+    const connected = graph.adjacency.get(symbol.connectedToNodeId) ?? new Set();
+    for (const elementId of connected) {
+      const symbolId = elementToSymbol.get(elementId);
+      if (symbolId) {
+        const neighborSymbol = symbolById.get(symbolId);
+        if (neighborSymbol) {
+          neighbors.push(neighborSymbol);
+        }
+      }
+    }
+
+    // Szukaj innych terminali na tym samym węźle
     for (const s of allSymbols) {
       if (
-        (s.elementType === 'Source' || s.elementType === 'Load') &&
-        s.connectedToNodeId === symbol.toNodeId
+        s.id !== symbol.id &&
+        (s.elementType === 'Source' ||
+          s.elementType === 'Load' ||
+          s.elementType === 'Generator') &&
+        s.connectedToNodeId === symbol.connectedToNodeId
       ) {
         neighbors.push(s);
       }
@@ -472,6 +529,203 @@ const BAY_TYPE_ORDER: Record<BayType, number> = {
 };
 
 /**
+ * Wyodrębnij cechy ścieżki baya (do klasyfikacji).
+ */
+interface BayFeatures {
+  hasSource: boolean;
+  hasLoad: boolean;
+  hasGenerator: boolean;
+  hasTransformer: boolean;
+  hasSubBusbar: boolean;
+  hasTwoBusbars: boolean;
+  generatorTypes: Set<string>;
+  terminalNames: string[];
+  onlyMeasurement: boolean;
+}
+
+/**
+ * Wyodrębnij cechy baya z listy elementów.
+ */
+function extractBayFeatures(
+  symbols: LayoutSymbol[]
+): BayFeatures {
+  const busbars = symbols.filter((s) => s.elementType === 'Bus');
+  const generators = symbols.filter((s) => s.elementType === 'Generator');
+  const sources = symbols.filter((s) => s.elementType === 'Source');
+  const loads = symbols.filter((s) => s.elementType === 'Load');
+  const transformers = symbols.filter((s) => s.elementType === 'TransformerBranch');
+
+  // Zbierz generatorType z generatorów
+  const generatorTypes = new Set<string>();
+  for (const gen of generators) {
+    if (gen.generatorType) {
+      generatorTypes.add(gen.generatorType);
+    }
+  }
+
+  // Zbierz nazwy terminali (Source, Load, Generator)
+  const terminals = [...sources, ...loads, ...generators];
+  const terminalNames = terminals.map((t) => t.elementName.toLowerCase());
+
+  // Sprawdź czy to pole pomiarowe (tylko CT/VT + switching, BEZ sub-busbara)
+  // Bay z sub-busbarem to feeder, nie pole pomiarowe
+  const onlyMeasurement = busbars.length === 0 && symbols.every(
+    (s) =>
+      s.elementType === 'Switch' ||
+      s.elementName.toLowerCase().includes('ct') ||
+      s.elementName.toLowerCase().includes('vt') ||
+      s.elementName.toLowerCase().includes('przekładnik')
+  ) && symbols.length <= 3;
+
+  return {
+    hasSource: sources.length > 0,
+    hasLoad: loads.length > 0,
+    hasGenerator: generators.length > 0,
+    hasTransformer: transformers.length > 0,
+    hasSubBusbar: busbars.length > 0,
+    hasTwoBusbars: busbars.length >= 2,
+    generatorTypes,
+    terminalNames,
+    onlyMeasurement,
+  };
+}
+
+/**
+ * Klasyfikuj typ baya na podstawie cech (priorytetowo).
+ *
+ * Priorytety (od najwyższego):
+ * 1. tie (łączy dwa busbary)
+ * 2. bess (magazyn energii)
+ * 3. oze_pv (fotowoltaika)
+ * 4. oze_wind (wiatrowa)
+ * 5. generator (konwencjonalny)
+ * 6. capacitor (kondensatory)
+ * 7. auxiliary (potrzeby własne)
+ * 8. measurement (pole pomiarowe)
+ * 9. incomer (transformator z WN)
+ * 10. feeder (domyślne pole liniowe)
+ */
+function classifyBayFromFeatures(features: BayFeatures): BayType {
+  const { generatorTypes, terminalNames } = features;
+
+  // 1. Tie: łączy dwa busbary
+  if (features.hasTwoBusbars) {
+    return 'tie';
+  }
+
+  // 2. BESS: sprawdź generatorType lub nazwę
+  if (generatorTypes.has('BESS')) {
+    return 'bess';
+  }
+  if (
+    terminalNames.some(
+      (n) =>
+        n.includes('bess') ||
+        n.includes('magazyn') ||
+        n.includes('battery') ||
+        n.includes('storage')
+    )
+  ) {
+    return 'bess';
+  }
+
+  // 3. OZE PV: sprawdź generatorType lub nazwę
+  if (generatorTypes.has('PV')) {
+    return 'oze_pv';
+  }
+  if (
+    terminalNames.some(
+      (n) =>
+        n.includes('pv') ||
+        n.includes('fotowolt') ||
+        n.includes('solar') ||
+        n.includes('fotowolaik')
+    )
+  ) {
+    return 'oze_pv';
+  }
+
+  // 4. OZE Wind: sprawdź generatorType lub nazwę
+  if (generatorTypes.has('WIND')) {
+    return 'oze_wind';
+  }
+  if (
+    terminalNames.some(
+      (n) =>
+        n.includes('wt') ||
+        n.includes('wiatr') ||
+        n.includes('wind') ||
+        n.includes('turbine')
+    )
+  ) {
+    return 'oze_wind';
+  }
+
+  // 5. Generator konwencjonalny
+  if (
+    generatorTypes.has('DIESEL') ||
+    generatorTypes.has('GAS') ||
+    generatorTypes.has('HYDRO') ||
+    generatorTypes.has('OTHER')
+  ) {
+    return 'generator';
+  }
+  if (
+    terminalNames.some(
+      (n) =>
+        n.includes('generator') ||
+        n.includes('agregat') ||
+        (n.includes('gen') && !n.includes('oze'))
+    )
+  ) {
+    return 'generator';
+  }
+
+  // 6. Bateria kondensatorów
+  if (
+    terminalNames.some(
+      (n) =>
+        n.includes('kondensator') ||
+        n.includes('capacitor') ||
+        n.includes('bk')
+    )
+  ) {
+    return 'capacitor';
+  }
+
+  // 7. Potrzeby własne
+  // Note: 'pz' must be a standalone word or at word boundary to avoid matching 'gpz' (Główny Punkt Zasilania)
+  if (
+    terminalNames.some(
+      (n) =>
+        n.includes('potrzeby własne') ||
+        n.includes('auxiliary') ||
+        /\bpz\b/.test(n) ||
+        n.includes('p.w.')
+    )
+  ) {
+    return 'auxiliary';
+  }
+
+  // 8. Pole pomiarowe
+  if (features.onlyMeasurement) {
+    return 'measurement';
+  }
+
+  // 9. Incomer: bay z zewnętrznym źródłem (Source) — zasilanie z sieci
+  if (features.hasSource) {
+    return 'incomer';
+  }
+
+  // 10. Feeder: ma load, sub-busbar, transformator, generator lub jest "normalnym" polem
+  if (features.hasLoad || features.hasSubBusbar || features.hasTransformer || features.hasGenerator) {
+    return 'feeder';
+  }
+
+  return 'unknown';
+}
+
+/**
  * Klasyfikuj typ baya na podstawie elementów.
  *
  * @param elements - Elementy w bayu
@@ -486,130 +740,11 @@ function classifyBayType(
 ): BayType {
   const symbols = elements.map((e) => symbolById.get(e.symbolId)).filter(Boolean) as LayoutSymbol[];
 
-  // Sprawdź terminale (końcowe elementy)
-  const terminals = symbols.filter(
-    (s) => s.elementType === 'Source' || s.elementType === 'Load' || s.elementType === 'Bus'
-  );
+  // Wyodrębnij cechy
+  const features = extractBayFeatures(symbols);
 
-  // Czy kończy się na sub-busbar?
-  const hasSubBusbar = terminals.some((t) => t.elementType === 'Bus');
-
-  // Czy zawiera transformator?
-  const hasTransformer = symbols.some((s) => s.elementType === 'TransformerBranch');
-
-  // Czy łączy dwa busbary? (tie)
-  const busbarsInBay = symbols.filter((s) => s.elementType === 'Bus');
-  if (busbarsInBay.length >= 2) {
-    return 'tie';
-  }
-
-  // Sprawdź typ na podstawie terminali
-  for (const terminal of terminals) {
-    const nameLower = terminal.elementName.toLowerCase();
-
-    // PV / Fotowoltaika
-    if (
-      terminal.elementType === 'Source' &&
-      (nameLower.includes('pv') ||
-        nameLower.includes('fotowolt') ||
-        nameLower.includes('solar') ||
-        nameLower.includes('fotowolaik'))
-    ) {
-      return 'oze_pv';
-    }
-
-    // Wiatr / Farm wiatrowa
-    if (
-      terminal.elementType === 'Source' &&
-      (nameLower.includes('fw') ||
-        nameLower.includes('wiatr') ||
-        nameLower.includes('wind') ||
-        nameLower.includes('turbine'))
-    ) {
-      return 'oze_wind';
-    }
-
-    // BESS / Magazyn energii
-    if (
-      terminal.elementType === 'Source' &&
-      (nameLower.includes('bess') ||
-        nameLower.includes('magazyn') ||
-        nameLower.includes('battery') ||
-        nameLower.includes('storage'))
-    ) {
-      return 'bess';
-    }
-
-    // Generator konwencjonalny
-    if (
-      terminal.elementType === 'Source' &&
-      (nameLower.includes('generator') ||
-        nameLower.includes('gen') ||
-        nameLower.includes('agregat'))
-    ) {
-      return 'generator';
-    }
-
-    // Bateria kondensatorów
-    if (
-      (terminal.elementType === 'Source' || terminal.elementType === 'Load') &&
-      (nameLower.includes('kondensator') ||
-        nameLower.includes('capacitor') ||
-        nameLower.includes('cap') ||
-        nameLower.includes('bk'))
-    ) {
-      return 'capacitor';
-    }
-
-    // Potrzeby własne
-    if (
-      nameLower.includes('potrzeby własne') ||
-      nameLower.includes('auxiliary') ||
-      nameLower.includes('pz') ||
-      nameLower.includes('p.w.')
-    ) {
-      return 'auxiliary';
-    }
-  }
-
-  // Incomer: bay z transformatorem od wyższego napięcia
-  if (hasTransformer) {
-    // Sprawdź czy transformator łączy z wyższym napięciem
-    const trafo = symbols.find((s) => s.elementType === 'TransformerBranch');
-    if (trafo) {
-      const hvVoltage = trafo.voltageHV ?? 0;
-      const lvVoltage = trafo.voltageLV ?? 0;
-
-      // Jeśli bay zawiera stronę LV transformatora → incomer
-      if (hvVoltage > lvVoltage) {
-        return 'incomer';
-      }
-    }
-  }
-
-  // Pole pomiarowe: tylko CT i VT
-  const onlyCTVT = symbols.every(
-    (s) =>
-      s.elementType === 'Switch' ||
-      s.elementType === 'Bus' ||
-      s.elementName.toLowerCase().includes('ct') ||
-      s.elementName.toLowerCase().includes('vt') ||
-      s.elementName.toLowerCase().includes('przekładnik')
-  );
-  if (onlyCTVT && symbols.length <= 3) {
-    return 'measurement';
-  }
-
-  // Feeder: podstawowy typ (kabel/linia → stacja/odbiornik)
-  if (
-    terminals.some((t) => t.elementType === 'Load') ||
-    hasSubBusbar ||
-    symbols.some((s) => s.elementType === 'LineBranch')
-  ) {
-    return 'feeder';
-  }
-
-  return 'unknown';
+  // Klasyfikuj na podstawie cech
+  return classifyBayFromFeatures(features);
 }
 
 // =============================================================================
