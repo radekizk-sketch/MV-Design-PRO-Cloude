@@ -6,8 +6,8 @@ export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '');
   const isDev = mode === 'development';
   const isTest = mode === 'test' || process.env.VITEST === 'true';
-  const apiUrlDev = env.VITE_API_URL_DEV ?? (isTest ? 'http://localhost' : undefined);
-  const apiUrlProd = env.VITE_API_URL ?? (isTest ? 'http://localhost' : undefined);
+  const apiUrlDev = env.VITE_API_URL_DEV ?? process.env.VITE_API_URL_DEV ?? (isTest ? 'http://localhost' : undefined);
+  const apiUrlProd = env.VITE_API_URL ?? process.env.VITE_API_URL ?? (isTest ? 'http://localhost' : undefined);
   const apiUrl = isDev ? apiUrlDev : apiUrlProd;
 
   if (!apiUrl) {

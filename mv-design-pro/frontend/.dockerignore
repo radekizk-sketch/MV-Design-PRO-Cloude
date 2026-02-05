@@ -1,0 +1,14 @@
+node_modules
+dist
+.git
+.gitignore
+*.test.ts
+*.test.tsx
+*.spec.ts
+*.spec.tsx
+__tests__
+e2e
+coverage
+.env.local
+playwright-report
+test-results

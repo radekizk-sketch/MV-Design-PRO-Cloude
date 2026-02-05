@@ -33,6 +33,9 @@ COPY . .
 # Install the project
 RUN poetry install --no-interaction --no-ansi
 
+# Ensure src/ packages are importable without poetry run
+ENV PYTHONPATH=/app/src
+
 EXPOSE 8000
 
 CMD ["uvicorn", "src.api.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
