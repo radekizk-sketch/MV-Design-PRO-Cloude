@@ -9,6 +9,7 @@
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { fetchTypesByCategory } from '../catalog/api';
+import { buildContextMenuActions } from '../context-menu/actions';
 import type { LineType, CableType, TransformerType, SwitchEquipmentType } from '../catalog/types';
 
 // Mock fetch
@@ -128,8 +129,6 @@ describe('Type Catalog API', () => {
 
 describe('Context Menu - Type Actions', () => {
   it('adds Assign Type action for LineBranch in MODEL_EDIT', () => {
-    const { buildContextMenuActions } = require('../context-menu/actions');
-
     const actions = buildContextMenuActions(
       'LineBranch',
       'branch-123',
@@ -149,8 +148,6 @@ describe('Context Menu - Type Actions', () => {
   });
 
   it('shows "Zmień typ..." when type_ref exists', () => {
-    const { buildContextMenuActions } = require('../context-menu/actions');
-
     const actions = buildContextMenuActions(
       'TransformerBranch',
       'trafo-123',
@@ -172,8 +169,6 @@ describe('Context Menu - Type Actions', () => {
   });
 
   it('hides type actions in CASE_CONFIG mode', () => {
-    const { buildContextMenuActions } = require('../context-menu/actions');
-
     const actions = buildContextMenuActions(
       'LineBranch',
       'branch-123',
@@ -190,8 +185,6 @@ describe('Context Menu - Type Actions', () => {
   });
 
   it('hides type actions in RESULT_VIEW mode', () => {
-    const { buildContextMenuActions } = require('../context-menu/actions');
-
     const actions = buildContextMenuActions(
       'LineBranch',
       'branch-123',
@@ -209,8 +202,6 @@ describe('Context Menu - Type Actions', () => {
   });
 
   it('does not add type actions for Bus element', () => {
-    const { buildContextMenuActions } = require('../context-menu/actions');
-
     const actions = buildContextMenuActions('Bus', 'bus-123', 'Bus 01', 'MODEL_EDIT', {
       onAssignType: vi.fn(),
     });

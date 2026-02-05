@@ -38,8 +38,8 @@ interface Tab {
 const TABS: Tab[] = [
   { id: 'LINE', label: 'Typy linii', icon: '[LN]' },
   { id: 'CABLE', label: 'Typy kabli', icon: '[CB]' },
-  { id: 'TRANSFORMER', label: 'Typy transformatorow', icon: '[TR]' },
-  { id: 'SWITCH_EQUIPMENT', label: 'Typy aparatury laczeniowej', icon: '[SW]' },
+  { id: 'TRANSFORMER', label: 'Typy transformatorów', icon: '[TR]' },
+  { id: 'SWITCH_EQUIPMENT', label: 'Typy aparatury łączeniowej', icon: '[SW]' },
 ];
 
 interface TypeLibraryBrowserProps {
@@ -233,7 +233,11 @@ export function TypeLibraryBrowser({
             return (
               <button
                 key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
+                onClick={() => {
+                  setSelectedTypeId(null);
+                  setSearchQuery('');
+                  setActiveTab(tab.id);
+                }}
                 className={clsx(
                   'px-6 py-3 text-sm font-medium border-b-2 transition-colors',
                   isActive

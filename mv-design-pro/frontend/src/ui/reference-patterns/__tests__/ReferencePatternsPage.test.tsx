@@ -67,11 +67,11 @@ describe('Verdict badges', () => {
   });
 
   it('maps GRANICZNE to correct Polish label', () => {
-    expect(VERDICT_LABELS_PL['GRANICZNE']).toBe('Graniczne');
+    expect(VERDICT_LABELS_PL['GRANICZNE']).toBe('Na granicy dopuszczalności');
   });
 
   it('maps NIEZGODNE to correct Polish label', () => {
-    expect(VERDICT_LABELS_PL['NIEZGODNE']).toBe('Niezgodne');
+    expect(VERDICT_LABELS_PL['NIEZGODNE']).toBe('Wymaga korekty');
   });
 });
 

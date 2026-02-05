@@ -311,8 +311,8 @@ export function getContextMenuHeader(
     Bus: 'Szyna',
     LineBranch: 'Linia',
     TransformerBranch: 'Transformator',
-    Switch: 'Lacznik',
-    Source: 'Zrodlo',
+    Switch: 'Łącznik',
+    Source: 'Źródło',
     Load: 'Odbiornik',
   };
 

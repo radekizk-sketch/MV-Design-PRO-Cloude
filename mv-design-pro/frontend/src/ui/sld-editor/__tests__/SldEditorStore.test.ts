@@ -103,19 +103,19 @@ describe('SldEditorStore', () => {
 
       // Select first symbol (single)
       store.selectSymbol('sym1', 'single');
-      expect(store.selectedIds).toEqual(['sym1']);
+      expect(useSldEditorStore.getState().selectedIds).toEqual(['sym1']);
 
       // Add second symbol (add mode = Shift+click)
       store.selectSymbol('sym2', 'add');
-      expect(store.selectedIds).toEqual(['sym1', 'sym2']);
+      expect(useSldEditorStore.getState().selectedIds).toEqual(['sym1', 'sym2']);
 
       // Add third symbol (add mode)
       store.selectSymbol('sym3', 'add');
-      expect(store.selectedIds).toEqual(['sym1', 'sym2', 'sym3']);
+      expect(useSldEditorStore.getState().selectedIds).toEqual(['sym1', 'sym2', 'sym3']);
 
       // Adding already selected symbol should not change selection
       store.selectSymbol('sym2', 'add');
-      expect(store.selectedIds).toEqual(['sym1', 'sym2', 'sym3']);
+      expect(useSldEditorStore.getState().selectedIds).toEqual(['sym1', 'sym2', 'sym3']);
     });
 
     it('should maintain deterministic order (sorted by id)', () => {
@@ -132,7 +132,7 @@ describe('SldEditorStore', () => {
       store.selectSymbol('sym2', 'add');
 
       // Should be sorted alphabetically
-      expect(store.selectedIds).toEqual(['sym1', 'sym2', 'sym3']);
+      expect(useSldEditorStore.getState().selectedIds).toEqual(['sym1', 'sym2', 'sym3']);
     });
   });
 
@@ -149,19 +149,19 @@ describe('SldEditorStore', () => {
 
       // Toggle sym1 (add to selection)
       store.selectSymbol('sym1', 'toggle');
-      expect(store.selectedIds).toEqual(['sym1']);
+      expect(useSldEditorStore.getState().selectedIds).toEqual(['sym1']);
 
       // Toggle sym2 (add to selection)
       store.selectSymbol('sym2', 'toggle');
-      expect(store.selectedIds).toEqual(['sym1', 'sym2']);
+      expect(useSldEditorStore.getState().selectedIds).toEqual(['sym1', 'sym2']);
 
       // Toggle sym1 again (remove from selection)
       store.selectSymbol('sym1', 'toggle');
-      expect(store.selectedIds).toEqual(['sym2']);
+      expect(useSldEditorStore.getState().selectedIds).toEqual(['sym2']);
 
       // Toggle sym2 (remove from selection)
       store.selectSymbol('sym2', 'toggle');
-      expect(store.selectedIds).toEqual([]);
+      expect(useSldEditorStore.getState().selectedIds).toEqual([]);
     });
   });
 
@@ -178,6 +178,11 @@ describe('SldEditorStore', () => {
       const symbol3 = createTestSymbol('sym3', 150, 200); // +50x, +100y from sym1
       store.setSymbols([symbol1, symbol2, symbol3]);
 
+      // Grid snap disabled for this test
+      useSldEditorStore.setState({
+        gridConfig: { ...useSldEditorStore.getState().gridConfig, snapEnabled: false },
+      });
+
       // Select all
       store.selectMultiple(['sym1', 'sym2', 'sym3']);
 
@@ -187,14 +192,11 @@ describe('SldEditorStore', () => {
       // Update drag to (150, 150) - offset = (+50, +50)
       store.updateDrag({ x: 150, y: 150 });
 
-      // Check new positions maintain relative offsets
-      const newSymbol1 = store.getSymbol('sym1')!;
-      const newSymbol2 = store.getSymbol('sym2')!;
-      const newSymbol3 = store.getSymbol('sym3')!;
-
-      // Grid snap disabled for this test
-      store.gridConfig.snapEnabled = false;
-      store.updateDrag({ x: 150, y: 150 });
+      // Check new positions maintain relative offsets (read from fresh state)
+      const updated = useSldEditorStore.getState();
+      const newSymbol1 = updated.symbols.get('sym1')!;
+      const newSymbol2 = updated.symbols.get('sym2')!;
+      const newSymbol3 = updated.symbols.get('sym3')!;
 
       expect(newSymbol1.position).toEqual({ x: 150, y: 150 });
       expect(newSymbol2.position).toEqual({ x: 250, y: 200 }); // +100x, +50y
@@ -257,8 +259,8 @@ describe('SldEditorStore', () => {
 
       // Copy
       store.copySelection();
-      expect(store.clipboard).not.toBeNull();
-      expect(store.clipboard!.symbols.length).toBe(2);
+      expect(useSldEditorStore.getState().clipboard).not.toBeNull();
+      expect(useSldEditorStore.getState().clipboard!.symbols.length).toBe(2);
 
       // Paste with offset
       const PASTE_OFFSET = { x: 20, y: 20 };
@@ -275,7 +277,7 @@ describe('SldEditorStore', () => {
       expect(newSymbols[1].id).not.toBe('sym2');
 
       // Verify new symbols are added to store
-      expect(store.symbols.size).toBe(4); // original 2 + pasted 2
+      expect(useSldEditorStore.getState().symbols.size).toBe(4); // original 2 + pasted 2
     });
 
     it('should duplicate selection with deterministic offset', () => {
@@ -318,7 +320,7 @@ describe('SldEditorStore', () => {
       const store = useSldEditorStore.getState();
 
       store.setGridSize(20);
-      store.gridConfig.snapEnabled = false;
+      store.toggleSnapEnabled();
 
       // Should return original position
       const pos = { x: 15, y: 15 };
@@ -353,7 +355,7 @@ describe('SldEditorStore', () => {
 
       // End lasso (applies selection)
       store.endLasso();
-      expect(store.selectedIds).toEqual(['sym1', 'sym2']);
+      expect(useSldEditorStore.getState().selectedIds).toEqual(['sym1', 'sym2']);
     });
 
     it('should handle inverted lasso rectangle (drag from bottom-right to top-left)', () => {
@@ -429,7 +431,7 @@ describe('SldEditorStore', () => {
 
       store.selectAll();
 
-      expect(store.selectedIds).toEqual(['sym1', 'sym2', 'sym3']);
+      expect(useSldEditorStore.getState().selectedIds).toEqual(['sym1', 'sym2', 'sym3']);
     });
   });
 
@@ -662,9 +664,9 @@ describe('SldEditorStore', () => {
       const updates = new Map<string, Position>([['sym1', { x: 103, y: 98 }]]);
       store.updateCadNodeOverrides(updates);
 
-      const doc = store.cadOverridesDocument!;
+      const doc = useSldEditorStore.getState().cadOverridesDocument!;
       expect(doc.nodes.sym1.pos).toEqual({ x: 100, y: 100 });
-      expect(store.cadOverridesStatus?.status).toBe('VALID');
+      expect(useSldEditorStore.getState().cadOverridesStatus?.status).toBe('VALID');
     });
 
     it('should add bend override with snap and keep status valid', () => {
@@ -680,9 +682,9 @@ describe('SldEditorStore', () => {
         { x: 300, y: 100 },
       ]);
 
-      const doc = store.cadOverridesDocument!;
+      const doc = useSldEditorStore.getState().cadOverridesDocument!;
       expect(doc.edges['edge-1']?.bends?.[0]).toEqual({ x: 160, y: 100 });
-      expect(store.cadOverridesStatus?.status).toBe('VALID');
+      expect(useSldEditorStore.getState().cadOverridesStatus?.status).toBe('VALID');
     });
 
     it('should reset node, edge, and global overrides', () => {
@@ -700,15 +702,15 @@ describe('SldEditorStore', () => {
       ]);
 
       store.resetCadOverrideForNode('sym1');
-      expect(store.cadOverridesDocument?.nodes.sym1).toBeUndefined();
+      expect(useSldEditorStore.getState().cadOverridesDocument?.nodes.sym1).toBeUndefined();
 
       store.resetCadOverrideForEdge('edge-1');
-      expect(store.cadOverridesDocument?.edges['edge-1']).toBeUndefined();
+      expect(useSldEditorStore.getState().cadOverridesDocument?.edges['edge-1']).toBeUndefined();
 
       store.updateCadNodeOverride('sym2', { x: 140, y: 140 });
       store.resetAllCadOverrides();
-      expect(store.cadOverridesDocument?.nodes).toEqual({});
-      expect(store.cadOverridesDocument?.edges).toEqual({});
+      expect(useSldEditorStore.getState().cadOverridesDocument?.nodes).toEqual({});
+      expect(useSldEditorStore.getState().cadOverridesDocument?.edges).toEqual({});
     });
   });
 });

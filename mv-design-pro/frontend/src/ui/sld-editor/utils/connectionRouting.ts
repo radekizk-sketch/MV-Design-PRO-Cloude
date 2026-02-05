@@ -341,9 +341,11 @@ function createConnection(
   const startPoint = getPortPoint(fromSymbol, fromPort);
   const endPoint = getPortPoint(toSymbol, toPort);
 
-  // Get obstacles excluding the connection endpoints (for collision detection)
+  // Get obstacles excluding the connection endpoints and the connection's own symbol
+  // (for branch connections, connectionId is the branch symbol id —
+  //  branch must not block its own connection routing)
   const filteredObstacles = obstacles.filter(
-    (o) => o.id !== fromSymbol.id && o.id !== toSymbol.id
+    (o) => o.id !== fromSymbol.id && o.id !== toSymbol.id && o.id !== connectionId
   );
 
   // =============================================================================
@@ -531,9 +533,11 @@ function routeOrthogonal(
   const routingObstacles = toRoutingObstacles(obstacles);
 
   // Build config for obstacle-aware router
+  // obstacleMargin = 0 because obstacles from buildRoutingObstacles are already
+  // expanded by config.obstacleMargin — no double expansion
   const obstacleRouterConfig: Partial<ObstacleRouterConfig> = {
     gridStep: config.gridSnap,
-    obstacleMargin: config.obstacleMargin,
+    obstacleMargin: 0,
   };
 
   try {
@@ -938,12 +942,12 @@ function alignPathToEndpoints(
 ): Position[] {
   if (autoPath.length === 0) {
     // Fallback: direct line (shouldn't happen)
-    return [startPoint, endPoint];
+    return normalizePath(ensureOrthogonal([startPoint, endPoint]), gridSnap);
   }
 
   if (autoPath.length === 1) {
     // Single point path: connect through it
-    return normalizePath([startPoint, autoPath[0], endPoint], gridSnap);
+    return normalizePath(ensureOrthogonal([startPoint, autoPath[0], endPoint]), gridSnap);
   }
 
   // Build aligned path:
@@ -970,8 +974,39 @@ function alignPathToEndpoints(
     aligned.push(endPoint);
   }
 
+  // Ensure all segments are orthogonal by inserting L-bend intermediate points
+  // where consecutive points differ in both X and Y (diagonal transition)
+  const orthogonal = ensureOrthogonal(aligned);
+
   // Normalize: snap and reduce collinear points
-  return normalizePath(aligned, gridSnap);
+  return normalizePath(orthogonal, gridSnap);
+}
+
+/**
+ * Ensure all segments in a path are orthogonal (horizontal or vertical).
+ * Inserts intermediate L-bend points where consecutive points differ in both X and Y.
+ * Uses vertical-first routing (ETAP standard: feeders exit busbar vertically).
+ *
+ * DETERMINISTIC: Pure function, vertical-first is consistent rule.
+ */
+function ensureOrthogonal(path: Position[]): Position[] {
+  if (path.length < 2) return path;
+
+  const result: Position[] = [path[0]];
+
+  for (let i = 1; i < path.length; i++) {
+    const prev = result[result.length - 1];
+    const curr = path[i];
+
+    // If not axis-aligned, insert an L-bend point (vertical-first)
+    if (prev.x !== curr.x && prev.y !== curr.y) {
+      result.push({ x: prev.x, y: curr.y });
+    }
+
+    result.push(curr);
+  }
+
+  return result;
 }
 
 // =============================================================================

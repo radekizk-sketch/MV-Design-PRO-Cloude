@@ -167,9 +167,10 @@ describe('ProtectionDiagnosticsPanel', () => {
 
     // Check for Polish text
     expect(screen.getByText('Diagnostyka zabezpieczeń')).toBeInTheDocument();
-    expect(screen.getByText('Błąd')).toBeInTheDocument();
-    expect(screen.getByText('Ostrzeżenie')).toBeInTheDocument();
-    expect(screen.getByText('Informacja')).toBeInTheDocument();
+    // Severity labels appear in both badges and filter controls, so use getAllByText
+    expect(screen.getAllByText(/Błąd/).length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText(/Ostrzeżenie/).length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText(/Informacja/).length).toBeGreaterThanOrEqual(1);
   });
 
   it('displays messages in Polish', () => {

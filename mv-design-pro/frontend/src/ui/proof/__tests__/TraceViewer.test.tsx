@@ -345,7 +345,7 @@ describe('Export PDF', () => {
     // Should contain Polish labels
     expect(html).toContain('Ślad obliczeń');
     expect(html).toContain('ID wykonania');
-    expect(html).toContain('Krok');
+    expect(html).toContain('Liczba kroków');
     expect(html).toContain('Wzór');
     expect(html).toContain('Wynik');
 
