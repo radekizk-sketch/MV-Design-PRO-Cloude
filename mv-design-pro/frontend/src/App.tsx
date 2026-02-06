@@ -36,6 +36,7 @@ import { ReferencePatternsPage } from './ui/reference-patterns';
 import { ResultsInspectorPage } from './ui/results-inspector';
 import { SLDViewPage, SldEditorPage } from './ui/sld';
 import { WizardPage } from './ui/wizard';
+import { EnmInspectorPage } from './ui/enm-inspector';
 import { PowerFactoryLayout } from './ui/layout';
 import { useAppStateStore } from './ui/app-state';
 import { ROUTES, useUrlSelectionSync, getCurrentHashRoute } from './ui/navigation';
@@ -238,6 +239,15 @@ function App() {
     return wrapWithReadyIndicator(
       <PowerFactoryLayout {...layoutProps}>
         <WizardPage />
+      </PowerFactoryLayout>
+    );
+  }
+
+  // Inspektor modelu ENM (v4.2 — diagnostyka inżynierska)
+  if (route === '#enm-inspector') {
+    return wrapWithReadyIndicator(
+      <PowerFactoryLayout {...layoutProps}>
+        <EnmInspectorPage />
       </PowerFactoryLayout>
     );
   }

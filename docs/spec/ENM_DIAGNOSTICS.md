@@ -1,0 +1,106 @@
+# ENM Diagnostics — Specyfikacja kanoniczna (v4.2)
+
+## 1. Cel
+
+Diagnostyka inżynierska modelu sieci (ENM) wykrywa błędy projektowe,
+wyjaśnia dostępność analiz i przygotowuje użytkownika przed RUN.
+
+## 2. Architektura
+
+```
+ENM (KANON, read-only)
+  → DiagnosticEngine (reguły E-Dxx)
+    → DiagnosticReport (frozen, deterministyczny)
+      → AnalysisMatrix (macierz dostępności)
+      → PreflightReport (przed RUN)
+      → EnmDiffReport (porównanie rewizji)
+        → Inspektor ENM (UI)
+```
+
+## 3. Silnik diagnostyczny (DiagnosticEngine)
+
+### Wejście
+- `NetworkGraph` (kanoniczny JSON, read-only)
+- Opcjonalny kontekst case (read-only)
+
+### Wyjście
+- `DiagnosticReport`:
+  - `status`: OK | WARN | FAIL
+  - `issues[]`: lista DiagnosticIssue
+  - `analysis_matrix`: macierz dostępności analiz
+
+### Zasady
+- Brak mutacji ENM
+- Stabilne kody błędów
+- Deterministyczne sortowanie wyników (severity → code)
+
+## 4. Reguły E-Dxx
+
+### BLOCKER (blokują solwer)
+
+| Kod | Opis |
+|-----|------|
+| E-D01 | Brak źródła zasilania (SLACK lub falownik) |
+| E-D02 | Niespójne poziomy napięć na połączeniu linia/kabel |
+| E-D03 | Brak ciągłości topologicznej (wyspy) |
+| E-D04 | Transformator bez strony GN/DN |
+| E-D05 | Linia/kabel bez impedancji (R=0, X=0) |
+| E-D07 | Otwarte łączniki izolują część sieci |
+| E-D08 | Sprzeczne częstotliwości (placeholder) |
+
+### WARN (ograniczenie analiz)
+
+| Kod | Opis |
+|-----|------|
+| E-D06 | Zwarcie jednofazowe niedostępne — brak Z0 |
+| W-D01 | Brak danych Z0 — ograniczenie analiz |
+| W-D02 | Parametry graniczne poza typowymi zakresami |
+| W-D03 | Nadmiar źródeł bez koordynacji |
+
+### INFO (informacyjne)
+
+| Kod | Opis |
+|-----|------|
+| I-D01 | Analizy dostępne w pełnym zakresie |
+| I-D02 | Topologia sieci: radialna/oczkowa |
+
+## 5. Macierz dostępności analiz
+
+| Analiza | Blokujące kody |
+|---------|----------------|
+| SC 3F | E-D01, E-D03, E-D04, E-D05 |
+| SC 1F | E-D01, E-D03, E-D04, E-D05, E-D06 |
+| LF | E-D01, E-D02, E-D03, E-D04, E-D05 |
+| Protection | E-D01, E-D03, E-D04, E-D05 |
+
+## 6. API (read-only)
+
+```
+GET /api/cases/{case_id}/diagnostics
+GET /api/cases/{case_id}/diagnostics/preflight
+GET /api/cases/{case_id}/enm/diff?from=revA&to=revB
+```
+
+Brak side-effects. Case-bound.
+
+## 7. Diff rewizji ENM
+
+Porównanie techniczne dwóch snapshotów:
+- Na poziomie encji (node/branch/switch/inverter_source)
+- Na poziomie parametrów (field-level changes)
+- Deterministyczny wynik (sortowanie po entity_type → change_type → entity_id)
+- Fingerprint SHA-256 dla identyfikacji rewizji
+
+## 8. Pre-flight checks
+
+Tabela wyświetlana przed K10 (RUN):
+- SC 3F | SC 1F | LF | Protection
+- Status: AVAILABLE / BLOCKED
+- Powód blokady (jeśli BLOCKED)
+- Kody blokujące
+
+## 9. Testy
+
+- Unit: 44 testy (reguły E-Dxx, engine, preflight, diff)
+- Deterministyczność: ten sam graf → ten sam wynik
+- Brak snapshotów — semantyczna walidacja

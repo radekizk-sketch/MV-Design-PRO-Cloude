@@ -111,6 +111,13 @@ export const ROUTES: Record<string, RouteDefinition> = {
     icon: 'SET',
     requiredMode: 'RESULT_VIEW',
   },
+  ENM_INSPECTOR: {
+    hash: '#enm-inspector',
+    label: 'Inspektor modelu',
+    description: 'Diagnostyka inzynierska modelu sieci ENM',
+    icon: 'INS',
+    requiredMode: undefined,
+  },
 };
 
 /**
