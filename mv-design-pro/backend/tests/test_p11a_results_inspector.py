@@ -442,14 +442,14 @@ class TestSldOverlayNodeDTO:
         """SldOverlayNodeDTO should store PF results."""
         node = SldOverlayNodeDTO(
             symbol_id="sym-001",
-            node_id="bus-001",
+            bus_id="bus-001",
             u_pu=0.99,
             u_kv=19.8,
             angle_deg=-2.5,
         )
 
         assert node.symbol_id == "sym-001"
-        assert node.node_id == "bus-001"
+        assert node.bus_id == "bus-001"
         assert node.u_pu == 0.99
         assert node.u_kv == 19.8
         assert node.angle_deg == -2.5
@@ -458,7 +458,7 @@ class TestSldOverlayNodeDTO:
         """SldOverlayNodeDTO should store SC results."""
         node = SldOverlayNodeDTO(
             symbol_id="sym-001",
-            node_id="bus-001",
+            bus_id="bus-001",
             ikss_ka=25.3,
             sk_mva=876.5,
         )
@@ -470,13 +470,13 @@ class TestSldOverlayNodeDTO:
         """to_dict should omit None values."""
         node = SldOverlayNodeDTO(
             symbol_id="sym-001",
-            node_id="bus-001",
+            bus_id="bus-001",
             u_pu=0.99,
         )
 
         d = node.to_dict()
         assert d["symbol_id"] == "sym-001"
-        assert d["node_id"] == "bus-001"
+        assert d["bus_id"] == "bus-001"
         assert d["u_pu"] == 0.99
         assert "u_kv" not in d
         assert "ikss_ka" not in d
@@ -526,8 +526,8 @@ class TestSldResultOverlayDTO:
         run_id = uuid4()
 
         nodes = (
-            SldOverlayNodeDTO(symbol_id="s1", node_id="n1", u_pu=0.99),
-            SldOverlayNodeDTO(symbol_id="s2", node_id="n2", u_pu=1.01),
+            SldOverlayNodeDTO(symbol_id="s1", bus_id="n1", u_pu=0.99),
+            SldOverlayNodeDTO(symbol_id="s2", bus_id="n2", u_pu=1.01),
         )
         branches = (
             SldOverlayBranchDTO(symbol_id="sb1", branch_id="b1", p_mw=3.0),
@@ -537,14 +537,14 @@ class TestSldResultOverlayDTO:
             diagram_id=diagram_id,
             run_id=run_id,
             result_status="FRESH",
-            nodes=nodes,
+            buses=nodes,
             branches=branches,
         )
 
         assert dto.diagram_id == diagram_id
         assert dto.run_id == run_id
         assert dto.result_status == "FRESH"
-        assert len(dto.nodes) == 2
+        assert len(dto.buses) == 2
         assert len(dto.branches) == 1
 
     def test_to_dict_serialization(self):
@@ -556,7 +556,7 @@ class TestSldResultOverlayDTO:
             diagram_id=diagram_id,
             run_id=run_id,
             result_status="OUTDATED",
-            nodes=(),
+            buses=(),
             branches=(),
         )
 
@@ -564,7 +564,7 @@ class TestSldResultOverlayDTO:
         assert d["diagram_id"] == str(diagram_id)
         assert d["run_id"] == str(run_id)
         assert d["result_status"] == "OUTDATED"
-        assert d["nodes"] == []
+        assert d["buses"] == []
         assert d["branches"] == []
 
 
@@ -601,21 +601,21 @@ class TestDeterminismRequirements:
         """Same SldResultOverlayDTO inputs must produce identical JSON."""
         diagram_id = uuid4()
         run_id = uuid4()
-        nodes = (
-            SldOverlayNodeDTO(symbol_id="s1", node_id="n1", u_pu=0.99),
+        buses = (
+            SldOverlayNodeDTO(symbol_id="s1", bus_id="n1", u_pu=0.99),
         )
 
         dto1 = SldResultOverlayDTO(
             diagram_id=diagram_id,
             run_id=run_id,
             result_status="FRESH",
-            nodes=nodes,
+            buses=buses,
         )
         dto2 = SldResultOverlayDTO(
             diagram_id=diagram_id,
             run_id=run_id,
             result_status="FRESH",
-            nodes=nodes,
+            buses=buses,
         )
 
         assert dto1.to_dict() == dto2.to_dict()

@@ -19,7 +19,7 @@ from domain.results import (
     NumericDelta,
     ComplexDelta,
     ShortCircuitComparison,
-    NodeVoltageComparison,
+    BusVoltageComparison,
     BranchPowerComparison,
     PowerFlowComparison,
     RunComparisonResult,
@@ -189,15 +189,15 @@ class TestShortCircuitComparison:
 class TestPowerFlowComparison:
     """Test PowerFlowComparison construction (P10b)."""
 
-    def test_construction_with_node_voltages(self):
-        """PowerFlowComparison should include per-node voltages."""
-        node1 = NodeVoltageComparison(
-            node_id="bus-1",
+    def test_construction_with_bus_voltages(self):
+        """PowerFlowComparison should include per-bus voltages."""
+        bus1 = BusVoltageComparison(
+            bus_id="bus-1",
             u_kv_delta=NumericDelta.compute(20.0, 19.8),
             u_pu_delta=NumericDelta.compute(1.0, 0.99),
         )
-        node2 = NodeVoltageComparison(
-            node_id="bus-2",
+        bus2 = BusVoltageComparison(
+            bus_id="bus-2",
             u_kv_delta=NumericDelta.compute(20.0, 20.1),
             u_pu_delta=NumericDelta.compute(1.0, 1.005),
         )
@@ -207,12 +207,12 @@ class TestPowerFlowComparison:
             total_losses_q_delta=NumericDelta.compute(0.02, 0.025),
             slack_p_delta=NumericDelta.compute(1.0, 1.05),
             slack_q_delta=NumericDelta.compute(0.5, 0.55),
-            node_voltages=(node1, node2),
+            node_voltages=(bus1, bus2),
             branch_powers=(),
         )
 
         assert len(comp.node_voltages) == 2
-        assert comp.node_voltages[0].node_id == "bus-1"
+        assert comp.node_voltages[0].bus_id == "bus-1"
 
     def test_to_dict_serialization(self):
         """PowerFlowComparison must serialize to dict."""

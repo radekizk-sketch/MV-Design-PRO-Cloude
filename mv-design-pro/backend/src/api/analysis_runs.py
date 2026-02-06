@@ -171,7 +171,7 @@ def get_analysis_run_overlay(
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
     dto = OverlayDTO(
-        node_overlays=overlay_payload.get("nodes", []),
+        bus_overlays=overlay_payload.get("nodes", []),
         branch_overlays=overlay_payload.get("branches", []),
     )
     return canonicalize_json(dto.to_dict())

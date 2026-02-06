@@ -63,13 +63,16 @@ export interface SldSymbol {
 }
 
 /**
- * Node/Bus symbol (horizontal bar).
+ * Bus symbol (horizontal bar).
  */
-export interface NodeSymbol extends SldSymbol {
+export interface BusSymbol extends SldSymbol {
   elementType: 'Bus';
   width: number; // busbar width
   height: number; // busbar height
 }
+
+/** @deprecated Use BusSymbol instead. */
+export type NodeSymbol = BusSymbol;
 
 /**
  * Branch type for LineBranch elements.
@@ -121,7 +124,7 @@ export interface LoadSymbol extends SldSymbol {
  * Union of all symbol types.
  */
 export type AnySldSymbol =
-  | NodeSymbol
+  | BusSymbol
   | BranchSymbol
   | SwitchSymbol
   | SourceSymbol

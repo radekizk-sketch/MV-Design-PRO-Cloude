@@ -1,43 +1,53 @@
 """
-Network Validator module.
+Network Validator module — PowerFactory-grade.
 
-PowerFactory-style validation that must pass before solver execution.
-Validates graph connectivity, element presence, and parameter validity.
+Industrial-grade validation that must pass before solver execution.
+Validates graph connectivity, element presence, parameter validity,
+voltage level consistency, and transformer polarity.
 
-This is NOT a solver - it's a pre-check layer.
+This is NOT a solver — it's a pre-check layer (Application Layer).
+
+Diagnostic format aligned with DIgSILENT PowerFactory "Check Network Data":
+- code: machine-readable identifier (e.g., "network.disconnected")
+- message: human-readable description (Polish for UI)
+- severity: ERROR (blocking) or WARNING (non-blocking)
+- element_id: affected element UUID
+- field: affected field name
+- suggested_fix: actionable Polish-language fix suggestion
 """
 
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import List, Optional, Set
-from uuid import UUID
 
 import networkx as nx
 
 
 class Severity(Enum):
     """Validation issue severity."""
-    ERROR = "ERROR"      # Blocking - solver cannot run
-    WARNING = "WARNING"  # Non-blocking - solver can run with caution
+    ERROR = "ERROR"      # Blocking — solver cannot run
+    WARNING = "WARNING"  # Non-blocking — solver can run with caution
 
 
 @dataclass
 class ValidationIssue:
     """
-    Single validation issue.
+    Single validation issue (PowerFactory-grade diagnostic).
 
     Attributes:
         code: Machine-readable issue code (e.g., "network.disconnected").
-        message: Human-readable description.
+        message: Human-readable description (Polish for UI display).
         severity: ERROR (blocking) or WARNING (non-blocking).
         element_id: ID of the element with the issue (if applicable).
         field: Field name with the issue (if applicable).
+        suggested_fix: Actionable fix suggestion (Polish).
     """
     code: str
     message: str
     severity: Severity = Severity.ERROR
     element_id: Optional[str] = None
     field: Optional[str] = None
+    suggested_fix: Optional[str] = None
 
     def to_dict(self) -> dict:
         """Convert to dictionary."""
@@ -47,6 +57,7 @@ class ValidationIssue:
             "severity": self.severity.value,
             "element_id": self.element_id,
             "field": self.field,
+            "suggested_fix": self.suggested_fix,
         }
 
 
@@ -55,7 +66,7 @@ class ValidationReport:
     """
     Collection of validation issues.
 
-    Immutable pattern - use with_error/with_warning to add issues.
+    Immutable pattern — use with_error/with_warning to add issues.
     """
     issues: tuple = field(default_factory=tuple)
 
@@ -96,6 +107,7 @@ class ValidationReport:
                 severity=Severity.ERROR,
                 element_id=issue.element_id,
                 field=issue.field,
+                suggested_fix=issue.suggested_fix,
             ),)
         )
 
@@ -116,6 +128,7 @@ class ValidationReport:
                 severity=Severity.WARNING,
                 element_id=issue.element_id,
                 field=issue.field,
+                suggested_fix=issue.suggested_fix,
             ),)
         )
 
@@ -131,20 +144,27 @@ class ValidationReport:
 
 class NetworkValidator:
     """
-    PowerFactory-style network validator.
+    PowerFactory-grade network validator.
 
     Validates network model before solver execution.
-    If validation fails, solver execution is BLOCKED.
+    If validation fails (ERROR-level issues), solver execution is BLOCKED.
 
-    Validation rules:
-    1. Graph connectivity - network must be connected
-    2. Source presence - at least one source required
-    3. No dangling elements - all branches connected to valid nodes
-    4. Bus voltage validity - all voltages > 0
-    5. Branch endpoint validity - both endpoints exist
-    6. Transformer voltage mismatch - HV ≠ LV
+    Validation rules (PowerFactory "Check Network Data" equivalent):
+    1. Empty network check
+    2. Graph connectivity (single island for solver)
+    3. Source presence (SLACK node or inverter source)
+    4. Dangling elements (branches with invalid endpoints)
+    5. Bus voltage validity (voltage_level > 0)
+    6. Branch endpoint validity (both endpoints exist, no self-loops)
+    7. Transformer voltage mismatch (HV != LV, both > 0)
+    8. SLACK node presence and uniqueness (exactly 1)
+    9. Switch endpoint validity
+    10. Inverter source bus validity
+    11. Branch impedance validity (non-zero impedance for lines/cables)
+    12. Transformer HV/LV polarity (HV bus voltage >= LV bus voltage)
+    13. Voltage level consistency across connected buses
 
-    This is NOT a solver - it performs no physics calculations.
+    This is NOT a solver — it performs no physics calculations.
     """
 
     def validate(self, graph) -> ValidationReport:
@@ -159,40 +179,64 @@ class NetworkValidator:
         """
         report = ValidationReport()
 
-        # Check if network is empty
+        # Rule 1: Check if network is empty
         report = self._check_empty_network(graph, report)
 
-        # Check graph connectivity
+        # Rule 2: Check graph connectivity
         report = self._check_connectivity(graph, report)
 
-        # Check source presence
+        # Rule 3: Check source presence
         report = self._check_source_presence(graph, report)
 
-        # Check for dangling elements
+        # Rule 4: Check for dangling elements
         report = self._check_dangling_elements(graph, report)
 
-        # Check bus voltages
+        # Rule 5: Check bus voltages
         report = self._check_bus_voltages(graph, report)
 
-        # Check branch endpoints
+        # Rule 6: Check branch endpoints
         report = self._check_branch_endpoints(graph, report)
 
-        # Check transformer voltages
+        # Rule 7: Check transformer voltages
         report = self._check_transformer_voltages(graph, report)
 
-        # Check for SLACK node
+        # Rule 8: Check for SLACK node
         report = self._check_slack_node(graph, report)
 
+        # Rule 9: Check switch endpoints
+        report = self._check_switch_endpoints(graph, report)
+
+        # Rule 10: Check inverter source buses
+        report = self._check_inverter_source_buses(graph, report)
+
+        # Rule 11: Check branch impedance (non-zero)
+        report = self._check_branch_impedance(graph, report)
+
+        # Rule 12: Check transformer HV/LV polarity vs bus voltages
+        report = self._check_transformer_polarity(graph, report)
+
+        # Rule 13: Check voltage level consistency on lines/cables
+        report = self._check_voltage_consistency(graph, report)
+
         return report
+
+    # =========================================================================
+    # Rule 1: Empty network
+    # =========================================================================
 
     def _check_empty_network(self, graph, report: ValidationReport) -> ValidationReport:
         """Check if network has any nodes."""
         if not graph.nodes:
             return report.with_error(ValidationIssue(
                 code="network.empty",
-                message="Network has no nodes",
+                message="Sieć nie zawiera żadnych szyn (węzłów)",
+                suggested_fix="Dodaj co najmniej jedną szynę do modelu sieci",
             ))
         return report
+
+    # =========================================================================
+    # Rule 2: Connectivity
+    # =========================================================================
 
     def _check_connectivity(self, graph, report: ValidationReport) -> ValidationReport:
         """
@@ -207,9 +251,20 @@ class NetworkValidator:
             islands = graph.find_islands()
             return report.with_error(ValidationIssue(
                 code="network.disconnected",
-                message=f"Network is disconnected into {len(islands)} islands",
+                message=(
+                    f"Sieć jest niespójna — wykryto {len(islands)} wysp(y). "
+                    f"Solver wymaga jednej spójnej topologii"
+                ),
+                suggested_fix=(
+                    "Połącz wszystkie wyspy gałęziami lub łącznikami, "
+                    "albo usuń odłączone elementy"
+                ),
             ))
         return report
+
+    # =========================================================================
+    # Rule 3: Source presence
+    # =========================================================================
 
     def _check_source_presence(self, graph, report: ValidationReport) -> ValidationReport:
         """
@@ -229,8 +284,13 @@ class NetworkValidator:
 
         return report.with_error(ValidationIssue(
             code="network.no_source",
-            message="Network has no source (SLACK node or inverter source)",
+            message="Sieć nie ma źródła zasilania (brak szyny SLACK lub źródła falownikowego)",
+            suggested_fix="Dodaj szynę typu SLACK lub źródło falownikowe (OZE)",
         ))
+
+    # =========================================================================
+    # Rule 4: Dangling elements
+    # =========================================================================
 
     def _check_dangling_elements(self, graph, report: ValidationReport) -> ValidationReport:
         """
@@ -242,19 +302,31 @@ class NetworkValidator:
             if branch.from_node_id not in node_ids:
                 report = report.with_error(ValidationIssue(
                     code="branch.dangling_from",
-                    message=f"Branch from_node_id '{branch.from_node_id}' does not exist",
+                    message=(
+                        f"Gałąź '{branch.name}' — szyna początkowa "
+                        f"'{branch.from_node_id}' nie istnieje"
+                    ),
                     element_id=branch_id,
                     field="from_node_id",
+                    suggested_fix="Podłącz gałąź do istniejącej szyny lub usuń gałąź",
                 ))
             if branch.to_node_id not in node_ids:
                 report = report.with_error(ValidationIssue(
                     code="branch.dangling_to",
-                    message=f"Branch to_node_id '{branch.to_node_id}' does not exist",
+                    message=(
+                        f"Gałąź '{branch.name}' — szyna końcowa "
+                        f"'{branch.to_node_id}' nie istnieje"
+                    ),
                     element_id=branch_id,
                     field="to_node_id",
+                    suggested_fix="Podłącz gałąź do istniejącej szyny lub usuń gałąź",
                 ))
 
         return report
+
+    # =========================================================================
+    # Rule 5: Bus voltages
+    # =========================================================================
 
     def _check_bus_voltages(self, graph, report: ValidationReport) -> ValidationReport:
         """
@@ -264,15 +336,23 @@ class NetworkValidator:
             if node.voltage_level <= 0:
                 report = report.with_error(ValidationIssue(
                     code="bus.voltage_invalid",
-                    message=f"Bus voltage_level must be > 0, got {node.voltage_level}",
+                    message=(
+                        f"Szyna '{node.name}' — napięcie znamionowe musi być > 0, "
+                        f"aktualnie: {node.voltage_level} kV"
+                    ),
                     element_id=node_id,
                     field="voltage_level",
+                    suggested_fix="Ustaw prawidłowy poziom napięcia znamionowego (np. 15, 20, 110 kV)",
                 ))
         return report
 
+    # =========================================================================
+    # Rule 6: Branch endpoints
+    # =========================================================================
+
     def _check_branch_endpoints(self, graph, report: ValidationReport) -> ValidationReport:
         """
-        Check if all branch endpoints exist.
+        Check if all branch endpoints exist and are valid.
         """
         node_ids = set(graph.nodes.keys())
 
@@ -280,28 +360,35 @@ class NetworkValidator:
             if branch.from_node_id not in node_ids:
                 report = report.with_error(ValidationIssue(
                     code="branch.from_missing",
-                    message="Branch from_node_id does not exist",
+                    message=f"Gałąź '{branch.name}' — brak szyny początkowej w modelu",
                     element_id=branch_id,
                     field="from_node_id",
+                    suggested_fix="Podłącz gałąź do istniejącej szyny",
                 ))
             if branch.to_node_id not in node_ids:
                 report = report.with_error(ValidationIssue(
                     code="branch.to_missing",
-                    message="Branch to_node_id does not exist",
+                    message=f"Gałąź '{branch.name}' — brak szyny końcowej w modelu",
                     element_id=branch_id,
                     field="to_node_id",
+                    suggested_fix="Podłącz gałąź do istniejącej szyny",
                 ))
             if branch.from_node_id == branch.to_node_id:
                 report = report.with_error(ValidationIssue(
                     code="branch.self_loop",
-                    message="Branch cannot connect a node to itself",
+                    message=f"Gałąź '{branch.name}' — nie może łączyć szyny samej ze sobą",
                     element_id=branch_id,
+                    suggested_fix="Zmień szynę początkową lub końcową gałęzi",
                 ))
         return report
 
+    # =========================================================================
+    # Rule 7: Transformer voltages
+    # =========================================================================
+
     def _check_transformer_voltages(self, graph, report: ValidationReport) -> ValidationReport:
         """
-        Check transformer HV/LV voltages are different.
+        Check transformer HV/LV voltages are different and positive.
         """
         from network_model.core.branch import BranchType, TransformerBranch
 
@@ -311,24 +398,43 @@ class NetworkValidator:
                     if branch.voltage_hv_kv == branch.voltage_lv_kv:
                         report = report.with_error(ValidationIssue(
                             code="transformer.voltage_equal",
-                            message="Transformer HV and LV voltages must be different",
+                            message=(
+                                f"Transformator '{branch.name}' — napięcie GN i DN "
+                                f"muszą się różnić ({branch.voltage_hv_kv} kV = "
+                                f"{branch.voltage_lv_kv} kV)"
+                            ),
                             element_id=branch_id,
+                            suggested_fix=(
+                                "Ustaw różne napięcia po stronie GN i DN transformatora"
+                            ),
                         ))
                     if branch.voltage_hv_kv <= 0:
                         report = report.with_error(ValidationIssue(
                             code="transformer.hv_invalid",
-                            message="Transformer HV voltage must be > 0",
+                            message=(
+                                f"Transformator '{branch.name}' — napięcie strony GN "
+                                f"musi być > 0, aktualnie: {branch.voltage_hv_kv} kV"
+                            ),
                             element_id=branch_id,
                             field="voltage_hv_kv",
+                            suggested_fix="Ustaw prawidłowe napięcie strony górnej (GN)",
                         ))
                     if branch.voltage_lv_kv <= 0:
                         report = report.with_error(ValidationIssue(
                             code="transformer.lv_invalid",
-                            message="Transformer LV voltage must be > 0",
+                            message=(
+                                f"Transformator '{branch.name}' — napięcie strony DN "
+                                f"musi być > 0, aktualnie: {branch.voltage_lv_kv} kV"
+                            ),
                             element_id=branch_id,
                             field="voltage_lv_kv",
+                            suggested_fix="Ustaw prawidłowe napięcie strony dolnej (DN)",
                         ))
         return report
+
+    # =========================================================================
+    # Rule 8: SLACK node
+    # =========================================================================
 
     def _check_slack_node(self, graph, report: ValidationReport) -> ValidationReport:
         """
@@ -344,14 +450,240 @@ class NetworkValidator:
         if len(slack_nodes) == 0:
             return report.with_error(ValidationIssue(
                 code="network.no_slack",
-                message="Network has no SLACK node (required for power flow)",
+                message=(
+                    "Sieć nie ma szyny bilansującej (SLACK) — "
+                    "wymagana do rozpływu mocy"
+                ),
+                suggested_fix="Ustaw jedną szynę jako typ SLACK (węzeł referencyjny)",
             ))
 
         if len(slack_nodes) > 1:
             return report.with_error(ValidationIssue(
                 code="network.multiple_slack",
-                message=f"Network has {len(slack_nodes)} SLACK nodes, expected 1",
+                message=(
+                    f"Sieć ma {len(slack_nodes)} szyn SLACK — "
+                    f"dozwolona jest dokładnie jedna"
+                ),
+                suggested_fix="Zmień nadmiarowe szyny SLACK na typ PQ lub PV",
             ))
+
+        return report
+
+    # =========================================================================
+    # Rule 9: Switch endpoints (NEW — PowerFactory-grade)
+    # =========================================================================
+
+    def _check_switch_endpoints(self, graph, report: ValidationReport) -> ValidationReport:
+        """
+        Check if all switch endpoints exist in the network.
+        """
+        if not hasattr(graph, 'switches'):
+            return report
+
+        node_ids = set(graph.nodes.keys())
+
+        for switch_id, switch in graph.switches.items():
+            if switch.from_node_id not in node_ids:
+                report = report.with_error(ValidationIssue(
+                    code="switch.from_missing",
+                    message=(
+                        f"Łącznik '{switch.name}' — szyna początkowa "
+                        f"'{switch.from_node_id}' nie istnieje"
+                    ),
+                    element_id=switch_id,
+                    field="from_node_id",
+                    suggested_fix="Podłącz łącznik do istniejącej szyny",
+                ))
+            if switch.to_node_id not in node_ids:
+                report = report.with_error(ValidationIssue(
+                    code="switch.to_missing",
+                    message=(
+                        f"Łącznik '{switch.name}' — szyna końcowa "
+                        f"'{switch.to_node_id}' nie istnieje"
+                    ),
+                    element_id=switch_id,
+                    field="to_node_id",
+                    suggested_fix="Podłącz łącznik do istniejącej szyny",
+                ))
+            if switch.from_node_id == switch.to_node_id:
+                report = report.with_error(ValidationIssue(
+                    code="switch.self_loop",
+                    message=(
+                        f"Łącznik '{switch.name}' — nie może łączyć "
+                        f"szyny samej ze sobą"
+                    ),
+                    element_id=switch_id,
+                    suggested_fix="Zmień szynę początkową lub końcową łącznika",
+                ))
+
+        return report
+
+    # =========================================================================
+    # Rule 10: Inverter source buses (NEW — PowerFactory-grade)
+    # =========================================================================
+
+    def _check_inverter_source_buses(
+        self, graph, report: ValidationReport
+    ) -> ValidationReport:
+        """
+        Check if all inverter source buses exist in the network.
+        """
+        if not hasattr(graph, 'inverter_sources'):
+            return report
+
+        node_ids = set(graph.nodes.keys())
+
+        for source_id, source in graph.inverter_sources.items():
+            if source.node_id not in node_ids:
+                report = report.with_error(ValidationIssue(
+                    code="source.bus_missing",
+                    message=(
+                        f"Źródło falownikowe '{source.name}' — szyna "
+                        f"'{source.node_id}' nie istnieje w modelu"
+                    ),
+                    element_id=source_id,
+                    field="node_id",
+                    suggested_fix="Podłącz źródło do istniejącej szyny",
+                ))
+
+        return report
+
+    # =========================================================================
+    # Rule 11: Branch impedance (non-zero for lines/cables) (NEW)
+    # =========================================================================
+
+    def _check_branch_impedance(
+        self, graph, report: ValidationReport
+    ) -> ValidationReport:
+        """
+        Check that line/cable branches have non-zero impedance.
+
+        Zero impedance causes singular Y-bus matrix.
+        """
+        from network_model.core.branch import BranchType, LineBranch
+
+        for branch_id, branch in graph.branches.items():
+            if branch.branch_type in (BranchType.LINE, BranchType.CABLE):
+                if isinstance(branch, LineBranch):
+                    # Skip branches with type_ref (params come from catalog)
+                    if branch.type_ref is not None:
+                        continue
+                    # Skip branches with impedance override
+                    if branch.impedance_override is not None:
+                        continue
+                    if branch.r_ohm_per_km == 0 and branch.x_ohm_per_km == 0:
+                        report = report.with_warning(ValidationIssue(
+                            code="branch.impedance_zero",
+                            message=(
+                                f"Gałąź '{branch.name}' — impedancja zerowa "
+                                f"(R=0, X=0). Może spowodować błąd solvera"
+                            ),
+                            element_id=branch_id,
+                            suggested_fix=(
+                                "Ustaw parametry R i/lub X > 0, "
+                                "lub przypisz typ z katalogu"
+                            ),
+                        ))
+                    if branch.length_km <= 0:
+                        report = report.with_warning(ValidationIssue(
+                            code="branch.length_zero",
+                            message=(
+                                f"Gałąź '{branch.name}' — długość ≤ 0 "
+                                f"({branch.length_km} km)"
+                            ),
+                            element_id=branch_id,
+                            field="length_km",
+                            suggested_fix="Ustaw długość gałęzi > 0 km",
+                        ))
+
+        return report
+
+    # =========================================================================
+    # Rule 12: Transformer HV/LV polarity vs bus voltages (NEW)
+    # =========================================================================
+
+    def _check_transformer_polarity(
+        self, graph, report: ValidationReport
+    ) -> ValidationReport:
+        """
+        Check that transformer HV side connects to higher voltage bus.
+
+        PowerFactory requirement: from_node_id (HV) bus must have voltage_level
+        >= to_node_id (LV) bus voltage_level.
+        """
+        from network_model.core.branch import BranchType, TransformerBranch
+
+        for branch_id, branch in graph.branches.items():
+            if branch.branch_type == BranchType.TRANSFORMER:
+                if isinstance(branch, TransformerBranch):
+                    from_node = graph.nodes.get(branch.from_node_id)
+                    to_node = graph.nodes.get(branch.to_node_id)
+                    if from_node is None or to_node is None:
+                        continue  # dangling endpoints handled by other rules
+                    if (
+                        from_node.voltage_level > 0
+                        and to_node.voltage_level > 0
+                        and from_node.voltage_level < to_node.voltage_level
+                    ):
+                        report = report.with_warning(ValidationIssue(
+                            code="transformer.polarity_reversed",
+                            message=(
+                                f"Transformator '{branch.name}' — strona GN "
+                                f"({from_node.voltage_level} kV) podłączona do "
+                                f"szyny o niższym napięciu niż strona DN "
+                                f"({to_node.voltage_level} kV). "
+                                f"Sprawdź kierunek podłączenia"
+                            ),
+                            element_id=branch_id,
+                            suggested_fix=(
+                                "Zamień szyny from/to transformatora, aby strona "
+                                "GN była podłączona do szyny wyższego napięcia"
+                            ),
+                        ))
+
+        return report
+
+    # =========================================================================
+    # Rule 13: Voltage level consistency on lines/cables (NEW)
+    # =========================================================================
+
+    def _check_voltage_consistency(
+        self, graph, report: ValidationReport
+    ) -> ValidationReport:
+        """
+        Check that lines/cables connect buses at the same voltage level.
+
+        Lines and cables should connect buses at the same nominal voltage.
+        A mismatch indicates a modeling error (transformer may be needed).
+        """
+        from network_model.core.branch import BranchType
+
+        for branch_id, branch in graph.branches.items():
+            if branch.branch_type in (BranchType.LINE, BranchType.CABLE):
+                from_node = graph.nodes.get(branch.from_node_id)
+                to_node = graph.nodes.get(branch.to_node_id)
+                if from_node is None or to_node is None:
+                    continue  # dangling endpoints handled by other rules
+                if (
+                    from_node.voltage_level > 0
+                    and to_node.voltage_level > 0
+                    and from_node.voltage_level != to_node.voltage_level
+                ):
+                    report = report.with_warning(ValidationIssue(
+                        code="branch.voltage_mismatch",
+                        message=(
+                            f"Gałąź '{branch.name}' łączy szyny o różnych "
+                            f"napięciach znamionowych: "
+                            f"{from_node.voltage_level} kV i "
+                            f"{to_node.voltage_level} kV"
+                        ),
+                        element_id=branch_id,
+                        suggested_fix=(
+                            "Linie/kable powinny łączyć szyny o tym samym "
+                            "napięciu. Jeśli potrzebna jest zmiana napięcia, "
+                            "użyj transformatora"
+                        ),
+                    ))
 
         return report
 
