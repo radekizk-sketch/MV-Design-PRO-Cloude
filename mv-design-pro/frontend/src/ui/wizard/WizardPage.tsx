@@ -5,11 +5,12 @@
  * przez proces budowy kompletnej sieci średniego napięcia.
  *
  * Każdy krok edytuje EnergyNetworkModel (ENM) — autosave via PUT.
+ * Integracja: wizardStateMachine (gate logic) + WizardSldPreview (live SLD).
  *
  * BINDING: Etykiety po polsku, brak kodów projektowych.
  */
 
-import { useState, useCallback, useEffect, useRef } from 'react';
+import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import type {
   EnergyNetworkModel,
   Bus,
@@ -21,6 +22,9 @@ import type {
   Load,
   ValidationResult,
 } from '../../types/enm';
+import { computeWizardState, getStepStatusColor, getOverallStatusLabel } from './wizardStateMachine';
+import type { WizardState } from './wizardStateMachine';
+import { WizardSldPreview } from './WizardSldPreview';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -364,23 +368,66 @@ function StepK8({ validation, onGoToStep }: { validation: ValidationResult | nul
 function StepK9({ enm }: { enm: EnergyNetworkModel }) {
   return (
     <div>
-      <p style={{ fontSize: '13px', color: '#6b7280', marginBottom: '12px' }}>Podgląd schematu jednokreskowego (SLD). Elementy referencjonowane z ENM po ref_id.</p>
-      <div style={{ padding: '24px', border: '2px dashed #d1d5db', borderRadius: '8px', textAlign: 'center', color: '#9ca3af' }}>
-        <div style={{ fontSize: '14px', marginBottom: '8px' }}>Schemat jednokreskowy</div>
-        <div style={{ fontSize: '12px' }}>{enm.buses.length} szyn | {enm.branches.length} gałęzi | {enm.transformers.length} trafo</div>
-        <div style={{ fontSize: '12px', marginTop: '4px' }}>Pełny SLD CAD dostępny w widoku #sld</div>
+      <p style={{ fontSize: '13px', color: '#6b7280', marginBottom: '12px' }}>Podgląd schematu jednokreskowego (SLD). Układ generowany automatycznie przez silnik topologiczny.</p>
+      <WizardSldPreview enm={enm} />
+      <div style={{ marginTop: '12px', display: 'flex', gap: '12px', fontSize: '12px', color: '#6b7280' }}>
+        <span>{enm.buses.length} szyn</span>
+        <span>{enm.branches.length + enm.transformers.length} gałęzi</span>
+        <span>{enm.sources.length} źródeł</span>
+        <span>{enm.loads.length} odbiorów</span>
+      </div>
+      <div style={{ marginTop: '8px', fontSize: '12px', color: '#9ca3af' }}>
+        Pełny edytor SLD dostępny w widoku <a href="#sld" style={{ color: '#3b82f6' }}>Schemat</a>
       </div>
     </div>
   );
 }
 
-function StepK10({ validation, runResult, isRunning, onRun }: {
-  validation: ValidationResult | null; runResult: Record<string, unknown> | null; isRunning: boolean; onRun: () => void;
+function StepK10({ validation, wizardState, runResult, isRunning, onRun }: {
+  validation: ValidationResult | null; wizardState: WizardState | null; runResult: Record<string, unknown> | null; isRunning: boolean; onRun: () => void;
 }) {
   const canRun = validation?.status !== 'FAIL';
   const results = (runResult as { results?: Array<Record<string, unknown>> })?.results ?? [];
+  const rm = wizardState?.readinessMatrix;
+
+  const analysisItems = [
+    { key: 'sc3f', label: 'Zwarcie 3F', ready: rm?.shortCircuit3F, btn: 'Uruchom zwarcia 3F' },
+    { key: 'sc1f', label: 'Zwarcie 1F', ready: rm?.shortCircuit1F, btn: null },
+    { key: 'lf', label: 'Rozpływ mocy', ready: rm?.loadFlow, btn: null },
+  ];
+
   return (
     <div>
+      {/* Readiness matrix */}
+      <h4 style={{ margin: '0 0 12px', fontSize: '14px' }}>Macierz gotowości analiz</h4>
+      <div style={{ marginBottom: '16px', display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+        {analysisItems.map(({ key, label, ready }) => {
+          const ok = ready?.available ?? false;
+          return (
+            <div key={key} data-testid={`readiness-${key}`} style={{ padding: '10px 14px', borderRadius: '6px', background: ok ? '#dcfce7' : '#fef2f2', fontSize: '13px', minWidth: '160px' }}>
+              <div style={{ fontWeight: 500, marginBottom: '4px' }}>{label}: {ok ? 'dostępne' : 'niedostępne'}</div>
+              {!ok && ready && ready.missingRequirements.length > 0 && (
+                <ul style={{ margin: '4px 0 0 16px', padding: 0, fontSize: '11px', color: '#6b7280' }}>
+                  {ready.missingRequirements.map((req, i) => <li key={i}>{req}</li>)}
+                </ul>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Element counts */}
+      {wizardState && (
+        <div style={{ marginBottom: '16px', padding: '10px 14px', background: '#f9fafb', borderRadius: '6px', fontSize: '12px', color: '#6b7280', display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
+          <span>Szyny: {wizardState.elementCounts.buses}</span>
+          <span>Źródła: {wizardState.elementCounts.sources}</span>
+          <span>Trafo: {wizardState.elementCounts.transformers}</span>
+          <span>Gałęzie: {wizardState.elementCounts.branches}</span>
+          <span>Odbiory: {wizardState.elementCounts.loads}</span>
+          <span>Generatory: {wizardState.elementCounts.generators}</span>
+        </div>
+      )}
+
       {!canRun && <div style={{ marginBottom: '16px', padding: '12px', background: '#fef2f2', borderRadius: '6px', fontSize: '13px', color: '#ef4444' }}>Model sieci zawiera blokery — obliczenia zablokowane. Wróć do K8.</div>}
       <button data-testid="run-sc-btn" onClick={onRun} disabled={!canRun || isRunning} style={{ padding: '10px 24px', backgroundColor: canRun ? '#3b82f6' : '#9ca3af', color: '#fff', border: 'none', borderRadius: '6px', fontSize: '14px', fontWeight: 500, cursor: canRun && !isRunning ? 'pointer' : 'not-allowed', opacity: isRunning ? 0.7 : 1 }}>
         {isRunning ? 'Obliczanie...' : 'Uruchom zwarcia 3F'}
@@ -412,11 +459,25 @@ function StepK10({ validation, runResult, isRunning, onRun }: {
 // Step sidebar indicator
 // ---------------------------------------------------------------------------
 
-function StepIndicator({ step, isActive, onClick }: { step: WizardStep; isActive: boolean; onClick: () => void }) {
+function StepIndicator({ step, isActive, stepState, onClick }: { step: WizardStep; isActive: boolean; stepState?: WizardState['steps'][number]; onClick: () => void }) {
+  const statusColor = stepState ? getStepStatusColor(stepState.status) : '#6b7280';
+  const bgColor = isActive ? '#3b82f6' : statusColor;
   return (
     <button onClick={onClick} data-testid={`wizard-step-${step.id}`} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 12px', border: isActive ? '2px solid #3b82f6' : '1px solid #e5e7eb', borderRadius: '8px', background: isActive ? '#eff6ff' : '#fff', cursor: 'pointer', width: '100%', textAlign: 'left' }}>
-      <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '28px', height: '28px', borderRadius: '50%', backgroundColor: isActive ? '#3b82f6' : '#6b7280', color: '#fff', fontSize: '13px', fontWeight: 600, flexShrink: 0 }}>{step.number}</span>
-      <span style={{ fontSize: '13px', fontWeight: isActive ? 600 : 400 }}>{step.title}</span>
+      <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '28px', height: '28px', borderRadius: '50%', backgroundColor: bgColor, color: '#fff', fontSize: '13px', fontWeight: 600, flexShrink: 0 }}>{step.number}</span>
+      <div style={{ flex: 1 }}>
+        <span style={{ fontSize: '13px', fontWeight: isActive ? 600 : 400 }}>{step.title}</span>
+        {stepState && stepState.completionPercent > 0 && stepState.completionPercent < 100 && (
+          <div style={{ marginTop: '2px', height: '2px', background: '#e5e7eb', borderRadius: '1px' }}>
+            <div style={{ height: '100%', width: `${stepState.completionPercent}%`, background: statusColor, borderRadius: '1px' }} />
+          </div>
+        )}
+      </div>
+      {stepState && stepState.issues.length > 0 && (
+        <span style={{ fontSize: '10px', color: stepState.issues.some(i => i.severity === 'BLOCKER') ? '#ef4444' : '#eab308' }}>
+          {stepState.issues.length}
+        </span>
+      )}
     </button>
   );
 }
@@ -437,6 +498,9 @@ export function WizardPage() {
   const [saveStatus, setSaveStatus] = useState<string>('');
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const caseId = getCaseId();
+
+  // Wizard state machine — deterministic, recomputed on every ENM change
+  const wizardState = useMemo<WizardState>(() => computeWizardState(enm), [enm]);
 
   // Load ENM on mount
   useEffect(() => { fetchENM(caseId).then(setEnm).catch(() => {}); }, [caseId]);
@@ -467,6 +531,8 @@ export function WizardPage() {
   }, [caseId]);
 
   const step = WIZARD_STEPS[currentStep];
+  const overallLabel = getOverallStatusLabel(wizardState.overallStatus);
+  const overallColor = wizardState.overallStatus === 'ready' ? '#22c55e' : wizardState.overallStatus === 'blocked' ? '#ef4444' : wizardState.overallStatus === 'incomplete' ? '#eab308' : '#d1d5db';
 
   return (
     <div data-testid="wizard-page" style={{ display: 'flex', height: '100%', fontFamily: 'system-ui, sans-serif' }}>
@@ -474,9 +540,15 @@ export function WizardPage() {
       <div style={{ width: '260px', borderRight: '1px solid #e5e7eb', padding: '16px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '4px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
           <h3 style={{ margin: 0, fontSize: '15px', fontWeight: 600 }}>Kreator sieci</h3>
-          <GateIndicator validation={validation} />
+          <div data-testid="wizard-gate" style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '3px 8px', borderRadius: '4px', background: `${overallColor}15`, border: `1px solid ${overallColor}40`, fontSize: '11px' }}>
+            <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: overallColor }} />
+            {overallLabel}
+          </div>
         </div>
-        {WIZARD_STEPS.map((s, i) => <StepIndicator key={s.id} step={s} isActive={i === currentStep} onClick={() => setCurrentStep(i)} />)}
+        {WIZARD_STEPS.map((s, i) => {
+          const stepState = wizardState.steps.find(ws => ws.stepId === s.id);
+          return <StepIndicator key={s.id} step={s} isActive={i === currentStep} stepState={stepState} onClick={() => setCurrentStep(i)} />;
+        })}
         {saveStatus && <div style={{ marginTop: '8px', fontSize: '11px', color: saveStatus === 'saved' ? '#22c55e' : saveStatus === 'error' ? '#ef4444' : '#6b7280' }}>{saveStatus === 'saved' ? 'Zapisano' : saveStatus === 'saving' ? 'Zapisywanie...' : 'Błąd zapisu'}</div>}
       </div>
 
@@ -496,7 +568,7 @@ export function WizardPage() {
           {step.id === 'K7' && <StepK7 enm={enm} onChange={handleChange} />}
           {step.id === 'K8' && <StepK8 validation={validation} onGoToStep={setCurrentStep} />}
           {step.id === 'K9' && <StepK9 enm={enm} />}
-          {step.id === 'K10' && <StepK10 validation={validation} runResult={runResult} isRunning={isRunning} onRun={handleRun} />}
+          {step.id === 'K10' && <StepK10 validation={validation} wizardState={wizardState} runResult={runResult} isRunning={isRunning} onRun={handleRun} />}
           {/* Nav */}
           <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '24px', gap: '12px' }}>
             <button onClick={() => setCurrentStep((p) => Math.max(0, p - 1))} disabled={currentStep === 0} style={{ padding: '8px 20px', border: '1px solid #d1d5db', borderRadius: '6px', background: '#fff', cursor: currentStep === 0 ? 'not-allowed' : 'pointer', opacity: currentStep === 0 ? 0.5 : 1, fontSize: '14px' }}>Wstecz</button>
