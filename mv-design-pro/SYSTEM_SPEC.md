@@ -216,6 +216,10 @@ FROZEN: These APIs cannot change without major version bump.
 
 Analysis = interpretation of solver results. No physics. No model modification.
 
+### 6.1a Normative Completion Reference
+
+Wiążące mapowanie IEC 60909-0:2016 (§4.1–§4.8) dla asymetrycznych zwarć i pakietu dowodowego jest utrzymywane w `docs/proof/NORMATIVE_COMPLETION_PACK_IEC_60909.md`.
+
 ### 6.2 Implemented Analyses
 
 | Analysis | Input | Output | Status |

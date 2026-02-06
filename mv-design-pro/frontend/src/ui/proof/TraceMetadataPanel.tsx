@@ -12,7 +12,7 @@
  * - Źródło normy (jeśli dostępne)
  * - 100% Polish UI
  *
- * NOTE: Nazwy kodowe (P11, P14, P17) NIGDY nie są pokazywane w UI.
+ * NOTE: Nazwy kodowe NIGDY nie są pokazywane w UI.
  */
 
 import { useMemo } from 'react';

@@ -21,7 +21,7 @@
  * - Eksport: JSONL, PDF
  * - 100% Polish UI
  *
- * NOTE: Nazwy kodowe (P11, P14, P17) NIGDY nie są pokazywane w UI.
+ * NOTE: Nazwy kodowe NIGDY nie są pokazywane w UI.
  */
 
 import { useState, useCallback, useMemo, useRef, useEffect } from 'react';

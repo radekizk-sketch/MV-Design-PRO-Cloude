@@ -9,7 +9,7 @@
  * - Wszystkie eksporty są read-only (nie modyfikują stanu UI)
  * - Eksport PDF używa browser print API (bez backendu)
  *
- * NOTE: Nazwy kodowe (P11, P14, P17) NIGDY nie są eksportowane.
+ * NOTE: Nazwy kodowe NIGDY nie są eksportowane.
  */
 
 export {

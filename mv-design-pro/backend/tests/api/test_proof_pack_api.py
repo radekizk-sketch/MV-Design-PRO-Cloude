@@ -141,3 +141,48 @@ def test_proof_pack_api_404_when_missing(tmp_path):
         f"/api/proof/{data['project_id']}/{data['case_id']}/{data['missing_run_id']}/pack"
     )
     assert response.status_code == 404
+
+
+def test_sc_asymmetrical_pack_api_returns_bundle_zip(tmp_path):
+    client, data = _prepare_api_client(tmp_path)
+    payload = {
+        "project_id": str(data["project_id"]),
+        "case_id": str(data["case_id"]),
+        "run_id": str(data["run_id"]),
+        "snapshot_id": "snapshot-123",
+        "project_name": "Projekt testowy",
+        "case_name": "Przypadek SC asymetryczny",
+        "fault_node_id": "B1",
+        "run_timestamp": "2026-02-06T10:00:00",
+        "solver_version": "1.0.0-test",
+        "u_n_kv": 15.0,
+        "c_factor": 1.1,
+        "u_prefault_kv": 9.526279,
+        "z1_re_ohm": 0.5,
+        "z1_im_ohm": 1.2,
+        "z2_re_ohm": 0.6,
+        "z2_im_ohm": 1.1,
+        "z0_re_ohm": 0.8,
+        "z0_im_ohm": 2.4,
+        "a_re": -0.5,
+        "a_im": 0.8660254038,
+        "tk_s": 1.0,
+        "m_factor": 1.0,
+        "n_factor": 0.0,
+    }
+    response = client.post("/api/proof/sc-asymmetrical/pack", json=payload)
+    assert response.status_code == 200
+    assert response.headers["content-type"] == "application/zip"
+
+    with zipfile.ZipFile(io.BytesIO(response.content)) as bundle:
+        entries = set(bundle.namelist())
+        assert "pakiet_dowodowy/SC1FZ.zip" in entries
+        assert "pakiet_dowodowy/SC2F.zip" in entries
+        assert "pakiet_dowodowy/SC2FZ.zip" in entries
+
+        for nested_name in ["pakiet_dowodowy/SC1FZ.zip", "pakiet_dowodowy/SC2F.zip", "pakiet_dowodowy/SC2FZ.zip"]:
+            nested_bytes = bundle.read(nested_name)
+            with zipfile.ZipFile(io.BytesIO(nested_bytes)) as nested:
+                nested_entries = set(nested.namelist())
+                assert "proof_pack/proof.json" in nested_entries
+                assert "proof_pack/proof.tex" in nested_entries

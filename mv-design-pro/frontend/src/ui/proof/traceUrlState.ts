@@ -11,7 +11,7 @@
  * - trace_section=<id> : ID aktywnej sekcji (fazy)
  * - trace_step=<id>    : ID/index aktywnego kroku
  *
- * NOTE: Nazwy kodowe (P11, P14, P17) NIGDY nie są używane w URL.
+ * NOTE: Nazwy kodowe NIGDY nie są używane w URL.
  */
 
 import { getCurrentSearchParams, getCurrentHashRoute } from '../navigation/urlState';

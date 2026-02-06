@@ -68,6 +68,8 @@
 
 ---
 
+> Normatywne domknięcie IEC 60909-0:2016 (§4.1–§4.8) dla śladu i pakietu dowodowego SC asymetrycznych: `docs/proof/NORMATIVE_COMPLETION_PACK_IEC_60909.md`.
+
 ## 2. Network Model Layer
 
 ### 2.1 Core Elements

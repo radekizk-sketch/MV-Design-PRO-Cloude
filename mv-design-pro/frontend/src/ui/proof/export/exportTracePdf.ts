@@ -10,7 +10,7 @@
  * - Eksport nie modyfikuje stanu UI (pure function)
  * - Layout: sekcje + kroki, czytelny format A4
  *
- * NOTE: Nazwy kodowe (P11, P14, P17) NIGDY nie są używane w eksporcie.
+ * NOTE: Nazwy kodowe NIGDY nie są używane w eksporcie.
  *
  * IMPLEMENTATION:
  * - Uses browser print API with custom print styles

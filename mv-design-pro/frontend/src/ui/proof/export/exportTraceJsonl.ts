@@ -10,7 +10,7 @@
  * - Każda linia = jeden krok w formacie JSON
  * - Nazwa pliku: trace_<run_id>_<timestamp>.jsonl
  *
- * NOTE: Nazwy kodowe (P11, P14, P17) NIGDY nie są używane w eksporcie.
+ * NOTE: Nazwy kodowe NIGDY nie są używane w eksporcie.
  */
 
 import type { ExtendedTrace, TraceStep } from '../../results-inspector/types';

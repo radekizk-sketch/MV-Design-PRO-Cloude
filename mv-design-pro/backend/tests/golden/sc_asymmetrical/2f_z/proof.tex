@@ -1,0 +1,500 @@
+
+\documentclass[11pt,a4paper]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[polish]{babel}
+\usepackage{amsmath,amssymb}
+\usepackage{booktabs}
+\usepackage{geometry}
+\usepackage{fancyhdr}
+\usepackage{lastpage}
+\usepackage{xcolor}
+
+\geometry{margin=2.5cm}
+
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\textit{MV-DESIGN-PRO — Proof Engine}}
+\fancyhead[R]{\textit{Dowód matematyczny}}
+\fancyfoot[C]{\thepage\ / \pageref{LastPage}}
+
+\definecolor{resultbox}{RGB}{230,245,230}
+
+\newcommand{\resultbox}[1]{%
+  \colorbox{resultbox}{\parbox{0.9\textwidth}{\centering #1}}%
+}
+
+
+
+
+\title{Dowód obliczeń zwarciowych IEC 60909 — zwarcie asymetryczne}
+\author{MV-DESIGN-PRO}
+\date{2026-02-06 10:00:00}
+
+
+\begin{document}
+
+\maketitle
+
+\tableofcontents
+
+\newpage
+
+\section{Dane wejściowe}
+\begin{itemize}
+  \item Projekt: Test Project §4.1
+  \item Przypadek: Golden Case 2f\_z
+  \item Wersja solvera: 1.0.0-test
+  \item Miejsce zwarcia: B1
+  \item Typ zwarcia: SC2FZ
+  \item Współczynnik napięciowy:
+$$
+c = 1.1000
+$$
+\end{itemize}
+
+
+
+
+
+\section{Dowód}
+
+\subsection{Krok 1: Impedancje składowych zgodna/przeciwna/zerowa}
+
+\textbf{Wzór:}
+$$
+\begin{aligned}Z_1 &= Z_{1,\mathrm{th}} \\Z_2 &= Z_{2,\mathrm{th}} \\Z_0 &= Z_{0,\mathrm{th}}\end{aligned}
+$$
+
+\textbf{Dane:}
+\begin{itemize}
+  \item
+$$
+Z_0 = 0.8000 + j2.4000\,\text{Ω}
+$$
+  \item
+$$
+Z_1 = 0.5000 + j1.2000\,\text{Ω}
+$$
+  \item
+$$
+Z_2 = 0.6000 + j1.1000\,\text{Ω}
+$$
+\end{itemize}
+
+\textbf{Podstawienie:}
+$$
+Z_1 = 0.5000 + j1.2000\,\text{Ω}, \quad Z_2 = 0.6000 + j1.1000\,\text{Ω}, \quad Z_0 = 0.8000 + j2.4000\,\text{Ω}
+$$
+
+\textbf{Wynik:}
+\begin{center}
+$$
+Z_1 = 0.5000 + j1.2000\,\text{Ω}
+$$
+\end{center}
+
+\textbf{Weryfikacja jednostek:}
+$$
+Ω = Ω ✓
+$$
+
+\subsection{Krok 2: Operator a i macierz Fortescue (składowe → fazy)}
+
+\textbf{Wzór:}
+$$
+a = e^{j 120^\circ}, \quad a^2 = e^{j 240^\circ} \\\begin{bmatrix} I_a \\ I_b \\ I_c \end{bmatrix} =\begin{bmatrix} 1 & 1 & 1 \\ 1 & a^2 & a \\ 1 & a & a^2 \end{bmatrix}\begin{bmatrix} I_0 \\ I_1 \\ I_2 \end{bmatrix}
+$$
+
+\textbf{Dane:}
+\begin{itemize}
+\end{itemize}
+
+\textbf{Podstawienie:}
+$$
+a = e^{j 120^\circ} = -0.5000 + j0.8660\,\text{—}
+$$
+
+\textbf{Wynik:}
+\begin{center}
+$$
+a = -0.5000 + j0.8660\,\text{—}
+$$
+\end{center}
+
+\textbf{Weryfikacja jednostek:}
+$$
+— (bezwymiarowy) ✓
+$$
+
+\subsection{Krok 3: Sieć składowych dla zwarcia 2F–Z}
+
+\textbf{Wzór:}
+$$
+Z_k = Z_1 + \frac{Z_2 \cdot Z_0}{Z_2 + Z_0}
+$$
+
+\textbf{Dane:}
+\begin{itemize}
+  \item
+$$
+Z_0 = 0.8000 + j2.4000\,\text{Ω}
+$$
+  \item
+$$
+Z_1 = 0.5000 + j1.2000\,\text{Ω}
+$$
+  \item
+$$
+Z_2 = 0.6000 + j1.1000\,\text{Ω}
+$$
+\end{itemize}
+
+\textbf{Podstawienie:}
+$$
+Z_k = 0.5000 + j1.2000\,\text{Ω} + (0.6000 + j1.1000\,\text{Ω} \cdot 0.8000 + j2.4000\,\text{Ω}) / 1.4000 + j3.5000\,\text{Ω} = 0.8586 + j1.9606\,\text{Ω}
+$$
+
+\textbf{Wynik:}
+\begin{center}
+$$
+Z_k = 0.8586 + j1.9606\,\text{Ω}
+$$
+\end{center}
+
+\textbf{Weryfikacja jednostek:}
+$$
+Ω + (Ω·Ω)/(Ω+Ω) = Ω ✓
+$$
+
+\subsection{Krok 4: Wyznaczenie prądów składowych I₁, I₂, I₀}
+
+\textbf{Wzór:}
+$$
+\begin{aligned}\text{1F–Z:} \quad & I_1 = I_2 = I_0 = \frac{U_f}{Z_k} \\\text{2F:} \quad & I_1 = \frac{U_f}{Z_k}, \quad I_2 = -I_1, \quad I_0 = 0 \\\text{2F–Z:} \quad & I_1 = \frac{U_f}{Z_k}, \quadI_2 = -\frac{Z_0}{Z_2 + Z_0} I_1, \quadI_0 = -\frac{Z_2}{Z_2 + Z_0} I_1\end{aligned}
+$$
+
+\textbf{Dane:}
+\begin{itemize}
+  \item
+$$
+U_f = 9.5263\,\text{kV}
+$$
+  \item
+$$
+Z_0 = 0.8000 + j2.4000\,\text{Ω}
+$$
+  \item
+$$
+Z_2 = 0.6000 + j1.1000\,\text{Ω}
+$$
+  \item
+$$
+Z_k = 0.8586 + j1.9606\,\text{Ω}
+$$
+\end{itemize}
+
+\textbf{Podstawienie:}
+$$
+I_1 = 9.5263 / 0.8586 + j1.9606\,\text{Ω} = 1.7855 - j4.0770\,\text{kA}, \quad I_2 = -\frac{Z_0}{Z_2 + Z_0} I_1 = -1.3568 + j2.6610\,\text{kA}, \quad I_0 = -\frac{Z_2}{Z_2 + Z_0} I_1 = -0.4286 + j1.4160\,\text{kA}, \quad Z_2 + Z_0 = 1.4000 + j3.5000\,\text{Ω}
+$$
+
+\textbf{Wynik:}
+\begin{center}
+$$
+I_1 = 1.7855 - j4.0770\,\text{kA}
+$$
+\end{center}
+
+\textbf{Weryfikacja jednostek:}
+$$
+kV / Ω = kA ✓
+$$
+
+\subsection{Krok 5: Rekonstrukcja prądów fazowych Ia, Ib, Ic}
+
+\textbf{Wzór:}
+$$
+\begin{bmatrix} I_a \\ I_b \\ I_c \end{bmatrix} =\begin{bmatrix} 1 & 1 & 1 \\ 1 & a^2 & a \\ 1 & a & a^2 \end{bmatrix}\begin{bmatrix} I_0 \\ I_1 \\ I_2 \end{bmatrix}
+$$
+
+\textbf{Dane:}
+\begin{itemize}
+  \item
+$$
+I_0 = -0.4286 + j1.4160\,\text{kA}
+$$
+  \item
+$$
+I_1 = 1.7855 - j4.0770\,\text{kA}
+$$
+  \item
+$$
+I_2 = -1.3568 + j2.6610\,\text{kA}
+$$
+  \item
+$$
+a = -0.5000 + j0.8660\,\text{—}
+$$
+\end{itemize}
+
+\textbf{Podstawienie:}
+$$
+I_a = I_0 + I_1 + I_2 = 0.0000 + j0.0000\,\text{kA}, \quad I_b = I_0 + a^2 I_1 + a I_2 = -6.4782 - j0.5974\,\text{kA}, \quad I_c = I_0 + a I_1 + a^2 I_2 = 5.1923 + j4.8453\,\text{kA}
+$$
+
+\textbf{Wynik:}
+\begin{center}
+$$
+I_a = 0.0000 + j0.0000\,\text{kA}
+$$
+\end{center}
+
+\textbf{Weryfikacja jednostek:}
+$$
+kA = kA ✓
+$$
+
+\subsection{Krok 6: Początkowy prąd zwarciowy I″k (zwarcie asymetryczne)}
+
+\textbf{Wzór:}
+$$
+\begin{aligned}\text{1F–Z:} \quad & I_k'' = \frac{\sqrt{3} \cdot c \cdot U_n}{|Z_1 + Z_2 + Z_0|} \\\text{2F:} \quad & I_k'' = \frac{c \cdot U_n}{|Z_1 + Z_2|} \\\text{2F–Z:} \quad & I_k'' = \frac{c \cdot U_n}{|Z_k|}\end{aligned}
+$$
+
+\textbf{Dane:}
+\begin{itemize}
+  \item
+$$
+U_n = 15.0000\,\text{kV}
+$$
+  \item
+$$
+Z_k = 0.8586 + j1.9606\,\text{Ω}
+$$
+  \item
+$$
+c = 1.1000\,\text{—}
+$$
+\end{itemize}
+
+\textbf{Podstawienie:}
+$$
+I_k'' = \frac{1.1000 \cdot 15.0000}{|Z_k|} = \frac{16.5000}{2.1404} = 7.7090\,\text{kA}
+$$
+
+\textbf{Wynik:}
+\begin{center}
+$$
+I_k'' = 7.7090\,\text{kA}
+$$
+\end{center}
+
+\textbf{Weryfikacja jednostek:}
+$$
+kV / Ω = kA ✓
+$$
+
+\subsection{Krok 7: Współczynnik udaru κ (zwarcie asymetryczne)}
+
+\textbf{Wzór:}
+$$
+\kappa = 1{,}02 + 0{,}98 \cdot e^{-3 \cdot R_k / X_k}
+$$
+
+\textbf{Dane:}
+\begin{itemize}
+  \item
+$$
+R_k = 0.8586\,\text{Ω}
+$$
+  \item
+$$
+X_k = 1.9606\,\text{Ω}
+$$
+\end{itemize}
+
+\textbf{Podstawienie:}
+$$
+\kappa = 1.02 + 0.98 \cdot e^{-3 \cdot 0.4379} = 1.02 + 0.98 \cdot 0.2688 = 1.2834
+$$
+
+\textbf{Wynik:}
+\begin{center}
+$$
+\kappa = 1.2834\,\text{—}
+$$
+\end{center}
+
+\textbf{Weryfikacja jednostek:}
+$$
+— (bezwymiarowy) ✓
+$$
+
+\subsection{Krok 8: Prąd udarowy ip (zwarcie asymetryczne)}
+
+\textbf{Wzór:}
+$$
+i_p = \kappa \cdot \sqrt{2} \cdot I_k''
+$$
+
+\textbf{Dane:}
+\begin{itemize}
+  \item
+$$
+I_k'' = 7.7090\,\text{kA}
+$$
+  \item
+$$
+\kappa = 1.2834\,\text{—}
+$$
+\end{itemize}
+
+\textbf{Podstawienie:}
+$$
+i_p = 1.2834 \cdot \sqrt{2} \cdot 7.7090 = 1.2834 \cdot 1.4142 \cdot 7.7090 = 13.9920\,\text{kA}
+$$
+
+\textbf{Wynik:}
+\begin{center}
+$$
+i_p = 13.9920\,\text{kA}
+$$
+\end{center}
+
+\textbf{Weryfikacja jednostek:}
+$$
+— · — · kA = kA ✓
+$$
+
+\subsection{Krok 9: Prąd dynamiczny I\_dyn (zwarcie asymetryczne)}
+
+\textbf{Wzór:}
+$$
+I_{dyn} = i_p
+$$
+
+\textbf{Dane:}
+\begin{itemize}
+  \item
+$$
+i_p = 13.9920\,\text{kA}
+$$
+\end{itemize}
+
+\textbf{Podstawienie:}
+$$
+I_{dyn} = i_p = 13.9920\,\text{kA}
+$$
+
+\textbf{Wynik:}
+\begin{center}
+$$
+I_{dyn} = 13.9920\,\text{kA}
+$$
+\end{center}
+
+\textbf{Weryfikacja jednostek:}
+$$
+kA = kA ✓
+$$
+
+\subsection{Krok 10: Prąd cieplny równoważny I\_th (zwarcie asymetryczne)}
+
+\textbf{Wzór:}
+$$
+I_{th} = I_k'' \cdot \sqrt{m + n}
+$$
+
+\textbf{Dane:}
+\begin{itemize}
+  \item
+$$
+I_k'' = 7.7090\,\text{kA}
+$$
+  \item
+$$
+m = 1.0000\,\text{—}
+$$
+  \item
+$$
+n = 0.0000\,\text{—}
+$$
+\end{itemize}
+
+\textbf{Podstawienie:}
+$$
+I_{th} = 7.7090 \cdot \sqrt{1.0000 + 0.0000} = 7.7090 \cdot 1.0000 = 7.7090\,\text{kA}
+$$
+
+\textbf{Wynik:}
+\begin{center}
+$$
+I_{th} = 7.7090\,\text{kA}
+$$
+\end{center}
+
+\textbf{Weryfikacja jednostek:}
+$$
+kA · — = kA ✓
+$$
+
+\section{Podsumowanie wyników}
+
+\textbf{Wyniki końcowe:}
+\begin{itemize}
+  \item
+$$
+I_0 = -0.4286 + j1.4160\,\text{kA}
+$$
+  \item
+$$
+I_1 = 1.7855 - j4.0770\,\text{kA}
+$$
+  \item
+$$
+I_2 = -1.3568 + j2.6610\,\text{kA}
+$$
+  \item
+$$
+I_a = 0.0000 + j0.0000\,\text{kA}
+$$
+  \item
+$$
+I_b = -6.4782 - j0.5974\,\text{kA}
+$$
+  \item
+$$
+I_c = 5.1923 + j4.8453\,\text{kA}
+$$
+  \item
+$$
+I_{dyn} = 13.9920\,\text{kA}
+$$
+  \item
+$$
+I_k'' = 7.7090\,\text{kA}
+$$
+  \item
+$$
+i_p = 13.9920\,\text{kA}
+$$
+  \item
+$$
+I_{th} = 7.7090\,\text{kA}
+$$
+  \item
+$$
+\kappa = 1.2834\,\text{—}
+$$
+  \item
+$$
+Z_k = 0.8586 + j1.9606\,\text{Ω}
+$$
+\end{itemize}
+
+Liczba kroków: 10
+
+Weryfikacja jednostek: \textcolor{green}{PASS}
+
+\end{document}

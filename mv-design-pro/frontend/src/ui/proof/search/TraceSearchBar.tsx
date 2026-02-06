@@ -11,7 +11,7 @@
  * - Nawigacja wyników (prev/next) z licznikiem
  * - testID dla każdego elementu
  *
- * NOTE: Nazwy kodowe (P11, P14, P17) NIGDY nie są pokazywane w UI.
+ * NOTE: Nazwy kodowe NIGDY nie są pokazywane w UI.
  */
 
 import { useCallback } from 'react';
