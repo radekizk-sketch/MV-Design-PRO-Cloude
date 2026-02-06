@@ -30,6 +30,7 @@ export {
   computeTopologicalLayout,
   processIncrementalUpdate,
   verifyDeterminism,
+  deepFreezeSymbols,
 } from './topologicalLayoutEngine';
 
 // =============================================================================

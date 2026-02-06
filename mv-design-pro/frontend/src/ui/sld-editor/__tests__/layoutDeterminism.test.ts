@@ -1,9 +1,13 @@
 /**
- * SLD LAYOUT DETERMINISM TESTS — Auto-layout + routing
+ * SLD LAYOUT DETERMINISM TESTS — Topological auto-layout + routing
  *
  * CANONICAL ALIGNMENT:
+ * - SLD_AUTOLAYOUT_AUDIT_I_NAPRAWA.md: BINDING SPEC
  * - Deterministycznosc: ten sam input -> identyczny output
- * - SLD spine layout (autoLayout) + simplified routing (connectionRouting)
+ * - Topological engine (computeTopologicalLayout) + routing (connectionRouting)
+ *
+ * NOTE: Migrated from legacy generateAutoLayout to computeTopologicalLayout
+ * per PR-SLD-AUTO-01 (canonical topological engine only).
  */
 
 import { describe, it, expect } from 'vitest';
@@ -13,13 +17,12 @@ import type {
   SourceSymbol,
   LoadSymbol,
   BranchSymbol,
+  Position,
 } from '../types';
 import {
-  generateAutoLayout,
-  applyLayoutToSymbols,
-  DEFAULT_LAYOUT_CONFIG,
-  type AutoLayoutResult,
-} from '../utils/autoLayout';
+  computeTopologicalLayout,
+  DEFAULT_GEOMETRY_CONFIG,
+} from '../utils/topological-layout';
 import {
   generateConnections,
   DEFAULT_ROUTING_CONFIG,
@@ -250,17 +253,7 @@ const createGridFixture = (): AnySldSymbol[] => {
     branchType: 'CABLE',
   };
 
-  return [
-    busA,
-    busB,
-    busC,
-    busD,
-    branchAB,
-    branchBC,
-    branchCD,
-    branchDA,
-    branchAC,
-  ];
+  return [busA, busB, busC, busD, branchAB, branchBC, branchCD, branchDA, branchAC];
 };
 
 // =============================================================================
@@ -273,34 +266,21 @@ const fixtures = [
   { name: 'Siatka', createSymbols: createGridFixture },
 ];
 
-const toSymbolMap = (symbols: AnySldSymbol[]) =>
-  new Map(symbols.map((symbol) => [symbol.id, symbol]));
+function applyLayoutToSymbols(
+  symbols: AnySldSymbol[],
+  positions: ReadonlyMap<string, Position>,
+): AnySldSymbol[] {
+  return symbols.map((s) => {
+    const pos = positions.get(s.id);
+    return pos ? { ...s, position: pos } : s;
+  });
+}
 
-const normalizeLayoutResult = (result: AutoLayoutResult, symbols: AnySldSymbol[]) => {
-  const symbolById = toSymbolMap(symbols);
-
-  return Array.from(result.positions.entries())
-    .map(([id, position]) => {
-      const symbol = symbolById.get(id);
-      const layoutEntry: {
-        id: string;
-        x: number;
-        y: number;
-        width?: number;
-        height?: number;
-      } = {
-        id,
-        x: position.x,
-        y: position.y,
-      };
-
-      if (symbol && 'width' in symbol && 'height' in symbol) {
-        layoutEntry.width = symbol.width;
-        layoutEntry.height = symbol.height;
-      }
-
-      return layoutEntry;
-    })
+const normalizeLayoutPositions = (
+  positions: ReadonlyMap<string, Position>,
+) => {
+  return Array.from(positions.entries())
+    .map(([id, pos]) => ({ id, x: pos.x, y: pos.y }))
     .sort((a, b) => a.id.localeCompare(b.id));
 };
 
@@ -316,11 +296,11 @@ const normalizeRoutes = (connections: Connection[]) =>
     .sort((a, b) => a.edgeId.localeCompare(b.edgeId));
 
 const runLayoutAndRouting = (symbols: AnySldSymbol[]) => {
-  const layout = generateAutoLayout(symbols);
-  const layoutedSymbols = applyLayoutToSymbols(symbols, layout.positions);
+  const result = computeTopologicalLayout(symbols);
+  const layoutedSymbols = applyLayoutToSymbols(symbols, result.positions);
   const connections = generateConnections(layoutedSymbols);
 
-  return { layout, layoutedSymbols, connections };
+  return { result, layoutedSymbols, connections };
 };
 
 const isOnGrid = (value: number, gridSize: number) => value % gridSize === 0;
@@ -340,25 +320,24 @@ const createPermutations = (symbols: AnySldSymbol[]) => [
 // TESTS
 // =============================================================================
 
-describe('SLD Layout + Routing Determinism', () => {
+describe('SLD Layout + Routing Determinism (Topological Engine)', () => {
   fixtures.forEach(({ name, createSymbols }) => {
     describe(`Fixture: ${name}`, () => {
       it('layout determinism: 2x ten sam input', () => {
         const symbols = createSymbols();
-        const result1 = generateAutoLayout(symbols);
-        const result2 = generateAutoLayout(symbols);
+        const result1 = computeTopologicalLayout(symbols);
+        const result2 = computeTopologicalLayout(symbols);
 
-        expect(normalizeLayoutResult(result1, symbols)).toEqual(
-          normalizeLayoutResult(result2, symbols)
+        expect(normalizeLayoutPositions(result1.positions)).toEqual(
+          normalizeLayoutPositions(result2.positions)
         );
       });
 
       it('routing determinism: 2x ten sam input', () => {
         const symbols = createSymbols();
-        const { layout, connections } = runLayoutAndRouting(symbols);
-        const connections2 = generateConnections(
-          applyLayoutToSymbols(symbols, layout.positions)
-        );
+        const { result, connections } = runLayoutAndRouting(symbols);
+        const layouted2 = applyLayoutToSymbols(symbols, result.positions);
+        const connections2 = generateConnections(layouted2);
 
         expect(normalizeRoutes(connections)).toEqual(normalizeRoutes(connections2));
       });
@@ -366,7 +345,7 @@ describe('SLD Layout + Routing Determinism', () => {
       it('permutation invariance for layout + routing', () => {
         const baseSymbols = createSymbols();
         const baseResult = runLayoutAndRouting(baseSymbols);
-        const baseLayout = normalizeLayoutResult(baseResult.layout, baseSymbols);
+        const baseLayout = normalizeLayoutPositions(baseResult.result.positions);
         const baseRoutes = normalizeRoutes(baseResult.connections);
 
         const permutations = createPermutations(baseSymbols);
@@ -374,20 +353,19 @@ describe('SLD Layout + Routing Determinism', () => {
         permutations.forEach((permutedSymbols) => {
           const permutedResult = runLayoutAndRouting(permutedSymbols);
 
-          expect(normalizeLayoutResult(permutedResult.layout, permutedSymbols)).toEqual(
-            baseLayout
-          );
+          expect(normalizeLayoutPositions(permutedResult.result.positions)).toEqual(baseLayout);
           expect(normalizeRoutes(permutedResult.connections)).toEqual(baseRoutes);
         });
       });
 
       it('grid snapping: wszystkie punkty na siatce', () => {
         const symbols = createSymbols();
-        const { layout, connections } = runLayoutAndRouting(symbols);
+        const { result, connections } = runLayoutAndRouting(symbols);
+        const gridSize = DEFAULT_GEOMETRY_CONFIG.gridSize;
 
-        layout.positions.forEach((position) => {
-          expect(isOnGrid(position.x, DEFAULT_LAYOUT_CONFIG.gridSize)).toBe(true);
-          expect(isOnGrid(position.y, DEFAULT_LAYOUT_CONFIG.gridSize)).toBe(true);
+        result.positions.forEach((position) => {
+          expect(isOnGrid(position.x, gridSize)).toBe(true);
+          expect(isOnGrid(position.y, gridSize)).toBe(true);
         });
 
         connections.forEach((connection) => {
@@ -400,9 +378,9 @@ describe('SLD Layout + Routing Determinism', () => {
 
       it('no NaN/Infinity in layout + routing', () => {
         const symbols = createSymbols();
-        const { layout, connections } = runLayoutAndRouting(symbols);
+        const { result, connections } = runLayoutAndRouting(symbols);
 
-        layout.positions.forEach((position) => {
+        result.positions.forEach((position) => {
           assertFinitePosition('layout.x', position.x);
           assertFinitePosition('layout.y', position.y);
         });
@@ -420,10 +398,6 @@ describe('SLD Layout + Routing Determinism', () => {
           const symbols = createSymbols();
           const { connections } = runLayoutAndRouting(symbols);
 
-          // PR-SLD-ETAP-GEOMETRY-FULL: With improved ETAP-grade layout,
-          // grid topology may produce straight connections (2 points) or
-          // L-route/Z-route connections (3+ points). Both are valid.
-          // The important thing is that all connections have at least 2 points.
           const allValid = connections.every((connection) => connection.path.length >= 2);
           expect(allValid).toBe(true);
         });

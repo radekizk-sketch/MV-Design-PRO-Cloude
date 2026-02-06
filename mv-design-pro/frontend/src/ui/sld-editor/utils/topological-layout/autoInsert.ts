@@ -47,7 +47,7 @@ import { buildGeometricSkeleton, DEFAULT_GEOMETRY_CONFIG } from './geometricSkel
  */
 export function processAutoInsert(
   operation: ModelOperation,
-  currentSymbols: AnySldSymbol[],
+  currentSymbols: readonly AnySldSymbol[],
   currentPositions: ReadonlyMap<string, Position>,
   currentSkeleton: GeometricSkeleton | null,
   config: LayoutGeometryConfig = DEFAULT_GEOMETRY_CONFIG

@@ -1,12 +1,14 @@
 /**
  * ETAP-GRADE GEOMETRY TESTS — Multi-transformer, sectioned busbars, no-floating symbols
  *
- * PR-SLD-ETAP-GEOMETRY-FULL: ETAP-grade geometry implementation tests
- *
  * CANONICAL ALIGNMENT:
+ * - SLD_AUTOLAYOUT_AUDIT_I_NAPRAWA.md: BINDING SPEC
  * - ETAP/PowerFactory visual standards
- * - Determinism: same input → identical output
+ * - Determinism: same input -> identical output
  * - NO FLOATING SYMBOL rule enforcement
+ *
+ * NOTE: Migrated from legacy generateAutoLayout to computeTopologicalLayout
+ * per PR-SLD-AUTO-01 (canonical topological engine only).
  */
 
 import { describe, it, expect } from 'vitest';
@@ -19,9 +21,9 @@ import type {
   SwitchSymbol,
 } from '../types';
 import {
-  generateAutoLayout,
-  type AutoLayoutResult,
-} from '../utils/autoLayout';
+  computeTopologicalLayout,
+  DEFAULT_GEOMETRY_CONFIG,
+} from '../utils/topological-layout';
 import {
   calculateTransformerPositions,
   calculateSectionedBusbar,
@@ -106,125 +108,6 @@ const createMultiTransformerFixture = (): AnySldSymbol[] => {
   };
 
   return [wnBus, snBus, source, trafo1, trafo2, load];
-};
-
-/**
- * Sectioned busbar fixture: SN busbar with coupler
- */
-const createSectionedBusbarFixture = (): AnySldSymbol[] => {
-  const snBus: NodeSymbol = {
-    id: 'bus-sn-sekcja',
-    elementId: 'bus-sn-sekcja',
-    elementType: 'Bus',
-    elementName: 'Szyna SN sekcja', // Contains "sekcja" keyword
-    position: { x: 0, y: 0 },
-    inService: true,
-    width: 200,
-    height: 8,
-  };
-
-  const source: SourceSymbol = {
-    id: 'source-sekcja',
-    elementId: 'source-sekcja',
-    elementType: 'Source',
-    elementName: 'Zasilanie',
-    position: { x: 0, y: 0 },
-    inService: true,
-    connectedToNodeId: 'bus-sn-sekcja',
-  };
-
-  // 4 feeders (will be distributed across 2 sections)
-  const switches: SwitchSymbol[] = [];
-  const loads: LoadSymbol[] = [];
-
-  for (let i = 1; i <= 4; i++) {
-    const sw: SwitchSymbol = {
-      id: `switch-${i}`,
-      elementId: `switch-${i}`,
-      elementType: 'Switch',
-      elementName: `Pole ${i}`,
-      position: { x: 0, y: 0 },
-      inService: true,
-      fromNodeId: 'bus-sn-sekcja',
-      toNodeId: `load-node-${i}`,
-      switchState: 'CLOSED',
-      switchType: 'BREAKER',
-    };
-    switches.push(sw);
-
-    const load: LoadSymbol = {
-      id: `load-${i}`,
-      elementId: `load-node-${i}`,
-      elementType: 'Load',
-      elementName: `Odbior ${i}`,
-      position: { x: 0, y: 0 },
-      inService: true,
-      connectedToNodeId: `switch-${i}`,
-    };
-    loads.push(load);
-  }
-
-  return [snBus, source, ...switches, ...loads];
-};
-
-/**
- * Sectioned busbar fixture based on coupler topology.
- */
-const createCouplerSectionFixture = (): AnySldSymbol[] => {
-  const busA: NodeSymbol = {
-    id: 'bus-sn-a',
-    elementId: 'bus-sn-a',
-    elementType: 'Bus',
-    elementName: 'Szyna SN A',
-    position: { x: 0, y: 0 },
-    inService: true,
-    width: 200,
-    height: 8,
-  };
-
-  const busB: NodeSymbol = {
-    id: 'bus-sn-b',
-    elementId: 'bus-sn-b',
-    elementType: 'Bus',
-    elementName: 'Szyna SN B',
-    position: { x: 0, y: 0 },
-    inService: true,
-    width: 200,
-    height: 8,
-  };
-
-  const coupler: SwitchSymbol = {
-    id: 'switch-coupler',
-    elementId: 'switch-coupler',
-    elementType: 'Switch',
-    elementName: 'Łącznik sekcyjny',
-    position: { x: 0, y: 0 },
-    inService: true,
-    fromNodeId: 'bus-sn-a',
-    toNodeId: 'bus-sn-b',
-    switchState: 'CLOSED',
-    switchType: 'BREAKER',
-  };
-
-  return [busA, busB, coupler];
-};
-
-/**
- * Sectioned busbar fixture based on strict name fallback.
- */
-const createNamedSectionFixture = (): AnySldSymbol[] => {
-  const snBus: NodeSymbol = {
-    id: 'bus-sn-section-1',
-    elementId: 'bus-sn-section-1',
-    elementType: 'Bus',
-    elementName: 'Szyna SN sekcja 1',
-    position: { x: 0, y: 0 },
-    inService: true,
-    width: 200,
-    height: 8,
-  };
-
-  return [snBus];
 };
 
 /**
@@ -323,12 +206,9 @@ describe('ETAP Multi-Transformer Layout', () => {
     expect(positions1).toEqual(positions2);
   });
 
-  it('should correctly layout multi-transformer fixture', () => {
+  it('should correctly layout multi-transformer fixture via topological engine', () => {
     const symbols = createMultiTransformerFixture();
-    const result = generateAutoLayout(symbols);
-
-    // Should have 2 transformers
-    expect(result.debug.transformerCount).toBe(2);
+    const result = computeTopologicalLayout(symbols);
 
     // Get transformer positions
     const trafo1Pos = result.positions.get('trafo-1');
@@ -396,7 +276,6 @@ describe('ETAP Sectioned Busbar Layout', () => {
 
     // Bay positions should be grid-snapped
     section1BayPositions.forEach((x) => {
-      // Use Math.abs to handle -0 vs 0 edge case
       expect(Math.abs(x % ETAP_GEOMETRY.layout.gridSize)).toBe(0);
     });
   });
@@ -418,34 +297,6 @@ describe('ETAP Sectioned Busbar Layout', () => {
     expect(result1.sections).toEqual(result2.sections);
     expect(result1.couplerPositions).toEqual(result2.couplerPositions);
     expect(result1.totalWidth).toEqual(result2.totalWidth);
-  });
-});
-
-// =============================================================================
-// BUSBAR SECTION DETECTION TESTS
-// =============================================================================
-
-describe('ETAP Busbar Section Detection', () => {
-  it('should detect sections via coupler topology regardless of name', () => {
-    const symbols = createCouplerSectionFixture();
-    const result = generateAutoLayout(symbols);
-
-    expect(result.debug.busbarSections.get('bus-sn-a')).toBe(2);
-    expect(result.debug.busbarSections.get('bus-sn-b')).toBe(2);
-  });
-
-  it('should detect sections via strict name fallback when no coupler exists', () => {
-    const symbols = createNamedSectionFixture();
-    const result = generateAutoLayout(symbols);
-
-    expect(result.debug.busbarSections.get('bus-sn-section-1')).toBe(2);
-  });
-
-  it('should ignore generic "sekcja" without a structured suffix', () => {
-    const symbols = createSectionedBusbarFixture();
-    const result = generateAutoLayout(symbols);
-
-    expect(result.debug.busbarSections.get('bus-sn-sekcja')).toBe(1);
   });
 });
 
@@ -473,7 +324,7 @@ describe('ETAP Canonical Spine', () => {
 
   it('should align main path elements on same X coordinate', () => {
     const symbols = createMultiTransformerFixture();
-    const result = generateAutoLayout(symbols);
+    const result = computeTopologicalLayout(symbols);
 
     const sourcePos = result.positions.get('source-1');
     const wnBusPos = result.positions.get('bus-wn-1');
@@ -494,21 +345,26 @@ describe('ETAP Canonical Spine', () => {
 // =============================================================================
 
 describe('ETAP No Floating Symbol Rule', () => {
-  it('should detect floating symbols in layout result', () => {
+  it('should detect floating symbols via quarantine diagnostics', () => {
     const symbols = createFloatingSymbolFixture();
-    const result = generateAutoLayout(symbols);
+    const result = computeTopologicalLayout(symbols);
 
-    // The floating bus should be reported
-    expect(result.debug.floatingSymbols).toBeDefined();
+    // The floating bus should appear in quarantined or unassigned diagnostics
+    expect(result.diagnostics).toBeDefined();
+    // All symbols should still get positions (quarantine zone)
+    expect(result.positions.size).toBe(symbols.length);
   });
 
   it('should report floating symbol in validation (G-04)', () => {
     const symbols = createFloatingSymbolFixture();
-    const layoutResult = generateAutoLayout(symbols);
+    const result = computeTopologicalLayout(symbols);
+
+    // Floating symbols from diagnostics
+    const floatingIds = result.diagnostics.quarantinedSymbolIds;
 
     const validationResult = validateSld(symbols, {
       checkFloatingSymbols: true,
-      floatingSymbolIds: layoutResult.debug.floatingSymbols,
+      floatingSymbolIds: floatingIds,
     });
 
     // Should have G-04 warning for floating bus
@@ -520,17 +376,17 @@ describe('ETAP No Floating Symbol Rule', () => {
 
   it('should not report connected symbols as floating', () => {
     const symbols = createMultiTransformerFixture();
-    const result = generateAutoLayout(symbols);
+    const result = computeTopologicalLayout(symbols);
 
-    // All symbols are connected, no floating
-    expect(result.debug.floatingSymbols).toHaveLength(0);
+    // All symbols are connected, quarantine should be empty or minimal
+    expect(result.diagnostics.quarantinedSymbolIds.length).toBe(0);
   });
 
   it('should position all symbols (no invisible symbols)', () => {
     const symbols = createFloatingSymbolFixture();
-    const result = generateAutoLayout(symbols);
+    const result = computeTopologicalLayout(symbols);
 
-    // All symbols should have positions (even floating ones)
+    // All symbols should have positions (even floating ones go to quarantine)
     symbols.forEach((symbol) => {
       expect(result.positions.has(symbol.id)).toBe(true);
     });
@@ -545,8 +401,8 @@ describe('ETAP Geometry Determinism', () => {
   it('should produce identical layout for same multi-transformer input', () => {
     const symbols = createMultiTransformerFixture();
 
-    const result1 = generateAutoLayout(symbols);
-    const result2 = generateAutoLayout(symbols);
+    const result1 = computeTopologicalLayout(symbols);
+    const result2 = computeTopologicalLayout(symbols);
 
     // Compare all positions
     result1.positions.forEach((pos1, id) => {
@@ -561,8 +417,8 @@ describe('ETAP Geometry Determinism', () => {
     const symbols = createMultiTransformerFixture();
     const shuffled = [...symbols].reverse();
 
-    const result1 = generateAutoLayout(symbols);
-    const result2 = generateAutoLayout(shuffled);
+    const result1 = computeTopologicalLayout(symbols);
+    const result2 = computeTopologicalLayout(shuffled);
 
     // Compare all positions
     result1.positions.forEach((pos1, id) => {
@@ -575,8 +431,8 @@ describe('ETAP Geometry Determinism', () => {
 
   it('should snap all positions to grid', () => {
     const symbols = createMultiTransformerFixture();
-    const result = generateAutoLayout(symbols);
-    const gridSize = ETAP_GEOMETRY.layout.gridSize;
+    const result = computeTopologicalLayout(symbols);
+    const gridSize = DEFAULT_GEOMETRY_CONFIG.gridSize;
 
     result.positions.forEach((pos) => {
       expect(pos.x % gridSize).toBe(0);

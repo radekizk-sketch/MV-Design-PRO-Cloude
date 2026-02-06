@@ -31,7 +31,7 @@ import type {
  * Build topology graph from SLD symbols.
  * DETERMINISTIC: Sorted by ID.
  */
-export function buildTopologyGraph(symbols: AnySldSymbol[]): TopologyGraph {
+export function buildTopologyGraph(symbols: readonly AnySldSymbol[]): TopologyGraph {
   const sorted = [...symbols].sort((a, b) => a.id.localeCompare(b.id));
   const elementToSymbol = new Map<string, string>();
   const symbolById = new Map<string, AnySldSymbol>();
@@ -156,7 +156,7 @@ export function isPccNode(symbol: AnySldSymbol): boolean {
  * DETERMINISTIC: Sorted by ID.
  */
 export function filterPccNodes(
-  symbols: AnySldSymbol[]
+  symbols: readonly AnySldSymbol[]
 ): { filtered: AnySldSymbol[]; pccIds: string[] } {
   const sorted = [...symbols].sort((a, b) => a.id.localeCompare(b.id));
   const pccIds: string[] = [];
@@ -414,7 +414,7 @@ function assignLayer(
  * @returns Map of symbolId -> RoleAssignment
  */
 export function assignTopologicalRoles(
-  symbols: AnySldSymbol[]
+  symbols: readonly AnySldSymbol[]
 ): {
   assignments: Map<string, RoleAssignment>;
   pccIds: string[];

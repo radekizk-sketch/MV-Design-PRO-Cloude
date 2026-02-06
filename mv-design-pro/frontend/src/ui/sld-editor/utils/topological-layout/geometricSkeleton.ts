@@ -344,7 +344,7 @@ function buildSlots(
  * @param orientation - Global orientation
  */
 export function buildGeometricSkeleton(
-  symbols: AnySldSymbol[],
+  symbols: readonly AnySldSymbol[],
   assignments: Map<string, RoleAssignment>,
   feederChainsByBusbar: Map<string, Array<{ allSymbolIds: string[] }>>,
   stationSymbolIds: Set<string>,
