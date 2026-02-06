@@ -16,6 +16,7 @@ from api.cases import router as cases_router
 from api.catalog import router as catalog_router
 from api.comparison import router as comparison_router
 from api.design_synth import router as design_synth_router
+from api.diagnostics import router as diagnostics_router
 from api.equipment_proof_pack import router as equipment_proof_pack_router
 from api.health import router as health_router
 from api.issues import router as issues_router
@@ -98,6 +99,7 @@ app.include_router(cases_router)
 app.include_router(catalog_router)
 app.include_router(comparison_router)
 app.include_router(design_synth_router)
+app.include_router(diagnostics_router)
 app.include_router(equipment_proof_pack_router)
 app.include_router(health_router)
 app.include_router(issues_router)
