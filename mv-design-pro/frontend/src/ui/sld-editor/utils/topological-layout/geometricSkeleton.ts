@@ -466,11 +466,8 @@ export function buildGeometricSkeleton(
       });
       for (const sec of sections) allSlots.push(...sec.slots);
 
-      // Update busbar width on symbol
-      const nodeSym = bus as NodeSymbol;
-      if ('width' in nodeSym) {
-        (nodeSym as any).width = totalWidth;
-      }
+      // Busbar width stored in busbarLayout.totalWidth (IMMUTABLE — no symbol mutation)
+      // BUG-01 FIX: Width is part of skeleton output, NOT mutated on input symbol
     }
     tiers.push({
       tierId: 'tier_L1',
@@ -537,11 +534,8 @@ export function buildGeometricSkeleton(
         axialPosition: y,
       });
 
-      // Update busbar width
-      const nodeSym = bus as NodeSymbol;
-      if ('width' in nodeSym) {
-        (nodeSym as any).width = totalWidth;
-      }
+      // Busbar width stored in busbarLayout.totalWidth (IMMUTABLE — no symbol mutation)
+      // BUG-01 FIX: Width is part of skeleton output, NOT mutated on input symbol
 
       // Position feeder elements in slots
       for (const section of sections) {

@@ -178,52 +178,41 @@ export const DEFAULT_AUTO_LAYOUT_CONFIG = {
 } as const;
 
 // =============================================================================
-// FEATURE FLAG
+// FEATURE FLAG — REMOVED (SLD_AUTOLAYOUT_AUDIT_I_NAPRAWA.md)
 // =============================================================================
 
 /**
- * Feature flag for SLD auto-layout V1.
+ * Auto-layout V1 is ALWAYS ON.
  *
- * Domyślnie OFF — włącza się przez ustawienie zmiennej środowiskowej
- * lub przez wywołanie enableAutoLayoutV1().
+ * Per SLD_AUTOLAYOUT_AUDIT_I_NAPRAWA.md:
+ * - Feature flag V1 → REMOVED, routing ALWAYS ON
+ * - Busbar feeder paths are ALWAYS computed (no feature flag check)
  *
- * BEZPIECZEŃSTWO: Feature flag pozwala na bezpieczne wdrożenie bez ryzyka regresji.
+ * These functions are kept for backward compatibility but always return true/no-op.
  */
-let _autoLayoutV1Enabled = false;
 
 /**
- * Check if SLD_AUTO_LAYOUT_V1 feature flag is enabled.
+ * Always returns true — auto-layout V1 is permanently enabled.
+ * @deprecated Feature flag removed. Auto-layout is always on.
  */
 export function isAutoLayoutV1Enabled(): boolean {
-  // Check environment variable first (for build-time configuration)
-  try {
-    const env = import.meta.env;
-    if (env && env['VITE_SLD_AUTO_LAYOUT_V1'] === 'true') {
-      return true;
-    }
-  } catch {
-    // Ignore if import.meta.env is not available
-  }
-
-  // Check runtime flag
-  return _autoLayoutV1Enabled;
+  return true;
 }
 
 /**
- * Enable SLD_AUTO_LAYOUT_V1 feature flag at runtime.
- *
- * UWAGA: Ta funkcja jest przeznaczona do użycia w testach i debugging.
- * W produkcji preferuj zmienną środowiskową VITE_SLD_AUTO_LAYOUT_V1.
+ * No-op — auto-layout V1 is permanently enabled.
+ * @deprecated Feature flag removed. Auto-layout is always on.
  */
 export function enableAutoLayoutV1(): void {
-  _autoLayoutV1Enabled = true;
+  // No-op: always enabled
 }
 
 /**
- * Disable SLD_AUTO_LAYOUT_V1 feature flag at runtime.
+ * No-op — auto-layout V1 is permanently enabled.
+ * @deprecated Feature flag removed. Auto-layout is always on.
  */
 export function disableAutoLayoutV1(): void {
-  _autoLayoutV1Enabled = false;
+  // No-op: always enabled
 }
 
 // =============================================================================

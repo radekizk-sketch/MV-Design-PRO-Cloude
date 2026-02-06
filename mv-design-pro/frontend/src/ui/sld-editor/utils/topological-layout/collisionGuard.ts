@@ -186,6 +186,11 @@ export function detectSymbolCollisions(
 /**
  * Resolve symbol-symbol collisions by shifting the lower-priority symbol.
  *
+ * SLD_AUTOLAYOUT_AUDIT_I_NAPRAWA.md — COLLISION RESOLUTION:
+ * - Shift ONLY in Y axis (preserve slot columns / X positions)
+ * - Prefer downward shift (away from source, toward loads)
+ * - Busbar width auto-expands if needed (handled in skeleton)
+ *
  * PRIORITY (immovable first):
  * 1. Busbars (highest - never move)
  * 2. Transformers
@@ -240,7 +245,6 @@ export function resolveSymbolCollisions(
       const prioB = typePriority[symB.elementType] ?? 5;
 
       let mover: string;
-      let anchor: Position;
 
       if (prioA !== prioB) {
         mover = prioA > prioB ? pair.symbolA : pair.symbolB;
@@ -249,28 +253,18 @@ export function resolveSymbolCollisions(
       }
 
       const moverPos = resolved.get(mover)!;
-      anchor = mover === pair.symbolA ? posB : posA;
+      const anchor = mover === pair.symbolA ? posB : posA;
 
-      // Calculate shift direction
-      const dx = moverPos.x - anchor.x;
+      // Y-ONLY COLLISION RESOLUTION (SLD_AUTOLAYOUT_AUDIT_I_NAPRAWA.md)
+      // Shift ONLY in Y axis to preserve slot column alignment (X positions).
+      // Always prefer downward shift (positive Y) for MV SLD top-down layout.
       const dy = moverPos.y - anchor.y;
+      const shiftY = pair.overlapY * (dy >= 0 ? 1 : 1); // always downward
 
-      // Shift horizontally if overlap is mostly in Y, otherwise vertically
-      let shiftX = 0;
-      let shiftY = 0;
-
-      if (pair.overlapX < pair.overlapY) {
-        // Shift horizontally
-        shiftX = pair.overlapX * (dx >= 0 ? 1 : -1);
-      } else {
-        // Shift vertically (prefer downward for MV SLD)
-        shiftY = pair.overlapY * (dy >= 0 ? 1 : 1);
-      }
-
-      const newX = Math.round((moverPos.x + shiftX) / config.gridSize) * config.gridSize;
+      const newX = moverPos.x; // X NEVER changes during collision resolution
       const newY = Math.round((moverPos.y + shiftY) / config.gridSize) * config.gridSize;
 
-      if (newX !== moverPos.x || newY !== moverPos.y) {
+      if (newY !== moverPos.y) {
         resolved.set(mover, { x: newX, y: newY });
         resolvedThisIteration++;
         totalResolved++;

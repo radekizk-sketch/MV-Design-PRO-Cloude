@@ -205,28 +205,27 @@ function checkOrthogonalPaths(feeders: readonly FeederLayoutResult[]): boolean {
 
 describe('SLD Auto-Layout Algorithm', () => {
   beforeEach(() => {
-    // Enable feature flag for tests
+    // Feature flag is permanently ON — no-op calls kept for backward compat
     enableAutoLayoutV1();
   });
 
   afterEach(() => {
-    // Reset feature flag
+    // Feature flag is permanently ON — no-op calls kept for backward compat
     disableAutoLayoutV1();
   });
 
   // ---------------------------------------------------------------------------
-  // Feature Flag Tests
+  // Feature Flag Tests (V1 permanently enabled — flag functions are no-ops)
   // ---------------------------------------------------------------------------
 
   describe('Feature Flag', () => {
-    it('should be enabled for tests', () => {
+    it('should always be enabled (permanently ON)', () => {
       expect(isAutoLayoutV1Enabled()).toBe(true);
     });
 
-    it('should be disabled after disableAutoLayoutV1()', () => {
+    it('should remain enabled after disableAutoLayoutV1() (no-op)', () => {
       disableAutoLayoutV1();
-      expect(isAutoLayoutV1Enabled()).toBe(false);
-      enableAutoLayoutV1(); // Re-enable for other tests
+      expect(isAutoLayoutV1Enabled()).toBe(true);
     });
   });
 
