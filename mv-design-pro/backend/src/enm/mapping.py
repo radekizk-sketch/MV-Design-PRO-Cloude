@@ -185,4 +185,66 @@ def map_enm_to_network_graph(enm: EnergyNetworkModel) -> NetworkGraph:
         )
         graph.add_branch(tb)
 
+    # 4. Sources → virtual ground node + impedance branch
+    #    The SC solver needs the source impedance in the Y-bus matrix.
+    #    IEC 60909: Z_source = U_n² / Sk'' (at source bus voltage).
+    for source in sorted(enm.sources, key=lambda s: s.ref_id):
+        bus_node_id = ref_to_node_id.get(source.bus_ref)
+        if bus_node_id is None:
+            continue
+
+        # Find bus voltage
+        bus_voltage_kv = 0.0
+        for bus in enm.buses:
+            if bus.ref_id == source.bus_ref:
+                bus_voltage_kv = bus.voltage_kv
+                break
+        if bus_voltage_kv <= 0:
+            continue
+
+        # Compute source impedance R + jX
+        r_ohm = 0.0
+        x_ohm = 0.0
+
+        if source.r_ohm is not None and source.x_ohm is not None:
+            r_ohm = source.r_ohm
+            x_ohm = source.x_ohm
+        elif source.sk3_mva is not None and source.sk3_mva > 0:
+            un_kv = bus_voltage_kv
+            z_abs = (un_kv ** 2) / source.sk3_mva  # Z = Un² / Sk'' [Ohm]
+            rx = source.rx_ratio if source.rx_ratio and source.rx_ratio > 0 else 0.1
+            x_ohm = z_abs / math.sqrt(1.0 + rx ** 2)
+            r_ohm = x_ohm * rx
+
+        if r_ohm == 0 and x_ohm == 0:
+            continue
+
+        # Create virtual ground node (PQ with zero load)
+        gnd_node_id = _ref_to_uuid(f"_gnd_{source.ref_id}")
+        gnd_node = Node(
+            id=gnd_node_id,
+            name=f"GND ({source.name})",
+            node_type=NodeType.PQ,
+            voltage_level=bus_voltage_kv,
+            active_power=0.0,
+            reactive_power=0.0,
+        )
+        graph.add_node(gnd_node)
+
+        # Create impedance branch: ground → source bus
+        src_branch = LineBranch(
+            id=_ref_to_uuid(f"_zsrc_{source.ref_id}"),
+            name=f"Z_source ({source.name})",
+            branch_type=BranchType.LINE,
+            from_node_id=gnd_node_id,
+            to_node_id=bus_node_id,
+            in_service=True,
+            r_ohm_per_km=r_ohm,
+            x_ohm_per_km=x_ohm,
+            b_us_per_km=0.0,
+            length_km=1.0,
+            rated_current_a=1.0,
+        )
+        graph.add_branch(src_branch)
+
     return graph

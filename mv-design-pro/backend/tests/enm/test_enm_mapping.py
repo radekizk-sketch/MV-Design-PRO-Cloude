@@ -161,7 +161,8 @@ class TestSolverRoundtrip:
             ],
         )
         graph = map_enm_to_network_graph(enm)
-        assert len(graph.nodes) == 2
+        # 2 buses + 1 virtual ground for source impedance = 3 nodes
+        assert len(graph.nodes) == 3
 
         from network_model.solvers.short_circuit_iec60909 import (
             ShortCircuitIEC60909Solver,
