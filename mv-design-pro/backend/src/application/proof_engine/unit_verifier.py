@@ -173,6 +173,67 @@ class UnitVerifier:
             "inputs": {"i_p": "kA"},
             "output": "kA",
         },
+        # SC1 Post-Fault (§4.1)
+        "EQ_SC1_001": {
+            "rule": "Ω = Ω",
+            "inputs": {"Z_1": "Ω", "Z_2": "Ω", "Z_0": "Ω"},
+            "output": "Ω",
+        },
+        "EQ_SC1_002": {
+            "rule": "— (bezwymiarowy)",
+            "inputs": {},
+            "output": "—",
+        },
+        "EQ_SC1_003": {
+            "rule": "Ω + Ω + Ω = Ω",
+            "inputs": {"Z_1": "Ω", "Z_2": "Ω", "Z_0": "Ω"},
+            "output": "Ω",
+        },
+        "EQ_SC1_004": {
+            "rule": "Ω + Ω = Ω",
+            "inputs": {"Z_1": "Ω", "Z_2": "Ω"},
+            "output": "Ω",
+        },
+        "EQ_SC1_005": {
+            "rule": "Ω + (Ω·Ω)/(Ω+Ω) = Ω",
+            "inputs": {"Z_1": "Ω", "Z_2": "Ω", "Z_0": "Ω"},
+            "output": "Ω",
+        },
+        "EQ_SC1_006": {
+            "rule": "kV / Ω = kA",
+            "inputs": {"U_f": "kV", "Z_k": "Ω"},
+            "output": "kA",
+        },
+        "EQ_SC1_007": {
+            "rule": "kA = kA",
+            "inputs": {"I_0": "kA", "I_1": "kA", "I_2": "kA"},
+            "output": "kA",
+        },
+        "EQ_SC1_008": {
+            "rule": "kV / Ω = kA",
+            "inputs": {"c": "—", "U_n": "kV", "Z_k": "Ω"},
+            "output": "kA",
+        },
+        "EQ_SC1_009": {
+            "rule": "— (bezwymiarowy)",
+            "inputs": {"R_k": "Ω", "X_k": "Ω"},
+            "output": "—",
+        },
+        "EQ_SC1_010": {
+            "rule": "— · — · kA = kA",
+            "inputs": {"κ": "—", "I_k''": "kA"},
+            "output": "kA",
+        },
+        "EQ_SC1_011": {
+            "rule": "kA · — = kA",
+            "inputs": {"I_k''": "kA", "m": "—", "n": "—"},
+            "output": "kA",
+        },
+        "EQ_SC1_012": {
+            "rule": "kA = kA",
+            "inputs": {"i_p": "kA"},
+            "output": "kA",
+        },
         # VDROP
         "EQ_VDROP_001": {
             "rule": "Ω/km · km = Ω",

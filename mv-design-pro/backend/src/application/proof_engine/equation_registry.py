@@ -2118,6 +2118,175 @@ EQ_SC1_007 = EquationDefinition(
 )
 
 
+# -----------------------------------------------------------------------------
+# SC1 Equations — Post-fault quantities (BINDING)
+# IEC 60909-0:2016 — I″k, κ, ip, I_th, I_dyn for asymmetrical faults
+# -----------------------------------------------------------------------------
+
+EQ_SC1_008 = EquationDefinition(
+    equation_id="EQ_SC1_008",
+    name_pl="Początkowy prąd zwarciowy I″k (zwarcie asymetryczne)",
+    standard_ref="IEC 60909-0:2016 § 4.2 / eq. 29, 23",
+    latex=(
+        r"\begin{aligned}"
+        r"\text{1F–Z:} \quad & I_k'' = \frac{\sqrt{3} \cdot c \cdot U_n}{|Z_1 + Z_2 + Z_0|} \\"
+        r"\text{2F:} \quad & I_k'' = \frac{c \cdot U_n}{|Z_1 + Z_2|} \\"
+        r"\text{2F–Z:} \quad & I_k'' = \frac{c \cdot U_n}{|Z_k|}"
+        r"\end{aligned}"
+    ),
+    symbols=(
+        SymbolDefinition(
+            symbol="I_k''",
+            unit="kA",
+            description_pl="Początkowy prąd zwarciowy (asymetryczny)",
+            mapping_key="ikss_ka",
+        ),
+        SymbolDefinition(
+            symbol="c",
+            unit="—",
+            description_pl="Współczynnik napięciowy",
+            mapping_key="c_factor",
+        ),
+        SymbolDefinition(
+            symbol="U_n",
+            unit="kV",
+            description_pl="Napięcie znamionowe",
+            mapping_key="u_n_kv",
+        ),
+        SymbolDefinition(
+            symbol="Z_k",
+            unit="Ω",
+            description_pl="Impedancja zastępcza w miejscu zwarcia",
+            mapping_key="z_equiv_ohm",
+        ),
+    ),
+    unit_derivation="kV / Ω = kA",
+    notes=(
+        "Współczynnik napięciowy c występuje WYŁĄCZNIE w tym równaniu dla dowodu SC1. "
+        "ANTI-DOUBLE-COUNTING: c NIE występuje w EQ_SC1_001–007 ani EQ_SC1_009–012."
+    ),
+)
+
+EQ_SC1_009 = EquationDefinition(
+    equation_id="EQ_SC1_009",
+    name_pl="Współczynnik udaru κ (zwarcie asymetryczne)",
+    standard_ref="IEC 60909-0:2016 § 4.3.1.1 eq. (56)",
+    latex=r"\kappa = 1{,}02 + 0{,}98 \cdot e^{-3 \cdot R_k / X_k}",
+    symbols=(
+        SymbolDefinition(
+            symbol="\\kappa",
+            unit="—",
+            description_pl="Współczynnik udaru",
+            mapping_key="kappa",
+        ),
+        SymbolDefinition(
+            symbol="R_k",
+            unit="Ω",
+            description_pl="Rezystancja zastępcza Z_k",
+            mapping_key="r_equiv_ohm",
+        ),
+        SymbolDefinition(
+            symbol="X_k",
+            unit="Ω",
+            description_pl="Reaktancja zastępcza Z_k",
+            mapping_key="x_equiv_ohm",
+        ),
+    ),
+    unit_derivation="— (bezwymiarowy)",
+    notes="κ obliczane z R/X impedancji zastępczej Z_k. Identyczny wzór jak dla 3F.",
+)
+
+EQ_SC1_010 = EquationDefinition(
+    equation_id="EQ_SC1_010",
+    name_pl="Prąd udarowy ip (zwarcie asymetryczne)",
+    standard_ref="IEC 60909-0:2016 § 4.3.1.1 eq. (55)",
+    latex=r"i_p = \kappa \cdot \sqrt{2} \cdot I_k''",
+    symbols=(
+        SymbolDefinition(
+            symbol="i_p",
+            unit="kA",
+            description_pl="Prąd udarowy (szczytowy)",
+            mapping_key="ip_ka",
+        ),
+        SymbolDefinition(
+            symbol="\\kappa",
+            unit="—",
+            description_pl="Współczynnik udaru",
+            mapping_key="kappa",
+        ),
+        SymbolDefinition(
+            symbol="I_k''",
+            unit="kA",
+            description_pl="Początkowy prąd zwarciowy",
+            mapping_key="ikss_ka",
+        ),
+    ),
+    unit_derivation="— · — · kA = kA",
+    notes="Prąd udarowy dla zwarcia asymetrycznego. Wzór identyczny jak dla 3F.",
+)
+
+EQ_SC1_011 = EquationDefinition(
+    equation_id="EQ_SC1_011",
+    name_pl="Prąd cieplny równoważny I_th (zwarcie asymetryczne)",
+    standard_ref="IEC 60909-0:2016 § 4.8 eq. (102)",
+    latex=r"I_{th} = I_k'' \cdot \sqrt{m + n}",
+    symbols=(
+        SymbolDefinition(
+            symbol="I_{th}",
+            unit="kA",
+            description_pl="Prąd cieplny równoważny",
+            mapping_key="ith_ka",
+        ),
+        SymbolDefinition(
+            symbol="I_k''",
+            unit="kA",
+            description_pl="Początkowy prąd zwarciowy",
+            mapping_key="ikss_ka",
+        ),
+        SymbolDefinition(
+            symbol="m",
+            unit="—",
+            description_pl="Współczynnik cieplny (składowa DC)",
+            mapping_key="m_factor",
+        ),
+        SymbolDefinition(
+            symbol="n",
+            unit="—",
+            description_pl="Współczynnik cieplny (składowa AC)",
+            mapping_key="n_factor",
+        ),
+    ),
+    unit_derivation="kA · — = kA",
+    notes=(
+        "Prąd cieplny równoważny I_th dla doboru aparatury. "
+        "m = 1, n = 0 w uproszczeniu (zwarcie odległe od generatora)."
+    ),
+)
+
+EQ_SC1_012 = EquationDefinition(
+    equation_id="EQ_SC1_012",
+    name_pl="Prąd dynamiczny I_dyn (zwarcie asymetryczne)",
+    standard_ref="IEC 60909-0:2016 § 4.3.1.1",
+    latex=r"I_{dyn} = i_p",
+    symbols=(
+        SymbolDefinition(
+            symbol="I_{dyn}",
+            unit="kA",
+            description_pl="Prąd dynamiczny (do doboru aparatury)",
+            mapping_key="idyn_ka",
+        ),
+        SymbolDefinition(
+            symbol="i_p",
+            unit="kA",
+            description_pl="Prąd udarowy",
+            mapping_key="ip_ka",
+        ),
+    ),
+    unit_derivation="kA = kA",
+    notes="I_dyn = i_p. Obowiązkowy wynik do doboru aparatury (wytrzymałość dynamiczna).",
+)
+
+
 # =============================================================================
 # ANTI-DOUBLE-COUNTING AUDIT
 # =============================================================================
@@ -2171,6 +2340,39 @@ class AntiDoubleCountingAudit:
             return False
         return True
 
+    # Równania dowodowe SC1 z audytem c (§4.1 blocker resolution)
+    SC1_PROOF_EQUATIONS_AUDIT: dict[str, bool] = {
+        "EQ_SC1_001": False,   # Impedancje składowe — c NIE występuje
+        "EQ_SC1_002": False,   # Operator Fortescue — c NIE występuje
+        "EQ_SC1_003": False,   # Z_k dla 1F–Z — c NIE występuje
+        "EQ_SC1_004": False,   # Z_k dla 2F — c NIE występuje
+        "EQ_SC1_005": False,   # Z_k dla 2F–Z — c NIE występuje
+        "EQ_SC1_006": False,   # Prądy składowe — c NIE występuje (używa U_f, nie c·Un)
+        "EQ_SC1_007": False,   # Rekombinacja fazowa — c NIE występuje
+        "EQ_SC1_008": True,    # I″k asymetryczny — c WYSTĘPUJE (jedyne miejsce SC1)
+        "EQ_SC1_009": False,   # Współczynnik κ — c NIE występuje
+        "EQ_SC1_010": False,   # Prąd udarowy ip — c NIE występuje
+        "EQ_SC1_011": False,   # Prąd cieplny I_th — c NIE występuje
+        "EQ_SC1_012": False,   # Prąd dynamiczny I_dyn — c NIE występuje
+    }
+
+    SC1_C_FACTOR_EQUATION = "EQ_SC1_008"
+
+    @classmethod
+    def verify_sc1(cls) -> bool:
+        """
+        Weryfikuje, że c występuje DOKŁADNIE RAZ w równaniach dowodowych SC1.
+
+        Returns:
+            True jeśli audit PASS, False jeśli FAIL
+        """
+        c_count = sum(1 for has_c in cls.SC1_PROOF_EQUATIONS_AUDIT.values() if has_c)
+        if c_count != 1:
+            return False
+        if not cls.SC1_PROOF_EQUATIONS_AUDIT.get(cls.SC1_C_FACTOR_EQUATION, False):
+            return False
+        return True
+
     @classmethod
     def get_audit_report(cls) -> str:
         """Zwraca raport audytu w formie tekstowej."""
@@ -2178,11 +2380,17 @@ class AntiDoubleCountingAudit:
             "ANTI-DOUBLE-COUNTING AUDIT — Współczynnik napięciowy c",
             "=" * 60,
             f"Model: {cls.MODEL}",
-            f"c występuje w: {cls.C_FACTOR_EQUATION}",
+            f"c występuje w: {cls.C_FACTOR_EQUATION} (SC3F), {cls.SC1_C_FACTOR_EQUATION} (SC1)",
             "",
             "Równania dowodowe SC3F:",
         ]
         for eq_id, has_c in sorted(cls.PROOF_EQUATIONS_AUDIT.items()):
+            status = "TAK" if has_c else "NIE"
+            lines.append(f"  {eq_id}: c {status}")
+
+        lines.append("")
+        lines.append("Równania dowodowe SC1:")
+        for eq_id, has_c in sorted(cls.SC1_PROOF_EQUATIONS_AUDIT.items()):
             status = "TAK" if has_c else "NIE"
             lines.append(f"  {eq_id}: c {status}")
 
@@ -2193,8 +2401,10 @@ class AntiDoubleCountingAudit:
             lines.append(f"  {eq_id}: c {status}")
 
         lines.append("")
-        passed = cls.verify()
-        lines.append(f"Status: {'PASS' if passed else 'FAIL'}")
+        sc3f_pass = cls.verify()
+        sc1_pass = cls.verify_sc1()
+        lines.append(f"Status SC3F: {'PASS' if sc3f_pass else 'FAIL'}")
+        lines.append(f"Status SC1: {'PASS' if sc1_pass else 'FAIL'}")
 
         return "\n".join(lines)
 
@@ -2336,6 +2546,11 @@ SC1_EQUATIONS: dict[str, EquationDefinition] = {
     "EQ_SC1_005": EQ_SC1_005,
     "EQ_SC1_006": EQ_SC1_006,
     "EQ_SC1_007": EQ_SC1_007,
+    "EQ_SC1_008": EQ_SC1_008,
+    "EQ_SC1_009": EQ_SC1_009,
+    "EQ_SC1_010": EQ_SC1_010,
+    "EQ_SC1_011": EQ_SC1_011,
+    "EQ_SC1_012": EQ_SC1_012,
 }
 
 # Step order for SC3F proof (BINDING) — tylko równania dowodowe
@@ -2430,13 +2645,18 @@ QU_STEP_ORDER: list[str] = [
     "EQ_QU_005",  # P11.1c: Q_cmd → U (VDROP link, no new physics)
 ]
 
-# Step order for SC1 proofs (BINDING) — P11.1c
+# Step order for SC1 proofs (BINDING) — P11.1c + §4.1 blocker resolution
 SC1FZ_STEP_ORDER: list[str] = [
     "EQ_SC1_001",  # Z₁, Z₂, Z₀
     "EQ_SC1_002",  # Transformacja Fortescue
     "EQ_SC1_003",  # Z_k dla 1F–Z
     "EQ_SC1_006",  # I₁, I₂, I₀
     "EQ_SC1_007",  # Rekombinacja fazowa
+    "EQ_SC1_008",  # I″k (początkowy prąd zwarciowy) — c TUTAJ (jedyne miejsce SC1)
+    "EQ_SC1_009",  # κ (współczynnik udaru)
+    "EQ_SC1_010",  # ip (prąd udarowy)
+    "EQ_SC1_012",  # I_dyn (prąd dynamiczny — OBOWIĄZKOWY)
+    "EQ_SC1_011",  # I_th (prąd cieplny — OBOWIĄZKOWY)
 ]
 
 SC2F_STEP_ORDER: list[str] = [
@@ -2445,6 +2665,11 @@ SC2F_STEP_ORDER: list[str] = [
     "EQ_SC1_004",  # Z_k dla 2F
     "EQ_SC1_006",  # I₁, I₂, I₀
     "EQ_SC1_007",  # Rekombinacja fazowa
+    "EQ_SC1_008",  # I″k (początkowy prąd zwarciowy) — c TUTAJ (jedyne miejsce SC1)
+    "EQ_SC1_009",  # κ (współczynnik udaru)
+    "EQ_SC1_010",  # ip (prąd udarowy)
+    "EQ_SC1_012",  # I_dyn (prąd dynamiczny — OBOWIĄZKOWY)
+    "EQ_SC1_011",  # I_th (prąd cieplny — OBOWIĄZKOWY)
 ]
 
 SC2FZ_STEP_ORDER: list[str] = [
@@ -2453,6 +2678,11 @@ SC2FZ_STEP_ORDER: list[str] = [
     "EQ_SC1_005",  # Z_k dla 2F–Z
     "EQ_SC1_006",  # I₁, I₂, I₀
     "EQ_SC1_007",  # Rekombinacja fazowa
+    "EQ_SC1_008",  # I″k (początkowy prąd zwarciowy) — c TUTAJ (jedyne miejsce SC1)
+    "EQ_SC1_009",  # κ (współczynnik udaru)
+    "EQ_SC1_010",  # ip (prąd udarowy)
+    "EQ_SC1_012",  # I_dyn (prąd dynamiczny — OBOWIĄZKOWY)
+    "EQ_SC1_011",  # I_th (prąd cieplny — OBOWIĄZKOWY)
 ]
 
 # Frozen IDs for stability tests (BINDING)
@@ -2485,6 +2715,7 @@ FROZEN_IDS: dict[str, list[str]] = {
         "i1_ka", "i2_ka", "i0_ka",
         "ia_ka", "ib_ka", "ic_ka",
         "a_operator",
+        "r_equiv_ohm", "x_equiv_ohm",
         # P15
         "u_ll_kv", "p_mw", "q_mvar", "s_mva", "i_ka", "in_a",
         "k_i_percent", "m_i_percent", "sn_mva", "k_s_percent", "m_s_percent",
@@ -2713,8 +2944,13 @@ class EquationRegistry:
 
     @classmethod
     def verify_anti_double_counting(cls) -> bool:
-        """Weryfikuje audit anti-double-counting."""
+        """Weryfikuje audit anti-double-counting (SC3F)."""
         return AntiDoubleCountingAudit.verify()
+
+    @classmethod
+    def verify_anti_double_counting_sc1(cls) -> bool:
+        """Weryfikuje audit anti-double-counting (SC1)."""
+        return AntiDoubleCountingAudit.verify_sc1()
 
 
 EquationRegistry.SC3F_EQUATIONS = SC3F_EQUATIONS

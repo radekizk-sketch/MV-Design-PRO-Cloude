@@ -42,6 +42,11 @@ from application.proof_engine.equation_registry import (
     EQ_SC1_005,
     EQ_SC1_006,
     EQ_SC1_007,
+    EQ_SC1_008,
+    EQ_SC1_009,
+    EQ_SC1_010,
+    EQ_SC1_011,
+    EQ_SC1_012,
     EQ_VDROP_001,
     EQ_VDROP_002,
     EQ_VDROP_003,
@@ -244,7 +249,7 @@ class LoadFlowVoltageInput:
 
 @dataclass
 class SC1Input:
-    """Dane wejściowe dla generatora dowodu SC1 (P11.1c FULL)."""
+    """Dane wejściowe dla generatora dowodu SC1 (P11.1c FULL + §4.1)."""
 
     # Identyfikacja
     project_name: str
@@ -266,6 +271,11 @@ class SC1Input:
 
     # Operator a (Fortescue)
     a_operator: complex
+
+    # Post-fault quantities (§4.1 — I″k, ip, I_th, I_dyn mandatory)
+    tk_s: float = 1.0
+    m_factor: float = 1.0
+    n_factor: float = 0.0
 
 
 class ProofGenerator:
@@ -655,6 +665,12 @@ class ProofGenerator:
     ) -> ProofDocument:
         """
         Generuje dowód SC1 (zwarcia asymetryczne) — FULL MATH.
+
+        Zawiera OBOWIĄZKOWE wyniki (§4.1):
+        - I″k (początkowy prąd zwarciowy)
+        - ip (prąd udarowy)
+        - I_th (prąd cieplny równoważny)
+        - I_dyn (prąd dynamiczny)
         """
         if artifact_id is None:
             artifact_id = uuid4()
@@ -684,6 +700,23 @@ class ProofGenerator:
             i1=i1,
             i2=i2,
         )
+
+        # Post-fault quantities (§4.1 MANDATORY: I″k, ip, I_th, I_dyn)
+        ikss_ka = cls._compute_sc1_ikss(
+            fault_type=fault_type,
+            c_factor=data.c_factor,
+            u_n_kv=data.u_n_kv,
+            z_equiv=z_equiv,
+        )
+
+        r_equiv = z_equiv.real
+        x_equiv = z_equiv.imag
+        rx_ratio = r_equiv / x_equiv if x_equiv != 0 else 0.0
+        kappa = 1.02 + 0.98 * math.exp(-3.0 * rx_ratio)
+        ip_ka = kappa * math.sqrt(2.0) * ikss_ka
+        idyn_ka = ip_ka
+        sqrt_mn = math.sqrt(data.m_factor + data.n_factor)
+        ith_ka = ikss_ka * sqrt_mn
 
         steps: list[ProofStep] = []
         step_number = 0
@@ -738,6 +771,43 @@ class ProofGenerator:
                     ib=ib,
                     ic=ic,
                 )
+            elif eq_id == "EQ_SC1_008":
+                step = cls._create_sc1_step_ikss(
+                    step_number=step_number,
+                    fault_type=fault_type,
+                    c_factor=data.c_factor,
+                    u_n_kv=data.u_n_kv,
+                    z_equiv=z_equiv,
+                    ikss_ka=ikss_ka,
+                )
+            elif eq_id == "EQ_SC1_009":
+                step = cls._create_sc1_step_kappa(
+                    step_number=step_number,
+                    r_equiv=r_equiv,
+                    x_equiv=x_equiv,
+                    kappa=kappa,
+                )
+            elif eq_id == "EQ_SC1_010":
+                step = cls._create_sc1_step_ip(
+                    step_number=step_number,
+                    kappa=kappa,
+                    ikss_ka=ikss_ka,
+                    ip_ka=ip_ka,
+                )
+            elif eq_id == "EQ_SC1_011":
+                step = cls._create_sc1_step_ith(
+                    step_number=step_number,
+                    ikss_ka=ikss_ka,
+                    m_factor=data.m_factor,
+                    n_factor=data.n_factor,
+                    ith_ka=ith_ka,
+                )
+            elif eq_id == "EQ_SC1_012":
+                step = cls._create_sc1_step_idyn(
+                    step_number=step_number,
+                    ip_ka=ip_ka,
+                    idyn_ka=idyn_ka,
+                )
             else:
                 raise ValueError(f"Unsupported SC1 equation in step order: {eq_id}")
             steps.append(step)
@@ -761,6 +831,11 @@ class ProofGenerator:
             "ia_ka": ProofValue.create("I_a", ia, "kA", "ia_ka"),
             "ib_ka": ProofValue.create("I_b", ib, "kA", "ib_ka"),
             "ic_ka": ProofValue.create("I_c", ic, "kA", "ic_ka"),
+            "ikss_ka": ProofValue.create("I_k''", ikss_ka, "kA", "ikss_ka"),
+            "ip_ka": ProofValue.create("i_p", ip_ka, "kA", "ip_ka"),
+            "ith_ka": ProofValue.create("I_{th}", ith_ka, "kA", "ith_ka"),
+            "idyn_ka": ProofValue.create("I_{dyn}", idyn_ka, "kA", "idyn_ka"),
+            "kappa": ProofValue.create("\\kappa", kappa, "—", "kappa"),
         }
 
         summary = ProofSummary(
@@ -861,6 +936,270 @@ class ProofGenerator:
         ib = i0 + a2 * i1 + a * i2
         ic = i0 + a * i1 + a2 * i2
         return ia, ib, ic
+
+    @staticmethod
+    def _compute_sc1_ikss(
+        *,
+        fault_type: str,
+        c_factor: float,
+        u_n_kv: float,
+        z_equiv: complex,
+    ) -> float:
+        """
+        I″k for asymmetrical faults per IEC 60909-0:2016.
+
+        - 1F-Z: I″k1 = √3·c·Un / |Z_k|  (eq. 29)
+        - 2F:   I″k2 = c·Un / |Z_k|       (eq. 23)
+        - 2F-Z: I″k2E = c·Un / |Z_k|
+        """
+        z_abs = abs(z_equiv)
+        if z_abs == 0:
+            raise ValueError("Z_k = 0; cannot compute I″k")
+        if fault_type == "SC1FZ":
+            return math.sqrt(3.0) * c_factor * u_n_kv / z_abs
+        return c_factor * u_n_kv / z_abs
+
+    # =========================================================================
+    # SC1 Post-Fault Step Builders (§4.1 — MANDATORY)
+    # =========================================================================
+
+    @classmethod
+    def _create_sc1_step_ikss(
+        cls,
+        *,
+        step_number: int,
+        fault_type: str,
+        c_factor: float,
+        u_n_kv: float,
+        z_equiv: complex,
+        ikss_ka: float,
+    ) -> ProofStep:
+        """Step: I″k (initial SC current for asymmetrical faults). c TUTAJ."""
+        equation = EQ_SC1_008
+        z_abs = abs(z_equiv)
+
+        input_values = (
+            ProofValue.create("c", c_factor, "—", "c_factor"),
+            ProofValue.create("U_n", u_n_kv, "kV", "u_n_kv"),
+            ProofValue.create("Z_k", z_equiv, "Ω", "z_equiv_ohm"),
+        )
+
+        if fault_type == "SC1FZ":
+            sqrt3 = math.sqrt(3.0)
+            substitution = (
+                f"I_k'' = \\frac{{\\sqrt{{3}} \\cdot {c_factor:.4f} \\cdot {u_n_kv:.4f}}}"
+                f"{{|Z_k|}} = "
+                f"\\frac{{{sqrt3:.4f} \\cdot {c_factor * u_n_kv:.4f}}}"
+                f"{{{z_abs:.4f}}} = "
+                f"{ikss_ka:.4f}\\,\\text{{kA}}"
+            )
+        else:
+            substitution = (
+                f"I_k'' = \\frac{{{c_factor:.4f} \\cdot {u_n_kv:.4f}}}"
+                f"{{|Z_k|}} = "
+                f"\\frac{{{c_factor * u_n_kv:.4f}}}"
+                f"{{{z_abs:.4f}}} = "
+                f"{ikss_ka:.4f}\\,\\text{{kA}}"
+            )
+
+        result = ProofValue.create("I_k''", ikss_ka, "kA", "ikss_ka")
+        unit_check = UnitVerifier.verify_equation(
+            equation.equation_id,
+            {"c": "—", "U_n": "kV", "Z_k": "Ω"},
+            "kA",
+        )
+
+        return ProofStep(
+            step_id=ProofStep.generate_step_id("SC1", step_number),
+            step_number=step_number,
+            title_pl=equation.name_pl,
+            equation=equation,
+            input_values=input_values,
+            substitution_latex=substitution,
+            result=result,
+            unit_check=unit_check,
+            source_keys={
+                "c": "c_factor",
+                "U_n": "u_n_kv",
+                "Z_k": "z_equiv_ohm",
+                "I_k''": "ikss_ka",
+            },
+        )
+
+    @classmethod
+    def _create_sc1_step_kappa(
+        cls,
+        *,
+        step_number: int,
+        r_equiv: float,
+        x_equiv: float,
+        kappa: float,
+    ) -> ProofStep:
+        """Step: κ (impact coefficient)."""
+        equation = EQ_SC1_009
+        rx_ratio = r_equiv / x_equiv if x_equiv != 0 else 0.0
+        exp_term = math.exp(-3 * rx_ratio)
+
+        input_values = (
+            ProofValue.create("R_k", r_equiv, "Ω", "r_equiv_ohm"),
+            ProofValue.create("X_k", x_equiv, "Ω", "x_equiv_ohm"),
+        )
+
+        substitution = (
+            f"\\kappa = 1.02 + 0.98 \\cdot e^{{-3 \\cdot {rx_ratio:.4f}}} = "
+            f"1.02 + 0.98 \\cdot {exp_term:.4f} = {kappa:.4f}"
+        )
+
+        result = ProofValue.create("\\kappa", kappa, "—", "kappa")
+        unit_check = UnitVerifier.verify_equation(
+            equation.equation_id,
+            {"R_k": "Ω", "X_k": "Ω"},
+            "—",
+        )
+
+        return ProofStep(
+            step_id=ProofStep.generate_step_id("SC1", step_number),
+            step_number=step_number,
+            title_pl=equation.name_pl,
+            equation=equation,
+            input_values=input_values,
+            substitution_latex=substitution,
+            result=result,
+            unit_check=unit_check,
+            source_keys={
+                "R_k": "r_equiv_ohm",
+                "X_k": "x_equiv_ohm",
+                "κ": "kappa",
+            },
+        )
+
+    @classmethod
+    def _create_sc1_step_ip(
+        cls,
+        *,
+        step_number: int,
+        kappa: float,
+        ikss_ka: float,
+        ip_ka: float,
+    ) -> ProofStep:
+        """Step: ip (peak impulse current)."""
+        equation = EQ_SC1_010
+        sqrt2 = math.sqrt(2.0)
+
+        input_values = (
+            ProofValue.create("\\kappa", kappa, "—", "kappa"),
+            ProofValue.create("I_k''", ikss_ka, "kA", "ikss_ka"),
+        )
+
+        substitution = (
+            f"i_p = {kappa:.4f} \\cdot \\sqrt{{2}} \\cdot {ikss_ka:.4f} = "
+            f"{kappa:.4f} \\cdot {sqrt2:.4f} \\cdot {ikss_ka:.4f} = "
+            f"{ip_ka:.4f}\\,\\text{{kA}}"
+        )
+
+        result = ProofValue.create("i_p", ip_ka, "kA", "ip_ka")
+        unit_check = UnitVerifier.verify_equation(
+            equation.equation_id,
+            {"κ": "—", "I_k''": "kA"},
+            "kA",
+        )
+
+        return ProofStep(
+            step_id=ProofStep.generate_step_id("SC1", step_number),
+            step_number=step_number,
+            title_pl=equation.name_pl,
+            equation=equation,
+            input_values=input_values,
+            substitution_latex=substitution,
+            result=result,
+            unit_check=unit_check,
+            source_keys={"κ": "kappa", "I_k''": "ikss_ka", "i_p": "ip_ka"},
+        )
+
+    @classmethod
+    def _create_sc1_step_idyn(
+        cls,
+        *,
+        step_number: int,
+        ip_ka: float,
+        idyn_ka: float,
+    ) -> ProofStep:
+        """Step: I_dyn (dynamic current — MANDATORY)."""
+        equation = EQ_SC1_012
+
+        input_values = (
+            ProofValue.create("i_p", ip_ka, "kA", "ip_ka"),
+        )
+
+        substitution = f"I_{{dyn}} = i_p = {idyn_ka:.4f}\\,\\text{{kA}}"
+
+        result = ProofValue.create("I_{dyn}", idyn_ka, "kA", "idyn_ka")
+        unit_check = UnitVerifier.verify_equation(
+            equation.equation_id,
+            {"i_p": "kA"},
+            "kA",
+        )
+
+        return ProofStep(
+            step_id=ProofStep.generate_step_id("SC1", step_number),
+            step_number=step_number,
+            title_pl=equation.name_pl,
+            equation=equation,
+            input_values=input_values,
+            substitution_latex=substitution,
+            result=result,
+            unit_check=unit_check,
+            source_keys={"i_p": "ip_ka", "I_dyn": "idyn_ka"},
+        )
+
+    @classmethod
+    def _create_sc1_step_ith(
+        cls,
+        *,
+        step_number: int,
+        ikss_ka: float,
+        m_factor: float,
+        n_factor: float,
+        ith_ka: float,
+    ) -> ProofStep:
+        """Step: I_th (thermal equivalent current — MANDATORY)."""
+        equation = EQ_SC1_011
+        sqrt_mn = math.sqrt(m_factor + n_factor)
+
+        input_values = (
+            ProofValue.create("I_k''", ikss_ka, "kA", "ikss_ka"),
+            ProofValue.create("m", m_factor, "—", "m_factor"),
+            ProofValue.create("n", n_factor, "—", "n_factor"),
+        )
+
+        substitution = (
+            f"I_{{th}} = {ikss_ka:.4f} \\cdot \\sqrt{{{m_factor:.4f} + {n_factor:.4f}}} = "
+            f"{ikss_ka:.4f} \\cdot {sqrt_mn:.4f} = {ith_ka:.4f}\\,\\text{{kA}}"
+        )
+
+        result = ProofValue.create("I_{th}", ith_ka, "kA", "ith_ka")
+        unit_check = UnitVerifier.verify_equation(
+            equation.equation_id,
+            {"I_k''": "kA", "m": "—", "n": "—"},
+            "kA",
+        )
+
+        return ProofStep(
+            step_id=ProofStep.generate_step_id("SC1", step_number),
+            step_number=step_number,
+            title_pl=equation.name_pl,
+            equation=equation,
+            input_values=input_values,
+            substitution_latex=substitution,
+            result=result,
+            unit_check=unit_check,
+            source_keys={
+                "I_k''": "ikss_ka",
+                "m": "m_factor",
+                "n": "n_factor",
+                "I_th": "ith_ka",
+            },
+        )
 
     # =========================================================================
     # SC3F Step Builders
