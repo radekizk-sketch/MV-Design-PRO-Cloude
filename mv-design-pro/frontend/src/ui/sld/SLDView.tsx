@@ -253,7 +253,7 @@ export const SLDView: React.FC<SLDViewProps> = ({
    * Handle mouse wheel (zoom).
    */
   const handleWheel = useCallback(
-    (e: React.WheelEvent) => {
+    (e: WheelEvent) => {
       e.preventDefault();
       const delta = e.deltaY > 0 ? -ZOOM_STEP : ZOOM_STEP;
       setViewport((prev) => ({
@@ -263,6 +263,13 @@ export const SLDView: React.FC<SLDViewProps> = ({
     },
     []
   );
+
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+    container.addEventListener('wheel', handleWheel, { passive: false });
+    return () => container.removeEventListener('wheel', handleWheel);
+  }, [handleWheel]);
 
   /**
    * Handle mouse down (start pan).
@@ -755,7 +762,6 @@ export const SLDView: React.FC<SLDViewProps> = ({
       <div
         ref={containerRef}
         className="flex-1 overflow-hidden relative"
-        onWheel={handleWheel}
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
