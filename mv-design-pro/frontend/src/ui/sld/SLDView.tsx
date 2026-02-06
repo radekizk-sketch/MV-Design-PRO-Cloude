@@ -275,6 +275,13 @@ export const SLDView: React.FC<SLDViewProps> = ({
     return () => container.removeEventListener('wheel', handleWheel);
   }, []);
 
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+    container.addEventListener('wheel', handleWheel, { passive: false });
+    return () => container.removeEventListener('wheel', handleWheel);
+  }, [handleWheel]);
+
   /**
    * Handle mouse down (start pan).
    */
