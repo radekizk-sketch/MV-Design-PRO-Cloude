@@ -1,6 +1,6 @@
 # MV-DESIGN-PRO Operational Plan
 
-**Version:** 3.0
+**Version:** 4.0
 **Status:** LIVING DOCUMENT
 **Reference:** SYSTEM_SPEC.md (authoritative)
 
@@ -13,7 +13,7 @@ MV-DESIGN-PRO is a functional Medium Voltage network design and analysis system 
 - 8+ proof packs (SC3F, VDROP, Equipment, PF, Losses, Protection, Earthing, LF Voltage)
 - 12+ analysis modules (Protection, Voltage, Normative, Coverage, Sensitivity, Comparison, Recommendations)
 - Full frontend: SLD editor, Results Browser, Case Manager, Proof Inspector, Protection Diagnostics
-- 157+ backend tests
+- 1600+ backend tests
 - Project import/export (ZIP, deterministic, versioned)
 - CAD geometry editing in SLD
 - PDF/DOCX report generation
@@ -60,6 +60,15 @@ MV-DESIGN-PRO is a functional Medium Voltage network design and analysis system 
 | SLD Routing Corridors | Connection routing obstacles | DONE |
 | Infra: /api/health | Health endpoint + API URL separation | DONE |
 | Memory Canonization V3.0 | This canonization pass | DONE |
+| EP-1: Application API | Projects + Cases + Network persistence | DONE |
+| EP-4: Case-Bound Runs | POST /cases/{cid}/runs/short-circuit, loadflow, protection | DONE |
+| EP-5: SC Asymmetrical | Solver supports 1F, 2F, 2F+G (already existed) | DONE |
+| EP-6: Protection Settings | I>/I>> dobor nastaw (Hoppel method) | DONE |
+| EP-7: Q(U) Regulation | Proof pack NC RfG compliance | DONE |
+| EP-9: PostgreSQL | Full SQLAlchemy ORM (was already migrated) | DONE |
+| EP-10: XLSX Importer | Import sieci z Excel | DONE |
+| EP-11: Docker + Health | Rozszerzony health: db_ok, engine_ok, solvers, uptime | DONE |
+| EP-3: Wizard K1-K10 | Frontend kreator budowy sieci | DONE |
 
 ---
 
@@ -95,21 +104,21 @@ Tasks:
 
 ### 4.2 MEDIUM Priority
 
-| Item | Description |
-|------|-------------|
-| Regulation Q(U) Proofs | Reactive power regulation proof pack |
-| P16: Normative Coordination | Selectivity coordination (DEFERRED from earlier) |
-| Frontend Test Coverage | Increase Vitest + Playwright coverage |
-| CI Pipeline Enhancement | Add frontend type-check and lint to CI |
+| Item | Description | Status |
+|------|-------------|--------|
+| Regulation Q(U) Proofs | Reactive power regulation proof pack | DONE |
+| P16: Normative Coordination | Selectivity coordination (DEFERRED from earlier) | PLANNED |
+| Frontend Test Coverage | Increase Vitest + Playwright coverage | PLANNED |
+| CI Pipeline Enhancement | Add frontend type-check and lint to CI | PLANNED |
 
 ### 4.3 LOW Priority
 
-| Item | Description |
-|------|-------------|
-| XLSX Network Importer | Import from spreadsheet (ADR-009) |
-| Cloud Backup Integration | S3/GCS integration |
-| Incremental Archive Export | Delta export |
-| Archive Diff | Compare two project archives |
+| Item | Description | Status |
+|------|-------------|--------|
+| XLSX Network Importer | Import from spreadsheet (ADR-009) | DONE |
+| Cloud Backup Integration | S3/GCS integration | PLANNED |
+| Incremental Archive Export | Delta export | PLANNED |
+| Archive Diff | Compare two project archives | PLANNED |
 
 ---
 

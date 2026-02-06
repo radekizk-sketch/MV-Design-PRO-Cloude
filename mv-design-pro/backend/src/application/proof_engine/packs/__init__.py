@@ -12,6 +12,8 @@ Pakiety dowodowe:
 - P18: Branch Loading - w proof_generator.py (Protection)
 - P19: Thermal - w proof_generator.py (Earthing)
 - SC Asymmetrical: 1F-Z, 2F, 2F-Z (§4.1 blocker resolution)
+- Protection Settings: I>/I>> (Hoppel method, IRiESD)
+- Q(U) Regulation: NC RfG compliance
 """
 
 from application.proof_engine.packs.p14_power_flow import (
@@ -27,6 +29,17 @@ from application.proof_engine.packs.sc_asymmetrical import (
     SCAsymmetricalPackResult,
     SCAsymmetricalProofPack,
 )
+from application.proof_engine.packs.protection_settings import (
+    ProtectionSettingsProofInput,
+    ProtectionSettingsProofPack,
+    ProtectionSettingsProofResult,
+)
+from application.proof_engine.packs.qu_regulation import (
+    QUCharacteristicPoint,
+    QURegulationProofInput,
+    QURegulationProofPack,
+    QURegulationProofResult,
+)
 
 __all__ = [
     "P14PowerFlowInput",
@@ -36,4 +49,11 @@ __all__ = [
     "SCAsymmetricalPackInput",
     "SCAsymmetricalPackResult",
     "SCAsymmetricalProofPack",
+    "ProtectionSettingsProofInput",
+    "ProtectionSettingsProofPack",
+    "ProtectionSettingsProofResult",
+    "QUCharacteristicPoint",
+    "QURegulationProofInput",
+    "QURegulationProofPack",
+    "QURegulationProofResult",
 ]

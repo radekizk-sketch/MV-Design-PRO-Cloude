@@ -30,6 +30,8 @@ from api.reference_patterns import router as reference_patterns_router
 from api.sld import router as sld_router
 from api.snapshots import router as snapshots_router
 from api.study_cases import router as study_cases_router
+from api.case_runs import router as case_runs_router
+from api.xlsx_import import router as xlsx_import_router
 from infrastructure.persistence.db import (
     create_engine_from_url,
     create_session_factory,
@@ -62,7 +64,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="MV-DESIGN PRO API",
     description="Professional Medium Voltage Network Design System API",
-    version="0.1.0",
+    version="4.0.0",
     docs_url="/docs",
     redoc_url="/redoc",
     lifespan=lifespan,
@@ -110,12 +112,14 @@ app.include_router(reference_patterns_router)
 app.include_router(sld_router)
 app.include_router(snapshots_router)
 app.include_router(study_cases_router)
+app.include_router(case_runs_router)
+app.include_router(xlsx_import_router)
 
 
 @app.get("/")
 async def root() -> dict[str, str]:
     """Root endpoint."""
-    return {"message": "MV-DESIGN PRO API", "version": "0.1.0"}
+    return {"message": "MV-DESIGN PRO API", "version": "4.0.0"}
 
 
 @app.get("/health")
