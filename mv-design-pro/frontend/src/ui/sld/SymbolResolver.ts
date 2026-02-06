@@ -25,6 +25,7 @@ import type { AnySldSymbol, BranchSymbol, SwitchSymbol } from '../sld-editor/typ
 const _warnedMessages = new Set<string>();
 
 function warnOnce(message: string): void {
+  if (!import.meta.env.DEV) return;
   if (_warnedMessages.has(message)) return;
   _warnedMessages.add(message);
   console.warn(message);
