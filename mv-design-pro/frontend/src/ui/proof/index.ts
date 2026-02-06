@@ -15,7 +15,7 @@
  * - Selection → trace navigation (mapowanie)
  * - Eksport: JSONL, PDF (client-side, bez backendu)
  *
- * NOTE: Nazwy kodowe (P11, P14, P17) NIGDY nie są eksportowane ani używane w UI.
+ * NOTE: Nazwy kodowe NIGDY nie są eksportowane ani używane w UI.
  */
 
 // Components

@@ -90,8 +90,8 @@ Tasks:
 | Phase 6: Wizard/SLD Unity | Formal verification that Wizard and SLD operate on same model | DONE |
 | NetworkValidator Extension | Full PowerFactory-grade validation rules (13 rules, 29 tests) | DONE |
 | Bus Terminology Completion | Finish Node -> Bus rename in all code paths | DONE |
-| SC Asymmetrical Proofs | 1F, 2F fault proof packs (IEC 60909) | PENDING |
-| Normative Completion Pack (P20) | Full PN-EN normative compliance proof | PENDING |
+| SC Asymmetrical Proofs | 1F, 2F, 2F-Z fault proof packs (IEC 60909) | DONE |
+| Normative Completion Pack (IEC 60909 §4.1) | Domknięcie mapowania norma→dowód + golden proofs + CI gates | DONE |
 
 ### 4.2 MEDIUM Priority
 
