@@ -19,6 +19,18 @@
 import type { AnySldSymbol, BranchSymbol, SwitchSymbol } from '../sld-editor/types';
 
 /**
+ * Dedupe cache for console warnings.
+ * Each unique message is logged at most once to avoid DevTools spam.
+ */
+const _warnedMessages = new Set<string>();
+
+function warnOnce(message: string): void {
+  if (_warnedMessages.has(message)) return;
+  _warnedMessages.add(message);
+  console.warn(message);
+}
+
+/**
  * Symbol ID z biblioteki ETAP.
  */
 export type EtapSymbolId =
@@ -351,7 +363,7 @@ export function resolveSymbol(symbol: AnySldSymbol): ResolvedSymbol | null {
           return getSymbolDefinition('disconnector');
         default:
           // Fallback dla nieznanych switchType
-          console.warn(`[SymbolResolver] Nieznany switchType: ${switchSymbol.switchType}, używam circuit_breaker`);
+          warnOnce(`[SymbolResolver] Nieznany switchType: ${switchSymbol.switchType}, używam circuit_breaker`);
           return getSymbolDefinition('circuit_breaker');
       }
     }
@@ -364,11 +376,11 @@ export function resolveSymbol(symbol: AnySldSymbol): ResolvedSymbol | null {
     case 'Load':
       // Load nie ma symbolu w bibliotece ETAP
       // Zwracamy null → fallback w rendererze (obecny trójkąt)
-      console.warn('[SymbolResolver] Load nie ma symbolu ETAP - używam fallbacku');
+      warnOnce('[SymbolResolver] Load nie ma symbolu ETAP - używam fallbacku');
       return null;
 
     default:
-      console.warn(`[SymbolResolver] Nieznany elementType: ${elementType}`);
+      warnOnce(`[SymbolResolver] Nieznany elementType: ${elementType}`);
       return null;
   }
 }

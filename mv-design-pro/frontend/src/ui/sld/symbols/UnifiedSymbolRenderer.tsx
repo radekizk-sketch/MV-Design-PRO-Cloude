@@ -44,6 +44,12 @@ import {
 } from '../sldEtapStyle';
 
 /**
+ * Dedupe cache for unknown symbol warnings.
+ * Prevents DevTools spam when rendering multiple unknown elements.
+ */
+const _warnedSymbols = new Set<string>();
+
+/**
  * Symbol size configuration.
  * ETAP symbols use viewBox 100x100, scaled to these sizes.
  * Uses ETAP_SYMBOL_SIZES from sldEtapStyle.ts as source of truth.
@@ -592,7 +598,11 @@ export const UnifiedSymbolRenderer: React.FC<UnifiedSymbolRendererProps> = ({
 
   // Handle unknown symbols (no ETAP mapping)
   if (!resolvedSymbol) {
-    console.warn(`[UnifiedSymbolRenderer] Brak mapowania ETAP dla elementu: ${elementType} (${elementName})`);
+    const warnKey = `${elementType}:${elementName}`;
+    if (!_warnedSymbols.has(warnKey)) {
+      _warnedSymbols.add(warnKey);
+      console.warn(`[UnifiedSymbolRenderer] Brak mapowania ETAP dla elementu: ${elementType} (${elementName})`);
+    }
     return (
       <g
         {...testIdAttrs}

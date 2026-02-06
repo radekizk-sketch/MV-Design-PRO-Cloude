@@ -32,7 +32,7 @@
  * 100% POLISH UI
  */
 
-import { type ReactNode, useCallback, useState, useMemo } from 'react';
+import { type ReactNode, useCallback, useState, useMemo, useEffect } from 'react';
 import { clsx } from 'clsx';
 import { ActiveCaseBar } from '../active-case-bar';
 import { StatusBar } from '../status-bar';
@@ -509,6 +509,20 @@ function CaseManagerPanel({
     },
     [onClose, onViewResults]
   );
+
+  // ESC key closes Case Manager
+  useEffect(() => {
+    if (!open) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onClose();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [open, onClose]);
 
   return (
     <>

@@ -133,6 +133,9 @@ export const SLDView: React.FC<SLDViewProps> = ({
   const isPanning = useRef(false);
   const lastMousePos = useRef({ x: 0, y: 0 });
 
+  // State for cursor visual (refs don't trigger re-renders)
+  const [cursorStyle, setCursorStyle] = useState<'default' | 'grabbing'>('default');
+
   /**
    * Fit to content on mount if enabled.
    */
@@ -251,18 +254,26 @@ export const SLDView: React.FC<SLDViewProps> = ({
 
   /**
    * Handle mouse wheel (zoom).
+   * Attached via useEffect with { passive: false } to allow preventDefault().
+   * React synthetic onWheel uses passive listeners — calling preventDefault()
+   * there throws "Unable to preventDefault inside passive event listener".
    */
-  const handleWheel = useCallback(
-    (e: React.WheelEvent) => {
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    const handleWheel = (e: WheelEvent) => {
       e.preventDefault();
       const delta = e.deltaY > 0 ? -ZOOM_STEP : ZOOM_STEP;
       setViewport((prev) => ({
         ...prev,
         zoom: Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, prev.zoom + delta)),
       }));
-    },
-    []
-  );
+    };
+
+    container.addEventListener('wheel', handleWheel, { passive: false });
+    return () => container.removeEventListener('wheel', handleWheel);
+  }, []);
 
   /**
    * Handle mouse down (start pan).
@@ -272,6 +283,7 @@ export const SLDView: React.FC<SLDViewProps> = ({
     if (e.button === 1 || e.button === 2) {
       e.preventDefault();
       isPanning.current = true;
+      setCursorStyle('grabbing');
       lastMousePos.current = { x: e.clientX, y: e.clientY };
     }
   }, []);
@@ -298,6 +310,7 @@ export const SLDView: React.FC<SLDViewProps> = ({
    */
   const handleMouseUp = useCallback(() => {
     isPanning.current = false;
+    setCursorStyle('default');
   }, []);
 
   /**
@@ -755,13 +768,12 @@ export const SLDView: React.FC<SLDViewProps> = ({
       <div
         ref={containerRef}
         className="flex-1 overflow-hidden relative"
-        onWheel={handleWheel}
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
         onMouseLeave={handleMouseUp}
         onContextMenu={handleContextMenu}
-        style={{ cursor: isPanning.current ? 'grabbing' : 'default' }}
+        style={{ cursor: cursorStyle }}
       >
         <SLDViewCanvas
           symbols={symbols}
