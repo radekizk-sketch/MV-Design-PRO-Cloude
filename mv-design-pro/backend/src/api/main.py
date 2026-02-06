@@ -33,6 +33,7 @@ from api.snapshots import router as snapshots_router
 from api.study_cases import router as study_cases_router
 from api.case_runs import router as case_runs_router
 from api.xlsx_import import router as xlsx_import_router
+from api.enm import router as enm_router
 from infrastructure.persistence.db import (
     create_engine_from_url,
     create_session_factory,
@@ -116,6 +117,7 @@ app.include_router(snapshots_router)
 app.include_router(study_cases_router)
 app.include_router(case_runs_router)
 app.include_router(xlsx_import_router)
+app.include_router(enm_router)
 
 
 @app.get("/")

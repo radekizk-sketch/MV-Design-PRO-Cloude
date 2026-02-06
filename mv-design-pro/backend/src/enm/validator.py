@@ -1,0 +1,352 @@
+"""
+ENMValidator — walidacja energetyczna modelu sieci (readiness gate).
+
+To NIE jest walidacja API (HTTP 400). To walidacja PROJEKTU SIECI.
+Komunikaty po polsku.
+"""
+
+from __future__ import annotations
+
+from typing import Literal
+
+import networkx as nx
+from pydantic import BaseModel
+
+from .models import (
+    Cable,
+    EnergyNetworkModel,
+    FuseBranch,
+    OverheadLine,
+    SwitchBranch,
+)
+
+
+class ValidationIssue(BaseModel):
+    code: str
+    severity: Literal["BLOCKER", "IMPORTANT", "INFO"]
+    message_pl: str
+    element_refs: list[str] = []
+    wizard_step_hint: str = ""
+    suggested_fix: str | None = None
+
+
+class AnalysisAvailability(BaseModel):
+    short_circuit_3f: bool = False
+    short_circuit_1f: bool = False
+    load_flow: bool = False
+
+
+class ValidationResult(BaseModel):
+    status: Literal["OK", "WARN", "FAIL"]
+    issues: list[ValidationIssue] = []
+    analysis_available: AnalysisAvailability = AnalysisAvailability()
+
+
+class ENMValidator:
+    """Walidator energetyczny modelu sieci."""
+
+    def validate(self, enm: EnergyNetworkModel) -> ValidationResult:
+        issues: list[ValidationIssue] = []
+
+        self._check_blockers(enm, issues)
+        self._check_warnings(enm, issues)
+        self._check_info(enm, issues)
+
+        has_blockers = any(i.severity == "BLOCKER" for i in issues)
+        has_warnings = any(i.severity == "IMPORTANT" for i in issues)
+
+        if has_blockers:
+            status: Literal["OK", "WARN", "FAIL"] = "FAIL"
+        elif has_warnings:
+            status = "WARN"
+        else:
+            status = "OK"
+
+        availability = self._compute_availability(enm, issues)
+
+        return ValidationResult(
+            status=status,
+            issues=issues,
+            analysis_available=availability,
+        )
+
+    # ------------------------------------------------------------------
+    # BLOCKERS (E001-E008)
+    # ------------------------------------------------------------------
+
+    def _check_blockers(self, enm: EnergyNetworkModel, issues: list[ValidationIssue]) -> None:
+        # E001: Brak źródła zasilania
+        if not enm.sources:
+            issues.append(ValidationIssue(
+                code="E001",
+                severity="BLOCKER",
+                message_pl="Brak źródła zasilania w modelu sieci.",
+                wizard_step_hint="K2",
+                suggested_fix="Dodaj źródło zasilania (sieć zewnętrzna lub Thevenin) na szynie głównej.",
+            ))
+
+        # E002: Brak szyn
+        if not enm.buses:
+            issues.append(ValidationIssue(
+                code="E002",
+                severity="BLOCKER",
+                message_pl="Brak szyn (węzłów) w modelu sieci.",
+                wizard_step_hint="K3",
+                suggested_fix="Dodaj przynajmniej jedną szynę w kroku K2 lub K3.",
+            ))
+
+        # E003: Graf niespójny (wyspy odcięte od źródła)
+        if len(enm.buses) > 1:
+            self._check_graph_connectivity(enm, issues)
+
+        # E004: Szyna bez napięcia znamionowego
+        for bus in enm.buses:
+            if bus.voltage_kv <= 0:
+                issues.append(ValidationIssue(
+                    code="E004",
+                    severity="BLOCKER",
+                    message_pl=f"Szyna '{bus.ref_id}' nie ma napięcia znamionowego (voltage_kv <= 0).",
+                    element_refs=[bus.ref_id],
+                    wizard_step_hint="K3",
+                    suggested_fix=f"Ustaw napięcie znamionowe szyny '{bus.name}'.",
+                ))
+
+        # E005: Gałąź bez impedancji
+        for branch in enm.branches:
+            if isinstance(branch, (OverheadLine, Cable)):
+                if branch.r_ohm_per_km == 0 and branch.x_ohm_per_km == 0:
+                    issues.append(ValidationIssue(
+                        code="E005",
+                        severity="BLOCKER",
+                        message_pl=(
+                            f"Gałąź '{branch.ref_id}' ma zerową impedancję "
+                            f"(R=0 i X=0 Ω/km)."
+                        ),
+                        element_refs=[branch.ref_id],
+                        wizard_step_hint="K4",
+                        suggested_fix=f"Wprowadź parametry impedancji gałęzi '{branch.name}'.",
+                    ))
+
+        # E006: Transformator bez napięcia zwarcia
+        for trafo in enm.transformers:
+            if trafo.uk_percent <= 0:
+                issues.append(ValidationIssue(
+                    code="E006",
+                    severity="BLOCKER",
+                    message_pl=(
+                        f"Transformator '{trafo.ref_id}' nie ma napięcia zwarcia (uk% <= 0)."
+                    ),
+                    element_refs=[trafo.ref_id],
+                    wizard_step_hint="K5",
+                    suggested_fix=f"Wprowadź uk% transformatora '{trafo.name}'.",
+                ))
+
+        # E007: Transformator hv = lv
+        for trafo in enm.transformers:
+            if trafo.hv_bus_ref == trafo.lv_bus_ref:
+                issues.append(ValidationIssue(
+                    code="E007",
+                    severity="BLOCKER",
+                    message_pl=(
+                        f"Transformator '{trafo.ref_id}': strona HV i LV "
+                        f"podłączone do tej samej szyny '{trafo.hv_bus_ref}'."
+                    ),
+                    element_refs=[trafo.ref_id],
+                    wizard_step_hint="K5",
+                    suggested_fix="Podłącz strony HV i LV do różnych szyn.",
+                ))
+
+        # E008: Źródło bez parametrów zwarciowych
+        for source in enm.sources:
+            has_sk = source.sk3_mva is not None and source.sk3_mva > 0
+            has_rx = (
+                source.r_ohm is not None
+                and source.x_ohm is not None
+                and (source.r_ohm > 0 or source.x_ohm > 0)
+            )
+            has_ik = source.ik3_ka is not None and source.ik3_ka > 0
+            if not (has_sk or has_rx or has_ik):
+                issues.append(ValidationIssue(
+                    code="E008",
+                    severity="BLOCKER",
+                    message_pl=(
+                        f"Źródło '{source.ref_id}' nie ma parametrów zwarciowych "
+                        f"(brak Sk'', Ik'' lub R/X)."
+                    ),
+                    element_refs=[source.ref_id],
+                    wizard_step_hint="K2",
+                    suggested_fix=(
+                        f"Wprowadź moc zwarciową Sk'' lub impedancję R+jX "
+                        f"źródła '{source.name}'."
+                    ),
+                ))
+
+    # ------------------------------------------------------------------
+    # WARNINGS (W001-W004)
+    # ------------------------------------------------------------------
+
+    def _check_warnings(self, enm: EnergyNetworkModel, issues: list[ValidationIssue]) -> None:
+        # W001: Brak Z₀ na linii
+        for branch in enm.branches:
+            if isinstance(branch, (OverheadLine, Cable)):
+                if branch.r0_ohm_per_km is None and branch.x0_ohm_per_km is None:
+                    issues.append(ValidationIssue(
+                        code="W001",
+                        severity="IMPORTANT",
+                        message_pl=(
+                            f"Gałąź '{branch.ref_id}' nie ma składowej zerowej (Z₀) — "
+                            f"zwarcia 1F/2F-Z niedostępne."
+                        ),
+                        element_refs=[branch.ref_id],
+                        wizard_step_hint="K7",
+                        suggested_fix="Wprowadź parametry R₀/X₀ w kroku K7.",
+                    ))
+
+        # W002: Brak Z₀ źródła
+        for source in enm.sources:
+            has_z0 = (
+                (source.r0_ohm is not None and source.x0_ohm is not None)
+                or source.z0_z1_ratio is not None
+            )
+            if not has_z0:
+                issues.append(ValidationIssue(
+                    code="W002",
+                    severity="IMPORTANT",
+                    message_pl=(
+                        f"Źródło '{source.ref_id}' nie ma składowej zerowej (Z₀) — "
+                        f"zwarcia 1F/2F-Z niedostępne."
+                    ),
+                    element_refs=[source.ref_id],
+                    wizard_step_hint="K2",
+                    suggested_fix="Wprowadź parametry R₀/X₀ lub Z₀/Z₁ źródła.",
+                ))
+
+        # W003: Brak odbiorów/generacji
+        if not enm.loads and not enm.generators:
+            issues.append(ValidationIssue(
+                code="W003",
+                severity="IMPORTANT",
+                message_pl="Brak odbiorów i generatorów — rozpływ mocy będzie pusty.",
+                wizard_step_hint="K6",
+                suggested_fix="Dodaj odbiory lub generatory w kroku K6.",
+            ))
+
+        # W004: Transformator bez grupy połączeń
+        for trafo in enm.transformers:
+            if not trafo.vector_group:
+                issues.append(ValidationIssue(
+                    code="W004",
+                    severity="IMPORTANT",
+                    message_pl=(
+                        f"Transformator '{trafo.ref_id}' nie ma grupy "
+                        f"połączeń (vector_group)."
+                    ),
+                    element_refs=[trafo.ref_id],
+                    wizard_step_hint="K5",
+                    suggested_fix="Wprowadź grupę połączeń (np. Dyn11).",
+                ))
+
+    # ------------------------------------------------------------------
+    # INFO (I001-I002)
+    # ------------------------------------------------------------------
+
+    def _check_info(self, enm: EnergyNetworkModel, issues: list[ValidationIssue]) -> None:
+        # I001: Łącznik otwarty
+        for branch in enm.branches:
+            if isinstance(branch, SwitchBranch) and branch.status == "open":
+                issues.append(ValidationIssue(
+                    code="I001",
+                    severity="INFO",
+                    message_pl=(
+                        f"Łącznik '{branch.ref_id}' w stanie 'open' — "
+                        f"odcina część sieci."
+                    ),
+                    element_refs=[branch.ref_id],
+                    wizard_step_hint="K3",
+                ))
+
+        # I002: Gałąź bez katalogu
+        for branch in enm.branches:
+            if isinstance(branch, (OverheadLine, Cable)) and not branch.catalog_ref:
+                issues.append(ValidationIssue(
+                    code="I002",
+                    severity="INFO",
+                    message_pl=(
+                        f"Gałąź '{branch.ref_id}' bez katalogu — "
+                        f"parametry wprowadzone ręcznie."
+                    ),
+                    element_refs=[branch.ref_id],
+                    wizard_step_hint="K4",
+                ))
+
+    # ------------------------------------------------------------------
+    # Graph connectivity check
+    # ------------------------------------------------------------------
+
+    def _check_graph_connectivity(
+        self, enm: EnergyNetworkModel, issues: list[ValidationIssue]
+    ) -> None:
+        g = nx.Graph()
+        bus_refs = {b.ref_id for b in enm.buses}
+        for ref in bus_refs:
+            g.add_node(ref)
+
+        for branch in enm.branches:
+            if branch.status == "closed":
+                if branch.from_bus_ref in bus_refs and branch.to_bus_ref in bus_refs:
+                    g.add_edge(branch.from_bus_ref, branch.to_bus_ref)
+
+        for trafo in enm.transformers:
+            if trafo.hv_bus_ref in bus_refs and trafo.lv_bus_ref in bus_refs:
+                g.add_edge(trafo.hv_bus_ref, trafo.lv_bus_ref)
+
+        source_bus_refs = {s.bus_ref for s in enm.sources if s.bus_ref in bus_refs}
+
+        components = list(nx.connected_components(g))
+        if len(components) <= 1:
+            return
+
+        for comp in components:
+            if not comp.intersection(source_bus_refs):
+                island_refs = sorted(comp)
+                issues.append(ValidationIssue(
+                    code="E003",
+                    severity="BLOCKER",
+                    message_pl=(
+                        f"Wyspa sieci odcięta od źródła zasilania: "
+                        f"{', '.join(island_refs[:5])}"
+                        f"{'...' if len(island_refs) > 5 else ''}."
+                    ),
+                    element_refs=island_refs[:10],
+                    wizard_step_hint="K4",
+                    suggested_fix="Połącz odizolowane szyny z resztą sieci.",
+                ))
+
+    # ------------------------------------------------------------------
+    # Analysis availability
+    # ------------------------------------------------------------------
+
+    def _compute_availability(
+        self, enm: EnergyNetworkModel, issues: list[ValidationIssue]
+    ) -> AnalysisAvailability:
+        has_blockers = any(i.severity == "BLOCKER" for i in issues)
+
+        if has_blockers:
+            return AnalysisAvailability(
+                short_circuit_3f=False,
+                short_circuit_1f=False,
+                load_flow=False,
+            )
+
+        # SC 1F requires Z₀ on all lines and sources
+        has_z0_warnings = any(i.code in ("W001", "W002") for i in issues)
+        sc_1f = not has_z0_warnings
+
+        # Load flow requires at least one load or generator
+        has_loads = bool(enm.loads) or bool(enm.generators)
+
+        return AnalysisAvailability(
+            short_circuit_3f=True,
+            short_circuit_1f=sc_1f,
+            load_flow=has_loads,
+        )

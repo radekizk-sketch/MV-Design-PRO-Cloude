@@ -69,6 +69,7 @@ MV-DESIGN-PRO is a functional Medium Voltage network design and analysis system 
 | EP-10: XLSX Importer | Import sieci z Excel | DONE |
 | EP-11: Docker + Health | Rozszerzony health: db_ok, engine_ok, solvers, uptime | DONE |
 | EP-3: Wizard K1-K10 | Frontend kreator budowy sieci | DONE |
+| ENM v1.0 | EnergyNetworkModel contract + mapping + validator + API + Wizard | DONE |
 
 ---
 
