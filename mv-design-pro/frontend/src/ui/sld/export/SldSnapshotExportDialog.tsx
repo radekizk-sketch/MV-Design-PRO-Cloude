@@ -174,6 +174,20 @@ export const SldSnapshotExportDialog: React.FC<SldSnapshotExportDialogProps> = (
     await onExport(format, options);
   }, [format, pngScale, pdfPageSize, pdfOrientation, scope, layers, onExport]);
 
+  // ESC key handler for closing dialog
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && !isExporting) {
+        onClose();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, isExporting, onClose]);
+
   if (!isOpen) return null;
 
   return (

@@ -385,9 +385,6 @@ export const SldCanvas: React.FC = () => {
           const result = sldStore.confirmConnection();
           if (result) {
             sldStore.showInfo('Połączenie utworzone');
-            // TODO: Tutaj mozna dodac logike tworzenia polaczenia w modelu
-            // eslint-disable-next-line no-console
-            console.log('[PR-SLD-05] Nowe polaczenie:', result);
           }
         } else {
           // Pokaz blad walidacji
@@ -415,8 +412,9 @@ export const SldCanvas: React.FC = () => {
   const handleCanvasMouseDown = useCallback(
     (e: React.MouseEvent<SVGSVGElement>) => {
       if (isMutationBlocked) return;
+      if (!svgRef.current) return;
 
-      const rect = svgRef.current!.getBoundingClientRect();
+      const rect = svgRef.current.getBoundingClientRect();
       const position = {
         x: e.clientX - rect.left,
         y: e.clientY - rect.top,

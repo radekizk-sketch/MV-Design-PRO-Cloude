@@ -135,12 +135,14 @@ export function BlockedOverlay({
           onClick={handleClick}
           className={clsx(
             'absolute inset-0 z-10',
-            'bg-gray-100/50 cursor-not-allowed',
+            'bg-gray-100/60 cursor-not-allowed',
             'flex items-center justify-center'
           )}
           title={message}
         >
-          <span className="sr-only">{message}</span>
+          <span className="px-3 py-1.5 bg-white/90 border border-gray-300 rounded shadow-sm text-xs text-gray-600 text-center max-w-[90%] pointer-events-none select-none">
+            {message}
+          </span>
         </div>
       )}
     </div>
