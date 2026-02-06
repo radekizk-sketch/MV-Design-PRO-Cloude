@@ -359,13 +359,18 @@ class TestSC1ProofGenerator:
             assert eq_id in sc1, f"Missing SC1 equation ID: {eq_id}"
 
     def test_sc1_step_order_defined(self):
-        """Kolejność kroków SC1 jest zdefiniowana i stabilna."""
+        """Kolejność kroków SC1 jest zdefiniowana i stabilna (§4.1)."""
         expected = [
             "EQ_SC1_001",
             "EQ_SC1_002",
             "EQ_SC1_003",
             "EQ_SC1_006",
             "EQ_SC1_007",
+            "EQ_SC1_008",
+            "EQ_SC1_009",
+            "EQ_SC1_010",
+            "EQ_SC1_012",
+            "EQ_SC1_011",
         ]
         assert EquationRegistry.get_sc1_step_order("SC1FZ") == expected
 
