@@ -18,7 +18,13 @@ export {
   doBoundingBoxesIntersect,
 } from './geometry';
 
-// Auto-layout (ETAP-style hierarchical layout)
+// Auto-layout (topological engine — 10/10)
+export {
+  computeTopologicalLayout,
+  verifyDeterminism,
+} from './topological-layout';
+
+// Legacy re-exports for backward compatibility
 export {
   generateAutoLayout,
   applyLayoutToSymbols,

@@ -207,33 +207,33 @@ function connectionsAreEqual(a: Connection[], b: Connection[]): boolean {
 
 describe('SLD Auto-Layout Integration', () => {
   beforeEach(() => {
-    // Reset to default state (OFF)
+    // Feature flag is permanently ON — no-op calls kept for backward compat
     disableAutoLayoutV1();
   });
 
   afterEach(() => {
-    // Cleanup
+    // Feature flag is permanently ON — no-op calls kept for backward compat
     disableAutoLayoutV1();
   });
 
   // ---------------------------------------------------------------------------
-  // Feature Flag Tests
+  // Feature Flag Tests (V1 permanently enabled — flag functions are no-ops)
   // ---------------------------------------------------------------------------
 
   describe('Feature Flag Control', () => {
-    it('should be OFF by default', () => {
-      expect(isAutoLayoutV1Enabled()).toBe(false);
+    it('should always be ON (permanently enabled)', () => {
+      expect(isAutoLayoutV1Enabled()).toBe(true);
     });
 
-    it('should be ON after enableAutoLayoutV1()', () => {
+    it('should remain ON after enableAutoLayoutV1() (no-op)', () => {
       enableAutoLayoutV1();
       expect(isAutoLayoutV1Enabled()).toBe(true);
     });
 
-    it('should be OFF after disableAutoLayoutV1()', () => {
+    it('should remain ON after disableAutoLayoutV1() (no-op)', () => {
       enableAutoLayoutV1();
       disableAutoLayoutV1();
-      expect(isAutoLayoutV1Enabled()).toBe(false);
+      expect(isAutoLayoutV1Enabled()).toBe(true);
     });
   });
 

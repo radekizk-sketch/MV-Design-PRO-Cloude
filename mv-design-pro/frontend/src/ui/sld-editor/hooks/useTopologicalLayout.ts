@@ -26,7 +26,7 @@ import {
 import {
   type AutoLayoutConfig,
   type CollisionConfig,
-} from '../utils/autoLayout';
+} from './useAutoLayout';
 import {
   resolveLabelCollisions,
   type LabelBoundingBox,

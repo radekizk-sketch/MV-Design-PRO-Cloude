@@ -1,4 +1,13 @@
 /**
+ * @deprecated LEGACY AUTO-LAYOUT — replaced by topological engine (topological-layout/)
+ *
+ * Per SLD_AUTOLAYOUT_AUDIT_I_NAPRAWA.md:
+ * - This file is DEPRECATED. The topological engine in topological-layout/ is now
+ *   the sole layout engine, invoked from useAutoLayout hook.
+ * - Exported functions are kept for backward compatibility with existing tests.
+ * - DO NOT add new features here. Use topological-layout/ instead.
+ *
+ * Original description:
  * AUTO-LAYOUT — ETAP-grade hierarchiczny algorytm rozmieszczania SLD
  *
  * PR-SLD-ETAP-GEOMETRY-01: ETAP-grade geometria SLD
@@ -882,6 +891,8 @@ export function generateAutoLayout(
   const quarantinedSymbols: string[] = [];
   const stationStacksMap = new Map<string, string[]>();
   const canonicalLayerAssignments = new Map<string, string>();
+  // BUG-01 FIX: Busbar widths stored externally (no symbol mutation)
+  const busbarWidths = new Map<string, number>();
 
   // If no symbols, return empty result (EMPTY STATE)
   if (symbols.length === 0) {
@@ -1030,11 +1041,9 @@ export function generateAutoLayout(
     const wnY = Math.round(currentY / gridSize) * gridSize;
     positions.set(wnBusbar.id, { x: centerX, y: wnY });
 
-    // Store busbar width for later use
-    const wnNodeSymbol = wnBusbar as NodeSymbol;
-    if ('width' in wnNodeSymbol) {
-      (wnNodeSymbol as any).width = wnBusbarWidth;
-    }
+    // Store busbar width in positions metadata (IMMUTABLE — no symbol mutation)
+    // BUG-01 FIX: Width stored in busbarWidths map, NOT mutated on symbol
+    busbarWidths.set(wnBusbar.id, wnBusbarWidth);
 
     currentY = wnY + ETAP_GEOMETRY.transformer.offsetFromWN;
   }
@@ -1076,11 +1085,9 @@ export function generateAutoLayout(
     const busX = centerX;
     positions.set(bus.id, { x: busX, y: snY });
 
-    // Store busbar width (use total width for sectioned busbars)
-    const nodeSymbol = bus as NodeSymbol;
-    if ('width' in nodeSymbol) {
-      (nodeSymbol as any).width = totalWidth;
-    }
+    // Store busbar width in positions metadata (IMMUTABLE — no symbol mutation)
+    // BUG-01 FIX: Width stored in busbarWidths map, NOT mutated on symbol
+    busbarWidths.set(bus.id, totalWidth);
 
     // Assign bays to sections and position them
     if (bays.length > 0 && sections.length > 0) {
