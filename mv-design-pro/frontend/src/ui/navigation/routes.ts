@@ -90,6 +90,27 @@ export const ROUTES: Record<string, RouteDefinition> = {
     icon: 'REF',
     requiredMode: 'RESULT_VIEW',
   },
+  WIZARD: {
+    hash: '#wizard',
+    label: 'Kreator sieci',
+    description: 'Kreator budowy sieci SN/nN krok po kroku (K1-K10)',
+    icon: 'WIZ',
+    requiredMode: 'MODEL_EDIT',
+  },
+  CASE_CONFIG: {
+    hash: '#case-config',
+    label: 'Konfiguracja przypadku',
+    description: 'Parametry przypadku obliczeniowego',
+    icon: 'CFG',
+    requiredMode: 'CASE_CONFIG',
+  },
+  PROTECTION_SETTINGS: {
+    hash: '#protection-settings',
+    label: 'Nastawy zabezpieczen',
+    description: 'Dobor nastaw zabezpieczen nadpradowych I>/I>>',
+    icon: 'SET',
+    requiredMode: 'RESULT_VIEW',
+  },
 };
 
 /**

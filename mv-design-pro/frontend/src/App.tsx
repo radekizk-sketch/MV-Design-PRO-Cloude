@@ -23,6 +23,8 @@
  * - "#proof" → Ślad obliczeń (Proof)
  * - "#protection-results" → Wyniki zabezpieczeń
  * - "#power-flow-results" → Wyniki rozpływu
+ * - "#wizard" → Kreator sieci (K1-K10)
+ * - "#protection-settings" → Nastawy zabezpieczeń
  */
 
 import { useEffect, useState, useCallback, useMemo } from 'react';
@@ -33,6 +35,7 @@ import { PowerFlowResultsInspectorPage } from './ui/power-flow-results';
 import { ReferencePatternsPage } from './ui/reference-patterns';
 import { ResultsInspectorPage } from './ui/results-inspector';
 import { SLDViewPage, SldEditorPage } from './ui/sld';
+import { WizardPage } from './ui/wizard';
 import { PowerFactoryLayout } from './ui/layout';
 import { useAppStateStore } from './ui/app-state';
 import { ROUTES, useUrlSelectionSync, getCurrentHashRoute } from './ui/navigation';
@@ -73,7 +76,8 @@ function isResultsRoute(route: string): boolean {
     route === '#proof' ||
     route === '#protection-results' ||
     route === '#power-flow-results' ||
-    route === '#reference-patterns'
+    route === '#reference-patterns' ||
+    route === '#protection-settings'
   );
 }
 
@@ -225,6 +229,15 @@ function App() {
     return wrapWithReadyIndicator(
       <PowerFactoryLayout {...layoutProps} hideInspector={true}>
         <ReferencePatternsPage />
+      </PowerFactoryLayout>
+    );
+  }
+
+  // Kreator sieci (Wizard K1-K10)
+  if (route === '#wizard') {
+    return wrapWithReadyIndicator(
+      <PowerFactoryLayout {...layoutProps}>
+        <WizardPage />
       </PowerFactoryLayout>
     );
   }
