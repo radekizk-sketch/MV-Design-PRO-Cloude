@@ -117,7 +117,7 @@ function boundsOverlap(
  * @returns Collision report
  */
 export function detectSymbolCollisions(
-  symbols: AnySldSymbol[],
+  symbols: readonly AnySldSymbol[],
   positions: ReadonlyMap<string, Position>,
   clearance?: number,
   config: LayoutGeometryConfig = DEFAULT_GEOMETRY_CONFIG
@@ -208,7 +208,7 @@ export function detectSymbolCollisions(
  * @returns Resolved positions and count
  */
 export function resolveSymbolCollisions(
-  symbols: AnySldSymbol[],
+  symbols: readonly AnySldSymbol[],
   positions: Map<string, Position>,
   maxIterations: number = 20,
   config: LayoutGeometryConfig = DEFAULT_GEOMETRY_CONFIG
@@ -291,7 +291,7 @@ export function resolveSymbolCollisions(
  */
 export function validateExportMargins(
   positions: ReadonlyMap<string, Position>,
-  symbols: AnySldSymbol[],
+  symbols: readonly AnySldSymbol[],
   format: 'A3' | 'A4' | 'PNG_100' | 'PNG_67' = 'A3',
   config: LayoutGeometryConfig = DEFAULT_GEOMETRY_CONFIG
 ): { fitsInPage: boolean; requiredWidth: number; requiredHeight: number } {

@@ -34,6 +34,41 @@ import { detectSymbolCollisions, resolveSymbolCollisions } from './collisionGuar
 import { processAutoInsert } from './autoInsert';
 
 // =============================================================================
+// IMMUTABILITY GUARD (BUG-01 Prevention)
+// =============================================================================
+
+/**
+ * Deep-freeze an array of symbols to catch accidental mutations.
+ * Applied at engine entry point in development/test mode.
+ *
+ * ZERO SYMBOL MUTATIONS: Layout generates positions as OUTPUT.
+ * Input symbols MUST remain bitwise identical after layout.
+ */
+export function deepFreezeSymbols<T extends object>(symbols: readonly T[]): readonly T[] {
+  if (typeof Object.freeze !== 'function') return symbols;
+  Object.freeze(symbols);
+  for (const symbol of symbols) {
+    if (symbol && typeof symbol === 'object') {
+      Object.freeze(symbol);
+      // Freeze nested position object if present
+      const pos = (symbol as any).position;
+      if (pos && typeof pos === 'object') {
+        Object.freeze(pos);
+      }
+      // Freeze nested points array if present (BranchSymbol)
+      const pts = (symbol as any).points;
+      if (Array.isArray(pts)) {
+        Object.freeze(pts);
+        for (const pt of pts) {
+          if (pt && typeof pt === 'object') Object.freeze(pt);
+        }
+      }
+    }
+  }
+  return symbols;
+}
+
+// =============================================================================
 // MAIN ENGINE
 // =============================================================================
 
@@ -52,11 +87,18 @@ import { processAutoInsert } from './autoInsert';
  * @returns Complete layout result with positions, roles, skeleton, collisions
  */
 export function computeTopologicalLayout(
-  symbols: AnySldSymbol[],
+  symbols: readonly AnySldSymbol[],
   config: LayoutGeometryConfig = DEFAULT_GEOMETRY_CONFIG,
   orientation: GlobalOrientation = 'top-down'
 ): TopologicalLayoutResult {
   const startTime = performance.now();
+
+  // IMMUTABILITY GUARD: Freeze input to catch accidental mutations (BUG-01)
+  // In production, Object.freeze is a no-op on already-frozen objects.
+  // In dev/test, this catches any .position = ..., .width = ..., etc.
+  if (process.env.NODE_ENV !== 'production') {
+    deepFreezeSymbols(symbols);
+  }
 
   // Handle empty state
   if (symbols.length === 0) {
@@ -200,7 +242,7 @@ export function computeTopologicalLayout(
  */
 export function processIncrementalUpdate(
   operation: ModelOperation,
-  currentSymbols: AnySldSymbol[],
+  currentSymbols: readonly AnySldSymbol[],
   currentResult: TopologicalLayoutResult | null,
   config: LayoutGeometryConfig = DEFAULT_GEOMETRY_CONFIG
 ): AutoInsertResult {
@@ -226,7 +268,7 @@ export function processIncrementalUpdate(
  * @returns True if layout is deterministic
  */
 export function verifyDeterminism(
-  symbols: AnySldSymbol[],
+  symbols: readonly AnySldSymbol[],
   config: LayoutGeometryConfig = DEFAULT_GEOMETRY_CONFIG
 ): boolean {
   const result1 = computeTopologicalLayout(symbols, config);

@@ -1,5 +1,5 @@
 /**
- * Tests for useAutoLayout hook and related functions.
+ * Tests for useAutoLayout hook and topological layout engine.
  *
  * CANONICAL ALIGNMENT:
  * - SLD_AUTOLAYOUT_AUDIT_I_NAPRAWA.md: BINDING SPEC
@@ -10,19 +10,19 @@
  * - Stabilnosc: mala zmiana = wiekszosc elementow zachowuje pozycje
  * - Brak nakladania: kolizje rozwiazywane deterministycznie
  * - Hash topologii: zmiany wykrywane poprawnie
+ * - Immutability: input symbols NOT mutated
  *
- * NOTE: This test now uses the topological engine (computeTopologicalLayout)
- * as the primary layout engine per SLD_AUTOLAYOUT_AUDIT_I_NAPRAWA.md.
- * Legacy generateAutoLayout tests are preserved for backward compatibility.
+ * NOTE: Legacy generateAutoLayout has been REMOVED.
+ * All tests now use the topological engine (computeTopologicalLayout).
  */
 
 import { describe, it, expect } from 'vitest';
 import {
   computeTopologyHash,
 } from '../useAutoLayout';
-import { generateAutoLayout, verifyLayoutDeterminism, DEFAULT_LAYOUT_CONFIG, DEFAULT_COLLISION_CONFIG } from '../../utils/autoLayout';
 import {
   computeTopologicalLayout,
+  verifyDeterminism,
   detectSymbolCollisions,
   resolveSymbolCollisions,
   DEFAULT_GEOMETRY_CONFIG,
@@ -217,7 +217,7 @@ function createTightSideBranchesModel(): AnySldSymbol[] {
     id: 'sym-bus-main',
     elementId: 'bus-main',
     elementType: 'Bus',
-    elementName: 'Szyna główna',
+    elementName: 'Szyna glowna',
     position: { x: 0, y: 0 },
     inService: true,
     width: 200,
@@ -251,7 +251,7 @@ function createTightSideBranchesModel(): AnySldSymbol[] {
 }
 
 /**
- * Warstwa z elementami o roznych szerokosciach (busbar + odpływy).
+ * Warstwa z elementami o roznych szerokosciach (busbar + odplywy).
  */
 function createMixedWidthLayerModel(): AnySldSymbol[] {
   const source: SourceSymbol = {
@@ -283,7 +283,7 @@ function createMixedWidthLayerModel(): AnySldSymbol[] {
     id: entry.id,
     elementId: entry.elementId,
     elementType: 'Bus',
-    elementName: `Odpływ ${index + 1}`,
+    elementName: `Odplyw ${index + 1}`,
     position: { x: 0, y: 0 },
     inService: true,
     width: entry.width,
@@ -306,15 +306,15 @@ function createMixedWidthLayerModel(): AnySldSymbol[] {
 }
 
 // =============================================================================
-// TESTY: DETERMINIZM (legacy + topological)
+// TESTY: DETERMINIZM (topological engine only)
 // =============================================================================
 
-describe('Auto-Layout Determinism', () => {
-  it('generates identical layout for the same model (legacy)', () => {
+describe('Auto-Layout Determinism (Topological Engine)', () => {
+  it('generates identical layout for the same model', () => {
     const model = createSimpleModel();
 
-    const result1 = generateAutoLayout(model);
-    const result2 = generateAutoLayout(model);
+    const result1 = computeTopologicalLayout(model);
+    const result2 = computeTopologicalLayout(model);
 
     expect(result1.positions.size).toBe(result2.positions.size);
 
@@ -326,10 +326,9 @@ describe('Auto-Layout Determinism', () => {
     }
   });
 
-  it('passes verifyLayoutDeterminism check (legacy)', () => {
+  it('passes verifyDeterminism check', () => {
     const model = createSimpleModel();
-    const isDeterministic = verifyLayoutDeterminism(model);
-    expect(isDeterministic).toBe(true);
+    expect(verifyDeterminism(model)).toBe(true);
   });
 
   it('generates identical layout regardless of input order', () => {
@@ -337,9 +336,9 @@ describe('Auto-Layout Determinism', () => {
     const reversed = [...model].reverse();
     const shuffled = [model[2], model[0], model[4], model[1], model[3]];
 
-    const result1 = generateAutoLayout(model);
-    const result2 = generateAutoLayout(reversed);
-    const result3 = generateAutoLayout(shuffled);
+    const result1 = computeTopologicalLayout(model);
+    const result2 = computeTopologicalLayout(reversed);
+    const result3 = computeTopologicalLayout(shuffled);
 
     for (const [id, pos1] of result1.positions) {
       const pos2 = result2.positions.get(id);
@@ -357,23 +356,9 @@ describe('Auto-Layout Determinism', () => {
   it('generates deterministic layout for large model', () => {
     const model = createLargeModel();
 
-    const result1 = generateAutoLayout(model);
-    const result2 = generateAutoLayout(model);
-
-    for (const [id, pos1] of result1.positions) {
-      const pos2 = result2.positions.get(id);
-      expect(pos2).toBeDefined();
-      expect(pos1.x).toBe(pos2!.x);
-      expect(pos1.y).toBe(pos2!.y);
-    }
-  });
-
-  it('topological engine is deterministic', () => {
-    const model = createSimpleModel();
     const result1 = computeTopologicalLayout(model);
     const result2 = computeTopologicalLayout(model);
 
-    expect(result1.positions.size).toBe(result2.positions.size);
     for (const [id, pos1] of result1.positions) {
       const pos2 = result2.positions.get(id);
       expect(pos2).toBeDefined();
@@ -390,7 +375,7 @@ describe('Auto-Layout Determinism', () => {
 describe('Auto-Layout Stability', () => {
   it('preserves most positions when adding one element', () => {
     const model = createSimpleModel();
-    const resultBefore = generateAutoLayout(model);
+    const resultBefore = computeTopologicalLayout(model);
 
     const extendedModel: AnySldSymbol[] = [
       ...model,
@@ -405,7 +390,7 @@ describe('Auto-Layout Stability', () => {
       } as LoadSymbol,
     ];
 
-    const resultAfter = generateAutoLayout(extendedModel);
+    const resultAfter = computeTopologicalLayout(extendedModel);
 
     let stableYCount = 0;
     for (const [id, posBefore] of resultBefore.positions) {
@@ -419,9 +404,9 @@ describe('Auto-Layout Stability', () => {
     expect(stabilityRatio).toBeGreaterThanOrEqual(0.5);
   });
 
-  it('layers remain stable when adding sibling element', () => {
+  it('tiers remain stable when adding sibling element', () => {
     const model = createSimpleModel();
-    const resultBefore = generateAutoLayout(model);
+    const resultBefore = computeTopologicalLayout(model);
 
     const extendedModel: AnySldSymbol[] = [
       ...model,
@@ -436,10 +421,15 @@ describe('Auto-Layout Stability', () => {
       } as LoadSymbol,
     ];
 
-    const resultAfter = generateAutoLayout(extendedModel);
+    const resultAfter = computeTopologicalLayout(extendedModel);
 
-    expect(resultBefore.debug.layers.get(0)).toContain('sym-source-1');
-    expect(resultAfter.debug.layers.get(0)).toContain('sym-source-1');
+    // Source should remain in the first tier in both results
+    const srcPosBefore = resultBefore.positions.get('sym-source-1');
+    const srcPosAfter = resultAfter.positions.get('sym-source-1');
+    expect(srcPosBefore).toBeDefined();
+    expect(srcPosAfter).toBeDefined();
+    // Y should be the same (source tier unchanged)
+    expect(srcPosBefore!.y).toBe(srcPosAfter!.y);
   });
 });
 
@@ -514,7 +504,7 @@ describe('Topology Hash', () => {
 });
 
 // =============================================================================
-// TESTY: KOLIZJE (using topological engine)
+// TESTY: KOLIZJE (topological engine)
 // =============================================================================
 
 describe('Collision Detection', () => {
@@ -644,7 +634,7 @@ describe('Tight Layout Fixtures', () => {
     expect(result.collisionReport).toBeDefined();
 
     // All symbols should have positions assigned
-    expect(result.positions.size).toBeGreaterThanOrEqual(model.length - 3); // branches may be inline
+    expect(result.positions.size).toBeGreaterThanOrEqual(model.length - 3);
 
     // Grid snapped
     const gridSize = DEFAULT_GEOMETRY_CONFIG.gridSize;
@@ -656,7 +646,7 @@ describe('Tight Layout Fixtures', () => {
 });
 
 // =============================================================================
-// TESTY: NADPISANIA POZYCJI (simplified — overrides tested via hook)
+// TESTY: NADPISANIA POZYCJI
 // =============================================================================
 
 describe('Position Overrides', () => {
@@ -667,7 +657,6 @@ describe('Position Overrides', () => {
     const basePos = result.positions.get('sym-source-1');
     expect(basePos).toBeDefined();
 
-    // Simulate override: shift by delta, snap to grid
     const deltaX = 40;
     const deltaY = 0;
     const gridSize = DEFAULT_GEOMETRY_CONFIG.gridSize;
@@ -682,18 +671,15 @@ describe('Position Overrides', () => {
     const model = createSimpleModel();
     const result = computeTopologicalLayout(model);
 
-    // Get two symbol positions
     const pos1 = result.positions.get('sym-source-1');
     const pos2 = result.positions.get('sym-bus-1');
     expect(pos1).toBeDefined();
     expect(pos2).toBeDefined();
 
-    // Move source to bus position (should cause collision)
     const testPositions = new Map(result.positions);
     testPositions.set('sym-source-1', { x: pos2!.x, y: pos2!.y });
 
     const report = detectSymbolCollisions(model, testPositions, DEFAULT_GEOMETRY_CONFIG.symbolClearance, DEFAULT_GEOMETRY_CONFIG);
-    // Moving source onto bus should create collision
     expect(report.hasCollisions).toBe(true);
   });
 
@@ -731,13 +717,9 @@ describe('No Overlapping in Final Layout', () => {
     const model = createLargeModel();
     const result = computeTopologicalLayout(model);
 
-    // Use engine's own collision report (authoritative after internal resolution)
     expect(result.collisionReport).toBeDefined();
-
-    // All symbols should have positions assigned
     expect(result.positions.size).toBeGreaterThan(0);
 
-    // Deterministic: same input = same output
     const result2 = computeTopologicalLayout(model);
     for (const [id, pos] of result.positions) {
       const pos2 = result2.positions.get(id);
@@ -753,29 +735,22 @@ describe('No Overlapping in Final Layout', () => {
 // =============================================================================
 
 describe('Layout Hierarchy', () => {
-  it('places Source in layer 0 (legacy)', () => {
+  it('places Source above other elements (lower Y)', () => {
     const model = createSimpleModel();
-    const result = generateAutoLayout(model);
+    const result = computeTopologicalLayout(model);
 
-    const layer0 = result.debug.layers.get(0);
-    expect(layer0).toBeDefined();
-    expect(layer0).toContain('sym-source-1');
-  });
+    const sourcePos = result.positions.get('sym-source-1');
+    const busPos = result.positions.get('sym-bus-1');
 
-  it('places Load in the deepest layer (legacy)', () => {
-    const model = createSimpleModel();
-    const result = generateAutoLayout(model);
-
-    const maxLayer = result.debug.totalLayers - 1;
-    const lastLayer = result.debug.layers.get(maxLayer);
-
-    expect(lastLayer).toBeDefined();
-    expect(lastLayer).toContain('sym-load-1');
+    expect(sourcePos).toBeDefined();
+    expect(busPos).toBeDefined();
+    // Source should be above bus in top-down layout
+    expect(sourcePos!.y).toBeLessThanOrEqual(busPos!.y);
   });
 
   it('Source position is higher (lower Y) than Load position', () => {
     const model = createSimpleModel();
-    const result = generateAutoLayout(model);
+    const result = computeTopologicalLayout(model);
 
     const sourcePos = result.positions.get('sym-source-1');
     const loadPos = result.positions.get('sym-load-1');
