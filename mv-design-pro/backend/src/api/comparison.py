@@ -73,11 +73,15 @@ class ShortCircuitComparisonResponse(BaseModel):
     ith_delta: NumericDeltaResponse
 
 
-class NodeVoltageComparisonResponse(BaseModel):
-    """Node voltage comparison response."""
-    node_id: str
+class BusVoltageComparisonResponse(BaseModel):
+    """Bus voltage comparison response."""
+    bus_id: str
     u_kv_delta: NumericDeltaResponse
     u_pu_delta: NumericDeltaResponse
+
+
+# Backward-compat alias
+NodeVoltageComparisonResponse = BusVoltageComparisonResponse
 
 
 class BranchPowerComparisonResponse(BaseModel):
@@ -93,7 +97,7 @@ class PowerFlowComparisonResponse(BaseModel):
     total_losses_q_delta: NumericDeltaResponse
     slack_p_delta: NumericDeltaResponse
     slack_q_delta: NumericDeltaResponse
-    node_voltages: list[NodeVoltageComparisonResponse]
+    bus_voltages: list[BusVoltageComparisonResponse]
     branch_powers: list[BranchPowerComparisonResponse]
 
 

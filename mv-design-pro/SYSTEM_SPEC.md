@@ -430,13 +430,13 @@ Both Wizard and SLD edit THE SAME NetworkModel instance. No state duplication, n
 | Frontend Status Bar | `ui/status-bar` | Yes |
 | Frontend SLD Export (PNG/PDF) | `ui/sld/export` | Yes |
 
-### 12.2 IN PROGRESS
+### 12.2 COMPLETED (formerly IN PROGRESS)
 
-| Function | Notes |
-|----------|-------|
-| NetworkValidator (full PowerFactory-grade) | Core exists, extended rules pending |
-| Bus terminology rename (Node -> Bus) | Partially done in docs/code |
-| Phase 6: Wizard/SLD Unity verification | Pending formal verification |
+| Function | Status | Notes |
+|----------|--------|-------|
+| NetworkValidator (full PowerFactory-grade) | DONE | 13 rules, suggested_fix, Polish messages, switch/inverter/impedance/polarity/voltage checks. 29 tests. |
+| Bus terminology rename (Node -> Bus) | DONE | DTOs, API, frontend types renamed with backward-compat aliases. Zero regressions. |
+| Phase 6: Wizard/SLD Unity verification | DONE | 27 backend + 23 frontend formal verification tests. Single model, round-trip, determinism confirmed. |
 
 ### 12.3 PLANNED
 

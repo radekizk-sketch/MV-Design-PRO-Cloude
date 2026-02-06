@@ -25,8 +25,8 @@ from uuid import UUID
 from domain.results import (
     AnalysisTypeMismatchError,
     BranchPowerComparison,
+    BusVoltageComparison,
     ComplexDelta,
-    NodeVoltageComparison,
     NumericDelta,
     PowerFlowComparison,
     ProjectMismatchError,
@@ -232,8 +232,8 @@ class ComparisonService:
         kv_b: dict[str, float],
         pu_a: dict[str, float],
         pu_b: dict[str, float],
-    ) -> list[NodeVoltageComparison]:
-        """Compare per-node voltages."""
+    ) -> list[BusVoltageComparison]:
+        """Compare per-bus voltages."""
         all_nodes = sorted(set(kv_a.keys()) | set(kv_b.keys()))
         comparisons = []
 
@@ -243,8 +243,8 @@ class ComparisonService:
             u_pu_val_a = float(pu_a.get(node_id, 0.0))
             u_pu_val_b = float(pu_b.get(node_id, 0.0))
 
-            comparisons.append(NodeVoltageComparison(
-                node_id=node_id,
+            comparisons.append(BusVoltageComparison(
+                bus_id=node_id,
                 u_kv_delta=NumericDelta.compute(u_kv_val_a, u_kv_val_b),
                 u_pu_delta=NumericDelta.compute(u_pu_val_a, u_pu_val_b),
             ))

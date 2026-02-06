@@ -100,11 +100,15 @@ class ResultListDTO:
 
 @dataclass(frozen=True)
 class OverlayDTO:
-    node_overlays: list[dict[str, Any]] = field(default_factory=list)
+    bus_overlays: list[dict[str, Any]] = field(default_factory=list)
     branch_overlays: list[dict[str, Any]] = field(default_factory=list)
 
     def to_dict(self) -> dict[str, Any]:
-        return {"node_overlays": self.node_overlays, "branch_overlays": self.branch_overlays}
+        return {
+            "bus_overlays": self.bus_overlays,
+            "node_overlays": self.bus_overlays,  # backward-compat alias
+            "branch_overlays": self.branch_overlays,
+        }
 
 
 @dataclass(frozen=True)
@@ -401,14 +405,14 @@ class ExtendedTraceDTO:
 
 
 @dataclass(frozen=True)
-class SldOverlayNodeDTO:
+class SldOverlayBusDTO:
     """
-    SLD overlay data for a single node.
+    SLD overlay data for a single bus.
 
     P11a: Mapping only, no physics.
     """
     symbol_id: str  # SLD symbol ID
-    node_id: str  # Network node ID
+    bus_id: str  # Network bus ID
     u_pu: float | None = None
     u_kv: float | None = None
     angle_deg: float | None = None
@@ -418,7 +422,8 @@ class SldOverlayNodeDTO:
     def to_dict(self) -> dict[str, Any]:
         result: dict[str, Any] = {
             "symbol_id": self.symbol_id,
-            "node_id": self.node_id,
+            "bus_id": self.bus_id,
+            "node_id": self.bus_id,  # backward-compat alias
         }
         if self.u_pu is not None:
             result["u_pu"] = self.u_pu
@@ -431,6 +436,10 @@ class SldOverlayNodeDTO:
         if self.sk_mva is not None:
             result["sk_mva"] = self.sk_mva
         return result
+
+
+# Backward-compat alias
+SldOverlayNodeDTO = SldOverlayBusDTO
 
 
 @dataclass(frozen=True)
@@ -473,7 +482,7 @@ class SldResultOverlayDTO:
     diagram_id: UUID
     run_id: UUID
     result_status: str  # FRESH, OUTDATED, NONE
-    nodes: tuple[SldOverlayNodeDTO, ...] = ()
+    buses: tuple[SldOverlayBusDTO, ...] = ()
     branches: tuple[SldOverlayBranchDTO, ...] = ()
 
     def to_dict(self) -> dict[str, Any]:
@@ -481,6 +490,7 @@ class SldResultOverlayDTO:
             "diagram_id": str(self.diagram_id),
             "run_id": str(self.run_id),
             "result_status": self.result_status,
-            "nodes": [node.to_dict() for node in self.nodes],
+            "buses": [bus.to_dict() for bus in self.buses],
+            "nodes": [bus.to_dict() for bus in self.buses],  # backward-compat alias
             "branches": [branch.to_dict() for branch in self.branches],
         }

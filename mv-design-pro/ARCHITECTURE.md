@@ -144,7 +144,20 @@ NetworkModel ──> NetworkValidator.validate() ──> VALID → Solver allowe
 
 Implementation: `network_model/validation/validator.py`
 
-Rules: connectivity, source presence, no dangling elements, bus voltage > 0, branch endpoints exist, transformer HV != LV.
+13 PowerFactory-grade rules with suggested_fix diagnostics:
+1. Empty network check
+2. Graph connectivity (single island)
+3. Source presence (SLACK or inverter)
+4. Dangling elements (invalid branch endpoints)
+5. Bus voltage validity (> 0)
+6. Branch endpoint validity (exist, no self-loops)
+7. Transformer HV/LV voltage validity
+8. SLACK node presence and uniqueness
+9. Switch endpoint validity
+10. Inverter source bus validity
+11. Branch impedance validity (non-zero for lines/cables)
+12. Transformer HV/LV polarity vs bus voltages
+13. Voltage level consistency on lines/cables
 
 ---
 

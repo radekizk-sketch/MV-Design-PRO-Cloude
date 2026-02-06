@@ -33,7 +33,7 @@ MV-DESIGN-PRO is a functional Medium Voltage network design and analysis system 
 | Phase 3: Catalog Layer | Immutable types, resolver, governance | DONE |
 | Phase 4: Case Layer | Case lifecycle, invalidation, clone | DONE |
 | Phase 5: Interpretation Layer | BoundaryIdentifier, PCC moved to analysis | DONE |
-| Phase 6: Wizard/SLD Unity | Verify single model access | PENDING (verification) |
+| Phase 6: Wizard/SLD Unity | Verify single model access | DONE (27 backend + 23 frontend tests) |
 | P10a: State/Lifecycle | Case result status machine | DONE |
 | P10b: Result State + Comparison | A/B comparison | DONE |
 | P11: Proof Engine | SC3F, VDROP proofs | DONE |
@@ -59,7 +59,7 @@ MV-DESIGN-PRO is a functional Medium Voltage network design and analysis system 
 | SLD Fit-to-Content | Viewport fit action | DONE |
 | SLD Routing Corridors | Connection routing obstacles | DONE |
 | Infra: /api/health | Health endpoint + API URL separation | DONE |
-| Memory Canonization V3.0 | This canonization pass | IN PROGRESS |
+| Memory Canonization V3.0 | This canonization pass | DONE |
 
 ---
 
@@ -85,13 +85,13 @@ Tasks:
 
 ### 4.1 HIGH Priority
 
-| Item | Description |
-|------|-------------|
-| Phase 6: Wizard/SLD Unity | Formal verification that Wizard and SLD operate on same model |
-| NetworkValidator Extension | Full PowerFactory-grade validation rules |
-| Bus Terminology Completion | Finish Node -> Bus rename in all code paths |
-| SC Asymmetrical Proofs | 1F, 2F fault proof packs (IEC 60909) |
-| Normative Completion Pack (P20) | Full PN-EN normative compliance proof |
+| Item | Description | Status |
+|------|-------------|--------|
+| Phase 6: Wizard/SLD Unity | Formal verification that Wizard and SLD operate on same model | DONE |
+| NetworkValidator Extension | Full PowerFactory-grade validation rules (13 rules, 29 tests) | DONE |
+| Bus Terminology Completion | Finish Node -> Bus rename in all code paths | DONE |
+| SC Asymmetrical Proofs | 1F, 2F fault proof packs (IEC 60909) | PENDING |
+| Normative Completion Pack (P20) | Full PN-EN normative compliance proof | PENDING |
 
 ### 4.2 MEDIUM Priority
 
@@ -117,7 +117,7 @@ Tasks:
 
 | Issue | Severity | Description |
 |-------|----------|-------------|
-| Node/Bus terminology | LOW | Some code paths still use "node" instead of "bus" |
+| Node/Bus terminology | RESOLVED | DTOs, API, frontend types renamed with backward-compat aliases |
 | Duplicate UI contract docs | LOW | Some contracts exist in both `docs/ui/` and root `docs/ui/` |
 | Large test fixtures | LOW | Some test files contain large inline fixtures |
 | ADR numbering conflicts | LOW | ADR-002, ADR-003, ADR-006, ADR-007, ADR-008 have duplicate numbers |

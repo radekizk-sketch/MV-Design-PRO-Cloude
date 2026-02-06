@@ -201,26 +201,31 @@ class ShortCircuitComparison:
 
 
 @dataclass(frozen=True)
-class NodeVoltageComparison:
+class BusVoltageComparison:
     """
-    Node voltage comparison for Power Flow.
+    Bus voltage comparison for Power Flow.
 
     CANONICAL FIELDS:
-    - node_id: Node identifier
+    - bus_id: Bus identifier
     - u_kv_delta: Voltage magnitude [kV]
     - u_pu_delta: Voltage in per-unit
     """
-    node_id: str
+    bus_id: str
     u_kv_delta: NumericDelta
     u_pu_delta: NumericDelta
 
     def to_dict(self) -> dict[str, Any]:
         """Serialize to dictionary."""
         return {
-            "node_id": self.node_id,
+            "bus_id": self.bus_id,
+            "node_id": self.bus_id,  # backward-compatible alias
             "u_kv_delta": self.u_kv_delta.to_dict(),
             "u_pu_delta": self.u_pu_delta.to_dict(),
         }
+
+
+# Backward-compatible alias
+NodeVoltageComparison = BusVoltageComparison
 
 
 @dataclass(frozen=True)
@@ -258,7 +263,7 @@ class PowerFlowComparison:
     - total_losses_q_delta: Total reactive losses [pu]
     - slack_p_delta: Slack node active power [pu]
     - slack_q_delta: Slack node reactive power [pu]
-    - node_voltages: Per-node voltage comparisons
+    - node_voltages: Per-bus voltage comparisons
     - branch_powers: Per-branch power comparisons (from side)
 
     INVARIANT: No normative interpretation, no limits/thresholds.
@@ -267,7 +272,7 @@ class PowerFlowComparison:
     total_losses_q_delta: NumericDelta
     slack_p_delta: NumericDelta
     slack_q_delta: NumericDelta
-    node_voltages: tuple[NodeVoltageComparison, ...]
+    node_voltages: tuple[BusVoltageComparison, ...]
     branch_powers: tuple[BranchPowerComparison, ...]
 
     def to_dict(self) -> dict[str, Any]:
@@ -277,7 +282,8 @@ class PowerFlowComparison:
             "total_losses_q_delta": self.total_losses_q_delta.to_dict(),
             "slack_p_delta": self.slack_p_delta.to_dict(),
             "slack_q_delta": self.slack_q_delta.to_dict(),
-            "node_voltages": [nv.to_dict() for nv in self.node_voltages],
+            "bus_voltages": [nv.to_dict() for nv in self.node_voltages],
+            "node_voltages": [nv.to_dict() for nv in self.node_voltages],  # backward-compat
             "branch_powers": [bp.to_dict() for bp in self.branch_powers],
         }
 

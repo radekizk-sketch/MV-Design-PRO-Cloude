@@ -32,7 +32,7 @@ from application.analysis_run.dtos import (
     ShortCircuitResultsDTO,
     ShortCircuitRowDTO,
     SldOverlayBranchDTO,
-    SldOverlayNodeDTO,
+    SldOverlayBusDTO,
     SldResultOverlayDTO,
 )
 from domain.analysis_run import AnalysisRun
@@ -421,7 +421,7 @@ class ResultsInspectorService:
             results = uow.results.list_results(run_id)
 
         sld_payload = diagram.get("payload", {})
-        node_overlays: list[SldOverlayNodeDTO] = []
+        bus_overlays: list[SldOverlayBusDTO] = []
         branch_overlays: list[SldOverlayBranchDTO] = []
 
         # Extract result data based on analysis type
@@ -456,10 +456,10 @@ class ResultsInspectorService:
             bus_data = bus_results.get(node_id, {})
             sc_data = sc_results.get(node_id, {})
 
-            node_overlays.append(
-                SldOverlayNodeDTO(
+            bus_overlays.append(
+                SldOverlayBusDTO(
                     symbol_id=symbol_id,
-                    node_id=node_id,
+                    bus_id=node_id,
                     u_pu=bus_data.get("v_pu"),
                     u_kv=bus_data.get("v_kv"),
                     angle_deg=bus_data.get("angle_deg"),
@@ -487,14 +487,14 @@ class ResultsInspectorService:
             )
 
         # Deterministic sort
-        node_overlays.sort(key=lambda n: (n.node_id, n.symbol_id))
+        bus_overlays.sort(key=lambda n: (n.bus_id, n.symbol_id))
         branch_overlays.sort(key=lambda b: (b.branch_id, b.symbol_id))
 
         return SldResultOverlayDTO(
             diagram_id=diagram_id,
             run_id=run_id,
             result_status=run.result_status,
-            nodes=tuple(node_overlays),
+            buses=tuple(bus_overlays),
             branches=tuple(branch_overlays),
         )
 

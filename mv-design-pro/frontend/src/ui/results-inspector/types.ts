@@ -260,17 +260,20 @@ export interface ExtendedTrace {
 // =============================================================================
 
 /**
- * SLD node overlay data.
+ * SLD bus overlay data.
  */
-export interface SldOverlayNode {
+export interface SldOverlayBus {
   symbol_id: string;
-  node_id: string;
+  bus_id: string;
   u_pu?: number;
   u_kv?: number;
   angle_deg?: number;
   ikss_ka?: number;
   sk_mva?: number;
 }
+
+/** @deprecated Use SldOverlayBus instead. */
+export type SldOverlayNode = SldOverlayBus;
 
 /**
  * SLD branch overlay data.
@@ -291,7 +294,7 @@ export interface SldResultOverlay {
   diagram_id: string;
   run_id: string;
   result_status: string;
-  nodes: SldOverlayNode[];
+  buses: SldOverlayBus[];
   branches: SldOverlayBranch[];
 }
 

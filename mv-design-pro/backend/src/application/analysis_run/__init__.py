@@ -18,7 +18,8 @@ from .dtos import (
     ShortCircuitRowDTO,
     ShortCircuitResultsDTO,
     ExtendedTraceDTO,
-    SldOverlayNodeDTO,
+    SldOverlayBusDTO,
+    SldOverlayNodeDTO,  # backward-compatible alias
     SldOverlayBranchDTO,
     SldResultOverlayDTO,
 )
@@ -57,7 +58,8 @@ __all__ = [
     "ShortCircuitRowDTO",
     "ShortCircuitResultsDTO",
     "ExtendedTraceDTO",
-    "SldOverlayNodeDTO",
+    "SldOverlayBusDTO",
+    "SldOverlayNodeDTO",  # backward-compatible alias
     "SldOverlayBranchDTO",
     "SldResultOverlayDTO",
     # Functions

@@ -71,14 +71,17 @@ export interface ShortCircuitComparison {
 // =============================================================================
 
 /**
- * Node voltage comparison (per-node).
- * Backend: domain/results.py → NodeVoltageComparison
+ * Bus voltage comparison (per-bus).
+ * Backend: domain/results.py → BusVoltageComparison
  */
-export interface NodeVoltageComparison {
-  node_id: string;
+export interface BusVoltageComparison {
+  bus_id: string;
   u_kv_delta: NumericDelta;
   u_pu_delta: NumericDelta;
 }
+
+/** @deprecated Use BusVoltageComparison instead. */
+export type NodeVoltageComparison = BusVoltageComparison;
 
 /**
  * Branch power comparison (per-branch).
@@ -99,7 +102,7 @@ export interface PowerFlowComparison {
   total_losses_q_delta: NumericDelta;
   slack_p_delta: NumericDelta;
   slack_q_delta: NumericDelta;
-  node_voltages: NodeVoltageComparison[];
+  bus_voltages: BusVoltageComparison[]; // formerly node_voltages
   branch_powers: BranchPowerComparison[];
 }
 
