@@ -158,6 +158,21 @@ export interface SldEmptyOverlayProps {
   onCreateCase?: () => void;
 
   /**
+   * Is case creation in progress.
+   */
+  isCreatingCase?: boolean;
+
+  /**
+   * Disable create button with explicit reason.
+   */
+  createCaseDisabled?: boolean;
+
+  /**
+   * Tooltip reason when create is disabled.
+   */
+  createCaseDisabledReason?: string;
+
+  /**
    * Additional CSS classes.
    */
   className?: string;
@@ -173,6 +188,9 @@ export function SldEmptyOverlay({
   hasCases = false,
   onSelectCase,
   onCreateCase,
+  isCreatingCase = false,
+  createCaseDisabled = false,
+  createCaseDisabledReason,
   className,
 }: SldEmptyOverlayProps) {
   const hasActiveCase = useHasActiveCase();
@@ -274,16 +292,19 @@ export function SldEmptyOverlay({
               <button
                 type="button"
                 onClick={onCreateCase}
+                disabled={createCaseDisabled || isCreatingCase}
+                title={createCaseDisabled ? createCaseDisabledReason : undefined}
                 className={clsx(
                   'px-4 py-2 text-sm font-medium rounded-md',
                   config.accentColor, 'text-white',
-                  'hover:opacity-90',
+                  !(createCaseDisabled || isCreatingCase) && 'hover:opacity-90',
+                  (createCaseDisabled || isCreatingCase) && 'opacity-60 cursor-not-allowed',
                   'transition-all duration-150',
                   'shadow-sm hover:shadow'
                 )}
                 data-testid="sld-empty-overlay-create-case"
               >
-                Utwórz pierwszy przypadek
+                {isCreatingCase ? 'Tworzenie przypadku...' : 'Utwórz pierwszy przypadek'}
               </button>
             )}
             {hasCases && onCreateCase && (

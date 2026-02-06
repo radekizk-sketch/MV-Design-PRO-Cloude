@@ -28,6 +28,9 @@ import { useSelectionStore } from '../selection/store';
 import { useAppStateStore, useHasActiveCase, useActiveMode } from '../app-state';
 import { SldInspectorPanel } from './inspector';
 import type { AnySldSymbol } from '../sld-editor/types';
+import { useStudyCasesStore } from '../study-cases/store';
+import { createProject } from '../projects/api';
+import { notify } from '../notifications/store';
 
 /**
  * Demo symbols for development/testing.
@@ -199,12 +202,26 @@ export const SldEditorPage: React.FC<SldEditorPageProps> = ({
   const hasActiveCase = useHasActiveCase();
   const activeMode = useActiveMode();
   const toggleCaseManager = useAppStateStore((state) => state.toggleCaseManager);
+  const activeProjectId = useAppStateStore((state) => state.activeProjectId);
+  const setActiveProject = useAppStateStore((state) => state.setActiveProject);
+  const setActiveCase = useAppStateStore((state) => state.setActiveCase);
+  const createCase = useStudyCasesStore((state) => state.createCase);
 
   // Selection state
   const selectedElement = useSelectionStore((state) => state.selectedElements[0] ?? null);
 
   // Inspector panel state
   const [inspectorPanelVisible, setInspectorPanelVisible] = useState(true);
+  const [isCreatingFirstCase, setIsCreatingFirstCase] = useState(false);
+
+  const withTimeout = useCallback(async <T,>(promise: Promise<T>, timeoutMs = 15000): Promise<T> => {
+    return await Promise.race([
+      promise,
+      new Promise<T>((_, reject) => {
+        window.setTimeout(() => reject(new Error('TIMEOUT_API_CREATE_CASE')), timeoutMs);
+      }),
+    ]);
+  }, []);
 
   // Determine symbols to display
   const symbols = useMemo(() => {
@@ -245,6 +262,48 @@ export const SldEditorPage: React.FC<SldEditorPageProps> = ({
     }
   }, [onOpenCaseManager, toggleCaseManager]);
 
+  const handleCreateFirstCase = useCallback(async () => {
+    if (isCreatingFirstCase) {
+      return;
+    }
+
+    setIsCreatingFirstCase(true);
+    try {
+      let projectId = activeProjectId;
+      if (!projectId) {
+        const project = await withTimeout(createProject({ name: 'Projekt 1' }));
+        projectId = project.id;
+        setActiveProject(project.id, project.name);
+      }
+
+      if (!projectId) {
+        notify('Nie można utworzyć przypadku: brak aktywnego projektu. Otwórz Menedżer przypadków i utwórz projekt.', 'warning');
+        return;
+      }
+
+      const createdCase = await withTimeout(
+        createCase({
+          project_id: projectId,
+          name: 'Przypadek 1',
+          description: '',
+          set_active: true,
+        })
+      );
+
+      setActiveCase(createdCase.id, createdCase.name, 'ShortCircuitCase', createdCase.result_status);
+      notify(`Utworzono i aktywowano przypadek: ${createdCase.name}.`, 'success');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Nieznany błąd';
+      if (message === 'TIMEOUT_API_CREATE_CASE') {
+        notify('Brak odpowiedzi API podczas tworzenia przypadku (limit 15 s). Sprawdź połączenie i spróbuj ponownie.', 'warning');
+        return;
+      }
+      notify(`Nie udało się utworzyć przypadku. Szczegóły techniczne: ${message}`, 'error');
+    } finally {
+      setIsCreatingFirstCase(false);
+    }
+  }, [isCreatingFirstCase, activeProjectId, withTimeout, setActiveProject, createCase, setActiveCase]);
+
   // Handle inspector close
   const handleInspectorClose = useCallback(() => {
     setInspectorPanelVisible(false);
@@ -277,7 +336,8 @@ export const SldEditorPage: React.FC<SldEditorPageProps> = ({
             state={emptyState}
             hasCases={false}  // TODO: Pass actual case count when available
             onSelectCase={handleEmptyAction}
-            onCreateCase={handleEmptyAction}
+            onCreateCase={handleCreateFirstCase}
+            isCreatingCase={isCreatingFirstCase}
           />
         )}
       </div>

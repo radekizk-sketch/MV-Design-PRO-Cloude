@@ -599,7 +599,7 @@ export const UnifiedSymbolRenderer: React.FC<UnifiedSymbolRendererProps> = ({
   // Handle unknown symbols (no ETAP mapping)
   if (!resolvedSymbol) {
     const warnKey = `${elementType}:${elementName}`;
-    if (!_warnedSymbols.has(warnKey)) {
+    if (import.meta.env.DEV && !_warnedSymbols.has(warnKey)) {
       _warnedSymbols.add(warnKey);
       console.warn(`[UnifiedSymbolRenderer] Brak mapowania ETAP dla elementu: ${elementType} (${elementName})`);
     }
