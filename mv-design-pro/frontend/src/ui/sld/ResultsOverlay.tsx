@@ -26,6 +26,13 @@ import type { ViewportState } from './types';
 import { useResultsInspectorStore } from '../results-inspector/store';
 import { buildOverlayPositionMaps, getLoadingColorClass, getLoadingBgClass } from './overlayUtils';
 import { LegendPanel } from './LegendPanel';
+import {
+  classifyVoltage,
+  getVoltageTextColor,
+  getVoltageBgColor,
+  getEvStatusBadgeClass,
+  getEvStatusLabel,
+} from './voltageColorScale';
 
 // =============================================================================
 // Formatters (deterministic)
@@ -71,6 +78,7 @@ interface NodeLabelProps {
   position: Position;
   voltage?: { kv?: number; pu?: number };
   shortCircuit?: { ikss_ka?: number; sk_mva?: number };
+  evStatus?: string;
   isOutdated: boolean;
   isSelected: boolean;
 }
@@ -80,13 +88,18 @@ function NodeLabel({
   position,
   voltage,
   shortCircuit,
+  evStatus,
   isOutdated,
   isSelected,
 }: NodeLabelProps) {
   const hasVoltage = voltage && (voltage.kv !== undefined || voltage.pu !== undefined);
   const hasShortCircuit = shortCircuit && shortCircuit.ikss_ka !== undefined;
+  const hasEvStatus = evStatus && evStatus !== 'PASS';
 
-  if (!hasVoltage && !hasShortCircuit) return null;
+  if (!hasVoltage && !hasShortCircuit && !hasEvStatus) return null;
+
+  const voltageLevel = classifyVoltage(voltage?.pu);
+  const voltageTextClass = getVoltageTextColor(voltageLevel);
 
   const borderClass = isSelected
     ? 'border-blue-500 ring-2 ring-blue-300'
@@ -94,7 +107,11 @@ function NodeLabel({
       ? 'border-slate-300'
       : 'border-blue-200';
 
-  const bgClass = isOutdated ? 'bg-slate-100 opacity-60' : 'bg-blue-50';
+  const bgClass = isOutdated
+    ? 'bg-slate-100 opacity-60'
+    : hasVoltage
+      ? getVoltageBgColor(voltageLevel)
+      : 'bg-blue-50';
 
   return (
     <div
@@ -107,16 +124,24 @@ function NodeLabel({
       }}
     >
       {hasVoltage && (
-        <span className="text-blue-800">
+        <span className={voltageTextClass}>
           {formatVoltage(voltage.kv, 'kV')}
           {voltage.pu !== undefined && (
-            <span className="ml-1 text-blue-600">({formatVoltage(voltage.pu, 'pu')})</span>
+            <span className="ml-1 opacity-80">({formatVoltage(voltage.pu, 'pu')})</span>
           )}
         </span>
       )}
       {hasShortCircuit && (
         <span className="ml-2 font-semibold text-rose-700">
           {formatShortCircuit(shortCircuit.ikss_ka)}
+        </span>
+      )}
+      {hasEvStatus && (
+        <span
+          data-testid={`sld-overlay-ev-${nodeId}`}
+          className={`ml-1.5 inline-block rounded border px-1 text-[10px] ${getEvStatusBadgeClass(evStatus)}`}
+        >
+          {getEvStatusLabel(evStatus)}
         </span>
       )}
     </div>
@@ -133,6 +158,7 @@ interface BranchLabelProps {
   current?: number;
   loading?: number;
   power?: { p?: number; q?: number };
+  evStatus?: string;
   isOutdated: boolean;
   isSelected: boolean;
 }
@@ -143,14 +169,16 @@ function BranchLabel({
   current,
   loading,
   power,
+  evStatus,
   isOutdated,
   isSelected,
 }: BranchLabelProps) {
   const hasCurrent = current !== undefined;
   const hasLoading = loading !== undefined;
   const hasPower = power && (power.p !== undefined || power.q !== undefined);
+  const hasEvStatus = evStatus && evStatus !== 'PASS';
 
-  if (!hasCurrent && !hasLoading && !hasPower) return null;
+  if (!hasCurrent && !hasLoading && !hasPower && !hasEvStatus) return null;
 
   const loadingColorClass = getLoadingColorClass(loading);
   const loadingBgClass = getLoadingBgClass(loading);
@@ -175,6 +203,14 @@ function BranchLabel({
         {hasCurrent && <span className="text-slate-700">{formatCurrent(current)}</span>}
         {hasLoading && (
           <span className={loadingColorClass}>{formatLoading(loading)}</span>
+        )}
+        {hasEvStatus && (
+          <span
+            data-testid={`sld-overlay-ev-${branchId}`}
+            className={`inline-block rounded border px-1 text-[10px] ${getEvStatusBadgeClass(evStatus)}`}
+          >
+            {getEvStatusLabel(evStatus)}
+          </span>
         )}
       </div>
       {hasPower && (
@@ -250,6 +286,7 @@ export function ResultsOverlay({
             ikss_ka: node.ikss_ka,
             sk_mva: node.sk_mva,
           },
+          evStatus: node.ev_status ?? node.voltage_status,
           isSelected: selectedElementId === node.node_id,
         };
       })
@@ -274,6 +311,7 @@ export function ResultsOverlay({
             p: branch.p_mw,
             q: branch.q_mvar,
           },
+          evStatus: branch.ev_status,
           isSelected: selectedElementId === branch.branch_id,
         };
       })
@@ -306,6 +344,7 @@ export function ResultsOverlay({
           position={label.position}
           voltage={label.voltage}
           shortCircuit={label.shortCircuit}
+          evStatus={label.evStatus}
           isOutdated={isOutdated}
           isSelected={label.isSelected}
         />
@@ -320,6 +359,7 @@ export function ResultsOverlay({
           current={label.current}
           loading={label.loading}
           power={label.power}
+          evStatus={label.evStatus}
           isOutdated={isOutdated}
           isSelected={label.isSelected}
         />
