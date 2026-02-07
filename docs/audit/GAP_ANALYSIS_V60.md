@@ -2,7 +2,7 @@
 
 **Data:** 2026-02-07
 **Status:** BINDING
-**Baseline testów:** 244 passed, 0 failures
+**Baseline testów:** Backend 2122 passed | Frontend 1704 passed (90 plików)
 
 ---
 
@@ -134,5 +134,34 @@ Sekwencja: ENM → Topologia → SLD Layout → Wizard↔SLD → Inspector → R
 
 ---
 
+---
+
+## 5. Status Realizacji
+
+| PR | Zakres | Status | Commit |
+|----|--------|--------|--------|
+| PR-00 | GAP Analysis V60 | **DONE** | `52771de` |
+| PR-01 | ENM Extensions (Substation, Bay, Junction, Corridor) | **DONE** | `52771de` |
+| PR-02 | Topology Layer (TopologyGraph, API endpoints) | **DONE** | `52771de` |
+| PR-03 | SLD Canonical Layout (StationGeometry, TRUNK, ENTRY_POINT) | **DONE** | `6f69605` |
+| PR-04 | Wizard ↔ SLD Integration (getStepForElement) | **DONE** | `52771de` |
+| PR-05 | Inspector SelectionRef Resolver | **DONE** | `6f69605` |
+| PR-06 | Report Cross-Reference | **DONE** | `6f69605` |
+| PR-07 | Golden Network (20 stacji, 31+ segmentów) + integration tests | **DONE** | `6f69605` |
+| PR-08 | Documentation (ADR-005, KANON_SLD_SYSTEM.md) | **DONE** | `6f69605` |
+
+### Zamknięte luki (31/31):
+
+- **ENM**: GAP-ENM-01 → 07 — DONE (Substation, Bay, Junction, Corridor + hash + validator + TS mirror)
+- **Topologia**: GAP-TOPO-01 → 04 — DONE (TopologyGraph, TRUNK BFS z transformatorami, ENTRY_POINT, NO_ROUTE_RECT)
+- **SLD**: GAP-SLD-01 → 06 — DONE (station-geometry.ts, TrunkPath, EntryPointMarker, StationBoundingBox)
+- **Wizard↔SLD**: GAP-WIZ-01 → 04 — DONE (getStepForElement, computeWizardStateWithTopology)
+- **Inspector**: GAP-INS-01 → 03 — DONE (selectionResolver.ts, resolveSelectionRef, ENM properties)
+- **Raporty**: GAP-RPT-01 → 03 — DONE (CrossReferenceTable, sld_symbol_id, wizard_step_hint)
+- **Testy**: GAP-TST-01 → 04 — DONE (Golden Network 20 stacji, 78+ nowych testów)
+- **API**: GAP-API-01, 03 — DONE (GET /enm/topology, GET /enm/readiness)
+
+---
+
 *Wygenerowano automatycznie na podstawie RECON repozytorium.*
-*Wersja: 60.0 | Data: 2026-02-07*
+*Wersja: 60.1 | Data: 2026-02-07 | Aktualizacja: recovery post PR #360*
