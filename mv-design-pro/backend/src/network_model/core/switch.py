@@ -25,11 +25,15 @@ class SwitchType(Enum):
     - DISCONNECTOR: Isolator (no-load switching)
     - LOAD_SWITCH: Load break switch
     - FUSE: Fuse link
+    - RECLOSER: Auto-recloser (automatic re-closing after fault)
+    - EARTH_SWITCH: Earthing switch (safety grounding)
     """
     BREAKER = "BREAKER"
     DISCONNECTOR = "DISCONNECTOR"
     LOAD_SWITCH = "LOAD_SWITCH"
     FUSE = "FUSE"
+    RECLOSER = "RECLOSER"
+    EARTH_SWITCH = "EARTH_SWITCH"
 
 
 class SwitchState(Enum):
