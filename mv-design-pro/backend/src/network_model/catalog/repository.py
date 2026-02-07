@@ -202,24 +202,30 @@ class CatalogRepository:
 
 def get_default_mv_catalog() -> CatalogRepository:
     """
-    Get default MV cable and line catalog with full thermal data.
+    Get default MV catalog with full equipment data.
 
     Returns a CatalogRepository pre-populated with:
     - Base cable types (XLPE/EPR, Cu/Al, 1-core/3-core, 70-400mm²)
     - Base overhead line types (Al/Al-St, 25-150mm²)
-    - Manufacturer-specific types (NKT, Tele-Fonika Kable)
-    - One incomplete type for testing (missing thermal data)
+    - Manufacturer-specific cable/line types (NKT, Tele-Fonika Kable)
+    - Power transformers WN/SN (110/15 kV, 110/20 kV): 16-63 MVA Yd11
+    - Distribution transformers SN/nN (15/0.4, 20/0.4 kV): 63-1000 kVA Dyn11/Yd11
+    - Switching equipment (breakers, load switches, disconnectors, reclosers, fuses)
+    - Converter-based sources (PV, wind, BESS)
 
     This is the canonical catalog for MV network design.
     """
     from .mv_cable_line_catalog import get_all_cable_types, get_all_line_types
+    from .mv_converter_catalog import get_all_converter_types
+    from .mv_switch_catalog import get_all_switch_equipment_types
+    from .mv_transformer_catalog import get_all_transformer_types
 
     return CatalogRepository.from_records(
         line_types=get_all_line_types(),
         cable_types=get_all_cable_types(),
-        transformer_types=[],
-        switch_equipment_types=[],
-        converter_types=[],
+        transformer_types=get_all_transformer_types(),
+        switch_equipment_types=get_all_switch_equipment_types(),
+        converter_types=get_all_converter_types(),
         inverter_types=[],
         protection_device_types=[],
         protection_curves=[],

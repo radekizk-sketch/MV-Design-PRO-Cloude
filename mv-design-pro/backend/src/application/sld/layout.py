@@ -6,6 +6,11 @@ PowerFactory Alignment (per sld_rules.md § F.6, POWERFACTORY_COMPLIANCE.md):
 - BFS-based hierarchical positioning from PCC/root
 - Switches affect topology when CLOSED and in_service
 - All elements visible (in_service=False → gray/dashed but still positioned)
+
+Layout modes:
+- horizontal (default): X=depth, Y=spread — legacy mode
+- vertical (vertical=True): X=spread, Y=depth — SLD top-down mode
+  Source at top, feeders descending, loads/stations at bottom.
 """
 
 from __future__ import annotations
@@ -35,6 +40,7 @@ def build_auto_layout_diagram(
     y_spacing: float = 120.0,
     annotations: Iterable[dict] | None = None,
     switches: Iterable[dict] | None = None,
+    vertical: bool = False,
 ) -> SldDiagram:
     """
     Build deterministic auto-layout SLD diagram.
@@ -99,7 +105,8 @@ def build_auto_layout_diagram(
             adjacency[to_node_id].add(from_node_id)
 
     positions = _layout_positions(
-        adjacency, node_ids, pcc_node_id, x_spacing=x_spacing, y_spacing=y_spacing
+        adjacency, node_ids, pcc_node_id,
+        x_spacing=x_spacing, y_spacing=y_spacing, vertical=vertical,
     )
 
     # Create node symbols with in_service state
@@ -195,6 +202,7 @@ def _layout_positions(
     *,
     x_spacing: float,
     y_spacing: float,
+    vertical: bool = False,
 ) -> dict[UUID, tuple[float, float]]:
     ordered_ids = list(_sorted_ids(node_ids))
     visited: set[UUID] = set()
@@ -219,11 +227,22 @@ def _layout_positions(
         for level in sorted(level_map):
             level_nodes = sorted(level_map[level], key=lambda item: str(item))
             for index, node_id in enumerate(level_nodes):
-                positions[node_id] = (
-                    level * x_spacing,
-                    current_offset + index * y_spacing,
-                )
-        current_offset += max_count * y_spacing + y_spacing
+                if vertical:
+                    # SLD mode: Y=depth (top→bottom), X=spread (left→right)
+                    positions[node_id] = (
+                        current_offset + index * x_spacing,
+                        level * y_spacing,
+                    )
+                else:
+                    # Legacy mode: X=depth, Y=spread
+                    positions[node_id] = (
+                        level * x_spacing,
+                        current_offset + index * y_spacing,
+                    )
+        if vertical:
+            current_offset += max_count * x_spacing + x_spacing
+        else:
+            current_offset += max_count * y_spacing + y_spacing
     return positions
 
 

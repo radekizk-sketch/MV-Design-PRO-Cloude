@@ -10,7 +10,7 @@ import pytest
 from network_model.core.branch import BranchType, LineBranch, TransformerBranch
 from network_model.core.graph import NetworkGraph
 from network_model.core.node import Node, NodeType
-from network_model.core.ybus import AdmittanceMatrixBuilder
+from network_model.core.ybus import AdmittanceMatrixBuilder, S_BASE_MVA
 
 
 def create_pq_node(node_id: str) -> Node:
@@ -91,8 +91,9 @@ def test_ybus_single_line_between_two_nodes():
     builder = AdmittanceMatrixBuilder(graph)
     y_bus = builder.build()
 
-    y_series = line.get_series_admittance()
-    y_shunt = line.get_shunt_admittance_per_end()
+    z_base = 20.0 ** 2 / S_BASE_MVA
+    y_series = line.get_series_admittance() * z_base
+    y_shunt = line.get_shunt_admittance_per_end() * z_base
 
     expected = np.array(
         [
@@ -119,8 +120,9 @@ def test_ybus_parallel_lines_between_two_nodes():
     builder = AdmittanceMatrixBuilder(graph)
     y_bus = builder.build()
 
-    y_series_total = line1.get_series_admittance() + line2.get_series_admittance()
-    y_shunt_total = line1.get_shunt_admittance_per_end() + line2.get_shunt_admittance_per_end()
+    z_base = 20.0 ** 2 / S_BASE_MVA
+    y_series_total = (line1.get_series_admittance() + line2.get_series_admittance()) * z_base
+    y_shunt_total = (line1.get_shunt_admittance_per_end() + line2.get_shunt_admittance_per_end()) * z_base
 
     expected = np.array(
         [
@@ -147,8 +149,9 @@ def test_ybus_ignores_out_of_service_branch():
     builder = AdmittanceMatrixBuilder(graph)
     y_bus = builder.build()
 
-    y_series = active_line.get_series_admittance()
-    y_shunt = active_line.get_shunt_admittance_per_end()
+    z_base = 20.0 ** 2 / S_BASE_MVA
+    y_series = active_line.get_series_admittance() * z_base
+    y_shunt = active_line.get_shunt_admittance_per_end() * z_base
 
     expected = np.array(
         [
@@ -315,7 +318,9 @@ def test_transformer_stamping_between_two_nodes():
     builder = AdmittanceMatrixBuilder(graph)
     y_bus = builder.build()
 
-    y_series = 1.0 / transformer.get_short_circuit_impedance_ohm_lv()
+    z_pu_sn = transformer.get_short_circuit_impedance_pu()
+    z_pu_base = z_pu_sn * (S_BASE_MVA / transformer.rated_power_mva)
+    y_series = 1.0 / z_pu_base
     expected = np.array(
         [
             [y_series, -y_series],

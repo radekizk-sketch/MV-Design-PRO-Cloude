@@ -265,11 +265,17 @@ export interface ExtendedTrace {
 export interface SldOverlayBus {
   symbol_id: string;
   bus_id: string;
+  /** Alias used by overlay_builder and SLD components */
+  node_id: string;
   u_pu?: number;
   u_kv?: number;
   angle_deg?: number;
   ikss_ka?: number;
   sk_mva?: number;
+  /** Energy validation voltage status: PASS | WARNING | FAIL | NOT_COMPUTED */
+  voltage_status?: string;
+  /** Worst energy validation status for this node */
+  ev_status?: string;
 }
 
 /** @deprecated Use SldOverlayBus instead. */
@@ -285,6 +291,8 @@ export interface SldOverlayBranch {
   q_mvar?: number;
   i_a?: number;
   loading_pct?: number;
+  /** Worst energy validation status for this branch */
+  ev_status?: string;
 }
 
 /**
@@ -294,8 +302,13 @@ export interface SldResultOverlay {
   diagram_id: string;
   run_id: string;
   result_status: string;
-  buses: SldOverlayBus[];
+  /** Node overlay data (primary field used by overlay_builder and SLD components) */
+  nodes: SldOverlayBus[];
+  /** @deprecated Use nodes instead */
+  buses?: SldOverlayBus[];
   branches: SldOverlayBranch[];
+  /** Overall energy validation status: PASS | WARNING | FAIL */
+  overall_ev_status?: string;
 }
 
 // =============================================================================
