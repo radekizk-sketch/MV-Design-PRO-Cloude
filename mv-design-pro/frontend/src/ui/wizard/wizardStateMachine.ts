@@ -349,3 +349,166 @@ export function getOverallStatusLabel(status: WizardState['overallStatus']): str
     default: return 'Pusty';
   }
 }
+
+// ---------------------------------------------------------------------------
+// SLD ↔ Wizard Integration (PR-04)
+// ---------------------------------------------------------------------------
+
+export interface ElementStepMapping {
+  /** Krok kreatora powiązany z elementem */
+  readonly stepId: string;
+  /** Typ elementu ENM */
+  readonly elementType: string;
+  /** Indeks sekcji w kroku (opcjonalny) */
+  readonly sectionIndex: number;
+}
+
+/**
+ * Mapowanie: klik elementu na SLD → odpowiedni krok kreatora.
+ *
+ * DETERMINISTIC: ten sam ref_id → identyczny krok.
+ *
+ * @param enm - EnergyNetworkModel
+ * @param elementRefId - ref_id klikniętego elementu
+ * @returns Mapowanie na krok kreatora lub null jeśli nieznany element
+ */
+export function getStepForElement(
+  enm: EnergyNetworkModel,
+  elementRefId: string
+): ElementStepMapping | null {
+  // Szukaj w bus
+  const busIdx = enm.buses.findIndex(b => b.ref_id === elementRefId);
+  if (busIdx >= 0) {
+    const bus = enm.buses[busIdx];
+    // Szyna źródłowa → K2, reszta → K3
+    const isSourceBus = enm.sources.some(s => s.bus_ref === bus.ref_id);
+    return {
+      stepId: isSourceBus ? 'K2' : 'K3',
+      elementType: 'bus',
+      sectionIndex: busIdx,
+    };
+  }
+
+  // Szukaj w sources
+  const srcIdx = enm.sources.findIndex(s => s.ref_id === elementRefId);
+  if (srcIdx >= 0) {
+    return { stepId: 'K2', elementType: 'source', sectionIndex: srcIdx };
+  }
+
+  // Szukaj w branches (linie/kable → K4, łączniki → K3)
+  const branchIdx = enm.branches.findIndex(b => b.ref_id === elementRefId);
+  if (branchIdx >= 0) {
+    const branch = enm.branches[branchIdx];
+    if (branch.type === 'line_overhead' || branch.type === 'cable') {
+      return { stepId: 'K4', elementType: 'branch', sectionIndex: branchIdx };
+    }
+    // Łączniki → K3 (struktura szyn i sekcji)
+    return { stepId: 'K3', elementType: 'switch', sectionIndex: branchIdx };
+  }
+
+  // Szukaj w transformers → K5
+  const trafoIdx = enm.transformers.findIndex(t => t.ref_id === elementRefId);
+  if (trafoIdx >= 0) {
+    return { stepId: 'K5', elementType: 'transformer', sectionIndex: trafoIdx };
+  }
+
+  // Szukaj w loads → K6
+  const loadIdx = enm.loads.findIndex(l => l.ref_id === elementRefId);
+  if (loadIdx >= 0) {
+    return { stepId: 'K6', elementType: 'load', sectionIndex: loadIdx };
+  }
+
+  // Szukaj w generators → K6
+  const genIdx = enm.generators.findIndex(g => g.ref_id === elementRefId);
+  if (genIdx >= 0) {
+    return { stepId: 'K6', elementType: 'generator', sectionIndex: genIdx };
+  }
+
+  // Szukaj w substations → K3
+  const subIdx = enm.substations.findIndex(s => s.ref_id === elementRefId);
+  if (subIdx >= 0) {
+    return { stepId: 'K3', elementType: 'substation', sectionIndex: subIdx };
+  }
+
+  // Szukaj w bays → K3
+  const bayIdx = enm.bays.findIndex(b => b.ref_id === elementRefId);
+  if (bayIdx >= 0) {
+    return { stepId: 'K3', elementType: 'bay', sectionIndex: bayIdx };
+  }
+
+  // Szukaj w junctions → K4
+  const juncIdx = enm.junctions.findIndex(j => j.ref_id === elementRefId);
+  if (juncIdx >= 0) {
+    return { stepId: 'K4', elementType: 'junction', sectionIndex: juncIdx };
+  }
+
+  // Szukaj w corridors → K4
+  const corrIdx = enm.corridors.findIndex(c => c.ref_id === elementRefId);
+  if (corrIdx >= 0) {
+    return { stepId: 'K4', elementType: 'corridor', sectionIndex: corrIdx };
+  }
+
+  return null;
+}
+
+// ---------------------------------------------------------------------------
+// Extended Wizard State (with topology)
+// ---------------------------------------------------------------------------
+
+export interface TopologyReadiness {
+  readonly hasSubstations: boolean;
+  readonly hasBays: boolean;
+  readonly hasJunctions: boolean;
+  readonly hasCorridors: boolean;
+  readonly completionPercent: number;
+}
+
+export interface WizardStateExtended extends WizardState {
+  readonly topologyReadiness: TopologyReadiness;
+  readonly extendedElementCounts: ExtendedElementCounts;
+}
+
+export interface ExtendedElementCounts extends ElementCounts {
+  readonly substations: number;
+  readonly bays: number;
+  readonly junctions: number;
+  readonly corridors: number;
+}
+
+/**
+ * Compute wizard state with topology readiness.
+ * Extends computeWizardState with additional topology information.
+ */
+export function computeWizardStateWithTopology(
+  enm: EnergyNetworkModel
+): WizardStateExtended {
+  const baseState = computeWizardState(enm);
+
+  const hasSubs = enm.substations.length > 0;
+  const hasBays = enm.bays.length > 0;
+  const hasJuncs = enm.junctions.length > 0;
+  const hasCorrs = enm.corridors.length > 0;
+
+  const topoItems = [hasSubs, hasBays, hasJuncs, hasCorrs];
+  const topoPercent = Math.round(
+    (topoItems.filter(Boolean).length / topoItems.length) * 100
+  );
+
+  return {
+    ...baseState,
+    topologyReadiness: {
+      hasSubstations: hasSubs,
+      hasBays: hasBays,
+      hasJunctions: hasJuncs,
+      hasCorridors: hasCorrs,
+      completionPercent: topoPercent,
+    },
+    extendedElementCounts: {
+      ...baseState.elementCounts,
+      substations: enm.substations.length,
+      bays: enm.bays.length,
+      junctions: enm.junctions.length,
+      corridors: enm.corridors.length,
+    },
+  };
+}

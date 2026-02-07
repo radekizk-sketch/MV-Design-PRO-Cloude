@@ -18,6 +18,10 @@ from .models import (
     FuseBranch,
     OverheadLine,
     SwitchBranch,
+    Substation,
+    Bay,
+    Junction,
+    Corridor,
 )
 
 
@@ -51,6 +55,7 @@ class ENMValidator:
         self._check_blockers(enm, issues)
         self._check_warnings(enm, issues)
         self._check_info(enm, issues)
+        self._check_topology_entities(enm, issues)
 
         has_blockers = any(i.severity == "BLOCKER" for i in issues)
         has_warnings = any(i.severity == "IMPORTANT" for i in issues)
@@ -276,6 +281,161 @@ class ENMValidator:
                         f"parametry wprowadzone ręcznie."
                     ),
                     element_refs=[branch.ref_id],
+                    wizard_step_hint="K4",
+                ))
+
+    # ------------------------------------------------------------------
+    # Topology entity checks (W005-W008, I003-I005)
+    # ------------------------------------------------------------------
+
+    def _check_topology_entities(
+        self, enm: EnergyNetworkModel, issues: list[ValidationIssue]
+    ) -> None:
+        bus_refs = {b.ref_id for b in enm.buses}
+        branch_refs = {b.ref_id for b in enm.branches}
+        trafo_refs = {t.ref_id for t in enm.transformers}
+        substation_refs = {s.ref_id for s in enm.substations}
+
+        # W005: Stacja referencja do nieistniejącej szyny
+        for sub in enm.substations:
+            for br in sub.bus_refs:
+                if br not in bus_refs:
+                    issues.append(ValidationIssue(
+                        code="W005",
+                        severity="IMPORTANT",
+                        message_pl=(
+                            f"Stacja '{sub.ref_id}' zawiera referencję do "
+                            f"nieistniejącej szyny '{br}'."
+                        ),
+                        element_refs=[sub.ref_id, br],
+                        wizard_step_hint="K3",
+                        suggested_fix="Usuń niepoprawną referencję lub dodaj brakującą szynę.",
+                    ))
+            for tr in sub.transformer_refs:
+                if tr not in trafo_refs:
+                    issues.append(ValidationIssue(
+                        code="W005",
+                        severity="IMPORTANT",
+                        message_pl=(
+                            f"Stacja '{sub.ref_id}' zawiera referencję do "
+                            f"nieistniejącego transformatora '{tr}'."
+                        ),
+                        element_refs=[sub.ref_id, tr],
+                        wizard_step_hint="K5",
+                        suggested_fix=(
+                            "Usuń niepoprawną referencję lub dodaj brakujący transformator."
+                        ),
+                    ))
+
+        # W006: Pole (Bay) referencja do nieistniejącej stacji lub szyny
+        for bay in enm.bays:
+            if bay.substation_ref not in substation_refs:
+                issues.append(ValidationIssue(
+                    code="W006",
+                    severity="IMPORTANT",
+                    message_pl=(
+                        f"Pole '{bay.ref_id}' referencja do nieistniejącej "
+                        f"stacji '{bay.substation_ref}'."
+                    ),
+                    element_refs=[bay.ref_id, bay.substation_ref],
+                    wizard_step_hint="K3",
+                    suggested_fix="Przypisz pole do istniejącej stacji.",
+                ))
+            if bay.bus_ref not in bus_refs:
+                issues.append(ValidationIssue(
+                    code="W006",
+                    severity="IMPORTANT",
+                    message_pl=(
+                        f"Pole '{bay.ref_id}' referencja do nieistniejącej "
+                        f"szyny '{bay.bus_ref}'."
+                    ),
+                    element_refs=[bay.ref_id, bay.bus_ref],
+                    wizard_step_hint="K3",
+                    suggested_fix="Przypisz pole do istniejącej szyny.",
+                ))
+
+        # W007: Junction z mniej niż 3 gałęziami
+        for junc in enm.junctions:
+            if len(junc.connected_branch_refs) < 3:
+                issues.append(ValidationIssue(
+                    code="W007",
+                    severity="IMPORTANT",
+                    message_pl=(
+                        f"Węzeł T '{junc.ref_id}' ma {len(junc.connected_branch_refs)} "
+                        f"gałęzi — wymagane minimum 3."
+                    ),
+                    element_refs=[junc.ref_id],
+                    wizard_step_hint="K4",
+                    suggested_fix="Dodaj brakujące gałęzie do węzła T.",
+                ))
+            for br_ref in junc.connected_branch_refs:
+                if br_ref not in branch_refs:
+                    issues.append(ValidationIssue(
+                        code="W007",
+                        severity="IMPORTANT",
+                        message_pl=(
+                            f"Węzeł T '{junc.ref_id}' referencja do "
+                            f"nieistniejącej gałęzi '{br_ref}'."
+                        ),
+                        element_refs=[junc.ref_id, br_ref],
+                        wizard_step_hint="K4",
+                        suggested_fix="Usuń niepoprawną referencję lub dodaj brakującą gałąź.",
+                    ))
+
+        # W008: Corridor z nieistniejącymi segmentami
+        for corr in enm.corridors:
+            for seg_ref in corr.ordered_segment_refs:
+                if seg_ref not in branch_refs:
+                    issues.append(ValidationIssue(
+                        code="W008",
+                        severity="IMPORTANT",
+                        message_pl=(
+                            f"Magistrala '{corr.ref_id}' referencja do "
+                            f"nieistniejącego segmentu '{seg_ref}'."
+                        ),
+                        element_refs=[corr.ref_id, seg_ref],
+                        wizard_step_hint="K4",
+                        suggested_fix="Usuń niepoprawną referencję lub dodaj brakujący segment.",
+                    ))
+
+        # I003: Stacja bez pól (bayów)
+        substations_with_bays = {bay.substation_ref for bay in enm.bays}
+        for sub in enm.substations:
+            if sub.ref_id not in substations_with_bays:
+                issues.append(ValidationIssue(
+                    code="I003",
+                    severity="INFO",
+                    message_pl=(
+                        f"Stacja '{sub.ref_id}' nie ma przypisanych pól rozdzielczych."
+                    ),
+                    element_refs=[sub.ref_id],
+                    wizard_step_hint="K3",
+                ))
+
+        # I004: Pusta magistrala (corridor bez segmentów)
+        for corr in enm.corridors:
+            if not corr.ordered_segment_refs:
+                issues.append(ValidationIssue(
+                    code="I004",
+                    severity="INFO",
+                    message_pl=(
+                        f"Magistrala '{corr.ref_id}' nie ma segmentów."
+                    ),
+                    element_refs=[corr.ref_id],
+                    wizard_step_hint="K4",
+                ))
+
+        # I005: Pierścień bez punktu NO
+        for corr in enm.corridors:
+            if corr.corridor_type == "ring" and not corr.no_point_ref:
+                issues.append(ValidationIssue(
+                    code="I005",
+                    severity="INFO",
+                    message_pl=(
+                        f"Magistrala pierścieniowa '{corr.ref_id}' nie ma "
+                        f"zdefiniowanego punktu normalnie otwartego (NO)."
+                    ),
+                    element_refs=[corr.ref_id],
                     wizard_step_hint="K4",
                 ))
 
