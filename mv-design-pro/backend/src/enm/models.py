@@ -218,6 +218,60 @@ class Generator(ENMElement):
 
 
 # ---------------------------------------------------------------------------
+# Substation (stacja SN/nn — kontener logiczny z rozdzielnicami)
+# ---------------------------------------------------------------------------
+
+
+class Substation(ENMElement):
+    """Stacja SN/nn — logiczny kontener z rozdzielnicami."""
+
+    station_type: Literal["gpz", "mv_lv", "switching", "customer"]
+    bus_refs: list[str] = []
+    transformer_refs: list[str] = []
+    entry_point_ref: str | None = None
+
+
+# ---------------------------------------------------------------------------
+# Bay (pole rozdzielcze SN)
+# ---------------------------------------------------------------------------
+
+
+class Bay(ENMElement):
+    """Pole rozdzielcze SN (IN, OUT, TR, COUPLER, FEEDER, MEASUREMENT, OZE)."""
+
+    bay_role: Literal["IN", "OUT", "TR", "COUPLER", "FEEDER", "MEASUREMENT", "OZE"]
+    substation_ref: str
+    bus_ref: str
+    equipment_refs: list[str] = []
+    protection_ref: str | None = None
+
+
+# ---------------------------------------------------------------------------
+# Junction (węzeł T — rozgałęzienie magistrali)
+# ---------------------------------------------------------------------------
+
+
+class Junction(ENMElement):
+    """Węzeł T (rozgałęzienie magistrali)."""
+
+    connected_branch_refs: list[str]
+    junction_type: Literal["T_node", "sectionalizer", "recloser_point", "NO_point"]
+
+
+# ---------------------------------------------------------------------------
+# Corridor (magistrala — ciąg linii SN)
+# ---------------------------------------------------------------------------
+
+
+class Corridor(ENMElement):
+    """Magistrala (ciąg linii SN od GPZ do stacji końcowej)."""
+
+    corridor_type: Literal["radial", "ring", "mixed"]
+    ordered_segment_refs: list[str]
+    no_point_ref: str | None = None
+
+
+# ---------------------------------------------------------------------------
 # ROOT
 # ---------------------------------------------------------------------------
 
@@ -230,3 +284,7 @@ class EnergyNetworkModel(BaseModel):
     sources: list[Source] = []
     loads: list[Load] = []
     generators: list[Generator] = []
+    substations: list[Substation] = []
+    bays: list[Bay] = []
+    junctions: list[Junction] = []
+    corridors: list[Corridor] = []

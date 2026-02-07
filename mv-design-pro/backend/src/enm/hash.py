@@ -23,7 +23,10 @@ def compute_enm_hash(enm: EnergyNetworkModel) -> str:
         exclude={"header": {"updated_at", "created_at", "hash_sha256"}},
     )
     # Remove random 'id' fields from all element lists — ref_id is the stable identity
-    for key in ("buses", "branches", "transformers", "sources", "loads", "generators"):
+    for key in (
+        "buses", "branches", "transformers", "sources", "loads", "generators",
+        "substations", "bays", "junctions", "corridors",
+    ):
         if key in data:
             for item in data[key]:
                 item.pop("id", None)

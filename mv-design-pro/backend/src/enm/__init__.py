@@ -20,6 +20,10 @@ from .models import (
     Load,
     Generator,
     GenLimits,
+    Substation,
+    Bay,
+    Junction,
+    Corridor,
 )
 from .hash import compute_enm_hash
 from .mapping import map_enm_to_network_graph
@@ -45,6 +49,10 @@ __all__ = [
     "Load",
     "Generator",
     "GenLimits",
+    "Substation",
+    "Bay",
+    "Junction",
+    "Corridor",
     "compute_enm_hash",
     "map_enm_to_network_graph",
     "ENMValidator",

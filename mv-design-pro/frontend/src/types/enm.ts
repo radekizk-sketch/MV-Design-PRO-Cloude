@@ -195,6 +195,48 @@ export interface Generator extends ENMElement {
 }
 
 // ---------------------------------------------------------------------------
+// Substation (stacja SN/nn — kontener logiczny z rozdzielnicami)
+// ---------------------------------------------------------------------------
+
+export interface Substation extends ENMElement {
+  station_type: 'gpz' | 'mv_lv' | 'switching' | 'customer';
+  bus_refs: string[];
+  transformer_refs: string[];
+  entry_point_ref?: string | null;
+}
+
+// ---------------------------------------------------------------------------
+// Bay (pole rozdzielcze SN)
+// ---------------------------------------------------------------------------
+
+export interface Bay extends ENMElement {
+  bay_role: 'IN' | 'OUT' | 'TR' | 'COUPLER' | 'FEEDER' | 'MEASUREMENT' | 'OZE';
+  substation_ref: string;
+  bus_ref: string;
+  equipment_refs: string[];
+  protection_ref?: string | null;
+}
+
+// ---------------------------------------------------------------------------
+// Junction (węzeł T — rozgałęzienie magistrali)
+// ---------------------------------------------------------------------------
+
+export interface Junction extends ENMElement {
+  connected_branch_refs: string[];
+  junction_type: 'T_node' | 'sectionalizer' | 'recloser_point' | 'NO_point';
+}
+
+// ---------------------------------------------------------------------------
+// Corridor (magistrala — ciąg linii SN)
+// ---------------------------------------------------------------------------
+
+export interface Corridor extends ENMElement {
+  corridor_type: 'radial' | 'ring' | 'mixed';
+  ordered_segment_refs: string[];
+  no_point_ref?: string | null;
+}
+
+// ---------------------------------------------------------------------------
 // ROOT
 // ---------------------------------------------------------------------------
 
@@ -206,6 +248,10 @@ export interface EnergyNetworkModel {
   sources: Source[];
   loads: Load[];
   generators: Generator[];
+  substations: Substation[];
+  bays: Bay[];
+  junctions: Junction[];
+  corridors: Corridor[];
 }
 
 // ---------------------------------------------------------------------------
@@ -231,6 +277,75 @@ export interface ValidationResult {
   status: 'OK' | 'WARN' | 'FAIL';
   issues: ValidationIssue[];
   analysis_available: AnalysisAvailability;
+}
+
+// ---------------------------------------------------------------------------
+// Topology Summary (z GET /enm/topology)
+// ---------------------------------------------------------------------------
+
+export interface TopologySummary {
+  case_id: string;
+  substations: Substation[];
+  bays: Bay[];
+  junctions: Junction[];
+  corridors: Corridor[];
+  bus_count: number;
+  branch_count: number;
+  transformer_count: number;
+}
+
+// ---------------------------------------------------------------------------
+// Readiness Matrix (z GET /enm/readiness)
+// ---------------------------------------------------------------------------
+
+export interface AnalysisReadiness {
+  short_circuit_3f: boolean;
+  short_circuit_1f: boolean;
+  load_flow: boolean;
+  protection: boolean;
+}
+
+export interface TopologyCompleteness {
+  has_substations: boolean;
+  has_bays: boolean;
+  has_junctions: boolean;
+  has_corridors: boolean;
+}
+
+export interface ElementCounts {
+  buses: number;
+  branches: number;
+  transformers: number;
+  sources: number;
+  loads: number;
+  generators: number;
+  substations: number;
+  bays: number;
+  junctions: number;
+  corridors: number;
+}
+
+export interface ReadinessMatrix {
+  case_id: string;
+  enm_revision: number;
+  validation_status: 'OK' | 'WARN' | 'FAIL';
+  analysis_readiness: AnalysisReadiness;
+  topology_completeness: TopologyCompleteness;
+  element_counts: ElementCounts;
+}
+
+// ---------------------------------------------------------------------------
+// Selection System (SLD ↔ Kreator ↔ Inspektor)
+// ---------------------------------------------------------------------------
+
+export interface SelectionRef {
+  /** ref_id elementu ENM */
+  element_ref_id: string;
+  /** Typ elementu */
+  element_type: 'bus' | 'branch' | 'transformer' | 'source' | 'load' | 'generator'
+    | 'substation' | 'bay' | 'junction' | 'corridor';
+  /** Krok kreatora powiązany z elementem */
+  wizard_step_hint: string;
 }
 
 // ---------------------------------------------------------------------------
