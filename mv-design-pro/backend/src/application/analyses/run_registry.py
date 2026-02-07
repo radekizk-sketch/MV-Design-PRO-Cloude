@@ -14,6 +14,9 @@ from application.analyses.protection.overcurrent.envelope_adapter import (
 from application.analyses.protection.catalog.envelope_adapter import (
     to_run_envelope as protection_device_mapping_to_run_envelope,
 )
+from application.analyses.energy_validation.envelope_adapter import (
+    to_run_envelope as energy_validation_to_run_envelope,
+)
 from application.analyses.run_envelope import AnalysisRunEnvelope
 
 AdapterFn = Callable[..., AnalysisRunEnvelope]
@@ -23,6 +26,7 @@ RUN_ENVELOPE_ADAPTERS: dict[str, AdapterFn] = {
     "short_circuit.iec60909": iec60909_to_run_envelope,
     "protection.overcurrent.v0": protection_overcurrent_to_run_envelope,
     "protection.device_mapping.v0": protection_device_mapping_to_run_envelope,
+    "energy_validation.v0": energy_validation_to_run_envelope,
 }
 
 

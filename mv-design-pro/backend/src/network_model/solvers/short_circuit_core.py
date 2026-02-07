@@ -70,15 +70,16 @@ def compute_equivalent_impedance(
     if fault_node_id not in graph.nodes:
         raise ValueError(f"Fault node '{fault_node_id}' does not exist in graph")
 
-    builder, z1_bus = build_zbus(graph)
+    builder, z1_bus_pu = build_zbus(graph)
     node_index = builder.node_id_to_index[fault_node_id]
-    z1 = z1_bus[node_index, node_index]
-    z2 = z2_bus[node_index, node_index] if z2_bus is not None else z1
+    z_base_ohm = builder.get_zbase_ohm(fault_node_id)
+    z1 = z1_bus_pu[node_index, node_index] * z_base_ohm
+    z2 = (z2_bus[node_index, node_index] * z_base_ohm) if z2_bus is not None else z1
 
     def require_z0_bus(message: str) -> complex:
         if z0_bus is None:
             raise ValueError(message)
-        return z0_bus[node_index, node_index]
+        return z0_bus[node_index, node_index] * z_base_ohm
 
     z0: complex | None = None
     if short_circuit_type == ShortCircuitType.THREE_PHASE:
@@ -126,7 +127,13 @@ def compute_post_fault_quantities(
         rx_ratio = math.inf
     else:
         rx_ratio = z_equiv.real / z_equiv.imag
-    kappa = 1.02 + 0.98 * math.exp(-3.0 * rx_ratio)
+    exp_arg = -3.0 * rx_ratio
+    if exp_arg > 700:
+        kappa = 2.0
+    elif exp_arg < -700:
+        kappa = 1.02
+    else:
+        kappa = 1.02 + 0.98 * math.exp(exp_arg)
     ip_a = kappa * math.sqrt(2.0) * ikss
     ith_a = ikss * math.sqrt(tk_s)
     sk_mva = (math.sqrt(3.0) * un_v * ikss) / 1_000_000.0
