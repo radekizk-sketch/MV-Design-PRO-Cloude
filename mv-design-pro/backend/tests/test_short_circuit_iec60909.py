@@ -447,7 +447,8 @@ def test_zkk_from_inverse_ybus():
     y_bus = builder.build()
     z_bus = np.linalg.inv(y_bus)
     node_index = builder.node_id_to_index["B"]
-    zkk_expected = z_bus[node_index, node_index]
+    z_base_ohm = builder.get_zbase_ohm("B")
+    zkk_expected = z_bus[node_index, node_index] * z_base_ohm
 
     result = ShortCircuitIEC60909Solver.compute_3ph_short_circuit(
         graph=graph,
