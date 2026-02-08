@@ -159,9 +159,13 @@ FINALIZACJA:
   - SLD nie wpływa na solver ani ENM Core
   - Corridor należy tutaj, NIE do ENM Core
 - §0.6 — Warstwa WhiteBox / Proof: dowód obliczeń, trace, immutable (~40 linii)
-- §0.7 — Mapowanie ENM → NetworkGraph — kontrakt deterministyczny (~80 linii)
+- §0.7 — Mapowanie ENM → NetworkGraph — kontrakt deterministyczny (~120 linii)
   - Reguły mapowania 1:1 z `enm/mapping.py`
   - Bus → Node, OverheadLine/Cable → LineBranch, Transformer → TransformerBranch, SwitchBranch → Switch, Source → virtual ground + impedance branch
+  - Generator(synchronous) → P/Q adjustment na Node (AS-IS, `mapping.py:57-59`)
+  - Generator(pv_inverter|wind_inverter|bess) → InverterSource (Decision #14 — TO-BE, brak w obecnym `mapping.py`)
+  - Load → P/Q adjustment na Node (AS-IS, ujemny znak P/Q, `mapping.py:54-56`)
+  - Solver SC widzi falownik jako InverterSource (ograniczone źródło prądowe), NIE jako P/Q adjustment
 - §0.8 — Diagram warstw (Mermaid) (~40 linii)
 - §0.9 — Study Case architecture (Case ≠ Model, singleton, invalidation) (~80 linii)
 - §0.10 — PowerFactory mapping (tabela odpowiedników) (~40 linii)
@@ -227,12 +231,54 @@ FINALIZACJA:
 - §2.14 — Supporting types (GroundingConfig, BusLimits, BranchRating, GenLimits) (~80 linii)
 - §2.15 — Inwarianty modelu ENM (~40 linii)
 - §2.16 — Przykład kompletny ENM (JSON) (~100 linii)
+- §2.17 — **Źródła energoelektroniczne (falowniki) — model normowy** (~200 linii)
+  - Decision Matrix ref: #11, #12, #14
+  - Status: AS-IS (model Generator z gen_type falownikowym) + TO-BE (walidacje, wymuszenia topologii)
+  - Zasada fundamentalna (BINDING): Generator energoelektroniczny (PV, BESS, agregat z falownikiem) jest ZAWSZE elementem nn (0,4 / 0,69 / 0,8 kV)
+  - Zakaz bezpośredniego przyłączenia do szyny SN (BINDING): `Generator(gen_type ∈ {pv_inverter, wind_inverter, bess})` na `Bus(voltage_kv > 1 kV)` = NIEDOZWOLONE
+  - Kanoniczna topologia fizyczna OZE → SN (BINDING):
+    ```
+    Generator (falownik, nn)
+    │
+    Bus nn źródła (0,4 / 0,69 / 0,8 kV)
+    │
+    Łącznik nn / zabezpieczenie nn (SwitchBranch / FuseBranch)
+    │
+    Bus nn stacji
+    │
+    Transformator nn/SN
+    │
+    Bus SN stacji
+    ```
+  - Implikacje: Generator NIE ZNA poziomu SN — SN osiągany WYŁĄCZNIE przez transformator
+  - Transformator jest bytem OBOWIĄZKOWYM przy integracji OZE z SN — osobny, jawny element ENM
+  - Mapowanie na solver (Decision #14): Generator(falownik) → InverterSource (ref: `network_model/core/inverter.py`)
+  - Parametry solverowe falownika: `in_rated_a`, `k_sc`, `converter_kind` (z katalogu `ConverterType` / `InverterType`)
+  - Konsekwencje dla White Box: pełny tor energii Generator → Bus nn → Trafo → Bus SN → sieć musi być odtwarzalny
+  - Konsekwencje dla zabezpieczeń: punkt przyłączenia (Bus nn) jest znany, parametry zwarciowe falownika dostępne przez InverterSource
+- §2.18 — **Odbiory — przyłączanie fizyczne** (~120 linii)
+  - Decision Matrix ref: #13
+  - Status: AS-IS (model Load z bus_ref) + TO-BE (wymuszenia kompletnej topologii)
+  - Load jest przypięty do konkretnego Bus przez `bus_ref` (AS-IS)
+  - Normowa topologia przyłączenia odbioru (BINDING):
+    ```
+    Bus (szyna)
+    │
+    Łącznik / zabezpieczenie (SwitchBranch / FuseBranch)
+    │
+    Bus pola odpływowego
+    │
+    Load
+    ```
+  - Implikacje: odbiór NIE może wisieć bezpośrednio na szynie bez pola odpływowego
+  - Walidacja systemowa: każdy Load MUSI mieć pełny tor do źródła zasilania (E003 — connectivity)
+  - Walidacja topologiczna: brak skrótów topologicznych (odbiór bez łącznika/pola)
 
 **Źródła:**
-- Kod: `enm/models.py` (291 linii), `types/enm.ts` (370 linii)
-- Normy: PN-EN 60909-0
+- Kod: `enm/models.py` (291 linii), `types/enm.ts` (370 linii), `network_model/core/inverter.py`, `network_model/catalog/types.py` (ConverterType, InverterType)
+- Normy: PN-EN 60909-0, IRiESD (warunki przyłączenia OZE)
 
-**Szacowana długość:** ~1350 linii
+**Szacowana długość:** ~1670 linii
 
 ---
 
@@ -353,6 +399,12 @@ FINALIZACJA:
 - §7.2 — Kody BLOCKER E001-E008 (pełna tabela: kod, message_pl, wizard_step_hint, suggested_fix) (~150 linii)
 - §7.3 — Kody IMPORTANT W001-W008 (~150 linii)
 - §7.4 — Kody INFO I001-I005 (~80 linii)
+- §7.4a — **Kody walidacji OZE / Odbiory (BINDING — Decision #11, #12, #13)** (~100 linii)
+  - Status: TO-BE (nowe reguły, jeszcze niezaimplementowane w `enm/validator.py`)
+  - E009 — BLOCKER: Generator energoelektroniczny na szynie SN (`gen_type ∈ {pv_inverter, wind_inverter, bess}` na Bus z `voltage_kv > 1 kV`) — zakaz bezpośredniego przyłączenia falownika do SN
+  - E010 — BLOCKER: Brak transformatora nn/SN przy integracji OZE z SN (Generator nn bez toru nn → transformator → SN w grafie ENM)
+  - W009 — IMPORTANT: Odbiór bez kompletnego toru przyłączenia (Load bez łącznika/pola na torze do szyny)
+  - Warunki blokady solvera: E009 i E010 blokują wszystkie analizy (SC, PF)
 - §7.5 — AnalysisAvailability (SC 3F, SC 1F, Load Flow) — reguły dostępności (~60 linii)
 - §7.6 — Walidacja topologiczna — connectivity check (NetworkX BFS) (~60 linii)
 - §7.7 — ValidationResult, ValidationIssue — kontrakty danych (~60 linii)
@@ -527,7 +579,23 @@ FINALIZACJA:
 - §13.7 — K6: Magistrala SN (~60 linii)
 - §13.8 — K7: Stacje SN (~60 linii)
 - §13.9 — K8: Transformatory SN/nN (~60 linii)
-- §13.10 — K9: Odbiory i generacja (~60 linii)
+- §13.10 — K9: Odbiory i generacja (~180 linii)
+  - Decision Matrix ref: #11, #12, #13
+  - **K9a — Dodawanie źródła OZE (BINDING):**
+    1. Użytkownik wybiera typ źródła (PV / BESS / agregat z falownikiem) i napięcie wyjściowe nn (0,4 / 0,69 / 0,8 kV)
+    2. Kreator tworzy Bus nn o zadanym napięciu i przypina Generator do tego Bus nn
+    3. Kreator pyta: „Czy źródło ma być przyłączone do sieci SN?"
+    4. Jeśli TAK → kreator WYMUSZA dodanie: transformatora nn/SN + pola transformatorowego po stronie SN
+    5. Bez transformatora → przejście dalej jest ZABLOKOWANE
+  - **Zakazy kreatora K9a (BINDING):**
+    - Kreator NIE MOŻE pozwolić na `Generator → Bus SN`
+    - Kreator NIE MOŻE tworzyć „źródeł w stacji" bez jawnego toru fizycznego
+    - Kreator NIE MOŻE tworzyć domyślnych transformatorów „w tle" — każdy element jawny w ENM
+  - **K9b — Dodawanie odbioru (BINDING):**
+    1. Użytkownik wybiera Bus/szynę przyłączenia
+    2. Kreator tworzy pole odpływowe (łącznik + zabezpieczenie)
+    3. Kreator tworzy Load przypięty do Bus pola odpływowego
+    - Kreator NIE MOŻE tworzyć odbioru wiszącego bezpośrednio na szynie bez pola odpływowego
 - §13.11 — K10: Walidacja i gotowość (~60 linii)
 - §13.12 — Reguły przejścia (preconditions per krok) (~60 linii)
 - §13.13 — Relacja kreator → ENM → Drzewo → SLD (event flow) (~60 linii)
@@ -634,30 +702,30 @@ FINALIZACJA:
 
 | Plik | Faza | Warstwa | Rozdziały | Szacowane linie |
 |---|---|---|---|---|
-| SPEC_00_LAYERING.md | 0 | Architecture | 10 | ~560 |
+| SPEC_00_LAYERING.md | 0 | Architecture | 10 | ~600 |
 | SPEC_01_GLOSSARY_NORMATIVE.md | 0 | Governance | 7 | ~290 |
-| SPEC_02_ENM_CORE.md | 0 | ENM Core | 16 | ~1350 |
+| SPEC_02_ENM_CORE.md | 0 | ENM Core | 18 | ~1670 |
 | SPEC_03_ENM_META.md | 0 | ENM Meta | 6 | ~380 |
 | SPEC_04_SLD_PROJECTION.md | 0 | SLD | 6 | ~310 |
 | SPEC_05_SLD_LAYOUT_ROUTE.md | 0 | SLD Layout | 7 | ~420 |
 | SPEC_06_RESULTS_API.md | 0 | Results API | 8 | ~580 |
-| SPEC_07_VALIDATION.md | 0 | Validation | 8 | ~660 |
+| SPEC_07_VALIDATION.md | 0 | Validation | 9 | ~760 |
 | SPEC_08_PUBLIC_API.md | 0 | Public API | 11 | ~820 |
 | SPEC_09_WHITE_BOX.md | 0 | WhiteBox | 11 | ~720 |
 | SPEC_10_SOLVER_SC_IEC60909.md | 1 | Solver | 16 | ~1200 |
 | SPEC_11_SOLVER_PF_NEWTON.md | 1 | Solver | 12 | ~860 |
 | SPEC_12_PROTECTION.md | 2 | Analysis | 6+3 TO-BE | ~700 |
-| SPEC_13_WIZARD.md | 3 | Application | 15 | ~860 |
+| SPEC_13_WIZARD.md | 3 | Application | 15 | ~980 |
 | SPEC_14_TREE_AND_SLD.md | 3 | Application | 4 | ~260 |
 | SPEC_15_PERSISTENCE.md | 4 | Infrastructure | 6+1 TO-BE | ~380 |
 | SPEC_16_TESTS.md | 4 | Infrastructure | 10 | ~540 |
 | SPEC_INDEX.md | — | Index | 5 | ~150 |
-| **RAZEM** | | | **~167** | **~11 040** |
+| **RAZEM** | | | **~175** | **~11 640** |
 
 ### Porównanie:
 - **SYSTEM_SPEC.md v3.0:** ~487 linii
-- **Nowa specyfikacja:** ~11 040 linii (18 plików)
-- **Wzrost:** ~22× (2200%)
+- **Nowa specyfikacja:** ~11 640 linii (18 plików)
+- **Wzrost:** ~24× (2400%)
 - **Pokrycie AS-IS:** ~95% (sekcje TO-BE wyraźnie oznaczone)
 
 ---
@@ -676,6 +744,8 @@ FINALIZACJA:
 10. **Zakaz mieszania AS-IS z TO-BE** w jednym kontrakcie
 11. **SLD referencja kanoniczna:** `docs/ui/SLD_UI_ARCHITECTURE.md` — nie duplikować, referencować
 12. **Kreator ≠ Drzewo ENM** — kreator to sekwencyjny kontroler, drzewo to pełna edycja
+13. **Falownik ≠ SN** — generator energoelektroniczny jest ZAWSZE elementem nn; przyłączenie do SN wymaga jawnego transformatora nn/SN w ENM
+14. **Kompletność torów** — każdy element (źródło OZE, odbiór) musi mieć pełny, jawny tor fizyczny w ENM — brak skrótów topologicznych
 
 ---
 
