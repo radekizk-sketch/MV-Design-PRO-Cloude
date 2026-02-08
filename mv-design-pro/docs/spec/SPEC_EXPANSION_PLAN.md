@@ -48,6 +48,7 @@ docs/spec/
 │   ══════════════════════════════════════
 │
 ├── SPEC_CHAPTER_01_PURPOSE_SCOPE_DEFINITIONS.md  ← Cel, zakres, definicje kanoniczne (GOTOWY)
+├── SPEC_CHAPTER_02_ENM_DOMAIN_MODEL.md           ← Model domenowy ENM: byty, granice, semantyka (GOTOWY)
 │
 │   ══════════════════════════════════════
 │   FAZA 0 — KONTRAKTY I WARSTWY
@@ -100,7 +101,8 @@ docs/spec/
 
 ```
 PREAMBUŁA — CEL, ZAKRES, DEFINICJE (UKOŃCZONA)
-  Krok 0:  SPEC_CHAPTER_01_PURPOSE_SCOPE_DEFINITIONS.md  ✅ GOTOWY
+  Krok 0a: SPEC_CHAPTER_01_PURPOSE_SCOPE_DEFINITIONS.md  ✅ GOTOWY
+  Krok 0b: SPEC_CHAPTER_02_ENM_DOMAIN_MODEL.md           ✅ GOTOWY
 
 FAZA 0 — KONTRAKTY I WARSTWY (PRIORYTET NAJWYŻSZY)
   Krok 1:  SPEC_00_LAYERING.md
@@ -820,6 +822,7 @@ FINALIZACJA:
 | Plik | Faza | Warstwa | Rozdziały | Szacowane linie |
 |---|---|---|---|---|
 | SPEC_CHAPTER_01_PURPOSE_SCOPE_DEFINITIONS.md | Preambuła | Foundation | 9 | ~480 ✅ |
+| SPEC_CHAPTER_02_ENM_DOMAIN_MODEL.md | Preambuła | ENM Domain | 14 | ~570 ✅ |
 | SPEC_00_LAYERING.md | 0 | Architecture | 11 | ~700 |
 | SPEC_01_GLOSSARY_NORMATIVE.md | 0 | Governance | 7 | ~290 |
 | SPEC_02_ENM_CORE.md | 0 | ENM Core | 19 | ~2020 |
@@ -838,12 +841,12 @@ FINALIZACJA:
 | SPEC_15_PERSISTENCE.md | 4 | Infrastructure | 6+1 TO-BE | ~380 |
 | SPEC_16_TESTS.md | 4 | Infrastructure | 10 | ~540 |
 | SPEC_INDEX.md | — | Index | 5 | ~150 |
-| **RAZEM** | | | **~184** | **~12 830** |
+| **RAZEM** | | | **~198** | **~13 400** |
 
 ### Porównanie:
 - **SYSTEM_SPEC.md v3.0:** ~487 linii
-- **Nowa specyfikacja:** ~12 830 linii (19 plików, w tym Rozdział 1 preambuły)
-- **Wzrost:** ~26× (2600%)
+- **Nowa specyfikacja:** ~13 400 linii (20 plików, w tym Rozdział 1-2 preambuły)
+- **Wzrost:** ~28× (2800%)
 - **Pokrycie AS-IS:** ~95% (sekcje TO-BE wyraźnie oznaczone)
 
 ---
