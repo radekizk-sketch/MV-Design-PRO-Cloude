@@ -259,17 +259,17 @@ FINALIZACJA:
 - §2.15 — Inwarianty modelu ENM (~40 linii)
 - §2.16 — Przykład kompletny ENM (JSON) (~100 linii)
 - §2.17 — **Źródła energoelektroniczne (falowniki) — model normowy** (~200 linii)
-  - Decision Matrix ref: #11, #12, #14
+  - Decision Matrix ref: #11, #12, #14, #19
   - Status: AS-IS (model Generator z gen_type falownikowym) + TO-BE (walidacje, wymuszenia topologii)
-  - Zasada fundamentalna (BINDING): Generator energoelektroniczny (PV, BESS, agregat z falownikiem) jest ZAWSZE elementem nn (0,4 / 0,69 / 0,8 kV)
+  - Zasada fundamentalna (BINDING): Generator energoelektroniczny (PV, BESS, agregat z falownikiem) jest ZAWSZE elementem niskonapięciowym (nn). Napięcie znamionowe falownika wynika wyłącznie z wybranego typu w katalogu — specyfikacja NIE definiuje sztywnych wartości napięć.
   - Zakaz bezpośredniego przyłączenia do szyny SN (BINDING): `Generator(gen_type ∈ {pv_inverter, wind_inverter, bess})` na `Bus(voltage_kv > 1 kV)` = NIEDOZWOLONE
   - Kanoniczna topologia fizyczna OZE → SN (BINDING):
     ```
-    Generator (falownik, nn)
+    N × Generator (falownik, nn)
     │
-    Bus nn źródła (0,4 / 0,69 / 0,8 kV)
+    Bus nn źródła (napięcie z typu katalogowego falownika)
     │
-    Łącznik nn / zabezpieczenie nn (SwitchBranch / FuseBranch)
+    Pole źródłowe nn (łączniki + zabezpieczenia)
     │
     Bus nn stacji
     │
@@ -277,6 +277,7 @@ FINALIZACJA:
     │
     Bus SN stacji
     ```
+  - Napięcie Bus nn źródła: determinowane przez typ przyłączonego falownika z katalogu, NIE przez regułę systemową ani decyzję użytkownika
   - Implikacje: Generator NIE ZNA poziomu SN — SN osiągany WYŁĄCZNIE przez transformator
   - Transformator jest bytem OBOWIĄZKOWYM przy integracji OZE z SN — osobny, jawny element ENM
   - Mapowanie na solver (Decision #14): Generator(falownik) → InverterSource (ref: `network_model/core/inverter.py`)
@@ -676,11 +677,11 @@ FINALIZACJA:
 - §13.10 — K9: Odbiory i generacja (~240 linii)
   - Decision Matrix ref: #11, #12, #13, #15, #16, #17, #18
   - **K9a — Dodawanie źródła OZE (BINDING):**
-    1. Użytkownik wybiera **TYP falownika z katalogu** (`ConverterType` / `InverterType`) — parametry znamionowe z typu (Decision #15, #18)
+    1. Użytkownik wybiera **TYP falownika z katalogu** (`ConverterType` / `InverterType`) — parametry znamionowe z typu, w tym napięcie znamionowe (Decision #15, #18, #19)
     2. Użytkownik podaje **LICZBĘ identycznych falowników równoległych** (`n_parallel`) — Decision #17
-    3. Użytkownik podaje napięcie wyjściowe nn (0,4 / 0,69 / 0,8 kV) — z katalogu typu lub ręcznie
+    3. System odczytuje napięcie znamionowe z wybranego typu katalogowego i przypisuje je do Bus nn źródła — użytkownik NIE wprowadza napięcia ręcznie
     4. Użytkownik ustawia parametry eksploatacyjne instancji (P, Q, tryb pracy)
-    5. Kreator tworzy Bus nn o zadanym napięciu i przypina Generator(y) do tego Bus nn
+    5. Kreator tworzy Bus nn o napięciu z katalogu typu i przypina Generator(y) do tego Bus nn
     6. Kreator pyta: „Czy źródło ma być przyłączone do sieci SN?"
     7. Jeśli TAK → kreator WYMUSZA dodanie: transformatora nn/SN (wybór z katalogu `TransformerType`) + pola transformatorowego po stronie SN
     8. Bez transformatora → przejście dalej jest ZABLOKOWANE
@@ -856,6 +857,7 @@ FINALIZACJA:
 15. **Instancja = TYP × parametry zmienne × ilość** — katalog typów jest domyślnym i preferowanym źródłem parametrów znamionowych; parametry zmienne (długość, tap, P/Q, n_parallel) z kreatora
 16. **Tryb EKSPERT = kontrolowany, audytowalny** — edycja parametrów typu WYŁĄCZNIE w jawnym trybie ekspert; override NIE modyfikuje katalogu; każdy override jest audytowalny w White Box; zakaz niejawnych/cichych modyfikacji
 17. **Pole (feeder) = jedyne miejsce przyłączania** — źródła, odbiory i transformatory przyłączane WYŁĄCZNIE przez pole; pole jest jedynym miejscem przypisywania zabezpieczeń
+18. **Napięcie falownika = parametr typu katalogowego** — specyfikacja NIE definiuje sztywnych wartości napięć falowników; napięcie znamionowe wynika wyłącznie z wybranego typu w katalogu; Bus nn źródła ma napięcie z katalogu typu, nie z reguły systemowej; kreator NIE oferuje ręcznego wyboru napięcia falownika
 
 ---
 

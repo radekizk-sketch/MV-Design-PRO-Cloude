@@ -360,7 +360,7 @@ Każda rozbieżność z §2 otrzymuje jednoznaczną dyspozycję.
 | 8c | `Corridor` — magistrala | **DO-NOT-SPECIFY** w ENM Core | SLD Layout / Route | `SPEC_05_SLD_LAYOUT_ROUTE.md` | Corridor jest konceptem routingu SLD i organizacji wizualnej, NIE elementem fizycznym sieci. Nie wpływa na solver. Specyfikacja ENM Core NIE powinna go zawierać. Corridor należy do warstwy SLD Layout. |
 | 9 | Walidacje (21 reguł w kodzie vs 6 w spec) | **BINDING** | Validation | `SPEC_07_VALIDATION.md` | Wszystkie 21 reguł ENMValidator (E001-E008, W001-W008, I001-I005) MUSZĄ być opisane w specyfikacji walidacji AS-IS, 1:1 z `enm/validator.py`. |
 | 10 | API Endpoints (30+ w kodzie vs 0 w spec) | **BINDING** | Public API | `SPEC_08_PUBLIC_API.md` | Wszystkie publiczne endpointy z `api/*.py` MUSZĄ być opisane z kontraktami request/response. |
-| 11 | Generator energoelektroniczny (falownik) — brak walidacji poziomu napięcia | **BINDING** | ENM Core + Validation | `SPEC_02_ENM_CORE.md`, `SPEC_07_VALIDATION.md` | Generator z `gen_type ∈ {pv_inverter, wind_inverter, bess}` jest ZAWSZE elementem niskonapięciowym (0,4–0,8 kV). W kodzie (`enm/models.py:216`) `gen_type` zawiera te wartości, ale brak walidacji w `enm/validator.py`: falownik może być przypisany do Bus SN (`voltage_kv > 1 kV`). Specyfikacja MUSI jawnie zakazać bezpośredniego przyłączenia generatora energoelektronicznego do szyny SN i opisać wymaganą walidację. |
+| 11 | Generator energoelektroniczny (falownik) — brak walidacji poziomu napięcia | **BINDING** | ENM Core + Validation | `SPEC_02_ENM_CORE.md`, `SPEC_07_VALIDATION.md` | Generator z `gen_type ∈ {pv_inverter, wind_inverter, bess}` jest ZAWSZE elementem niskonapięciowym (nn). Napięcie znamionowe falownika wynika wyłącznie z wybranego typu w katalogu — specyfikacja NIE definiuje sztywnych wartości napięć. W kodzie (`enm/models.py:216`) `gen_type` zawiera te wartości, ale brak walidacji w `enm/validator.py`: falownik może być przypisany do Bus SN (`voltage_kv > 1 kV`). Specyfikacja MUSI jawnie zakazać bezpośredniego przyłączenia generatora energoelektronicznego do szyny SN i opisać wymaganą walidację. |
 | 12 | Brak wymuszenia transformatora przy integracji OZE z SN | **BINDING** | ENM Core + Wizard | `SPEC_02_ENM_CORE.md`, `SPEC_13_WIZARD.md` | Każda integracja źródła OZE (falownika nn) z siecią SN wymaga obecności transformatora nn/SN w ENM jako osobnego, jawnego elementu. Obecny kod tego nie wymusza — `mapping.py` mapuje Generator na P/Q adjustment bez sprawdzenia toru napięciowego. Specyfikacja MUSI definiować kanoniczną topologię: `Generator(nn) → Bus(nn) → Łącznik/Zabezpieczenie → Bus(nn stacji) → Transformator(nn/SN) → Bus(SN)`. Kreator MUSI wymuszać tę sekwencję. |
 | 13 | Odbiory — brak wymuszenia kompletnego toru przyłączenia | **BINDING** | ENM Core + Wizard | `SPEC_02_ENM_CORE.md`, `SPEC_13_WIZARD.md` | Load jest przyłączany do Bus przez `bus_ref` (`enm/models.py:201`), ale brak wymuszenia kompletnego toru fizycznego (szyna → łącznik/zabezpieczenie → pole odpływowe → odbiór). Specyfikacja MUSI opisywać normową topologię przyłączenia odbioru. |
 | 14 | InverterSource w solverze — brak mapowania z ENM Generator | **BINDING** | Layering + Solver | `SPEC_00_LAYERING.md`, `SPEC_10_SOLVER_SC_IEC60909.md` | `InverterSource` istnieje w warstwie solvera (`network_model/core/inverter.py`) i jest używany w SC solver (`_compute_inverter_contribution()` w `short_circuit_iec60909.py`), ale NIE jest mapowany z ENM `Generator(gen_type=pv_inverter|wind_inverter|bess)` w `enm/mapping.py`. Katalog zawiera `ConverterType` i `InverterType` (`catalog/types.py`). Specyfikacja MUSI opisać kontrakt mapowania Generator(falownik) → InverterSource. |
@@ -368,6 +368,7 @@ Każda rozbieżność z §2 otrzymuje jednoznaczną dyspozycję.
 | 16 | Brak trybu EKSPERT — kontrolowana edycja parametrów typu | **BINDING** | Application + ENM | `SPEC_02_ENM_CORE.md`, `SPEC_13_WIZARD.md` | System NIE posiada trybu ekspert w kodzie. UI ma 3 tryby SLD: EDYCJA, WYNIKI, ZABEZPIECZENIA — żaden nie dotyczy parametrów typu. Istnieje `impedance_override` na `LineBranch` (`resolve_line_params()` w `resolver.py`), ale TYLKO dla linii/kabli. Specyfikacja MUSI zdefiniować jawny TRYB EKSPERT: (1) wyraźnie oznaczony w UI, (2) świadomie aktywowany, (3) override NIE modyfikuje katalogu, (4) override zapisywany per instancja, (5) audytowalny w White Box. Status: TO-BE. |
 | 17 | Brak liczby instancji równoległych na Generator/InverterSource | **BINDING** | ENM Core + Solver | `SPEC_02_ENM_CORE.md`, `SPEC_10_SOLVER_SC_IEC60909.md` | `Generator` (`enm/models.py:212`) nie ma pola `n_parallel` ani `count`. `InverterSource` (`inverter.py`) również nie ma. Solver SC sumuje wkłady N osobnych obiektów `InverterSource`, ale kreator nie oferuje „N identycznych falowników równolegle". Specyfikacja MUSI zdefiniować obsługę wielu identycznych falowników: użytkownik podaje TYP + LICZBĘ → kreator tworzy N instancji w ENM (lub jedno pole `n_parallel` z rozwinięciem przy mapowaniu na solver). Status: TO-BE. |
 | 18 | Zasada kompozycji: instancja = TYP × parametry zmienne × ilość | **BINDING** | Architecture | `SPEC_00_LAYERING.md`, `SPEC_02_ENM_CORE.md` | Specyfikacja MUSI definiować kanoniczną zasadę kompozycji elementów ENM: `instancja = TYP(katalog) + parametry_zmienne(kreator) + [override(tryb_ekspert)] + ilość`. Dotyczy wszystkich elementów: linia (LineType × długość), transformator (TransformerType × pozycja zaczepu × uziemienie), falownik (ConverterType × parametry eksploatacyjne × n_parallel), odbiór (LoadType × P,Q,cosφ). Zasada ta jest częściowo zaimplementowana (AS-IS: resolver.py, catalog_ref na Branch/Trafo) i częściowo planowana (TO-BE: catalog_ref na Generator, n_parallel, tryb ekspert). |
+| 19 | Napięcie falownika = parametr typu katalogowego, nie reguła specyfikacji | **BINDING** | ENM Core + Catalog + Wizard | `SPEC_02_ENM_CORE.md`, `SPEC_13_WIZARD.md` | Specyfikacja NIE MOŻE definiować sztywnych wartości napięć falowników. Napięcie znamionowe falownika wynika WYŁĄCZNIE z wybranego typu w katalogu (`ConverterType` / `InverterType`). Bus nn źródła ma napięcie determinowane przez typ przyłączonego falownika — nie przez regułę systemową, nie przez decyzję użytkownika w kreatorze. Kreator odczytuje napięcie z katalogu i przypisuje je do Bus nn automatycznie. Specyfikacja zachowuje jedynie zasadę: falownik jest elementem nn, bezpośrednie przyłączenie do SN jest niedozwolone. |
 
 ### 9.3 Konsekwencje architektoniczne
 
@@ -387,15 +388,15 @@ Każda rozbieżność z §2 otrzymuje jednoznaczną dyspozycję.
 - Solver NIE widzi Bay, Substation, Corridor — widzi tylko Bus, Branch, Transformer, Switch, Source.
 
 **Z decyzji #11 i #12 wynika (źródła OZE — BINDING):**
-- Generator energoelektroniczny (falownik) z `gen_type ∈ {pv_inverter, wind_inverter, bess}` jest ZAWSZE elementem niskonapięciowym (nn: 0,4 / 0,69 / 0,8 kV).
+- Generator energoelektroniczny (falownik) z `gen_type ∈ {pv_inverter, wind_inverter, bess}` jest ZAWSZE elementem niskonapięciowym (nn). Napięcie znamionowe falownika wynika wyłącznie z wybranego typu w katalogu — specyfikacja NIE definiuje sztywnych wartości napięć.
 - Bezpośrednie przyłączenie falownika do szyny SN (Bus z `voltage_kv > 1 kV`) jest **NIEDOZWOLONE**.
 - Jedyna dopuszczalna topologia fizyczna OZE → SN:
   ```
-  Generator (falownik, nn)
+  N × Generator (falownik, nn)
   │
-  Bus nn źródła (0,4 / 0,69 / 0,8 kV)
+  Bus nn źródła (napięcie z typu katalogowego falownika)
   │
-  Łącznik nn / zabezpieczenie nn (SwitchBranch / FuseBranch)
+  Pole źródłowe nn (łączniki + zabezpieczenia)
   │
   Bus nn stacji
   │
@@ -403,6 +404,7 @@ Każda rozbieżność z §2 otrzymuje jednoznaczną dyspozycję.
   │
   Bus SN stacji
   ```
+- Bus nn źródła: napięcie determinowane przez typ przyłączonego falownika z katalogu, NIE przez regułę systemową ani decyzję użytkownika.
 - Generator **nie zna** poziomu SN — poziom SN osiągany WYŁĄCZNIE przez transformator.
 - Każdy element toru jest jawny w ENM — brak domyślnych/ukrytych transformatorów.
 - Kreator MUSI wymuszać obecność transformatora nn/SN przy integracji OZE z SN.
