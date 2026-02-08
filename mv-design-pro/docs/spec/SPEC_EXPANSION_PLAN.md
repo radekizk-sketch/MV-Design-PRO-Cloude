@@ -48,7 +48,8 @@ docs/spec/
 │   ══════════════════════════════════════
 │
 ├── SPEC_CHAPTER_01_PURPOSE_SCOPE_DEFINITIONS.md  ← Cel, zakres, definicje kanoniczne (GOTOWY)
-├── SPEC_CHAPTER_02_ENM_DOMAIN_MODEL.md           ← Model domenowy ENM: byty, granice, semantyka (GOTOWY)
+├── SPEC_CHAPTER_02_ENM_DOMAIN_MODEL.md           ← Model domenowy ENM: byty, granice, semantyka (GOTOWY, v2.0 FINAL)
+├── SPEC_CHAPTER_03_TOPOLOGY_CONNECTIVITY.md      ← Topologia i łączność: sekcjonowanie, master–oddział (GOTOWY)
 │
 │   ══════════════════════════════════════
 │   FAZA 0 — KONTRAKTY I WARSTWY
@@ -104,6 +105,8 @@ PREAMBUŁA — CEL, ZAKRES, DEFINICJE (UKOŃCZONA)
   Krok 0a: SPEC_CHAPTER_01_PURPOSE_SCOPE_DEFINITIONS.md  ✅ GOTOWY
   Krok 0b: SPEC_CHAPTER_02_ENM_DOMAIN_MODEL.md           ✅ GOTOWY (v2.0 FINAL)
             └── Domena Protection ZAMKNIĘTA (§2.15–§2.21, Decyzje #21–#25)
+  Krok 0c: SPEC_CHAPTER_03_TOPOLOGY_CONNECTIVITY.md      ✅ GOTOWY (v1.0 FINAL)
+            └── Domena Topologia ZAMKNIĘTA (§3.1–§3.11, Decyzje #26–#28)
 
 FAZA 0 — KONTRAKTY I WARSTWY (PRIORYTET NAJWYŻSZY)
   Krok 1:  SPEC_00_LAYERING.md
@@ -857,6 +860,7 @@ FINALIZACJA:
 |---|---|---|---|---|
 | SPEC_CHAPTER_01_PURPOSE_SCOPE_DEFINITIONS.md | Preambuła | Foundation | 9 | ~480 ✅ |
 | SPEC_CHAPTER_02_ENM_DOMAIN_MODEL.md | Preambuła | ENM Domain | 21 | ~1260 ✅ FINAL |
+| SPEC_CHAPTER_03_TOPOLOGY_CONNECTIVITY.md | Preambuła | Topology | 11 | ~550 ✅ FINAL |
 | SPEC_00_LAYERING.md | 0 | Architecture | 11 | ~700 |
 | SPEC_01_GLOSSARY_NORMATIVE.md | 0 | Governance | 7 | ~290 |
 | SPEC_02_ENM_CORE.md | 0 | ENM Core | 19 | ~2020 |
@@ -875,12 +879,12 @@ FINALIZACJA:
 | SPEC_15_PERSISTENCE.md | 4 | Infrastructure | 6+1 TO-BE | ~380 |
 | SPEC_16_TESTS.md | 4 | Infrastructure | 10 | ~540 |
 | SPEC_INDEX.md | — | Index | 5 | ~150 |
-| **RAZEM** | | | **~226** | **~14 890** |
+| **RAZEM** | | | **~237** | **~15 440** |
 
 ### Porównanie:
 - **SYSTEM_SPEC.md v3.0:** ~487 linii
-- **Nowa specyfikacja:** ~14 890 linii (20 plików, w tym Rozdział 1-2 preambuły)
-- **Wzrost:** ~31× (3100%)
+- **Nowa specyfikacja:** ~15 440 linii (21 plików, w tym Rozdział 1-3 preambuły)
+- **Wzrost:** ~32× (3200%)
 - **Pokrycie AS-IS:** ~95% (sekcje TO-BE wyraźnie oznaczone)
 
 ---
