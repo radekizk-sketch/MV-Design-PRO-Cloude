@@ -731,7 +731,9 @@ class AnalysisRunService:
                     message="Short-circuit requires GRID source with grid_supply flag",
                 )
             )
-        if connection_node_id:
+        # Contract precedence: when GRID exists but lacks explicit grid_supply flag,
+        # return source.grid_supply_missing first and skip connection matching check.
+        if connection_node_id and grid_supply_sources:
             connection_sources = [
                 src
                 for src in grid_supply_sources
