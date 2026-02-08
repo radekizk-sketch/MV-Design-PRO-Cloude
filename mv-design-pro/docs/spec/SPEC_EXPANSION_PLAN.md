@@ -44,6 +44,12 @@ docs/spec/
 ├── SPEC_EXPANSION_PLAN.md               ← Ten dokument (istnieje)
 │
 │   ══════════════════════════════════════
+│   PREAMBUŁA — CEL, ZAKRES, DEFINICJE
+│   ══════════════════════════════════════
+│
+├── SPEC_CHAPTER_01_PURPOSE_SCOPE_DEFINITIONS.md  ← Cel, zakres, definicje kanoniczne (GOTOWY)
+│
+│   ══════════════════════════════════════
 │   FAZA 0 — KONTRAKTY I WARSTWY
 │   ══════════════════════════════════════
 │
@@ -93,6 +99,9 @@ docs/spec/
 ## 2. KOLEJNOŚĆ PISANIA (BINDING)
 
 ```
+PREAMBUŁA — CEL, ZAKRES, DEFINICJE (UKOŃCZONA)
+  Krok 0:  SPEC_CHAPTER_01_PURPOSE_SCOPE_DEFINITIONS.md  ✅ GOTOWY
+
 FAZA 0 — KONTRAKTY I WARSTWY (PRIORYTET NAJWYŻSZY)
   Krok 1:  SPEC_00_LAYERING.md
   Krok 2:  SPEC_01_GLOSSARY_NORMATIVE.md
@@ -810,6 +819,7 @@ FINALIZACJA:
 
 | Plik | Faza | Warstwa | Rozdziały | Szacowane linie |
 |---|---|---|---|---|
+| SPEC_CHAPTER_01_PURPOSE_SCOPE_DEFINITIONS.md | Preambuła | Foundation | 9 | ~480 ✅ |
 | SPEC_00_LAYERING.md | 0 | Architecture | 11 | ~700 |
 | SPEC_01_GLOSSARY_NORMATIVE.md | 0 | Governance | 7 | ~290 |
 | SPEC_02_ENM_CORE.md | 0 | ENM Core | 19 | ~2020 |
@@ -828,12 +838,12 @@ FINALIZACJA:
 | SPEC_15_PERSISTENCE.md | 4 | Infrastructure | 6+1 TO-BE | ~380 |
 | SPEC_16_TESTS.md | 4 | Infrastructure | 10 | ~540 |
 | SPEC_INDEX.md | — | Index | 5 | ~150 |
-| **RAZEM** | | | **~175** | **~12 350** |
+| **RAZEM** | | | **~184** | **~12 830** |
 
 ### Porównanie:
 - **SYSTEM_SPEC.md v3.0:** ~487 linii
-- **Nowa specyfikacja:** ~12 350 linii (18 plików)
-- **Wzrost:** ~25× (2500%)
+- **Nowa specyfikacja:** ~12 830 linii (19 plików, w tym Rozdział 1 preambuły)
+- **Wzrost:** ~26× (2600%)
 - **Pokrycie AS-IS:** ~95% (sekcje TO-BE wyraźnie oznaczone)
 
 ---
