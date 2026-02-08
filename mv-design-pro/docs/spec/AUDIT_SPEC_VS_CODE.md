@@ -331,4 +331,53 @@ Specyfikacja SYSTEM_SPEC.md v3.0 pokrywa ~**15-20%** rzeczywistego systemu. Koni
 
 ---
 
+## 9. DECISION MATRIX (BINDING)
+
+Poniższe decyzje architektoniczne są **wiążące** dla całego procesu rozbudowy specyfikacji.
+Każda rozbieżność z §2 otrzymuje jednoznaczną dyspozycję.
+
+### 9.1 Klasyfikacja decyzji
+
+| Status | Znaczenie |
+|---|---|
+| **BINDING** | Decyzja podjęta — MUSI być odzwierciedlona w specyfikacji AS-IS |
+| **DO-NOT-SPECIFY** | Celowo pominięte — NIE podlega specyfikacji w danej warstwie |
+| **REQUIRES-DECISION** | Wymaga osobnej decyzji architektonicznej przed specyfikacją |
+
+### 9.2 Macierz decyzji
+
+| # | Rozbieżność | Decyzja | Warstwa | Plik docelowy | Uzasadnienie |
+|---|---|---|---|---|---|
+| 1 | Pola solverowe (`node_type`, `voltage_magnitude_pu`) opisane jako atrybuty Bus ENM | **DO-NOT-SPECIFY** | Solver | — | To nie jest fizyka ENM, lecz warstwa obliczeniowa. Bus ENM = `voltage_kv, grounding, zone`. Node solvera = `node_type, voltage_magnitude, ...`. Specyfikacja ENM MUSI opisywać wyłącznie kontrakt `enm/models.py`. Pola solvera należą do warstwy Solver i są produkowane przez deterministyczne mapowanie `map_enm_to_network_graph()`. |
+| 2 | Brak rozróżnienia ENM vs Solver w specyfikacji | **BINDING** | Architecture | `SPEC_00_LAYERING.md` | System operuje na trzech odrębnych warstwach danych: (1) ENM — edytowalny model fizyczny, (2) NetworkGraph — read-only model solverowy, (3) Results — frozen wyniki obliczeń. Specyfikacja MUSI definiować granice warstw i kontrakt mapowania ENM→NetworkGraph. |
+| 3 | `Generator` traktowany jak `Source` w spec | **BINDING** | ENM Core | `SPEC_02_ENM_CORE.md` | Generator ≠ Source. Różne warunki brzegowe (PV vs SLACK), różne parametry (`p_mw, q_mvar, gen_type, limits` vs `sk3_mva, r_ohm, x_ohm, c_max`), osobne listy w `EnergyNetworkModel`. Specyfikacja MUSI traktować Generator jako osobny byt ENM. |
+| 4 | `ShortCircuitResult` (Frozen API) nieopisany — 20+ pól w kodzie, 4 w spec | **BINDING** | Results API | `SPEC_06_RESULTS_API.md` | Frozen API jest kontraktem publicznym. Specyfikacja MUSI zawierać kompletną listę pól 1:1 z `ShortCircuitResult` w `short_circuit_iec60909.py` oraz `EXPECTED_SHORT_CIRCUIT_RESULT_KEYS`. |
+| 5 | `PowerFlowNewtonSolution` nieopisany — 30+ pól w kodzie, 4 w spec | **BINDING** | Results API | `SPEC_06_RESULTS_API.md` | Jak #4. Specyfikacja MUSI zawierać kompletną listę pól 1:1 z `PowerFlowNewtonSolution` w `power_flow_newton.py`. |
+| 6 | `Transformer3W` w spec, brak implementacji | **REQUIRES-DECISION** | Future / Planned | — | Transformer3W nie istnieje w kodzie (ani ENM, ani solver). Nie implementować w specyfikacji AS-IS. Jeśli decyzja o implementacji zapadnie, powstanie osobny dokument TO-BE. W obecnej specyfikacji: usunąć z listy elementów rdzeniowych lub oznaczyć jawnie jako PLANNED/NOT-IMPLEMENTED. |
+| 7 | `FuseBranch` zaimplementowany w kodzie, brak w spec | **BINDING** | ENM Core | `SPEC_02_ENM_CORE.md` | FuseBranch (`type="fuse"`) istnieje w `enm/models.py`, mapowany na `Switch(FUSE)` w solverze. Specyfikacja MUSI go opisywać jako element dyskryminowanej unii `Branch`. |
+| 8a | `Bay` — pole rozdzielcze | **BINDING** | ENM Meta | `SPEC_03_ENM_META.md` | Bay jest bytem organizacyjnym ENM (logiczna struktura rozdzielni). Nie wpływa na solver. Specyfikacja MUSI go opisywać jako element ENM warstwy meta (organizacja, nie fizyka). |
+| 8b | `Junction` — węzeł T | **BINDING** | ENM Core | `SPEC_02_ENM_CORE.md` | Junction modeluje rozgałęzienie magistrali — jest częścią topologii fizycznej ENM. Bus kind=JUNCTION w kontekście routingu. Specyfikacja MUSI go opisywać. |
+| 8c | `Corridor` — magistrala | **DO-NOT-SPECIFY** w ENM Core | SLD Layout / Route | `SPEC_05_SLD_LAYOUT_ROUTE.md` | Corridor jest konceptem routingu SLD i organizacji wizualnej, NIE elementem fizycznym sieci. Nie wpływa na solver. Specyfikacja ENM Core NIE powinna go zawierać. Corridor należy do warstwy SLD Layout. |
+| 9 | Walidacje (21 reguł w kodzie vs 6 w spec) | **BINDING** | Validation | `SPEC_07_VALIDATION.md` | Wszystkie 21 reguł ENMValidator (E001-E008, W001-W008, I001-I005) MUSZĄ być opisane w specyfikacji walidacji AS-IS, 1:1 z `enm/validator.py`. |
+| 10 | API Endpoints (30+ w kodzie vs 0 w spec) | **BINDING** | Public API | `SPEC_08_PUBLIC_API.md` | Wszystkie publiczne endpointy z `api/*.py` MUSZĄ być opisane z kontraktami request/response. |
+
+### 9.3 Konsekwencje architektoniczne
+
+**Z decyzji #1 i #2 wynika:**
+- Specyfikacja ENM (SPEC_02) opisuje WYŁĄCZNIE kontrakt `enm/models.py` (Pydantic v2) i `types/enm.ts` (TypeScript mirror).
+- Pola solverowe (`node_type`, `voltage_magnitude_pu`, `active_power_mw`) NIE pojawiają się w specyfikacji ENM.
+- Mapowanie ENM→Solver (`enm/mapping.py`) jest opisane w SPEC_00_LAYERING jako kontrakt warstwy.
+
+**Z decyzji #3 wynika:**
+- `EnergyNetworkModel.generators` jest osobną listą, a nie częścią `sources`.
+- Generator ma osobne warunki brzegowe solvera (PV node) vs Source (SLACK node).
+
+**Z decyzji #8a–8c wynika:**
+- Bay i Substation → warstwa ENM Meta (organizacja logiczna).
+- Junction → warstwa ENM Core (topologia fizyczna).
+- Corridor → warstwa SLD Layout (wizualizacja, routing).
+- Solver NIE widzi Bay, Substation, Corridor — widzi tylko Bus, Branch, Transformer, Switch, Source.
+
+---
+
 **KONIEC AUDYTU**
