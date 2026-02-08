@@ -38,16 +38,6 @@ import { notify } from '../notifications/store';
  */
 const DEMO_SYMBOLS: AnySldSymbol[] = [
   {
-    id: 'bus_pcc',
-    elementId: 'bus_pcc',
-    elementType: 'Bus',
-    elementName: 'PCC (Punkt wspólnego przyłączenia)',
-    position: { x: 400, y: 100 },
-    inService: true,
-    width: 120,
-    height: 12,
-  } as any,
-  {
     id: 'bus_main',
     elementId: 'bus_main',
     elementType: 'Bus',
@@ -74,7 +64,7 @@ const DEMO_SYMBOLS: AnySldSymbol[] = [
     elementName: 'Sieć zasilająca',
     position: { x: 400, y: 40 },
     inService: true,
-    connectedToNodeId: 'bus_pcc',
+    connectedToNodeId: 'bus_main',
   } as any,
   {
     id: 'trafo_1',
@@ -83,8 +73,8 @@ const DEMO_SYMBOLS: AnySldSymbol[] = [
     elementName: 'TR1 110/15kV',
     position: { x: 400, y: 150 },
     inService: true,
-    fromNodeId: 'bus_pcc',
-    toNodeId: 'bus_main',
+    fromNodeId: 'bus_main',
+    toNodeId: 'bus_dist',
     points: [],
   } as any,
   {

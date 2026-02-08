@@ -76,6 +76,18 @@ export interface EnmPropertyField {
 // MAPOWANIE SLD → ENM element_type
 // =============================================================================
 
+
+function isPccLikeValue(value: string | null | undefined): boolean {
+  if (!value) return false;
+  const normalized = value.toLowerCase();
+  return (
+    normalized.includes('pcc') ||
+    normalized.startsWith('bus_pcc') ||
+    normalized.startsWith('pcc_') ||
+    normalized.endsWith('_pcc')
+  );
+}
+
 const SLD_TO_ENM_TYPE: Record<SldElementType, SelectionRef['element_type']> = {
   Bus: 'bus',
   LineBranch: 'branch',
@@ -120,9 +132,21 @@ export function resolveSelectionRef(
   sldElementType: SldElementType,
   enm: EnergyNetworkModel
 ): ResolvedSelection | null {
+  // PCC nie może być eksponowane w SLD/inspektorze.
+  if (isPccLikeValue(elementId)) {
+    if (sldElementType === 'Source') {
+      const fallbackSource =
+        enm.sources.find((src) => src.ref_id === 'source_grid' || src.id === 'source_grid') ?? enm.sources[0];
+      if (fallbackSource) {
+        return resolveSelectionRef(fallbackSource.ref_id, 'Source', enm);
+      }
+    }
+    return null;
+  }
+
   // 1. Znajdź ref_id elementu w ENM
   const enmRefId = findEnmRefId(elementId, sldElementType, enm);
-  if (!enmRefId) return null;
+  if (!enmRefId || isPccLikeValue(enmRefId)) return null;
 
   // 2. Mapuj na typ ENM
   const enmType = SLD_TO_ENM_TYPE[sldElementType];
