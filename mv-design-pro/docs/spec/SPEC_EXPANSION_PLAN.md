@@ -102,7 +102,8 @@ docs/spec/
 ```
 PREAMBUŁA — CEL, ZAKRES, DEFINICJE (UKOŃCZONA)
   Krok 0a: SPEC_CHAPTER_01_PURPOSE_SCOPE_DEFINITIONS.md  ✅ GOTOWY
-  Krok 0b: SPEC_CHAPTER_02_ENM_DOMAIN_MODEL.md           ✅ GOTOWY
+  Krok 0b: SPEC_CHAPTER_02_ENM_DOMAIN_MODEL.md           ✅ GOTOWY (v2.0 FINAL)
+            └── Domena Protection ZAMKNIĘTA (§2.15–§2.21, Decyzje #21–#25)
 
 FAZA 0 — KONTRAKTY I WARSTWY (PRIORYTET NAJWYŻSZY)
   Krok 1:  SPEC_00_LAYERING.md
@@ -639,13 +640,17 @@ FINALIZACJA:
 
 **Status:** AS-IS (sekcje implementacji) + TO-BE (sekcje rozszerzeń)
 
-**BINDING — Decyzje #21, #22, #23, #24:**
+**DOMENA PROTECTION — KANON ARCHITEKTONICZNY ZAMKNIĘTY (Decyzje #21–#25)**
 
+> Rozdział 2 (§2.15–§2.21) definiuje kompletny kanon architektoniczny zabezpieczeń.
+> SPEC_12 implementuje ten kanon na poziomie warstwy Analysis / Interpretation.
+>
 > Plik SPEC_12 MUSI respektować:
 > - **Decyzja #21:** Podział z §2.15 — Technologiczne vs Sieciowe (rozłączne klasy)
 > - **Decyzja #22:** Koordynacja falownik ↔ sieć (§2.16) — falownik = warunek brzegowy, scenariusz dual „z OZE" / „bez OZE"
-> - **Decyzja #23:** White Box Protection (§2.17) — deterministyczny łańcuch przyczynowy, `event_class`, raport „kto zadziałał pierwszy"
-> - **Decyzja #24:** UI nastaw (§2.18) — projekcja ENM + Analysis, tryb standardowy/ekspercki, widok ETAP-style
+> - **Decyzja #23:** White Box Protection (§2.17) — deterministyczny łańcuch przyczynowy, `event_class` + `event_scope`, raport „kto zadziałał pierwszy"
+> - **Decyzja #24:** UI nastaw (§2.18) — projekcja ENM + Analysis, tryb standardowy/ekspercki, widok ETAP-style, kolumna Źródło sygnału
+> - **Decyzja #25:** ProtectionDevice (§2.20) — byt logiczny ENM, kontener funkcji, zakaz mieszania klas, domena zamknięta
 
 **Rozdziały:**
 - §12.1 — Klasyfikacja funkcji: Technologiczne vs Sieciowe (~80 linii)
@@ -675,7 +680,7 @@ FINALIZACJA:
 - Kod: `application/analyses/protection/`, `protection/curves/`, `sanity_checks/rules.py`, `domain/protection_analysis.py`
 - Frontend: `ui/protection-coordination/`, `ui/protection-curves/`, `ui/protection-results/`
 - Normy: PN-EN 60255-151, NC RfG (EU 2016/631), IRiESD, PN-EN 50549-1/2
-- Decyzje: AUDIT #21, #22, #23, #24; SPEC_CHAPTER_02 §2.15–§2.19
+- Decyzje: AUDIT #21, #22, #23, #24, #25; SPEC_CHAPTER_02 §2.15–§2.21 (ZAMKNIĘTE)
 
 **Szacowana długość:** ~900 linii (AS-IS) + ~500 linii (TO-BE)
 
@@ -851,7 +856,7 @@ FINALIZACJA:
 | Plik | Faza | Warstwa | Rozdziały | Szacowane linie |
 |---|---|---|---|---|
 | SPEC_CHAPTER_01_PURPOSE_SCOPE_DEFINITIONS.md | Preambuła | Foundation | 9 | ~480 ✅ |
-| SPEC_CHAPTER_02_ENM_DOMAIN_MODEL.md | Preambuła | ENM Domain | 19 | ~1110 ✅ |
+| SPEC_CHAPTER_02_ENM_DOMAIN_MODEL.md | Preambuła | ENM Domain | 21 | ~1260 ✅ FINAL |
 | SPEC_00_LAYERING.md | 0 | Architecture | 11 | ~700 |
 | SPEC_01_GLOSSARY_NORMATIVE.md | 0 | Governance | 7 | ~290 |
 | SPEC_02_ENM_CORE.md | 0 | ENM Core | 19 | ~2020 |
@@ -870,12 +875,12 @@ FINALIZACJA:
 | SPEC_15_PERSISTENCE.md | 4 | Infrastructure | 6+1 TO-BE | ~380 |
 | SPEC_16_TESTS.md | 4 | Infrastructure | 10 | ~540 |
 | SPEC_INDEX.md | — | Index | 5 | ~150 |
-| **RAZEM** | | | **~224** | **~14 740** |
+| **RAZEM** | | | **~226** | **~14 890** |
 
 ### Porównanie:
 - **SYSTEM_SPEC.md v3.0:** ~487 linii
-- **Nowa specyfikacja:** ~14 740 linii (20 plików, w tym Rozdział 1-2 preambuły)
-- **Wzrost:** ~30× (3000%)
+- **Nowa specyfikacja:** ~14 890 linii (20 plików, w tym Rozdział 1-2 preambuły)
+- **Wzrost:** ~31× (3100%)
 - **Pokrycie AS-IS:** ~95% (sekcje TO-BE wyraźnie oznaczone)
 
 ---

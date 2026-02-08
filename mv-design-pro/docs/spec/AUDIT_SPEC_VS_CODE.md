@@ -374,6 +374,7 @@ Każda rozbieżność z §2 otrzymuje jednoznaczną dyspozycję.
 | 22 | Koordynacja falownik ↔ sieć SN: falownik = warunek brzegowy, nie uczestnik selektywności | **BINDING** | Protection + Solver SC | `SPEC_CHAPTER_02_ENM_DOMAIN_MODEL.md`, `SPEC_12_PROTECTION.md` | Projekt zabezpieczeń SN MUSI zakładać, że falownik odłączy się pierwszy (≤250 ms) przy przekroczeniu progów NC RfG — sieć NIE MOŻE „czekać" na falownik w logice selektywności. Po odłączeniu falownika solver SC MUSI uwzględniać zanik wkładu OZE (scenariusz „z OZE" vs „bez OZE"). Kod AS-IS: brak jawnego scenariusza dual (z/bez OZE) w `short_circuit_iec60909.py` — GAP do opisania w SPEC_10 i SPEC_12. |
 | 23 | White Box Protection: deterministyczny łańcuch przyczynowy zadziałania | **BINDING** | WhiteBox + Protection | `SPEC_CHAPTER_02_ENM_DOMAIN_MODEL.md`, `SPEC_09_WHITE_BOX.md`, `SPEC_12_PROTECTION.md` | Każde zadziałanie zabezpieczenia MUSI być odtwarzalne jako deterministyczny łańcuch: ENM → scenariusz → wartości obliczone → funkcja → nastawa → porównanie → decyzja → aparat → skutek. Zakaz heurystyk i „automatycznych trip". Kod AS-IS: `ProtectionTrace` (`domain/protection_analysis.py`) z `ProtectionTraceStep` — implementuje łańcuch, ale NIE posiada pola `event_class` ∈ {TECHNOLOGICAL, NETWORK}. Frontend AS-IS: `TracePanel.tsx` wyświetla trace. GAP: brak rozróżnienia klasy zdarzenia i raportu „kto zadziałał pierwszy". |
 | 24 | UI zabezpieczeń: projekcja ENM + Analysis, nie osobny model, tryb standardowy/ekspercki | **BINDING** | Presentation + Application | `SPEC_CHAPTER_02_ENM_DOMAIN_MODEL.md`, `SPEC_14_TREE_AND_SLD.md` | UI zabezpieczeń jest projekcją modelu ENM i wyników `ProtectionEvaluation` — NIE osobnym modelem danych. Tryb standardowy: edycja WYŁĄCZNIE zabezpieczeń sieciowych, walidacja selektywności, zabezpieczenia technologiczne niewidoczne. Tryb ekspercki: podgląd zabezpieczeń technologicznych (read-only), jawne oznaczenie „brak koordynacji". Zakaz edycji nastaw technologicznych w jakimkolwiek trybie. Kod AS-IS: `ProtectionSettingsEditor.tsx`, `TccChart.tsx`, `ProtectionCoordinationPage.tsx` — implementują edytor i wykresy, ale BEZ rozróżnienia trybu standardowy/ekspercki i BEZ klasyfikacji Technological/Network. |
+| 25 | ProtectionDevice: byt logiczny ENM, kontener funkcji zabezpieczeniowych, domena ZAMKNIĘTA | **BINDING** | ENM Logical + Protection | `SPEC_CHAPTER_02_ENM_DOMAIN_MODEL.md`, `SPEC_12_PROTECTION.md` | `ProtectionDevice` jest bytem logicznym ENM (jak Bay, Substation) — NIE bytem obliczeniowym (NIE należy do zamkniętej listy 10 z §2.3). Przypisany do elementu ENM (Branch/Transformer/Bus) przez `location_element_id`. Kontener funkcji: jedno urządzenie = jedna klasa (Technological LUB Network, zakaz mieszania). `EnergyNetworkModel` root NIE zawiera `protection_devices` (AS-IS) — przechowywane w warstwie domenowej `domain/protection_device.py`. Punkt integracji: `Bay.protection_ref`. Solver mocy NIE widzi ProtectionDevice. Typy: RELAY, FUSE, RECLOSER, CIRCUIT_BREAKER. **ZAMKNIĘCIE DOMENY:** Sekcje §2.15–§2.21 Rozdziału 2 definiują kompletny kanon architektoniczny zabezpieczeń. Dalsze modyfikacje wymagają ADR. |
 
 ### 9.3 Konsekwencje architektoniczne
 
@@ -476,6 +477,18 @@ Każda rozbieżność z §2 otrzymuje jednoznaczną dyspozycję.
 - Tryb ekspercki: podgląd zabezpieczeń technologicznych (read-only), jawne oznaczenie „brak koordynacji".
 - Zakaz: edycji nastaw technologicznych, ukrywania miejsca pomiaru, łączenia klas na jednym TCC bez rozróżnienia.
 - Kod AS-IS: `ProtectionSettingsEditor.tsx` edytuje stopnie 50/51, `TccChart.tsx` rysuje krzywe TCC — ale bez trybu standardowy/ekspercki i bez klasyfikacji klas — GAP.
+
+**Z decyzji #25 wynika (ProtectionDevice + zamknięcie domeny — BINDING):**
+- `ProtectionDevice` jest bytem logicznym ENM — kontenerem funkcji zabezpieczeniowych.
+- Przypisany do elementu sieci (Branch/Transformer/Bus) przez `location_element_id`.
+- Jedno urządzenie = jedna klasa: Technological LUB Network, zakaz mieszania.
+- Typy urządzeń: RELAY (przekaźnik), FUSE (bezpiecznik), RECLOSER (SPZ), CIRCUIT_BREAKER (wyłącznik).
+- `ProtectionDevice` NIE jest bytem obliczeniowym — solver mocy go nie widzi, `map_enm_to_network_graph()` go nie przetwarza.
+- Punkt integracji z ENM: `Bay.protection_ref` (AS-IS).
+- `EnergyNetworkModel` root NIE zawiera listy `protection_devices` — urządzenia w warstwie domenowej.
+- White Box MUSI klasyfikować zdarzenia dwuwymiarowo: `event_class` ∈ {TECHNOLOGICAL, NETWORK} × `event_scope` ∈ {LOCAL_DEVICE, NETWORK_SECTION}.
+- UI MUSI prezentować kolumnę „Źródło sygnału" (CT/VT/INTERNAL) obok „Miejsca pomiaru".
+- **DOMENA PROTECTION W ROZDZIALE 2 JEST ZAMKNIĘTA** — sekcje §2.15–§2.21 definiują kompletny kanon. Dalsze modyfikacje wymagają ADR i wpisu do Macierzy Decyzji.
 
 **Z decyzji #17 wynika (falowniki równoległe — BINDING, TO-BE):**
 - Kreator MUSI umożliwiać podanie **liczby identycznych falowników pracujących równolegle** przy dodawaniu źródła OZE.

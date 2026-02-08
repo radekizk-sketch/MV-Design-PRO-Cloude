@@ -934,7 +934,20 @@ ProtectionTrace (frozen dataclass)
 
 ### 2.17.3 Rozróżnienie raportowe (BINDING)
 
-White Box MUSI jawnie odróżniać dwa typy zdarzeń:
+White Box MUSI jawnie odróżniać dwa typy zdarzeń, klasyfikując każde zdarzenie dwuwymiarowo:
+
+**Wymiar 1 — klasa zdarzenia:**
+- `event_class ∈ {TECHNOLOGICAL, NETWORK}`
+
+**Wymiar 2 — zasięg zdarzenia:**
+- `event_scope ∈ {LOCAL_DEVICE, NETWORK_SECTION}`
+
+| Kombinacja | Znaczenie | Przykład |
+|---|---|---|
+| TECHNOLOGICAL + LOCAL_DEVICE | Falownik odłącza się autonomicznie | U< LVRT → trip Q_nn |
+| NETWORK + NETWORK_SECTION | Zabezpieczenie sieciowe odcina sekcję sieci | 50 I>> → trip 3Q1 |
+| TECHNOLOGICAL + NETWORK_SECTION | **NIEDOZWOLONE** — zabezpieczenie technologiczne nie steruje aparatem sieciowym | — |
+| NETWORK + LOCAL_DEVICE | **NIEDOZWOLONE** — zabezpieczenie sieciowe nie steruje wewnętrznym odłączeniem falownika | — |
 
 #### Zadziałanie technologiczne falownika
 
@@ -1022,6 +1035,7 @@ UI MUSI prezentować zabezpieczenia w formie tabel analogicznych do ETAP / e2TAN
 | Kierunkowość | bool | Czy funkcja jest kierunkowa (67/67N) |
 | Aparat | ID | Identyfikator sterowanego aparatu (3Q1, Q_nn, F1) |
 | Miejsce pomiaru | nn / SN | Poziom napięcia punktu pomiarowego |
+| Źródło sygnału | enum | Typ przetwornika pomiarowego: `CT` / `VT` / `INTERNAL` (firmware falownika) |
 | Klasa | enum | `Technological` / `Network` |
 | Werdykt | enum | `PASS` / `MARGINAL` / `FAIL` / `ERROR` |
 
@@ -1107,8 +1121,144 @@ System posiada (AS-IS):
 
 ---
 
+## 2.20 ProtectionDevice — byt logiczny ENM (BINDING)
+
+### 2.20.1 Definicja
+
+`ProtectionDevice` jest **bytem logicznym ENM** — kontenerem funkcji zabezpieczeniowych przypisanym do elementu sieci.
+
+**ProtectionDevice:**
+- **JEST** bytem logicznym ENM (jak Bay, Substation — organizacyjny, nie obliczeniowy).
+- **JEST** kontenerem funkcji zabezpieczeniowych (`ProtectionFunction.Technological` i/lub `ProtectionFunction.Network`).
+- **JEST** wejściem do analiz zabezpieczeniowych (protection analysis pipeline).
+- **JEST** referencją dla White Box i UI.
+- **NIE JEST** bytem obliczeniowym solvera mocy (NIE należy do zamkniętej listy 10 bytów z §2.3).
+- **NIE JEST** przetwarzany przez `map_enm_to_network_graph()`.
+
+### 2.20.2 Struktura (AS-IS)
+
+```
+ProtectionDevice (frozen dataclass)
+├── id: UUID                          # Unikalny identyfikator
+├── name: str                         # Nazwa urządzenia
+├── device_type: ProtectionDeviceType # RELAY | FUSE | RECLOSER | CIRCUIT_BREAKER
+├── location_element_id: str          # ID chronionego elementu ENM (Bus/Branch/Transformer)
+├── settings: OvercurrentProtectionSettings  # Nastawy nadprądowe (stopnie 50/51/50N/51N)
+├── manufacturer: str | None          # Producent
+├── model: str | None                 # Model urządzenia
+├── location_description: str | None  # Opis lokalizacji (po polsku)
+├── ct_ratio: str | None              # Przekładnia CT (np. "200/5")
+├── rated_current_a: float | None     # Prąd znamionowy [A]
+└── created_at: datetime              # Znacznik czasu utworzenia
+```
+
+**Źródło:** `domain/protection_device.py` — `ProtectionDevice`, `ProtectionDeviceType`, `OvercurrentProtectionSettings`
+
+### 2.20.3 Przypisanie do elementu ENM
+
+ProtectionDevice jest przypisywany do elementów ENM przez pole `location_element_id`:
+
+| Element ENM | Rola zabezpieczenia | Przykład |
+|---|---|---|
+| **Branch** (linia/kabel) | Zabezpieczenie odejścia (pole liniowe) | 51 I> na odejściu kablowym |
+| **Transformer** | Zabezpieczenie transformatora (pole transformatorowe) | 50 I>> + 51 I> pola transformatorowego |
+| **Bus** | Zabezpieczenie szyny (szyny zbiorczej) | 87 (różnicowe szyny) |
+
+**Punkt integracji ENM:**
+- `Bay.protection_ref: str | None` — opcjonalna referencja z pola rozdzielczego do `ProtectionDevice.id`.
+- `EnergyNetworkModel` root **NIE zawiera** listy `protection_devices` (AS-IS) — urządzenia zabezpieczeniowe przechowywane w warstwie domenowej (`domain/protection_device.py`), nie w modelu ENM.
+
+**Decyzja architektoniczna:** ProtectionDevice jest bytem logicznym powiązanym z ENM przez referencję `location_element_id`, ale przechowywany niezależnie od `EnergyNetworkModel` root. Umożliwia to:
+- modyfikację konfiguracji zabezpieczeń bez mutacji modelu sieciowego,
+- wielokrotne scenariusze zabezpieczeń dla tego samego modelu sieci,
+- separację warstw: topologia (ENM) ≠ konfiguracja zabezpieczeń (domena).
+
+### 2.20.4 Typy urządzeń (kanon)
+
+| Typ | Oznaczenie | Opis | Funkcje typowe |
+|---|---|---|---|
+| `RELAY` | Przekaźnik | Przekaźnik zabezpieczeniowy (cyfrowy/elektromechaniczny) | 50, 51, 50N, 51N, 67, 27, 59, 81 |
+| `FUSE` | Bezpiecznik | Bezpiecznik topikowy (krzywa Merson/NH) | Charakterystyka I²t |
+| `RECLOSER` | SPZ | Wyłącznik z samoczynnym ponownym załączeniem | 79 + 50/51 |
+| `CIRCUIT_BREAKER` | Wyłącznik | Wyłącznik mocy z wyzwalaczem | 50, 51 (wyzwalacz bezpośredni) |
+
+### 2.20.5 Relacja ProtectionDevice ↔ ProtectionFunction
+
+```
+ProtectionDevice
+├── device_type: RELAY
+├── location_element_id: "branch_cable_01"
+├── settings: OvercurrentProtectionSettings
+│   ├── stage_51:  {enabled: true,  pickup: 200A, TMS: 0.3, curve: SI}  → Network
+│   ├── stage_50:  {enabled: true,  pickup: 1200A, time: 0.08s}         → Network
+│   ├── stage_51n: {enabled: true,  pickup: 40A, TMS: 0.5, curve: SI}   → Network
+│   └── stage_50n: {enabled: true,  pickup: 200A, time: 0.1s}           → Network
+└── (dla falownika: funkcje technologiczne U<, f>, df/dt)               → Technological
+```
+
+**Inwariant:** Jeden ProtectionDevice może zawierać funkcje WYŁĄCZNIE jednej klasy:
+- Urządzenie przypisane do pola SN → funkcje sieciowe (Network).
+- Falownik z wbudowaną ochroną → funkcje technologiczne (Technological).
+- **ZAKAZ** mieszania klas w jednym ProtectionDevice.
+
+### 2.20.6 Zakazy (BINDING)
+
+1. **ZAKAZ** dodawania `ProtectionDevice` do zamkniętej listy bytów obliczeniowych ENM (§2.3) — to byt logiczny, nie obliczeniowy.
+2. **ZAKAZ** przetwarzania `ProtectionDevice` przez `map_enm_to_network_graph()` — solver mocy nie widzi zabezpieczeń.
+3. **ZAKAZ** przechowywania nastaw solvera mocy (voltage_magnitude, active_power) w `ProtectionDevice`.
+4. **ZAKAZ** tworzenia `ProtectionDevice` bez `location_element_id` — każde urządzenie MUSI być przypisane do elementu ENM.
+5. **ZAKAZ** mieszania funkcji Technological i Network w jednym `ProtectionDevice`.
+
+---
+
+## 2.21 Definition of Done — domena Protection (FINAL)
+
+### 2.21.1 Kryteria zamknięcia
+
+Domena zabezpieczeń MV-DESIGN-PRO jest uznana za **ZAMKNIĘTĄ** po spełnieniu wszystkich poniższych kryteriów:
+
+| # | Kryterium | Status |
+|---|---|---|
+| 1 | Jednoznaczny podział ProtectionFunction na dwie klasy: Technological vs Network | ✅ §2.15 |
+| 2 | Zakaz koordynacji między klasami | ✅ §2.15.5, §2.16.5 |
+| 3 | Punkt pomiarowy obowiązkowy dla każdej funkcji | ✅ §2.15.2 |
+| 4 | Koordynacja falownik ↔ sieć: falownik = warunek brzegowy | ✅ §2.16 |
+| 5 | Relacja czasowa: falownik ≤250 ms odłącza się pierwszy | ✅ §2.16.2 |
+| 6 | Scenariusze kanoniczne: zwarcie SN, linia, wyspa, przeciążenie, napięcie | ✅ §2.16.3 |
+| 7 | Odniesienia normowe: IEC 60909, 60255, NC RfG, IRiESD, PN-EN 50549 | ✅ §2.16.4 |
+| 8 | White Box: deterministyczny łańcuch przyczynowy (9 kroków) | ✅ §2.17.1 |
+| 9 | White Box: `event_class` ∈ {TECHNOLOGICAL, NETWORK} | ✅ §2.17.3 |
+| 10 | White Box: `event_scope` ∈ {LOCAL_DEVICE, NETWORK_SECTION} | ✅ §2.17.3 |
+| 11 | White Box: raport „kto zadziałał pierwszy" | ✅ §2.17.4 |
+| 12 | UI: widok tabelaryczny ETAP-style (11 kolumn obowiązkowych) | ✅ §2.18.2 |
+| 13 | UI: tryb standardowy (sieciowe) + tryb ekspercki (read-only technologiczne) | ✅ §2.18.3 |
+| 14 | UI: wykresy TCC (IEC 60255 + IEEE C37.112) | ✅ §2.18.4 |
+| 15 | Walidacje: 9 reguł E-P01…I-P02 (niezależne od ENM Validator) | ✅ §2.19 |
+| 16 | ProtectionDevice: byt logiczny ENM (nie obliczeniowy) | ✅ §2.20 |
+| 17 | ProtectionDevice: przypisanie do Branch/Transformer/Bus | ✅ §2.20.3 |
+| 18 | ProtectionDevice: zakaz mieszania klas w jednym urządzeniu | ✅ §2.20.5 |
+| 19 | Spójność z Decyzjami #21–#25 w AUDIT | ✅ AUDIT §9.2 |
+| 20 | Brak sprzeczności z NC RfG / IRiESD | ✅ §2.16.4 |
+
+### 2.21.2 Zakres zamknięcia
+
+Sekcje §2.15–§2.21 definiują **kompletny kanon architektoniczny zabezpieczeń** na poziomie Rozdziału 2 (model domenowy ENM).
+
+Szczegółowa specyfikacja implementacyjna (nastawy, krzywe, algorytmy koordynacji, formaty eksportu) jest delegowana do **SPEC_12_PROTECTION.md** (warstwa Analysis / Interpretation).
+
+### 2.21.3 Oświadczenie zamknięcia (BINDING)
+
+> **Domena Protection w Rozdziale 2 jest ZAMKNIĘTA.**
+>
+> Dalsze modyfikacje sekcji §2.15–§2.21 wymagają formalnej decyzji architektonicznej (ADR)
+> i wpisu do Macierzy Decyzji w AUDIT_SPEC_VS_CODE.md.
+>
+> Temat zabezpieczeń na poziomie modelu domenowego ENM nie wymaga dalszych „dopowiedzeń".
+
+---
+
 **KONIEC ROZDZIAŁU 2**
 
 ---
 
-*Dokument kanoniczny. Wersja 1.2. Zaktualizowany o §2.16–§2.19 (koordynacja, White Box, UI, walidacje).*
+*Dokument kanoniczny. Wersja 2.0 FINAL. Domena Protection zamknięta (§2.15–§2.21).*
