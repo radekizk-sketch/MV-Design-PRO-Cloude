@@ -261,6 +261,15 @@ def _identify_trunk(
             (branch.ref_id, branch.from_bus_ref, length)
         )
 
+    # Uwzględnij transformatory (łączą szyny WN/SN — kluczowe dla trunk BFS)
+    for trafo in enm.transformers:
+        bus_branches.setdefault(trafo.hv_bus_ref, []).append(
+            (trafo.ref_id, trafo.lv_bus_ref, 0.0)
+        )
+        bus_branches.setdefault(trafo.lv_bus_ref, []).append(
+            (trafo.ref_id, trafo.hv_bus_ref, 0.0)
+        )
+
     # BFS od szyn źródłowych
     visited: set[str] = set()
     trunk: list[TrunkSegment] = []
