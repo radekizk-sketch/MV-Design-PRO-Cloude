@@ -691,8 +691,144 @@ Dokładnie JEDEN obiekt `EnergyNetworkModel` istnieje per projekt. Kreator (Wiza
 
 ---
 
+## 2.15 Zabezpieczenia — klasyfikacja i punkt pomiaru (BINDING)
+
+### 2.15.1 Dwie klasy ProtectionFunction
+
+System MV-DESIGN-PRO rozróżnia dwie odrębne klasy funkcji zabezpieczeniowych. Klasy te NIE SĄ wymienne, NIE konkurują ze sobą i NIE podlegają wspólnej koordynacji selektywnej.
+
+#### A. ProtectionFunction.Technological (zabezpieczenia technologiczne falownika)
+
+**Definicja:** Wbudowane funkcje ochronne generatora energoelektronicznego (falownika), działające autonomicznie na poziomie urządzenia. Realizowane przez sterownik falownika, nie przez zewnętrzny przekaźnik.
+
+**Właściwości:**
+- Działają **autonomicznie** — niezależnie od systemu zabezpieczeń sieciowych.
+- Czas działania **≤ 250 ms** (determinowany przez firmware falownika).
+- **NIE podlegają koordynacji selektywnej** — nie uczestniczą w stopniowaniu Δt z zabezpieczeniami sieciowymi.
+- Parametry wynikają z wymagań normatywnych przyłączeniowych (NC RfG, IRiESD), nie z analizy zwarciowej sieci.
+
+**Funkcje technologiczne falownika:**
+
+| Funkcja | ANSI | Opis | Źródło nastawy |
+|---|---|---|---|
+| I> (technologiczne) | — | Ograniczenie prądowe falownika | Parametr urządzenia |
+| I>> (technologiczne) | — | Wyłączenie awaryjne falownika | Parametr urządzenia |
+| U< | 27 | Podnapięciowe (LVRT/wyłączenie) | NC RfG / IRiESD |
+| U> | 59 | Nadnapięciowe | NC RfG / IRiESD |
+| U>> | 59 (high) | Nadnapięciowe szybkie | NC RfG / IRiESD |
+| f< | 81U | Podczęstotliwościowe | NC RfG / IRiESD |
+| f> | 81O | Nadczęstotliwościowe | NC RfG / IRiESD |
+| df/dt | 81R | ROCOF (rate of change of frequency) | NC RfG / IRiESD |
+
+**Reguły (BINDING):**
+1. Funkcje technologiczne **NIE SĄ wejściem** do solvera zabezpieczeń (`protection analysis`).
+2. Funkcje technologiczne **NIE konkurują** z zabezpieczeniami sieciowymi — ich nastawy nie są koordynowane z I>>/I> pola SN.
+3. Funkcje technologiczne są **dokumentowane w White Box** jako warunki brzegowe normowe (NC RfG / IRiESD).
+4. Punkt pomiaru: **strona nn falownika** — pomiar wewnętrzny urządzenia.
+
+#### B. ProtectionFunction.Network (zabezpieczenia sieciowe)
+
+**Definicja:** Klasyczne zabezpieczenia sieciowe IEC / ETAP, realizowane przez zewnętrzne przekaźniki zabezpieczeniowe, nastawialne, selektywne, koordynowane w ramach sieci SN.
+
+**Właściwości:**
+- **Nastawialne** — nastawy wynikają z analizy zwarciowej i rozpływowej sieci.
+- **Selektywne** — koordynowane czasowo i prądowo z innymi zabezpieczeniami sieciowymi (stopniowanie Δt).
+- **Koordynowane** — uczestniczą w pełnej koordynacji zabezpieczeń sieci SN.
+- Sterują aparatem łączeniowym (wyłącznik, rozłącznik).
+
+**Minimalny kanon funkcji sieciowych (AS-IS):**
+
+| Funkcja | ANSI | Opis | Status w kodzie |
+|---|---|---|---|
+| Zabezpieczenie nadprądowe bezzwłoczne | 50 | I>> (instantaneous) | AS-IS (`OVERCURRENT_INST`) |
+| Zabezpieczenie nadprądowe zwłoczne | 51 | I> (time-delayed, IDMT) | AS-IS (`OVERCURRENT_TIME`) |
+| Zabezpieczenie ziemnozwarciowe bezzwłoczne | 50N | Ie>> (earth fault inst.) | AS-IS (`EARTH_FAULT_INST`) |
+| Zabezpieczenie ziemnozwarciowe zwłoczne | 51N | Ie> (earth fault time) | AS-IS (`EARTH_FAULT_TIME`) |
+| Zabezpieczenie podnapięciowe | 27 | U< | AS-IS (`UNDERVOLTAGE`) |
+| Zabezpieczenie nadnapięciowe | 59 | U> | AS-IS (`OVERVOLTAGE`) |
+| Zabezpieczenie podczęstotliwościowe | 81U | f< | AS-IS (`UNDERFREQUENCY`) |
+| Zabezpieczenie nadczęstotliwościowe | 81O | f> | AS-IS (`OVERFREQUENCY`) |
+| ROCOF | 81R | df/dt | AS-IS (`ROCOF`) |
+| SPZ (samoczynne ponowne załączenie) | 79 | Reclosing | AS-IS (`RECLOSING`) |
+| Zabezpieczenie kierunkowe | 67 / 67N | Directional I> / Ie> | PLANNED |
+| Zabezpieczenie odległościowe | 21 | Distance / impedance | PLANNED |
+| Zabezpieczenie różnicowe | 87 | Differential | PLANNED |
+| Blokada łączeniowa | 86 | Lockout | PLANNED |
+
+**Dodatkowe sygnały sieciowe (warunki ziemnozwarciowe):**
+- 3U0 — napięcie zerowe (pomiar z przekładnika napięciowego)
+- 3I0 — prąd zerowy (pomiar z przekładnika prądowego)
+- Go> — konduktancja zerowa (admitancja doziemna)
+
+**Reguły (BINDING):**
+1. Funkcje sieciowe **SĄ wejściem** do solvera zabezpieczeń.
+2. Funkcje sieciowe **korzystają z wyników** analiz zwarciowych (SC) i rozpływowych (PF).
+3. Funkcje sieciowe **sterują aparatem łączeniowym** — każda funkcja jest przypisana do konkretnego wyłącznika/rozłącznika.
+4. Punkt pomiaru: **strona SN** — przekładniki prądowe (CT) i napięciowe (VT) w polu rozdzielczym.
+
+### 2.15.2 Punkt pomiaru (OBOWIĄZKOWE)
+
+Każda ProtectionFunction — zarówno technologiczna, jak i sieciowa — MUSI jawnie określać:
+
+| Atrybut | Opis | Przykład |
+|---|---|---|
+| **Miejsce pomiaru** | Poziom napięcia, na którym funkcja wykonuje pomiar | nn (strona falownika) / SN (pole rozdzielcze) |
+| **Źródło sygnału** | Typ przetwornika pomiarowego dostarczającego sygnał | CT (przekładnik prądowy) / VT (przekładnik napięciowy) / wewnętrzny (firmware) |
+| **Sterowany aparat** | Aparat łączeniowy, który funkcja wyłącza | QN1 (wyłącznik nn), 3Q1 (wyłącznik SN), brak (tylko alarm) |
+
+**Przykład — przyłączenie OZE:**
+
+```
+Tor: Falownik(nn) → Bus nn → [Q_nn] → Trafo nn/SN → Bus SN → [3Q1_SN]
+
+Zabezpieczenia technologiczne falownika:
+  I>, U<, U>, f<, f>, df/dt
+  Punkt pomiaru: nn (wewnętrzny falownika)
+  Źródło sygnału: wewnętrzny (firmware)
+  Sterowany aparat: Q_nn (wyłącznik nn) lub wewnętrzne odłączenie
+
+Zabezpieczenia sieciowe pola SN:
+  50 (I>>), 51 (I>), 50N (Ie>>), 51N (Ie>)
+  Punkt pomiaru: SN (pole rozdzielcze)
+  Źródło sygnału: CT/VT w polu transformatorowym SN
+  Sterowany aparat: 3Q1 (wyłącznik SN)
+```
+
+### 2.15.3 White Box — rozróżnienie zadziałań (BINDING)
+
+White Box MUSI umieć odróżnić i raportować osobno:
+
+| Zdarzenie | Klasa | Raport White Box |
+|---|---|---|
+| Zadziałanie technologiczne falownika (np. U< LVRT → wyłączenie) | Technological | `protection_event.class = TECHNOLOGICAL`, źródło: parametry urządzenia / NC RfG |
+| Zadziałanie zabezpieczenia sieciowego (np. 51 I> → trip 3Q1) | Network | `protection_event.class = NETWORK`, źródło: analiza zwarciowa + nastawy |
+
+**Inwariant:** Zadziałanie technologiczne i sieciowe NIE MOGĄ być raportowane jako jedno zdarzenie. Są to odrębne mechanizmy z odrębnymi źródłami parametrów, odrębnymi punktami pomiaru i odrębnymi sterowanymi aparatami.
+
+### 2.15.4 Relacja do warstwy Analysis (SPEC_12)
+
+Niniejsza sekcja definiuje **klasyfikację** funkcji zabezpieczeniowych w kontekście modelu ENM.
+
+Szczegółowa specyfikacja:
+- koordynacji selektywnej (stopniowanie Δt),
+- doboru nastaw (I>>, I>, Ie>),
+- charakterystyk czasowych (DT, NI, VI, EI),
+- solvera zabezpieczeń (protection analysis pipeline),
+- katalogu urządzeń (vendor curves)
+
+— jest opisana w **SPEC_12_PROTECTION.md** (warstwa Analysis / Interpretation).
+
+### 2.15.5 Zakazy (BINDING)
+
+1. **ZAKAZ koordynowania** zabezpieczeń technologicznych falownika z zabezpieczeniami sieciowymi SN w ramach jednego solvera selektywności.
+2. **ZAKAZ traktowania** nastaw technologicznych falownika jako nastaw solvera zabezpieczeń.
+3. **ZAKAZ łączenia** zdarzenia technologicznego i sieciowego w jeden raport zadziałania.
+4. **ZAKAZ pomijania** punktu pomiaru i sterowanego aparatu w definicji funkcji zabezpieczeniowej.
+
+---
+
 **KONIEC ROZDZIAŁU 2**
 
 ---
 
-*Dokument kanoniczny. Wersja 1.0. Zatwierdzenie wymagane przed przejściem do kolejnych rozdziałów.*
+*Dokument kanoniczny. Wersja 1.1. Zaktualizowany o §2.15 Zabezpieczenia.*

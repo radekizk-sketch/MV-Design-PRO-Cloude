@@ -631,24 +631,39 @@ FINALIZACJA:
 
 **Status:** AS-IS (sekcje implementacji) + TO-BE (sekcje rozszerzeń)
 
+**BINDING — Klasyfikacja funkcji zabezpieczeniowych (Decyzja #21):**
+
+> Plik SPEC_12 MUSI respektować podział z §2.15 SPEC_CHAPTER_02:
+> - **Klasa Technologiczne:** warunki brzegowe solvera, NIE wejście do koordynacji selektywnej
+> - **Klasa Sieciowe:** pełne wejście do solvera zabezpieczeń (nastawy, krzywe, koordynacja)
+> - Solver zabezpieczeń przetwarza WYŁĄCZNIE klasę Sieciowe
+> - Każda funkcja z punktem pomiarowym (miejsce, sygnał, aparatura)
+> - White Box rozróżnia zdarzenia TECHNOLOGICAL vs NETWORK
+> - Kod AS-IS (`sanity_checks/rules.py`) NIE klasyfikuje — GAP do opisania w §12.T4
+
 **Rozdziały:**
-- §12.1 — Funkcje zabezpieczeniowe: I>, I>>, Ie> (~80 linii)
-- §12.2 — Charakterystyki czasowe: DT, NI (IDMT), VI, EI (~80 linii)
-- §12.3 — Dobór nastaw I>> (selektywność, czułość, cieplność) (~100 linii)
-- §12.4 — Koordynacja czasowa (stopniowanie Δt = 0.3/0.5 s) (~60 linii)
-- §12.5 — Mapowanie na kod (~40 linii)
-- §12.6 — Testy akceptacyjne (~40 linii)
+- §12.1 — Klasyfikacja funkcji zabezpieczeniowych: Technologiczne vs Sieciowe (~80 linii)
+- §12.2 — Funkcje sieciowe: I>, I>>, Ie> (ANSI 50, 51, 50N, 51N) (~80 linii)
+- §12.3 — Charakterystyki czasowe: DT, NI (IDMT), VI, EI (~80 linii)
+- §12.4 — Dobór nastaw I>> (selektywność, czułość, cieplność) (~100 linii)
+- §12.5 — Koordynacja czasowa (stopniowanie Δt = 0.3/0.5 s) (~60 linii)
+- §12.6 — Punkt pomiarowy: CT/VT, aparatura sterowana (~60 linii)
+- §12.7 — Mapowanie na kod (~40 linii)
+- §12.8 — Testy akceptacyjne (~40 linii)
 
 > **TO-BE** sekcje (wyraźnie oznaczone):
 - §12.T1 — Model ProtectionDevice (Pydantic, TS) — PLANNED
 - §12.T2 — Przekładniki CT — PLANNED
 - §12.T3 — SPZ — PLANNED
+- §12.T4 — Implementacja klasyfikacji Technologiczne/Sieciowe w `ProtectionFunctionSummary` — PLANNED (GAP z Decyzji #21)
+- §12.T5 — White Box `event_type` ∈ {TECHNOLOGICAL, NETWORK} — PLANNED
 
 **Źródła:**
-- Kod: `application/analyses/protection/`, `protection/curves/`
-- Normy: PN-EN 60255-151
+- Kod: `application/analyses/protection/`, `protection/curves/`, `sanity_checks/rules.py`
+- Normy: PN-EN 60255-151, NC RfG (EU 2016/631), IRiESD
+- Decyzja: AUDIT #21, SPEC_CHAPTER_02 §2.15
 
-**Szacowana długość:** ~500 linii (AS-IS) + ~200 linii (TO-BE)
+**Szacowana długość:** ~640 linii (AS-IS) + ~300 linii (TO-BE)
 
 ---
 
@@ -835,13 +850,13 @@ FINALIZACJA:
 | SPEC_09_WHITE_BOX.md | 0 | WhiteBox | 12 | ~800 |
 | SPEC_10_SOLVER_SC_IEC60909.md | 1 | Solver | 16 | ~1200 |
 | SPEC_11_SOLVER_PF_NEWTON.md | 1 | Solver | 12 | ~860 |
-| SPEC_12_PROTECTION.md | 2 | Analysis | 6+3 TO-BE | ~700 |
+| SPEC_12_PROTECTION.md | 2 | Analysis | 8+5 TO-BE | ~940 |
 | SPEC_13_WIZARD.md | 3 | Application | 15 | ~1100 |
 | SPEC_14_TREE_AND_SLD.md | 3 | Application | 4 | ~260 |
 | SPEC_15_PERSISTENCE.md | 4 | Infrastructure | 6+1 TO-BE | ~380 |
 | SPEC_16_TESTS.md | 4 | Infrastructure | 10 | ~540 |
 | SPEC_INDEX.md | — | Index | 5 | ~150 |
-| **RAZEM** | | | **~198** | **~13 400** |
+| **RAZEM** | | | **~205** | **~13 640** |
 
 ### Porównanie:
 - **SYSTEM_SPEC.md v3.0:** ~487 linii
