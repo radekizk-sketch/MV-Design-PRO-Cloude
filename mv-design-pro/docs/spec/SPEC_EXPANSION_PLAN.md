@@ -169,12 +169,22 @@ FINALIZACJA:
 - §0.8 — Diagram warstw (Mermaid) (~40 linii)
 - §0.9 — Study Case architecture (Case ≠ Model, singleton, invalidation) (~80 linii)
 - §0.10 — PowerFactory mapping (tabela odpowiedników) (~40 linii)
+- §0.11 — **Warstwa katalogu typów — resolver, precedencja, ParameterSource** (~100 linii)
+  - Decision Matrix ref: #15, #18
+  - Status: AS-IS (resolver zaimplementowany) + TO-BE (rozszerzenie na Generator)
+  - Katalog typów (`catalog/types.py`): LineType, CableType, TransformerType, SwitchEquipmentType, ConverterType, InverterType
+  - Resolver (`catalog/resolver.py`): 3-poziomowa precedencja `impedance_override > type_ref > instance` (AS-IS)
+  - `ParameterSource` enum: OVERRIDE, TYPE_REF, INSTANCE — jednoznaczna identyfikacja pochodzenia parametru
+  - Funkcje resolwera: `resolve_line_params()`, `resolve_transformer_params()`, `resolve_thermal_params()` (AS-IS)
+  - Zasada kompozycji (BINDING): `instancja ENM = TYP(katalog) + parametry_zmienne(kreator) + [override(tryb_ekspert)] + ilość`
+  - Parametry katalogu są **tylko do odczytu** w trybie standardowym; edycja wymaga trybu EKSPERT (Decision #16)
+  - TO-BE: rozszerzenie resolwera o Generator/Load → ConverterType/InverterType
 
 **Źródła:**
-- Kod: `enm/mapping.py`, `enm/models.py`, `network_model/core/`, `application/study_case/`
+- Kod: `enm/mapping.py`, `enm/models.py`, `network_model/core/`, `network_model/catalog/resolver.py`, `network_model/catalog/types.py`, `application/study_case/`
 - Architektura: `ARCHITECTURE.md`, `AGENTS.md`, `SYSTEM_SPEC.md` §1, §4, §9, §10
 
-**Szacowana długość:** ~560 linii
+**Szacowana długość:** ~700 linii
 
 ---
 
@@ -214,17 +224,34 @@ FINALIZACJA:
 - §2.4 — Branch — typ bazowy, discriminated union na `type` (~60 linii)
   - `Branch = OverheadLine | Cable | SwitchBranch | FuseBranch`
 - §2.5 — OverheadLine (r/x/b per km, length, rating, składowe zerowe r0/x0/b0) (~120 linii)
+  - Parametry znamionowe: z `catalog_ref` → `LineType` (AS-IS, resolver: `resolve_line_params()`)
+  - Parametry zmienne instancji: `length_km` (z kreatora)
+  - Tryb EKSPERT: dopuszczalny `impedance_override` (AS-IS, `ParameterSource.OVERRIDE`)
+  - Kompozycja: `OverheadLine = LineType × długość [× override]`
 - §2.6 — Cable (jak OverheadLine + insulation: XLPE/PVC/PAPER) (~100 linii)
+  - Kompozycja analogiczna: `Cable = CableType × długość [× override]`
 - §2.7 — SwitchBranch (switch/breaker/disconnector/bus_coupler, status, r_ohm/x_ohm) (~80 linii)
 - §2.8 — FuseBranch (rated_current_a, rated_voltage_kv) (~60 linii)
 - §2.9 — Transformer (sn_mva, uhv_kv, ulv_kv, uk_percent, pk_kw, vector_group, tap, grounding) (~150 linii)
+  - Parametry znamionowe: z `catalog_ref` → `TransformerType` (AS-IS, resolver: `resolve_transformer_params()`)
+  - Parametry zmienne instancji (z kreatora): `tap_position`, konfiguracja pracy, uziemienie punktu neutralnego (`hv_neutral`, `lv_neutral`)
+  - Tryb EKSPERT: dopuszczalny override wybranych parametrów (np. `uk_percent`, `pk_kw`) — TO-BE
+  - Minimalne/maksymalne napięcia do obliczeń NIE SĄ parametrem transformatora — są domeną solvera (normy, scenariusze)
+  - Kompozycja: `Transformer = TransformerType × pozycja_zaczepu × uziemienie [× override]`
   - Transformer3W: **REQUIRES-DECISION** — nie opisywać AS-IS, oznaczyć jako NOT-IMPLEMENTED
 - §2.10 — Source (sk3_mva, r/x_ohm, rx_ratio, z0, c_max/c_min) (~120 linii)
   - Source ≠ Generator (Decision #3)
-- §2.11 — Load (p_mw, q_mvar, model: pq/zip) (~60 linii)
-- §2.12 — Generator (p_mw, q_mvar, gen_type, limits) (~80 linii)
+- §2.11 — Load (p_mw, q_mvar, model: pq/zip) (~80 linii)
+  - Parametry zmienne instancji (z kreatora): `p_mw`, `q_mvar`, `model` (pq/zip)
+  - Brak `catalog_ref` w AS-IS; profil pracy i przypisanie do pola odpływowego — z kreatora
+- §2.12 — Generator (p_mw, q_mvar, gen_type, limits) (~120 linii)
   - Generator jako osobny byt ENM (Decision #3)
   - gen_type: synchronous, pv_inverter, wind_inverter, bess
+  - TO-BE (Decision #15): `catalog_ref` → `ConverterType` / `InverterType` — brak w obecnym kodzie
+  - TO-BE (Decision #17): `n_parallel` — liczba identycznych falowników pracujących równolegle
+  - Parametry zmienne instancji (z kreatora): `p_mw`, `q_mvar`, parametry eksploatacyjne
+  - Tryb EKSPERT (Decision #16): dopuszczalny override wybranych parametrów typu (np. limity prądu, tryby reakcji) — TO-BE
+  - Kompozycja docelowa: `Generator = ConverterType × parametry_eksploatacyjne × n_parallel [× override]`
 - §2.13 — Junction (connected_branch_refs, junction_type) (~60 linii)
   - Junction jest częścią ENM Core (Decision #8b) — modeluje rozgałęzienie magistrali
   - junction_type: T_node, sectionalizer, recloser_point, NO_point
@@ -254,7 +281,19 @@ FINALIZACJA:
   - Transformator jest bytem OBOWIĄZKOWYM przy integracji OZE z SN — osobny, jawny element ENM
   - Mapowanie na solver (Decision #14): Generator(falownik) → InverterSource (ref: `network_model/core/inverter.py`)
   - Parametry solverowe falownika: `in_rated_a`, `k_sc`, `converter_kind` (z katalogu `ConverterType` / `InverterType`)
-  - Konsekwencje dla White Box: pełny tor energii Generator → Bus nn → Trafo → Bus SN → sieć musi być odtwarzalny
+  - **Katalog i instancja falownika (Decision #15, #18):**
+    - Użytkownik wybiera TYP falownika z katalogu (`ConverterType` / `InverterType`) — parametry znamionowe z typu
+    - Użytkownik podaje LICZBĘ identycznych falowników równoległych (`n_parallel`) — Decision #17
+    - Parametry zmienne instancji: parametry eksploatacyjne (moc czynna/bierna, tryb pracy)
+    - Kompozycja: `Generator(falownik) = ConverterType × parametry_eksploatacyjne × n_parallel [× override(ekspert)]`
+  - **Tryb EKSPERT dla falownika (Decision #16):**
+    - Dopuszczalny override: limity prądu, tryby reakcji, k_sc
+    - Override NIE modyfikuje katalogu — dotyczy wyłącznie danej instancji
+    - Override jest jawnie oznaczony i audytowalny w White Box
+  - **Solver przy N falownikach równoległych:**
+    - Mapowanie: N falowników → N instancji InverterSource LUB 1 InverterSource z `in_rated_a × N`
+    - Solver SC: `Ik_total = N × k_sc × In_rated`
+  - Konsekwencje dla White Box: pełny tor energii Generator → Bus nn → Trafo → Bus SN → sieć musi być odtwarzalny; typ katalogowy → override (jeśli jest) → ilość → model solvera → wynik
   - Konsekwencje dla zabezpieczeń: punkt przyłączenia (Bus nn) jest znany, parametry zwarciowe falownika dostępne przez InverterSource
 - §2.18 — **Odbiory — przyłączanie fizyczne** (~120 linii)
   - Decision Matrix ref: #13
@@ -273,12 +312,45 @@ FINALIZACJA:
   - Implikacje: odbiór NIE może wisieć bezpośrednio na szynie bez pola odpływowego
   - Walidacja systemowa: każdy Load MUSI mieć pełny tor do źródła zasilania (E003 — connectivity)
   - Walidacja topologiczna: brak skrótów topologicznych (odbiór bez łącznika/pola)
+- §2.19 — **Zasada kompozycji: TYP × parametry zmienne × ilość = instancja ENM** (~150 linii)
+  - Decision Matrix ref: #15, #16, #17, #18
+  - Status: AS-IS (resolver, catalog_ref na Branch/Trafo) + TO-BE (catalog_ref na Generator, tryb ekspert, n_parallel)
+  - **Zasada fundamentalna (BINDING):**
+    ```
+    instancja ENM = TYP(katalog) + parametry_zmienne(kreator) + [override(tryb_ekspert)] + ilość
+    ```
+  - **Tryb standardowy (DOMYŚLNY):**
+    - Parametry typu pochodzą WYŁĄCZNIE z katalogu (`catalog_ref` → Type)
+    - Pola parametrów typu są TYLKO DO ODCZYTU
+    - Użytkownik NIE MOŻE ich edytować bez przejścia do trybu ekspert
+  - **Tryb EKSPERT (KONTROLOWANY — TO-BE):**
+    - Jawnie oznaczony w UI, świadomie aktywowany przez użytkownika
+    - Edycja WYBRANYCH parametrów typu na poziomie instancji
+    - Override NIE modyfikuje katalogu — dotyczy wyłącznie danej instancji
+    - Override zapisywany jako: `{parameter_name: overridden_value}`
+  - **Audyt i determinizm (OBOWIĄZKOWE):**
+    - ENM przechowuje per instancja: `type_id`, snapshot parametrów typu, listę override'ów, metadane
+    - White Box jednoznacznie wskazuje: parametr z katalogu vs parametr z override
+    - `ParameterSource` (OVERRIDE, TYPE_REF, INSTANCE) — AS-IS w `catalog/resolver.py`
+  - **Tabela kompozycji per element:**
+    | Element | Typ katalogowy | Parametry zmienne | Override (ekspert) | Ilość |
+    |---------|---------------|-------------------|-------------------|-------|
+    | OverheadLine | LineType | `length_km` | `impedance_override` (AS-IS) | — |
+    | Cable | CableType | `length_km` | `impedance_override` (AS-IS) | — |
+    | Transformer | TransformerType | `tap_position`, uziemienie | `uk_percent`, `pk_kw` (TO-BE) | — |
+    | Generator (falownik) | ConverterType / InverterType (TO-BE) | P, Q, tryb pracy | limity, k_sc (TO-BE) | `n_parallel` (TO-BE) |
+    | Load | — (brak katalogu) | `p_mw`, `q_mvar`, `model` | — | — |
+    | SwitchBranch | SwitchEquipmentType | `status` (open/closed) | — | — |
+  - **Konsekwencje dla solverów:**
+    - Resolver produkuje parametry finalne (po uwzględnieniu precedencji) → mapowanie ENM→NetworkGraph
+    - Solver operuje na parametrach finalnych — NIE zna katalogu ani override'ów
+    - White Box odtwarza pełny łańcuch: typ → override → parametry zmienne → ilość → model solvera → wynik
 
 **Źródła:**
-- Kod: `enm/models.py` (291 linii), `types/enm.ts` (370 linii), `network_model/core/inverter.py`, `network_model/catalog/types.py` (ConverterType, InverterType)
+- Kod: `enm/models.py` (291 linii), `types/enm.ts` (370 linii), `network_model/core/inverter.py`, `network_model/catalog/types.py`, `network_model/catalog/resolver.py`
 - Normy: PN-EN 60909-0, IRiESD (warunki przyłączenia OZE)
 
-**Szacowana długość:** ~1670 linii
+**Szacowana długość:** ~2020 linii
 
 ---
 
@@ -405,6 +477,11 @@ FINALIZACJA:
   - E010 — BLOCKER: Brak transformatora nn/SN przy integracji OZE z SN (Generator nn bez toru nn → transformator → SN w grafie ENM)
   - W009 — IMPORTANT: Odbiór bez kompletnego toru przyłączenia (Load bez łącznika/pola na torze do szyny)
   - Warunki blokady solvera: E009 i E010 blokują wszystkie analizy (SC, PF)
+- §7.4b — **Kody walidacji katalogu i trybu ekspert (BINDING — Decision #15, #16, #18)** (~80 linii)
+  - Status: TO-BE (nowe reguły, jeszcze niezaimplementowane)
+  - W009b — IMPORTANT: Instancja bez `catalog_ref` (element bez referencji do katalogu typów — parametry z ręcznego wprowadzenia)
+  - W010 — IMPORTANT: Override w trybie ekspert bez snapshotu typu (brak możliwości audytu odstępstwa)
+  - I006 — INFO: Override aktywny na instancji (informacja o odstępstwie od katalogu)
 - §7.5 — AnalysisAvailability (SC 3F, SC 1F, Load Flow) — reguły dostępności (~60 linii)
 - §7.6 — Walidacja topologiczna — connectivity check (NetworkX BFS) (~60 linii)
 - §7.7 — ValidationResult, ValidationIssue — kontrakty danych (~60 linii)
@@ -457,6 +534,19 @@ FINALIZACJA:
 - §9.6 — Pakiety dowodowe (SC3F, VDROP, Equipment, PF, Losses, Protection, Earthing, LF Voltage) (~80 linii)
 - §9.7 — Rejestry równań (EQ_SC3F_001..010, EQ_VDROP_001..009) (~60 linii)
 - §9.8 — Deterministyka (ten sam ENM → identyczny White Box → identyczny hash) (~40 linii)
+- §9.8a — **Audyt parametrów: katalog vs override (Decision #15, #16, #18)** (~80 linii)
+  - Status: TO-BE
+  - White Box MUSI odtwarzać pełny łańcuch parametrów per instancja:
+    ```
+    Typ katalogowy (snapshot)
+    → Override (jeśli tryb ekspert — lista: parametr → wartość)
+    → Parametry zmienne (kreator: długość, tap, P/Q, n_parallel)
+    → Ilość instancji równoległych
+    → Model solvera (parametry finalne po resolwerze)
+    → Wynik obliczeniowy
+    ```
+  - Każdy parametr w dowodzie MUSI być oznaczony: `ParameterSource.TYPE_REF` / `ParameterSource.OVERRIDE` / `ParameterSource.INSTANCE`
+  - Override MUSI być jawnie widoczny w eksporcie (LaTeX, PDF, DOCX)
 - §9.9 — Formaty eksportu (JSON, LaTeX, PDF, DOCX) (~40 linii)
 - §9.10 — Pełny przykład White Box trace SC3F (~120 linii)
 - §9.11 — Mapowanie na kod (~40 linii)
@@ -574,28 +664,45 @@ FINALIZACJA:
 - §13.2 — K1: Parametry systemu (~60 linii)
 - §13.3 — K2: Źródło zasilania (~60 linii)
 - §13.4 — K3: Szyny zbiorcze GPZ (~60 linii)
-- §13.5 — K4: Transformator WN/SN (~60 linii)
+- §13.5 — K4: Transformator WN/SN (~80 linii)
+  - Wybór `TransformerType` z katalogu (Decision #15, #18); parametry zmienne: `tap_position`, uziemienie
+  - Tryb EKSPERT: dopuszczalny override `uk_percent`, `pk_kw` (TO-BE, Decision #16)
 - §13.6 — K5: Pola rozdzielcze GPZ (~60 linii)
-- §13.7 — K6: Magistrala SN (~60 linii)
+- §13.7 — K6: Magistrala SN (~80 linii)
+  - Wybór `LineType` / `CableType` z katalogu; parametr zmienny: `length_km`
+  - Tryb EKSPERT: `impedance_override` (AS-IS, `ParameterSource.OVERRIDE`)
 - §13.8 — K7: Stacje SN (~60 linii)
 - §13.9 — K8: Transformatory SN/nN (~60 linii)
-- §13.10 — K9: Odbiory i generacja (~180 linii)
-  - Decision Matrix ref: #11, #12, #13
+- §13.10 — K9: Odbiory i generacja (~240 linii)
+  - Decision Matrix ref: #11, #12, #13, #15, #16, #17, #18
   - **K9a — Dodawanie źródła OZE (BINDING):**
-    1. Użytkownik wybiera typ źródła (PV / BESS / agregat z falownikiem) i napięcie wyjściowe nn (0,4 / 0,69 / 0,8 kV)
-    2. Kreator tworzy Bus nn o zadanym napięciu i przypina Generator do tego Bus nn
-    3. Kreator pyta: „Czy źródło ma być przyłączone do sieci SN?"
-    4. Jeśli TAK → kreator WYMUSZA dodanie: transformatora nn/SN + pola transformatorowego po stronie SN
-    5. Bez transformatora → przejście dalej jest ZABLOKOWANE
+    1. Użytkownik wybiera **TYP falownika z katalogu** (`ConverterType` / `InverterType`) — parametry znamionowe z typu (Decision #15, #18)
+    2. Użytkownik podaje **LICZBĘ identycznych falowników równoległych** (`n_parallel`) — Decision #17
+    3. Użytkownik podaje napięcie wyjściowe nn (0,4 / 0,69 / 0,8 kV) — z katalogu typu lub ręcznie
+    4. Użytkownik ustawia parametry eksploatacyjne instancji (P, Q, tryb pracy)
+    5. Kreator tworzy Bus nn o zadanym napięciu i przypina Generator(y) do tego Bus nn
+    6. Kreator pyta: „Czy źródło ma być przyłączone do sieci SN?"
+    7. Jeśli TAK → kreator WYMUSZA dodanie: transformatora nn/SN (wybór z katalogu `TransformerType`) + pola transformatorowego po stronie SN
+    8. Bez transformatora → przejście dalej jest ZABLOKOWANE
+  - **Tryb EKSPERT w K9a (Decision #16 — TO-BE):**
+    - Użytkownik może aktywować tryb EKSPERT i nadpisać wybrane parametry typu falownika (np. limity prądu, k_sc)
+    - Override NIE modyfikuje katalogu — dotyczy wyłącznie danej instancji
+    - Kreator oznacza override jawnie i zapisuje w modelu ENM
   - **Zakazy kreatora K9a (BINDING):**
     - Kreator NIE MOŻE pozwolić na `Generator → Bus SN`
     - Kreator NIE MOŻE tworzyć „źródeł w stacji" bez jawnego toru fizycznego
     - Kreator NIE MOŻE tworzyć domyślnych transformatorów „w tle" — każdy element jawny w ENM
+    - Kreator NIE MOŻE „cicho" modyfikować parametrów typu — zmiana wymaga jawnego trybu EKSPERT
   - **K9b — Dodawanie odbioru (BINDING):**
     1. Użytkownik wybiera Bus/szynę przyłączenia
-    2. Kreator tworzy pole odpływowe (łącznik + zabezpieczenie)
-    3. Kreator tworzy Load przypięty do Bus pola odpływowego
+    2. Użytkownik podaje parametry odbioru: moc (P, Q, cosφ), model (pq/zip), profil pracy
+    3. Kreator tworzy pole odpływowe (łącznik + zabezpieczenie) — przypisanie do pola jest OBOWIĄZKOWE
+    4. Kreator tworzy Load przypięty do Bus pola odpływowego
     - Kreator NIE MOŻE tworzyć odbioru wiszącego bezpośrednio na szynie bez pola odpływowego
+  - **K9c — Ogólna zasada katalogowa w K9 (Decision #15, #18):**
+    - Dla każdego elementu dodawanego w K9 (falownik, transformator nn/SN, łącznik, zabezpieczenie): kreator PREFERUJE wybór z katalogu typów
+    - Parametry zmienne instancji (długość, moc, tap, n_parallel) podawane przez użytkownika
+    - Tryb EKSPERT dostępny per instancja — z jawnym oznaczeniem override'u
 - §13.11 — K10: Walidacja i gotowość (~60 linii)
 - §13.12 — Reguły przejścia (preconditions per krok) (~60 linii)
 - §13.13 — Relacja kreator → ENM → Drzewo → SLD (event flow) (~60 linii)
@@ -702,30 +809,30 @@ FINALIZACJA:
 
 | Plik | Faza | Warstwa | Rozdziały | Szacowane linie |
 |---|---|---|---|---|
-| SPEC_00_LAYERING.md | 0 | Architecture | 10 | ~600 |
+| SPEC_00_LAYERING.md | 0 | Architecture | 11 | ~700 |
 | SPEC_01_GLOSSARY_NORMATIVE.md | 0 | Governance | 7 | ~290 |
-| SPEC_02_ENM_CORE.md | 0 | ENM Core | 18 | ~1670 |
+| SPEC_02_ENM_CORE.md | 0 | ENM Core | 19 | ~2020 |
 | SPEC_03_ENM_META.md | 0 | ENM Meta | 6 | ~380 |
 | SPEC_04_SLD_PROJECTION.md | 0 | SLD | 6 | ~310 |
 | SPEC_05_SLD_LAYOUT_ROUTE.md | 0 | SLD Layout | 7 | ~420 |
 | SPEC_06_RESULTS_API.md | 0 | Results API | 8 | ~580 |
-| SPEC_07_VALIDATION.md | 0 | Validation | 9 | ~760 |
+| SPEC_07_VALIDATION.md | 0 | Validation | 10 | ~840 |
 | SPEC_08_PUBLIC_API.md | 0 | Public API | 11 | ~820 |
-| SPEC_09_WHITE_BOX.md | 0 | WhiteBox | 11 | ~720 |
+| SPEC_09_WHITE_BOX.md | 0 | WhiteBox | 12 | ~800 |
 | SPEC_10_SOLVER_SC_IEC60909.md | 1 | Solver | 16 | ~1200 |
 | SPEC_11_SOLVER_PF_NEWTON.md | 1 | Solver | 12 | ~860 |
 | SPEC_12_PROTECTION.md | 2 | Analysis | 6+3 TO-BE | ~700 |
-| SPEC_13_WIZARD.md | 3 | Application | 15 | ~980 |
+| SPEC_13_WIZARD.md | 3 | Application | 15 | ~1100 |
 | SPEC_14_TREE_AND_SLD.md | 3 | Application | 4 | ~260 |
 | SPEC_15_PERSISTENCE.md | 4 | Infrastructure | 6+1 TO-BE | ~380 |
 | SPEC_16_TESTS.md | 4 | Infrastructure | 10 | ~540 |
 | SPEC_INDEX.md | — | Index | 5 | ~150 |
-| **RAZEM** | | | **~175** | **~11 640** |
+| **RAZEM** | | | **~175** | **~12 350** |
 
 ### Porównanie:
 - **SYSTEM_SPEC.md v3.0:** ~487 linii
-- **Nowa specyfikacja:** ~11 640 linii (18 plików)
-- **Wzrost:** ~24× (2400%)
+- **Nowa specyfikacja:** ~12 350 linii (18 plików)
+- **Wzrost:** ~25× (2500%)
 - **Pokrycie AS-IS:** ~95% (sekcje TO-BE wyraźnie oznaczone)
 
 ---
@@ -746,6 +853,9 @@ FINALIZACJA:
 12. **Kreator ≠ Drzewo ENM** — kreator to sekwencyjny kontroler, drzewo to pełna edycja
 13. **Falownik ≠ SN** — generator energoelektroniczny jest ZAWSZE elementem nn; przyłączenie do SN wymaga jawnego transformatora nn/SN w ENM
 14. **Kompletność torów** — każdy element (źródło OZE, odbiór) musi mieć pełny, jawny tor fizyczny w ENM — brak skrótów topologicznych
+15. **Instancja = TYP × parametry zmienne × ilość** — katalog typów jest domyślnym i preferowanym źródłem parametrów znamionowych; parametry zmienne (długość, tap, P/Q, n_parallel) z kreatora
+16. **Tryb EKSPERT = kontrolowany, audytowalny** — edycja parametrów typu WYŁĄCZNIE w jawnym trybie ekspert; override NIE modyfikuje katalogu; każdy override jest audytowalny w White Box; zakaz niejawnych/cichych modyfikacji
+17. **Pole (feeder) = jedyne miejsce przyłączania** — źródła, odbiory i transformatory przyłączane WYŁĄCZNIE przez pole; pole jest jedynym miejscem przypisywania zabezpieczeń
 
 ---
 

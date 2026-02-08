@@ -364,6 +364,10 @@ Każda rozbieżność z §2 otrzymuje jednoznaczną dyspozycję.
 | 12 | Brak wymuszenia transformatora przy integracji OZE z SN | **BINDING** | ENM Core + Wizard | `SPEC_02_ENM_CORE.md`, `SPEC_13_WIZARD.md` | Każda integracja źródła OZE (falownika nn) z siecią SN wymaga obecności transformatora nn/SN w ENM jako osobnego, jawnego elementu. Obecny kod tego nie wymusza — `mapping.py` mapuje Generator na P/Q adjustment bez sprawdzenia toru napięciowego. Specyfikacja MUSI definiować kanoniczną topologię: `Generator(nn) → Bus(nn) → Łącznik/Zabezpieczenie → Bus(nn stacji) → Transformator(nn/SN) → Bus(SN)`. Kreator MUSI wymuszać tę sekwencję. |
 | 13 | Odbiory — brak wymuszenia kompletnego toru przyłączenia | **BINDING** | ENM Core + Wizard | `SPEC_02_ENM_CORE.md`, `SPEC_13_WIZARD.md` | Load jest przyłączany do Bus przez `bus_ref` (`enm/models.py:201`), ale brak wymuszenia kompletnego toru fizycznego (szyna → łącznik/zabezpieczenie → pole odpływowe → odbiór). Specyfikacja MUSI opisywać normową topologię przyłączenia odbioru. |
 | 14 | InverterSource w solverze — brak mapowania z ENM Generator | **BINDING** | Layering + Solver | `SPEC_00_LAYERING.md`, `SPEC_10_SOLVER_SC_IEC60909.md` | `InverterSource` istnieje w warstwie solvera (`network_model/core/inverter.py`) i jest używany w SC solver (`_compute_inverter_contribution()` w `short_circuit_iec60909.py`), ale NIE jest mapowany z ENM `Generator(gen_type=pv_inverter|wind_inverter|bess)` w `enm/mapping.py`. Katalog zawiera `ConverterType` i `InverterType` (`catalog/types.py`). Specyfikacja MUSI opisać kontrakt mapowania Generator(falownik) → InverterSource. |
+| 15 | Katalog typów — resolver istnieje, ale brak catalog_ref na Generator i Load | **BINDING** | ENM Core + Catalog | `SPEC_02_ENM_CORE.md`, `SPEC_00_LAYERING.md` | System posiada `catalog/resolver.py` z 3-poziomową precedencją (`impedance_override > type_ref > instance`) i typami `ParameterSource` (OVERRIDE, TYPE_REF, INSTANCE). `OverheadLine`, `Cable`, `Transformer` mają `catalog_ref` (AS-IS). `Generator` i `Load` NIE mają `catalog_ref` (GAP). Katalog zawiera `ConverterType`, `InverterType` (`catalog/types.py`), ale Generator ich nie referencjonuje. Specyfikacja MUSI opisać zasadę: katalog jest domyślnym i preferowanym źródłem parametrów znamionowych dla WSZYSTKICH elementów sieciowych, oraz zaplanować rozszerzenie `catalog_ref` na Generator (TO-BE). |
+| 16 | Brak trybu EKSPERT — kontrolowana edycja parametrów typu | **BINDING** | Application + ENM | `SPEC_02_ENM_CORE.md`, `SPEC_13_WIZARD.md` | System NIE posiada trybu ekspert w kodzie. UI ma 3 tryby SLD: EDYCJA, WYNIKI, ZABEZPIECZENIA — żaden nie dotyczy parametrów typu. Istnieje `impedance_override` na `LineBranch` (`resolve_line_params()` w `resolver.py`), ale TYLKO dla linii/kabli. Specyfikacja MUSI zdefiniować jawny TRYB EKSPERT: (1) wyraźnie oznaczony w UI, (2) świadomie aktywowany, (3) override NIE modyfikuje katalogu, (4) override zapisywany per instancja, (5) audytowalny w White Box. Status: TO-BE. |
+| 17 | Brak liczby instancji równoległych na Generator/InverterSource | **BINDING** | ENM Core + Solver | `SPEC_02_ENM_CORE.md`, `SPEC_10_SOLVER_SC_IEC60909.md` | `Generator` (`enm/models.py:212`) nie ma pola `n_parallel` ani `count`. `InverterSource` (`inverter.py`) również nie ma. Solver SC sumuje wkłady N osobnych obiektów `InverterSource`, ale kreator nie oferuje „N identycznych falowników równolegle". Specyfikacja MUSI zdefiniować obsługę wielu identycznych falowników: użytkownik podaje TYP + LICZBĘ → kreator tworzy N instancji w ENM (lub jedno pole `n_parallel` z rozwinięciem przy mapowaniu na solver). Status: TO-BE. |
+| 18 | Zasada kompozycji: instancja = TYP × parametry zmienne × ilość | **BINDING** | Architecture | `SPEC_00_LAYERING.md`, `SPEC_02_ENM_CORE.md` | Specyfikacja MUSI definiować kanoniczną zasadę kompozycji elementów ENM: `instancja = TYP(katalog) + parametry_zmienne(kreator) + [override(tryb_ekspert)] + ilość`. Dotyczy wszystkich elementów: linia (LineType × długość), transformator (TransformerType × pozycja zaczepu × uziemienie), falownik (ConverterType × parametry eksploatacyjne × n_parallel), odbiór (LoadType × P,Q,cosφ). Zasada ta jest częściowo zaimplementowana (AS-IS: resolver.py, catalog_ref na Branch/Trafo) i częściowo planowana (TO-BE: catalog_ref na Generator, n_parallel, tryb ekspert). |
 
 ### 9.3 Konsekwencje architektoniczne
 
@@ -415,6 +419,29 @@ Każda rozbieżność z §2 otrzymuje jednoznaczną dyspozycję.
 - Mapowanie w `enm/mapping.py` MUSI uwzględniać konwersję parametrów: `Generator.p_mw` → `InverterSource.in_rated_a` (przez napięcie szyny nn i konwersję mocy na prąd).
 - Solver SC widzi wkład falownikowy TYLKO przez `InverterSource` (ograniczone źródło prądowe `Ik = k_sc · In`), NIE przez P/Q adjustment na węźle.
 - Katalogowy `ConverterType` / `InverterType` (`catalog/types.py`) dostarcza parametry: `un_kv`, `sn_mva`, `pmax_mw`, `k_sc`.
+
+**Z decyzji #15 i #18 wynika (katalog typów — BINDING):**
+- Katalog typów (`catalog/types.py`) jest **domyślnym i preferowanym źródłem** parametrów znamionowych.
+- Resolver (`catalog/resolver.py`) implementuje 3-poziomową precedencję: `impedance_override > type_ref > instance` (AS-IS).
+- Każdy element sieciowy ENM POWINIEN posiadać `catalog_ref` referencjonujący typ katalogowy.
+- AS-IS: `OverheadLine.catalog_ref`, `Cable.catalog_ref`, `Transformer.catalog_ref` — zaimplementowane.
+- TO-BE: `Generator.catalog_ref` → `ConverterType` / `InverterType` — wymagane rozszerzenie.
+- Parametry odczytane z katalogu są **tylko do odczytu** w trybie standardowym.
+- `ParameterSource` (OVERRIDE, TYPE_REF, INSTANCE) jednoznacznie identyfikuje pochodzenie każdego parametru.
+
+**Z decyzji #16 wynika (tryb EKSPERT — BINDING, TO-BE):**
+- System MUSI przewidywać jawny **TRYB EKSPERT**, umożliwiający kontrolowaną edycję wybranych parametrów typu na poziomie instancji.
+- Tryb EKSPERT: (1) wyraźnie oznaczony w UI, (2) świadomie aktywowany przez użytkownika, (3) każdy override NIE modyfikuje katalogu — dotyczy wyłącznie danej instancji.
+- Override jest zapisywany jako **odstępstwo od danych katalogowych**: `{parameter_name: overridden_value}`.
+- ENM MUSI przechowywać per instancja: `type_id`, snapshot parametrów typu, listę override'ów.
+- White Box MUSI jednoznacznie wskazywać: które parametry pochodzą z katalogu, a które zostały nadpisane w trybie ekspert.
+- Zakaz niejawnych modyfikacji: NIEDOZWOLONE jest automatyczne lub „ciche" zmienianie parametrów typu bez wiedzy użytkownika.
+
+**Z decyzji #17 wynika (falowniki równoległe — BINDING, TO-BE):**
+- Kreator MUSI umożliwiać podanie **liczby identycznych falowników pracujących równolegle** przy dodawaniu źródła OZE.
+- Podejście implementacyjne (do decyzji): albo (A) kreator tworzy N osobnych instancji Generator w ENM, albo (B) Generator posiada pole `n_parallel` z rozwinięciem przy mapowaniu na solver.
+- Solver SC MUSI uwzględniać sumaryczny wkład wszystkich falowników równoległych: `Ik_total = N × k_sc × In_rated`.
+- White Box MUSI odtwarzać: typ katalogowy → ilość → parametry per instancja → wkład sumaryczny.
 
 ---
 
