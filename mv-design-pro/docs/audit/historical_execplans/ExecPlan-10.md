@@ -56,7 +56,7 @@ Define strict, explicit, and minimal data contracts between frontend and backend
 
 ## Domain Snapshot Contract
 ### What the Frontend Receives
-- Immutable NetworkGraph snapshot data for all domain entities (Node, Branch, Transformer, Source, Load, PCC) including only the canonical attributes defined by ExecPlan-01.
+- Immutable NetworkGraph snapshot data for all domain entities (Node, Branch, Transformer, Source, Load, BoundaryNode) including only the canonical attributes defined by ExecPlan-01.
 - Snapshot metadata: snapshot ID, creation timestamp, and optional parent snapshot ID (for lineage/audit), as assigned by the backend.
 - Deterministic ordering information as defined by ExecPlan-01 (stable entity ordering must be preserved as-is).
 

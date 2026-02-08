@@ -47,7 +47,7 @@ IS NOT:
 ## Acceptance
 - Envelope DTO is JSON-serializable and deterministic.
 - DesignSynth adapter yields stable fingerprints across repeated calls.
-- PCC – punkt wspólnego przyłączenia is referenced as an input for connection studies via the spec artifact reference.
+- BoundaryNode – węzeł przyłączenia is referenced as an input for connection studies via the spec artifact reference.
 
 ## Outcomes & Retrospective
 (To be filled after rollout across additional analyses.)

@@ -37,8 +37,8 @@ def test_connection_study_happy_path(api_client):
         "case_id": str(case_id),
         "base_snapshot_id": "snap-1",
         "spec_payload": {
-            "pcc": {
-                "id": "PCC-1",
+            "connection_node": {
+                "id": "BoundaryNode-1",
                 "voltage_kv": 15.0,
                 "grid_supply": True,
             }
@@ -54,11 +54,11 @@ def test_connection_study_happy_path(api_client):
     assert body["design_evidence_id"]
     assert body["report_json"]
     report_json = body["report_json"]
-    assert "PCC – punkt wspólnego przyłączenia" in report_json
-    assert report_json["PCC – punkt wspólnego przyłączenia"]["id"] == "PCC-1"
+    assert "BoundaryNode – węzeł przyłączenia" in report_json
+    assert report_json["BoundaryNode – węzeł przyłączenia"]["id"] == "BoundaryNode-1"
 
 
-def test_connection_study_missing_pcc_returns_422(api_client):
+def test_connection_study_missing_connection_node_returns_422(api_client):
     client, case_id = api_client
     payload = {
         "case_id": str(case_id),
@@ -71,5 +71,5 @@ def test_connection_study_missing_pcc_returns_422(api_client):
     assert response.status_code == 422
     detail = response.json()["detail"]
     assert any(
-        "PCC – punkt wspólnego przyłączenia" in error["msg"] for error in detail
+        "BoundaryNode – węzeł przyłączenia" in error["msg"] for error in detail
     )

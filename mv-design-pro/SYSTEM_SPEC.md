@@ -38,7 +38,7 @@ There is exactly ONE NetworkModel per project. It contains only physical electri
 
 ### 2.2 NOT in NetworkModel
 
-- PCC (Point of Common Coupling) - interpretation, not physics
+- BoundaryNode (Point of Common Coupling) - interpretation, not physics
 - Boundary markers - belong to Analysis layer
 - Legal/contractual boundaries
 - Station containers store no physics (logical grouping only)
@@ -230,7 +230,7 @@ Wiążące mapowanie IEC 60909-0:2016 (§4.1–§4.8) dla asymetrycznych zwarć 
 | Voltage Analysis | PF results | Voltage violations | STABLE |
 | Voltage Profile | PF results | Bus voltage profiles | STABLE |
 | Thermal/Overload Analysis | PF results | Branch overload warnings | STABLE |
-| Boundary Identifier (PCC) | Network topology | PCC bus identification | STABLE |
+| Boundary Identifier (BoundaryNode) | Network topology | BoundaryNode bus identification | STABLE |
 | Normative Evaluator | All results | PN-EN compliance | STABLE |
 | Coverage Score | All results | Completeness assessment | STABLE |
 | LF Sensitivity | PF results | Sensitivity analysis | STABLE |
@@ -372,7 +372,7 @@ Both Wizard and SLD edit THE SAME NetworkModel instance. No state duplication, n
 
 ### 11.2 Forbidden Terms in Core Model
 
-- PCC (belongs to interpretation layer)
+- BoundaryNode (belongs to interpretation layer)
 - Connection Point (use Bus)
 - Virtual Node (no virtual entities)
 - Aggregated Element (no aggregation)
@@ -412,7 +412,7 @@ Both Wizard and SLD edit THE SAME NetworkModel instance. No state duplication, n
 | LF Sensitivity | `analysis.lf_sensitivity` | Yes |
 | Scenario Comparison | `analysis.scenario_comparison` | Yes |
 | Auto Recommendations | `analysis.recommendations` | Yes |
-| Boundary Identifier (PCC) | `analysis.boundary` | Yes |
+| Boundary Identifier (BoundaryNode) | `analysis.boundary` | Yes |
 | Analysis Run Service (unified pipeline) | `application.analysis_run` | Yes |
 | Design Synthesis (connection study) | `application.analyses.design_synth` | Yes |
 | Project Archive (import/export ZIP) | `application.project_archive` | Yes |
@@ -465,7 +465,7 @@ Both Wizard and SLD edit THE SAME NetworkModel instance. No state duplication, n
 6. Case cannot mutate model.
 7. Validation before computation.
 8. Determinism: same input = same output.
-9. PCC is NOT in NetworkModel.
+9. BoundaryNode is NOT in NetworkModel.
 10. No project codenames in UI-visible strings.
 
 ---

@@ -40,7 +40,7 @@ def run_connection_study(
         {**report_json, "fingerprint": report_fingerprint}
     )
     spec_payload_canonical = canonicalize_json(spec.spec_json)
-    pcc_payload = _extract_pcc(spec_payload_canonical)
+    connection_payload = _extract_connection_node(spec_payload_canonical)
     trace = _build_trace(
         spec_payload_canonical, proposal.proposal_json, report_json, report_fingerprint
     )
@@ -51,7 +51,7 @@ def run_connection_study(
         case_id=str(case_id),
         base_snapshot_id=base_snapshot_id,
         spec_payload_canonical=spec_payload_canonical,
-        pcc=pcc_payload,
+        connection_node=connection_payload,
         trace=trace,
         design_spec_id=str(spec_id),
         design_proposal_id=str(proposal_id),
@@ -76,11 +76,11 @@ def run_connection_study(
 
 
 def _build_proposal_payload(spec_payload: dict[str, Any]) -> dict[str, Any]:
-    pcc_payload = _extract_pcc(spec_payload)
+    connection_payload = _extract_connection_node(spec_payload)
     proposal = {
         "stage": "connection_study",
         "proposal_version": "M2",
-        "pcc": pcc_payload,
+        "connection_node": connection_payload,
         "constraints": spec_payload.get("constraints", {}),
         "assumptions": spec_payload.get("assumptions", {}),
         "grid": spec_payload.get("grid", {}),
@@ -109,7 +109,7 @@ def _build_trace(
             inputs={"raw_spec_keys": sorted(spec_payload.keys())},
             outputs={
                 "canonical_spec_keys": sorted(spec_payload.keys()),
-                "pcc": _extract_pcc(spec_payload),
+                "connection_node": _extract_connection_node(spec_payload),
             },
         ),
         TraceStep(
@@ -137,9 +137,9 @@ def _build_trace(
     return DesignSynthTrace(steps=steps)
 
 
-def _extract_pcc(spec_payload: dict[str, Any]) -> dict[str, Any]:
-    if "pcc" in spec_payload:
-        return spec_payload["pcc"]
-    if "PCC" in spec_payload:
-        return spec_payload["PCC"]
+def _extract_connection_node(spec_payload: dict[str, Any]) -> dict[str, Any]:
+    if "connection_node" in spec_payload:
+        return spec_payload["connection_node"]
+    if "BoundaryNode" in spec_payload:
+        return spec_payload["BoundaryNode"]
     return {}

@@ -214,19 +214,19 @@ class NetworkWizardService:
             self._mark_sld_dirty(uow, project_id)
             self._invalidate_results(uow, project_id)
 
-    def set_pcc(self, project_id: UUID, node_id: UUID) -> None:
+    def set_connection_node(self, project_id: UUID, node_id: UUID) -> None:
         with self._uow_factory() as uow:
             self._ensure_project(uow, project_id)
             node = uow.network.get_node(node_id)
             if node is None or node["project_id"] != project_id:
                 raise NotFound(f"Node {node_id} not found")
-            uow.wizard.set_pcc(project_id, node_id, commit=False)
+            uow.wizard.set_connection_node(project_id, node_id, commit=False)
             self._mark_sld_dirty(uow, project_id)
 
-    def get_pcc(self, project_id: UUID) -> UUID | None:
+    def get_connection_node(self, project_id: UUID) -> UUID | None:
         with self._uow_factory() as uow:
             self._ensure_project(uow, project_id)
-            return uow.wizard.get_settings(project_id)["pcc_node_id"]
+            return uow.wizard.get_settings(project_id)["connection_node_id"]
 
     def set_sources(self, project_id: UUID, sources: list[SourcePayload]) -> None:
         with self._uow_factory() as uow:
@@ -806,7 +806,7 @@ class NetworkWizardService:
             nodes = uow.network.list_nodes(project_id)
             branches = uow.network.list_branches(project_id)
             settings = uow.wizard.get_settings(project_id)
-            pcc_node_id = settings.get("pcc_node_id")
+            connection_node_id = settings.get("connection_node_id")
             grounding = settings.get("grounding") or {}
             limits = settings.get("limits") or {}
             sources = uow.wizard.list_sources(project_id)
@@ -829,19 +829,19 @@ class NetworkWizardService:
                 ValidationIssue(code="network.empty", message="Network has no nodes")
             )
 
-        if pcc_node_id is None:
+        if connection_node_id is None:
             report = report.with_error(
                 ValidationIssue(
-                    code="pcc.missing",
-                    message="PCC – punkt wspólnego przyłączenia must be defined",
+                    code="connection_node.missing",
+                    message="BoundaryNode – węzeł przyłączenia must be defined",
                 )
             )
-        elif pcc_node_id not in node_ids:
+        elif connection_node_id not in node_ids:
             report = report.with_error(
                 ValidationIssue(
-                    code="pcc.invalid",
-                    message="PCC – punkt wspólnego przyłączenia points to missing node",
-                    element_id=str(pcc_node_id),
+                    code="connection_node.invalid",
+                    message="BoundaryNode – węzeł przyłączenia points to missing node",
+                    element_id=str(connection_node_id),
                 )
             )
 
@@ -867,7 +867,7 @@ class NetworkWizardService:
                 )
             )
         else:
-            pcc_has_source = False
+            connection_has_source = False
             for source in sources:
                 node_id = source.get("node_id")
                 node_uuid: UUID | None = None
@@ -899,8 +899,8 @@ class NetworkWizardService:
                                     element_id=str(node_id),
                                 )
                             )
-                if pcc_node_id is not None and node_uuid == pcc_node_id:
-                    pcc_has_source = True
+                if connection_node_id is not None and node_uuid == connection_node_id:
+                    connection_has_source = True
                 if not source.get("source_type"):
                     report = report.with_error(
                         ValidationIssue(
@@ -909,11 +909,11 @@ class NetworkWizardService:
                             element_id=str(source.get("id")),
                         )
                     )
-            if pcc_node_id is not None and not pcc_has_source:
+            if connection_node_id is not None and not connection_has_source:
                 report = report.with_error(
                     ValidationIssue(
-                        code="sources.pcc_missing",
-                        message="PCC – punkt wspólnego przyłączenia has no source",
+                        code="sources.connection_missing",
+                        message="BoundaryNode – węzeł przyłączenia has no source",
                     )
                 )
 
@@ -1001,7 +1001,7 @@ class NetworkWizardService:
             case_payload.get("converter_setpoints", {})
         )
 
-        slack_node_id = settings.get("pcc_node_id") or self._select_slack_node_id(project_id)
+        slack_node_id = settings.get("connection_node_id") or self._select_slack_node_id(project_id)
         slack_data = self._lookup_node_attrs(project_id, slack_node_id)
         slack_spec = SlackSpec(
             node_id=str(slack_node_id),
@@ -1086,17 +1086,17 @@ class NetworkWizardService:
             if case is None or case.project_id != project_id:
                 raise NotFound(f"OperatingCase {case_id} not found")
             settings = uow.wizard.get_settings(project_id)
-            pcc_node_id = settings.get("pcc_node_id")
+            connection_node_id = settings.get("connection_node_id")
             grounding = settings.get("grounding") or {}
             limits = settings.get("limits") or {}
             sources = uow.wizard.list_sources(project_id)
             loads = uow.wizard.list_loads(project_id)
 
-        if pcc_node_id is None:
+        if connection_node_id is None:
             report = ValidationReport().with_error(
                 ValidationIssue(
-                    code="pcc.missing",
-                    message="PCC – punkt wspólnego przyłączenia must be defined",
+                    code="connection_node.missing",
+                    message="BoundaryNode – węzeł przyłączenia must be defined",
                 )
             )
             raise ValidationFailed(report)
@@ -1126,7 +1126,7 @@ class NetworkWizardService:
         return ShortCircuitInput(
             graph=graph,
             base_mva=base_mva,
-            pcc_node_id=str(pcc_node_id),
+            connection_node_id=str(connection_node_id),
             sources=self._normalize_source_dicts(sources),
             loads=self._normalize_load_dicts(loads),
             grounding=grounding,
@@ -1145,7 +1145,7 @@ class NetworkWizardService:
             operating_cases = uow.cases.list_operating_cases(project_id)
             study_cases = uow.cases.list_study_cases(project_id)
             settings = uow.wizard.get_settings(project_id)
-            pcc_node_id = settings.get("pcc_node_id")
+            connection_node_id = settings.get("connection_node_id")
             sources = uow.wizard.list_sources(project_id)
             loads = uow.wizard.list_loads(project_id)
             line_types = uow.wizard.list_line_types()
@@ -1183,7 +1183,7 @@ class NetworkWizardService:
             branches=branches_payload,
             operating_cases=operating_payload,
             study_cases=study_payload,
-            pcc_node_id=str(pcc_node_id) if pcc_node_id else None,
+            connection_node_id=str(connection_node_id) if connection_node_id else None,
             sources=sources_payload,
             loads=loads_payload,
             grounding=settings.get("grounding") or {},
@@ -1204,7 +1204,7 @@ class NetworkWizardService:
             nodes = uow.network.list_nodes(project_id)
             branches = uow.network.list_branches(project_id)
             settings = uow.wizard.get_settings(project_id)
-            pcc_node_id = settings.get("pcc_node_id")
+            connection_node_id = settings.get("connection_node_id")
 
             if mode == "auto":
                 diagram = build_auto_layout_diagram(
@@ -1212,11 +1212,11 @@ class NetworkWizardService:
                     name=name,
                     nodes=nodes,
                     branches=branches,
-                    pcc_node_id=pcc_node_id,
+                    connection_node_id=connection_node_id,
                     diagram_id=uuid4(),
                 )
             else:
-                diagram = self._build_manual_sld(project_id, name, nodes, branches, pcc_node_id)
+                diagram = self._build_manual_sld(project_id, name, nodes, branches, connection_node_id)
 
             uow.sld.save(
                 project_id=project_id,
@@ -1236,7 +1236,7 @@ class NetworkWizardService:
             nodes = uow.network.list_nodes(project_id)
             branches = uow.network.list_branches(project_id)
             settings = uow.wizard.get_settings(project_id)
-            pcc_node_id = settings.get("pcc_node_id")
+            connection_node_id = settings.get("connection_node_id")
             annotations = diagram["payload"].get("annotations", [])
 
             rebuilt = build_auto_layout_diagram(
@@ -1244,7 +1244,7 @@ class NetworkWizardService:
                 name=diagram["name"],
                 nodes=nodes,
                 branches=branches,
-                pcc_node_id=pcc_node_id,
+                connection_node_id=connection_node_id,
                 diagram_id=diagram_id,
                 annotations=annotations,
             )
@@ -1292,7 +1292,7 @@ class NetworkWizardService:
                 uow.wizard.delete_sources_by_project(project_id, commit=False)
                 uow.wizard.delete_loads_by_project(project_id, commit=False)
                 uow.wizard.delete_switching_states_by_project(project_id, commit=False)
-                uow.wizard.set_pcc(project_id, None, commit=False)
+                uow.wizard.set_connection_node(project_id, None, commit=False)
                 uow.wizard.set_grounding(project_id, {}, commit=False)
                 uow.wizard.set_limits(project_id, {}, commit=False)
             existing_source_ids = {item["id"] for item in uow.wizard.list_sources(project_id)}
@@ -1348,9 +1348,9 @@ class NetworkWizardService:
                 if existing is not None and existing.project_id != project_id:
                     case_data["id"] = self._deterministic_uuid(project_id, case_data)
 
-            pcc_node_id = parsed.get("pcc_node_id")
-            if pcc_node_id and str(pcc_node_id) in node_id_map:
-                parsed["pcc_node_id"] = node_id_map[str(pcc_node_id)]
+            connection_node_id = parsed.get("connection_node_id")
+            if connection_node_id and str(connection_node_id) in node_id_map:
+                parsed["connection_node_id"] = node_id_map[str(connection_node_id)]
 
             for source in parsed.get("sources", []):
                 node_id = str(source.get("node_id", "")).strip()
@@ -1404,10 +1404,10 @@ class NetworkWizardService:
                 else:
                     created, updated = self._bump_counts(result, created, updated, "study_cases")
 
-            pcc_node_id = parsed.get("pcc_node_id")
-            if pcc_node_id:
+            connection_node_id = parsed.get("connection_node_id")
+            if connection_node_id:
                 try:
-                    uow.wizard.set_pcc(project_id, UUID(str(pcc_node_id)), commit=False)
+                    uow.wizard.set_connection_node(project_id, UUID(str(connection_node_id)), commit=False)
                 except ValueError as exc:
                     errors.append(str(exc))
 
@@ -1580,12 +1580,12 @@ class NetworkWizardService:
         name: str,
         nodes: list[dict],
         branches: list[dict],
-        pcc_node_id: UUID | None,
+        connection_node_id: UUID | None,
     ) -> SldDiagram:
-        # NOTE: pcc_node_id is kept as parameter for layout purposes only
+        # NOTE: connection_node_id is kept as parameter for layout purposes only
         # but is NOT stored in SldNodeSymbol or SldDiagram.
-        # PCC – punkt wspólnego przyłączenia is interpretation, not model data.
-        _ = pcc_node_id  # Unused, kept for API compatibility
+        # BoundaryNode – węzeł przyłączenia is interpretation, not model data.
+        _ = connection_node_id  # Unused, kept for API compatibility
         node_symbols = [
             SldNodeSymbol(
                 id=uuid4(),
@@ -1625,7 +1625,7 @@ class NetworkWizardService:
             "LV_BUS_SECTION",
             "BAY_NODE",
             "JUNCTION",
-            "PCC_NODE",
+            "BoundaryNode_NODE",
         }:
             return "PQ"
         return None

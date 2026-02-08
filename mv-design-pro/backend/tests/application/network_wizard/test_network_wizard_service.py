@@ -74,7 +74,7 @@ def test_network_wizard_happy_path() -> None:
     project = service.create_project("MV Project", "Happy path")
 
     slack_node, _ = _create_basic_network(service, project.id)
-    service.set_pcc(project.id, slack_node["id"])
+    service.set_connection_node(project.id, slack_node["id"])
     service.add_source(
         project.id,
         SourcePayload(
@@ -139,7 +139,7 @@ def test_network_wizard_validation_errors() -> None:
     report = service.validate_network(project.id)
     codes = {issue.code for issue in report.errors}
     assert "branch.to_missing" in codes
-    assert "pcc.missing" in codes
+    assert "connection_node.missing" in codes
     assert "node.base_kv" in codes
     assert "branch.param_positive" in codes
 
@@ -175,7 +175,7 @@ def test_network_wizard_export_determinism() -> None:
     service = _build_service()
     project = service.create_project("Determinism")
     slack_node, _ = _create_basic_network(service, project.id)
-    service.set_pcc(project.id, slack_node["id"])
+    service.set_connection_node(project.id, slack_node["id"])
     service.add_source(
         project.id,
         SourcePayload(
@@ -196,7 +196,7 @@ def test_build_short_circuit_input_fault_spec() -> None:
     service = _build_service()
     project = service.create_project("FaultSpec")
     slack_node, _ = _create_basic_network(service, project.id)
-    service.set_pcc(project.id, slack_node["id"])
+    service.set_connection_node(project.id, slack_node["id"])
     service.add_source(
         project.id,
         SourcePayload(
@@ -211,14 +211,14 @@ def test_build_short_circuit_input_fault_spec() -> None:
     fault_spec = {"fault_type": "3F", "node_id": str(slack_node["id"])}
     sc_input = service.build_short_circuit_input(project.id, case.id, fault_spec)
 
-    assert sc_input.pcc_node_id == str(slack_node["id"])
+    assert sc_input.connection_node_id == str(slack_node["id"])
 
 
 def test_case_switching_state_overrides_branch() -> None:
     service = _build_service()
     project = service.create_project("Switching")
     slack_node, pq_node = _create_basic_network(service, project.id)
-    service.set_pcc(project.id, slack_node["id"])
+    service.set_connection_node(project.id, slack_node["id"])
     service.add_source(
         project.id,
         SourcePayload(

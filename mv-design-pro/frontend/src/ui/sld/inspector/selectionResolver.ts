@@ -81,10 +81,10 @@ function isPccLikeValue(value: string | null | undefined): boolean {
   if (!value) return false;
   const normalized = value.toLowerCase();
   return (
-    normalized.includes('pcc') ||
-    normalized.startsWith('bus_pcc') ||
-    normalized.startsWith('pcc_') ||
-    normalized.endsWith('_pcc')
+    normalized.includes('connection_node') ||
+    normalized.startsWith('bus_connection_node') ||
+    normalized.startsWith('connection_') ||
+    normalized.endsWith('_connection_node')
   );
 }
 
@@ -132,7 +132,7 @@ export function resolveSelectionRef(
   sldElementType: SldElementType,
   enm: EnergyNetworkModel
 ): ResolvedSelection | null {
-  // PCC nie może być eksponowane w SLD/inspektorze.
+  // BoundaryNode nie może być eksponowane w SLD/inspektorze.
   if (isPccLikeValue(elementId)) {
     if (sldElementType === 'Source') {
       const fallbackSource =

@@ -32,7 +32,7 @@ def _base_input() -> EquipmentProofInput:
         project_id="proj-1",
         case_id="case-1",
         run_id="run-1",
-        pcc_node_id="PCC-1",
+        connection_node_id="BoundaryNode-1",
         device=device,
         required_fault_results=required,
     )
@@ -57,7 +57,7 @@ def test_equipment_proof_fail_missing_field():
         project_id=proof_input.project_id,
         case_id=proof_input.case_id,
         run_id=proof_input.run_id,
-        pcc_node_id=proof_input.pcc_node_id,
+        connection_node_id=proof_input.connection_node_id,
         device=DeviceRating(
             device_id=device.device_id,
             name_pl=device.name_pl,
@@ -87,7 +87,7 @@ def test_equipment_proof_idyn_uses_ip_proxy_when_missing_idyn():
         project_id=proof_input.project_id,
         case_id=proof_input.case_id,
         run_id=proof_input.run_id,
-        pcc_node_id=proof_input.pcc_node_id,
+        connection_node_id=proof_input.connection_node_id,
         device=proof_input.device,
         required_fault_results=required,
     )
@@ -105,7 +105,7 @@ def test_equipment_proof_ith_time_mismatch_fails_mvp():
         project_id=proof_input.project_id,
         case_id=proof_input.case_id,
         run_id=proof_input.run_id,
-        pcc_node_id=proof_input.pcc_node_id,
+        connection_node_id=proof_input.connection_node_id,
         device=DeviceRating(
             device_id=device.device_id,
             name_pl=device.name_pl,

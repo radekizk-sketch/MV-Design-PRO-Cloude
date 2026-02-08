@@ -210,7 +210,7 @@ class EquipmentProofGenerator:
             project_id=proof_input.project_id,
             case_id=proof_input.case_id,
             run_id=proof_input.run_id,
-            pcc_node_id=proof_input.pcc_node_id,
+            connection_node_id=proof_input.connection_node_id,
             device_id=proof_input.device.device_id,
             overall_status=overall_status,
             failed_checks=failed,
@@ -316,7 +316,7 @@ class EquipmentProofGenerator:
             "PN-EN 60909 (P12)",
             (
                 _symbol("D_{req}", "—", "Zestaw danych wymaganych", "required"),
-                _symbol("U_{req}", "kV", "Napięcie w punkcie PCC", "u_kv"),
+                _symbol("U_{req}", "kV", "Napięcie w punkcie BoundaryNode", "u_kv"),
                 _symbol("I_k''", "kA", "Prąd zwarciowy początkowy", "ikss_ka"),
                 _symbol("i_p", "kA", "Prąd udarowy", "ip_ka"),
                 _symbol("I_{dyn}", "kA", "Prąd dynamiczny", "idyn_ka"),

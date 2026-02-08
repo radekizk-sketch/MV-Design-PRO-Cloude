@@ -36,8 +36,8 @@ class ProjectRepository:
             mode=project.mode,
             voltage_level_kv=project.voltage_level_kv,
             frequency_hz=project.frequency_hz,
-            pcc_node_id=project.pcc_node_id,
-            pcc_description=project.pcc_description,
+            connection_node_id=project.connection_node_id,
+            connection_description=project.connection_description,
             owner_id=project.owner_id,
             active_network_snapshot_id=project.active_network_snapshot_id,
             sources_jsonb=[],
@@ -101,8 +101,8 @@ class ProjectRepository:
         row.mode = project.mode
         row.voltage_level_kv = project.voltage_level_kv
         row.frequency_hz = project.frequency_hz
-        row.pcc_node_id = project.pcc_node_id
-        row.pcc_description = project.pcc_description
+        row.connection_node_id = project.connection_node_id
+        row.connection_description = project.connection_description
         row.owner_id = project.owner_id
         row.active_network_snapshot_id = project.active_network_snapshot_id
         row.updated_at = project.updated_at
@@ -185,22 +185,22 @@ class ProjectRepository:
             # Tables don't exist yet - no dependencies possible
             return False
 
-    def get_pcc(self, project_id: UUID) -> UUID | None:
-        """Get PCC node ID for a project."""
-        stmt = select(ProjectORM.pcc_node_id).where(
+    def get_connection_node(self, project_id: UUID) -> UUID | None:
+        """Get BoundaryNode node ID for a project."""
+        stmt = select(ProjectORM.connection_node_id).where(
             ProjectORM.id == project_id,
             ProjectORM.deleted_at.is_(None),
         )
         return self._session.execute(stmt).scalar_one_or_none()
 
-    def set_pcc(self, project_id: UUID, node_id: UUID | None, *, commit: bool = True) -> None:
-        """Set PCC node ID for a project."""
+    def set_connection_node(self, project_id: UUID, node_id: UUID | None, *, commit: bool = True) -> None:
+        """Set BoundaryNode node ID for a project."""
         stmt = select(ProjectORM).where(
             ProjectORM.id == project_id,
             ProjectORM.deleted_at.is_(None),
         )
         row = self._session.execute(stmt).scalar_one()
-        row.pcc_node_id = node_id
+        row.connection_node_id = node_id
         if commit:
             self._session.commit()
 
@@ -258,8 +258,8 @@ class ProjectRepository:
             mode=orm.mode,
             voltage_level_kv=float(orm.voltage_level_kv),
             frequency_hz=float(orm.frequency_hz),
-            pcc_node_id=orm.pcc_node_id,
-            pcc_description=orm.pcc_description,
+            connection_node_id=orm.connection_node_id,
+            connection_description=orm.connection_description,
             owner_id=orm.owner_id,
             active_network_snapshot_id=orm.active_network_snapshot_id,
             created_at=orm.created_at,

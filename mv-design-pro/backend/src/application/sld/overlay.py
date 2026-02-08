@@ -7,7 +7,7 @@ PowerFactory Alignment (per sld_rules.md § B, powerfactory_ui_parity.md § B.2)
 - Overlay visible only in RESULT_VIEW mode
 - OUTDATED results → grayed or hidden per powerfactory_ui_parity.md
 
-PCC (Point of Common Coupling) identification is handled by Analysis layer
+BoundaryNode (Point of Common Coupling) identification is handled by Analysis layer
 (BoundaryIdentifier), not by this overlay builder.
 """
 

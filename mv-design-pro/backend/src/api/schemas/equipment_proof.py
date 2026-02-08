@@ -25,6 +25,6 @@ class EquipmentProofRequest(BaseModel):
     project_id: str = Field(..., min_length=1)
     case_id: str = Field(..., min_length=1)
     run_id: str = Field(..., min_length=1)
-    pcc_node_id: str = Field(..., min_length=1)
+    connection_node_id: str = Field(..., min_length=1)
     device: DeviceRatingPayload
     required_fault_results: dict[str, Any]

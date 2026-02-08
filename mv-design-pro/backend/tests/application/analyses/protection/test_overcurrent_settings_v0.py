@@ -69,7 +69,7 @@ def test_overcurrent_v0_happy_path(uow_factory) -> None:
     sc_run_id = _store_short_circuit_run(uow_factory)
     envelope = run_overcurrent_v0(
         sc_run_id=sc_run_id,
-        pcc={"id": "PCC-1", "voltage_kv": 15.0, "rated_current_a": 250.0},
+        connection_node={"id": "BoundaryNode-1", "voltage_kv": 15.0, "rated_current_a": 250.0},
         topology_ref=None,
         uow_factory=uow_factory,
     )
@@ -86,7 +86,7 @@ def test_overcurrent_v0_happy_path(uow_factory) -> None:
     assert settings["i_inst_50_a"] > settings["i_pickup_51_a"]
     assert settings["i_pickup_51n_a"] > 0
     assert settings["i_inst_50n_a"] > settings["i_pickup_51n_a"]
-    assert report["inputs"]["pcc"]["id"] == "PCC-1"
+    assert report["inputs"]["connection_node"]["id"] == "BoundaryNode-1"
     assert "fingerprint" in report
 
     with uow_factory() as uow:
@@ -99,13 +99,13 @@ def test_overcurrent_v0_is_deterministic(uow_factory) -> None:
     sc_run_id = _store_short_circuit_run(uow_factory)
     envelope1 = run_overcurrent_v0(
         sc_run_id=sc_run_id,
-        pcc={"id": "PCC-1", "voltage_kv": 15.0, "rated_current_a": 250.0},
+        connection_node={"id": "BoundaryNode-1", "voltage_kv": 15.0, "rated_current_a": 250.0},
         topology_ref=None,
         uow_factory=uow_factory,
     )
     envelope2 = run_overcurrent_v0(
         sc_run_id=sc_run_id,
-        pcc={"id": "PCC-1", "voltage_kv": 15.0, "rated_current_a": 250.0},
+        connection_node={"id": "BoundaryNode-1", "voltage_kv": 15.0, "rated_current_a": 250.0},
         topology_ref=None,
         uow_factory=uow_factory,
     )
@@ -126,7 +126,7 @@ def test_overcurrent_v0_fallbacks(uow_factory) -> None:
     sc_run_id = _store_short_circuit_run(uow_factory)
     envelope = run_overcurrent_v0(
         sc_run_id=sc_run_id,
-        pcc={"id": "PCC-1", "voltage_kv": 15.0},
+        connection_node={"id": "BoundaryNode-1", "voltage_kv": 15.0},
         topology_ref=None,
         uow_factory=uow_factory,
     )

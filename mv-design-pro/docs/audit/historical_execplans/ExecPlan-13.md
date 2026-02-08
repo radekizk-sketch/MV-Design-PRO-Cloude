@@ -90,7 +90,7 @@ LATER:
 
 A structured, explicit specification attached to case_id that includes:
 - Purpose: project type (connection study), scope boundaries.
-- PCC – punkt wspólnego przyłączenia requirements (connection point assumptions, constraints).
+- BoundaryNode – węzeł przyłączenia requirements (connection point assumptions, constraints).
 - Electrical targets and constraints (e.g., permissible voltage drop range, thermal loading limits, short-circuit constraints, power factor targets).
 - Candidate equipment and catalog constraints (allowed cable families, transformer rating ranges, CT/VT classes, compensation device constraints).
 - Regulatory and utility requirements as explicit input statements (no hidden rules).

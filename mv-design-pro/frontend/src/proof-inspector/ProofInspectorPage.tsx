@@ -185,7 +185,7 @@ export function ProofInspectorPage({ data = sampleProofData }: ProofInspectorPag
                 {data.header.fingerprint ?? '—'}
               </p>
               <p>
-                <span className="font-semibold text-slate-700">PCC – punkt wspólnego przyłączenia:</span>{' '}
+                <span className="font-semibold text-slate-700">BoundaryNode – węzeł przyłączenia:</span>{' '}
                 {data.header.fault_location ?? '—'}
               </p>
             </div>

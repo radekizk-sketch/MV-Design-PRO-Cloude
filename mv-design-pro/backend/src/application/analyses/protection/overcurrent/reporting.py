@@ -7,7 +7,7 @@ from application.analyses.design_synth.fingerprint import fingerprint_json
 from application.analyses.protection.overcurrent.inputs import ProtectionInput
 from application.analyses.protection.overcurrent.settings import OvercurrentSettingsV0
 
-PCC_LABEL = "PCC – punkt wspólnego przyłączenia"
+BoundaryNode_LABEL = "BoundaryNode – węzeł przyłączenia"
 
 
 def build_overcurrent_report_v0(
@@ -19,8 +19,8 @@ def build_overcurrent_report_v0(
     report_body: dict[str, Any] = {
         "analysis_type": "protection.overcurrent.v0",
         "inputs": {
-            "pcc": input.pcc,
-            "pcc_label": PCC_LABEL,
+            "connection_node": input.connection_node,
+            "connection_label": BoundaryNode_LABEL,
             "fault_levels": input.fault_levels,
             "case_id": input.case_id,
             "base_snapshot_id": input.base_snapshot_id,

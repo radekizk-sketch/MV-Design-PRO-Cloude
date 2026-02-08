@@ -354,7 +354,7 @@ export interface LayoutDiagnostics {
   readonly unassignedSymbolIds: readonly string[];
   /** Symbole w kwarantannie (bez polaczen) */
   readonly quarantinedSymbolIds: readonly string[];
-  /** Odfiltrowane PCC */
+  /** Odfiltrowane BoundaryNode */
   readonly filteredPccIds: readonly string[];
   /** Stosy stacyjne */
   readonly stationStacks: ReadonlyMap<string, readonly string[]>;

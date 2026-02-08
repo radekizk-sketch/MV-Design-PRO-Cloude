@@ -55,8 +55,8 @@ def test_analysis_runs_read_design_synth_envelope(api_client):
         "case_id": str(case_id),
         "base_snapshot_id": "snap-1",
         "spec_payload": {
-            "pcc": {
-                "id": "PCC-1",
+            "connection_node": {
+                "id": "BoundaryNode-1",
                 "voltage_kv": 15.0,
                 "grid_supply": True,
             }

@@ -17,7 +17,7 @@ export const DEMO_DIAGNOSTICS_RESULTS: ProtectionSanityCheckResult[] = [
     severity: 'ERROR',
     code: 'VOLT_MISSING_UN',
     message_pl: 'Brak wartości Un dla nastawy napięciowej',
-    element_id: 'BUS_PCC_001',
+    element_id: 'BUS_BoundaryNode_001',
     element_type: 'Bus',
     function_ansi: '27',
     function_code: 'UNDERVOLTAGE',

@@ -55,8 +55,8 @@ def _build_snapshot(*, snapshot_id: str, parent_snapshot_id: str | None = None) 
             in_service=True,
         )
     )
-    # NOTE: pcc_node_id was removed from NetworkGraph.
-    # PCC – punkt wspólnego przyłączenia is interpretation, not model property.
+    # NOTE: connection_node_id was removed from NetworkGraph.
+    # BoundaryNode – węzeł przyłączenia is interpretation, not model property.
     meta = SnapshotMeta.create(
         snapshot_id=snapshot_id,
         parent_snapshot_id=parent_snapshot_id,
@@ -88,7 +88,7 @@ def test_snapshot_repository_roundtrip_and_immutability() -> None:
     assert loaded is not None
     assert loaded.meta.snapshot_id == "snap-1"
     assert loaded.meta.parent_snapshot_id is None
-    # pcc_node_id no longer stored in NetworkGraph
+    # connection_node_id no longer stored in NetworkGraph
     assert "node-c" not in loaded.graph.nodes
     session.close()
 

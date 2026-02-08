@@ -74,11 +74,11 @@ describe('Wizard: step structure', () => {
     }
   });
 
-  it('K2 step is named punkt zasilania (not PCC)', () => {
+  it('K2 step is named punkt zasilania (not BoundaryNode)', () => {
     const k2 = WIZARD_STEPS.find((s) => s.id === 'K2');
     expect(k2).toBeDefined();
     expect(k2!.title.toLowerCase()).toContain('punkt zasilania');
-    expect(k2!.title.toLowerCase()).not.toContain('pcc');
+    expect(k2!.title.toLowerCase()).not.toContain('connection_node');
   });
 
   it('K8 step is validation gate', () => {

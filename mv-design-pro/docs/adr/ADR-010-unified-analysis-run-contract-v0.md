@@ -29,7 +29,7 @@ Introduce `AnalysisRunEnvelope v0` as a minimal, stable contract that wraps anal
 - `created_at_utc` (ISO8601)
 - `fingerprint` (SHA-256 of the canonical, stable envelope view)
 
-PCC – punkt wspólnego przyłączenia is a required element of inputs for connection studies and must be present in the DesignSynth specification inputs referenced by `inputs.spec_ref`.
+BoundaryNode – węzeł przyłączenia is a required element of inputs for connection studies and must be present in the DesignSynth specification inputs referenced by `inputs.spec_ref`.
 
 ## Versioning
 - `schema_version` is a required field.

@@ -85,7 +85,7 @@ Ten pakiet zawiera **kanoniczne źródła wiedzy** dla systemu dowodów matematy
 │  │  - Unit verification                                 │    │
 │  │  - LaTeX/JSON export                                 │    │
 │  └─────────────────────────────────────────────────────┘    │
-│  - BoundaryIdentifier (PCC)                                  │
+│  - BoundaryIdentifier (BoundaryNode)                                  │
 │  - Thermal Analysis                                          │
 │  - Voltage Analysis                                          │
 └─────────────────────────────────────────────────────────────┘

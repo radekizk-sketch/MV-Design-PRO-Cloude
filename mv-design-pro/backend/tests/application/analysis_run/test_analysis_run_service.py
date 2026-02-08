@@ -99,7 +99,7 @@ def test_analysis_run_lifecycle_pf() -> None:
     wizard, service = _build_services()
     project = wizard.create_project("PF")
     slack_node, pq_node = _create_basic_network(wizard, project.id)
-    wizard.set_pcc(project.id, slack_node["id"])
+    wizard.set_connection_node(project.id, slack_node["id"])
     wizard.add_load(
         project.id,
         LoadPayload(
@@ -134,7 +134,7 @@ def test_analysis_run_lifecycle_sc() -> None:
     wizard, service = _build_services()
     project = wizard.create_project("SC")
     slack_node, _ = _create_basic_network(wizard, project.id)
-    wizard.set_pcc(project.id, slack_node["id"])
+    wizard.set_connection_node(project.id, slack_node["id"])
     _add_grid_source(wizard, project.id, slack_node["id"])
     case = wizard.create_operating_case(
         project.id,
@@ -166,7 +166,7 @@ def test_result_invalidation_on_network_change() -> None:
     wizard, service = _build_services()
     project = wizard.create_project("Invalidate")
     slack_node, pq_node = _create_basic_network(wizard, project.id)
-    wizard.set_pcc(project.id, slack_node["id"])
+    wizard.set_connection_node(project.id, slack_node["id"])
     wizard.add_load(
         project.id,
         LoadPayload(
@@ -207,7 +207,7 @@ def test_result_status_after_recalculate_and_case_change() -> None:
     wizard, service = _build_services()
     project = wizard.create_project("Recalculate")
     slack_node, pq_node = _create_basic_network(wizard, project.id)
-    wizard.set_pcc(project.id, slack_node["id"])
+    wizard.set_connection_node(project.id, slack_node["id"])
     wizard.add_load(
         project.id,
         LoadPayload(
@@ -290,7 +290,7 @@ def test_network_validator_warning_allows_solver(
     wizard, service = _build_services()
     project = wizard.create_project("Warning Network")
     slack_node, pq_node = _create_basic_network(wizard, project.id)
-    wizard.set_pcc(project.id, slack_node["id"])
+    wizard.set_connection_node(project.id, slack_node["id"])
     _add_grid_source(wizard, project.id, slack_node["id"])
     wizard.add_load(
         project.id,
@@ -361,9 +361,9 @@ def test_validation_missing_slack() -> None:
     assert executed.error_message
 
 
-def test_validation_missing_pcc() -> None:
+def test_validation_missing_connection_node() -> None:
     wizard, service = _build_services()
-    project = wizard.create_project("Missing PCC")
+    project = wizard.create_project("Missing BoundaryNode")
     slack_node, _ = _create_basic_network(wizard, project.id)
     _add_grid_source(wizard, project.id, slack_node["id"])
     case = wizard.create_operating_case(
@@ -388,7 +388,7 @@ def test_failed_run_sets_status(monkeypatch: pytest.MonkeyPatch) -> None:
     wizard, service = _build_services()
     project = wizard.create_project("Solver Failure")
     slack_node, pq_node = _create_basic_network(wizard, project.id)
-    wizard.set_pcc(project.id, slack_node["id"])
+    wizard.set_connection_node(project.id, slack_node["id"])
     wizard.add_load(
         project.id,
         LoadPayload(
@@ -427,7 +427,7 @@ def test_short_circuit_blocked_in_nn_mode() -> None:
     wizard, service = _build_services()
     project = wizard.create_project("Gate NN")
     slack_node, _ = _create_basic_network(wizard, project.id)
-    wizard.set_pcc(project.id, slack_node["id"])
+    wizard.set_connection_node(project.id, slack_node["id"])
     _add_grid_source(wizard, project.id, slack_node["id"])
     case = wizard.create_operating_case(
         project.id,
@@ -452,7 +452,7 @@ def test_short_circuit_requires_grid_supply_flag() -> None:
     wizard, service = _build_services()
     project = wizard.create_project("SC Grid Supply")
     slack_node, _ = _create_basic_network(wizard, project.id)
-    wizard.set_pcc(project.id, slack_node["id"])
+    wizard.set_connection_node(project.id, slack_node["id"])
     wizard.add_source(
         project.id,
         SourcePayload(
@@ -485,7 +485,7 @@ def test_fault_loop_blocked_in_sn_mode() -> None:
     wizard, service = _build_services()
     project = wizard.create_project("Gate SN")
     slack_node, _ = _create_basic_network(wizard, project.id)
-    wizard.set_pcc(project.id, slack_node["id"])
+    wizard.set_connection_node(project.id, slack_node["id"])
     _add_grid_source(wizard, project.id, slack_node["id"])
     case = wizard.create_operating_case(
         project.id,
@@ -588,7 +588,7 @@ def test_missing_project_design_mode_fails() -> None:
     wizard, service = _build_services()
     project = wizard.create_project("Missing Mode")
     slack_node, _ = _create_basic_network(wizard, project.id)
-    wizard.set_pcc(project.id, slack_node["id"])
+    wizard.set_connection_node(project.id, slack_node["id"])
     _add_grid_source(wizard, project.id, slack_node["id"])
     case = wizard.create_operating_case(
         project.id,
@@ -612,7 +612,7 @@ def test_short_circuit_results_are_deterministic() -> None:
     wizard, service = _build_services()
     project = wizard.create_project("Determinism")
     slack_node, _ = _create_basic_network(wizard, project.id)
-    wizard.set_pcc(project.id, slack_node["id"])
+    wizard.set_connection_node(project.id, slack_node["id"])
     _add_grid_source(wizard, project.id, slack_node["id"])
     case = wizard.create_operating_case(
         project.id,

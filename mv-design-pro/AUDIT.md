@@ -94,7 +94,7 @@
 | Model | Switch types (BREAKER/DISCONNECTOR/...) | **DONE** | `switch.py` | Parytet |
 | Model | InverterSource (PV/BESS) | **DONE** | `inverter.py` + `graph.py:199-274` | Parytet |
 | Model | Station (logical) | **PARTIAL** | Brak explicit class | PF ma kontenery |
-| Model | PCC NOT in NetworkModel | **DONE** | `graph.py` — brak `pcc_node_id` | Parytet (usunięto) |
+| Model | BoundaryNode NOT in NetworkModel | **DONE** | `graph.py` — brak `connection_node_id` | Parytet (usunięto) |
 | Model | Typy katalogowe (immutable) | **DONE** | `catalog/types.py` | Parytet |
 | Model | Type resolver (precedence) | **DONE** | `catalog/resolver.py` | Parytet |
 | Model | Snapshot (immutable) | **DONE** | `core/snapshot.py` | Parytet |
@@ -476,7 +476,7 @@ Brak w zakresie — to enhancement.
 ### G.1 Co działa dobrze
 
 1. **Short Circuit IEC 60909** — pełna zgodność, wszystkie typy zwarć, White-Box Trace
-2. **Model danych** — parytet z PowerFactory, PCC usunięty z core
+2. **Model danych** — parytet z PowerFactory, BoundaryNode usunięty z core
 3. **UI podstawowe** — Project Tree, SLD, Data Manager, Property Grid
 4. **Dokumentacja** — kanoniczne specs, egzekwowane przez guardy
 5. **Study Case workflow** — immutability, invalidation, clone/compare

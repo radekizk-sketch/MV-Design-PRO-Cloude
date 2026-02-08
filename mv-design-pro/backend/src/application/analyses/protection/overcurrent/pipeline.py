@@ -27,7 +27,7 @@ from network_model.solvers.short_circuit_iec60909 import ShortCircuitResult
 def run_overcurrent_skeleton(
     *,
     sc_run_id: str,
-    pcc: dict[str, Any],
+    connection_node: dict[str, Any],
     topology_ref: dict[str, Any] | None,
     uow_factory: Callable[[], UnitOfWork],
 ) -> AnalysisRunEnvelope:
@@ -40,7 +40,7 @@ def run_overcurrent_skeleton(
         sc_result,
         case_id=entry.case_id,
         base_snapshot_id=entry.base_snapshot_id,
-        pcc=pcc,
+        connection_node=connection_node,
         topology_ref=topology_ref,
     )
     outputs = {"status": "NOT_COMPUTED", "note": "Skeleton run"}
@@ -63,7 +63,7 @@ def run_overcurrent_skeleton(
 def run_overcurrent_v0(
     *,
     sc_run_id: str,
-    pcc: dict[str, Any],
+    connection_node: dict[str, Any],
     topology_ref: dict[str, Any] | None,
     uow_factory: Callable[[], UnitOfWork],
     config: OvercurrentConfigV0 | None = None,
@@ -77,7 +77,7 @@ def run_overcurrent_v0(
         sc_result,
         case_id=entry.case_id,
         base_snapshot_id=entry.base_snapshot_id,
-        pcc=pcc,
+        connection_node=connection_node,
         topology_ref=topology_ref,
     )
     settings = compute_overcurrent_settings(protection_input, config=config)
@@ -239,7 +239,7 @@ def _build_trace_overcurrent_v0(
         {
             "step": "build_protection_input",
             "fault_levels": protection_input.fault_levels,
-            "pcc": protection_input.pcc,
+            "connection_node": protection_input.connection_node,
             "source_run_id": protection_input.source_run_id,
         },
         {

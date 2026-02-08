@@ -151,9 +151,9 @@ function BusComparisonTable({ comparisons, showOnlyChanges }: BusComparisonTable
           {filtered.map((comp) => {
             const status = getStatusChange(comp.u_pu_delta);
             return (
-              <tr key={comp.node_id} className="border-t border-slate-100 hover:bg-slate-50">
+              <tr key={comp.bus_id} className="border-t border-slate-100 hover:bg-slate-50">
                 <td className="px-3 py-2 font-medium text-slate-800">
-                  {comp.node_id.substring(0, 8)}...
+                  {comp.bus_id.substring(0, 8)}...
                 </td>
                 <td className="px-3 py-2 text-right text-slate-600">
                   {formatNumber(comp.u_kv_delta.value_a)}
@@ -432,7 +432,7 @@ export function ResultsComparisonPage({ runHistory, onClose }: ResultsComparison
                 <div className="mt-6 rounded border border-slate-200 bg-white p-4">
                   {activeTab === 'BUSES' && (
                     <BusComparisonTable
-                      comparisons={comparison.power_flow?.node_voltages || []}
+                      comparisons={comparison.power_flow?.bus_voltages || []}
                       showOnlyChanges={showOnlyChanges}
                     />
                   )}

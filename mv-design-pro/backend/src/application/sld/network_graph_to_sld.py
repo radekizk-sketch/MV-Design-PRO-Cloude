@@ -45,7 +45,7 @@ def convert_graph_to_sld_payload(
         project_id: Optional project UUID (auto-generated if None).
 
     Returns:
-        Dict with keys: project_id, nodes, branches, switches, pcc_node_id, id_map.
+        Dict with keys: project_id, nodes, branches, switches, connection_node_id, id_map.
         The id_map maps original string IDs to generated UUIDs for traceability.
     """
     if project_id is None:
@@ -97,10 +97,10 @@ def convert_graph_to_sld_payload(
         })
 
     # Root node = SLACK (infinite bus reference).
-    pcc_node_id: UUID | None = None
+    connection_node_id: UUID | None = None
     try:
         slack_node = graph.get_slack_node()
-        pcc_node_id = id_map[slack_node.id]
+        connection_node_id = id_map[slack_node.id]
     except ValueError:
         pass
 
@@ -109,7 +109,7 @@ def convert_graph_to_sld_payload(
         "nodes": nodes,
         "branches": branches,
         "switches": switches,
-        "pcc_node_id": pcc_node_id,
+        "connection_node_id": connection_node_id,
         "id_map": id_map,
     }
 
@@ -148,7 +148,7 @@ def build_sld_from_network_graph(
         nodes=payload["nodes"],
         branches=payload["branches"],
         switches=payload["switches"],
-        pcc_node_id=payload["pcc_node_id"],
+        connection_node_id=payload["connection_node_id"],
         x_spacing=x_spacing,
         y_spacing=y_spacing,
         vertical=True,

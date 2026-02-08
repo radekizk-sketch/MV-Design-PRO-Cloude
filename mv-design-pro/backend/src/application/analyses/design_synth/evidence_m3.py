@@ -13,7 +13,7 @@ def build_evidence_payload(
     case_id: str,
     base_snapshot_id: str,
     spec_payload_canonical: dict[str, Any],
-    pcc: dict[str, Any],
+    connection_node: dict[str, Any],
     trace: DesignSynthTrace,
     design_spec_id: str,
     design_proposal_id: str,
@@ -22,14 +22,14 @@ def build_evidence_payload(
     report_fingerprint: str,
     created_at_utc_iso: str,
 ) -> dict[str, Any]:
-    # PCC – punkt wspólnego przyłączenia is stored under the `pcc` key.
+    # BoundaryNode – węzeł przyłączenia is stored under the `connection_node` key.
     report_summary = _build_report_summary(report_json)
     payload = {
         "inputs": {
             "case_id": case_id,
             "base_snapshot_id": base_snapshot_id,
             "spec_payload_canonical": spec_payload_canonical,
-            "pcc": pcc,
+            "connection_node": connection_node,
         },
         "transformations": trace.to_dict()["steps"],
         "outputs": {

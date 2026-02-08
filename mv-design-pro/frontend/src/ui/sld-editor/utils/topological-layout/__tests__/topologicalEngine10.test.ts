@@ -222,7 +222,7 @@ describe('Deterministic Snapshots', () => {
     // All symbols should have positions
     for (const sym of symbols) {
       const pos = result.positions.get(sym.id);
-      // PCC symbols may be filtered out, but standard network has none
+      // BoundaryNode symbols may be filtered out, but standard network has none
       expect(pos).toBeDefined();
       expect(typeof pos!.x).toBe('number');
       expect(typeof pos!.y).toBe('number');

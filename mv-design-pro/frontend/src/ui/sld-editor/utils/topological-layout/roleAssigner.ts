@@ -129,15 +129,15 @@ export function detectVoltageLevel(symbol: AnySldSymbol): VoltageLevel {
 }
 
 // =============================================================================
-// PCC FILTERING
+// BoundaryNode FILTERING
 // =============================================================================
 
-const PCC_NAME_PATTERNS = ['pcc', 'point of common coupling', 'punkt przyłączenia', 'punkt wspólnego'];
-const PCC_ID_PATTERNS = ['bus_pcc', 'pcc_', '_pcc'];
-const PCC_TYPE_PATTERNS = ['pcc', 'connection_point', 'virtual_node'];
+const BoundaryNode_NAME_PATTERNS = ['connection_node', 'point of common coupling', 'punkt przyłączenia', 'punkt wspólnego'];
+const BoundaryNode_ID_PATTERNS = ['bus_connection_node', 'connection_', '_connection_node'];
+const BoundaryNode_TYPE_PATTERNS = ['connection_node', 'connection_point', 'virtual_node'];
 
 /**
- * Check if a symbol is a PCC node (to be filtered from layout).
+ * Check if a symbol is a BoundaryNode node (to be filtered from layout).
  */
 export function isPccNode(symbol: AnySldSymbol): boolean {
   const nameLower = symbol.elementName.toLowerCase();
@@ -145,37 +145,37 @@ export function isPccNode(symbol: AnySldSymbol): boolean {
   const idLower = symbol.id.toLowerCase();
   const elementIdLower = symbol.elementId.toLowerCase();
 
-  for (const p of PCC_NAME_PATTERNS) {
+  for (const p of BoundaryNode_NAME_PATTERNS) {
     if (nameLower.includes(p)) return true;
   }
-  for (const p of PCC_ID_PATTERNS) {
+  for (const p of BoundaryNode_ID_PATTERNS) {
     if (idLower.includes(p) || elementIdLower.includes(p)) return true;
   }
-  for (const p of PCC_TYPE_PATTERNS) {
+  for (const p of BoundaryNode_TYPE_PATTERNS) {
     if (typeLower.includes(p)) return true;
   }
   return false;
 }
 
 /**
- * Filter PCC nodes from symbols.
+ * Filter BoundaryNode nodes from symbols.
  * DETERMINISTIC: Sorted by ID.
  */
 export function filterPccNodes(
   symbols: readonly AnySldSymbol[]
-): { filtered: AnySldSymbol[]; pccIds: string[] } {
+): { filtered: AnySldSymbol[]; connectionNodeIds: string[] } {
   const sorted = [...symbols].sort((a, b) => a.id.localeCompare(b.id));
-  const pccIds: string[] = [];
+  const connectionNodeIds: string[] = [];
   const filtered: AnySldSymbol[] = [];
 
   for (const s of sorted) {
     if (isPccNode(s)) {
-      pccIds.push(s.id);
+      connectionNodeIds.push(s.id);
     } else {
       filtered.push(s);
     }
   }
-  return { filtered, pccIds };
+  return { filtered, connectionNodeIds };
 }
 
 // =============================================================================
@@ -423,11 +423,11 @@ export function assignTopologicalRoles(
   symbols: readonly AnySldSymbol[]
 ): {
   assignments: Map<string, RoleAssignment>;
-  pccIds: string[];
+  connectionNodeIds: string[];
   stationSymbolIds: Set<string>;
   feederChainsByBusbar: Map<string, FeederChain[]>;
 } {
-  const { filtered, pccIds } = filterPccNodes(symbols);
+  const { filtered, connectionNodeIds } = filterPccNodes(symbols);
   const sorted = [...filtered].sort((a, b) => a.id.localeCompare(b.id));
   const assignments = new Map<string, RoleAssignment>();
 
@@ -592,5 +592,5 @@ export function assignTopologicalRoles(
     });
   }
 
-  return { assignments, pccIds, stationSymbolIds, feederChainsByBusbar };
+  return { assignments, connectionNodeIds, stationSymbolIds, feederChainsByBusbar };
 }

@@ -33,14 +33,14 @@ class NetworkWizardRepository:
         if row is None:
             return {
                 "project_id": project_id,
-                "pcc_node_id": None,
+                "connection_node_id": None,
                 "active_case_id": None,
                 "grounding": {},
                 "limits": {},
             }
         return {
             "project_id": row.project_id,
-            "pcc_node_id": row.pcc_node_id,
+            "connection_node_id": row.connection_node_id,
             "active_case_id": row.active_case_id,
             "grounding": row.grounding_jsonb,
             "limits": row.limits_jsonb,
@@ -50,7 +50,7 @@ class NetworkWizardRepository:
         self,
         project_id: UUID,
         *,
-        pcc_node_id: UUID | None,
+        connection_node_id: UUID | None,
         active_case_id: UUID | None,
         grounding: dict,
         limits: dict,
@@ -62,25 +62,25 @@ class NetworkWizardRepository:
             self._session.add(
                 ProjectSettingsORM(
                     project_id=project_id,
-                    pcc_node_id=pcc_node_id,
+                    connection_node_id=connection_node_id,
                     active_case_id=active_case_id,
                     grounding_jsonb=grounding,
                     limits_jsonb=limits,
                 )
             )
         else:
-            row.pcc_node_id = pcc_node_id
+            row.connection_node_id = connection_node_id
             row.active_case_id = active_case_id
             row.grounding_jsonb = grounding
             row.limits_jsonb = limits
         if commit:
             self._session.commit()
 
-    def set_pcc(self, project_id: UUID, node_id: UUID | None, *, commit: bool = True) -> None:
+    def set_connection_node(self, project_id: UUID, node_id: UUID | None, *, commit: bool = True) -> None:
         settings = self.get_settings(project_id)
         self.upsert_settings(
             project_id,
-            pcc_node_id=node_id,
+            connection_node_id=node_id,
             active_case_id=settings["active_case_id"],
             grounding=settings["grounding"],
             limits=settings["limits"],
@@ -91,7 +91,7 @@ class NetworkWizardRepository:
         settings = self.get_settings(project_id)
         self.upsert_settings(
             project_id,
-            pcc_node_id=settings["pcc_node_id"],
+            connection_node_id=settings["connection_node_id"],
             active_case_id=settings["active_case_id"],
             grounding=grounding,
             limits=settings["limits"],
@@ -102,7 +102,7 @@ class NetworkWizardRepository:
         settings = self.get_settings(project_id)
         self.upsert_settings(
             project_id,
-            pcc_node_id=settings["pcc_node_id"],
+            connection_node_id=settings["connection_node_id"],
             active_case_id=settings["active_case_id"],
             grounding=settings["grounding"],
             limits=limits,
@@ -118,7 +118,7 @@ class NetworkWizardRepository:
         settings = self.get_settings(project_id)
         self.upsert_settings(
             project_id,
-            pcc_node_id=settings["pcc_node_id"],
+            connection_node_id=settings["connection_node_id"],
             active_case_id=case_id,
             grounding=settings["grounding"],
             limits=settings["limits"],

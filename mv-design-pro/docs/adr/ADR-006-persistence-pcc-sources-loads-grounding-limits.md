@@ -1,16 +1,16 @@
-# ADR-006: Persistence of PCC, Sources, Loads, Grounding, Limits
+# ADR-006: Persistence of BoundaryNode, Sources, Loads, Grounding, Limits
 
 ## Status
 Accepted
 
 ## Context
-PR3 requires explicit persistence for PCC – punkt wspólnego przyłączenia, sources, loads,
+PR3 requires explicit persistence for BoundaryNode – węzeł przyłączenia, sources, loads,
 network grounding, and operational limits. JSON payloads must remain deterministic and
 schema-driven for import/export workflows.
 
 ## Decision
 We introduce dedicated tables:
-- `project_settings` for PCC, grounding, and limits
+- `project_settings` for BoundaryNode, grounding, and limits
 - `network_sources` and `network_loads` for node-attached assets
 
 All payloads are stored as deterministic JSON and accessed only through repositories.

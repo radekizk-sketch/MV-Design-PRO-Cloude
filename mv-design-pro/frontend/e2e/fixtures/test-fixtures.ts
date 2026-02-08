@@ -238,7 +238,7 @@ export const TEST_EXTENDED_TRACE = {
       result: {
         sk_mva: { value: 5216.5, unit: 'MVA', label: 'Moc zwarciowa' },
       },
-      notes: 'Moc zwarciowa w punkcie wspólnego przyłączenia (PCC)',
+      notes: 'Moc zwarciowa w punkcie wspólnego przyłączenia (BoundaryNode)',
     },
   ],
 };

@@ -10,7 +10,6 @@ import { useEnmInspectorStore } from './store';
 import type {
   DiagnosticIssue,
   DiagnosticReport,
-  DiagnosticSeverity,
   DiagnosticStatus,
 } from './types';
 import {

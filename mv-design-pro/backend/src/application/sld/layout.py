@@ -3,7 +3,7 @@ SLD Auto-Layout Algorithm.
 
 PowerFactory Alignment (per sld_rules.md § F.6, POWERFACTORY_COMPLIANCE.md):
 - Deterministic: Same input → identical layout
-- BFS-based hierarchical positioning from PCC/root
+- BFS-based hierarchical positioning from BoundaryNode/root
 - Switches affect topology when CLOSED and in_service
 - All elements visible (in_service=False → gray/dashed but still positioned)
 
@@ -34,7 +34,7 @@ def build_auto_layout_diagram(
     name: str,
     nodes: Iterable[dict],
     branches: Iterable[dict],
-    pcc_node_id: UUID | None,
+    connection_node_id: UUID | None,
     diagram_id: UUID | None = None,
     x_spacing: float = 200.0,
     y_spacing: float = 120.0,
@@ -105,7 +105,7 @@ def build_auto_layout_diagram(
             adjacency[to_node_id].add(from_node_id)
 
     positions = _layout_positions(
-        adjacency, node_ids, pcc_node_id,
+        adjacency, node_ids, connection_node_id,
         x_spacing=x_spacing, y_spacing=y_spacing, vertical=vertical,
     )
 
@@ -198,7 +198,7 @@ def build_auto_layout_diagram(
 def _layout_positions(
     adjacency: dict[UUID, set[UUID]],
     node_ids: Iterable[UUID],
-    pcc_node_id: UUID | None,
+    connection_node_id: UUID | None,
     *,
     x_spacing: float,
     y_spacing: float,
@@ -208,8 +208,8 @@ def _layout_positions(
     visited: set[UUID] = set()
     components: list[dict[UUID, int]] = []
 
-    if pcc_node_id in adjacency:
-        components.append(_bfs_levels(adjacency, pcc_node_id, visited))
+    if connection_node_id in adjacency:
+        components.append(_bfs_levels(adjacency, connection_node_id, visited))
 
     for node_id in ordered_ids:
         if node_id not in visited:

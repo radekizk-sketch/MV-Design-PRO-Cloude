@@ -198,8 +198,8 @@ class TestProjectsCRUD:
 
         # Optional fields (should be present even if None)
         assert "description" in data
-        assert "pcc_node_id" in data
-        assert "pcc_description" in data
+        assert "connection_node_id" in data
+        assert "connection_description" in data
         assert "owner_id" in data
 
     def test_tests_are_independent(self, app_client):

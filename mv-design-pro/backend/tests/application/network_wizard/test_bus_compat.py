@@ -45,7 +45,7 @@ def test_export_network_payload_emits_buses_alias() -> None:
         branches=[],
         operating_cases=[],
         study_cases=[],
-        pcc_node_id=None,
+        connection_node_id=None,
         sources=[],
         loads=[],
         grounding={},

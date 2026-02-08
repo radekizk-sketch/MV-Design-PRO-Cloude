@@ -188,7 +188,7 @@ def test_submit_action_is_deterministic_on_same_parent(api_client):
 
 def test_submit_batch_actions_accepts_and_creates_snapshot(api_client):
     client, snapshot, _session_factory = api_client
-    # NOTE: set_pcc action was removed. PCC – punkt wspólnego przyłączenia
+    # NOTE: set_connection_node action was removed. BoundaryNode – węzeł przyłączenia
     # is interpretation, not a model property stored in NetworkGraph.
     action_payload = [
         {
@@ -252,7 +252,7 @@ def test_submit_batch_actions_accepts_and_creates_snapshot(api_client):
     graph = snapshot_response.json()["graph"]
     assert {"node-3", "node-4"}.issubset({node["id"] for node in graph["nodes"]})
     assert "branch-2" in {branch["id"] for branch in graph["branches"]}
-    # pcc_node_id is no longer stored in graph
+    # connection_node_id is no longer stored in graph
 
     parent_response = client.get(f"/snapshots/{snapshot.meta.snapshot_id}")
     assert parent_response.status_code == 200

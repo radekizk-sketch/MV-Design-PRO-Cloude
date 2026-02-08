@@ -19,7 +19,7 @@ It is not an implementation task list, not a solver specification, and not a sub
 - IEC / PN-EN 60909 solver Result API is FROZEN.
 - Protection NEVER computes physics.
 - White-Box calculations are mandatory.
-- PCC terminology (“punkt wspólnego przyłączenia”) is mandatory.
+- BoundaryNode terminology (“węzeł przyłączenia”) is mandatory.
 - Deterministic, auditable behavior.
 - Small PRs preferred (even if planned in large blocks).
 - ExecPlans are mandatory for all complex work.
@@ -27,7 +27,7 @@ It is not an implementation task list, not a solver specification, and not a sub
 ## System Roles
 - Power System Engineer — normative authority, final arbiter.
 - Protection Engineer — settings, selectivity, interpretation.
-- Design Engineer — topology, PCC, OZE integration.
+- Design Engineer — topology, BoundaryNode, OZE integration.
 - Reviewer / Auditor — traceability, white-box verification.
 - Software Engineer — implementation under ExecPlan constraints.
 - AI Coding Agent (Codex) — stateless executor of ExecPlans.
@@ -99,7 +99,7 @@ It is not a solver and does not compute physics.
 ## NOW
 - Identify domain entities and invariants.
 - Define NetworkGraph projection rules.
-- Establish mapping for PCC and OZE terminology.
+- Establish mapping for BoundaryNode and OZE terminology.
 
 ## LATER
 - Extend domain for future equipment types in a backward-compatible manner.
@@ -309,7 +309,7 @@ It is not a solver and must not approximate or re-derive physics.
 ```
 
 ```md
-# ExecPlan-08: Network Wizard (SN / nn / PCC / OZE)
+# ExecPlan-08: Network Wizard (SN / nn / BoundaryNode / OZE)
 
 ## Purpose
 Define the network wizard as a structured editor for model creation using mandatory terminology.
@@ -322,7 +322,7 @@ It is not a solver and must not compute any electrical quantities.
 
 ## NOW
 - Define wizard steps and role responsibilities.
-- Enforce PCC (“punkt wspólnego przyłączenia”) terminology.
+- Enforce BoundaryNode (“węzeł przyłączenia”) terminology.
 - Ensure output is a valid NetworkGraph definition.
 
 ## LATER

@@ -9,7 +9,7 @@ PR3 must build solver inputs without invoking solvers. Power Flow already expose
 
 ## Decision
 We introduce `ShortCircuitInput` as an application-level DTO within the Network Wizard
-module. It holds `NetworkGraph`, PCC – punkt wspólnego przyłączenia, sources, and
+module. It holds `NetworkGraph`, BoundaryNode – węzeł przyłączenia, sources, and
 fault/options dictionaries. Power Flow input continues to use the existing
 `analysis.power_flow.types.PowerFlowInput` without modifications.
 

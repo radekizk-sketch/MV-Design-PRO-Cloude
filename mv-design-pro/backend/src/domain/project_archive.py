@@ -100,7 +100,7 @@ class ProjectMeta:
     description: str | None
     schema_version: str
     active_network_snapshot_id: str | None
-    pcc_node_id: str | None
+    connection_node_id: str | None
     sources: list[dict[str, Any]]
     created_at: str  # ISO 8601
     updated_at: str  # ISO 8601
@@ -335,7 +335,7 @@ def archive_to_dict(archive: ProjectArchive) -> dict[str, Any]:
                 "description": archive.project_meta.description,
                 "schema_version": archive.project_meta.schema_version,
                 "active_network_snapshot_id": archive.project_meta.active_network_snapshot_id,
-                "pcc_node_id": archive.project_meta.pcc_node_id,
+                "connection_node_id": archive.project_meta.connection_node_id,
                 "sources": archive.project_meta.sources,
                 "created_at": archive.project_meta.created_at,
                 "updated_at": archive.project_meta.updated_at,
@@ -444,7 +444,7 @@ def dict_to_archive(data: dict[str, Any]) -> ProjectArchive:
             description=pm.get("description"),
             schema_version=pm["schema_version"],
             active_network_snapshot_id=pm.get("active_network_snapshot_id"),
-            pcc_node_id=pm.get("pcc_node_id"),
+            connection_node_id=pm.get("connection_node_id"),
             sources=pm.get("sources", []),
             created_at=pm["created_at"],
             updated_at=pm["updated_at"],

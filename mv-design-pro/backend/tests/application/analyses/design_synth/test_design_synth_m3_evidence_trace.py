@@ -26,7 +26,7 @@ def test_design_synth_m3_evidence_trace_deterministic(uow_factory) -> None:
     case_id = _create_case(wizard)
 
     spec_payload = {
-        "pcc": {"id": "PCC-1", "voltage_kv": 15.0, "grid_supply": True},
+        "connection_node": {"id": "BoundaryNode-1", "voltage_kv": 15.0, "grid_supply": True},
         "constraints": {"voltage_drop_max_pct": 3.0},
         "assumptions": {"ambient_temp_c": 25},
     }
@@ -55,7 +55,7 @@ def test_design_synth_m3_evidence_trace_deterministic(uow_factory) -> None:
             "refs",
             "meta",
         }
-        assert evidence_json["inputs"]["pcc"]["id"] == "PCC-1"
+        assert evidence_json["inputs"]["connection_node"]["id"] == "BoundaryNode-1"
         assert evidence_json["meta"]["schema_version"] == "M3"
         assert evidence_json["outputs"]["report_fingerprint"]
 

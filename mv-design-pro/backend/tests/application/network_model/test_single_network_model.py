@@ -60,7 +60,7 @@ def _create_basic_network(wizard: NetworkWizardService, project_id) -> None:
             },
         ),
     )
-    wizard.set_pcc(project_id, slack_node["id"])
+    wizard.set_connection_node(project_id, slack_node["id"])
     wizard.add_source(
         project_id,
         SourcePayload(

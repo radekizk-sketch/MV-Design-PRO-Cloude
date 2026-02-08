@@ -51,7 +51,7 @@ def sample_project(test_db_session):
         description="Opis projektu do testów eksportu",
         schema_version="1.0.0",
         active_network_snapshot_id=None,
-        pcc_node_id=None,
+        connection_node_id=None,
         sources_jsonb=[{"type": "GRID", "ssc_mva": 100.0}],
         created_at=now,
         updated_at=now,

@@ -127,7 +127,7 @@ Network topology inputs:
 ### Scope (SN)
 
 At minimum:
-- 3-phase short-circuit at selected nodes (including PCC – punkt wspólnego przyłączenia, when present).
+- 3-phase short-circuit at selected nodes (including BoundaryNode – węzeł przyłączenia, when present).
 - Earth-fault short-circuit only if the network has explicit earthing/return-path modeling adequate for it; otherwise, do not fake it.
 
 Outputs must include at least the frozen IEC 60909 quantities already established in the project (e.g., Ik", Ib, Ith, peak/dynamic where available, Sz/Sk where defined by existing APIs). Do not rename or restructure existing result container fields.

@@ -66,10 +66,10 @@ const VALID_ELEMENT_TYPES: ElementType[] = [
 function isPccLikeSelectionId(id: string): boolean {
   const normalized = id.toLowerCase();
   return (
-    normalized.includes('pcc') ||
-    normalized.startsWith('bus_pcc') ||
-    normalized.startsWith('pcc_') ||
-    normalized.endsWith('_pcc')
+    normalized.includes('connection_node') ||
+    normalized.startsWith('bus_connection_node') ||
+    normalized.startsWith('connection_') ||
+    normalized.endsWith('_connection_node')
   );
 }
 

@@ -9,7 +9,7 @@ JSON and CSV payloads and stable UUID handling.
 
 ## Decision
 We define a JSON export contract that includes project metadata, nodes, branches,
-operating cases, study cases, PCC – punkt wspólnego przyłączenia, and sources. CSV
+operating cases, study cases, BoundaryNode – węzeł przyłączenia, and sources. CSV
 imports support minimal node/branch fields with JSON-encoded attributes. Import reports
 include created/updated/skipped counts and validation output.
 

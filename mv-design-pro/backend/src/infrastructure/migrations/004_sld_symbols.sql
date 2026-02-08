@@ -8,7 +8,7 @@ CREATE TABLE sld_node_symbols (
     x DOUBLE PRECISION NOT NULL,
     y DOUBLE PRECISION NOT NULL,
     label VARCHAR(255),
-    is_pcc BOOLEAN NOT NULL DEFAULT FALSE
+    is_connection_node BOOLEAN NOT NULL DEFAULT FALSE
 );
 
 CREATE TABLE sld_branch_symbols (

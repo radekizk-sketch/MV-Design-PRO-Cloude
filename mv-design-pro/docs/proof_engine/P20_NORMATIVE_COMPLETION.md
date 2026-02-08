@@ -83,7 +83,7 @@ Następnie: rule_id, target_id.
 - Widoki: lista reguł NR_*, statusy i krótkie uzasadnienia „WHY”
 - Bez możliwości edycji wyników — tylko konfiguracja limitów
 
-**PCC – punkt wspólnego przyłączenia** pozostaje wyłącznie w warstwie interpretacji.
+**BoundaryNode – węzeł przyłączenia** pozostaje wyłącznie w warstwie interpretacji.
 
 ---
 

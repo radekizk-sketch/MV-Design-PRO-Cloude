@@ -59,10 +59,10 @@ FORBIDDEN: black-box solvers, hidden corrections, undocumented simplifications.
 - Multiple Cases reference one Model (read-only view)
 - Model change invalidates ALL case results
 
-### 2.5 PCC Prohibition Rule
+### 2.5 BoundaryNode Prohibition Rule
 
-- PCC is NOT in NetworkModel (it is interpretation, not physics)
-- PCC belongs ONLY in Analysis/Interpretation layer (BoundaryIdentifier)
+- BoundaryNode is NOT in NetworkModel (it is interpretation, not physics)
+- BoundaryNode belongs ONLY in Analysis/Interpretation layer (BoundaryIdentifier)
 
 ### 2.6 Frozen Result API Rule
 
@@ -110,7 +110,7 @@ Cross-layer violations are architectural regressions requiring immediate fix.
 1. Preserve frozen Result APIs
 2. Maintain deterministic behavior
 3. Keep WHITE BOX traceability
-4. Do not add PCC to NetworkModel
+4. Do not add BoundaryNode to NetworkModel
 5. Do not add physics to non-solver layers
 6. Do not create shadow data models
 
@@ -127,7 +127,7 @@ Cross-layer violations are architectural regressions requiring immediate fix.
 
 ### 5.1 NEVER
 
-- Add PCC/boundary concepts to NetworkModel
+- Add BoundaryNode/boundary concepts to NetworkModel
 - Add physics calculations to non-solver components
 - Create black-box calculations
 - Modify frozen Result APIs without version bump

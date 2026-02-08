@@ -159,14 +159,14 @@ function createStandardMvNetwork(): AnySldSymbol[] {
 }
 
 /**
- * Network with PCC node (should be filtered).
+ * Network with BoundaryNode node (should be filtered).
  */
 function createNetworkWithPcc(): AnySldSymbol[] {
   return [
-    createBus('pcc_node', 'PCC - Punkt przyłączenia'),
-    createSource('src1', 'Zasilanie', 'pcc_node'),
+    createBus('connection_node', 'BoundaryNode - Punkt przyłączenia'),
+    createSource('src1', 'Zasilanie', 'connection_node'),
     createBus('bus_sn', 'Szyna SN 15kV'),
-    createTransformer('trafo1', 'Transformator', 'pcc_node', 'bus_sn'),
+    createTransformer('trafo1', 'Transformator', 'connection_node', 'bus_sn'),
   ];
 }
 
@@ -325,16 +325,16 @@ describe('Role Assignment', () => {
 });
 
 // =============================================================================
-// PCC FILTERING TESTS
+// BoundaryNode FILTERING TESTS
 // =============================================================================
 
-describe('PCC Filtering', () => {
-  it('should filter PCC nodes from symbols', () => {
+describe('BoundaryNode Filtering', () => {
+  it('should filter BoundaryNode nodes from symbols', () => {
     const pccBus: NodeSymbol = {
       id: 'pcc1',
-      elementId: 'pcc_elem',
+      elementId: 'connection_elem',
       elementType: 'Bus',
-      elementName: 'PCC - Punkt przyłączenia',
+      elementName: 'BoundaryNode - Punkt przyłączenia',
       position: { x: 0, y: 0 },
       inService: true,
       width: 200,
@@ -344,7 +344,7 @@ describe('PCC Filtering', () => {
     expect(isPccNode(pccBus)).toBe(true);
   });
 
-  it('should NOT filter non-PCC nodes', () => {
+  it('should NOT filter non-BoundaryNode nodes', () => {
     const normalBus: NodeSymbol = {
       id: 'bus1',
       elementId: 'bus_elem',
@@ -359,12 +359,12 @@ describe('PCC Filtering', () => {
     expect(isPccNode(normalBus)).toBe(false);
   });
 
-  it('should filter PCC from network and maintain determinism', () => {
+  it('should filter BoundaryNode from network and maintain determinism', () => {
     const symbols = createNetworkWithPcc();
-    const { filtered, pccIds } = filterPccNodes(symbols);
+    const { filtered, connectionNodeIds } = filterPccNodes(symbols);
 
-    expect(pccIds.length).toBe(1);
-    expect(pccIds[0]).toBe('sym_pcc_node');
+    expect(connectionNodeIds.length).toBe(1);
+    expect(connectionNodeIds[0]).toBe('sym_connection_node');
     expect(filtered.length).toBe(symbols.length - 1);
   });
 });
@@ -535,7 +535,7 @@ describe('Geometric Skeleton', () => {
     const symbols = createStandardMvNetwork();
     const result = computeTopologicalLayout(symbols);
 
-    // All non-PCC symbols should have positions
+    // All non-BoundaryNode symbols should have positions
     for (const symbol of symbols) {
       const pos = result.positions.get(symbol.id);
       expect(pos).toBeDefined();
@@ -708,7 +708,7 @@ describe('Diagnostics', () => {
     expect(result.diagnostics.assignedRoleCount).toBe(symbols.length);
   });
 
-  it('should report filtered PCC nodes', () => {
+  it('should report filtered BoundaryNode nodes', () => {
     const symbols = createNetworkWithPcc();
     const result = computeTopologicalLayout(symbols);
     expect(result.diagnostics.filteredPccIds.length).toBe(1);
