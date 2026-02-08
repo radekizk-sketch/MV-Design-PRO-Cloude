@@ -371,6 +371,9 @@ Każda rozbieżność z §2 otrzymuje jednoznaczną dyspozycję.
 | 19 | Napięcie falownika = parametr typu katalogowego, nie reguła specyfikacji | **BINDING** | ENM Core + Catalog + Wizard | `SPEC_02_ENM_CORE.md`, `SPEC_13_WIZARD.md` | Specyfikacja NIE MOŻE definiować sztywnych wartości napięć falowników. Napięcie znamionowe falownika wynika WYŁĄCZNIE z wybranego typu w katalogu (`ConverterType` / `InverterType`). Bus nn źródła ma napięcie determinowane przez typ przyłączonego falownika — nie przez regułę systemową, nie przez decyzję użytkownika w kreatorze. Kreator odczytuje napięcie z katalogu i przypisuje je do Bus nn automatycznie. Specyfikacja zachowuje jedynie zasadę: falownik jest elementem nn, bezpośrednie przyłączenie do SN jest niedozwolone. |
 | 20 | Granica ENM: zamknięta lista bytów obliczeniowych, zakaz danych solverowych | **BINDING** | ENM Core | `SPEC_CHAPTER_02_ENM_DOMAIN_MODEL.md` | ENM posiada zamkniętą listę 10 bytów obliczeniowych: Bus, Junction, OverheadLine, Cable, SwitchBranch, FuseBranch, Transformer, Source, Generator, Load. Solver widzi WYŁĄCZNIE te byty (po mapowaniu). Substation, Bay, Corridor NIE SĄ bytami obliczeniowymi — solver ich nie przetwarza (`mapping.py` ich nie importuje). ENM NIE MOŻE przechowywać danych solverowych (node_type, voltage_magnitude_pu, active_power_mw) ani wyników obliczeń. Dodanie nowego bytu obliczeniowego wymaga ADR. |
 | 21 | Klasyfikacja funkcji zabezpieczeniowych: Technologiczne vs Sieciowe | **BINDING** | ENM Core + Protection + WhiteBox | `SPEC_CHAPTER_02_ENM_DOMAIN_MODEL.md`, `SPEC_12_PROTECTION.md` | ProtectionFunction dzieli się na dwie rozłączne klasy: (1) **Technologiczne** — wbudowane w falownik (LVRT, HVRT, 81U/81O/81R, anti-islanding), autonomiczne, ≤250 ms, BEZ koordynacji selektywnej, modelowane jako warunki brzegowe NC RfG / IRiESD; (2) **Sieciowe** — klasyczne IEC/ETAP (50, 51, 50N, 51N, 27, 59, 21, 67, 87, 79), nastawiane, selektywne, podlegające koordynacji. Klasy te NIE SĄ zamienne i NIE podlegają wzajemnej koordynacji — solver zabezpieczeń przetwarza WYŁĄCZNIE klasę Sieciowe, klasa Technologiczne jest warunkiem brzegowym. Każda ProtectionFunction MUSI mieć punkt pomiarowy (miejsce, źródło sygnału, aparatura sterowana). White Box MUSI rozróżniać zdarzenia TECHNOLOGICAL i NETWORK w `event_type`. Kod AS-IS (`sanity_checks/rules.py`) NIE klasyfikuje funkcji — wszystkie traktowane jednorodnie (GAP do usunięcia w SPEC_12). |
+| 22 | Koordynacja falownik ↔ sieć SN: falownik = warunek brzegowy, nie uczestnik selektywności | **BINDING** | Protection + Solver SC | `SPEC_CHAPTER_02_ENM_DOMAIN_MODEL.md`, `SPEC_12_PROTECTION.md` | Projekt zabezpieczeń SN MUSI zakładać, że falownik odłączy się pierwszy (≤250 ms) przy przekroczeniu progów NC RfG — sieć NIE MOŻE „czekać" na falownik w logice selektywności. Po odłączeniu falownika solver SC MUSI uwzględniać zanik wkładu OZE (scenariusz „z OZE" vs „bez OZE"). Kod AS-IS: brak jawnego scenariusza dual (z/bez OZE) w `short_circuit_iec60909.py` — GAP do opisania w SPEC_10 i SPEC_12. |
+| 23 | White Box Protection: deterministyczny łańcuch przyczynowy zadziałania | **BINDING** | WhiteBox + Protection | `SPEC_CHAPTER_02_ENM_DOMAIN_MODEL.md`, `SPEC_09_WHITE_BOX.md`, `SPEC_12_PROTECTION.md` | Każde zadziałanie zabezpieczenia MUSI być odtwarzalne jako deterministyczny łańcuch: ENM → scenariusz → wartości obliczone → funkcja → nastawa → porównanie → decyzja → aparat → skutek. Zakaz heurystyk i „automatycznych trip". Kod AS-IS: `ProtectionTrace` (`domain/protection_analysis.py`) z `ProtectionTraceStep` — implementuje łańcuch, ale NIE posiada pola `event_class` ∈ {TECHNOLOGICAL, NETWORK}. Frontend AS-IS: `TracePanel.tsx` wyświetla trace. GAP: brak rozróżnienia klasy zdarzenia i raportu „kto zadziałał pierwszy". |
+| 24 | UI zabezpieczeń: projekcja ENM + Analysis, nie osobny model, tryb standardowy/ekspercki | **BINDING** | Presentation + Application | `SPEC_CHAPTER_02_ENM_DOMAIN_MODEL.md`, `SPEC_14_TREE_AND_SLD.md` | UI zabezpieczeń jest projekcją modelu ENM i wyników `ProtectionEvaluation` — NIE osobnym modelem danych. Tryb standardowy: edycja WYŁĄCZNIE zabezpieczeń sieciowych, walidacja selektywności, zabezpieczenia technologiczne niewidoczne. Tryb ekspercki: podgląd zabezpieczeń technologicznych (read-only), jawne oznaczenie „brak koordynacji". Zakaz edycji nastaw technologicznych w jakimkolwiek trybie. Kod AS-IS: `ProtectionSettingsEditor.tsx`, `TccChart.tsx`, `ProtectionCoordinationPage.tsx` — implementują edytor i wykresy, ale BEZ rozróżnienia trybu standardowy/ekspercki i BEZ klasyfikacji Technological/Network. |
 
 ### 9.3 Konsekwencje architektoniczne
 
@@ -449,6 +452,30 @@ Każda rozbieżność z §2 otrzymuje jednoznaczną dyspozycję.
 - Każda `ProtectionFunction` MUSI posiadać punkt pomiarowy: miejsce, źródło sygnału (CT/VT/bezpośredni), aparatura sterowana (CB/LS/fuse).
 - White Box MUSI rozróżniać typ zdarzenia: `event_type ∈ {TECHNOLOGICAL, NETWORK}`.
 - Kod AS-IS (`sanity_checks/rules.py`, `ProtectionFunctionSummary`) NIE posiada klasyfikacji — wszystkie 17 reguł sanity checks traktuje jednorodnie. To jest GAP opisany w SPEC_12 TO-BE.
+
+**Z decyzji #22 wynika (koordynacja falownik ↔ sieć — BINDING):**
+- Falownik jest **warunkiem brzegowym** analizy zabezpieczeń SN, NIE uczestnikiem selektywności.
+- Projekt nastaw SN MUSI zakładać, że falownik odłączy się pierwszy (≤250 ms) przy przekroczeniu progów NC RfG.
+- Solver SC MUSI uwzględniać dwa scenariusze: „z OZE" (przed odłączeniem falownika) i „bez OZE" (po odłączeniu).
+- Po odłączeniu falownika prąd zwarciowy w torze maleje — nastawy I>> MUSZĄ zapewniać zadziałanie w OBU scenariuszach.
+- Zakaz włączania zabezpieczeń technologicznych do stopniowania Δt, koordynowania LVRT z I> sieciowym, pomijania zaniku wkładu OZE.
+- Kod AS-IS: `short_circuit_iec60909.py` nie posiada jawnego scenariusza dual (z/bez OZE) — GAP.
+
+**Z decyzji #23 wynika (White Box Protection — BINDING):**
+- Każde zadziałanie zabezpieczenia (TRIP/NO_TRIP) MUSI być odtwarzalne jako deterministyczny łańcuch przyczynowy.
+- `ProtectionTrace` MUSI zawierać WSZYSTKIE kroki: od topologii ENM, przez wartości obliczone, po decyzję i aparat.
+- White Box MUSI raportować zdarzenia technologiczne i sieciowe OSOBNO, z polem `event_class`.
+- W scenariuszach równoczesnych (falownik + sieć reagują na to samo zdarzenie): raport „kto zadziałał pierwszy i dlaczego".
+- Zakaz heurystyk, domyślnych trip, ukrywania kroków pośrednich.
+- Kod AS-IS: `ProtectionTrace` i `ProtectionTraceStep` (frozen) istnieją, ale bez pola `event_class` — GAP.
+
+**Z decyzji #24 wynika (UI zabezpieczeń — BINDING):**
+- UI zabezpieczeń jest projekcją ENM + `ProtectionEvaluation` — NIE osobnym modelem.
+- Widok tabelaryczny ETAP-style z kolumnami: Funkcja, ANSI, Nastawa, Czas, TMS, Kierunkowość, Aparat, Miejsce pomiaru, Klasa, Werdykt.
+- Tryb standardowy: edycja zabezpieczeń sieciowych, walidacja selektywności, zabezpieczenia technologiczne niewidoczne.
+- Tryb ekspercki: podgląd zabezpieczeń technologicznych (read-only), jawne oznaczenie „brak koordynacji".
+- Zakaz: edycji nastaw technologicznych, ukrywania miejsca pomiaru, łączenia klas na jednym TCC bez rozróżnienia.
+- Kod AS-IS: `ProtectionSettingsEditor.tsx` edytuje stopnie 50/51, `TccChart.tsx` rysuje krzywe TCC — ale bez trybu standardowy/ekspercki i bez klasyfikacji klas — GAP.
 
 **Z decyzji #17 wynika (falowniki równoległe — BINDING, TO-BE):**
 - Kreator MUSI umożliwiać podanie **liczby identycznych falowników pracujących równolegle** przy dodawaniu źródła OZE.

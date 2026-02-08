@@ -559,15 +559,23 @@ FINALIZACJA:
     ```
   - Każdy parametr w dowodzie MUSI być oznaczony: `ParameterSource.TYPE_REF` / `ParameterSource.OVERRIDE` / `ParameterSource.INSTANCE`
   - Override MUSI być jawnie widoczny w eksporcie (LaTeX, PDF, DOCX)
-- §9.9 — Formaty eksportu (JSON, LaTeX, PDF, DOCX) (~40 linii)
-- §9.10 — Pełny przykład White Box trace SC3F (~120 linii)
-- §9.11 — Mapowanie na kod (~40 linii)
+- §9.9 — **White Box Protection: łańcuch przyczynowy zadziałania (Decision #23)** (~100 linii)
+  - Deterministyczny łańcuch: ENM → scenariusz → wartości → funkcja → nastawa → decyzja → aparat → skutek
+  - Rozróżnienie `event_class` ∈ {TECHNOLOGICAL, NETWORK}
+  - Raport „kto zadziałał pierwszy" — sekwencja zadziałań z czasami
+  - Powiązanie z `ProtectionTrace`, `ProtectionTraceStep` (AS-IS), rozszerzenie o `event_class` (TO-BE)
+- §9.10 — Formaty eksportu (JSON, LaTeX, PDF, DOCX) (~40 linii)
+- §9.11 — Pełny przykład White Box trace SC3F (~120 linii)
+- §9.12 — Pełny przykład White Box trace Protection (zadziałanie 50 I>> + odłączenie falownika) (~80 linii)
+- §9.13 — Mapowanie na kod (~40 linii)
 
 **Źródła:**
-- Kod: `network_model/whitebox/tracer.py`, `application/proof_engine/`
+- Kod: `network_model/whitebox/tracer.py`, `application/proof_engine/`, `domain/protection_analysis.py`
+- Frontend: `ui/protection-coordination/TracePanel.tsx`
 - Docs: `docs/proof_engine/`
+- Decyzje: AUDIT #23; SPEC_CHAPTER_02 §2.17
 
-**Szacowana długość:** ~720 linii
+**Szacowana długość:** ~900 linii
 
 ---
 
@@ -631,39 +639,45 @@ FINALIZACJA:
 
 **Status:** AS-IS (sekcje implementacji) + TO-BE (sekcje rozszerzeń)
 
-**BINDING — Klasyfikacja funkcji zabezpieczeniowych (Decyzja #21):**
+**BINDING — Decyzje #21, #22, #23, #24:**
 
-> Plik SPEC_12 MUSI respektować podział z §2.15 SPEC_CHAPTER_02:
-> - **Klasa Technologiczne:** warunki brzegowe solvera, NIE wejście do koordynacji selektywnej
-> - **Klasa Sieciowe:** pełne wejście do solvera zabezpieczeń (nastawy, krzywe, koordynacja)
-> - Solver zabezpieczeń przetwarza WYŁĄCZNIE klasę Sieciowe
-> - Każda funkcja z punktem pomiarowym (miejsce, sygnał, aparatura)
-> - White Box rozróżnia zdarzenia TECHNOLOGICAL vs NETWORK
-> - Kod AS-IS (`sanity_checks/rules.py`) NIE klasyfikuje — GAP do opisania w §12.T4
+> Plik SPEC_12 MUSI respektować:
+> - **Decyzja #21:** Podział z §2.15 — Technologiczne vs Sieciowe (rozłączne klasy)
+> - **Decyzja #22:** Koordynacja falownik ↔ sieć (§2.16) — falownik = warunek brzegowy, scenariusz dual „z OZE" / „bez OZE"
+> - **Decyzja #23:** White Box Protection (§2.17) — deterministyczny łańcuch przyczynowy, `event_class`, raport „kto zadziałał pierwszy"
+> - **Decyzja #24:** UI nastaw (§2.18) — projekcja ENM + Analysis, tryb standardowy/ekspercki, widok ETAP-style
 
 **Rozdziały:**
-- §12.1 — Klasyfikacja funkcji zabezpieczeniowych: Technologiczne vs Sieciowe (~80 linii)
+- §12.1 — Klasyfikacja funkcji: Technologiczne vs Sieciowe (~80 linii)
 - §12.2 — Funkcje sieciowe: I>, I>>, Ie> (ANSI 50, 51, 50N, 51N) (~80 linii)
 - §12.3 — Charakterystyki czasowe: DT, NI (IDMT), VI, EI (~80 linii)
 - §12.4 — Dobór nastaw I>> (selektywność, czułość, cieplność) (~100 linii)
 - §12.5 — Koordynacja czasowa (stopniowanie Δt = 0.3/0.5 s) (~60 linii)
-- §12.6 — Punkt pomiarowy: CT/VT, aparatura sterowana (~60 linii)
-- §12.7 — Mapowanie na kod (~40 linii)
-- §12.8 — Testy akceptacyjne (~40 linii)
+- §12.6 — Koordynacja falownik ↔ sieć SN (scenariusze, relacja czasowa, normy) (~100 linii)
+- §12.7 — Punkt pomiarowy: CT/VT, aparatura sterowana (~60 linii)
+- §12.8 — White Box Protection: łańcuch przyczynowy, rozróżnienie klas, raport sekwencyjny (~100 linii)
+- §12.9 — Walidacje systemowe zabezpieczeń: E-P01…I-P02 (~80 linii)
+- §12.10 — UI nastaw zabezpieczeń: widok ETAP-style, tryby, TCC (~80 linii)
+- §12.11 — Mapowanie na kod (~40 linii)
+- §12.12 — Testy akceptacyjne (~40 linii)
 
 > **TO-BE** sekcje (wyraźnie oznaczone):
 - §12.T1 — Model ProtectionDevice (Pydantic, TS) — PLANNED
 - §12.T2 — Przekładniki CT — PLANNED
 - §12.T3 — SPZ — PLANNED
-- §12.T4 — Implementacja klasyfikacji Technologiczne/Sieciowe w `ProtectionFunctionSummary` — PLANNED (GAP z Decyzji #21)
-- §12.T5 — White Box `event_type` ∈ {TECHNOLOGICAL, NETWORK} — PLANNED
+- §12.T4 — Implementacja klasyfikacji Technologiczne/Sieciowe w `ProtectionFunctionSummary` — PLANNED (GAP #21)
+- §12.T5 — White Box `event_class` ∈ {TECHNOLOGICAL, NETWORK} — PLANNED (GAP #23)
+- §12.T6 — Scenariusz dual „z OZE" / „bez OZE" w solverze SC — PLANNED (GAP #22)
+- §12.T7 — Tryb standardowy/ekspercki w UI zabezpieczeń — PLANNED (GAP #24)
+- §12.T8 — Walidacje E-P01…I-P02 w protection analysis pipeline — PLANNED
 
 **Źródła:**
-- Kod: `application/analyses/protection/`, `protection/curves/`, `sanity_checks/rules.py`
-- Normy: PN-EN 60255-151, NC RfG (EU 2016/631), IRiESD
-- Decyzja: AUDIT #21, SPEC_CHAPTER_02 §2.15
+- Kod: `application/analyses/protection/`, `protection/curves/`, `sanity_checks/rules.py`, `domain/protection_analysis.py`
+- Frontend: `ui/protection-coordination/`, `ui/protection-curves/`, `ui/protection-results/`
+- Normy: PN-EN 60255-151, NC RfG (EU 2016/631), IRiESD, PN-EN 50549-1/2
+- Decyzje: AUDIT #21, #22, #23, #24; SPEC_CHAPTER_02 §2.15–§2.19
 
-**Szacowana długość:** ~640 linii (AS-IS) + ~300 linii (TO-BE)
+**Szacowana długość:** ~900 linii (AS-IS) + ~500 linii (TO-BE)
 
 ---
 
@@ -837,7 +851,7 @@ FINALIZACJA:
 | Plik | Faza | Warstwa | Rozdziały | Szacowane linie |
 |---|---|---|---|---|
 | SPEC_CHAPTER_01_PURPOSE_SCOPE_DEFINITIONS.md | Preambuła | Foundation | 9 | ~480 ✅ |
-| SPEC_CHAPTER_02_ENM_DOMAIN_MODEL.md | Preambuła | ENM Domain | 14 | ~570 ✅ |
+| SPEC_CHAPTER_02_ENM_DOMAIN_MODEL.md | Preambuła | ENM Domain | 19 | ~1110 ✅ |
 | SPEC_00_LAYERING.md | 0 | Architecture | 11 | ~700 |
 | SPEC_01_GLOSSARY_NORMATIVE.md | 0 | Governance | 7 | ~290 |
 | SPEC_02_ENM_CORE.md | 0 | ENM Core | 19 | ~2020 |
@@ -847,21 +861,21 @@ FINALIZACJA:
 | SPEC_06_RESULTS_API.md | 0 | Results API | 8 | ~580 |
 | SPEC_07_VALIDATION.md | 0 | Validation | 10 | ~840 |
 | SPEC_08_PUBLIC_API.md | 0 | Public API | 11 | ~820 |
-| SPEC_09_WHITE_BOX.md | 0 | WhiteBox | 12 | ~800 |
+| SPEC_09_WHITE_BOX.md | 0 | WhiteBox | 14 | ~900 |
 | SPEC_10_SOLVER_SC_IEC60909.md | 1 | Solver | 16 | ~1200 |
 | SPEC_11_SOLVER_PF_NEWTON.md | 1 | Solver | 12 | ~860 |
-| SPEC_12_PROTECTION.md | 2 | Analysis | 8+5 TO-BE | ~940 |
+| SPEC_12_PROTECTION.md | 2 | Analysis | 12+8 TO-BE | ~1400 |
 | SPEC_13_WIZARD.md | 3 | Application | 15 | ~1100 |
 | SPEC_14_TREE_AND_SLD.md | 3 | Application | 4 | ~260 |
 | SPEC_15_PERSISTENCE.md | 4 | Infrastructure | 6+1 TO-BE | ~380 |
 | SPEC_16_TESTS.md | 4 | Infrastructure | 10 | ~540 |
 | SPEC_INDEX.md | — | Index | 5 | ~150 |
-| **RAZEM** | | | **~205** | **~13 640** |
+| **RAZEM** | | | **~224** | **~14 740** |
 
 ### Porównanie:
 - **SYSTEM_SPEC.md v3.0:** ~487 linii
-- **Nowa specyfikacja:** ~13 400 linii (20 plików, w tym Rozdział 1-2 preambuły)
-- **Wzrost:** ~28× (2800%)
+- **Nowa specyfikacja:** ~14 740 linii (20 plików, w tym Rozdział 1-2 preambuły)
+- **Wzrost:** ~30× (3000%)
 - **Pokrycie AS-IS:** ~95% (sekcje TO-BE wyraźnie oznaczone)
 
 ---

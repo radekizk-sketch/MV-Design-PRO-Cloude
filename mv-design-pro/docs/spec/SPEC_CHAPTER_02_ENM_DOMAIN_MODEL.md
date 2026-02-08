@@ -827,8 +827,288 @@ Szczegółowa specyfikacja:
 
 ---
 
+## 2.16 Koordynacja zabezpieczeń: falownik ↔ sieć SN (BINDING)
+
+### 2.16.1 Zasada nadrzędna
+
+> Zabezpieczenia technologiczne falownika (§2.15.1 A) **NIE PODLEGAJĄ koordynacji selektywnej**
+> z zabezpieczeniami sieci SN (§2.15.1 B), lecz **stanowią warunek brzegowy** dla pracy źródła.
+
+Koordynacja dotyczy WYŁĄCZNIE:
+- zabezpieczeń sieciowych (ProtectionFunction.Network),
+- aparatów łączeniowych w polach nn i SN,
+- transformatora nn/SN jako elementu granicznego.
+
+### 2.16.2 Relacja czasowa (kanon)
+
+**Zabezpieczenia technologiczne falownika:**
+- Czas własny ≤ 250 ms (determinowany przez firmware).
+- Reakcja lokalna: odłączenie źródła (otwarcie Q_nn lub wewnętrzne zablokowanie).
+- Brak selektywności — działanie autonomiczne, niezależne od stanu sieci.
+
+**Zabezpieczenia sieciowe SN:**
+- Czasy rzędu 0,1 s – kilku sekund.
+- Selektywność stopniowana (Δt = 0,3 / 0,5 s między kolejnymi poziomami).
+- Koordynacja między polami rozdzielczymi i poziomami napięć.
+
+**Reguła BINDING:**
+1. Projekt zabezpieczeń SN MUSI zakładać, że falownik **odłączy się pierwszy** przy przekroczeniu swoich progów technologicznych.
+2. Sieć NIE MOŻE „czekać" na falownik w logice selektywności — falownik nie jest uczestnikiem stopniowania Δt.
+3. Po odłączeniu falownika sieć SN widzi **zanik wkładu prądowego źródła OZE** — solver zabezpieczeń MUSI to uwzględniać jako zmianę prądu zwarciowego w torze.
+
+### 2.16.3 Scenariusze koordynacyjne (kanon)
+
+| Scenariusz | Falownik | Sieć SN | Kolejność |
+|---|---|---|---|
+| Zwarcie na szynie SN | Odłączy się (U< / I>) ≤250 ms | 50 (I>>) zadziała selektywnie | Falownik pierwszy |
+| Zwarcie na linii SN | Odłączy się (LVRT/anti-islanding) | 51 (I>) + koordynacja Δt | Falownik pierwszy |
+| Praca wyspowa (Loss of Mains) | 81R (df/dt) → odłączenie | 79 (SPZ) po zaniku napięcia | Falownik zapobiega wyspie |
+| Przeciążenie transformatora nn/SN | Ograniczenie mocy (I> tech.) | 51 (I>) pola transformatorowego | Niezależne — brak koordynacji |
+| Napięcie poza zakresem | U< / U> / U>> → odłączenie | 27 / 59 pola SN | Niezależne |
+
+### 2.16.4 Punkty odniesienia normowe
+
+Koordynacja MUSI być opisana w odniesieniu do:
+
+| Norma | Zakres |
+|---|---|
+| IEC 60909 | Wartości prądów zwarciowych (dane wejściowe do nastaw) |
+| IEC 60255-151 | Charakterystyki czasowe przekaźników (IDMT, DT) |
+| NC RfG (EU 2016/631) | Wymagania przyłączeniowe generatorów — LVRT, HVRT, f<, f>, df/dt |
+| IRiESD OSD | Krajowe wymagania przyłączeniowe (Polska) — uzupełnienie NC RfG |
+| PN-EN 50549-1/2 | Wymagania dla mikroinstalacji i źródeł > 800 W |
+
+### 2.16.5 Zakazy koordynacyjne (BINDING)
+
+1. **ZAKAZ** włączania funkcji technologicznych falownika do solvera selektywności (stopniowanie Δt).
+2. **ZAKAZ** projektowania nastaw sieciowych w oparciu o założenie, że falownik „nie odłączy się" — falownik ZAWSZE odłączy się przy przekroczeniu progów NC RfG.
+3. **ZAKAZ** koordynowania czasu działania I> sieciowego z czasem LVRT falownika — to są odrębne mechanizmy.
+4. **ZAKAZ** pomijania zaniku wkładu OZE po odłączeniu falownika w analizie zwarciowej — solver SC MUSI uwzględniać scenariusz „z OZE" i „bez OZE".
+
+---
+
+## 2.17 White Box Protection — łańcuch przyczynowy zadziałania (BINDING)
+
+### 2.17.1 Zasada White Box Protection
+
+Każde zadziałanie zabezpieczenia — zarówno technologicznego, jak i sieciowego — MUSI być w pełni odtwarzalne w postaci **deterministycznego łańcucha przyczynowego**:
+
+```
+ENM (topologia + parametry)
+  → Scenariusz (zwarcie / przeciążenie / odchyłka U/f)
+    → Wartości obliczone (I_k, U_bus, f, df/dt)
+      → Funkcja zabezpieczeniowa (ANSI / typ)
+        → Nastawa (próg + czas / krzywa)
+          → Porównanie: wartość vs nastawa
+            → Decyzja (TRIP / NO_TRIP / ALARM)
+              → Aparat (CB / LS / fuse / wewnętrzne)
+                → Skutek (odłączenie / brak zadziałania)
+```
+
+**Inwarianty (BINDING):**
+1. Każdy krok łańcucha MUSI być zapisany w `ProtectionTrace.steps[]`.
+2. Żaden krok NIE MOŻE być pominięty ani zastąpiony heurystyką.
+3. Łańcuch MUSI być **deterministyczny**: te same dane wejściowe → ten sam wynik.
+4. Zakaz: „zadziałało bo tak", „automatyczna nastawa", „domyślny trip".
+
+### 2.17.2 Struktura ProtectionTrace (AS-IS)
+
+System posiada implementację White Box trace dla zabezpieczeń (AS-IS):
+
+```
+ProtectionTrace (frozen dataclass)
+├── run_id: str                     # Unikalny identyfikator analizy
+├── sc_run_id: str                  # Referencja do analizy SC (źródło prądów)
+├── snapshot_id: str | None         # Snapshot ENM w momencie analizy
+├── template_ref: str | None        # Szablon nastaw użyty
+├── overrides: dict[str, Any]       # Odstępstwa od szablonu
+├── steps: tuple[ProtectionTraceStep, ...]  # WSZYSTKIE kroki obliczeniowe
+│   ├── step: str                   # Identyfikator kroku
+│   ├── description_pl: str         # Opis po polsku
+│   ├── inputs: dict[str, Any]      # Wartości wejściowe
+│   └── outputs: dict[str, Any]     # Wartości wyjściowe
+└── created_at: datetime            # Znacznik czasu
+```
+
+**Źródło:** `domain/protection_analysis.py` — `ProtectionTrace`, `ProtectionTraceStep`
+
+### 2.17.3 Rozróżnienie raportowe (BINDING)
+
+White Box MUSI jawnie odróżniać dwa typy zdarzeń:
+
+#### Zadziałanie technologiczne falownika
+
+| Pole | Wartość |
+|---|---|
+| `protection_event.class` | `TECHNOLOGICAL` |
+| Przyczyna | Warunki lokalne (U, f, df/dt, I — na zaciskach falownika) |
+| Źródło nastawy | NC RfG / IRiESD / parametry producenta |
+| Skutek | Odłączenie źródła OZE |
+| Aparat | Q_nn (wyłącznik nn) lub wewnętrzne zablokowanie falownika |
+| Wpływ na sieć | Zanik wkładu prądowego OZE |
+
+#### Zadziałanie zabezpieczenia sieciowego
+
+| Pole | Wartość |
+|---|---|
+| `protection_event.class` | `NETWORK` |
+| Przyczyna | Zwarcie / przeciążenie / nieselektywność w sieci SN |
+| Źródło nastawy | Analiza zwarciowa (SC) + rozpływowa (PF) + koordynacja |
+| Skutek | Otwarcie aparatu w polu rozdzielczym |
+| Aparat | 3Q1 (wyłącznik SN), LS (rozłącznik), bezpiecznik |
+| Wpływ na sieć | Wyłączenie sekcji sieci / pola / odejścia |
+
+**Inwariant:** Zadziałanie technologiczne i sieciowe NIE MOGĄ być łączone w jeden rekord `ProtectionTraceStep`. Są to odrębne łańcuchy przyczynowe z odrębnymi źródłami, punktami pomiaru i aparatami.
+
+### 2.17.4 Raport „kto zadziałał pierwszy" (BINDING)
+
+W scenariuszach, w których zarówno falownik, jak i zabezpieczenie sieciowe reagują na to samo zdarzenie (np. zwarcie na szynie SN), White Box MUSI raportować:
+
+1. **Kolejność zadziałań** — który mechanizm zadziałał pierwszy (z czasem).
+2. **Niezależność** — że oba zadziałania wynikają z odrębnych łańcuchów przyczynowych.
+3. **Wpływ sekwencyjny** — czy odłączenie falownika (zadziałanie pierwsze) zmienia warunki dla zabezpieczenia sieciowego (zadziałanie drugie).
+
+Format:
+```
+protection_sequence:
+  - event_1: {class: TECHNOLOGICAL, function: U<, time_ms: 150, result: TRIP_Q_nn}
+  - event_2: {class: NETWORK, function: 50, time_ms: 80, result: TRIP_3Q1}
+  - first_to_act: event_2 (50 I>> @ 80ms < U< @ 150ms)
+  - interaction: "Zadziałanie 50 I>> odcina tor zwarciowy przed odłączeniem falownika.
+                  Falownik widzi zanik napięcia i odłącza się z powodu U< (LVRT timeout)."
+```
+
+### 2.17.5 Powiązanie z istniejącymi artefaktami (AS-IS)
+
+| Artefakt AS-IS | Plik | Rola |
+|---|---|---|
+| `ProtectionTrace` | `domain/protection_analysis.py` | Ślad obliczeń (frozen) |
+| `ProtectionTraceStep` | `domain/protection_analysis.py` | Pojedynczy krok łańcucha |
+| `ProtectionEvaluation` | `domain/protection_analysis.py` | Wynik ewaluacji (TRIP/NO_TRIP) |
+| `ProtectionComparisonResult` | `domain/protection_comparison.py` | Porównanie A/B scenariuszy |
+| `TracePanel` (frontend) | `ui/protection-coordination/TracePanel.tsx` | Wizualizacja śladu |
+| `CoordinationVerdict` | `ui/protection-coordination/types.ts` | PASS / MARGINAL / FAIL / ERROR |
+
+**GAP (TO-BE):** Istniejący `ProtectionTrace` NIE posiada pola `event_class ∈ {TECHNOLOGICAL, NETWORK}`. Rozszerzenie opisane w SPEC_12 §12.T5.
+
+---
+
+## 2.18 UI nastaw zabezpieczeń — kontrakt prezentacji (BINDING)
+
+### 2.18.1 Zasada nadrzędna UI
+
+> UI zabezpieczeń jest **projekcją modelu ENM i wyników analizy zabezpieczeń**,
+> a NIE osobnym modelem danych i NIE formularzem dowolnym.
+
+UI:
+- **JEST** widokiem tylko-do-odczytu wyników analizy zabezpieczeń (warstwa Presentation).
+- **JEST** interfejsem edycji nastaw sieciowych (przez warstwę Application → ENM).
+- **NIE JEST** solverem — nie wykonuje obliczeń fizycznych.
+- **NIE JEST** osobnym modelem danych — operuje na danych z `ProtectionEvaluation` i ENM.
+
+### 2.18.2 Widok tabelaryczny nastaw (kanon ETAP-style)
+
+UI MUSI prezentować zabezpieczenia w formie tabel analogicznych do ETAP / e2TANGO / PowerFactory.
+
+**Kolumny obowiązkowe:**
+
+| Kolumna | Typ | Opis |
+|---|---|---|
+| Funkcja | IEC designation | Oznaczenie funkcji zabezpieczeniowej (50, 51, 50N, 51N, 27, 59, …) |
+| ANSI | kod ANSI | Kod numeryczny ANSI/IEEE |
+| Nastawa | float + unit | Wartość nastawy z jednostką (A, kV, s, Hz, Hz/s) |
+| Czas | float [s] / krzywa | Czas zadziałania lub oznaczenie krzywej (DT / SI / VI / EI) |
+| TMS | float | Time Multiplier Setting (dla krzywych IDMT) |
+| Kierunkowość | bool | Czy funkcja jest kierunkowa (67/67N) |
+| Aparat | ID | Identyfikator sterowanego aparatu (3Q1, Q_nn, F1) |
+| Miejsce pomiaru | nn / SN | Poziom napięcia punktu pomiarowego |
+| Klasa | enum | `Technological` / `Network` |
+| Werdykt | enum | `PASS` / `MARGINAL` / `FAIL` / `ERROR` |
+
+**Tabela AS-IS (frontend):**
+System posiada implementację interfejsu zabezpieczeń (AS-IS):
+- `ProtectionSettingsEditor.tsx` — edytor nastaw (stopnie 50/51/50N/51N)
+- `ProtectionCoordinationPage.tsx` — strona koordynacji
+- `TccChart.tsx` — wykres TCC (krzywe czasowo-prądowe)
+- `TracePanel.tsx` — panel White Box trace
+
+### 2.18.3 Tryby edycji (BINDING)
+
+#### Tryb standardowy (domyślny)
+
+- Edycja **WYŁĄCZNIE** zabezpieczeń sieciowych (ProtectionFunction.Network).
+- Walidacja selektywności w czasie rzeczywistym (werdykt PASS/MARGINAL/FAIL).
+- Zabezpieczenia technologiczne falownika: **niewidoczne** (nie zaśmiecają widoku).
+- Zakaz: edycji nastaw technologicznych, maskowania miejsca pomiaru.
+
+#### Tryb ekspercki
+
+- Podgląd zabezpieczeń technologicznych falownika: **read-only**.
+- Jawne oznaczenie: „czas własny ≤ 250 ms, brak koordynacji selektywnej, NC RfG".
+- Podgląd relacji czasowej falownik ↔ sieć (§2.16.2).
+- Edycja zabezpieczeń sieciowych: pełna (jak w trybie standardowym).
+- Zakaz: edycji nastaw technologicznych falownika (nawet w trybie eksperckim).
+
+### 2.18.4 Wykresy TCC (Time-Current Characteristics)
+
+UI MUSI prezentować krzywe TCC zgodnie z konwencją ETAP:
+- Oś X: prąd [A] lub wielokrotność prądu nastawczego [×I_pickup] — skala logarytmiczna.
+- Oś Y: czas [s] — skala logarytmiczna.
+- Krzywe: IEC 60255 (SI, VI, EI, LTI, DT) oraz IEEE C37.112 (MI, STI).
+- Każda krzywa z oznaczeniem funkcji i aparatu.
+
+**AS-IS:** `TccChart.tsx` implementuje wykresy TCC ze standardami IEC i IEEE.
+
+### 2.18.5 Zakazy UI (BINDING)
+
+1. **ZAKAZ** edycji nastaw technologicznych falownika w jakimkolwiek trybie.
+2. **ZAKAZ** prezentowania zabezpieczeń technologicznych i sieciowych na jednym wykresie TCC bez jawnego rozróżnienia klasy.
+3. **ZAKAZ** ukrywania miejsca pomiaru i sterowanego aparatu w widoku tabelarycznym.
+4. **ZAKAZ** prezentowania werdyktu koordynacji (PASS/FAIL) dla zabezpieczeń technologicznych — one nie podlegają koordynacji.
+5. **ZAKAZ** tworzenia osobnego modelu danych UI — UI operuje na `ProtectionEvaluation` z warstwy Analysis.
+
+---
+
+## 2.19 Walidacje systemowe zabezpieczeń (BINDING)
+
+### 2.19.1 Walidacje obowiązkowe
+
+System MUSI wykrywać i raportować następujące sytuacje:
+
+| Kod | Poziom | Warunek | Opis |
+|---|---|---|---|
+| E-P01 | ERROR | Brak zabezpieczenia sieciowego na torze krytycznym | Tor: Bus SN → aparat → odejście — bez funkcji 50/51 |
+| E-P02 | ERROR | Brak punktu pomiarowego dla funkcji zabezpieczeniowej | Funkcja bez zdefiniowanego CT/VT/źródła sygnału |
+| E-P03 | ERROR | Brak sterowanego aparatu dla funkcji zabezpieczeniowej | Funkcja bez przypisanego wyłącznika/rozłącznika |
+| W-P01 | WARNING | Konflikt czasowy: sieć szybsza niż falownik | Czas zadziałania zabezpieczenia sieciowego < czas własny falownika (≤250ms) — niespójność z §2.16.2 |
+| W-P02 | WARNING | Brak raportu White Box dla zadziałania | Ewaluacja zakończona werdyktem TRIP/FAIL bez pełnego `ProtectionTrace` |
+| W-P03 | WARNING | Nastawa I>> poniżej minimalnego prądu zwarciowego | Próg zadziałania niższy niż I_k_min — ryzyko nieselektywnego wyłączenia |
+| W-P04 | WARNING | Nastawa I> powyżej prądu znamionowego transformatora | Próg przeciążeniowy wyższy niż In transformatora — ryzyko braku ochrony |
+| I-P01 | INFO | Zabezpieczenie technologiczne falownika bez koordynacji | Informacja: funkcja technologiczna nie uczestniczy w selektywności (poprawne) |
+| I-P02 | INFO | Scenariusz „z OZE" vs „bez OZE" — różnica prądów zwarciowych | Informacja: zanik wkładu OZE po odłączeniu falownika |
+
+### 2.19.2 Relacja do istniejących walidacji ENM
+
+Walidacje E-P01 — I-P02 należą do warstwy **Analysis** (protection analysis pipeline), NIE do warstwy ENM Validator (`enm/validator.py`).
+
+Walidacje ENM (§2.11, kody E001–I005) dotyczą **topologii i kompletności modelu**.
+Walidacje zabezpieczeń (E-P01 — I-P02) dotyczą **poprawności konfiguracji zabezpieczeń**.
+
+Obie grupy są niezależne i nie kolidują.
+
+### 2.19.3 Walidacja AS-IS
+
+System posiada (AS-IS):
+- 17 reguł sanity checks w `sanity_checks/rules.py` — weryfikacja kompletności nastaw.
+- `ProtectionFunctionSummary` z mapowaniem kodów ANSI.
+- Werdykty: `PASS`, `MARGINAL`, `FAIL`, `ERROR`.
+
+**GAP (TO-BE):** Brak walidacji E-P01 (tor krytyczny bez zabezpieczenia), W-P01 (konflikt czasowy falownik/sieć), I-P02 (wpływ zaniku OZE). Opisane w SPEC_12 TO-BE.
+
+---
+
 **KONIEC ROZDZIAŁU 2**
 
 ---
 
-*Dokument kanoniczny. Wersja 1.1. Zaktualizowany o §2.15 Zabezpieczenia.*
+*Dokument kanoniczny. Wersja 1.2. Zaktualizowany o §2.16–§2.19 (koordynacja, White Box, UI, walidacje).*
