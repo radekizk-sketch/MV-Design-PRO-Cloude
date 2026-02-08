@@ -87,7 +87,7 @@ class TestAdapterConversion:
         assert p1["nodes"] == p2["nodes"]
         assert p1["branches"] == p2["branches"]
         assert p1["switches"] == p2["switches"]
-        assert p1["pcc_node_id"] == p2["pcc_node_id"]
+        assert p1["connection_node_id"] == p2["connection_node_id"]
 
     def test_uuid_mapping_covers_all_ids(self, golden_graph, golden_payload):
         """id_map must contain entries for all nodes, branches, switches."""
@@ -115,11 +115,11 @@ class TestAdapterConversion:
         )
         assert len(all_uuids) == total
 
-    def test_pcc_node_is_slack(self, golden_graph, golden_payload):
-        """PCC node in payload must correspond to the SLACK node."""
+    def test_connection_node_node_is_slack(self, golden_graph, golden_payload):
+        """BoundaryNode node in payload must correspond to the SLACK node."""
         slack = golden_graph.get_slack_node()
         expected_uuid = _to_uuid(slack.id)
-        assert golden_payload["pcc_node_id"] == expected_uuid
+        assert golden_payload["connection_node_id"] == expected_uuid
 
     def test_switch_states_preserved(self, golden_graph, golden_payload):
         """Switch state (OPEN/CLOSED) must be preserved in payload."""

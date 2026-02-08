@@ -49,4 +49,4 @@ Sekcja PDF „Porównanie scenariuszy (P27)” zawiera:
 
 ## 7. Terminologia
 
-- **PCC – punkt wspólnego przyłączenia** (terminologia obowiązkowa).
+- **BoundaryNode – węzeł przyłączenia** (terminologia obowiązkowa).

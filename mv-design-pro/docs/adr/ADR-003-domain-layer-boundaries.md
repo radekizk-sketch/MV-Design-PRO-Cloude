@@ -6,7 +6,7 @@ Accepted
 ## Context
 Industrializacja wymaga jawnej warstwy domenowej niezależnej od solverów, DB i UI.
 Domena ma definiować obiekty Project/Network/Case/StudyRun oraz wspierać
-walidacje, w tym spójne użycie terminu **„PCC – punkt wspólnego przyłączenia”**.
+walidacje, w tym spójne użycie terminu **„BoundaryNode – węzeł przyłączenia”**.
 
 ## Decision
 Wprowadzamy warstwę `domain/` z podstawowymi encjami:

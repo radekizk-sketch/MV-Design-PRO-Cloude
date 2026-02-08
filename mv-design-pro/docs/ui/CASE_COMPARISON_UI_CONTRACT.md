@@ -295,8 +295,8 @@ umożliwiający **inżynierską analizę różnic** zgodnie z praktyką DIgSILEN
 ┌─────────────────────────────────────────────────────────────────┐
 │ PORÓWNANIE PRZYPADKÓW                                           │
 ├─────────────────────────────────────────────────────────────────┤
-│ Case A:    SC_CASE_001 (Zwarcie na BUS_PCC)                     │
-│ Case B:    SC_CASE_002 (Zwarcie na BUS_PCC — wariant bez SW_003)│
+│ Case A:    SC_CASE_001 (Zwarcie na BUS_BoundaryNode)                     │
+│ Case B:    SC_CASE_002 (Zwarcie na BUS_BoundaryNode — wariant bez SW_003)│
 │ Run:       2026-01-28 19:45:12 / 2026-01-28 19:52:33           │
 │ Analysis:  Short Circuit (IEC 60909, c_max=1.1)                │
 │ Target:    BUS (Ik″, ip, Ith)                                  │

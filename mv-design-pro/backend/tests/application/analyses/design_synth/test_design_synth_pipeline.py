@@ -11,7 +11,7 @@ sys.path.insert(0, str(backend_src))
 from application.analyses.design_synth.canonical import canonicalize_json
 from application.analyses.design_synth.pipeline import run_connection_study
 from application.analyses.design_synth.service import DesignSynthService
-from application.analyses.design_synth.reporting import PCC_SECTION_TITLE
+from application.analyses.design_synth.reporting import BoundaryNode_SECTION_TITLE
 from application.network_wizard import NetworkWizardService
 from infrastructure.persistence.db import create_engine_from_url, create_session_factory, init_db
 from infrastructure.persistence.unit_of_work import build_uow_factory
@@ -36,7 +36,7 @@ def test_design_synth_pipeline_end_to_end() -> None:
     case_id = _create_case(wizard)
 
     spec_payload = {
-        "pcc": {"id": "PCC-1", "voltage_kv": 15.0, "grid_supply": True},
+        "connection_node": {"id": "BoundaryNode-1", "voltage_kv": 15.0, "grid_supply": True},
         "constraints": {"voltage_drop_max_pct": 3.0},
         "assumptions": {"ambient_temp_c": 25},
     }
@@ -53,8 +53,8 @@ def test_design_synth_pipeline_end_to_end() -> None:
     assert service.get_evidence(result.design_evidence_id).case_id == case_id
 
     report = result.report_json
-    assert PCC_SECTION_TITLE in report
-    assert report[PCC_SECTION_TITLE]["id"] == "PCC-1"
+    assert BoundaryNode_SECTION_TITLE in report
+    assert report[BoundaryNode_SECTION_TITLE]["id"] == "BoundaryNode-1"
 
     second_result = run_connection_study(
         case_id,

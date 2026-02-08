@@ -24,7 +24,7 @@ Cel: spójny język PL, jedna prawda kanoniczna, brak duplikatów i sprzecznośc
 
 - `docs/ui/RESULTS_BROWSER_CONTRACT.md` — ujednolicić nazewnictwo PL i etykiety UI (np. „Przeglądarka wyników”).
 - `docs/ui/ELEMENT_INSPECTOR_CONTRACT.md` — konsekwentne tłumaczenie sekcji i tabel.
-- `docs/ui/CASE_COMPARISON_UI_CONTRACT.md` — ujednolicenie terminologii PL + PCC – punkt wspólnego przyłączenia.
+- `docs/ui/CASE_COMPARISON_UI_CONTRACT.md` — ujednolicenie terminologii PL + BoundaryNode – węzeł przyłączenia.
 - `docs/ui/SLD_RENDER_LAYERS_CONTRACT.md` — tłumaczenie angielskich nagłówków/tabel.
 - `docs/ui/CATALOG_BROWSER_CONTRACT.md` — tłumaczenie angielskich nagłówków/tabel.
 - `docs/ui/SC_NODE_RESULTS_CONTRACT.md` — spójne nazewnictwo PL.
@@ -33,5 +33,5 @@ Cel: spójny język PL, jedna prawda kanoniczna, brak duplikatów i sprzecznośc
 
 ## REMOVE (duplikaty / nieaktualne)
 
-- `docs/audit/historical_execplans/EXECPLANS.md` — historyczny katalog planów, duplikuje `PLANS.md` i zawiera nieaktualne założenia (PCC w modelu). Do usunięcia po potwierdzeniu architekta.
-- `docs/audit/historical_execplans/ExecPlan-01.md` — zawiera sprzeczne założenia (PCC jako obiekt modelu). Do usunięcia po potwierdzeniu architekta.
+- `docs/audit/historical_execplans/EXECPLANS.md` — historyczny katalog planów, duplikuje `PLANS.md` i zawiera nieaktualne założenia (BoundaryNode w modelu). Do usunięcia po potwierdzeniu architekta.
+- `docs/audit/historical_execplans/ExecPlan-01.md` — zawiera sprzeczne założenia (BoundaryNode jako obiekt modelu). Do usunięcia po potwierdzeniu architekta.

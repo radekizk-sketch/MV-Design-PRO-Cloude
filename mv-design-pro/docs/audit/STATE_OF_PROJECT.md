@@ -24,7 +24,7 @@
 |---|---|---|---|---|---|---|
 | Model danych sieci | NetworkGraph + Bus/Branch/Transformer/Switch | IN-PROGRESS | PARTIAL | `backend/src/network_model/core/graph.py`, `backend/src/network_model/core/branch.py`, `backend/src/network_model/core/switch.py` | `backend/tests/test_branch.py` | Brak pełnej listy elementów PF (np. Station/Measurements); baza jest stabilna. |
 | Katalog typów | Line/Cable/Transformer types (immutable) | DONE | PARTIAL | `backend/src/network_model/catalog/types.py`, `backend/src/network_model/catalog/repository.py` | `backend/tests/test_catalog_layer.py`, `backend/tests/network_model/catalog/test_resolver.py` | Determinizm i typy frozen. |
-| PCC – punkt wspólnego przyłączenia | PCC jako warstwa interpretacji | DONE | YES | `backend/src/analysis/boundary/identifier.py`, `backend/src/application/analyses/boundary.py`, `backend/src/network_model/sld_projection.py` | `backend/tests/analysis/test_boundary_identifier.py`, `backend/tests/test_sld_projection.py` | PCC nie istnieje w NetworkModel. |
+| BoundaryNode – węzeł przyłączenia | BoundaryNode jako warstwa interpretacji | DONE | YES | `backend/src/analysis/boundary/identifier.py`, `backend/src/application/analyses/boundary.py`, `backend/src/network_model/sld_projection.py` | `backend/tests/analysis/test_boundary_identifier.py`, `backend/tests/test_sld_projection.py` | BoundaryNode nie istnieje w NetworkModel. |
 | IEC 60909 | Solver SC 3F/1F/2F/2F+G + white_box_trace | DONE | PARTIAL | `backend/src/network_model/solvers/short_circuit_iec60909.py` | `backend/tests/test_short_circuit_iec60909.py` | Pełny ślad white-box, brak zmian Result API. |
 | IEC 60909 Result API | ShortCircuitResult + to_dict + white_box_trace | DONE | YES | `backend/src/network_model/solvers/short_circuit_iec60909.py` | `backend/tests/test_result_api_contract.py` | API zamrożone, kontrakty testowe. |
 | Power Flow | Newton-Raphson solver + white_box_trace | DONE | PARTIAL | `backend/src/network_model/solvers/power_flow_newton.py` | `backend/tests/test_power_flow_v1.py`, `backend/tests/test_power_flow_v2.py` | PF-grade, ale bez pełnego eksportu PDF/DOCX. |
@@ -95,8 +95,8 @@ Poniższe obszary spełniają kryteria: implementacja + testy + dokumentacja kon
 
 - **Zamrożone API IEC 60909:** zachowane (ShortCircuitResult, `to_dict`, `white_box_trace`).
 - **ExecPlans:** repo korzysta z `PLANS.md` jako mechanizmu zmian.
-- **Język PL + PCC – punkt wspólnego przyłączenia:** dokumentacja wymaga pełnego ujednolicenia (patrz GAP #4).
-- **BoundaryIdentifier:** PCC – punkt wspólnego przyłączenia w warstwie analizy, nie w NetworkModel.
+- **Język PL + BoundaryNode – węzeł przyłączenia:** dokumentacja wymaga pełnego ujednolicenia (patrz GAP #4).
+- **BoundaryIdentifier:** BoundaryNode – węzeł przyłączenia w warstwie analizy, nie w NetworkModel.
 
 ## F. Rekomendacje PR-owe
 

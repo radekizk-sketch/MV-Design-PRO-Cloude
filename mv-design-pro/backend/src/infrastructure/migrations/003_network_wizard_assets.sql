@@ -1,6 +1,6 @@
 CREATE TABLE project_settings (
     project_id UUID PRIMARY KEY REFERENCES projects(id),
-    pcc_node_id UUID REFERENCES network_nodes(id),
+    connection_node_id UUID REFERENCES network_nodes(id),
     grounding_jsonb JSONB NOT NULL DEFAULT '{}'::jsonb,
     limits_jsonb JSONB NOT NULL DEFAULT '{}'::jsonb
 );

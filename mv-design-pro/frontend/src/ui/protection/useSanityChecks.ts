@@ -44,7 +44,7 @@ const USE_FIXTURE_DATA = true;
  * Mapowanie element_id do fixture elementow z element-assignment.ts:
  * - switch-001, switch-002 (Switch)
  * - trafo-001 (TransformerBranch)
- * - pcc-001 (Bus - punkt wspolnego przylaczenia)
+ * - connection_node-001 (Bus - punkt wspolnego przylaczenia)
  * - line-001 (LineBranch)
  */
 export const SANITY_CHECK_FIXTURES: ProtectionSanityCheckResult[] = [
@@ -79,12 +79,12 @@ export const SANITY_CHECK_FIXTURES: ProtectionSanityCheckResult[] = [
     },
   },
 
-  // ERROR: Nakladanie U< i U> dla pcc-001 (PCC)
+  // ERROR: Nakladanie U< i U> dla connection_node-001 (BoundaryNode)
   {
     severity: 'ERROR',
     code: 'VOLT_OVERLAP',
     message_pl: 'Nakladanie sie progow U< i U> (U< >= U>): U<=0,9×Un >= U>=0,85×Un',
-    element_id: 'pcc-001',
+    element_id: 'connection_node-001',
     element_type: 'Bus',
     function_ansi: '27/59',
     function_code: 'VOLTAGE',
@@ -94,12 +94,12 @@ export const SANITY_CHECK_FIXTURES: ProtectionSanityCheckResult[] = [
     },
   },
 
-  // WARN: Prog f< zbyt niski dla pcc-001
+  // WARN: Prog f< zbyt niski dla connection_node-001
   {
     severity: 'WARN',
     code: 'FREQ_F_LT_TOO_LOW',
     message_pl: 'Prog f< zbyt niski (< 45 Hz): 44,5 Hz',
-    element_id: 'pcc-001',
+    element_id: 'connection_node-001',
     element_type: 'Bus',
     function_ansi: '81U',
     function_code: 'UNDERFREQUENCY',
@@ -119,12 +119,12 @@ export const SANITY_CHECK_FIXTURES: ProtectionSanityCheckResult[] = [
     function_code: 'DIFFERENTIAL',
   },
 
-  // WARN: SPZ bez funkcji wyzwalajacej dla pcc-001
+  // WARN: SPZ bez funkcji wyzwalajacej dla connection_node-001
   {
     severity: 'WARN',
     code: 'SPZ_NO_TRIP_FUNCTION',
     message_pl: 'SPZ aktywne bez funkcji wyzwalajacej — brak I> lub I>> do wyzwolenia SPZ',
-    element_id: 'pcc-001',
+    element_id: 'connection_node-001',
     element_type: 'Bus',
     function_ansi: '79',
     function_code: 'RECLOSING',

@@ -9,7 +9,7 @@ Un (napięcie odniesienia):
 1. Dla 27/59 (U</U>): Un = napięcie znamionowe miejsca pomiaru
    - preferencja: bus_voltage_kv (napięcie szyny)
    - jeśli VT: vt_primary_kv (napięcie pierwotne VT)
-   - jeśli PCC: pcc_voltage_kv
+   - jeśli BoundaryNode: connection_voltage_kv
    - brak danych → UNKNOWN
 
 In (prąd odniesienia):
@@ -17,7 +17,7 @@ In (prąd odniesienia):
    - linia/kabel: line_rated_current_a
    - wyłącznik: breaker_rated_current_a
    - transformator: In = Sn / (√3 × Un_strony) — dozwolone wyliczenie
-   - PCC: pcc_rated_current_a
+   - BoundaryNode: connection_rated_current_a
    - brak danych → UNKNOWN
 
 ZASADA KLUCZOWA:
@@ -82,7 +82,7 @@ def _resolve_un(
     Priorytety:
     1. VT primary (jeśli dostępne) — najdokładniejszy pomiar
     2. Bus voltage (jeśli dostępne) — z modelu sieci
-    3. PCC voltage (jeśli element to PCC)
+    3. BoundaryNode voltage (jeśli element to BoundaryNode)
     4. UNKNOWN — brak danych
     """
     # Priorytet 1: VT primary
@@ -101,21 +101,21 @@ def _resolve_un(
             f"Un = {ctx.bus_voltage_kv} kV (szyna)",
         )
 
-    # Priorytet 3: PCC voltage (jeśli element to PCC lub mamy dane PCC)
-    if ctx.element_type == ProtectedElementType.PCC:
-        if ctx.pcc_voltage_kv is not None and ctx.pcc_voltage_kv > 0:
+    # Priorytet 3: BoundaryNode voltage (jeśli element to BoundaryNode lub mamy dane BoundaryNode)
+    if ctx.element_type == ProtectedElementType.BoundaryNode:
+        if ctx.connection_voltage_kv is not None and ctx.connection_voltage_kv > 0:
             return (
-                ctx.pcc_voltage_kv,
-                BaseValueSourceUn.PCC,
-                f"Un = {ctx.pcc_voltage_kv} kV (PCC – punkt wspolnego przylaczenia)",
+                ctx.connection_voltage_kv,
+                BaseValueSourceUn.BoundaryNode,
+                f"Un = {ctx.connection_voltage_kv} kV (BoundaryNode – punkt wspolnego przylaczenia)",
             )
 
-    # Fallback na PCC voltage jeśli dostępne
-    if ctx.pcc_voltage_kv is not None and ctx.pcc_voltage_kv > 0:
+    # Fallback na BoundaryNode voltage jeśli dostępne
+    if ctx.connection_voltage_kv is not None and ctx.connection_voltage_kv > 0:
         return (
-            ctx.pcc_voltage_kv,
-            BaseValueSourceUn.PCC,
-            f"Un = {ctx.pcc_voltage_kv} kV (PCC)",
+            ctx.connection_voltage_kv,
+            BaseValueSourceUn.BoundaryNode,
+            f"Un = {ctx.connection_voltage_kv} kV (BoundaryNode)",
         )
 
     # Brak danych
@@ -132,7 +132,7 @@ def _resolve_in(
     - LINE/CABLE: line_rated_current_a
     - BREAKER: breaker_rated_current_a
     - TRANSFORMER: In = Sn / (√3 × Un_strony)
-    - PCC: pcc_rated_current_a
+    - BoundaryNode: connection_rated_current_a
     - BUS: preferuje breaker, potem line (pole rozdzielcze)
     """
     element_type = ctx.element_type
@@ -161,15 +161,15 @@ def _resolve_in(
     if element_type == ProtectedElementType.TRANSFORMER:
         return _resolve_in_transformer(ctx)
 
-    # PCC
-    if element_type == ProtectedElementType.PCC:
-        if ctx.pcc_rated_current_a is not None and ctx.pcc_rated_current_a > 0:
+    # BoundaryNode
+    if element_type == ProtectedElementType.BoundaryNode:
+        if ctx.connection_rated_current_a is not None and ctx.connection_rated_current_a > 0:
             return (
-                ctx.pcc_rated_current_a,
-                BaseValueSourceIn.PCC,
-                f"In = {ctx.pcc_rated_current_a:.1f} A (PCC – punkt wspolnego przylaczenia)",
+                ctx.connection_rated_current_a,
+                BaseValueSourceIn.BoundaryNode,
+                f"In = {ctx.connection_rated_current_a:.1f} A (BoundaryNode – punkt wspolnego przylaczenia)",
             )
-        return (None, BaseValueSourceIn.UNKNOWN, "In nieznane – brak rated_current_a PCC")
+        return (None, BaseValueSourceIn.UNKNOWN, "In nieznane – brak rated_current_a BoundaryNode")
 
     # BUS — może mieć przypisane zabezpieczenie (np. pole rozdzielcze)
     if element_type == ProtectedElementType.BUS:
@@ -187,12 +187,12 @@ def _resolve_in(
                 BaseValueSourceIn.LINE,
                 f"In = {ctx.line_rated_current_a:.1f} A (linia)",
             )
-        # PCC jeśli to szyna PCC
-        if ctx.pcc_rated_current_a is not None and ctx.pcc_rated_current_a > 0:
+        # BoundaryNode jeśli to szyna BoundaryNode
+        if ctx.connection_rated_current_a is not None and ctx.connection_rated_current_a > 0:
             return (
-                ctx.pcc_rated_current_a,
-                BaseValueSourceIn.PCC,
-                f"In = {ctx.pcc_rated_current_a:.1f} A (PCC)",
+                ctx.connection_rated_current_a,
+                BaseValueSourceIn.BoundaryNode,
+                f"In = {ctx.connection_rated_current_a:.1f} A (BoundaryNode)",
             )
         return (None, BaseValueSourceIn.UNKNOWN, "In nieznane – brak danych pradowych szyny")
 

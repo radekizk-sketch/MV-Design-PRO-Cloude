@@ -32,7 +32,7 @@ MV-DESIGN-PRO is a functional Medium Voltage network design and analysis system 
 | Phase 2.x: UI PF++ Contracts | Advanced UI contracts (topology tree, switching, SC node) | DONE (docs) |
 | Phase 3: Catalog Layer | Immutable types, resolver, governance | DONE |
 | Phase 4: Case Layer | Case lifecycle, invalidation, clone | DONE |
-| Phase 5: Interpretation Layer | BoundaryIdentifier, PCC moved to analysis | DONE |
+| Phase 5: Interpretation Layer | BoundaryIdentifier, BoundaryNode moved to analysis | DONE |
 | Phase 6: Wizard/SLD Unity | Verify single model access | DONE (27 backend + 23 frontend tests) |
 | P10a: State/Lifecycle | Case result status machine | DONE |
 | P10b: Result State + Comparison | A/B comparison | DONE |

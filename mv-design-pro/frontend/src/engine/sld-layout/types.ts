@@ -551,7 +551,7 @@ export interface LayoutDebugInfo {
   /** Sekcje szyn (busbar ID → section count) */
   busbarSections: Map<string, number>;
 
-  /** PCC nodes filtered from render */
+  /** BoundaryNode nodes filtered from render */
   filteredPccNodes: string[];
 
   /** Station stacks (root ID → symbol IDs) */

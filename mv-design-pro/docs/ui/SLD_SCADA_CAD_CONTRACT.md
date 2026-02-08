@@ -34,7 +34,7 @@ Dokument jest **BINDING** dla:
 |--------|-----------|----------|
 | **SCADA SLD** | Warstwowy widok SLD w stylu systemów SCADA/ETAP/SmartCollect: neonowe kolory, stan operacyjny, przepływy mocy, wizualizacja pracy sieci | Szyny kolorowe, przepływy prądu z kierunkiem, kolor czerwony = przeciążenie |
 | **CAD overlay** | Nakładka techniczna zawierająca parametry katalogowe, impedancje, długości, przekroje kabli, dane konstrukcyjne | R/X/B linii, długość kabla, typ przekroju |
-| **PCC** | Punkt wspólnego przyłączenia (Point of Common Coupling) — granica między siecią operatora a instalacją użytkownika. **ZAWSZE używaj terminu PCC**, nigdy "punkt przyłączenia", "granica", itp. | PCC przy złączu SN/nn |
+| **BoundaryNode** | Węzeł przyłączenia (Point of Common Coupling) — granica między siecią operatora a instalacją użytkownika. **ZAWSZE używaj terminu BoundaryNode**, nigdy "punkt przyłączenia", "granica", itp. | BoundaryNode przy złączu SN/nn |
 | **BUS** | Szyna elektryczna (busbar), węzeł topologiczny sieci | Szyna rozdzielcza 15 kV |
 | **BUS-centric** | Prezentacja wyników skupiona wokół szyn jako punktów węzłowych (nie na liniach) | Wyniki zwarciowe `Ik″` wyświetlane **tylko przy BUS** |
 | **Case** | Przypadek obliczeniowy zgodny z IEC/PN-EN 60909 | MAX / MIN / N-1 |
@@ -596,7 +596,7 @@ Jeśli konflikt pozostaje nierozstrzygnięty → **zgłoś jako Issue** (REPOSIT
 - [ ] Etykiety CAD używają hierarchii **INLINE → OFFSET → SIDE STACK** (automatyczne przełączanie).
 - [ ] Parametry katalogowe (R/X/B, Sn, uk) są **zawsze widoczne** w CAD overlay.
 - [ ] Wydruk (PDF/DOCX) jest **1:1 snapchotem UI** bez utraty informacji.
-- [ ] Terminologia: **PCC** (punkt wspólnego przyłączenia), **BUS-centric**, **Case** (MAX/MIN/N-1).
+- [ ] Terminologia: **BoundaryNode** (węzeł przyłączenia), **BUS-centric**, **Case** (MAX/MIN/N-1).
 - [ ] Duplikacja SCADA ↔ CAD dozwolona **tylko jeśli poprawia czytelność** i nie zmienia semantyki.
 - [ ] System automatycznie wykrywa kolizje etykiet i przełącza tryby (collision_ratio).
 

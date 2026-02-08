@@ -54,7 +54,7 @@
 │                   INTERPRETATION LAYER                            │
 │  ┌──────────────┐  ┌──────────────┐  ┌────────────────────────┐ │
 │  │ PROOF ENGINE │  │   ANALYSIS   │  │ BOUNDARY IDENTIFIER    │ │
-│  │ (P11)        │  │ Protection   │  │ (PCC)                  │ │
+│  │ (P11)        │  │ Protection   │  │ (BoundaryNode)                  │ │
 │  │ TraceArtifact│  │ Voltage      │  └────────────────────────┘ │
 │  │ ProofDocument│  │ Thermal      │                              │
 │  │ Export       │  │ Normative    │                              │
@@ -270,7 +270,7 @@ Key components:
 | Normative Evaluator | `analysis/normative/` | PN-EN compliance rules |
 | Coverage Score | `analysis/coverage_score/` | Analysis completeness assessment |
 | LF Sensitivity | `analysis/lf_sensitivity/` | Load flow sensitivity analysis |
-| Boundary Identifier | `analysis/boundary/` | PCC identification (heuristic) |
+| Boundary Identifier | `analysis/boundary/` | BoundaryNode identification (heuristic) |
 | Scenario Comparison | `analysis/scenario_comparison/` | Case A vs B delta analysis |
 | Recommendations | `analysis/recommendations/` | Auto-generated improvement suggestions |
 
@@ -412,7 +412,7 @@ backend/src/
 │   ├── validation/     NetworkValidator
 │   └── whitebox/       WhiteBoxTrace
 ├── analysis/
-│   ├── boundary/       BoundaryIdentifier (PCC)
+│   ├── boundary/       BoundaryIdentifier (BoundaryNode)
 │   ├── coverage_score/ Completeness assessment
 │   ├── lf_sensitivity/ Load flow sensitivity
 │   ├── normative/      PN-EN compliance evaluator
@@ -488,10 +488,10 @@ UI contracts define presentation rules and are maintained separately from this a
 |-----|-------|
 | ADR-001 | Power Flow v2: overlay vs core |
 | ADR-002 | Network Wizard Service / Unit System |
-| ADR-003 | Domain Layer Boundaries / PCC Persistence |
+| ADR-003 | Domain Layer Boundaries / BoundaryNode Persistence |
 | ADR-004 | Network Import/Export Contracts |
 | ADR-005 | Solver Input DTO Contracts |
-| ADR-006 | Solver Layer Separation / PCC Persistence |
+| ADR-006 | Solver Layer Separation / BoundaryNode Persistence |
 | ADR-007 | IEC60909 Frozen Reference / Type Library Strategy |
 | ADR-008 | Per-Case Switching State / Power Flow Location |
 | ADR-009 | XLSX Importer (future) |

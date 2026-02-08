@@ -11,7 +11,7 @@ from application.proof_engine.proof_pack import (
 
 def build_equipment_proof_pack(proof_input: EquipmentProofInput) -> tuple[str, bytes]:
     bundle = EquipmentProofGenerator.generate(proof_input)
-    snapshot_id = _snapshot_id_from_pcc(proof_input.pcc_node_id)
+    snapshot_id = _snapshot_id_from_connection_node(proof_input.connection_node_id)
     context = ProofPackContext(
         project_id=proof_input.project_id,
         case_id=proof_input.case_id,
@@ -24,8 +24,8 @@ def build_equipment_proof_pack(proof_input: EquipmentProofInput) -> tuple[str, b
     return filename, pack_bytes
 
 
-def _snapshot_id_from_pcc(pcc_node_id: str) -> str:
-    return f"pcc:{pcc_node_id}" if pcc_node_id else "unknown"
+def _snapshot_id_from_connection_node(connection_node_id: str) -> str:
+    return f"connection_node:{connection_node_id}" if connection_node_id else "unknown"
 
 
 def _proof_pack_filename(proof_input: EquipmentProofInput) -> str:

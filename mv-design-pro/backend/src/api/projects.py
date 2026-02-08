@@ -76,8 +76,8 @@ class ProjectResponse(BaseModel):
     mode: str
     voltage_level_kv: float
     frequency_hz: float
-    pcc_node_id: UUID | None = None
-    pcc_description: str | None = None
+    connection_node_id: UUID | None = None
+    connection_description: str | None = None
     owner_id: UUID | None = None
     created_at: datetime
     updated_at: datetime
@@ -137,8 +137,8 @@ def list_projects(
                 mode=p.mode,
                 voltage_level_kv=float(p.voltage_level_kv),
                 frequency_hz=float(p.frequency_hz),
-                pcc_node_id=p.pcc_node_id,
-                pcc_description=p.pcc_description,
+                connection_node_id=p.connection_node_id,
+                connection_description=p.connection_description,
                 owner_id=p.owner_id,
                 created_at=p.created_at,
                 updated_at=p.updated_at,
@@ -176,8 +176,8 @@ def create_project(
             mode=orm.mode,
             voltage_level_kv=float(orm.voltage_level_kv),
             frequency_hz=float(orm.frequency_hz),
-            pcc_node_id=orm.pcc_node_id,
-            pcc_description=orm.pcc_description,
+            connection_node_id=orm.connection_node_id,
+            connection_description=orm.connection_description,
             owner_id=orm.owner_id,
             created_at=orm.created_at,
             updated_at=orm.updated_at,
@@ -208,8 +208,8 @@ def get_project(
             mode=orm.mode,
             voltage_level_kv=float(orm.voltage_level_kv),
             frequency_hz=float(orm.frequency_hz),
-            pcc_node_id=orm.pcc_node_id,
-            pcc_description=orm.pcc_description,
+            connection_node_id=orm.connection_node_id,
+            connection_description=orm.connection_description,
             owner_id=orm.owner_id,
             created_at=orm.created_at,
             updated_at=orm.updated_at,

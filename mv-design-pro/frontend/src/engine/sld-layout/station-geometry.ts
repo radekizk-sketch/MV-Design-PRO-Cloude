@@ -319,7 +319,7 @@ function computeTrunkPath(
 
 function computeEntryPoints(
   substations: SubstationInput[],
-  busPositions: Map<string, Point>,
+  _busPositions: Map<string, Point>,
   stationBoxes: StationBoundingBox[]
 ): EntryPointMarker[] {
   const markers: EntryPointMarker[] = [];

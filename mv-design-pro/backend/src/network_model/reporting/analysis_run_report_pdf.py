@@ -261,6 +261,6 @@ def _truncate_json(value: Any, max_chars: int = 1200) -> str:
 
 
 def _label_for_summary_key(key: str) -> str:
-    if key == "pcc_node_id":
-        return "PCC – punkt wspólnego przyłączenia"
+    if key == "connection_node_id":
+        return "BoundaryNode – węzeł przyłączenia"
     return key

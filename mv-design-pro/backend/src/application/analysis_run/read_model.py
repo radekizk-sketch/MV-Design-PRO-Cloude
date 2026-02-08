@@ -40,7 +40,7 @@ def minimize_summary(summary: dict[str, Any]) -> dict[str, Any]:
         "fault_node_id",
         "short_circuit_type",
         "ikss_a",
-        "pcc_node_id",
+        "connection_node_id",
     ]
     reduced = {key: summary[key] for key in preferred_keys if key in summary}
     if reduced:

@@ -228,14 +228,14 @@ describe('resolveSelectionRef', () => {
   });
 
 
-  describe('Ochrona przed selekcją PCC', () => {
-    it('zwraca null dla elementu PCC', () => {
-      const result = resolveSelectionRef('bus_pcc', 'Bus', enm);
+  describe('Ochrona przed selekcją BoundaryNode', () => {
+    it('zwraca null dla elementu BoundaryNode', () => {
+      const result = resolveSelectionRef('bus_connection_node', 'Bus', enm);
       expect(result).toBeNull();
     });
 
-    it('dla źródła z selekcją PCC wykonuje fallback do źródła sieci', () => {
-      const result = resolveSelectionRef('pcc_source', 'Source', enm);
+    it('dla źródła z selekcją BoundaryNode wykonuje fallback do źródła sieci', () => {
+      const result = resolveSelectionRef('connection_source', 'Source', enm);
       expect(result).not.toBeNull();
       expect(result!.selectionRef.element_type).toBe('source');
       expect(result!.selectionRef.element_ref_id).toBe('src_grid');

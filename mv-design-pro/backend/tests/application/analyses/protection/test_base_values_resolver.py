@@ -320,9 +320,9 @@ class TestFrequencyProtection:
     def test_underfrequency_abs(self) -> None:
         """f< (81U) = 47.5 Hz → computed_from='wartosc bezwzgledna'."""
         ctx = ProtectedElementContext(
-            element_type=ProtectedElementType.PCC,
-            element_id="pcc-001",
-            pcc_voltage_kv=15.0,
+            element_type=ProtectedElementType.BoundaryNode,
+            element_id="connection_node-001",
+            connection_voltage_kv=15.0,
         )
         base = resolve_base_values(ctx)
 
@@ -344,8 +344,8 @@ class TestFrequencyProtection:
     def test_overfrequency_abs(self) -> None:
         """f> (81O) = 51.5 Hz."""
         ctx = ProtectedElementContext(
-            element_type=ProtectedElementType.PCC,
-            element_id="pcc-001",
+            element_type=ProtectedElementType.BoundaryNode,
+            element_id="connection_node-001",
         )
         base = resolve_base_values(ctx)
 
@@ -367,8 +367,8 @@ class TestFrequencyProtection:
     def test_rocof_abs(self) -> None:
         """df/dt (81R) = 2 Hz/s."""
         ctx = ProtectedElementContext(
-            element_type=ProtectedElementType.PCC,
-            element_id="pcc-001",
+            element_type=ProtectedElementType.BoundaryNode,
+            element_id="connection_node-001",
         )
         base = resolve_base_values(ctx)
 
@@ -455,39 +455,39 @@ class TestComputedFromRequired:
 
 
 # =============================================================================
-# Test: PCC — punkt wspólnego przyłączenia
+# Test: BoundaryNode — węzeł przyłączenia
 # =============================================================================
 
 
 class TestPccProtection:
-    """PCC – punkt wspólnego przyłączenia."""
+    """BoundaryNode – węzeł przyłączenia."""
 
-    def test_resolve_pcc_voltage(self) -> None:
-        """Un z PCC voltage."""
+    def test_resolve_connection_node_voltage(self) -> None:
+        """Un z BoundaryNode voltage."""
         ctx = ProtectedElementContext(
-            element_type=ProtectedElementType.PCC,
-            element_id="pcc-001",
-            pcc_voltage_kv=110.0,
-            pcc_rated_current_a=630.0,
+            element_type=ProtectedElementType.BoundaryNode,
+            element_id="connection_node-001",
+            connection_voltage_kv=110.0,
+            connection_rated_current_a=630.0,
         )
         base = resolve_base_values(ctx)
 
         assert base.un_kv == 110.0
-        assert base.source_un == BaseValueSourceUn.PCC
-        assert "PCC" in base.notes_pl
+        assert base.source_un == BaseValueSourceUn.BoundaryNode
+        assert "BoundaryNode" in base.notes_pl
 
-    def test_resolve_pcc_current(self) -> None:
-        """In z PCC rated current."""
+    def test_resolve_connection_node_current(self) -> None:
+        """In z BoundaryNode rated current."""
         ctx = ProtectedElementContext(
-            element_type=ProtectedElementType.PCC,
-            element_id="pcc-001",
-            pcc_voltage_kv=110.0,
-            pcc_rated_current_a=630.0,
+            element_type=ProtectedElementType.BoundaryNode,
+            element_id="connection_node-001",
+            connection_voltage_kv=110.0,
+            connection_rated_current_a=630.0,
         )
         base = resolve_base_values(ctx)
 
         assert base.in_a == 630.0
-        assert base.source_in == BaseValueSourceIn.PCC
+        assert base.source_in == BaseValueSourceIn.BoundaryNode
 
 
 # =============================================================================

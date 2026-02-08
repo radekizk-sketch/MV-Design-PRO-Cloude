@@ -110,15 +110,15 @@ export function computeTopologicalLayout(
   // ==========================================
   const {
     assignments: roleAssignments,
-    pccIds,
+    connectionNodeIds,
     stationSymbolIds,
     feederChainsByBusbar,
   } = assignTopologicalRoles(symbols);
 
-  // Filter PCC from working set
-  const workingSymbols = symbols.filter((s) => !pccIds.includes(s.id));
+  // Filter BoundaryNode from working set
+  const workingSymbols = symbols.filter((s) => !connectionNodeIds.includes(s.id));
   if (workingSymbols.length === 0) {
-    return createEmptyResult(orientation, startTime, pccIds);
+    return createEmptyResult(orientation, startTime, connectionNodeIds);
   }
 
   // ==========================================
@@ -208,7 +208,7 @@ export function computeTopologicalLayout(
     assignedRoleCount: roleAssignments.size,
     unassignedSymbolIds: unassigned,
     quarantinedSymbolIds: quarantined,
-    filteredPccIds: pccIds,
+    filteredPccIds: connectionNodeIds,
     stationStacks: stationStacksMap,
     layoutTimeMs: performance.now() - startTime,
     isEmpty: false,
@@ -305,7 +305,7 @@ export function verifyDeterminism(
 function createEmptyResult(
   orientation: GlobalOrientation,
   startTime: number,
-  pccIds: string[] = []
+  connectionNodeIds: string[] = []
 ): TopologicalLayoutResult {
   return {
     positions: new Map(),
@@ -332,7 +332,7 @@ function createEmptyResult(
       assignedRoleCount: 0,
       unassignedSymbolIds: [],
       quarantinedSymbolIds: [],
-      filteredPccIds: pccIds,
+      filteredPccIds: connectionNodeIds,
       stationStacks: new Map(),
       layoutTimeMs: performance.now() - startTime,
       isEmpty: true,

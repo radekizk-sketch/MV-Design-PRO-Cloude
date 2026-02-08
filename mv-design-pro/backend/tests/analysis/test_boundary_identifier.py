@@ -37,7 +37,7 @@ def _make_branch(branch_id: str, from_node_id: str, to_node_id: str) -> Branch:
     )
 
 
-def test_external_grid_identifies_pcc() -> None:
+def test_external_grid_identifies_connection_node() -> None:
     snapshot = _make_snapshot(
         nodes=[_make_node("n1"), _make_node("n2")],
         branches=[_make_branch("b1", "n1", "n2")],
@@ -55,7 +55,7 @@ def test_external_grid_identifies_pcc() -> None:
 
     result = BoundaryIdentifier().identify(snapshot, case_params)
 
-    assert result.pcc_node_id == "n1"
+    assert result.connection_node_id == "n1"
     assert result.method == "external_grid"
     assert result.diagnostics == []
 
@@ -85,7 +85,7 @@ def test_fallback_generator_dominant_boundary() -> None:
 
     result = BoundaryIdentifier().identify(snapshot, case_params)
 
-    assert result.pcc_node_id == "n2"
+    assert result.connection_node_id == "n2"
     assert result.method == "generator_dominant"
     assert result.diagnostics == []
 
@@ -104,7 +104,7 @@ def test_ambiguity_returns_none_with_diagnostics() -> None:
 
     result = BoundaryIdentifier().identify(snapshot, case_params)
 
-    assert result.pcc_node_id is None
+    assert result.connection_node_id is None
     assert result.diagnostics
 
 

@@ -60,7 +60,7 @@
 | Symbol wirtualny | Dlaczego zakazany | Poprawne podejście |
 |------------------|------------------|-------------------|
 | "Virtual Bus" | Brak obiektu modelu | Dodaj rzeczywisty Bus do modelu |
-| "PCC Marker" | PCC – punkt wspólnego przyłączenia jest interpretacją | Nakładka z warstwy Analysis |
+| "BoundaryNode Marker" | BoundaryNode – węzeł przyłączenia jest interpretacją | Nakładka z warstwy Analysis |
 | "Boundary Line" | Brak znaczenia fizycznego | Nakładka z warstwy Analysis |
 | "Aggregated Feeder" | Ukrywa topologię | Pokazuj elementy indywidualnie |
 
@@ -98,7 +98,7 @@ Nakładki wyników są generowane przez warstwę Analysis, nie przez Solver:
 | PowerFlowResult | Adnotacje napięć | Wartości U na szynach |
 | ThermalAnalysis | Kolory obciążenia | Czerwony/żółty/zielony |
 | VoltageAnalysis | Markery przekroczeń | Przekroczenie/obniżenie napięcia |
-| BoundaryIdentifier | Znak PCC | Wskaźnik granicy |
+| BoundaryIdentifier | Znak BoundaryNode | Wskaźnik granicy |
 
 ### B.3 Brak wyników w modelu
 
@@ -108,7 +108,7 @@ Nakładki wyników są generowane przez warstwę Analysis, nie przez Solver:
 |-----------|--------------------|
 | `Bus.calculated_voltage = 14.8` | Zapisz w PowerFlowResult |
 | `Branch.calculated_current = 125` | Zapisz w PowerFlowResult |
-| `Bus.is_pcc = True` | Nakładka BoundaryIdentifier |
+| `Bus.is_connection_node = True` | Nakładka BoundaryIdentifier |
 
 **Uzasadnienie:** NetworkModel opisuje topologię fizyczną. Wyniki są ulotnymi rezultatami obliczeń.
 
@@ -208,7 +208,7 @@ MODEL_EDIT ◄─────────► CASE_CONFIG ◄──────�
 | Obciążenie >100% | Czerwony |
 | Napięcie w normie | Brak markera |
 | Przekroczenie napięcia | Czerwony marker |
-| Granica PCC – punktu wspólnego przyłączenia | Linia przerywana (nakładka) |
+| Granica BoundaryNode – punktu wspólnego przyłączenia | Linia przerywana (nakładka) |
 
 ---
 
@@ -331,17 +331,17 @@ Nakładka MUSI wskazywać status wyników:
 
 ### F.5 Zakazy
 
-#### F.5.1 PCC – punkt wspólnego przyłączenia
+#### F.5.1 BoundaryNode – węzeł przyłączenia
 
-**BINDING:** PCC NIE istnieje w NetworkModel ani jako obiekt SLD.
+**BINDING:** BoundaryNode NIE istnieje w NetworkModel ani jako obiekt SLD.
 
-| Warstwa | Status PCC |
+| Warstwa | Status BoundaryNode |
 |---------|------------|
 | NetworkModel | ZABRONIONY |
 | SLD (symbol) | ZABRONIONY |
 | Analysis (overlay) | DOZWOLONY — wyłącznie jako wynik analizy |
 
-PCC może być wyświetlony wyłącznie jako overlay pochodzący z warstwy Analysis (BoundaryIdentifier), nigdy jako obiekt modelu.
+BoundaryNode może być wyświetlony wyłącznie jako overlay pochodzący z warstwy Analysis (BoundaryIdentifier), nigdy jako obiekt modelu.
 
 #### F.5.2 Regulatorów i trybów dynamicznych
 
@@ -392,10 +392,10 @@ PCC może być wyświetlony wyłącznie jako overlay pochodzący z warstwy Analy
 |---------|----------------------|--------------|
 | Szyna (Bus) | Obiekt modelu | Symbol obowiązkowy |
 | Linia (LineBranch) | Obiekt modelu | Symbol obowiązkowy |
-| PCC – punkt wspólnego przyłączenia | **ZABRONIONY** | **ZABRONIONY** — wyłącznie overlay z Analysis |
+| BoundaryNode – węzeł przyłączenia | **ZABRONIONY** | **ZABRONIONY** — wyłącznie overlay z Analysis |
 | Granica sieci (Boundary) | **ZABRONIONY** | **ZABRONIONY** — wyłącznie overlay |
 
-**INWARIANT:** PCC – punkt wspólnego przyłączenia może być wyświetlony wyłącznie jako **nakładka wyników** pochodząca z warstwy Analysis (np. BoundaryIdentifier), nigdy jako obiekt NetworkModel ani symbol bazowy SLD.
+**INWARIANT:** BoundaryNode – węzeł przyłączenia może być wyświetlony wyłącznie jako **nakładka wyników** pochodząca z warstwy Analysis (np. BoundaryIdentifier), nigdy jako obiekt NetworkModel ani symbol bazowy SLD.
 
 ---
 

@@ -53,13 +53,13 @@ def test_project_two_buses_one_branch() -> None:
     ]
 
 
-def test_pcc_marker_not_in_projection() -> None:
+def test_connection_node_marker_not_in_projection() -> None:
     """
-    Regression test: PCC – punkt wspólnego przyłączenia is NOT stored in NetworkGraph.
-    PCC markers should NOT be generated from the graph (it's an interpretation layer concern).
+    Regression test: BoundaryNode – węzeł przyłączenia is NOT stored in NetworkGraph.
+    BoundaryNode markers should NOT be generated from the graph (it's an interpretation layer concern).
     """
     graph, snapshot_id = _build_snapshot()
-    # NOTE: graph.pcc_node_id was removed. PCC is interpretation, not model property.
+    # NOTE: graph.connection_node_id was removed. BoundaryNode is interpretation, not model property.
 
     snapshot = create_network_snapshot(
         graph,
@@ -68,9 +68,9 @@ def test_pcc_marker_not_in_projection() -> None:
     )
     diagram = project_snapshot_to_sld(snapshot)
 
-    # Verify no pcc_marker elements are generated from graph
+    # Verify no connection_marker elements are generated from graph
     element_types = [e.element_type for e in diagram.elements]
-    assert "pcc_marker" not in element_types
+    assert "connection_marker" not in element_types
 
 
 def test_in_service_false_excludes_entity() -> None:

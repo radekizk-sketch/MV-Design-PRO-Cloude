@@ -471,9 +471,9 @@ describe('Wizard/SLD Unity: URL State Sync', () => {
     expect(params.get('name')).toBeNull();
     expect(params.toString()).toBe('');
   });
-  it('decodeSelectionFromParams returns null for identyfikator PCC', () => {
+  it('decodeSelectionFromParams returns null for identyfikator BoundaryNode', () => {
     const params = new URLSearchParams();
-    params.set('sel', 'bus_pcc');
+    params.set('sel', 'bus_connection_node');
     params.set('type', 'Bus');
     params.set('name', 'Węzeł graniczny');
 
@@ -481,11 +481,11 @@ describe('Wizard/SLD Unity: URL State Sync', () => {
     expect(result).toBeNull();
   });
 
-  it('encodeSelectionToParams pomija selekcję PCC', () => {
+  it('encodeSelectionToParams pomija selekcję BoundaryNode', () => {
     const params = encodeSelectionToParams({
-      id: 'pcc_virtual_node',
+      id: 'connection_virtual_node',
       type: 'Bus',
-      name: 'Węzeł PCC',
+      name: 'Węzeł BoundaryNode',
     });
 
     expect(params.toString()).toBe('');

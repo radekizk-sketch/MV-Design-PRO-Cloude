@@ -131,7 +131,7 @@ class ImportReport:
 class ShortCircuitInput:
     graph: Any
     base_mva: float
-    pcc_node_id: str
+    connection_node_id: str
     sources: list[dict[str, Any]]
     loads: list[dict[str, Any]]
     grounding: dict[str, Any]

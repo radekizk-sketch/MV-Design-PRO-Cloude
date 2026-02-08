@@ -18,7 +18,7 @@ Define the canonical domain layer for MV-DESIGN-PRO and freeze its invariants. T
 1. The domain model (NetworkGraph + entities) is architecturally closed after this plan; downstream layers may not reinterpret or extend semantics.
 2. Domain objects are snapshot-immutable; all changes occur via explicit model-edit actions that produce new snapshots.
 3. Result APIs for IEC / PN-EN 60909 remain frozen; results are attached via external result containers, never by mutating domain entities.
-4. PCC (punkt wspólnego przyłączenia) is a first-class domain concept and must exist in every network model.
+4. BoundaryNode (węzeł przyłączenia) is a first-class domain concept and must exist in every network model.
 5. NetworkGraph determinism (ordering, identity, referential stability) is mandatory for SLD projection and auditing.
 
 ## Outcomes & Retrospective
@@ -91,10 +91,10 @@ Define the canonical domain layer for MV-DESIGN-PRO and freeze its invariants. T
    - Always connects to exactly one node.
    - Has identity, name, rated attributes, and in_service flag.
 
-6. **PCC (punkt wspólnego przyłączenia)**
+6. **BoundaryNode (węzeł przyłączenia)**
    - A mandatory domain element representing the point of common coupling.
-   - PCC is tied to exactly one node in the NetworkGraph.
-   - Each NetworkGraph has exactly one PCC.
+   - BoundaryNode is tied to exactly one node in the NetworkGraph.
+   - Each NetworkGraph has exactly one BoundaryNode.
 
 ### in_service Semantics
 - The in_service flag indicates whether an entity is active in the network model.
@@ -105,7 +105,7 @@ Define the canonical domain layer for MV-DESIGN-PRO and freeze its invariants. T
 - All branches connect exactly two existing nodes.
 - All transformers connect at least two existing nodes.
 - All sources and loads connect exactly one existing node.
-- PCC exists, is unique, and references an existing node.
+- BoundaryNode exists, is unique, and references an existing node.
 - The NetworkGraph must be internally consistent; dangling references are invalid.
 
 ## Invariants & Forbidden Mutations
@@ -155,7 +155,7 @@ Define the canonical domain layer for MV-DESIGN-PRO and freeze its invariants. T
 - Solver does not mutate domain entities or topology.
 
 ## Validation & Acceptance (Engineering-Verifiable)
-- A validator can confirm that every entity references existing nodes and PCC is unique.
+- A validator can confirm that every entity references existing nodes and BoundaryNode is unique.
 - in_service entities only are included in solver inputs and SLD projections.
 - Identity stability is verified across serialization/deserialization.
 - A new engineer can implement Wizard and SLD without guessing topology semantics.

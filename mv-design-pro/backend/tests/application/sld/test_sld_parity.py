@@ -232,18 +232,18 @@ class TestSldDiagramBijection:
 
 class TestNoPccInSldSymbols:
     """
-    Tests verifying PCC is NOT in SLD base symbols.
+    Tests verifying BoundaryNode is NOT in SLD base symbols.
     Per SYSTEM_SPEC.md § 18.3.4, sld_rules.md § A.4, § F.5.1.
     """
 
-    def test_node_symbol_no_is_pcc_field(self) -> None:
-        """SldNodeSymbolDTO has no is_pcc field (removed per compliance)."""
+    def test_node_symbol_no_is_connection_node_field(self) -> None:
+        """SldNodeSymbolDTO has no is_connection_node field (removed per compliance)."""
         node = SldNodeSymbolDTO(id=uuid4(), node_id=uuid4(), x=0, y=0)
-        assert not hasattr(node, "is_pcc")
+        assert not hasattr(node, "is_connection_node")
         payload = node.to_dict()
-        assert "is_pcc" not in payload
+        assert "is_connection_node" not in payload
 
-    def test_diagram_no_pcc_markers(self) -> None:
-        """SldDiagramDTO has no pcc_markers field."""
+    def test_diagram_no_connection_node_markers(self) -> None:
+        """SldDiagramDTO has no connection_markers field."""
         diagram = SldDiagramDTO(id=uuid4(), name="Test")
-        assert not hasattr(diagram, "pcc_markers")
+        assert not hasattr(diagram, "connection_markers")

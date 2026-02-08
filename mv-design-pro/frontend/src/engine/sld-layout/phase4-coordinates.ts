@@ -109,7 +109,7 @@ export function assignCoordinates(context: PipelineContext): PipelineContext {
 
   // Krok 6b: PHASE4 AESTHETICS — Propagate bay X positions through the entire hierarchy
   // This ensures that all elements in a bay chain inherit the correct horizontal position
-  propagateBayXPositions(orderedBays, positions, busbarGeometries, symbolById, config);
+  propagateBayXPositions(orderedBays ?? [], positions, busbarGeometries, symbolById, config);
 
   // Krok 7: Zastosuj user overrides
   applyUserOverrides(positions, userOverrides, config);
@@ -460,8 +460,8 @@ function positionBays(
  */
 function repositionSubBusbars(
   bay: Bay,
-  symbolById: Map<string, LayoutSymbol>,
-  config: LayoutConfig,
+  _symbolById: Map<string, LayoutSymbol>,
+  _config: LayoutConfig,
   positions: Map<string, ElementPosition>,
   busbarGeometries: Map<string, BusbarGeometry>
 ): void {
@@ -522,7 +522,7 @@ function propagateBayXPositions(
   positions: Map<string, ElementPosition>,
   busbarGeometries: Map<string, BusbarGeometry>,
   symbolById: Map<string, LayoutSymbol>,
-  config: LayoutConfig
+  _config: LayoutConfig
 ): void {
   // Process each top-level bay and propagate its slotX to all nested elements
   for (const bay of bays) {

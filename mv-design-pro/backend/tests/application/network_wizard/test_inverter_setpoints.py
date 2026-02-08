@@ -53,7 +53,7 @@ def _build_inverter_network(
             params={"r_ohm_per_km": 0.1, "x_ohm_per_km": 0.2, "length_km": 1.0},
         ),
     )
-    service.set_pcc(project_id, slack["id"])
+    service.set_connection_node(project_id, slack["id"])
     service.add_source(
         project_id,
         SourcePayload(

@@ -13,8 +13,6 @@
 import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import type {
   EnergyNetworkModel,
-  Bus,
-  Branch,
   OverheadLine,
   Cable,
   Transformer,
@@ -60,7 +58,7 @@ function createDefaultENM(): EnergyNetworkModel {
       created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
       revision: 0, hash_sha256: '', defaults: { frequency_hz: 50, unit_system: 'SI' },
     },
-    buses: [], branches: [], transformers: [], sources: [], loads: [], generators: [],
+    buses: [], branches: [], transformers: [], sources: [], loads: [], generators: [], substations: [], bays: [], junctions: [], corridors: [],
   };
 }
 
@@ -129,21 +127,6 @@ function Select({ value, onChange, children }: {
       style={{ padding: '6px 10px', border: '1px solid #d1d5db', borderRadius: '4px', fontSize: '13px', width: '100%' }}>
       {children}
     </select>
-  );
-}
-
-function GateIndicator({ validation }: { validation: ValidationResult | null }) {
-  if (!validation) return null;
-  const color = validation.status === 'OK' ? '#22c55e' : validation.status === 'WARN' ? '#eab308' : '#ef4444';
-  const bc = validation.issues.filter((i) => i.severity === 'BLOCKER').length;
-  const wc = validation.issues.filter((i) => i.severity === 'IMPORTANT').length;
-  return (
-    <div data-testid="gate-indicator" style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '3px 8px', borderRadius: '4px', background: `${color}15`, border: `1px solid ${color}40`, fontSize: '11px' }}>
-      <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: color }} />
-      {validation.status === 'OK' && 'Gotowy'}
-      {validation.status === 'WARN' && `${wc} ostrz.`}
-      {validation.status === 'FAIL' && `${bc} bloker.`}
-    </div>
   );
 }
 
@@ -245,7 +228,7 @@ function StepK4({ enm, onChange }: StepProps) {
     const nl: OverheadLine = { id: crypto.randomUUID(), ref_id: `line_L${String(n).padStart(2, '0')}`, name: `Linia L${n}`, tags: [], meta: {}, type: 'line_overhead', from_bus_ref: refs[0] ?? '', to_bus_ref: refs[1] ?? refs[0] ?? '', status: 'closed', length_km: 5, r_ohm_per_km: 0.443, x_ohm_per_km: 0.340 };
     onChange({ ...enm, branches: [...enm.branches, nl] });
   };
-  const upd = (ref: string, p: Partial<OverheadLine | Cable>) => onChange({ ...enm, branches: enm.branches.map((b) => b.ref_id === ref ? { ...b, ...p } : b) });
+  const upd = (ref: string, p: Partial<OverheadLine | Cable>) => onChange({ ...enm, branches: enm.branches.map((b) => (b.ref_id === ref ? ({ ...b, ...p } as typeof b) : b)) });
   const rm = (ref: string) => onChange({ ...enm, branches: enm.branches.filter((b) => b.ref_id !== ref) });
 
   return (

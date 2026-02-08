@@ -48,12 +48,12 @@ This document provides a comprehensive checklist for verifying compliance with D
 
 | ID | Requirement | Verification | Status |
 |----|-------------|--------------|--------|
-| NM-020 | NO PCC in NetworkModel | Check: pcc_node_id removed from NetworkGraph | PASS |
+| NM-020 | NO BoundaryNode in NetworkModel | Check: connection_node_id removed from NetworkGraph | PASS |
 | NM-021 | NO boundary markers in model | Check: no boundary fields | PASS |
 | NM-022 | NO legal/contractual concepts | Check: no legal fields | PASS |
 | NM-023 | Station = logical only | Check: Station has no impedance | N/A |
 
-**Remediated (2025-01):** `pcc_node_id` removed from NetworkGraph. PCC is now identified exclusively in the interpretation layer via BoundaryIdentifier. See PLANS.md Phase 2 Task 2.1.
+**Remediated (2025-01):** `connection_node_id` removed from NetworkGraph. BoundaryNode is now identified exclusively in the interpretation layer via BoundaryIdentifier. See PLANS.md Phase 2 Task 2.1.
 
 ---
 
@@ -235,14 +235,14 @@ This document provides a comprehensive checklist for verifying compliance with D
 | SD-012 | No visual shortcuts without model | Check: all visible in model | PASS |
 | SD-013 | Edit via SLD = edit model | Check: same NetworkGraph | PASS |
 
-### 7.3 PCC in SLD
+### 7.3 BoundaryNode in SLD
 
 | ID | Requirement | Verification | Status |
 |----|-------------|--------------|--------|
-| SD-020 | NO is_pcc in SldNodeSymbol | Check: is_pcc field removed | PASS |
-| SD-021 | PCC identified from interpretation | Check: BoundaryIdentifier | PASS |
+| SD-020 | NO is_connection_node in SldNodeSymbol | Check: is_connection_node field removed | PASS |
+| SD-021 | BoundaryNode identified from interpretation | Check: BoundaryIdentifier | PASS |
 
-**Remediated (2025-01):** `is_pcc` removed from SldNodeSymbol. PCC marker is now generated as overlay from BoundaryIdentifier in the analysis layer. See PLANS.md Phase 2 Task 2.1.
+**Remediated (2025-01):** `is_connection_node` removed from SldNodeSymbol. BoundaryNode marker is now generated as overlay from BoundaryIdentifier in the analysis layer. See PLANS.md Phase 2 Task 2.1.
 
 ### 7.4 SLD Operating Modes (NEW)
 
@@ -301,13 +301,13 @@ This document provides a comprehensive checklist for verifying compliance with D
 | IN-003 | NO physics in analysis | Check: no impedance calculations | VERIFY |
 | IN-004 | NO model modification | Check: read-only access | VERIFY |
 
-### 8.2 PCC Identification
+### 8.2 BoundaryNode Identification
 
 | ID | Requirement | Verification | Status |
 |----|-------------|--------------|--------|
-| IN-010 | PCC identified in interpretation | Check: BoundaryIdentifier | PASS |
-| IN-011 | PCC not in NetworkModel | Check: pcc_node_id removed | PASS |
-| IN-012 | PCC uses heuristics | Check: not physics | PASS |
+| IN-010 | BoundaryNode identified in interpretation | Check: BoundaryIdentifier | PASS |
+| IN-011 | BoundaryNode not in NetworkModel | Check: connection_node_id removed | PASS |
+| IN-012 | BoundaryNode uses heuristics | Check: not physics | PASS |
 
 **Remediated (2025-01):** BoundaryIdentifier implemented in `application/analyses/boundary.py`. Uses heuristic identification (external grid connection) without physics calculations.
 
@@ -340,9 +340,9 @@ This document provides a comprehensive checklist for verifying compliance with D
 
 | ID | Description | Resolution |
 |----|-------------|------------|
-| NM-020 | pcc_node_id in NetworkGraph | REMEDIATED - removed from NetworkGraph |
-| SD-020 | is_pcc in SldNodeSymbol | REMEDIATED - removed from SldNodeSymbol |
-| IN-011 | PCC not moved to interpretation | REMEDIATED - BoundaryIdentifier implemented |
+| NM-020 | connection_node_id in NetworkGraph | REMEDIATED - removed from NetworkGraph |
+| SD-020 | is_connection_node in SldNodeSymbol | REMEDIATED - removed from SldNodeSymbol |
+| IN-011 | BoundaryNode not moved to interpretation | REMEDIATED - BoundaryIdentifier implemented |
 | SD-011 | SldPccMarkerElement in SLD | REMEDIATED - removed from sld_projection.py (2025-01) |
 
 ---
@@ -351,27 +351,27 @@ This document provides a comprehensive checklist for verifying compliance with D
 
 ### 10.1 Completed Actions (Phase 2 - 2025-01)
 
-1. **Remove pcc_node_id from NetworkGraph** — DONE
+1. **Remove connection_node_id from NetworkGraph** — DONE
    - File: `backend/src/network_model/core/graph.py`
    - Action: Field removed, snapshot serialization updated
 
-2. **Remove is_pcc from SLD** — DONE
+2. **Remove is_connection_node from SLD** — DONE
    - File: `backend/src/domain/sld.py`
    - Action: Field removed from SldNodeSymbol, sld_projection.py updated
 
 3. **BoundaryIdentifier implementation** — DONE
    - File: `backend/src/application/analyses/boundary.py`
-   - Action: PCC identification via heuristics (external grid connection)
+   - Action: BoundaryNode identification via heuristics (external grid connection)
 
 4. **Action Envelope updated** — DONE
-   - Removed `set_pcc` action from core action types
-   - PCC hint preserved in application/wizard settings layer
+   - Removed `set_connection_node` action from core action types
+   - BoundaryNode hint preserved in application/wizard settings layer
 
 ### 10.2 Completed Actions (SLD PowerFactory Parity - 2025-01)
 
 5. **SldPccMarkerElement removed from sld_projection** — DONE
    - File: `backend/src/network_model/sld_projection.py`
-   - Action: Removed from SldElement union, PCC is overlay-only
+   - Action: Removed from SldElement union, BoundaryNode is overlay-only
 
 6. **SldSwitchElement added** — DONE
    - File: `backend/src/network_model/sld_projection.py`
@@ -396,8 +396,8 @@ This document provides a comprehensive checklist for verifying compliance with D
 ### 10.3 Verification
 
 All remediations verified via:
-- Unit tests confirming PCC removal from core layer
-- Integration tests confirming PCC overlay from analysis layer
+- Unit tests confirming BoundaryNode removal from core layer
+- Integration tests confirming BoundaryNode overlay from analysis layer
 - 28 SLD invariant tests (bijection, determinism, modes, switches, in_service)
 - PLANS.md Phase 2 Task 2.1 marked DONE
 
@@ -948,11 +948,11 @@ OUTDATED → FRESH (after re-calculation)
 
 ## 13. Verification Commands
 
-### 12.1 Check for PCC in Model
+### 12.1 Check for BoundaryNode in Model
 
 ```bash
 # Should return 0 matches after remediation
-grep -r "pcc_node_id" backend/src/network_model/core/
+grep -r "connection_node_id" backend/src/network_model/core/
 ```
 
 ### 12.2 Check for WHITE BOX
@@ -1141,4 +1141,4 @@ MV-DESIGN-PRO osiągnął pełną zgodność funkcjonalną i ergonomiczną z pro
 - DoD:
   - [ ] Jeśli SN: prądy doziemne z uwzględnieniem impedancji uziemienia i rozdziału prądu.
   - [ ] Tryb uproszczonych napięć dotykowych z wyraźnymi zastrzeżeniami.
-  - [ ] Terminologia w ProofDocument: 1F-Z, 2F, 2F-Z oraz PCC – punkt wspólnego przyłączenia.
+  - [ ] Terminologia w ProofDocument: 1F-Z, 2F, 2F-Z oraz BoundaryNode – węzeł przyłączenia.

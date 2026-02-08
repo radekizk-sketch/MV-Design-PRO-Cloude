@@ -10,8 +10,8 @@ CANONICAL ALIGNMENT:
 - PowerFactory/ETAP parity: Base value resolution
 
 ZASADA KLUCZOWA:
-- Un = napięcie znamionowe miejsca pomiaru (bus/VT/PCC)
-- In = prąd znamionowy obiektu chronionego (line/transformer/breaker/PCC)
+- Un = napięcie znamionowe miejsca pomiaru (bus/VT/BoundaryNode)
+- In = prąd znamionowy obiektu chronionego (line/transformer/breaker/BoundaryNode)
 - computed = wartość wyliczona z setpoint + BaseValues (opcjonalna)
 
 NIE jest to solver protection, NIE selektywność, NIE krzywe.

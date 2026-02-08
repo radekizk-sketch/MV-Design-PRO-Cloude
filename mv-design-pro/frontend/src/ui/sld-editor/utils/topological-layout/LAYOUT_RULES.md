@@ -16,12 +16,12 @@ Every SLD symbol receives exactly ONE topological role:
 | `AXIAL_ELEMENT` | Transformer, Switch | Element on main vertical axis |
 | `INLINE_ELEMENT` | Series elements in feeder chain | Element inline within a feeder |
 
-**Invariant**: `count(roles) === count(symbols)` (after PCC filtering)
+**Invariant**: `count(roles) === count(symbols)` (after BoundaryNode filtering)
 
-## 2. PCC Filtering
+## 2. BoundaryNode Filtering
 
-Nodes whose `elementName` contains "PCC" (case-insensitive) are filtered from rendering.
-PCC is a business/analysis concept, not a physical element - it does not appear on SLD.
+Nodes whose `elementName` contains "BoundaryNode" (case-insensitive) are filtered from rendering.
+BoundaryNode is a business/analysis concept, not a physical element - it does not appear on SLD.
 
 ## 3. Canonical Layers (Vertical Ordering)
 

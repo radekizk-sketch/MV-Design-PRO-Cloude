@@ -65,7 +65,7 @@ def _build_export_service() -> tuple[AnalysisRunExportService, dict[str, UUID]]:
             "fault_spec": {"node_id": node_id_str},
         },
         input_hash="hash-sc",
-        result_summary={"status": "FINISHED", "pcc_node_id": str(uuid4())},
+        result_summary={"status": "FINISHED", "connection_node_id": str(uuid4())},
         white_box_trace=[
             {"key": "step_a", "title": "Step A", "notes": "ok"},
             {"key": "step_b", "title": "Step B", "notes": None, "metrics": {"k": 1}},

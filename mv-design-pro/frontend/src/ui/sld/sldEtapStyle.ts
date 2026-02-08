@@ -913,22 +913,22 @@ export const ETAP_GEOMETRY = {
   },
 
   // ---------------------------------------------------------------------------
-  // PCC FILTERING (PR-SLD-ETAP-TOPOLOGY-LAYOUT-FINAL)
+  // BoundaryNode FILTERING (PR-SLD-ETAP-TOPOLOGY-LAYOUT-FINAL)
   // ---------------------------------------------------------------------------
 
   /**
-   * PCC (Point of Common Coupling) filtering rules.
+   * BoundaryNode (Point of Common Coupling) filtering rules.
    *
-   * CANON: PCC NIE JEST RYSOWANE w SLD.
-   * PCC jest koncepcją biznesową, nie fizyczną — należy do warstwy analizy.
+   * CANON: BoundaryNode NIE JEST RYSOWANE w SLD.
+   * BoundaryNode jest koncepcją biznesową, nie fizyczną — należy do warstwy analizy.
    */
   pccFiltering: {
-    /** Enable PCC node filtering from render graph */
+    /** Enable BoundaryNode node filtering from render graph */
     filterPccNodes: true,
-    /** PCC name patterns to filter (case-insensitive) */
-    pccNamePatterns: ['pcc', 'point of common coupling', 'punkt przyłączenia'],
-    /** PCC element type patterns to filter */
-    pccTypePatterns: ['pcc', 'connection_point', 'virtual_node'],
+    /** BoundaryNode name patterns to filter (case-insensitive) */
+    pccNamePatterns: ['connection_node', 'point of common coupling', 'punkt przyłączenia'],
+    /** BoundaryNode element type patterns to filter */
+    pccTypePatterns: ['connection_node', 'connection_point', 'virtual_node'],
   },
 
   // ---------------------------------------------------------------------------

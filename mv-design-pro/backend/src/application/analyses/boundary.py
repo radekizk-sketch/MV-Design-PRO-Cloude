@@ -2,8 +2,8 @@
 Compatibility wrapper for boundary identification.
 
 PowerFactory Alignment:
-- PCC (Point of Common Coupling) is INTERPRETATION, not physics
-- PCC is identified using heuristics, not model structure
+- BoundaryNode (Point of Common Coupling) is INTERPRETATION, not physics
+- BoundaryNode is identified using heuristics, not model structure
 - This is an ANALYSIS, not a SOLVER
 
 This module delegates to analysis.boundary (interpretation layer).
@@ -31,7 +31,7 @@ class BoundaryIdentifier:
     def identify(self, snapshot: NetworkSnapshot, case_params: dict | None = None) -> BoundaryResult:
         return self._identifier.identify(snapshot, case_params)
 
-    def identify_pcc(self, network_graph, case_params: dict | None = None) -> BoundaryResult:
+    def identify_connection_node(self, network_graph, case_params: dict | None = None) -> BoundaryResult:
         snapshot = NetworkSnapshot(
             meta=SnapshotMeta.create(network_model_id=getattr(network_graph, "network_model_id", None)),
             graph=network_graph,
@@ -39,17 +39,17 @@ class BoundaryIdentifier:
         return self._identifier.identify(snapshot, case_params)
 
 
-def identify_pcc(network_graph, case_params: dict | None = None) -> Optional[str]:
+def identify_connection_node(network_graph, case_params: dict | None = None) -> Optional[str]:
     """
-    Convenience function to identify PCC.
+    Convenience function to identify BoundaryNode.
 
     Args:
         network_graph: NetworkGraph instance.
         case_params: Optional case parameters (sources, loads).
 
     Returns:
-        PCC node ID or None.
+        BoundaryNode node ID or None.
     """
     identifier = BoundaryIdentifier()
-    result = identifier.identify_pcc(network_graph, case_params)
-    return result.pcc_node_id
+    result = identifier.identify_connection_node(network_graph, case_params)
+    return result.connection_node_id

@@ -15,7 +15,7 @@ def download_equipment_proof_pack(payload: EquipmentProofRequest) -> Response:
         project_id=payload.project_id,
         case_id=payload.case_id,
         run_id=payload.run_id,
-        pcc_node_id=payload.pcc_node_id,
+        connection_node_id=payload.connection_node_id,
         device=DeviceRating(
             device_id=payload.device.device_id,
             name_pl=payload.device.name_pl,

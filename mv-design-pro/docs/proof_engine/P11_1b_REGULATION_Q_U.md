@@ -189,7 +189,7 @@ $$
 
 | Symbol | Mapping key | Jednostka | Opis |
 |--------|-------------|-----------|------|
-| $X$ | `x_ohm` | Ω | Reaktancja do PCC |
+| $X$ | `x_ohm` | Ω | Reaktancja do BoundaryNode |
 | $Q$ | `q_regulated_mvar` | Mvar | Moc bierna po regulacji |
 | $U_n$ | `u_n_kv` | kV | Napięcie znamionowe |
 | $\Delta U_Q$ | `delta_u_q_percent` | % | Zmiana napięcia od Q |
@@ -241,20 +241,20 @@ case_a:
   name: "Nastawa domyślna"
   u2_pu: 1.03
   result:
-    u_pcc_pu: 1.045
+    u_connection_node_pu: 1.045
     delta_u_percent: 4.5
 
 case_b:
   name: "Nastawa rozszerzona"
   u2_pu: 1.05
   result:
-    u_pcc_pu: 1.040
+    u_connection_node_pu: 1.040
     delta_u_percent: 4.0
 
 conclusion_pl: |
   Rozszerzenie martwej strefy Q(U) z U2=1.03 do U2=1.05
   spowodowało wcześniejsze włączenie regulacji pojemnościowej,
-  co obniżyło napięcie w PCC o 0.5% (z 104.5% do 104.0%).
+  co obniżyło napięcie w BoundaryNode o 0.5% (z 104.5% do 104.0%).
 ```
 
 ---
@@ -391,6 +391,6 @@ conclusion_pl: |
 - DoD:
   - [ ] Jeśli SN: prądy doziemne z uwzględnieniem impedancji uziemienia i rozdziału prądu.
   - [ ] Tryb uproszczonych napięć dotykowych z wyraźnymi zastrzeżeniami.
-  - [ ] Terminologia w ProofDocument: 1F-Z, 2F, 2F-Z oraz PCC – punkt wspólnego przyłączenia.
+  - [ ] Terminologia w ProofDocument: 1F-Z, 2F, 2F-Z oraz BoundaryNode – węzeł przyłączenia.
 
 **END OF P11.1b**

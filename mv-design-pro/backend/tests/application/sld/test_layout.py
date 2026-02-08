@@ -90,14 +90,14 @@ def test_layout_is_deterministic() -> None:
         name="Main",
         nodes=nodes_order_a,
         branches=branches,
-        pcc_node_id=node_a,
+        connection_node_id=node_a,
     )
     diagram_second = build_auto_layout_diagram(
         project_id=project_id,
         name="Main",
         nodes=nodes_order_b,
         branches=reversed(branches),
-        pcc_node_id=node_a,
+        connection_node_id=node_a,
     )
 
     assert diagram_first.to_payload() == diagram_second.to_payload()
@@ -121,7 +121,7 @@ def test_bijection_no_helper_nodes() -> None:
         name="Bijection",
         nodes=nodes,
         branches=branches,
-        pcc_node_id=node_a,
+        connection_node_id=node_a,
     )
 
     payload = diagram.to_payload()
@@ -160,7 +160,7 @@ def test_in_service_false_visible_in_sld() -> None:
         name="InService",
         nodes=nodes,
         branches=branches,
-        pcc_node_id=node_a,
+        connection_node_id=node_a,
     )
 
     payload = diagram.to_payload()
@@ -207,7 +207,7 @@ def test_switch_open_closed_state() -> None:
         nodes=nodes,
         branches=[],
         switches=switches,
-        pcc_node_id=node_a,
+        connection_node_id=node_a,
     )
 
     payload = diagram.to_payload()
@@ -251,7 +251,7 @@ def test_switch_types_breaker_disconnector_fuse() -> None:
         ],
         branches=[],
         switches=switches,
-        pcc_node_id=node_a,
+        connection_node_id=node_a,
     )
 
     payload = diagram.to_payload()
@@ -279,7 +279,7 @@ def test_deterministic_with_switches() -> None:
         nodes=nodes,
         branches=[],
         switches=switches_order_a,
-        pcc_node_id=node_a,
+        connection_node_id=node_a,
     )
     diagram_second = build_auto_layout_diagram(
         project_id=project_id,
@@ -287,7 +287,7 @@ def test_deterministic_with_switches() -> None:
         nodes=list(reversed(nodes)),
         branches=[],
         switches=switches_order_b,
-        pcc_node_id=node_a,
+        connection_node_id=node_a,
     )
 
     assert diagram_first.to_payload() == diagram_second.to_payload()

@@ -31,7 +31,7 @@ backend/src/network_model/core/
 - **Brak regulacji** - NetworkGraph nie wie o OSD ani kodeksach
 - **Brak analiz** - Core nie wykonuje obliczeń rozpływu ani zwarć
 - **Brak persystencji** - Core nie zna bazy danych
-- **Brak PCC w modelu** - PCC – punkt wspólnego przyłączenia NIE występuje w NetworkGraph; jest identyfikowany w warstwie analysis przez BoundaryIdentifier
+- **Brak BoundaryNode w modelu** - BoundaryNode – węzeł przyłączenia NIE występuje w NetworkGraph; jest identyfikowany w warstwie analysis przez BoundaryIdentifier
 
 ### 2.3 Snapshot Store (Persistence)
 
@@ -62,8 +62,8 @@ Minimalne API backendu wspiera pełny przepływ:
 }
 ```
 
-> **Uwaga:** PCC – punkt wspólnego przyłączenia nie jest przechowywany w NetworkGraph.
-> PCC – punkt wspólnego przyłączenia jest identyfikowany w warstwie interpretacji/analysis przez BoundaryIdentifier.
+> **Uwaga:** BoundaryNode – węzeł przyłączenia nie jest przechowywany w NetworkGraph.
+> BoundaryNode – węzeł przyłączenia jest identyfikowany w warstwie interpretacji/analysis przez BoundaryIdentifier.
 > Zobacz SYSTEM_SPEC.md § 18.3.4.
 
 **POST /snapshots/{snapshot_id}/actions** przyjmuje `ActionEnvelope`, waliduje go i zwraca
@@ -149,7 +149,7 @@ z kodem `batch_aborted`, natomiast akcja błędna zawiera własne kody i ścież
 
 DesignSynth przechowuje artefakty poziomu przypadku (bez mutacji domeny Core): **DesignSpec**, **DesignProposal** oraz **DesignEvidence**. Są one zapisywane w tabelach `design_specs`, `design_proposals`, `design_evidence` i służą jako audytowalne, deterministycznie serializowane (JSON-safe) wejścia/wyjścia dla procesu projektowania na poziomie OperatingCase (case_id + snapshot_id). W Core nie ma logiki solverów ani fizyki powiązanej z tymi artefaktami.
 
-DesignSynth M2 rozszerza to o deterministyczny pipeline „connection study” (spec → proposal → evidence → report). Pipeline działa w warstwie application jako orkiestracja (bez solverów), zapisuje artefakty poziomu przypadku oraz generuje raport JSON z sekcją **„PCC – punkt wspólnego przyłączenia”**, założeniami i ograniczeniami. Raport zawiera fingerprint wyliczony z kanonicznego JSON, co zapewnia powtarzalność i audytowalność.
+DesignSynth M2 rozszerza to o deterministyczny pipeline „connection study” (spec → proposal → evidence → report). Pipeline działa w warstwie application jako orkiestracja (bez solverów), zapisuje artefakty poziomu przypadku oraz generuje raport JSON z sekcją **„BoundaryNode – węzeł przyłączenia”**, założeniami i ograniczeniami. Raport zawiera fingerprint wyliczony z kanonicznego JSON, co zapewnia powtarzalność i audytowalność.
 
 ## 3. Komponenty
 
@@ -344,8 +344,8 @@ Brak tu fizyki i norm — tylko struktura oraz referencje do encji snapshotu.
 - `create_branch` — `from_node_id`, `to_node_id`, `branch_kind`
 - `set_in_service` — `entity_id`, `in_service` (bool)
 
-> **Uwaga:** Akcja `set_pcc` została usunięta z warstwy Core w ramach Phase 2 Task 2.1.
-> Hint PCC – punktu wspólnego przyłączenia jest zarządzany w warstwie ustawień application/wizard, a nie w NetworkGraph.
+> **Uwaga:** Akcja `set_connection_node` została usunięta z warstwy Core w ramach Phase 2 Task 2.1.
+> Hint BoundaryNode – punktu wspólnego przyłączenia jest zarządzany w warstwie ustawień application/wizard, a nie w NetworkGraph.
 
 ### 5.3 ActionResult (zaakceptuj/odrzuć)
 

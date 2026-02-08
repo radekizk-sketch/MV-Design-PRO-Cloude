@@ -281,10 +281,10 @@ export const PROTECTION_ASSIGNMENT_FIXTURES: ElementProtectionAssignment[] = [
     },
   },
   {
-    element_id: 'pcc-001',
+    element_id: 'connection_node-001',
     element_type: 'Bus',
     device_id: 'relay-freq-001',
-    device_name_pl: 'Zabezpieczenie czestotliwosciowe (PCC)',
+    device_name_pl: 'Zabezpieczenie czestotliwosciowe (BoundaryNode)',
     device_kind: 'RELAY_OVERCURRENT', // tu powinno być inne, ale na potrzeby fixture
     status: 'ACTIVE',
     settings_summary: {

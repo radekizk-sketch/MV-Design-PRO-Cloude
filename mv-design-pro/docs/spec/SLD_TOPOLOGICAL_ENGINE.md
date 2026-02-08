@@ -54,7 +54,7 @@ Symbols (IMMUTABLE)
 | **Y-ONLY KOLIZJE** | Rozdzielczość kolizji tylko w osi Y (zachowanie kolumn) |
 | **GRID SNAP** | Wszystkie pozycje na siatce (domyślnie 20px) |
 | **AUTO ZAWSZE** | Layout działa ZAWSZE i SAM (bez przycisków) |
-| **BEZ PCC** | Elementy PCC filtrowane z layoutu |
+| **BEZ BoundaryNode** | Elementy BoundaryNode filtrowane z layoutu |
 
 ## 4. Rola Topologiczna
 

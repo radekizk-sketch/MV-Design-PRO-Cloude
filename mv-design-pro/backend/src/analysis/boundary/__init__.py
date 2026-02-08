@@ -1,4 +1,4 @@
-"""Boundary identification (PCC) analysis module."""
+"""Boundary identification (BoundaryNode) analysis module."""
 
 from .identifier import BoundaryIdentifier, BoundaryResult
 

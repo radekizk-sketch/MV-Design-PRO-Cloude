@@ -44,9 +44,9 @@ class Project:
     # Network parameters
     voltage_level_kv: float = 15.0
     frequency_hz: float = 50.0
-    # PCC (Point of Common Coupling)
-    pcc_node_id: UUID | None = None
-    pcc_description: str | None = None
+    # BoundaryNode (Point of Common Coupling)
+    connection_node_id: UUID | None = None
+    connection_description: str | None = None
     # Ownership
     owner_id: UUID | None = None
     # P10a: Reference to the active (current) network snapshot

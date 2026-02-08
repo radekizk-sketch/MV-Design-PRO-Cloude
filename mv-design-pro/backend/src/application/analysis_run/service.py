@@ -358,7 +358,7 @@ class AnalysisRunService:
             "fault_node_id": payload.get("fault_node_id"),
             "short_circuit_type": payload.get("short_circuit_type"),
             "ikss_a": payload.get("ikss_a"),
-            "pcc_node_id": sc_input["pcc_node_id"],
+            "connection_node_id": sc_input["connection_node_id"],
         }
         white_box_trace = payload.get("white_box_trace")
         finished_at = datetime.now(timezone.utc)
@@ -426,7 +426,7 @@ class AnalysisRunService:
         converter_setpoints = self._normalize_converter_setpoints(
             case.case_payload.get("converter_setpoints", {})
         )
-        slack_node_id = settings.get("pcc_node_id") or self._select_slack_node_id(nodes)
+        slack_node_id = settings.get("connection_node_id") or self._select_slack_node_id(nodes)
         slack_attrs = self._lookup_node_attrs(nodes, slack_node_id) if slack_node_id else {}
         slack_spec = {
             "node_id": str(slack_node_id) if slack_node_id else None,
@@ -520,8 +520,8 @@ class AnalysisRunService:
         return {
             "snapshot_id": snapshot_id,
             "base_mva": base_mva,
-            "pcc_node_id": str(settings.get("pcc_node_id"))
-            if settings.get("pcc_node_id")
+            "connection_node_id": str(settings.get("connection_node_id"))
+            if settings.get("connection_node_id")
             else None,
             "fault_spec": {
                 "fault_type": fault_spec.get("fault_type"),
@@ -647,7 +647,7 @@ class AnalysisRunService:
         return {
             "graph": graph,
             "base_mva": float(snapshot.get("base_mva", 100.0)),
-            "pcc_node_id": snapshot.get("pcc_node_id"),
+            "connection_node_id": snapshot.get("connection_node_id"),
             "sources": snapshot.get("sources", []),
             "loads": snapshot.get("loads", []),
             "grounding": snapshot.get("grounding", {}),
@@ -685,12 +685,12 @@ class AnalysisRunService:
 
     def _validate_short_circuit_input(self, sc_input: dict[str, Any]) -> ValidationReport:
         report = ValidationReport()
-        pcc_node_id = sc_input.get("pcc_node_id")
-        if not pcc_node_id:
+        connection_node_id = sc_input.get("connection_node_id")
+        if not connection_node_id:
             report = report.with_error(
                 ValidationIssue(
-                    code="pcc.missing",
-                    message="PCC – punkt wspólnego przyłączenia must be defined",
+                    code="connection_node.missing",
+                    message="BoundaryNode – węzeł przyłączenia must be defined",
                 )
             )
         fault_spec = sc_input.get("fault_spec") or {}
@@ -731,17 +731,17 @@ class AnalysisRunService:
                     message="Short-circuit requires GRID source with grid_supply flag",
                 )
             )
-        if pcc_node_id:
-            pcc_sources = [
+        if connection_node_id:
+            connection_sources = [
                 src
                 for src in grid_supply_sources
-                if str(src.get("node_id")) == str(pcc_node_id)
+                if str(src.get("node_id")) == str(connection_node_id)
             ]
-            if not pcc_sources:
+            if not connection_sources:
                 report = report.with_error(
                     ValidationIssue(
-                        code="source.pcc_missing",
-                        message="PCC must have GRID supply source",
+                        code="source.connection_missing",
+                        message="BoundaryNode must have GRID supply source",
                     )
                 )
 
@@ -899,8 +899,8 @@ class AnalysisRunService:
 
         graph = self._build_network_graph(project_id, case.id)
         settings = uow.wizard.get_settings(project_id)
-        # NOTE: PCC – punkt wspólnego przyłączenia is no longer stored in NetworkGraph.
-        # PCC is an interpretation, not a model property. The pcc_node_id hint
+        # NOTE: BoundaryNode – węzeł przyłączenia is no longer stored in NetworkGraph.
+        # BoundaryNode is an interpretation, not a model property. The connection_node_id hint
         # remains in wizard settings for use by analysis/interpretation layer.
         sources = uow.wizard.list_sources(project_id)
         for source in sources:
@@ -1049,7 +1049,7 @@ class AnalysisRunService:
             "LV_BUS_SECTION",
             "BAY_NODE",
             "JUNCTION",
-            "PCC_NODE",
+            "BoundaryNode_NODE",
         }:
             return "PQ"
         return None

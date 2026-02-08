@@ -38,8 +38,8 @@ def compute_overcurrent_settings(
         "iec_ni_formula=tms*0.14/((I/Ipickup)**0.02-1)",
     ]
 
-    _collect_pcc_warnings(input.pcc, warnings)
-    nominal_current = _extract_nominal_current(input.pcc)
+    _collect_connection_node_warnings(input.connection_node, warnings)
+    nominal_current = _extract_nominal_current(input.connection_node)
 
     if nominal_current is None or nominal_current <= 0:
         i_pickup_51_a = 100.0
@@ -108,9 +108,9 @@ def _iec_ni_time(ratio: float, tms: float) -> float | None:
     return float(tms) * 0.14 / denominator
 
 
-def _extract_nominal_current(pcc: dict[str, Any]) -> float | None:
+def _extract_nominal_current(connection_node: dict[str, Any]) -> float | None:
     for key in ("in_a", "rated_current_a", "current_a", "load_current_a"):
-        value = pcc.get(key)
+        value = connection_node.get(key)
         if value is not None:
             try:
                 return float(value)
@@ -119,10 +119,10 @@ def _extract_nominal_current(pcc: dict[str, Any]) -> float | None:
     return None
 
 
-def _collect_pcc_warnings(pcc: dict[str, Any], warnings: list[str]) -> None:
+def _collect_connection_node_warnings(connection_node: dict[str, Any], warnings: list[str]) -> None:
     for key in ("id", "voltage_kv"):
-        if pcc.get(key) in (None, ""):
-            warnings.append(f"pcc_missing_{key}")
+        if connection_node.get(key) in (None, ""):
+            warnings.append(f"connection_missing_{key}")
 
 
 def _read_float(payload: dict[str, Any], key: str) -> float | None:

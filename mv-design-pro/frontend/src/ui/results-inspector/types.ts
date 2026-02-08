@@ -238,7 +238,7 @@ export const TRACE_VALUE_LABELS: Record<string, string> = {
   q_mvar: 'Moc bierna',
   s_mva: 'Moc pozorna',
   // Grid
-  pcc: 'Punkt wspólnego przyłączenia (PCC)',
+  connection_node: 'Węzeł przyłączenia (BoundaryNode)',
   // Other
   kappa: 'Współczynnik κ',
   m_factor: 'Współczynnik m',

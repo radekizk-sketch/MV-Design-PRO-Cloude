@@ -1,0 +1,311 @@
+# AUDIT BoundaryNode REMOVAL
+
+- branch: fix/remove-connection_node-end-to-end
+- commit: f93ac5433b066c1a1ef7509548fb79a1e94869ca
+
+## Files from baseline scan
+- ./AGENTS.md
+- ./ARCHITECTURE.md
+- ./AUDIT.md
+- ./PLANS.md
+- ./POWERFACTORY_COMPLIANCE.md
+- ./SYSTEM_SPEC.md
+- ./backend/pytest_report.txt
+- ./backend/src/analysis/boundary/__init__.py
+- ./backend/src/analysis/boundary/identifier.py
+- ./backend/src/api/equipment_proof_pack.py
+- ./backend/src/api/projects.py
+- ./backend/src/api/schemas/design_synth.py
+- ./backend/src/api/schemas/equipment_proof.py
+- ./backend/src/application/analyses/boundary.py
+- ./backend/src/application/analyses/design_synth/evidence_m3.py
+- ./backend/src/application/analyses/design_synth/pipeline.py
+- ./backend/src/application/analyses/design_synth/reporting.py
+- ./backend/src/application/analyses/protection/base_values/__init__.py
+- ./backend/src/application/analyses/protection/base_values/models.py
+- ./backend/src/application/analyses/protection/base_values/resolver.py
+- ./backend/src/application/analyses/protection/overcurrent/calculator.py
+- ./backend/src/application/analyses/protection/overcurrent/inputs.py
+- ./backend/src/application/analyses/protection/overcurrent/reporting.py
+- ./backend/src/application/analyses/protection/sanity_checks/rules.py
+- ./backend/src/application/analysis_run/read_model.py
+- ./backend/src/application/analysis_run/service.py
+- ./backend/src/application/equipment_proof/generator.py
+- ./backend/src/application/equipment_proof/proof_pack.py
+- ./backend/src/application/equipment_proof/types.py
+- ./backend/src/application/network_wizard/dtos.py
+- ./backend/src/application/network_wizard/exporters/json_exporter.py
+- ./backend/src/application/network_wizard/importers/json_importer.py
+- ./backend/src/application/network_wizard/service.py
+- ./backend/src/application/project_archive/service.py
+- ./backend/src/application/sld/layout.py
+- ./backend/src/application/sld/network_graph_to_sld.py
+- ./backend/src/application/sld/overlay.py
+- ./backend/src/domain/models.py
+- ./backend/src/domain/project_archive.py
+- ./backend/src/infrastructure/migrations/002_add_connection_node_sources.sql
+- ./backend/src/infrastructure/migrations/003_network_wizard_assets.sql
+- ./backend/src/infrastructure/migrations/004_sld_symbols.sql
+- ./backend/src/infrastructure/persistence/models.py
+- ./backend/src/infrastructure/persistence/repositories/network_wizard_repository.py
+- ./backend/src/infrastructure/persistence/repositories/project_repository.py
+- ./backend/src/infrastructure/persistence/repositories/sld_repository.py
+- ./backend/src/network_model/reporting/analysis_run_report_docx.py
+- ./backend/src/network_model/reporting/analysis_run_report_pdf.py
+- ./backend/src/network_model/sld_projection.py
+- ./backend/tests/analysis/test_boundary_identifier.py
+- ./backend/tests/api/test_analysis_runs_index_api.py
+- ./backend/tests/api/test_analysis_runs_read_api.py
+- ./backend/tests/api/test_design_synth_connection_study_api.py
+- ./backend/tests/api/test_projects.py
+- ./backend/tests/api/test_snapshot_api.py
+- ./backend/tests/application/analyses/design_synth/test_design_synth_m3_evidence_trace.py
+- ./backend/tests/application/analyses/design_synth/test_design_synth_pipeline.py
+- ./backend/tests/application/analyses/protection/catalog/test_device_mapping_v0.py
+- ./backend/tests/application/analyses/protection/catalog/test_vendor_adapter_v0.py
+- ./backend/tests/application/analyses/protection/catalog/test_vendor_elektrometal_etango_v0.py
+- ./backend/tests/application/analyses/protection/test_base_values_resolver.py
+- ./backend/tests/application/analyses/protection/test_overcurrent_settings_v0.py
+- ./backend/tests/application/analyses/protection/test_overcurrent_skeleton.py
+- ./backend/tests/application/analysis_run/test_analysis_run_export_service.py
+- ./backend/tests/application/analysis_run/test_analysis_run_service.py
+- ./backend/tests/application/equipment_proof/test_equipment_proof.py
+- ./backend/tests/application/network_model/test_single_network_model.py
+- ./backend/tests/application/network_wizard/data/golden_network.json
+- ./backend/tests/application/network_wizard/test_bus_compat.py
+- ./backend/tests/application/network_wizard/test_inverter_setpoints.py
+- ./backend/tests/application/network_wizard/test_network_wizard_service.py
+- ./backend/tests/application/project_archive/test_project_archive.py
+- ./backend/tests/application/project_archive/test_project_archive_service.py
+- ./backend/tests/application/sld/test_golden_network_sld.py
+- ./backend/tests/application/sld/test_layout.py
+- ./backend/tests/application/sld/test_sld_integration.py
+- ./backend/tests/application/sld/test_sld_parity.py
+- ./backend/tests/infrastructure/persistence/test_snapshot_repository.py
+- ./backend/tests/test_sld_projection.py
+- ./docs/01-Core.md
+- ./docs/04-Application.md
+- ./docs/BoundaryNode_OCCURRENCES_SCAN.md
+- ./docs/adr/ADR-003-domain-layer-boundaries.md
+- ./docs/adr/ADR-003-connection_node-and-sources-persistence.md
+- ./docs/adr/ADR-004-network-import-export-contracts.md
+- ./docs/adr/ADR-005-solver-input-dto-contracts.md
+- ./docs/adr/ADR-006-persistence-connection_node-sources-loads-grounding-limits.md
+- ./docs/adr/ADR-010-unified-analysis-run-contract-v0.md
+- ./docs/analysis/P26_AUTO_RECOMMENDATIONS_ETAP_PLUS.md
+- ./docs/analysis/P27_SCENARIO_COMPARISON_ETAP_PLUS.md
+- ./docs/audit/DOC_CLEANUP_PLAN.md
+- ./docs/audit/STATE_OF_PROJECT.md
+- ./docs/audit/historical_execplans/EXECPLANS.md
+- ./docs/audit/historical_execplans/ExecPlan-01.md
+- ./docs/audit/historical_execplans/ExecPlan-09.md
+- ./docs/audit/historical_execplans/ExecPlan-10.md
+- ./docs/audit/historical_execplans/ExecPlan-13.md
+- ./docs/audit/historical_execplans/ExecPlan-14.md
+- ./docs/audit/historical_execplans/ExecPlan-15.md
+- ./docs/audit/spec_vs_code_gap_report.md
+- ./docs/designer-wizard/MV_DESIGN_PRO_CANONICAL_WIZARD_ALGORITHM.md
+- ./docs/proof_engine/P11_1a_MVP_SC3F_AND_VDROP.md
+- ./docs/proof_engine/P11_1b_REGULATION_Q_U.md
+- ./docs/proof_engine/P11_1c_SC_ASYMMETRICAL.md
+- ./docs/proof_engine/P11_1d_PROOF_UI_EXPORT.md
+- ./docs/proof_engine/P11_OVERVIEW.md
+- ./docs/proof_engine/P19_EARTHING_GROUND_FAULT_SN.md
+- ./docs/proof_engine/P20_NORMATIVE_COMPLETION.md
+- ./docs/proof_engine/PROOF_SCHEMAS.md
+- ./docs/proof_engine/README.md
+- ./docs/spec/SLD_TOPOLOGICAL_ENGINE.md
+- ./docs/ui/SLD_SCADA_CAD_CONTRACT.md
+- ./docs/ui/SLD_SHORT_CIRCUIT_BUS_CENTRIC.md
+- ./docs/ui/sld_rules.md
+- ./docs/ui/wizard_screens.md
+- ./frontend/e2e/fixtures/test-fixtures.ts
+- ./frontend/src/engine/sld-layout/types.ts
+- ./frontend/src/proof-inspector/ProofInspectorPage.tsx
+- ./frontend/src/ui/__tests__/wizard-sld-unity.test.ts
+- ./frontend/src/ui/navigation/urlState.ts
+- ./frontend/src/ui/protection/element-assignment.ts
+- ./frontend/src/ui/protection/useSanityChecks.ts
+- ./frontend/src/ui/results-inspector/types.ts
+- ./frontend/src/ui/sld-editor/utils/topological-layout/LAYOUT_RULES.md
+- ./frontend/src/ui/sld-editor/utils/topological-layout/__tests__/topologicalEngine10.test.ts
+- ./frontend/src/ui/sld-editor/utils/topological-layout/__tests__/topologicalLayout.test.ts
+- ./frontend/src/ui/sld-editor/utils/topological-layout/roleAssigner.ts
+- ./frontend/src/ui/sld-editor/utils/topological-layout/topologicalLayoutEngine.ts
+- ./frontend/src/ui/sld-editor/utils/topological-layout/types.ts
+- ./frontend/src/ui/sld/inspector/__tests__/selectionResolver.test.ts
+- ./frontend/src/ui/sld/inspector/selectionResolver.ts
+- ./frontend/src/ui/sld/sldEtapStyle.ts
+- ./frontend/src/ui/wizard/__tests__/wizard-navigation.test.ts
+
+## Classification
+- backend models/api/reporting:
+  - ./backend/pytest_report.txt
+  - ./backend/src/analysis/boundary/__init__.py
+  - ./backend/src/analysis/boundary/identifier.py
+  - ./backend/src/api/equipment_proof_pack.py
+  - ./backend/src/api/projects.py
+  - ./backend/src/api/schemas/design_synth.py
+  - ./backend/src/api/schemas/equipment_proof.py
+  - ./backend/src/application/analyses/boundary.py
+  - ./backend/src/application/analyses/design_synth/evidence_m3.py
+  - ./backend/src/application/analyses/design_synth/pipeline.py
+  - ./backend/src/application/analyses/design_synth/reporting.py
+  - ./backend/src/application/analyses/protection/base_values/__init__.py
+  - ./backend/src/application/analyses/protection/base_values/models.py
+  - ./backend/src/application/analyses/protection/base_values/resolver.py
+  - ./backend/src/application/analyses/protection/overcurrent/calculator.py
+  - ./backend/src/application/analyses/protection/overcurrent/inputs.py
+  - ./backend/src/application/analyses/protection/overcurrent/reporting.py
+  - ./backend/src/application/analyses/protection/sanity_checks/rules.py
+  - ./backend/src/application/analysis_run/read_model.py
+  - ./backend/src/application/analysis_run/service.py
+  - ./backend/src/application/equipment_proof/generator.py
+  - ./backend/src/application/equipment_proof/proof_pack.py
+  - ./backend/src/application/equipment_proof/types.py
+  - ./backend/src/application/network_wizard/dtos.py
+  - ./backend/src/application/network_wizard/exporters/json_exporter.py
+  - ./backend/src/application/network_wizard/importers/json_importer.py
+  - ./backend/src/application/network_wizard/service.py
+  - ./backend/src/application/project_archive/service.py
+  - ./backend/src/application/sld/layout.py
+  - ./backend/src/application/sld/network_graph_to_sld.py
+  - ./backend/src/application/sld/overlay.py
+  - ./backend/src/domain/models.py
+  - ./backend/src/domain/project_archive.py
+  - ./backend/src/infrastructure/migrations/002_add_connection_node_sources.sql
+  - ./backend/src/infrastructure/migrations/003_network_wizard_assets.sql
+  - ./backend/src/infrastructure/migrations/004_sld_symbols.sql
+  - ./backend/src/infrastructure/persistence/models.py
+  - ./backend/src/infrastructure/persistence/repositories/network_wizard_repository.py
+  - ./backend/src/infrastructure/persistence/repositories/project_repository.py
+  - ./backend/src/infrastructure/persistence/repositories/sld_repository.py
+  - ./backend/src/network_model/reporting/analysis_run_report_docx.py
+  - ./backend/src/network_model/reporting/analysis_run_report_pdf.py
+  - ./backend/src/network_model/sld_projection.py
+  - ./backend/tests/analysis/test_boundary_identifier.py
+  - ./backend/tests/api/test_analysis_runs_index_api.py
+  - ./backend/tests/api/test_analysis_runs_read_api.py
+  - ./backend/tests/api/test_design_synth_connection_study_api.py
+  - ./backend/tests/api/test_projects.py
+  - ./backend/tests/api/test_snapshot_api.py
+  - ./backend/tests/application/analyses/design_synth/test_design_synth_m3_evidence_trace.py
+  - ./backend/tests/application/analyses/design_synth/test_design_synth_pipeline.py
+  - ./backend/tests/application/analyses/protection/catalog/test_device_mapping_v0.py
+  - ./backend/tests/application/analyses/protection/catalog/test_vendor_adapter_v0.py
+  - ./backend/tests/application/analyses/protection/catalog/test_vendor_elektrometal_etango_v0.py
+  - ./backend/tests/application/analyses/protection/test_base_values_resolver.py
+  - ./backend/tests/application/analyses/protection/test_overcurrent_settings_v0.py
+  - ./backend/tests/application/analyses/protection/test_overcurrent_skeleton.py
+  - ./backend/tests/application/analysis_run/test_analysis_run_export_service.py
+  - ./backend/tests/application/analysis_run/test_analysis_run_service.py
+  - ./backend/tests/application/equipment_proof/test_equipment_proof.py
+  - ./backend/tests/application/network_model/test_single_network_model.py
+  - ./backend/tests/application/network_wizard/data/golden_network.json
+  - ./backend/tests/application/network_wizard/test_bus_compat.py
+  - ./backend/tests/application/network_wizard/test_inverter_setpoints.py
+  - ./backend/tests/application/network_wizard/test_network_wizard_service.py
+  - ./backend/tests/application/project_archive/test_project_archive.py
+  - ./backend/tests/application/project_archive/test_project_archive_service.py
+  - ./backend/tests/application/sld/test_golden_network_sld.py
+  - ./backend/tests/application/sld/test_layout.py
+  - ./backend/tests/application/sld/test_sld_integration.py
+  - ./backend/tests/application/sld/test_sld_parity.py
+  - ./backend/tests/infrastructure/persistence/test_snapshot_repository.py
+  - ./backend/tests/test_sld_projection.py
+- frontend types/ui/sld/wizard:
+  - ./frontend/e2e/fixtures/test-fixtures.ts
+  - ./frontend/src/engine/sld-layout/types.ts
+  - ./frontend/src/proof-inspector/ProofInspectorPage.tsx
+  - ./frontend/src/ui/__tests__/wizard-sld-unity.test.ts
+  - ./frontend/src/ui/navigation/urlState.ts
+  - ./frontend/src/ui/protection/element-assignment.ts
+  - ./frontend/src/ui/protection/useSanityChecks.ts
+  - ./frontend/src/ui/results-inspector/types.ts
+  - ./frontend/src/ui/sld-editor/utils/topological-layout/LAYOUT_RULES.md
+  - ./frontend/src/ui/sld-editor/utils/topological-layout/__tests__/topologicalEngine10.test.ts
+  - ./frontend/src/ui/sld-editor/utils/topological-layout/__tests__/topologicalLayout.test.ts
+  - ./frontend/src/ui/sld-editor/utils/topological-layout/roleAssigner.ts
+  - ./frontend/src/ui/sld-editor/utils/topological-layout/topologicalLayoutEngine.ts
+  - ./frontend/src/ui/sld-editor/utils/topological-layout/types.ts
+  - ./frontend/src/ui/sld/inspector/__tests__/selectionResolver.test.ts
+  - ./frontend/src/ui/sld/inspector/selectionResolver.ts
+  - ./frontend/src/ui/sld/sldEtapStyle.ts
+  - ./frontend/src/ui/wizard/__tests__/wizard-navigation.test.ts
+- docs/tests/fixtures:
+  - ./AGENTS.md
+  - ./AUDIT.md
+  - ./PLANS.md
+  - ./POWERFACTORY_COMPLIANCE.md
+  - ./backend/tests/analysis/test_boundary_identifier.py
+  - ./backend/tests/api/test_analysis_runs_index_api.py
+  - ./backend/tests/api/test_analysis_runs_read_api.py
+  - ./backend/tests/api/test_design_synth_connection_study_api.py
+  - ./backend/tests/api/test_projects.py
+  - ./backend/tests/api/test_snapshot_api.py
+  - ./backend/tests/application/analyses/design_synth/test_design_synth_m3_evidence_trace.py
+  - ./backend/tests/application/analyses/design_synth/test_design_synth_pipeline.py
+  - ./backend/tests/application/analyses/protection/catalog/test_device_mapping_v0.py
+  - ./backend/tests/application/analyses/protection/catalog/test_vendor_adapter_v0.py
+  - ./backend/tests/application/analyses/protection/catalog/test_vendor_elektrometal_etango_v0.py
+  - ./backend/tests/application/analyses/protection/test_base_values_resolver.py
+  - ./backend/tests/application/analyses/protection/test_overcurrent_settings_v0.py
+  - ./backend/tests/application/analyses/protection/test_overcurrent_skeleton.py
+  - ./backend/tests/application/analysis_run/test_analysis_run_export_service.py
+  - ./backend/tests/application/analysis_run/test_analysis_run_service.py
+  - ./backend/tests/application/equipment_proof/test_equipment_proof.py
+  - ./backend/tests/application/network_model/test_single_network_model.py
+  - ./backend/tests/application/network_wizard/data/golden_network.json
+  - ./backend/tests/application/network_wizard/test_bus_compat.py
+  - ./backend/tests/application/network_wizard/test_inverter_setpoints.py
+  - ./backend/tests/application/network_wizard/test_network_wizard_service.py
+  - ./backend/tests/application/project_archive/test_project_archive.py
+  - ./backend/tests/application/project_archive/test_project_archive_service.py
+  - ./backend/tests/application/sld/test_golden_network_sld.py
+  - ./backend/tests/application/sld/test_layout.py
+  - ./backend/tests/application/sld/test_sld_integration.py
+  - ./backend/tests/application/sld/test_sld_parity.py
+  - ./backend/tests/infrastructure/persistence/test_snapshot_repository.py
+  - ./backend/tests/test_sld_projection.py
+  - ./docs/01-Core.md
+  - ./docs/04-Application.md
+  - ./docs/BoundaryNode_OCCURRENCES_SCAN.md
+  - ./docs/adr/ADR-003-domain-layer-boundaries.md
+  - ./docs/adr/ADR-003-connection_node-and-sources-persistence.md
+  - ./docs/adr/ADR-004-network-import-export-contracts.md
+  - ./docs/adr/ADR-005-solver-input-dto-contracts.md
+  - ./docs/adr/ADR-006-persistence-connection_node-sources-loads-grounding-limits.md
+  - ./docs/adr/ADR-010-unified-analysis-run-contract-v0.md
+  - ./docs/analysis/P26_AUTO_RECOMMENDATIONS_ETAP_PLUS.md
+  - ./docs/analysis/P27_SCENARIO_COMPARISON_ETAP_PLUS.md
+  - ./docs/audit/DOC_CLEANUP_PLAN.md
+  - ./docs/audit/STATE_OF_PROJECT.md
+  - ./docs/audit/historical_execplans/EXECPLANS.md
+  - ./docs/audit/historical_execplans/ExecPlan-01.md
+  - ./docs/audit/historical_execplans/ExecPlan-09.md
+  - ./docs/audit/historical_execplans/ExecPlan-10.md
+  - ./docs/audit/historical_execplans/ExecPlan-13.md
+  - ./docs/audit/historical_execplans/ExecPlan-14.md
+  - ./docs/audit/historical_execplans/ExecPlan-15.md
+  - ./docs/audit/spec_vs_code_gap_report.md
+  - ./docs/designer-wizard/MV_DESIGN_PRO_CANONICAL_WIZARD_ALGORITHM.md
+  - ./docs/proof_engine/P11_1a_MVP_SC3F_AND_VDROP.md
+  - ./docs/proof_engine/P11_1b_REGULATION_Q_U.md
+  - ./docs/proof_engine/P11_1c_SC_ASYMMETRICAL.md
+  - ./docs/proof_engine/P11_1d_PROOF_UI_EXPORT.md
+  - ./docs/proof_engine/P11_OVERVIEW.md
+  - ./docs/proof_engine/P19_EARTHING_GROUND_FAULT_SN.md
+  - ./docs/proof_engine/P20_NORMATIVE_COMPLETION.md
+  - ./docs/proof_engine/PROOF_SCHEMAS.md
+  - ./docs/proof_engine/README.md
+  - ./docs/spec/SLD_TOPOLOGICAL_ENGINE.md
+  - ./docs/ui/SLD_SCADA_CAD_CONTRACT.md
+  - ./docs/ui/SLD_SHORT_CIRCUIT_BUS_CENTRIC.md
+  - ./docs/ui/sld_rules.md
+  - ./docs/ui/wizard_screens.md
+  - ./frontend/e2e/fixtures/test-fixtures.ts
+  - ./frontend/src/ui/__tests__/wizard-sld-unity.test.ts
+  - ./frontend/src/ui/sld-editor/utils/topological-layout/__tests__/topologicalEngine10.test.ts
+  - ./frontend/src/ui/sld-editor/utils/topological-layout/__tests__/topologicalLayout.test.ts
+  - ./frontend/src/ui/sld/inspector/__tests__/selectionResolver.test.ts
+  - ./frontend/src/ui/wizard/__tests__/wizard-navigation.test.ts

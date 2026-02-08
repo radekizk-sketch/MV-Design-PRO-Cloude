@@ -149,7 +149,7 @@ class ProjectArchiveService:
             "description": project.description,
             "schema_version": project.schema_version,
             "active_network_snapshot_id": project.active_network_snapshot_id,
-            "pcc_node_id": str(project.pcc_node_id) if project.pcc_node_id else None,
+            "connection_node_id": str(project.connection_node_id) if project.connection_node_id else None,
             "sources": project.sources_jsonb,
             "created_at": project.created_at.isoformat(),
             "updated_at": project.updated_at.isoformat(),
@@ -202,7 +202,7 @@ class ProjectArchiveService:
                 description=project.description,
                 schema_version=project.schema_version,
                 active_network_snapshot_id=project.active_network_snapshot_id,
-                pcc_node_id=str(project.pcc_node_id) if project.pcc_node_id else None,
+                connection_node_id=str(project.connection_node_id) if project.connection_node_id else None,
                 sources=project.sources_jsonb,
                 created_at=project.created_at.isoformat(),
                 updated_at=project.updated_at.isoformat(),
@@ -391,7 +391,7 @@ class ProjectArchiveService:
                     "x": ns.x,
                     "y": ns.y,
                     "label": ns.label,
-                    "is_pcc": ns.is_pcc,
+                    "is_connection_node": ns.is_connection_node,
                 }
                 for ns in node_symbols
             ]
@@ -516,7 +516,7 @@ class ProjectArchiveService:
         settings_data = None
         if settings_orm:
             settings_data = {
-                "pcc_node_id": str(settings_orm.pcc_node_id) if settings_orm.pcc_node_id else None,
+                "connection_node_id": str(settings_orm.connection_node_id) if settings_orm.connection_node_id else None,
                 "active_case_id": str(settings_orm.active_case_id) if settings_orm.active_case_id else None,
                 "grounding_jsonb": settings_orm.grounding_jsonb,
                 "limits_jsonb": settings_orm.limits_jsonb,
@@ -821,7 +821,7 @@ class ProjectArchiveService:
             description=archive.project_meta.description,
             schema_version=archive.project_meta.schema_version,
             active_network_snapshot_id=None,  # Ustawimy później
-            pcc_node_id=None,  # Ustawimy później
+            connection_node_id=None,  # Ustawimy później
             sources_jsonb=archive.project_meta.sources,
             created_at=now,
             updated_at=now,
@@ -847,11 +847,11 @@ class ProjectArchiveService:
 
         self._session.flush()
 
-        # Aktualizuj pcc_node_id jeśli był ustawiony
-        if archive.project_meta.pcc_node_id:
-            pcc_new_id = id_map.get(archive.project_meta.pcc_node_id)
-            if pcc_new_id:
-                project_orm.pcc_node_id = pcc_new_id
+        # Aktualizuj connection_node_id jeśli był ustawiony
+        if archive.project_meta.connection_node_id:
+            connection_new_id = id_map.get(archive.project_meta.connection_node_id)
+            if connection_new_id:
+                project_orm.connection_node_id = connection_new_id
 
         # 3. Network branches
         for branch_data in archive.network_model.branches:
@@ -1004,8 +1004,8 @@ class ProjectArchiveService:
             settings = archive.cases.settings
             settings_orm = ProjectSettingsORM(
                 project_id=new_project_id,
-                pcc_node_id=id_map.get(settings["pcc_node_id"])
-                if settings.get("pcc_node_id")
+                connection_node_id=id_map.get(settings["connection_node_id"])
+                if settings.get("connection_node_id")
                 else None,
                 active_case_id=id_map.get(settings["active_case_id"])
                 if settings.get("active_case_id")
@@ -1050,7 +1050,7 @@ class ProjectArchiveService:
                 x=ns_data["x"],
                 y=ns_data["y"],
                 label=ns_data.get("label"),
-                is_pcc=ns_data.get("is_pcc", False),
+                is_connection_node=ns_data.get("is_connection_node", False),
             )
             self._session.add(ns_orm)
 

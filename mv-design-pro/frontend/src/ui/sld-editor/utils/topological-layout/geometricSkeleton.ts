@@ -16,7 +16,7 @@
  * DETERMINIZM: Ten sam model -> identyczny szkielet
  */
 
-import type { AnySldSymbol, Position, NodeSymbol, BranchSymbol } from '../../types';
+import type { AnySldSymbol, Position, BranchSymbol } from '../../types';
 import type {
   RoleAssignment,
   VoltageLevel,

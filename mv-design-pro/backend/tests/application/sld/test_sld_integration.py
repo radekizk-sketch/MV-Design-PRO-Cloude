@@ -49,7 +49,7 @@ def _create_basic_network(service: NetworkWizardService, project_id: UUID) -> tu
             params={"r_ohm_per_km": 0.1, "x_ohm_per_km": 0.2, "length_km": 1.0},
         ),
     )
-    service.set_pcc(project_id, slack_node["id"])
+    service.set_connection_node(project_id, slack_node["id"])
     return slack_node, load_node, branch
 
 
@@ -69,8 +69,8 @@ def test_sld_binding_nodes_and_branches() -> None:
 
     assert payload_node_ids == node_ids
     assert payload_branch_ids == branch_ids
-    # NOTE: is_pcc was removed from SldNodeSymbol.
-    # PCC – punkt wspólnego przyłączenia is interpretation, not stored data.
+    # NOTE: is_connection_node was removed from SldNodeSymbol.
+    # BoundaryNode – węzeł przyłączenia is interpretation, not stored data.
 
 
 def test_sld_export_import_roundtrip() -> None:

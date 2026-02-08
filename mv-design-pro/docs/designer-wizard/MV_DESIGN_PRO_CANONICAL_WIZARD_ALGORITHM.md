@@ -183,13 +183,13 @@ EFEKT:
 - nowe obliczenia
 
 --------------------------------------------------------------------------------
-ALG_STEP 8 — PCC – PUNKT WSPÓLNEGO PRZYŁĄCZENIA
+ALG_STEP 8 — BoundaryNode – PUNKT WSPÓLNEGO PRZYŁĄCZENIA
 --------------------------------------------------------------------------------
 [DOCX]
-„Dla źródeł wytwórczych należy określić PCC.”
+„Dla źródeł wytwórczych należy określić BoundaryNode.”
 
 OPERACJA:
-- SET_PCC
+- SET_BoundaryNode
 
 EFEKT:
 - kontekst NC RfG
@@ -217,7 +217,7 @@ ALG_STEP 10 — WALIDACJA KOŃCOWA
 SPRAWDZANE:
 - normy
 - kompletność
-- PCC
+- BoundaryNode
 
 JEŻELI:
 - niezgodność → RETURN do właściwego kroku

@@ -104,7 +104,7 @@ class ElementContext:
 
     Attributes:
         element_id: identyfikator elementu
-        element_type: typ elementu (LINE, TRANSFORMER, BUS, PCC, etc.)
+        element_type: typ elementu (LINE, TRANSFORMER, BUS, BoundaryNode, etc.)
     """
     element_id: str
     element_type: str

@@ -1,8 +1,8 @@
 """
-Boundary identification heuristics (PCC) for interpretation layer.
+Boundary identification heuristics (BoundaryNode) for interpretation layer.
 
 PowerFactory alignment:
-- PCC is interpretation-only (no model mutation)
+- BoundaryNode is interpretation-only (no model mutation)
 - Deterministic, heuristic identification
 - Read-only access to NetworkSnapshot + Case params
 """
@@ -24,13 +24,13 @@ class BoundaryResult:
     Result of boundary identification.
 
     Attributes:
-        pcc_node_id: Identified PCC node (if any).
+        connection_node_id: Identified BoundaryNode node (if any).
         method: Heuristic method used for identification.
         confidence: Confidence level of identification (0.0-1.0).
-        diagnostics: Diagnostics and reason codes if no unique PCC.
+        diagnostics: Diagnostics and reason codes if no unique BoundaryNode.
     """
 
-    pcc_node_id: Optional[str]
+    connection_node_id: Optional[str]
     method: Optional[str]
     confidence: float
     diagnostics: list[str] = field(default_factory=list)
@@ -38,7 +38,7 @@ class BoundaryResult:
 
 class BoundaryIdentifier:
     """
-    Identifies network boundaries (PCC) using PowerFactory-style heuristics.
+    Identifies network boundaries (BoundaryNode) using PowerFactory-style heuristics.
 
     Heuristic order (first satisfied wins):
     1) External Grid / Source boundary
@@ -66,7 +66,7 @@ class BoundaryIdentifier:
 
         if not graph.nodes:
             return BoundaryResult(
-                pcc_node_id=None,
+                connection_node_id=None,
                 method=None,
                 confidence=0.0,
                 diagnostics=["snapshot.empty"],
@@ -75,7 +75,7 @@ class BoundaryIdentifier:
         external_grid_nodes = self._external_grid_nodes(graph, case_params)
         if len(external_grid_nodes) == 1:
             return BoundaryResult(
-                pcc_node_id=external_grid_nodes[0],
+                connection_node_id=external_grid_nodes[0],
                 method="external_grid",
                 confidence=0.95,
                 diagnostics=[],
@@ -83,7 +83,7 @@ class BoundaryIdentifier:
         if len(external_grid_nodes) > 1:
             diagnostics.append("external_grid.multiple")
             return BoundaryResult(
-                pcc_node_id=None,
+                connection_node_id=None,
                 method=None,
                 confidence=0.0,
                 diagnostics=diagnostics,
@@ -92,7 +92,7 @@ class BoundaryIdentifier:
         generator_nodes = self._generator_dominant_nodes(graph, case_params)
         if len(generator_nodes) == 1:
             return BoundaryResult(
-                pcc_node_id=generator_nodes[0],
+                connection_node_id=generator_nodes[0],
                 method="generator_dominant",
                 confidence=0.75,
                 diagnostics=[],
@@ -100,7 +100,7 @@ class BoundaryIdentifier:
         if len(generator_nodes) > 1:
             diagnostics.append("generator_dominant.multiple")
             return BoundaryResult(
-                pcc_node_id=None,
+                connection_node_id=None,
                 method=None,
                 confidence=0.0,
                 diagnostics=diagnostics,
@@ -109,7 +109,7 @@ class BoundaryIdentifier:
         feeder_nodes = self._single_feeder_nodes(graph)
         if len(feeder_nodes) == 1:
             return BoundaryResult(
-                pcc_node_id=feeder_nodes[0],
+                connection_node_id=feeder_nodes[0],
                 method="single_feeder",
                 confidence=0.6,
                 diagnostics=[],
@@ -117,7 +117,7 @@ class BoundaryIdentifier:
         if len(feeder_nodes) > 1:
             diagnostics.append("single_feeder.multiple")
             return BoundaryResult(
-                pcc_node_id=None,
+                connection_node_id=None,
                 method=None,
                 confidence=0.0,
                 diagnostics=diagnostics,
@@ -126,7 +126,7 @@ class BoundaryIdentifier:
         voltage_nodes = self._voltage_level_boundary_nodes(graph)
         if len(voltage_nodes) == 1:
             return BoundaryResult(
-                pcc_node_id=voltage_nodes[0],
+                connection_node_id=voltage_nodes[0],
                 method="voltage_level",
                 confidence=0.5,
                 diagnostics=[],
@@ -134,17 +134,17 @@ class BoundaryIdentifier:
         if len(voltage_nodes) > 1:
             diagnostics.append("voltage_level.multiple")
             return BoundaryResult(
-                pcc_node_id=None,
+                connection_node_id=None,
                 method=None,
                 confidence=0.0,
                 diagnostics=diagnostics,
             )
 
         return BoundaryResult(
-            pcc_node_id=None,
+            connection_node_id=None,
             method=None,
             confidence=0.0,
-            diagnostics=["pcc.not_found"],
+            diagnostics=["connection_node.not_found"],
         )
 
     def _external_grid_nodes(self, graph, case_params: Mapping) -> list[str]:

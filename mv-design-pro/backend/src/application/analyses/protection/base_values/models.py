@@ -33,12 +33,12 @@ class BaseValueSourceUn(str, Enum):
 
     - BUS: z napięcia znamionowego szyny/węzła
     - VT_PRIMARY: z przekładni VT (strona pierwotna)
-    - PCC: z punktu wspólnego przyłączenia
+    - BoundaryNode: z punktu wspólnego przyłączenia
     - UNKNOWN: brak danych (bez zgadywania)
     """
     BUS = "BUS"
     VT_PRIMARY = "VT_PRIMARY"
-    PCC = "PCC"
+    BoundaryNode = "BoundaryNode"
     UNKNOWN = "UNKNOWN"
 
 
@@ -49,13 +49,13 @@ class BaseValueSourceIn(str, Enum):
     - LINE: z prądu znamionowego linii/kabla
     - TRANSFORMER_SIDE: z mocy znamionowej transformatora (wyliczone In = Sn / (√3 × Un))
     - BREAKER: z prądu znamionowego wyłącznika/pola
-    - PCC: z danych przyłączeniowych PCC
+    - BoundaryNode: z danych przyłączeniowych BoundaryNode
     - UNKNOWN: brak danych (bez zgadywania)
     """
     LINE = "LINE"
     TRANSFORMER_SIDE = "TRANSFORMER_SIDE"
     BREAKER = "BREAKER"
-    PCC = "PCC"
+    BoundaryNode = "BoundaryNode"
     UNKNOWN = "UNKNOWN"
 
 
@@ -73,7 +73,7 @@ class ProtectedElementType(str, Enum):
     TRANSFORMER = "TRANSFORMER"
     BREAKER = "BREAKER"
     BUS = "BUS"
-    PCC = "PCC"
+    BoundaryNode = "BoundaryNode"
     UNKNOWN = "UNKNOWN"
 
 
@@ -96,13 +96,13 @@ class ProtectedElementContext:
     Zawiera dostępne dane znamionowe z modelu sieci.
 
     Attributes:
-        element_type: typ elementu (LINE, TRANSFORMER, BREAKER, PCC, etc.)
+        element_type: typ elementu (LINE, TRANSFORMER, BREAKER, BoundaryNode, etc.)
         element_id: identyfikator elementu
 
         # Dane napięciowe (dla Un)
         bus_voltage_kv: napięcie znamionowe szyny [kV] (Node.voltage_level)
         vt_primary_kv: napięcie pierwotne VT [kV] (jeśli dostępne)
-        pcc_voltage_kv: napięcie PCC [kV] (jeśli element to PCC)
+        connection_voltage_kv: napięcie BoundaryNode [kV] (jeśli element to BoundaryNode)
 
         # Dane prądowe (dla In)
         line_rated_current_a: prąd znamionowy linii [A] (LineBranch.rated_current_a)
@@ -114,8 +114,8 @@ class ProtectedElementContext:
         transformer_voltage_lv_kv: napięcie strony nN [kV]
         transformer_side: strona, po której mierzymy (HV/LV)
 
-        # Dane PCC
-        pcc_rated_current_a: prąd znamionowy PCC [A] (jeśli dostępne)
+        # Dane BoundaryNode
+        connection_rated_current_a: prąd znamionowy BoundaryNode [A] (jeśli dostępne)
     """
     element_type: ProtectedElementType
     element_id: str
@@ -123,7 +123,7 @@ class ProtectedElementContext:
     # Dane napięciowe
     bus_voltage_kv: float | None = None
     vt_primary_kv: float | None = None
-    pcc_voltage_kv: float | None = None
+    connection_voltage_kv: float | None = None
 
     # Dane prądowe
     line_rated_current_a: float | None = None
@@ -135,8 +135,8 @@ class ProtectedElementContext:
     transformer_voltage_lv_kv: float | None = None
     transformer_side: TransformerSide | None = None
 
-    # Dane PCC
-    pcc_rated_current_a: float | None = None
+    # Dane BoundaryNode
+    connection_rated_current_a: float | None = None
 
     def to_dict(self) -> dict[str, Any]:
         """Serialize to JSON-compatible dict."""
@@ -145,14 +145,14 @@ class ProtectedElementContext:
             "element_id": self.element_id,
             "bus_voltage_kv": self.bus_voltage_kv,
             "vt_primary_kv": self.vt_primary_kv,
-            "pcc_voltage_kv": self.pcc_voltage_kv,
+            "connection_voltage_kv": self.connection_voltage_kv,
             "line_rated_current_a": self.line_rated_current_a,
             "breaker_rated_current_a": self.breaker_rated_current_a,
             "transformer_rated_power_mva": self.transformer_rated_power_mva,
             "transformer_voltage_hv_kv": self.transformer_voltage_hv_kv,
             "transformer_voltage_lv_kv": self.transformer_voltage_lv_kv,
             "transformer_side": self.transformer_side.value if self.transformer_side else None,
-            "pcc_rated_current_a": self.pcc_rated_current_a,
+            "connection_rated_current_a": self.connection_rated_current_a,
         }
 
 
@@ -355,7 +355,7 @@ class ProtectionComputedValue:
 SOURCE_UN_LABELS_PL: dict[BaseValueSourceUn, str] = {
     BaseValueSourceUn.BUS: "Napiecie szyny",
     BaseValueSourceUn.VT_PRIMARY: "Przekladnik napieciowy (strona pierwotna)",
-    BaseValueSourceUn.PCC: "PCC – punkt wspolnego przylaczenia",
+    BaseValueSourceUn.BoundaryNode: "BoundaryNode – punkt wspolnego przylaczenia",
     BaseValueSourceUn.UNKNOWN: "Nieznane",
 }
 
@@ -363,7 +363,7 @@ SOURCE_IN_LABELS_PL: dict[BaseValueSourceIn, str] = {
     BaseValueSourceIn.LINE: "Prad znamionowy linii/kabla",
     BaseValueSourceIn.TRANSFORMER_SIDE: "Prad znamionowy transformatora (strona)",
     BaseValueSourceIn.BREAKER: "Prad znamionowy wylacznika",
-    BaseValueSourceIn.PCC: "PCC – punkt wspolnego przylaczenia",
+    BaseValueSourceIn.BoundaryNode: "BoundaryNode – punkt wspolnego przylaczenia",
     BaseValueSourceIn.UNKNOWN: "Nieznany",
 }
 

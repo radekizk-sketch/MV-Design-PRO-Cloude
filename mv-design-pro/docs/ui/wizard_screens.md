@@ -2263,7 +2263,7 @@ W trybie statycznym źródła konwerterowe działają wyłącznie jako źródła
 **Ograniczenia trybu statycznego:**
 - Brak regulatorów (Volt-VAR, Volt-Watt, droop)
 - Brak modeli dynamicznych (RMS/EMT)
-- PCC – punkt wspólnego przyłączenia nie istnieje w NetworkModel (analysis-only)
+- BoundaryNode – węzeł przyłączenia nie istnieje w NetworkModel (analysis-only)
 
 ---
 

@@ -129,10 +129,10 @@ class ProjectORM(Base):
     mode: Mapped[str] = mapped_column(String(10), nullable=False, default="AS-IS")
 
     # Point of Common Coupling (wymagany dla TO-BE z OZE, NC RfG)
-    pcc_node_id: Mapped[UUID | None] = mapped_column(
-        GUID(), ForeignKey("network_nodes.id", use_alter=True, name="fk_projects_pcc_node")
+    connection_node_id: Mapped[UUID | None] = mapped_column(
+        GUID(), ForeignKey("network_nodes.id", use_alter=True, name="fk_projects_connection_node_node")
     )
-    pcc_description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    connection_description: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     # Network parameters
     voltage_level_kv: Mapped[float] = mapped_column(
@@ -197,8 +197,8 @@ class ProjectSettingsORM(Base):
     project_id: Mapped[UUID] = mapped_column(
         GUID(), ForeignKey("projects.id"), primary_key=True
     )
-    pcc_node_id: Mapped[UUID | None] = mapped_column(
-        GUID(), ForeignKey("network_nodes.id", use_alter=True, name="fk_settings_pcc_node")
+    connection_node_id: Mapped[UUID | None] = mapped_column(
+        GUID(), ForeignKey("network_nodes.id", use_alter=True, name="fk_settings_connection_node_node")
     )
     active_case_id: Mapped[UUID | None] = mapped_column(
         GUID(),
@@ -514,7 +514,7 @@ class SldNodeSymbolORM(Base):
     x: Mapped[float] = mapped_column(Float, nullable=False)
     y: Mapped[float] = mapped_column(Float, nullable=False)
     label: Mapped[str | None] = mapped_column(String(255))
-    is_pcc: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    is_connection_node: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
 
 
 class SldBranchSymbolORM(Base):

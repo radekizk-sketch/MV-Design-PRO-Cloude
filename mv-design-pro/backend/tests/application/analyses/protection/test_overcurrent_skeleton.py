@@ -58,21 +58,21 @@ def test_overcurrent_skeleton_is_deterministic(uow_factory) -> None:
 
     envelope1 = run_overcurrent_skeleton(
         sc_run_id=sc_run_id,
-        pcc={"id": "PCC-1", "voltage_kv": 15.0},
+        connection_node={"id": "BoundaryNode-1", "voltage_kv": 15.0},
         topology_ref=None,
         uow_factory=uow_factory,
     )
     envelope2 = run_overcurrent_skeleton(
         sc_run_id=sc_run_id,
-        pcc={"id": "PCC-1", "voltage_kv": 15.0},
+        connection_node={"id": "BoundaryNode-1", "voltage_kv": 15.0},
         topology_ref=None,
         uow_factory=uow_factory,
     )
 
     assert envelope1.analysis_type == "protection.overcurrent.v0"
     assert envelope1.inputs.inline is not None
-    assert "pcc" in envelope1.inputs.inline
-    assert envelope1.inputs.inline["pcc"]["id"] == "PCC-1"
+    assert "connection_node" in envelope1.inputs.inline
+    assert envelope1.inputs.inline["connection_node"]["id"] == "BoundaryNode-1"
     assert envelope1.fingerprint == envelope2.fingerprint
     assert_deterministic(
         envelope1.to_dict(),

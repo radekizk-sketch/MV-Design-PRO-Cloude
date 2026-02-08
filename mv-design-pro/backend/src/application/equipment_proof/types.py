@@ -38,7 +38,7 @@ class EquipmentProofInput:
     project_id: str
     case_id: str
     run_id: str
-    pcc_node_id: str
+    connection_node_id: str
     device: DeviceRating
     required_fault_results: dict[str, Any]
 
@@ -47,7 +47,7 @@ class EquipmentProofInput:
             "project_id": self.project_id,
             "case_id": self.case_id,
             "run_id": self.run_id,
-            "pcc_node_id": self.pcc_node_id,
+            "connection_node_id": self.connection_node_id,
             "device": self.device.to_dict(),
             "required_fault_results": self.required_fault_results,
         }
@@ -84,7 +84,7 @@ class EquipmentProofResult:
     project_id: str
     case_id: str
     run_id: str
-    pcc_node_id: str
+    connection_node_id: str
     device_id: str
     overall_status: str
     failed_checks: tuple[str, ...]
@@ -97,7 +97,7 @@ class EquipmentProofResult:
             "project_id": self.project_id,
             "case_id": self.case_id,
             "run_id": self.run_id,
-            "pcc_node_id": self.pcc_node_id,
+            "connection_node_id": self.connection_node_id,
             "device_id": self.device_id,
             "overall_status": self.overall_status,
             "failed_checks": self.failed_checks,
@@ -113,7 +113,7 @@ class EquipmentProofResult:
                 "project_id": self.project_id,
                 "case_id": self.case_id,
                 "run_id": self.run_id,
-                "pcc_node_id": self.pcc_node_id,
+                "connection_node_id": self.connection_node_id,
                 "device_id": self.device_id,
                 "overall_status": self.overall_status,
                 "failed_checks": self.failed_checks,

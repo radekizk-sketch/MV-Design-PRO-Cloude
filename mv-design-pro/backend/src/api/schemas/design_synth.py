@@ -23,18 +23,18 @@ class ConnectionStudyRequest(BaseModel):
 
     @field_validator("spec_payload")
     @classmethod
-    def spec_payload_requires_pcc(cls, value: dict[str, Any]) -> dict[str, Any]:
+    def spec_payload_requires_connection_node(cls, value: dict[str, Any]) -> dict[str, Any]:
         if not isinstance(value, dict):
             raise ValueError("spec_payload must be an object")
-        if "pcc" in value:
+        if "connection_node" in value:
             normalized = dict(value)
-            normalized.pop("PCC", None)
+            normalized.pop("BoundaryNode", None)
             return normalized
-        if "PCC" in value:
+        if "BoundaryNode" in value:
             normalized = dict(value)
-            normalized["pcc"] = normalized.pop("PCC")
+            normalized["connection_node"] = normalized.pop("BoundaryNode")
             return normalized
-        raise ValueError("Missing PCC – punkt wspólnego przyłączenia in spec_payload")
+        raise ValueError("Missing BoundaryNode – węzeł przyłączenia in spec_payload")
 
 
 class ConnectionStudyResponse(BaseModel):

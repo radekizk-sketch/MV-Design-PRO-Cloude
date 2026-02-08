@@ -95,17 +95,17 @@ list_study_cases(project_id) -> list[StudyCase]
 
 #### Konfiguracja (Application-Layer Settings)
 ```python
-set_pcc(project_id, node_id) -> None
-get_pcc(project_id) -> UUID | None
+set_connection_node(project_id, node_id) -> None
+get_connection_node(project_id) -> UUID | None
 set_grounding(project_id, payload) -> None
 get_grounding(project_id) -> GroundingPayload
 set_limits(project_id, payload) -> None
 get_limits(project_id) -> LimitsPayload
 ```
 
-> **WAŻNE (PowerFactory Alignment):** `set_pcc()` i `get_pcc()` obsługują **hint użytkownika**
-> przechowywany w ustawieniach aplikacji/projektu. PCC – punkt wspólnego przyłączenia **NIE**
-> jest przechowywany w NetworkModel/NetworkGraph. Faktyczna identyfikacja PCC – punktu wspólnego
+> **WAŻNE (PowerFactory Alignment):** `set_connection_node()` i `get_connection_node()` obsługują **hint użytkownika**
+> przechowywany w ustawieniach aplikacji/projektu. BoundaryNode – węzeł przyłączenia **NIE**
+> jest przechowywany w NetworkModel/NetworkGraph. Faktyczna identyfikacja BoundaryNode – punktu wspólnego
 > przyłączenia jest wykonywana przez BoundaryIdentifier w warstwie analysis, która może użyć
 > tego hintu jako wejścia.
 > Zobacz SYSTEM_SPEC.md § 18.3.4.
@@ -118,7 +118,7 @@ validate_network(project_id, case_id=None) -> ValidationReport
 
 Sprawdza:
 - Istnienie węzłów i gałęzi
-- Poprawność PCC hint (czy wskazany węzeł istnieje w projekcie)
+- Poprawność BoundaryNode hint (czy wskazany węzeł istnieje w projekcie)
 - Kompletność sources
 - Kompletność loads
 - Poprawność parametrów gałęzi
@@ -251,7 +251,7 @@ class LoadPayload:
 class ShortCircuitInput:
     graph: NetworkGraph
     base_mva: float
-    pcc_node_id: str  # Application-layer hint, NOT from NetworkGraph
+    connection_node_id: str  # Application-layer hint, NOT from NetworkGraph
     sources: list[dict]
     loads: list[dict]
     grounding: dict
@@ -260,9 +260,9 @@ class ShortCircuitInput:
     options: dict
 ```
 
-> **Uwaga:** `pcc_node_id` w ShortCircuitInput to parametr warstwy application
+> **Uwaga:** `connection_node_id` w ShortCircuitInput to parametr warstwy application
 > (hint użytkownika z ustawień projektu), a nie pole z NetworkGraph.
-> NetworkGraph NIE zawiera PCC – punktu wspólnego przyłączenia (zobacz SYSTEM_SPEC.md § 18.3.4).
+> NetworkGraph NIE zawiera BoundaryNode – punktu wspólnego przyłączenia (zobacz SYSTEM_SPEC.md § 18.3.4).
 
 > **Terminology:** Bus to kanoniczny termin PowerFactory. `NodePayload` pozostaje
 > kompatybilnym aliasem wewnętrznym, a API akceptuje zarówno `bus_type`, jak i `node_type`.
@@ -316,8 +316,8 @@ line = service.add_branch(project.id, BranchPayload(
     params={"r_ohm_per_km": 0.05, "x_ohm_per_km": 0.4, "length_km": 50}
 ))
 
-# 4. Ustaw hint PCC – punktu wspólnego przyłączenia (warstwa application, NIE w NetworkModel)
-service.set_pcc(project.id, slack["id"])  # Stores hint in project settings
+# 4. Ustaw hint BoundaryNode – punktu wspólnego przyłączenia (warstwa application, NIE w NetworkModel)
+service.set_connection_node(project.id, slack["id"])  # Stores hint in project settings
 
 # 5. Dodaj source
 service.add_source(project.id, SourcePayload(

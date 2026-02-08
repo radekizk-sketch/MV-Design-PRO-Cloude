@@ -54,7 +54,7 @@ Define the SLD engine as a pure, deterministic projection of the domain snapshot
 - **Transformers** map to SLD transformer elements connecting all transformer terminals to their referenced nodes; winding count and terminals are displayed as provided by the domain snapshot.
 - **Sources** map to SLD source symbols attached to their single node.
 - **Loads** map to SLD load symbols attached to their single node.
-- **PCC** maps to a distinct SLD marker anchored to the PCC’s node.
+- **BoundaryNode** maps to a distinct SLD marker anchored to the BoundaryNode’s node.
 - **in_service=false** entities are excluded from SLD projection entirely (no implied substitution or placeholder).
 
 ### Identity, Ordering, and Stability Guarantees

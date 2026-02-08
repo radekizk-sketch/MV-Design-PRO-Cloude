@@ -13,7 +13,7 @@ w sieciach SN oraz opcjonalny, uproszczony krok napięcia dotykowego. Dowód jes
 post-hoc i korzysta wyłącznie z danych wejściowych (trace/result/katalog).
 
 Terminologia BINDING:
-- PCC – punkt wspólnego przyłączenia
+- BoundaryNode – węzeł przyłączenia
 
 ---
 

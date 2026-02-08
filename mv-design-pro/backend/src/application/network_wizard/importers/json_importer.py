@@ -60,7 +60,7 @@ def parse_network_payload(payload: dict[str, Any]) -> dict[str, Any]:
         "branches": branches,
         "operating_cases": operating_cases,
         "study_cases": study_cases,
-        "pcc_node_id": payload.get("pcc_node_id"),
+        "connection_node_id": payload.get("connection_node_id"),
         "sources": payload.get("sources", []),
         "loads": payload.get("loads", []),
         "grounding": payload.get("grounding", {}),

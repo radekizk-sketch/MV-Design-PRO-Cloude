@@ -12,13 +12,13 @@ def build_protection_input(
     *,
     case_id: str | None,
     base_snapshot_id: str | None,
-    pcc: dict[str, Any],
+    connection_node: dict[str, Any],
     topology_ref: dict[str, Any] | None,
 ) -> ProtectionInput:
     return ProtectionInput(
         case_id=case_id,
         base_snapshot_id=base_snapshot_id,
-        pcc=pcc,
+        connection_node=connection_node,
         fault_levels=_build_fault_levels(sc_result),
         topology_ref=topology_ref,
         source_run_id=_resolve_source_run_id(sc_result),

@@ -51,4 +51,4 @@ Sekcja PDF „Rekomendacje (P26)” zawiera:
 
 ## 7. Terminologia
 
-- **PCC – punkt wspólnego przyłączenia** (terminologia obowiązkowa w raportach).
+- **BoundaryNode – węzeł przyłączenia** (terminologia obowiązkowa w raportach).
