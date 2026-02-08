@@ -227,6 +227,21 @@ describe('resolveSelectionRef', () => {
     });
   });
 
+
+  describe('Ochrona przed selekcją PCC', () => {
+    it('zwraca null dla elementu PCC', () => {
+      const result = resolveSelectionRef('bus_pcc', 'Bus', enm);
+      expect(result).toBeNull();
+    });
+
+    it('dla źródła z selekcją PCC wykonuje fallback do źródła sieci', () => {
+      const result = resolveSelectionRef('pcc_source', 'Source', enm);
+      expect(result).not.toBeNull();
+      expect(result!.selectionRef.element_type).toBe('source');
+      expect(result!.selectionRef.element_ref_id).toBe('src_grid');
+    });
+  });
+
   describe('Determinism', () => {
     it('same input produces identical output', () => {
       const r1 = resolveSelectionRef('bus_gpz_110', 'Bus', enm);

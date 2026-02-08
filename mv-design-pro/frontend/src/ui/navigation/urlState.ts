@@ -62,6 +62,17 @@ const VALID_ELEMENT_TYPES: ElementType[] = [
   'Load',
 ];
 
+
+function isPccLikeSelectionId(id: string): boolean {
+  const normalized = id.toLowerCase();
+  return (
+    normalized.includes('pcc') ||
+    normalized.startsWith('bus_pcc') ||
+    normalized.startsWith('pcc_') ||
+    normalized.endsWith('_pcc')
+  );
+}
+
 /**
  * Check if string is valid ElementType.
  */
@@ -84,7 +95,7 @@ export function encodeSelectionToParams(
 ): URLSearchParams {
   const params = new URLSearchParams();
 
-  if (selection) {
+  if (selection && !isPccLikeSelectionId(selection.id)) {
     params.set(URL_PARAMS.SELECTION_ID, selection.id);
     params.set(URL_PARAMS.SELECTION_TYPE, selection.type);
     params.set(URL_PARAMS.SELECTION_NAME, selection.name);
@@ -115,6 +126,10 @@ export function decodeSelectionFromParams(
 
   // Validate element type
   if (!isValidElementType(type)) {
+    return null;
+  }
+
+  if (isPccLikeSelectionId(id)) {
     return null;
   }
 
@@ -311,7 +326,7 @@ export function updateUrlWithSelectionAndDiagnostics(
   const params = new URLSearchParams();
 
   // Add selection params
-  if (selection) {
+  if (selection && !isPccLikeSelectionId(selection.id)) {
     params.set(URL_PARAMS.SELECTION_ID, selection.id);
     params.set(URL_PARAMS.SELECTION_TYPE, selection.type);
     params.set(URL_PARAMS.SELECTION_NAME, selection.name);

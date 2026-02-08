@@ -132,8 +132,9 @@ export function detectVoltageLevel(symbol: AnySldSymbol): VoltageLevel {
 // PCC FILTERING
 // =============================================================================
 
-const PCC_NAME_PATTERNS = ['pcc', 'point of common coupling', 'punkt przyłączenia'];
-const PCC_TYPE_PATTERNS = ['pcc'];
+const PCC_NAME_PATTERNS = ['pcc', 'point of common coupling', 'punkt przyłączenia', 'punkt wspólnego'];
+const PCC_ID_PATTERNS = ['bus_pcc', 'pcc_', '_pcc'];
+const PCC_TYPE_PATTERNS = ['pcc', 'connection_point', 'virtual_node'];
 
 /**
  * Check if a symbol is a PCC node (to be filtered from layout).
@@ -141,9 +142,14 @@ const PCC_TYPE_PATTERNS = ['pcc'];
 export function isPccNode(symbol: AnySldSymbol): boolean {
   const nameLower = symbol.elementName.toLowerCase();
   const typeLower = symbol.elementType.toLowerCase();
+  const idLower = symbol.id.toLowerCase();
+  const elementIdLower = symbol.elementId.toLowerCase();
 
   for (const p of PCC_NAME_PATTERNS) {
     if (nameLower.includes(p)) return true;
+  }
+  for (const p of PCC_ID_PATTERNS) {
+    if (idLower.includes(p) || elementIdLower.includes(p)) return true;
   }
   for (const p of PCC_TYPE_PATTERNS) {
     if (typeLower.includes(p)) return true;
