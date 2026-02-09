@@ -1,6 +1,6 @@
 # ROZDZIAŁ 6 — KONTRAKTY SOLVERÓW & MAPOWANIE ENM → MODEL OBLICZENIOWY
 
-**Wersja:** 1.0
+**Wersja:** 1.1 SUPPLEMENT
 **Data:** 2026-02-09
 **Status:** AS-IS (1:1 z kodem) + TO-BE (sekcje oznaczone)
 **Warstwa:** Solver + Mapping + Results API
@@ -286,6 +286,16 @@ Ik_sc = k_sc × In_rated    [A]
 
 **Rola w solverze PF:** Nie uczestniczy bezpośrednio — falownik w PF jest reprezentowany przez P/Q adjustment na węźle (przez mapowanie Generator → Node.active_power/reactive_power).
 
+**INWARINAT KANONICZNY:**
+> InverterSource (źródło energoelektroniczne) NIE wchodzi do macierzy Y-bus
+> w żadnym solverze stacjonarnym (Power Flow, Short Circuit).
+> InverterSource jest modelowany jako źródło prądowe o ograniczonej amplitudzie (k_sc × In),
+> dodawane ADDYTYWNIE do wyniku obliczenia prądu zwarciowego z sieci Thévenina.
+
+**DOPRECYZOWANIE ZAKRESU:**
+> Modele dynamiczne (EMT, RMS-dynamic) są POZA ZAKRESEM niniejszej specyfikacji
+> i nie wpływają na kontrakty solverów opisane w Rozdziale 6.
+
 > **TO-BE** — Decyzja #14: Pełne mapowanie `Generator(gen_type=pv_inverter|wind_inverter|bess)` → `InverterSource` w `enm/mapping.py`. Stan AS-IS: Generator falownikowy mapowany jako P/Q adjustment na Node (jak generator synchroniczny), brak tworzenia InverterSource w mapping.
 
 ---
@@ -325,6 +335,18 @@ class NetworkGraph:
 - Grupuje węzły i transformatory — BEZ wpływu na obliczenia
 - Solver NIE widzi Station w macierzy Y-bus
 - Warstwa organizacyjna / wizualizacyjna
+
+**ZAKAZ KANONICZNY — Station / Substation:**
+> Byt Station / Substation jako kontener logiczny:
+> - NIE wpływa na wybór węzła SLACK,
+> - NIE wpływa na bazę napięciową,
+> - NIE wpływa na konfigurację solvera,
+> - NIE jest uwzględniany w walidacji grafu obliczeniowego.
+
+**INWARINAT:**
+> Station istnieje WYŁĄCZNIE jako struktura organizacyjna ENM/UI.
+> Solver widzi wyłącznie: Node, Branch (LineBranch, TransformerBranch), Switch, InverterSource.
+> Żaden parametr Station (station_type, bus_ids, branch_ids) NIE jest wejściem do jakiegokolwiek solvera.
 
 ---
 
@@ -441,6 +463,16 @@ W przeciwnym razie (z Sk'' i rx_ratio):
 ```
 
 Bus źródłowy (Bus z przyłączonym Source) → NodeType.SLACK (v_mag=1.0 pu, θ=0.0 rad).
+
+**INWARINAT KANONICZNY — Węzeł wirtualny źródła (Source internal node):**
+> Węzeł wirtualny źródła:
+> - istnieje WYŁĄCZNIE w warstwie NetworkGraph (produkowany przez `map_enm_to_network_graph()`),
+> - NIE jest eksponowany do ENM, UI ani SLD,
+> - NIE posiada `ref_id` widocznego poza solverem,
+> - jego identyfikator generowany jest deterministycznie przez UUID5 z `source.ref_id` + suffix.
+>
+> Węzeł wirtualny nie jest elementem modelu użytkownika — jest artefaktem obliczeniowym
+> wymaganym do poprawnego modelowania impedancji źródła zasilania w macierzy Y-bus.
 
 #### Load → Akumulacja P/Q na Node
 
@@ -807,6 +839,22 @@ class PowerFlowNewtonSolution:
 8. White Box     → zapis ybus_trace, nr_trace, init_state
 ```
 
+### 6.6.8 Granica odpowiedzialności solverów — ochrona / zabezpieczenia (BINDING)
+
+**ZAKAZ KANONICZNY:**
+> Solvery obliczeniowe (Load Flow, Short Circuit) NIE implementują logiki zabezpieczeniowej
+> i NIE podejmują decyzji selektywnych.
+
+**DOPRECYZOWANIE:**
+> Solvery dostarczają WYŁĄCZNIE dane wejściowe do warstwy Protection, w szczególności:
+> - prądy zwarciowe (Ik'', Ip, Ith),
+> - napięcia węzłów,
+> - kierunki przepływów.
+>
+> Koordynacja zabezpieczeń jest realizowana w ODRĘBNEJ warstwie analitycznej (→ SPEC_12_PROTECTION.md).
+> Solver NIE ZNA: nastaw zabezpieczeń, charakterystyk czasowych (DT/IDMT), logiki selektywności,
+> aparatury łączeniowej (CB, LS), ani przekładników (CT/VT). Są to wyłącznie dane warstwy Analysis.
+
 ---
 
 ## 6.7 Frozen Result API — zasady (Decyzje #4, #5)
@@ -954,6 +1002,20 @@ Każdy solver MUSI produkować `white_box_trace` — listę kroków obliczeniowy
 - **Stan docelowy:** Solver zwarć asymetrycznych (1F, 2F+G) wymaga macierzy Y₀ i Z₀
 - **Wpływ:** Wymaga nowego `AdmittanceMatrixBuilder` dla składowej zerowej
 
+**DOPRECYZOWANIE ZAKRESU:**
+> Brak obsługi składowych zerowych (Z₀, Y₀, uziemień) jest ŚWIADOMYM ograniczeniem
+> aktualnego zakresu solverów. Solver AS-IS operuje wyłącznie na składowej symetrycznej
+> dodatniej (Y₁, Z₁). Wyniki zwarć asymetrycznych (1F, 2F+G) są poprawne wyłącznie
+> w zakresie składowej dodatniej — pełna analiza wymaga implementacji TO-BE.
+
+**ZASADA ROZWOJOWA:**
+> Implementacja składowych zerowych będzie realizowana jako osobny etap specyfikacji
+> i NIE MOŻE być częściowa ani domyślna. Wymaga:
+> - osobnej macierzy Y₀ z uwzględnieniem grup połączeń transformatorów i uziemień,
+> - osobnej macierzy Y₂ (dla większości elementów SN: Y₂ = Y₁),
+> - rozszerzenia kontraktu wynikowego o prądy składowych (I₁, I₂, I₀),
+> - ADR przed implementacją.
+
 ### 6.11.4 GAP: Gałąź magnesująca transformatora w Y-bus (Decyzja #44)
 
 - **Stan AS-IS:** Transformator modelowany wyłącznie impedancją zwarcia (bez `i0_percent`, `p0_kw` w Y-bus)
@@ -976,7 +1038,20 @@ Każdy solver MUSI produkować `white_box_trace` — listę kroków obliczeniowy
 | Generator → InverterSource mapping | TO-BE | 0% |
 | Scenariusz dual SC (z/bez OZE) | TO-BE | 0% |
 
-**DOMENA KONTRAKTÓW SOLVERÓW I MAPOWANIA ENM→MODEL OBLICZENIOWY W ROZDZIALE 6 JEST ZAMKNIĘTA (v1.0).**
+---
+
+## 6.13 Definition of Done — kryteria domknięcia rozdziału (BINDING)
+
+Rozdział 6 jest kanonicznie domknięty, jeżeli spełnione są WSZYSTKIE poniższe warunki:
+
+1. **Solver ≠ Protection:** Nie istnieje żadna interpretacja, w której solver „wie" cokolwiek o zabezpieczeniach — solver NIE zna nastaw, charakterystyk, logiki selektywności ani aparatury łączeniowej.
+2. **InverterSource ∉ Y-bus:** InverterSource nigdy nie trafia do macierzy admitancyjnej Y-bus w żadnym solverze stacjonarnym — jest wyłącznie addytywnym źródłem prądowym.
+3. **Station ∉ Solver:** Station / Substation nie wpływa na żadne obliczenie — nie determinuje SLACK, bazy napięciowej, konfiguracji solvera ani walidacji grafu.
+4. **White Box kompletny:** Każdy element solverowy (Node, LineBranch, TransformerBranch, Switch, InverterSource) jest audytowalny przez White Box — ślad obliczeniowy zawiera wszystkie kroki od danych wejściowych do wyniku.
+5. **Węzeł wirtualny ukryty:** Węzeł wirtualny źródła istnieje wyłącznie w warstwie NetworkGraph i nie jest eksponowany do ENM, UI ani SLD.
+6. **Frozen API gwarantowane:** Zbiory `EXPECTED_SHORT_CIRCUIT_RESULT_KEYS` i pola `PowerFlowNewtonSolution` są zamrożone — zmiana wymaga major version bump.
+
+**DOMENA KONTRAKTÓW SOLVERÓW I MAPOWANIA ENM→MODEL OBLICZENIOWY W ROZDZIALE 6 JEST ZAMKNIĘTA (v1.1 SUPPLEMENT).**
 
 ---
 
