@@ -51,6 +51,7 @@ docs/spec/
 ├── SPEC_CHAPTER_02_ENM_DOMAIN_MODEL.md           ← Model domenowy ENM: byty, granice, semantyka (GOTOWY, v2.0 FINAL)
 ├── SPEC_CHAPTER_03_TOPOLOGY_CONNECTIVITY.md      ← Topologia i łączność: sekcjonowanie, master–oddział (GOTOWY)
 ├── SPEC_CHAPTER_04_LINES_CABLES_SN.md            ← Linie i kable SN: modelowanie, parametry, magistrale, ringi (GOTOWY)
+├── SPEC_CHAPTER_05_SYSTEM_CANONICAL_CONTRACTS.md  ← Kontrakty kanoniczne systemu: kreator, katalogi, stacje, zabezpieczenia, modele niedozwolone (GOTOWY)
 │
 │   ══════════════════════════════════════
 │   FAZA 0 — KONTRAKTY I WARSTWY
@@ -95,7 +96,7 @@ docs/spec/
 └── SPEC_16_TESTS.md                     ← Kryteria akceptacji, test plan
 ```
 
-**Zmiana vs poprzedni plan:** Zredukowano z 20 do 17 plików Fazy 0-4. Dodano 4 rozdziały preambuły (Rozdział 1-4). Łącznie 22 plików. Konsolidacja wg warstw (Decision Matrix), eliminacja duplikatów (np. linie/kable/transformatory/łączniki/źródła → jeden `SPEC_02_ENM_CORE.md`; stacje/bay → `SPEC_03_ENM_META.md`).
+**Zmiana vs poprzedni plan:** Zredukowano z 20 do 17 plików Fazy 0-4. Dodano 5 rozdziałów preambuły (Rozdział 1-5). Łącznie 23 plików. Konsolidacja wg warstw (Decision Matrix), eliminacja duplikatów (np. linie/kable/transformatory/łączniki/źródła → jeden `SPEC_02_ENM_CORE.md`; stacje/bay → `SPEC_03_ENM_META.md`). Rozdział 5 domyka kontrakty systemowe (kreator, katalogi, stacje, zabezpieczenia, modele niedozwolone).
 
 ---
 
@@ -110,6 +111,8 @@ PREAMBUŁA — CEL, ZAKRES, DEFINICJE (UKOŃCZONA)
             └── Domena Topologia ZAMKNIĘTA (§3.1–§3.11, Decyzje #26–#28)
   Krok 0d: SPEC_CHAPTER_04_LINES_CABLES_SN.md            ✅ GOTOWY (v1.1 SUPPLEMENT)
             └── Domena Linie/Kable SN ZAMKNIĘTA (§4.1–§4.14 + §4.15–§4.19, Decyzje #29–#33)
+  Krok 0e: SPEC_CHAPTER_05_SYSTEM_CANONICAL_CONTRACTS.md  ✅ GOTOWY (v1.0 FINAL)
+            └── Domena Kontraktów Kanonicznych ZAMKNIĘTA (§5.1–§5.12, Decyzje #34–#38)
 
 FAZA 0 — KONTRAKTY I WARSTWY (PRIORYTET NAJWYŻSZY)
   Krok 1:  SPEC_00_LAYERING.md
@@ -865,6 +868,7 @@ FINALIZACJA:
 | SPEC_CHAPTER_02_ENM_DOMAIN_MODEL.md | Preambuła | ENM Domain | 21 | ~1260 ✅ FINAL |
 | SPEC_CHAPTER_03_TOPOLOGY_CONNECTIVITY.md | Preambuła | Topology | 11 | ~550 ✅ FINAL |
 | SPEC_CHAPTER_04_LINES_CABLES_SN.md | Preambuła | ENM Core + Catalog + Bay | 19 | ~840 ✅ SUPPLEMENT |
+| SPEC_CHAPTER_05_SYSTEM_CANONICAL_CONTRACTS.md | Preambuła | Application + Catalog + Validation + WhiteBox | 12 | ~710 ✅ FINAL |
 | SPEC_00_LAYERING.md | 0 | Architecture | 11 | ~700 |
 | SPEC_01_GLOSSARY_NORMATIVE.md | 0 | Governance | 7 | ~290 |
 | SPEC_02_ENM_CORE.md | 0 | ENM Core | 19 | ~2020 |
@@ -883,12 +887,12 @@ FINALIZACJA:
 | SPEC_15_PERSISTENCE.md | 4 | Infrastructure | 6+1 TO-BE | ~380 |
 | SPEC_16_TESTS.md | 4 | Infrastructure | 10 | ~540 |
 | SPEC_INDEX.md | — | Index | 5 | ~150 |
-| **RAZEM** | | | **~256** | **~16 280** |
+| **RAZEM** | | | **~268** | **~16 990** |
 
 ### Porównanie:
 - **SYSTEM_SPEC.md v3.0:** ~487 linii
-- **Nowa specyfikacja:** ~16 280 linii (22 plików, w tym Rozdział 1-4 preambuły)
-- **Wzrost:** ~33× (3300%)
+- **Nowa specyfikacja:** ~16 990 linii (23 plików, w tym Rozdział 1-5 preambuły)
+- **Wzrost:** ~35× (3500%)
 - **Pokrycie AS-IS:** ~95% (sekcje TO-BE wyraźnie oznaczone)
 
 ---
