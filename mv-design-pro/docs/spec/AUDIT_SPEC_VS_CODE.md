@@ -783,6 +783,43 @@ Każda rozbieżność z §2 otrzymuje jednoznaczną dyspozycję.
 - Sanity checks niezależne od ENM Validator — dedykowana bramka pre-analysis.
 - **DOMENA SYSTEMU ZABEZPIECZEŃ W ROZDZIALE 9 JEST ZAMKNIĘTA (v1.0).**
 
+| 65 | Agregacja jednostek równoległych: v1 = strategia B (multiplikacja logiczna), docelowo A (parametryczna) | **BINDING** | ENM + Solver | `SPEC_CHAPTER_07…` (§7.A.1) | v1: brak pola n_parallel na Generator/InverterSource. Użytkownik tworzy N osobnych instancji (strategia B). Docelowo (Decyzja #17): n_parallel: int = 1 na Generator. Solver: PF: N×p_mw; SC: N×k_sc×In. White Box raportuje quantity + strategy. Z-AGR-01..03. |
+| 66 | Model obciążenia ZIP: formalnie zablokowany w v1, wymaga osobnej ADR | **BINDING** | ENM + Solver | `SPEC_CHAPTER_07…` (§7.A.2) | Load.model="zip" zdefiniowany w Pydantic ale: mapper IGNORUJE (traktuje jako PQ), solver nie obsługuje, kreator nie oferuje. Formuła ZIP: P(U)=P₀[a(U/U₀)²+b(U/U₀)+c], a+b+c=1.0. Aktywacja wymaga: mapper, solver NR, White Box, Study Case, testy. Z-ZIP-01..04. |
+| 67 | BESS tryby pracy: DISCHARGE/CHARGE/IDLE — kanoniczna tabela z P/Q/SC/White Box | **BINDING** | ENM + Solver + White Box | `SPEC_CHAPTER_07…` (§7.A.3) | v1: brak jawnego bess_mode, tryb implicit z p_mw (>0=discharge, <0=charge, 0=idle). Tabela: DISCHARGE(P>0, generacja, SC=k_sc×In), CHARGE(P<0, pobór, SC contributes), IDLE(P=0, neutralny). Docelowo: BESSMode enum + parametr StudyCase. Z-BESS-01..03. |
+| 68 | StudyCaseContext: zamrożony kontekst obliczeniowy — jednoznaczne wejście do solverów | **BINDING** | Domain + Solver | `SPEC_CHAPTER_07…` (§7.A.4) | StudyCaseContext = ENM snapshot + katalog(fingerprint) + StudyCaseConfig + ProtectionConfig + aktywne źródła + obciążenia + generatory + stany łączników. v1: input_snapshot(dict) + input_hash(SHA-256) na AnalysisRun. Kanonicalizacja deterministyczna. Gwarancja: ten sam context + solver = identyczne wyniki. |
+| 69 | Tryb ekspercki: AuditContract (7 pól) dla override parametrów typu | **BINDING** | Catalog + ENM + White Box | `SPEC_CHAPTER_08…` (§8.A.1) | v1: impedance_override na LineBranch, brak kontraktu audytowego. TO-BE: AuditContract: override_id(UUID), changed_by(str), changed_at(datetime), reason(str min 10), parameters_changed(dict), expert_flag(bool=True), impact_scope(list[str]). Rozszerzenie na Transformer i Generator = TO-BE (#16). Z-EXP-01..05. |
+| 70 | CompatibilityMatrix: macierz kompatybilności typów katalogowych (WARNING) | **BINDING** | Catalog + Validation | `SPEC_CHAPTER_08…` (§8.A.2) | 5 relacji: InverterType↔TransformerType(Sn,Un), InverterType↔ProtectionDeviceType(In), TransformerType↔ProtectionDeviceType(In), CableType↔ProtectionDeviceType(In vs I_pickup), LineType↔ProtectionDeviceType. WARNING, nie ERROR. v1: NIEZAIMPLEMENTOWANA. TO-BE: CompatibilityCheck + CompatibilityMatrix frozen. |
+| 71 | Macierz zmian między Cases: co zmienne (config), co stałe (topologia, typy) | **BINDING** | Domain + Case | `SPEC_CHAPTER_08…` (§8.A.3) | v1 zmienne: StudyCaseConfig + ProtectionConfig. Stałe BINDING: topologia, typy, parametry znamionowe. Stałe v1/zmienne TO-BE: łączniki, profile P/Q, BESS mode, źródła, override. Konsekwencja v1: zmiana łącznika = nowy snapshot → invalidacja ALL. TO-BE: StudyCaseOverlay. |
+| 72 | Study Case = config-only, hierarchia Project→ENM→Case→Run→Result | **BINDING** | Architecture | `SPEC_CHAPTER_10…` (§10.1) | StudyCase(frozen, 13 pól): id, project_id, name, network_snapshot_id, config, protection_config, result_status(NONE/FRESH/OUTDATED), is_active, result_refs, revision, created_at, updated_at, study_payload. 1 ENM→N Cases, 1 Case→M Runs, 1 aktywny per projekt. Clone→NONE. Z-SC-01..09, INV-SC-01..09. |
+| 73 | Scenariusze kanoniczne: PF(5) + SC(6) + U(2) + operacyjne(3 TO-BE) = 16 typów | **BINDING** | Domain + Case | `SPEC_CHAPTER_10…` (§10.3) | PF: normalny, min/max obciążenie, noc/dzień OZE. SC: 3F max/min, 2F, 1F, z/bez OZE. U: Umin/Umax. Operacyjne (TO-BE): normalna, N-1(overlay), rekonfiguracja(overlay). P10 ScenarioType: NORMAL, N_1, MAINTENANCE, EMERGENCY, USER_DEFINED. |
+| 74 | Warunki brzegowe Case: jawne, bez domyślnych, bez dziedziczenia niejawnego | **BINDING** | Domain + Validation | `SPEC_CHAPTER_10…` (§10.4) | v1 jawne: Source.in_service(ENM), Switch.status(ENM), StudyCaseConfig, include_inverter/motor, fault_type/lokalizacja(per Run). Z ENM (nie per Case): profile P/Q, tryby BESS. Z-WB-01..03. |
+| 75 | Kanonicalizacja + SHA-256: deterministyczny input_hash | **BINDING** | Infrastructure + Solver | `SPEC_CHAPTER_10…` (§10.6) | canonicalize(): sortuje klucze, stabilnie sortuje listy, UUID→str, datetime→ISO, Enum→str, complex→{re,im}. JSON: sort_keys=True, separators=(",",":") → SHA-256. Deduplikacja P20a: FINISHED run z tym samym hash → kopiuj wyniki. |
+| 76 | Invalidacja wyników: 6 zdarzeń → macierz efektów | **BINDING** | Domain + Application | `SPEC_CHAPTER_10…` (§10.8) | (1) zmiana ENM → ALL OUTDATED, (2) zmiana Config → dany OUTDATED, (3) zmiana ProtectionConfig → dany OUTDATED, (4) Clone → NONE, (5) Commit Wizard → ALL OUTDATED, (6) obliczenie → FRESH. |
+| 77 | Relacja Case→Solver: Case steruje, NIE ingeruje w algorytm | **BINDING** | Domain + Solver | `SPEC_CHAPTER_10…` (§10.9) | Config → c_factor/base_mva/tolerance/include_inverter → AnalysisRunService → Solver(input, options). PowerFlowOptions(6p): tolerance, max_iter, damping, flat_start, validate, trace_level. 7 Solver Input Specs. |
+| 78 | White Box per AnalysisRun: ENM→Config→Input→Algorytm→Wynik | **BINDING** | White Box + Solver | `SPEC_CHAPTER_10…` (§10.10) | Trace: input_snapshot(dict), input_hash(str), trace_json(Proof Pack), white_box_trace(audit). Łańcuch deterministyczny. Z-WB-04..06: zakaz wyników bez run, run bez hash, scenariusza bez trace. |
+| 79 | Walidacje pre-calculation: E-SC-01..05 + W-SC-01..02 + B-SC-01 | **BINDING** | Validation | `SPEC_CHAPTER_10…` (§10.18) | 5 ERROR: brak config, c_factor≤0, tolerance≤0, brak aktywnego Case, ENM blockers. 2 WARNING: OUTDATED, brak trace. 1 BLOCKER(strict): brak White Box. Spójność: c_max<c_min, brak solvera, brak snapshot, 2 aktywne Cases. |
+
+**Z decyzji #65–#68 wynika (Suplementy R7 v1.1 — BINDING):**
+- Agregacja v1: strategia B (multiplikacja). Docelowo: strategia A (parametryczna, n_parallel).
+- ZIP: formalnie ZABLOKOWANY (Z-ZIP-01..04), wymaga ADR.
+- BESS: 3 tryby kanoniczne (DISCHARGE/CHARGE/IDLE), v1 implicit z p_mw.
+- StudyCaseContext: zamrożony kontekst = jednoznaczne wejście do solverów.
+- **SUPLEMENTY ROZDZIAŁU 7 (v1.1) SĄ ZAMKNIĘTE.**
+
+**Z decyzji #69–#71 wynika (Suplementy R8 v1.1 — BINDING):**
+- AuditContract: 7 pól obowiązkowych dla override (kto, kiedy, dlaczego, co, wpływ).
+- CompatibilityMatrix: 5 relacji WARNING, niezaimplementowana v1.
+- Macierz zmian: v1 zmienne = Config + ProtectionConfig only. TO-BE: overlay.
+- **SUPLEMENTY ROZDZIAŁU 8 (v1.1) SĄ ZAMKNIĘTE.**
+
+**Z decyzji #72–#79 wynika (Rozdział 10 — BINDING):**
+- StudyCase = config-only, frozen, 13 pól, hierarchia Project→ENM→Case→Run→Result.
+- AnalysisRun = jednorazowy, frozen, state machine CREATED→VALIDATED→RUNNING→FINISHED/FAILED.
+- Deterministyczna kanonicalizacja + SHA-256 + deduplikacja P20a.
+- Invalidacja: 6 zdarzeń → macierz efektów (globalna/lokalna/NONE).
+- 16 scenariuszy kanonicznych, walidacje E-SC/W-SC/B-SC, White Box per run.
+- **DOMENA SCENARIUSZY OBLICZENIOWYCH W ROZDZIALE 10 JEST ZAMKNIĘTA (v1.0).**
+
 ---
 
 **KONIEC AUDYTU**

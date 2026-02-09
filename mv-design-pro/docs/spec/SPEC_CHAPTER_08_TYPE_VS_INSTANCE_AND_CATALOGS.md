@@ -1,6 +1,6 @@
 # Rozdział 8 — Typ vs Instancja + Katalogi Typów (Type Library)
 
-**Wersja:** 1.0
+**Wersja:** 1.1
 **Status:** AS-IS (z sekcjami TO-BE jawnie oznaczonymi)
 **Warstwa:** ENM Domain + Catalog + Resolver + Application (Kreator)
 **Zależności:** Rozdział 2 (ENM Domain Model), Rozdział 5 (§5.13–§5.19 — Kontrakty katalogowe), Rozdział 6 (Solver Contracts), Rozdział 7 (Source/Generator/Load)
@@ -737,7 +737,213 @@ White Box MUSI umieć odtworzyć pełny łańcuch per instancja:
 
 ---
 
-**DOMENA TYPU VS INSTANCJI ORAZ KATALOGÓW TYPÓW W ROZDZIALE 8 JEST ZAMKNIĘTA (v1.0).**
+## §8.A — Suplement v1.1: Domknięcie kontraktów TO-BE
+
+> **Cel:** Domknięcie kontraktów audytowych trybu eksperckiego i macierzy kompatybilności,
+> przygotowanie systemu do Etapu 10/18 (Study Cases & Scenarios).
+> **Status:** Kontrakty BINDING. NIE cofają ustaleń v1.0 — wyłącznie doprecyzowują.
+
+---
+
+### §8.A.1 Tryb ekspercki — kontrakt audytowy (BINDING — Decyzja #69)
+
+#### §8.A.1.1 Zasada nadrzędna
+
+> **Override parametrów typu jest dozwolony WYŁĄCZNIE w trybie eksperckim
+> i MUSI być w pełni audytowalny.**
+
+#### §8.A.1.2 Stan AS-IS (v1)
+
+Jedyny override AS-IS: `impedance_override` na `LineBranch` (`branch.py:212`).
+
+Override jest zapisany w modelu ENM jako jawne pole:
+
+```python
+# core/branch.py — LineBranch
+impedance_override: ImpedanceOverride | None  # (r_ohm_per_km, x_ohm_per_km, b_us_per_km)
+```
+
+Resolver (`resolve_line_params()`) uwzględnia override z najwyższym priorytetem:
+- `ParameterSource.OVERRIDE > TYPE_REF > INSTANCE`
+
+**Brak kontraktu audytowego AS-IS** — override jest zapisany w modelu, ale bez:
+- identyfikacji autora,
+- timestampu zmiany,
+- uzasadnienia,
+- śledzenia wpływu na wyniki.
+
+#### §8.A.1.3 Minimalny AuditContract (TO-BE, BINDING)
+
+Każdy override MUSI zapisywać:
+
+| Pole | Typ | Opis | Wymagane |
+|------|-----|------|----------|
+| `override_id` | UUID | Identyfikator override | ✅ |
+| `changed_by` | str | Identyfikator użytkownika / roli | ✅ |
+| `changed_at` | datetime (ISO 8601) | Timestamp zmiany | ✅ |
+| `reason` | str | Uzasadnienie tekstowe (min. 10 znaków) | ✅ |
+| `parameters_changed` | dict[str, {old, new}] | Lista zmienionych parametrów z wartościami przed/po | ✅ |
+| `expert_flag` | bool = True | Flaga trybu eksperckiego | ✅ |
+| `impact_scope` | list[str] | Lista solverów, których wyniki są invalidowane | ✅ |
+
+#### §8.A.1.4 Integracja z White Box
+
+White Box MUSI raportować override jako element śladu:
+
+```
+[OVERRIDE] element_id=branch_42
+  changed_by: "jan.kowalski"
+  changed_at: "2025-01-15T14:30:00Z"
+  reason: "Korekta impedancji na podstawie pomiarów terenowych"
+  r_ohm_per_km: 0.320 → 0.345
+  x_ohm_per_km: 0.370 → 0.385
+  source: ParameterSource.OVERRIDE
+```
+
+#### §8.A.1.5 Rozszerzenie override (TO-BE, Decyzja #16)
+
+| Element | Override docelowy | Parametry | Status |
+|---------|-------------------|-----------|--------|
+| LineBranch | `impedance_override` | R', X', B' | ✅ AS-IS |
+| Transformer | `transformer_override` (TO-BE) | uk%, pk | TO-BE |
+| Generator (falownik) | `inverter_override` (TO-BE) | k_sc, In, limity Q | TO-BE |
+
+Każdy nowy override MUSI implementować AuditContract (§8.A.1.3).
+
+#### §8.A.1.6 Zakazy (BINDING)
+
+| ID | Zakaz | Uzasadnienie |
+|----|-------|-------------|
+| **Z-EXP-01** | Zakaz override bez śladu audytowego (AuditContract) | Audytowalność |
+| **Z-EXP-02** | Zakaz override w trybie standardowym UI — wyłącznie tryb ekspercki | Bezpieczeństwo |
+| **Z-EXP-03** | Zakaz override parametrów krytycznych bezpieczeństwa bez flagi `expert_flag=True` | Governance |
+| **Z-EXP-04** | Zakaz override bez uzasadnienia (`reason` wymagane, min. 10 znaków) | Traceability |
+| **Z-EXP-05** | Zakaz trwałej modyfikacji katalogu z poziomu override (override ≠ edycja typu) | Immutability katalogu |
+
+---
+
+### §8.A.2 CompatibilityMatrix — macierz kompatybilności typów (BINDING — Decyzja #70)
+
+#### §8.A.2.1 Definicja
+
+> **CompatibilityMatrix = macierz relacji kompatybilności między typami katalogowymi,
+> służąca do walidacji konfiguracji i generowania ostrzeżeń.**
+
+#### §8.A.2.2 Zakres
+
+| Relacja | Kryterium | Severity | Opis |
+|---------|-----------|----------|------|
+| InverterType ↔ TransformerType | `Sn_inv ≤ Sn_trafo`, `Un_inv = Ulv_trafo` | WARNING | Zgodność mocy/napięcia falownika z transformatorem nn/SN |
+| InverterType ↔ ProtectionDeviceType | `In_inv ≤ In_protection` | WARNING | Zgodność prądu znamionowego z nastaw zabezpieczenia |
+| TransformerType ↔ ProtectionDeviceType | `In_trafo_lv ≤ In_protection` | WARNING | Zgodność prądu trafo z zabezpieczeniem |
+| CableType ↔ ProtectionDeviceType | `In_cable ≥ I_pickup` | WARNING | Obciążalność kabla vs nastawa zabezpieczenia |
+| LineType ↔ ProtectionDeviceType | `In_line ≥ I_pickup` | WARNING | Obciążalność linii vs nastawa zabezpieczenia |
+
+#### §8.A.2.3 Charakter macierzy
+
+- **Informacyjna** — NIE blokuje konfiguracji (generuje WARNING, nie ERROR).
+- **Walidacyjna** — używana przez kreator i walidator pre-analysis.
+- **Nie zmienia fizyki** — solver nie korzysta z CompatibilityMatrix.
+- **White Box** — niezgodności raportowane jako ostrzeżenia w trace.
+- **READ-ONLY** — macierz nie jest modyfikowalna przez użytkownika.
+
+#### §8.A.2.4 Stan AS-IS (v1)
+
+**CompatibilityMatrix nie jest zaimplementowana w v1.** Walidacja zgodności typów:
+- Brak automatycznego sprawdzania InverterType ↔ TransformerType.
+- Brak ostrzeżeń o niezgodności In/Un/Sn.
+- Kreator nie weryfikuje zgodności typów między elementami.
+
+#### §8.A.2.5 Kontrakt docelowy (TO-BE)
+
+```python
+@dataclass(frozen=True)
+class CompatibilityCheck:
+    type_a_id: str
+    type_a_class: str             # np. "InverterType"
+    type_b_id: str
+    type_b_class: str             # np. "TransformerType"
+    criterion: str                # np. "Sn_inv ≤ Sn_trafo"
+    is_compatible: bool
+    severity: str                 # WARNING
+    message_pl: str               # Deterministyczny komunikat PL
+
+@dataclass(frozen=True)
+class CompatibilityMatrix:
+    checks: tuple[CompatibilityCheck, ...]
+    project_id: str
+    evaluated_at: datetime
+    all_compatible: bool          # True jeśli brak WARNING
+```
+
+---
+
+### §8.A.3 Macierz zmian między Study Case'ami (BINDING — Decyzja #71)
+
+#### §8.A.3.1 Zasada
+
+> **Między Study Case'ami (na tym samym ENM snapshot) mogą się zmieniać WYŁĄCZNIE
+> parametry konfiguracyjne — NIE topologia ani typy katalogowe.**
+
+#### §8.A.3.2 Tabela: co zmienne, co stałe
+
+| Kategoria | Przykłady | Zmienne między Cases? | Opis |
+|-----------|-----------|----------------------|------|
+| **StudyCaseConfig** | c_factor_max/min, base_mva, tolerance | ✅ TAK (v1) | Parametry obliczeń — jedyna zmienna v1 |
+| **ProtectionConfig** | template_ref, overrides | ✅ TAK (v1) | Konfiguracja zabezpieczeń per Case |
+| Stany łączników | Switch OPEN/CLOSED | ❌ NIE (v1) / ✅ TAK (TO-BE) | Wymaga nakładki Case (overlay) |
+| Profile obciążeń | Load.p_mw, Load.q_mvar | ❌ NIE (v1) / ✅ TAK (TO-BE) | Wymaga profili per Case |
+| Profile generacji | Generator.p_mw, Generator.q_mvar | ❌ NIE (v1) / ✅ TAK (TO-BE) | Wymaga profili per Case |
+| Tryby BESS | bess_mode: CHARGE/DISCHARGE/IDLE | ❌ NIE (v1) / ✅ TAK (TO-BE) | Wymaga §7.A.3 |
+| Aktywność źródeł | Source.in_service | ❌ NIE (v1) / ✅ TAK (TO-BE) | Wymaga nakładki Case |
+| **Topologia ENM** | Bus, Branch, Switch — istnienie elementów | ❌ **NIE (BINDING)** | Wymaga nowego ENM snapshot |
+| **Typy katalogowe** | LineType, TransformerType parametry | ❌ **NIE (BINDING)** | Typ = frozen immutable |
+| **Parametry znamionowe** | R', X', uk%, Sn | ❌ **NIE (BINDING)** | Pochodzą z katalogu (read-only) |
+| **Override ekspercki** | impedance_override | ❌ NIE (v1) / ✅ TAK (TO-BE) | Wymaga AuditContract §8.A.1 |
+
+#### §8.A.3.3 Stan AS-IS (v1)
+
+W v1 Study Case zmienia **WYŁĄCZNIE** `StudyCaseConfig` i `ProtectionConfig`. Wszystkie pozostałe parametry (stany łączników, profile P/Q, aktywność źródeł) są częścią ENM i NIE mogą być zmieniane per Case.
+
+**Konsekwencja:** Zmiana stanu łącznika, profilu obciążenia lub trybu BESS wymaga nowego ENM snapshot → invalidacja WSZYSTKICH Case'ów.
+
+#### §8.A.3.4 Kontrakt docelowy — nakładka Case (TO-BE, osobna ADR)
+
+Docelowo Study Case BĘDZIE posiadać **warstwę nakładkową** (overlay):
+
+```python
+@dataclass(frozen=True)
+class StudyCaseOverlay:
+    switch_overrides: dict[str, str]            # {switch_id: "OPEN"/"CLOSED"}
+    load_profiles: dict[str, dict]              # {load_id: {p_mw, q_mvar}}
+    gen_profiles: dict[str, dict]               # {gen_id: {p_mw, q_mvar, bess_mode}}
+    source_overrides: dict[str, dict]           # {source_id: {in_service: bool}}
+```
+
+Reguły nakładki:
+- Overlay NIE mutuje ENM — nadpisuje parametry zmienne na etapie budowy `StudyCaseContext`.
+- Overlay jest częścią Study Case (przechowywany obok config).
+- Solver widzi finalny stan (ENM + overlay = StudyCaseContext).
+- White Box raportuje overlay jako element śladu (`source: OVERLAY`).
+
+---
+
+### §8.A.4 Definition of Done (Suplement v1.1)
+
+| # | Kryterium | Status |
+|---|-----------|--------|
+| 1 | AuditContract dla trybu eksperckiego zdefiniowany (7 pól obowiązkowych) | ✅ |
+| 2 | Integracja override z White Box opisana (format trace) | ✅ |
+| 3 | Rozszerzenie override na Transformer i Generator zarysowane (TO-BE) | ✅ |
+| 4 | Zakazy Z-EXP-01..05 sformułowane | ✅ |
+| 5 | CompatibilityMatrix zdefiniowana (5 relacji, WARNING severity) | ✅ |
+| 6 | Kontrakt docelowy CompatibilityCheck opisany | ✅ |
+| 7 | Macierz zmian między Cases (co zmienne, co stałe) zdefiniowana | ✅ |
+| 8 | Kontrakt nakładki Case (overlay) zarysowany jako TO-BE | ✅ |
+
+---
+
+**DOMENA TYPU VS INSTANCJI ORAZ KATALOGÓW TYPÓW W ROZDZIALE 8 JEST ZAMKNIĘTA (v1.1).**
 
 ---
 

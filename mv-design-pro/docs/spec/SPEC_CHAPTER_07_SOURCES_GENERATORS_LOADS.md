@@ -1,6 +1,6 @@
 # Rozdział 7 — Model Źródeł, Generatorów i Odbiorów (Source / Generator / Load)
 
-**Wersja:** 1.0
+**Wersja:** 1.1
 **Status:** AS-IS (z sekcjami TO-BE jawnie oznaczonymi)
 **Warstwa:** ENM Domain + Solver Mapping + Validation
 **Zależności:** Rozdział 2 (ENM Domain Model), Rozdział 5 (Kontrakty Kanoniczne), Rozdział 6 (Solver Contracts & Mapping)
@@ -933,7 +933,245 @@ Source posiada pola `c_max` i `c_min` ale mapper ich NIE używa. Współczynnik 
 
 ---
 
-**DOMENA ŹRÓDEŁ, GENERATORÓW I ODBIORÓW W ROZDZIALE 7 JEST ZAMKNIĘTA (v1.0).**
+## §7.A — Suplement v1.1: Domknięcie kontraktów TO-BE
+
+> **Cel:** Domknięcie brakujących kontraktów zidentyfikowanych w §7.10.2 (GAP-y),
+> przygotowanie systemu do Etapu 10/18 (Study Cases & Scenarios).
+> **Status:** Kontrakty BINDING. NIE cofają ustaleń v1.0 — wyłącznie doprecyzowują.
+
+---
+
+### §7.A.1 Agregacja jednostek równoległych (n_parallel) — kontrakt solverowy
+
+#### §7.A.1.1 Zasada nadrzędna (BINDING — Decyzja #65)
+
+> **Jeżeli instancja ENM reprezentuje N identycznych jednostek fizycznych
+> (np. falowników PV, BESS, generatorów powtarzalnych),
+> agregacja ich wpływu elektrycznego MUSI być jednoznaczna i jawna dla solvera.**
+
+#### §7.A.1.2 Dopuszczalne strategie agregacji
+
+| Strategia | Opis | Status v1 |
+|-----------|------|-----------|
+| **A. Agregacja parametryczna** | ENM przechowuje `quantity=N`, solver interpretuje: P_total=N×P_rated, Ik_total=N×(k_sc×In) | **Docelowa (TO-BE)** |
+| **B. Multiplikacja logiczna** | ENM zawiera N osobnych instancji Generator, solver widzi N niezależnych bytów | **AS-IS (v1)** |
+
+**BINDING (v1):** System stosuje **wyłącznie strategię B** (multiplikacja logiczna). Strategia A jest TO-BE.
+
+#### §7.A.1.3 Stan AS-IS (v1)
+
+- Brak pola `n_parallel` na Generator ENM (`enm/models.py`).
+- Brak pola `n_parallel` na InverterSource (`inverter.py`).
+- Użytkownik tworzy N osobnych instancji Generator w kreatorze.
+- Mapper traktuje każdą instancję niezależnie (`mapping.py:57–59`).
+- Każda instancja wnosi niezależne P/Q do bilansu węzłowego.
+
+#### §7.A.1.4 Kontrakt docelowy — strategia A (TO-BE, Decyzja #17)
+
+Docelowo ENM BĘDZIE posiadać:
+
+```python
+# enm/models.py — Generator (rozszerzenie)
+n_parallel: int = 1       # Liczba identycznych jednostek (≥1)
+```
+
+Solver — reguły agregacji (TO-BE):
+
+| Solver | Reguła agregacji |
+|--------|-----------------|
+| **Power Flow** | `P_node += n_parallel × p_mw`, `Q_node += n_parallel × q_mvar` |
+| **Short Circuit** | `Ik_inv_total = n_parallel × k_sc × In_rated` |
+| **Protection** | Prąd odniesiony do sumarycznej mocy `N × Sn` |
+
+White Box MUSI raportować:
+- `quantity = N` jako element śladu,
+- `P_unit = p_mw` (per jednostka),
+- `P_total = N × p_mw` (sumarycznie),
+- `strategy = "PARAMETRIC_AGGREGATION"`.
+
+#### §7.A.1.5 Zakazy (BINDING)
+
+| ID | Zakaz | Uzasadnienie |
+|----|-------|-------------|
+| **Z-AGR-01** | Zakaz niejawnej agregacji — solver NIE MOŻE zakładać n_parallel bez jawnego pola | Deterministyczność |
+| **Z-AGR-02** | Zakaz mieszania strategii A i B w jednym projekcie (docelowo) | Spójność modelu |
+| **Z-AGR-03** | Zakaz n_parallel < 1 (walidacja ENM) | Integralność danych |
+
+---
+
+### §7.A.2 Model obciążenia ZIP — formalne zablokowanie w v1
+
+#### §7.A.2.1 Decyzja normatywna (BINDING — Decyzja #66)
+
+> **Model obciążenia ZIP jest zdefiniowany w ENM (pole `model` na Load),
+> ale jest NIEAKTYWNY w solverach v1 i ZABLOKOWANY w kreatorze.**
+
+#### §7.A.2.2 Stan AS-IS (v1)
+
+| Komponent | Stan | Opis |
+|-----------|------|------|
+| `Load.model` | ✅ Zdefiniowany | Pydantic field: `"pq"` / `"zip"`, default `"pq"` |
+| Mapper | ❌ Ignoruje | `mapping.py:54–56` traktuje KAŻDY Load jako PQ (`bus_p -= p_mw`) |
+| Solver PF | ❌ Nie obsługuje | Newton-Raphson: tylko PQ specs, brak logiki ZIP |
+| Kreator | ❌ Nie oferuje | Frontend nie wystawia opcji ZIP |
+| White Box | ❌ Nie raportuje | Pole `model` nie jest elementem trace |
+
+#### §7.A.2.3 Kontrakt blokujący (BINDING)
+
+| ID | Zakaz | Uzasadnienie |
+|----|-------|-------------|
+| **Z-ZIP-01** | Zakaz użycia ZIP w solverze PF v1 — mapper MUSI ignorować `model` | Brak implementacji |
+| **Z-ZIP-02** | Zakaz konfiguracji ZIP w kreatorze v1 — UI nie oferuje wyboru modelu | Brak backend |
+| **Z-ZIP-03** | Zakaz walidacji `Load.model` w ENMValidator v1 — pole jest informacyjne | Backward compat |
+| **Z-ZIP-04** | Aktywacja ZIP wymaga osobnej decyzji ADR z pełnym kontraktem solverowym | Governance |
+
+#### §7.A.2.4 Kontrakt docelowy ZIP (TO-BE, osobna ADR)
+
+Model ZIP definiuje moc obciążenia jako funkcję napięcia:
+
+$$P(U) = P_0 \left[ a_P \left(\frac{U}{U_0}\right)^2 + b_P \left(\frac{U}{U_0}\right) + c_P \right]$$
+
+$$Q(U) = Q_0 \left[ a_Q \left(\frac{U}{U_0}\right)^2 + b_Q \left(\frac{U}{U_0}\right) + c_Q \right]$$
+
+Warunek normalizacji: $a + b + c = 1.0$.
+
+| Składnik | Litera | Model fizyczny |
+|----------|--------|---------------|
+| Z (impedancyjny) | $a$ | Moc ∝ U² (grzejniki, oporniki) |
+| I (prądowy) | $b$ | Moc ∝ U (prostowniki, LED) |
+| P (mocowy) | $c$ | Moc = const (falowniki, zasilacze impulsowe) |
+
+Aktywacja ZIP WYMAGA:
+1. Rozszerzenia mappera o generację `LoadSpec` z typem ZIP i współczynnikami a/b/c.
+2. Rozszerzenia solvera PF o zależność P(U)/Q(U) w iteracji Newton-Raphson.
+3. Rozszerzenia White Box o ślad ZIP (współczynniki a/b/c, U₀, U_actual).
+4. Rozszerzenia Study Case o możliwość wyboru modelu per Load.
+5. Nowych testów walidujących zbieżność NR z obciążeniami ZIP.
+
+---
+
+### §7.A.3 BESS — tryby pracy (kanoniczna tabela)
+
+#### §7.A.3.1 Zasada (BINDING — Decyzja #67)
+
+> **BESS (Battery Energy Storage System) MUSI posiadać jawny tryb pracy
+> determinujący zachowanie elektryczne instancji w danym Study Case.**
+
+#### §7.A.3.2 Kanoniczna tabela trybów pracy
+
+| Tryb | Znak P | Znak Q | Solver PF | Solver SC | Bilans mocy | White Box |
+|------|--------|--------|-----------|-----------|-------------|-----------|
+| **DISCHARGE** | P > 0 (generacja) | Q ≥ 0 lub < 0 | Generator: `bus_p += p_mw` | InverterSource: `Ik = k_sc × In` | Źródło mocy (+P) | `mode=DISCHARGE, P_inject=+p_mw` |
+| **CHARGE** | P < 0 (pobór) | Q ≥ 0 lub < 0 | Load: `bus_p -= |p_mw|` | InverterSource: `Ik = k_sc × In` (contributes) | Odbiór mocy (−P) | `mode=CHARGE, P_absorb=−p_mw` |
+| **IDLE** | P = 0 | Q = 0 | Niewidoczny (zerowy wkład) | `in_service=false` (brak wkładu SC) | Neutralny (0) | `mode=IDLE, P=0, Q=0` |
+
+#### §7.A.3.3 Stan AS-IS (v1)
+
+**v1 NIE posiada jawnego pola trybu pracy BESS.** Tryb jest implicitly wyznaczany przez znak `p_mw`:
+
+```python
+# enm/models.py — Generator
+p_mw: float        # > 0 = discharge, < 0 = charge, 0 = idle
+gen_type: "bess"   # Identyfikacja typu
+```
+
+Mapper (`mapping.py:57–59`) stosuje regułę uniwersalną:
+- `bus_p += p_mw` — p_mw > 0 oznacza generację, p_mw < 0 oznacza pobór.
+- Brak rozróżnienia trybów w logice mappera.
+- Brak walidacji spójności znaku z trybem.
+
+#### §7.A.3.4 Kontrakt docelowy (TO-BE)
+
+Docelowo Generator(gen_type="bess") BĘDZIE posiadać jawne pole trybu:
+
+```python
+# Rozszerzenie Generator (TO-BE)
+class BESSMode(str, Enum):
+    DISCHARGE = "discharge"
+    CHARGE = "charge"
+    IDLE = "idle"
+
+# Na Generator (gen_type="bess"):
+bess_mode: BESSMode | None = None    # None = tryb wyznaczony z p_mw (backward compat)
+```
+
+Reguły:
+- `bess_mode` jest parametrem **Study Case** (Rozdział 10), nie parametrem stałym ENM.
+- Zmiana trybu NIE mutuje ENM — zmienia się wyłącznie konfiguracja Case.
+- Mapper weryfikuje spójność: `bess_mode=CHARGE` wymaga `p_mw < 0`.
+- White Box MUSI raportować: tryb, P, Q, oraz źródło trybu (jawny / implicit z p_mw).
+
+#### §7.A.3.5 Zakazy (BINDING)
+
+| ID | Zakaz | Uzasadnienie |
+|----|-------|-------------|
+| **Z-BESS-01** | Zakaz domyślnego przełączania trybów bez jawnego parametru instancji lub Study Case | Deterministyczność |
+| **Z-BESS-02** | Zakaz ukrywania trybu pracy BESS w White Box — tryb MUSI być elementem śladu | Audytowalność |
+| **Z-BESS-03** | Zakaz traktowania BESS jako czystego Generatora w trybie CHARGE (jest odbiorem) | Poprawność bilansu |
+
+---
+
+### §7.A.4 StudyCaseContext — kontrakt wejściowy obliczeniowy (BINDING — Decyzja #68)
+
+#### §7.A.4.1 Definicja
+
+> **StudyCaseContext = zamrożony kontekst obliczeniowy sieci,
+> stanowiący jednoznaczne wejście do solverów.**
+
+#### §7.A.4.2 Skład StudyCaseContext
+
+| Składnik | Źródło AS-IS | Typ | Opis |
+|----------|-------------|-----|------|
+| ENM snapshot | `NetworkSnapshotORM.snapshot_json` | frozen dict | Pełny graf sieci (Bus, Branch, Switch, Source, Generator, Load) |
+| Katalog typów snapshot | `CatalogRepository` (frozen) | frozen dataclass | Typy używane w projekcie z fingerprintem SHA-256 |
+| StudyCaseConfig | `StudyCase.config` | frozen dataclass | c_factor_max/min, base_mva, max_iterations, tolerance, include_motor/inverter |
+| ProtectionConfig | `StudyCase.protection_config` | frozen dataclass | template_ref, fingerprint, overrides |
+| Aktywne źródła | ENM snapshot (status filter) | lista Source | Tylko Source z `in_service=true` |
+| Aktywne obciążenia | ENM snapshot | lista Load | Aktywne Load z P/Q |
+| Tryby generatorów | ENM snapshot + params | dict[gen_id, {p, q}] | P/Q per Generator (w tym BESS z implicit mode) |
+| Stany łączników | ENM snapshot (field status) | dict[switch_id, OPEN/CLOSED] | Topologia operacyjna |
+
+#### §7.A.4.3 Cel
+
+- **Jednoznaczne wejście do solverów** — solver widzi wyłącznie StudyCaseContext + opcje solvera.
+- **Deterministyczne wyniki** — ten sam StudyCaseContext + ten sam solver = identyczne wyniki.
+- **Pełna reprodukowalność White Box** — trace odwołuje się do snapshotów, nie do stanu bieżącego.
+- **Porównywalność** — dwa StudyCaseContext mogą być porównane pole-po-polu (diff).
+
+#### §7.A.4.4 Realizacja AS-IS
+
+W v1 StudyCaseContext jest realizowany przez:
+
+| Mechanizm AS-IS | Plik | Opis |
+|-----------------|------|------|
+| `input_snapshot: dict` | `domain/analysis_run.py` | Kanonicalizowany JSON z pełnym grafem (na AnalysisRun) |
+| `input_hash: str` (SHA-256) | `domain/analysis_run.py` | Deterministyczny hash inputu |
+| `StudyCaseConfig` | `domain/study_case.py` | Parametry obliczeń (c_factor, base_mva, tolerance) |
+| `network_snapshot_id` | `domain/study_case.py` (P10a) | Referencja do snapshotu ENM |
+| `ProtectionConfig` | `domain/study_case.py` (P14c) | Konfiguracja zabezpieczeń |
+
+Kanonicalizacja (`application/analysis_run/service.py`):
+1. Rekursywne sortowanie kluczy JSON.
+2. Deterministyczne sortowanie list (nodes, branches, sources, loads).
+3. `json.dumps(snapshot, sort_keys=True, separators=(",", ":"))`.
+4. `SHA-256(canonical_json) → input_hash`.
+
+---
+
+### §7.A.5 Definition of Done (Suplement v1.1)
+
+| # | Kryterium | Status |
+|---|-----------|--------|
+| 1 | Strategia agregacji v1 (B — multiplikacja logiczna) jawnie udokumentowana | ✅ |
+| 2 | Kontrakt docelowy strategii A (parametryczna) z polami ENM i regułami solvera | ✅ |
+| 3 | ZIP formalnie zablokowany (Z-ZIP-01..04) z kontraktem docelowym (formuły ZIP) | ✅ |
+| 4 | BESS: kanoniczna tabela trybów DISCHARGE/CHARGE/IDLE z P/Q/SC/White Box | ✅ |
+| 5 | StudyCaseContext zdefiniowany jako zamrożone wejście obliczeniowe | ✅ |
+| 6 | Zakazy Z-AGR-01..03, Z-ZIP-01..04, Z-BESS-01..03 sformułowane | ✅ |
+
+---
+
+**DOMENA ŹRÓDEŁ, GENERATORÓW I ODBIORÓW W ROZDZIALE 7 JEST ZAMKNIĘTA (v1.1).**
 
 ---
 

@@ -53,9 +53,10 @@ docs/spec/
 ├── SPEC_CHAPTER_04_LINES_CABLES_SN.md            ← Linie i kable SN: modelowanie, parametry, magistrale, ringi (GOTOWY)
 ├── SPEC_CHAPTER_05_SYSTEM_CANONICAL_CONTRACTS.md  ← Kontrakty kanoniczne systemu: kreator, katalogi, stacje, zabezpieczenia, modele niedozwolone (GOTOWY)
 ├── SPEC_CHAPTER_06_SOLVER_CONTRACTS_AND_MAPPING.md ← Kontrakty solverów & mapowanie ENM→Model Obliczeniowy (GOTOWY, v1.0)
-├── SPEC_CHAPTER_07_SOURCES_GENERATORS_LOADS.md     ← Model Źródeł, Generatorów i Odbiorów (GOTOWY, v1.0)
-├── SPEC_CHAPTER_08_TYPE_VS_INSTANCE_AND_CATALOGS.md ← Typ vs Instancja + Katalogi Typów (GOTOWY, v1.0)
+├── SPEC_CHAPTER_07_SOURCES_GENERATORS_LOADS.md     ← Model Źródeł, Generatorów i Odbiorów (GOTOWY, v1.1 — suplement GAP)
+├── SPEC_CHAPTER_08_TYPE_VS_INSTANCE_AND_CATALOGS.md ← Typ vs Instancja + Katalogi Typów (GOTOWY, v1.1 — suplement GAP)
 ├── SPEC_CHAPTER_09_PROTECTION_SYSTEM.md              ← System Zabezpieczeń ETAP-Grade (GOTOWY, v1.0)
+├── SPEC_CHAPTER_10_STUDY_CASES_AND_SCENARIOS.md      ← Scenariusze Obliczeniowe & Study Cases (GOTOWY, v1.0)
 │
 │   ══════════════════════════════════════
 │   FAZA 0 — KONTRAKTY I WARSTWY
@@ -121,15 +122,20 @@ PREAMBUŁA — CEL, ZAKRES, DEFINICJE (UKOŃCZONA)
   Krok 0f: SPEC_CHAPTER_06_SOLVER_CONTRACTS_AND_MAPPING.md  ✅ GOTOWY (v1.0)
             └── Domena Kontraktów Solverów ZAMKNIĘTA (§6.1–§6.12, Decyzje #43–#48)
             └── Obejmuje: byty obliczeniowe, mapowanie ENM→NetworkGraph, Y-bus, Frozen API (SC+PF), White Box
-  Krok 0g: SPEC_CHAPTER_07_SOURCES_GENERATORS_LOADS.md      ✅ GOTOWY (v1.0)
-            └── Domena Źródeł, Generatorów i Odbiorów ZAMKNIĘTA (§7.0–§7.10, Decyzje #49–#53)
+  Krok 0g: SPEC_CHAPTER_07_SOURCES_GENERATORS_LOADS.md      ✅ GOTOWY (v1.1)
+            └── Domena Źródeł, Generatorów i Odbiorów ZAMKNIĘTA (§7.0–§7.10 + §7.A, Decyzje #49–#53, #65–#68)
             └── Obejmuje: Source (13 pól, impedancja, Virtual GND), Generator (5 pól, gen_type, InverterSource), Load (4 pola, PQ/ZIP), konwencja znaków, macierz pokrycia
-  Krok 0h: SPEC_CHAPTER_08_TYPE_VS_INSTANCE_AND_CATALOGS.md ✅ GOTOWY (v1.0)
-            └── Domena Typu vs Instancji ZAMKNIĘTA (§8.0–§8.12, Decyzje #54–#58)
+            └── Suplement v1.1: agregacja n_parallel(strategia A/B), ZIP zablokowany(Z-ZIP-01..04), BESS tryby(DISCHARGE/CHARGE/IDLE), StudyCaseContext(zamrożone wejście)
+  Krok 0h: SPEC_CHAPTER_08_TYPE_VS_INSTANCE_AND_CATALOGS.md ✅ GOTOWY (v1.1)
+            └── Domena Typu vs Instancji ZAMKNIĘTA (§8.0–§8.12 + §8.A, Decyzje #54–#58, #69–#71)
             └── Obejmuje: formuła TYP+parametry+override+ilość, ParameterSource(3-poziomowa precedencja), CatalogRepository(9 kolekcji), resolver(3 funkcje), governance(manifest+fingerprint), tryb ekspercki(impedance_override)
+            └── Suplement v1.1: AuditContract(7 pól), CompatibilityMatrix(5 relacji), macierz zmian między Cases, StudyCaseOverlay(TO-BE)
   Krok 0i: SPEC_CHAPTER_09_PROTECTION_SYSTEM.md              ✅ GOTOWY (v1.0)
             └── Domena Systemu Zabezpieczeń ZAMKNIĘTA (§9.0–§9.17, Decyzje #59–#64)
             └── Obejmuje: ProtectionDevice(frozen, 11 pól, 5 stopni nadprądowych), klasy TECHNOLOGICAL/NETWORK, krzywe IEC 60255+IEEE C37.112+producenckie, koordynacja(3 kanoniczne+4 I>>), White Box Protection Trace(9 kroków), porównanie A/B(StateChange, IssueCode), sanity checks(16 reguł), walidacje architektoniczne(E-P01..I-P02), UI ETAP-style(11 kolumn), API(12 endpointów)
+  Krok 0j: SPEC_CHAPTER_10_STUDY_CASES_AND_SCENARIOS.md      ✅ GOTOWY (v1.0)
+            └── Domena Scenariuszy Obliczeniowych ZAMKNIĘTA (§10.0–§10.22, Decyzje #72–#79)
+            └── Obejmuje: hierarchia Project→ENM→StudyCase→AnalysisRun→Result, StudyCase(frozen, 13 pól, config-only), AnalysisRun(frozen, state machine 5 stanów), StudyCaseConfig(8 parametrów), cykl życia(NONE→FRESH→OUTDATED), invalidacja(6 zdarzeń), kanonicalizacja(SHA-256), deduplikacja(P20a), NetworkSnapshot(P10a), porównanie(StudyCaseComparison), P10 hierarchy(Study→Scenario→Run→Snapshot), PowerFlowOptions(6p), 7 Solver Input Specs, API(21 endpointów), walidacje(E-SC/W-SC/B-SC), Z-SC-01..09, INV-SC-01..09
 
 FAZA 0 — KONTRAKTY I WARSTWY (PRIORYTET NAJWYŻSZY)
   Krok 1:  SPEC_00_LAYERING.md
@@ -887,9 +893,10 @@ FINALIZACJA:
 | SPEC_CHAPTER_04_LINES_CABLES_SN.md | Preambuła | ENM Core + Catalog + Bay | 19 | ~840 ✅ SUPPLEMENT |
 | SPEC_CHAPTER_05_SYSTEM_CANONICAL_CONTRACTS.md | Preambuła | Application + Catalog + Validation + WhiteBox | 19 | ~1150 ✅ SUPPLEMENT |
 | SPEC_CHAPTER_06_SOLVER_CONTRACTS_AND_MAPPING.md | Preambuła | Solver + Mapping + Results API | 12 | ~580 ✅ v1.0 |
-| SPEC_CHAPTER_07_SOURCES_GENERATORS_LOADS.md | Preambuła | ENM Domain + Solver Mapping | 10 | ~620 ✅ v1.0 |
-| SPEC_CHAPTER_08_TYPE_VS_INSTANCE_AND_CATALOGS.md | Preambuła | ENM + Catalog + Resolver | 12 | ~680 ✅ v1.0 |
+| SPEC_CHAPTER_07_SOURCES_GENERATORS_LOADS.md | Preambuła | ENM Domain + Solver Mapping | 15 | ~1130 ✅ v1.1 |
+| SPEC_CHAPTER_08_TYPE_VS_INSTANCE_AND_CATALOGS.md | Preambuła | ENM + Catalog + Resolver | 16 | ~1050 ✅ v1.1 |
 | SPEC_CHAPTER_09_PROTECTION_SYSTEM.md | Preambuła | Domain + Analysis + Presentation | 17 | ~890 ✅ v1.0 |
+| SPEC_CHAPTER_10_STUDY_CASES_AND_SCENARIOS.md | Preambuła | Domain + Application + Infrastructure | 22 | ~890 ✅ v1.0 |
 | SPEC_00_LAYERING.md | 0 | Architecture | 11 | ~700 |
 | SPEC_01_GLOSSARY_NORMATIVE.md | 0 | Governance | 7 | ~290 |
 | SPEC_02_ENM_CORE.md | 0 | ENM Core | 19 | ~2020 |
@@ -908,12 +915,12 @@ FINALIZACJA:
 | SPEC_15_PERSISTENCE.md | 4 | Infrastructure | 6+1 TO-BE | ~380 |
 | SPEC_16_TESTS.md | 4 | Infrastructure | 10 | ~540 |
 | SPEC_INDEX.md | — | Index | 5 | ~150 |
-| **RAZEM** | | | **~326** | **~20 200** |
+| **RAZEM** | | | **~366** | **~22 060** |
 
 ### Porównanie:
 - **SYSTEM_SPEC.md v3.0:** ~487 linii
-- **Nowa specyfikacja:** ~20 200 linii (27 plików, w tym Rozdział 1-9 preambuły)
-- **Wzrost:** ~41× (4100%)
+- **Nowa specyfikacja:** ~22 060 linii (28 plików, w tym Rozdział 1-10 preambuły + suplementy R7/R8)
+- **Wzrost:** ~45× (4500%)
 - **Pokrycie AS-IS:** ~95% (sekcje TO-BE wyraźnie oznaczone)
 
 ---
