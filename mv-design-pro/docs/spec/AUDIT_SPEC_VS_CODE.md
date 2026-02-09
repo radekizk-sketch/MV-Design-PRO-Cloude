@@ -880,6 +880,71 @@ Każda rozbieżność z §2 otrzymuje jednoznaczną dyspozycję.
 - Determinizm: Z-VAL-01..05, INV-VAL-01..12.
 - **DOMENA WALIDACJI I QA W ROZDZIALE 12 JEST ZAMKNIĘTA (v1.0).**
 
+| 102 | Zamknięta lista 6 typów raportów formalnych: PF, SC, Protection, Validation, Comparative, Audit | **BINDING** | Presentation | `SPEC_CHAPTER_13…` (§13.1) | Dodanie nowego typu = ADR (INV-RPT-13). Każdy typ mapowany na klasę (PRIMARY/COMPARATIVE/AUDIT z R11). Raport = artefakt „do podpisu". |
+| 103 | Struktura kanoniczna raportu formalnego: metadane + zakres + snapshot + wyniki + interpretacja + White Box | **BINDING** | Presentation | `SPEC_CHAPTER_13…` (§13.2) | 6 sekcji obowiązkowych: §13.2.1 metadane (12 pól), §13.2.2 zakres obliczeń, §13.2.3 dane wejściowe (snapshot), §13.2.4 wyniki liczbowe (tabele, jednostki, oznaczenia normowe), §13.2.5 interpretacja inżynierska (violations, margins, status OK/WARNING/FAIL), §13.2.6 ślad White Box (trace_steps, validation_trace, solver_events, causality). |
+| 104 | Pełny ślad audytowy: ENM → NetworkSnapshot → StudyCase → AnalysisRun → Solver → Result → Raport → ProofPack → Eksport | **BINDING** | Cross-cutting | `SPEC_CHAPTER_13…` (§13.3) | Łańcuch hashy: hash_enm → fingerprint → case_hash → input_hash → result_hash → proof_fingerprint → pack_fingerprint → report_hash. Każdy raport MUSI zawierać pełny łańcuch (INV-RPT-14). |
+| 105 | Raport a UI: UI wyświetla, NIE modyfikuje. Raport a CI: automatyczne generowanie i porównanie | **BINDING** | Presentation + Infrastructure | `SPEC_CHAPTER_13…` (§13.5–§13.7) | INV-RPT-15: UI read-only. CI: generowanie raportów w pipeline, porównanie między commitami, archiwizacja jako artefakty. Audyt zewnętrzny: odtworzenie bez kodu źródłowego (LaTeX+PDF wystarczą). |
+| 106 | Determinizm raportów: te same dane → identyczny raport bitowo (poza timestamp) | **BINDING** | Presentation | `SPEC_CHAPTER_13…` (§13.6) | Zmiana raportu tylko z: zmiany danych, zmiany solvera, zmiany specyfikacji. INV-RPT-16..18. |
+| 107 | Relacja R13 vs R11: R11 = techniczne aspekty (ProofPack, exportery, formaty). R13 = formalizacja raportu jako artefaktu „do podpisu" | **BINDING** | Presentation | `SPEC_CHAPTER_13…` (§13.0.2) | Komplementarne, nie duplikujące. R13 dodaje: zamkniętą listę typów, kanoniczną strukturę, ślad audytowy, CI/audyt. |
+
+**Z decyzji #102–#107 wynika (Rozdział 13 — BINDING):**
+- 6 typów raportów formalnych. Dodanie nowego = ADR.
+- Struktura kanoniczna: 6 sekcji obowiązkowych (metadane, zakres, snapshot, wyniki, interpretacja, White Box).
+- Pełny ślad audytowy z łańcuchem hashy ENM → raport.
+- UI read-only, CI: automatyczne generowanie i porównanie raportów.
+- Komplementarność R11 (techniczne) i R13 (formalne).
+- **DOMENA RAPORTÓW FORMALNYCH W ROZDZIALE 13 JEST ZAMKNIĘTA (v1.0).**
+
+| 108 | Zasada nadrzędna determinizmu: ten sam ENM + Case + Solver = identyczny wynik bitowo | **BINDING** | Cross-cutting | `SPEC_CHAPTER_14…` (§14.0) | Odstępstwo = BŁĄD SYSTEMOWY. Przewaga nad ETAP/PowerFactory: pełny hash chain, offline reprodukcja, CI regresja. |
+| 109 | Snapshoty danych: każdy AnalysisRun zapisuje frozen snapshot ENM, TypeLib, Case, Solver config, spec version | **BINDING** | Infrastructure | `SPEC_CHAPTER_14…` (§14.2) | Z-DET-01: zakaz „żywych referencji" do mutowalnych danych. AS-IS: AnalysisRun.input_snapshot, NetworkSnapshot.fingerprint. |
+| 110 | Kanoniczne hashe: SHA-256, UTF-8, sort_keys, LF normalization, canonical JSON | **BINDING** | Infrastructure | `SPEC_CHAPTER_14…` (§14.3) | Hash chain: hash_enm → hash_types → hash_case → input_hash → result_hash → proof_fingerprint → pack_fingerprint → report_hash. INV-DET-01: propagacja. Deduplikacja P20a. |
+| 111 | Solvery a determinizm: sorted IDs, no RNG, no hash(), no set iteration, deterministic Jacobian | **BINDING** | Solver | `SPEC_CHAPTER_14…` (§14.4) | Z-DET-02..04: zakazy random(), time(), Python hash(), set iteration. SC IEC 60909: algebraiczne formuły. PF Newton: sorted nodes. |
+| 112 | White Box a reprodukcja: odtworzenie krok po kroku, identyfikacja rozbieżności, porównanie runów | **BINDING** | White Box | `SPEC_CHAPTER_14…` (§14.5) | ProofDocument: deterministic, self-contained, verifiable (SHA-256). TO-BE: per-step diff między ProofDocuments. |
+| 113 | Zmiany systemowe: macierz co ZMIENIA wynik (ENM, Case, Solver) vs co NIE ZMIENIA (UI, SLD, locale) | **BINDING** | Cross-cutting | `SPEC_CHAPTER_14…` (§14.7) | 5 typów zmian → efekty. INV-DET-08: zmiana UI/SLD/locale NIE zmienia wyniku. |
+| 114 | CI regresja determinizmu: golden tests, hash comparison per commit, ProofPack archiwizacja | **BINDING** | Infrastructure | `SPEC_CHAPTER_14…` (§14.8) | Pipeline: load golden → run solver → compare hash → fail if different. AS-IS: test_result_api_contract.py. |
+
+**Z decyzji #108–#114 wynika (Rozdział 14 — BINDING):**
+- Ten sam input = identyczny output (bitowo). Odstępstwo = błąd.
+- Snapshoty: frozen per AnalysisRun. Zakaz żywych referencji (Z-DET-01).
+- SHA-256 canonical hash chain z pełną propagacją.
+- Solvery: sorted IDs, no RNG, no hash()/set iteration (Z-DET-02..04).
+- White Box: odtworzenie, porównanie, self-contained ProofPack.
+- CI: golden tests, hash regression, ProofPack artifacts.
+- INV-DET-01..08.
+- **DOMENA DETERMINIZMU I WERSJONOWANIA W ROZDZIALE 14 JEST ZAMKNIĘTA (v1.0).**
+
+| 115 | 4 poziomy governance: DATA (snap/freeze), COMPUTATION (nowy run), SPEC (ADR), RESULT (approve/freeze) | **BINDING** | Governance | `SPEC_CHAPTER_15…` (§15.1) | INV-GOV-01..04. Dane niemutowalne po snap. Zmiana solvera = nowy run. Zmiana spec = ADR. Wynik bez zatwierdzenia = nieobowiązujący. |
+| 116 | ADR obowiązkowy: zmiana kanonu, kontraktu solvera, aktywacja TO-BE, zmiana normy, nowy inwariant, zmiana frozen API | **BINDING** | Governance | `SPEC_CHAPTER_15…` (§15.2) | Struktura ADR: kontekst, decyzja, alternatywy odrzucone, konsekwencje, zakres wpływu, data+autor. Z-GOV-01..03. |
+| 117 | Workflow zmiany: Draft → Review → Approved → Frozen. Edycja Frozen = nowa wersja | **BINDING** | Governance | `SPEC_CHAPTER_15…` (§15.4) | Z-GOV-04: nigdy edycja in-place na FROZEN. Mapowanie na obiekty: ENM(snapshot), Case(locked), Run(FINISHED), Raport(hash), Spec(tagged). |
+| 118 | Role: Author, Reviewer, Approver, Auditor. Four-eyes: Author ≠ sole Approver | **BINDING** | Governance | `SPEC_CHAPTER_15…` (§15.3) | TO-BE: implementacja ról w systemie. v1: implicit (user = all roles). |
+| 119 | Zatwierdzenia: ENM(snapshot+fingerprint), Case(hash), Run(result_hash), Raport(report_hash+APPROVED) | **BINDING** | Governance | `SPEC_CHAPTER_15…` (§15.5) | Każde zatwierdzenie: autor, timestamp, nieodwracalne. |
+| 120 | CI governance: PR wymaga ADR (jeśli dotyczy), regression tests, hash verification | **BINDING** | Governance + Infrastructure | `SPEC_CHAPTER_15…` (§15.7) | Decision Matrix append-only (INV-GOV-07). Spec: tagged releases. ADR: inkrementalne numery. |
+
+**Z decyzji #115–#120 wynika (Rozdział 15 — BINDING):**
+- 4 poziomy governance (DATA/COMPUTATION/SPEC/RESULT).
+- ADR obowiązkowy dla zmian kanonicznych. Struktura ADR: 7 sekcji.
+- Workflow: Draft → Review → Approved → Frozen (Z-GOV-04: no in-place edit on Frozen).
+- Role: Author/Reviewer/Approver/Auditor. Four-eyes principle.
+- CI: PR + ADR + regression.
+- INV-GOV-01..08, Z-GOV-01..04.
+- **DOMENA GOVERNANCE W ROZDZIALE 15 JEST ZAMKNIĘTA (v1.0).**
+
+| 121 | 3 klasy integracji: MODEL (ENM/TypeLib/ProjectArchive), RESULT (raporty/ProofPack/porównania), PROCESS (CI/API/webhook) | **BINDING** | Infrastructure | `SPEC_CHAPTER_16…` (§16.1) | Zamknięta lista. Każda klasa z kierunkami (export/import) i formatami. |
+| 122 | Formaty wymiany: JSON/JSONL/CSV/XLSX/PDF/DOCX/ZIP — wszystkie z metadanymi | **BINDING** | Infrastructure | `SPEC_CHAPTER_16…` (§16.2) | Z-INT-01: zakaz binarnych bez specyfikacji. Z-INT-02: zakaz bez metadanych. Z-INT-03: zakaz importu bez walidacji. |
+| 123 | Metadane integracyjne obowiązkowe: project_id, hash_enm, spec_version, timestamp, approval_status | **BINDING** | Infrastructure | `SPEC_CHAPTER_16…` (§16.3) | INV-INT-01: eksport bez metadanych = nieprawidłowy. 9 pól obowiązkowych. |
+| 124 | Eksport OSD: Approved/Frozen status, brak modyfikacji po eksporcie (Z-INT-04) | **BINDING** | Infrastructure + Governance | `SPEC_CHAPTER_16…` (§16.4) | PDF do podpisu, White Box jako dowód, zgodność IEC 60909 (golden tests), archiwizacja (ProjectArchive). |
+| 125 | Import: pipeline z walidacją W1+W2, oznaczenie EXTERNAL_IMPORT, mapowanie na Type Library | **BINDING** | Infrastructure + Validation | `SPEC_CHAPTER_16…` (§16.5) | AS-IS: XlsxNetworkImporter, ProjectArchive, verify_archive_integrity(). Z-INT-05..06. |
+| 126 | API: wersjonowanie (/api/v1/), breaking change = ADR + major bump, logowanie dostępu (TO-BE) | **BINDING** | Infrastructure | `SPEC_CHAPTER_16…` (§16.6) | INV-INT-06: API breaking = ADR. TO-BE: JWT/API key auth, role-based access, audit log. |
+
+**Z decyzji #121–#126 wynika (Rozdział 16 — BINDING):**
+- 3 klasy integracji (MODEL/RESULT/PROCESS).
+- Formaty: JSON/JSONL/CSV/XLSX/PDF/DOCX/ZIP — wszystkie z obowiązkowymi metadanymi.
+- Eksport OSD: Approved/Frozen, brak modyfikacji (Z-INT-04).
+- Import: pełny pipeline z walidacją W1+W2 (Z-INT-05).
+- API: wersjonowanie, security TO-BE, audit log TO-BE.
+- INV-INT-01..06, Z-INT-01..06.
+- **DOMENA INTEGRACJI ZEWNĘTRZNYCH W ROZDZIALE 16 JEST ZAMKNIĘTA (v1.0).**
+
 ---
 
 **KONIEC AUDYTU**

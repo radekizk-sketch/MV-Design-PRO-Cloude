@@ -59,6 +59,10 @@ docs/spec/
 ├── SPEC_CHAPTER_10_STUDY_CASES_AND_SCENARIOS.md      ← Scenariusze Obliczeniowe & Study Cases (GOTOWY, v1.1 — suplement GAP)
 ├── SPEC_CHAPTER_11_REPORTING_AND_EXPORT.md            ← Raportowanie, Cross-Reference, Trace & Export (GOTOWY, v1.0)
 ├── SPEC_CHAPTER_12_VALIDATION_AND_QA.md               ← Walidacje Systemowe, QA, Reguły Blokujące (GOTOWY, v1.0)
+├── SPEC_CHAPTER_13_REPORTING_AND_EXPORTS.md            ← Raportowanie Formalne, Eksporty, Ślady Audytowe (GOTOWY, v1.0)
+├── SPEC_CHAPTER_14_DETERMINISM_AND_VERSIONING.md       ← Determinizm, Wersjonowanie, Reprodukowalność (GOTOWY, v1.0)
+├── SPEC_CHAPTER_15_GOVERNANCE_AND_ADR.md               ← Governance, ADR, Zarządzanie Zmianą (GOTOWY, v1.0)
+├── SPEC_CHAPTER_16_EXTERNAL_INTEGRATIONS.md            ← Integracje Zewnętrzne, Interoperacyjność (GOTOWY, v1.0)
 │
 │   ══════════════════════════════════════
 │   FAZA 0 — KONTRAKTY I WARSTWY
@@ -148,6 +152,22 @@ PREAMBUŁA — CEL, ZAKRES, DEFINICJE (UKOŃCZONA)
   Krok 0l: SPEC_CHAPTER_12_VALIDATION_AND_QA.md            ✅ GOTOWY (v1.0)
             └── Domena Walidacji i QA ZAMKNIĘTA (§12.0–§12.14, Decyzje #94–#101)
             └── Obejmuje: 6 warstw walidacji (W1:ENMValidator(21 reguł E001–I005) → W2:NetworkValidator(13 reguł grafowych) → W3:WizardValidator(K1–K10, ReadinessMatrix) → W4:ProtectionSanityChecks(16 coded rules) → W5:PreCalculation(E-SC/W-SC/B-SC) → W6:EnergyValidation(5 post-solver checks)), macierz severity (BLOCKER/ERROR=blokada, WARNING/IMPORTANT=ostrzeżenie, INFO=informacja), determinizm per warstwa, AnalysisAvailability(SC3F/SC1F/LoadFlow), EnergyValidationConfig(configurable thresholds), Protection catalog validator, domain ValidationReport(frozen, immutable builder), API 5 AS-IS + 3 TO-BE, INV-VAL-01..12, Z-VAL-01..05, 30+ komponentów
+
+  Krok 0m: SPEC_CHAPTER_13_REPORTING_AND_EXPORTS.md        ✅ GOTOWY (v1.0)
+            └── Domena Raportowania Formalnego ZAMKNIĘTA (§13.0–§13.9, Decyzje #102–#107)
+            └── Obejmuje: 6 typów raportów (PRIMARY/COMPARATIVE/AUDIT/COMPLIANCE/CUSTOM/WHITE_BOX), struktura kanoniczna (6 sekcji: metadane, zakres, snapshot, wyniki, interpretacja, White Box), pełny ślad audytowy z hash chain (hash_enm→hash_case→input_hash→result_hash→proof_fingerprint→report_hash), formaty eksportu (PDF/DOCX/JSON/CSV/LaTeX), determinizm DOCX(make_docx_deterministic), CI/audyt, INV-RPT-13..18, Z-RPT-06..09
+
+  Krok 0n: SPEC_CHAPTER_14_DETERMINISM_AND_VERSIONING.md   ✅ GOTOWY (v1.0)
+            └── Domena Determinizmu ZAMKNIĘTA (§14.0–§14.10, Decyzje #108–#114)
+            └── Obejmuje: pojęcia kanoniczne (determinizm, reprodukowalność, wersjonowanie), snapshoty danych (NetworkSnapshot SHA-256), kanoniczne hashe (hash chain 8-stopniowy), solvery a determinizm (Z-DET-02..04: brak random, brak float non-determinism, brak time-dependent), White Box reprodukcja, raporty deterministyczne, zmiany systemowe (co zmienia/nie zmienia wynik), CI regresja determinizmu (golden tests), INV-DET-01..08
+
+  Krok 0o: SPEC_CHAPTER_15_GOVERNANCE_AND_ADR.md           ✅ GOTOWY (v1.0)
+            └── Domena Governance ZAMKNIĘTA (§15.0–§15.9, Decyzje #115–#120)
+            └── Obejmuje: 4 poziomy governance (DATA/COMPUTATION/SPEC/RESULT), ADR structure (7 pól: context, decision, rejected, consequences, impact, date, author), role (Author/Reviewer/Approver/Auditor), workflow (Draft→Review→Approved→Frozen), zatwierdzania (ENM/Case/Run/Raport), White Box a governance, CI/repozytorium, INV-GOV-01..08, Z-GOV-01..04
+
+  Krok 0p: SPEC_CHAPTER_16_EXTERNAL_INTEGRATIONS.md        ✅ GOTOWY (v1.0)
+            └── Domena Integracji Zewnętrznych ZAMKNIĘTA (§16.0–§16.9, Decyzje #121–#126)
+            └── Obejmuje: 3 klasy integracji (MODEL: ENM/TypeLib/ProjectArchive, RESULT: raporty/ProofPack, PROCESS: CI/API), formaty wymiany (JSON/JSONL/CSV/XLSX/PDF/DOCX/ZIP), metadane integracyjne (9 pól obowiązkowych), OSD eksport (Approved/Frozen, zakaz modyfikacji), import pipeline (6 kroków: parse→map→W1→W2→mark→catalog), API security (TO-BE: JWT/RBAC), INV-INT-01..06, Z-INT-01..06
 
 FAZA 0 — KONTRAKTY I WARSTWY (PRIORYTET NAJWYŻSZY)
   Krok 1:  SPEC_00_LAYERING.md
@@ -911,6 +931,10 @@ FINALIZACJA:
 | SPEC_CHAPTER_10_STUDY_CASES_AND_SCENARIOS.md | Preambuła | Domain + Application + Infrastructure | 26 | ~1230 ✅ v1.1 |
 | SPEC_CHAPTER_11_REPORTING_AND_EXPORT.md | Preambuła | Presentation + WhiteBox + Infrastructure | 12 | ~980 ✅ v1.0 |
 | SPEC_CHAPTER_12_VALIDATION_AND_QA.md | Preambuła | Validation + Application + Analysis | 14 | ~820 ✅ v1.0 |
+| SPEC_CHAPTER_13_REPORTING_AND_EXPORTS.md | Preambuła | Presentation + WhiteBox + Audit | 9 | ~244 ✅ v1.0 |
+| SPEC_CHAPTER_14_DETERMINISM_AND_VERSIONING.md | Preambuła | Infrastructure + Solver + CI | 10 | ~289 ✅ v1.0 |
+| SPEC_CHAPTER_15_GOVERNANCE_AND_ADR.md | Preambuła | Governance + Process + Workflow | 9 | ~265 ✅ v1.0 |
+| SPEC_CHAPTER_16_EXTERNAL_INTEGRATIONS.md | Preambuła | Infrastructure + Application | 9 | ~260 ✅ v1.0 |
 | SPEC_00_LAYERING.md | 0 | Architecture | 11 | ~700 |
 | SPEC_01_GLOSSARY_NORMATIVE.md | 0 | Governance | 7 | ~290 |
 | SPEC_02_ENM_CORE.md | 0 | ENM Core | 19 | ~2020 |
@@ -929,12 +953,12 @@ FINALIZACJA:
 | SPEC_15_PERSISTENCE.md | 4 | Infrastructure | 6+1 TO-BE | ~380 |
 | SPEC_16_TESTS.md | 4 | Infrastructure | 10 | ~540 |
 | SPEC_INDEX.md | — | Index | 5 | ~150 |
-| **RAZEM** | | | **~403** | **~24 370** |
+| **RAZEM** | | | **~440** | **~25 428** |
 
 ### Porównanie:
 - **SYSTEM_SPEC.md v3.0:** ~487 linii
-- **Nowa specyfikacja:** ~24 370 linii (30 plików, w tym Rozdział 1-12 preambuły + suplementy)
-- **Wzrost:** ~48× (4800%)
+- **Nowa specyfikacja:** ~25 428 linii (34 plików, w tym Rozdział 1-16 preambuły + suplementy)
+- **Wzrost:** ~52× (5200%)
 - **Pokrycie AS-IS:** ~95% (sekcje TO-BE wyraźnie oznaczone)
 
 ---
