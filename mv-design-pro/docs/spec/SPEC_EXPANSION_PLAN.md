@@ -108,8 +108,8 @@ PREAMBUŁA — CEL, ZAKRES, DEFINICJE (UKOŃCZONA)
             └── Domena Protection ZAMKNIĘTA (§2.15–§2.21, Decyzje #21–#25)
   Krok 0c: SPEC_CHAPTER_03_TOPOLOGY_CONNECTIVITY.md      ✅ GOTOWY (v1.0 FINAL)
             └── Domena Topologia ZAMKNIĘTA (§3.1–§3.11, Decyzje #26–#28)
-  Krok 0d: SPEC_CHAPTER_04_LINES_CABLES_SN.md            ✅ GOTOWY (v1.0 FINAL)
-            └── Domena Linie/Kable SN ZAMKNIĘTA (§4.1–§4.14, Decyzje #29–#31)
+  Krok 0d: SPEC_CHAPTER_04_LINES_CABLES_SN.md            ✅ GOTOWY (v1.1 SUPPLEMENT)
+            └── Domena Linie/Kable SN ZAMKNIĘTA (§4.1–§4.14 + §4.15–§4.19, Decyzje #29–#33)
 
 FAZA 0 — KONTRAKTY I WARSTWY (PRIORYTET NAJWYŻSZY)
   Krok 1:  SPEC_00_LAYERING.md
@@ -864,7 +864,7 @@ FINALIZACJA:
 | SPEC_CHAPTER_01_PURPOSE_SCOPE_DEFINITIONS.md | Preambuła | Foundation | 9 | ~480 ✅ |
 | SPEC_CHAPTER_02_ENM_DOMAIN_MODEL.md | Preambuła | ENM Domain | 21 | ~1260 ✅ FINAL |
 | SPEC_CHAPTER_03_TOPOLOGY_CONNECTIVITY.md | Preambuła | Topology | 11 | ~550 ✅ FINAL |
-| SPEC_CHAPTER_04_LINES_CABLES_SN.md | Preambuła | ENM Core + Catalog | 14 | ~620 ✅ FINAL |
+| SPEC_CHAPTER_04_LINES_CABLES_SN.md | Preambuła | ENM Core + Catalog + Bay | 19 | ~840 ✅ SUPPLEMENT |
 | SPEC_00_LAYERING.md | 0 | Architecture | 11 | ~700 |
 | SPEC_01_GLOSSARY_NORMATIVE.md | 0 | Governance | 7 | ~290 |
 | SPEC_02_ENM_CORE.md | 0 | ENM Core | 19 | ~2020 |
@@ -883,11 +883,11 @@ FINALIZACJA:
 | SPEC_15_PERSISTENCE.md | 4 | Infrastructure | 6+1 TO-BE | ~380 |
 | SPEC_16_TESTS.md | 4 | Infrastructure | 10 | ~540 |
 | SPEC_INDEX.md | — | Index | 5 | ~150 |
-| **RAZEM** | | | **~251** | **~16 060** |
+| **RAZEM** | | | **~256** | **~16 280** |
 
 ### Porównanie:
 - **SYSTEM_SPEC.md v3.0:** ~487 linii
-- **Nowa specyfikacja:** ~16 060 linii (22 plików, w tym Rozdział 1-4 preambuły)
+- **Nowa specyfikacja:** ~16 280 linii (22 plików, w tym Rozdział 1-4 preambuły)
 - **Wzrost:** ~33× (3300%)
 - **Pokrycie AS-IS:** ~95% (sekcje TO-BE wyraźnie oznaczone)
 

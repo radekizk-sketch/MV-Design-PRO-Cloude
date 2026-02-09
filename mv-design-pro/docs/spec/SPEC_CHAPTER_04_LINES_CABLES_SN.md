@@ -1,10 +1,10 @@
 # ROZDZIAŁ 4 — LINIE I KABLE SN: MODELOWANIE, PARAMETRY, MAGISTRALE, RINGI
 
-**Wersja:** 1.0 FINAL
-**Data:** 2026-02-08
+**Wersja:** 1.1 SUPPLEMENT
+**Data:** 2026-02-09
 **Status:** AS-IS (1:1 z kodem) + TO-BE (sekcje oznaczone)
-**Warstwa:** ENM Core + Catalog + Solver Contract
-**Zależności:** Rozdział 2 (§2.3–§2.6, §2.19), Rozdział 3 (§3.6–§3.7), AUDIT §9 (Decyzje #15, #18, #26–#28)
+**Warstwa:** ENM Core + Catalog + Solver Contract + ENM Meta (Bay)
+**Zależności:** Rozdział 2 (§2.3–§2.6, §2.15–§2.21, §2.19), Rozdział 3 (§3.3–§3.7), AUDIT §9 (Decyzje #15, #18, #25–#31, #32–#33)
 **Autor:** System Architect + PhD Energetyki
 
 ---
@@ -838,7 +838,256 @@ Linie/kable SN mają grubość `ETAP_STROKE.feeder` — cieńszą od szyny zbior
 
 **DOMENA LINII I KABLI SN W ROZDZIALE 4 JEST ZAMKNIĘTA.**
 
-Sekcje §4.1–§4.14 definiują kompletny kanon modelowania linii napowietrznych i kabli podziemnych SN. Dalsze modyfikacje wymagają ADR i wpisu do Macierzy Decyzji (AUDIT §9).
+Sekcje §4.1–§4.14 definiują rdzeń kanonu modelowania linii napowietrznych i kabli podziemnych SN.
+Sekcje §4.15–§4.19 (SUPPLEMENT v1.1) uzupełniają brakujące kontrakty: Branch ↔ Bay, ochrona liniowa, walidacje napięciowe, parametry zerowe, doprecyzowania topologiczne.
+
+Dalsze modyfikacje wymagają ADR i wpisu do Macierzy Decyzji (AUDIT §9).
+
+---
+
+## 4.15 Relacja Branch ↔ Bay — kontrakt logiczny (Decyzja #32)
+
+### 4.15.1 Uzasadnienie normowe
+
+W praktyce ETAP / PowerFactory / OSD linia SN **nigdy nie istnieje „sama"** — jest zawsze przyłączona poprzez **pole liniowe (Bay)**, które pełni rolę:
+- punktu przyłączenia do szyny (Bus SN),
+- punktu pomiarowego (przekładniki CT/VT),
+- nośnika zabezpieczeń (ProtectionDevice).
+
+Brak jawnej relacji Branch ↔ Bay oznacza brak możliwości odpowiedzi na pytanie „które zabezpieczenie chroni tę linię" — co jest wymagane zarówno przez White Box Protection (Rozdział 2, §2.17), jak i przez analizę koordynacji (§2.16).
+
+### 4.15.2 Stan AS-IS
+
+| Element | Pole | Typ | Status |
+|---------|------|-----|--------|
+| `Bay` | `equipment_refs` | `list[str] = []` | AS-IS — pole istnieje, ale **brak walidacji** i **brak resolwera** (`enm/models.py:245`) |
+| `Bay` | `protection_ref` | `str \| None` | AS-IS — pole istnieje, ale **używane wyłącznie jako flaga readiness** (`api/enm.py:117`) |
+| `BranchBase` | `bay_ref` | — | **NIE ISTNIEJE** w AS-IS |
+| `ProtectionDevice` | `location_element_id` | `str` | AS-IS — referencja bezpośrednia do Branch/Bus, **niezależna od Bay** (`domain/protection_device.py:269`) |
+| `mapping.py` | — | — | Bay **całkowicie ignorowane** w mapowaniu ENM → NetworkGraph |
+| `validator.py` | W006 | — | Waliduje `bay.substation_ref` i `bay.bus_ref`, ale **NIE waliduje** `equipment_refs` |
+
+### 4.15.3 Kontrakt docelowy (TO-BE — Decyzja #32)
+
+> **TO-BE** — nie zaimplementowane. Wymaga osobnej decyzji implementacyjnej.
+
+**Kierunek relacji:** Bay → Branch (przez istniejące `equipment_refs`), NIE Branch → Bay.
+
+Uzasadnienie: w ENM relacja jest naturalna w kierunku Bay → Equipment (pole posiada wyposażenie, nie odwrotnie). Dodanie `bay_ref` do `BranchBase` stworzyłoby cykliczną zależność i duplikację.
+
+**Reguły docelowe (BINDING):**
+
+1. **Każda instancja** `OverheadLine` lub `Cable` MUSI być referencjonowana w `equipment_refs` dokładnie jednego Bay
+2. Bay pola liniowego (`bay_role ∈ {"OUT", "FEEDER"}`) MUSI zawierać w `equipment_refs` co najmniej jeden Branch typu linia/kabel
+3. **Jeden Branch** NIE MOŻE być referencjonowany w `equipment_refs` wielu Bay (relacja 1:1)
+4. **Bay** NIE jest bytem obliczeniowym — solver go NIE widzi
+5. **Bay** jest obowiązkowym kontenerem logicznym dla: aparatów łączeniowych, przekładników CT/VT, ProtectionDevice
+
+**Zakazy (BINDING):**
+- Branch bez przypisania do Bay (po implementacji kontraktu)
+- Jeden Branch w wielu Bay
+- Bay bez Branch w roli OUT/FEEDER (po implementacji kontraktu)
+
+### 4.15.4 Relacja tymczasowa (AS-IS — stan przejściowy)
+
+Do czasu implementacji kontraktu TO-BE:
+- `Bay.equipment_refs` jest **opcjonalne** i **niewalidowane** (AS-IS)
+- `ProtectionDevice.location_element_id` referencjonuje Branch **bezpośrednio** (bez pośrednictwa Bay)
+- Brak relacji Branch ↔ Bay **NIE blokuje** solverów ani analiz (Bay jest ignorowany przez mapping)
+- Stan przejściowy jest **jawnie udokumentowany** jako GAP
+
+---
+
+## 4.16 Linia jako obiekt chroniony — Branch ↔ Protection via Bay
+
+### 4.16.1 Schemat kanoniczny
+
+Zabezpieczenia liniowe NIE są przypisywane bezpośrednio do Branch — są przypisywane do **Bay**, które chroni dany Branch:
+
+```
+Bus SN
+│
+Bay (bay_role="OUT" / "FEEDER")
+├── SwitchBranch (łącznik — w equipment_refs)
+├── CT / VT (punkt pomiarowy — TO-BE)
+├── ProtectionDevice (Bay.protection_ref → PD.id)
+│
+Branch (OverheadLine / Cable — w equipment_refs)
+│
+... (kolejne Bus SN / Junction / stacje)
+```
+
+### 4.16.2 Co „widzi" ProtectionDevice
+
+ProtectionDevice przypisane do Bay „widzi":
+- **Prądy i napięcia** z przekładników CT/VT zlokalizowanych w Bay (punkt pomiarowy)
+- **Obiekt chroniony:** Branch(e) referencjonowane w `Bay.equipment_refs`
+- **Impedancję chronionej linii:** dostępną z parametrów Branch (R′, X′, L) → resolwer
+
+### 4.16.3 Konsekwencje dla White Box (BINDING)
+
+White Box Protection (Rozdział 2, §2.17) MUSI raportować:
+- **Bay**, w którym zadziałało zabezpieczenie (identyfikator i lokalizacja)
+- **Branch** (obiekt chroniony) z jego `ref_id`, typem katalogowym i parametrami impedancyjnymi
+- **ProtectionDevice** z nastaw, które doprowadziły do zadziałania
+- **Łańcuch przyczynowy:** prąd w Bay (CT) → porównanie z nastawą → decyzja → aparat (w Bay) → skutek (odłączenie Branch)
+
+### 4.16.4 Stan AS-IS — uproszczony model
+
+| Aspekt | Stan AS-IS | Opis |
+|--------|-----------|------|
+| `ProtectionDevice.location_element_id` | Referencja bezpośrednia do Branch | Pomija Bay — łączy zabezpieczenie z linią wprost |
+| `Bay.protection_ref` | Flaga readiness | Nie tworzy linku do konkretnego `ProtectionDevice` |
+| White Box trace | `ProtectionTrace` z `ProtectionTraceStep` | Raportuje zadziałanie, ale **bez identyfikacji Bay** |
+
+> Stan AS-IS jest uproszczony, ale **funkcjonalny** — ProtectionDevice zna obiekt chroniony (Branch) przez `location_element_id`. Pełny kontrakt Bay→Branch→Protection jest TO-BE (§4.15.3).
+
+---
+
+## 4.17 Walidacja zgodności napięć typu katalogowego (Decyzja #33)
+
+### 4.17.1 Opis problemu
+
+Typ katalogowy (`LineType` / `CableType`) posiada pole `voltage_rating_kv` — napięcie znamionowe izolacji. Bus SN, do którego przyłączona jest linia/kabel, posiada `voltage_kv`. System MUSI weryfikować zgodność tych wartości.
+
+### 4.17.2 Stan AS-IS
+
+**Brak walidacji.** Nie istnieje reguła porównująca `voltage_rating_kv` typu katalogowego z `voltage_kv` szyny. Użytkownik może przypisać kabel 20 kV do szyny 15 kV bez ostrzeżenia.
+
+### 4.17.3 Reguła walidacyjna (TO-BE — Decyzja #33)
+
+> **TO-BE** — nie zaimplementowane. Wymaga osobnej decyzji implementacyjnej.
+
+| Kod | Poziom | Warunek | Opis |
+|-----|--------|---------|------|
+| W-L04 | IMPORTANT | `LineType.voltage_rating_kv ≠ Bus.voltage_kv` (dla from_bus) | Niezgodność napięcia znamionowego typu katalogowego z napięciem szyny |
+| W-L05 | IMPORTANT | `CableType.voltage_rating_kv ≠ Bus.voltage_kv` (dla from_bus) | Niezgodność napięcia znamionowego typu katalogowego z napięciem szyny |
+
+**Reguły (BINDING):**
+1. Walidacja porównuje `voltage_rating_kv` z `voltage_kv` **szyny from_bus** (Bus, do którego linia jest przyłączona po stronie zasilającej)
+2. Niezgodność generuje **WARNING (IMPORTANT)**, NIE BLOCKER
+3. Uzasadnienie: w praktyce OSD występują tolerancje (np. kabel 20 kV na szynie 15 kV jest dopuszczalny)
+4. Niezgodność jest **odnotowywana w White Box** jako założenie graniczne
+5. Walidacja wymaga rozwiązania `catalog_ref` → typ (użycie resolwera)
+
+### 4.17.4 Przypadki szczególne
+
+| Przypadek | Zachowanie |
+|-----------|-----------|
+| Brak `catalog_ref` | Walidacja **pominięta** (brak typu → brak `voltage_rating_kv`) |
+| `catalog_ref` nieznany | `TypeNotFoundError` — obsługiwane przez resolver (§4.6.5) |
+| `voltage_rating_kv` wyższe niż `voltage_kv` | WARNING (zawyżona izolacja — dopuszczalne, ale nieoptymalne) |
+| `voltage_rating_kv` niższe niż `voltage_kv` | WARNING (izolacja poniżej napięcia sieci — poważne, ale decyzja użytkownika) |
+
+---
+
+## 4.18 Parametry zerowe — decyzja architektoniczna
+
+### 4.18.1 Stan AS-IS (potwierdzenie §4.3.5)
+
+Parametry zerowe (`r0_ohm_per_km`, `x0_ohm_per_km`, `b0_siemens_per_km`) na `OverheadLine` i `Cable`:
+- **Są przechowywane** w modelu ENM (pola opcjonalne)
+- **NIE są przetwarzane** przez obecne solvery (`mapping.py:9`: „Zero-sequence fields are ignored by current solvers")
+- **NIE są mapowane** do `LineBranch` w `map_enm_to_network_graph()`
+
+Stan ten jest **świadomy i poprawny** — obecne solvery obsługują wyłącznie zwarcia symetryczne (3F) i Power Flow w sekwencji zgodnej.
+
+### 4.18.2 Decyzja architektoniczna (BINDING)
+
+> Parametry zerowe linii i kabli SN stają się **OBOWIĄZKOWE** w momencie uruchomienia analiz:
+> - zwarć jednofazowych doziemnych (1F — IEC 60909-0 §4.2.1),
+> - zwarć dwufazowych z ziemią (2F+G — IEC 60909-0 §4.3),
+> - analiz asymetrii składowych symetrycznych,
+> - selektywności ziemnozwarciowej (zabezpieczenia Ie>, Ie>>).
+
+Do tego czasu:
+- Brak parametrów zerowych **NIE jest błędem** walidacji
+- Jest **jawnie raportowany** jako ograniczenie zakresu analiz
+- Walidacja W001 (istniejąca) informuje o braku parametrów zerowych (INFO)
+
+### 4.18.3 Wpływ na resolver i katalog
+
+| Aspekt | Stan obecny | Stan docelowy |
+|--------|-------------|---------------|
+| `LineType` | Brak pól R₀, X₀, B₀ | TO-BE: `r0_ohm_per_km`, `x0_ohm_per_km`, `b0_us_per_km` |
+| `CableType` | Brak pól R₀, X₀, C₀ | TO-BE: `r0_ohm_per_km`, `x0_ohm_per_km`, `c0_nf_per_km` |
+| `resolve_line_params()` | Nie resolwuje Z₀ | TO-BE: `resolve_zero_seq_params()` |
+| `mapping.py` | Pomija Z₀ | TO-BE: mapowanie na `LineBranch.r0_ohm_per_km`, `.x0_ohm_per_km` |
+| Y-bus solver | Brak macierzy Z₀ | TO-BE: osobna macierz Y-bus₀ dla sekwencji zerowej |
+
+### 4.18.4 Walidacja przyszłościowa (TO-BE)
+
+> **TO-BE** — nie zaimplementowane. Wymaga osobnej decyzji implementacyjnej.
+
+| Kod | Poziom | Warunek | Kontekst |
+|-----|--------|---------|----------|
+| E-L03 | BLOCKER | Brak Z₀ na linii/kablu przy analizie 1F/2F+G | Blokuje solver zwarciowy w trybie 1F/2F+G |
+| W-L06 | IMPORTANT | Brak Z₀ na linii/kablu przy dostępnych analizach 3F only | Informuje o ograniczeniu zakresu |
+
+---
+
+## 4.19 Doprecyzowania topologiczne
+
+### 4.19.1 Magistrala — definicja uzupełniająca
+
+Uzupełnienie do §4.9:
+
+> Magistrala (feeder) NIE jest bytem obliczeniowym ani logicznym ENM. Jest **konstrukcją topologiczną** złożoną z wielu Branch (linia/kabel) połączonych przez Bus SN lub Junction. System NIE posiada klasy „Feeder", „MasterLine" ani „MultiSegmentLine".
+
+`Corridor` (`enm/models.py:266`) jest bytem **warstwy meta/SLD** — agreguje segmenty w `ordered_segment_refs` wyłącznie na potrzeby wizualizacji i routingu. Solver NIE przetwarza `Corridor`.
+
+### 4.19.2 Ring SN — punkt NO musi być SwitchBranch
+
+Doprecyzowanie do §4.10:
+
+> Punkt normalnie otwarty (NO) w ringu SN **MUSI** być realizowany przez element łączeniowy (`SwitchBranch` z `status="open"`), nigdy przez Branch (OverheadLine/Cable z `status="open"`).
+
+Uzasadnienie:
+- W praktyce OSD punkt NO jest aparatem łączeniowym (rozłącznik, wyłącznik), nie fragmentem linii
+- Aparatura łączeniowa umożliwia zdalne przełączanie (SCADA)
+- Branch z `status="open"` oznacza linię fizycznie odłączoną (uszkodzenie, demontaż), nie punkt przełączeniowy
+- `Corridor.no_point_ref` powinien wskazywać `SwitchBranch.ref_id`
+
+> **Stan AS-IS:** Kod nie wymusza tego rozróżnienia — zarówno SwitchBranch jak i Branch mogą mieć `status="open"`. Reguła jest **kontraktem architektonicznym** egzekwowanym przez walidację TO-BE.
+
+| Kod | Poziom | Warunek | Opis |
+|-----|--------|---------|------|
+| W-L07 | IMPORTANT | `Corridor.no_point_ref` wskazuje na Branch (nie SwitchBranch) | Punkt NO ringu powinien być aparatem łączeniowym |
+
+### 4.19.3 Kreator — obowiązek Bay przy tworzeniu linii/kabla
+
+Doprecyzowanie do §4.12:
+
+> Kreator NIE MOŻE utworzyć Branch typu linia/kabel SN bez jednoczesnego utworzenia lub wskazania Bay pola liniowego (`bay_role ∈ {"OUT", "FEEDER"}`).
+
+Uzasadnienie:
+- Linia SN bez pola to element „wiszący" — brak punktu pomiarowego i zabezpieczeń
+- Kreator wymusza kompletny tor fizyczny (Decyzja #14, zasada kompletności torów)
+- Bay jest tworzony automatycznie w kroku K6/K7 (magistrala SN)
+
+> **Stan AS-IS:** Kreator tworzy Bay w krokach K5–K7, ale **nie waliduje** kompletności relacji `Bay.equipment_refs ↔ Branch.ref_id`. Kontrakt jest TO-BE (§4.15.3).
+
+---
+
+## 4.14a Definition of Done — UZUPEŁNIENIE (v1.1 SUPPLEMENT)
+
+### Dodatkowe kryteria akceptacji (ALL MUST PASS with §4.14)
+
+| # | Kryterium | Status |
+|---|----------|--------|
+| 21 | Relacja Bay → Branch opisana: AS-IS (`equipment_refs` bez walidacji) + TO-BE (kontrakt 1:1) | Dokumentacja ✅ |
+| 22 | `BranchBase` NIE posiada `bay_ref` (AS-IS potwierdzone kodem) | ✅ AS-IS |
+| 23 | ProtectionDevice referencjonuje Branch przez `location_element_id` (AS-IS, niezależnie od Bay) | ✅ AS-IS |
+| 24 | Schemat kanoniczny: Bay → CT/VT → ProtectionDevice → Branch (chroniony) | Dokumentacja ✅ |
+| 25 | Walidacja W-L04/W-L05: zgodność `voltage_rating_kv` ↔ `voltage_kv` (TO-BE udokumentowane) | Dokumentacja ✅ |
+| 26 | Parametry zerowe: jawna decyzja — OBOWIĄZKOWE przy analizach 1F/2F+G, opcjonalne przy 3F | Dokumentacja ✅ |
+| 27 | Punkt NO ringu = SwitchBranch (kontrakt architektoniczny, W-L07 TO-BE) | Dokumentacja ✅ |
+
+### Zamknięcie domeny (AKTUALIZACJA)
+
+**DOMENA LINII I KABLI SN W ROZDZIALE 4 JEST ZAMKNIĘTA (v1.1 SUPPLEMENT).**
+
+Sekcje §4.1–§4.14 + §4.15–§4.19 definiują kompletny kanon modelowania linii napowietrznych i kabli podziemnych SN, w tym kontrakty Bay ↔ Branch, ochronę liniową, walidacje napięciowe i parametry zerowe. Dalsze modyfikacje wymagają ADR i wpisu do Macierzy Decyzji (AUDIT §9).
 
 ---
 
