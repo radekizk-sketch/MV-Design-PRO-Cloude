@@ -623,6 +623,43 @@ Każda rozbieżność z §2 otrzymuje jednoznaczną dyspozycję.
 - Katalog niezależny od projektu — zmiana invaliduje WSZYSTKIE projekty.
 - **DOMENA KATALOGÓW TYPÓW W ROZDZIALE 5 JEST ZAMKNIĘTA (v1.1 SUPPLEMENT).**
 
+| 43 | Składowe zerowe (Z₀) ignorowane przez solver — brak macierzy Y₀/Z₀ | **BINDING** | Solver + Mapping | `SPEC_CHAPTER_06_SOLVER_CONTRACTS_AND_MAPPING.md` (§6.11.3) | Parametry zerowe (`r0_ohm_per_km`, `x0_ohm_per_km`, `b0_siemens_per_km`) są mapowane z ENM do NetworkGraph (AS-IS), ale solver składowej dodatniej ich NIE wykorzystuje. Macierz Y-bus budowana WYŁĄCZNIE dla składowej symetrycznej dodatniej. Solver zwarć asymetrycznych (1F, 2F+G) wymaga osobnych macierzy Y₁, Y₂, Y₀ — to jest GAP architektoniczny. Kod AS-IS: `enm/mapping.py` mapuje r0/x0/b0, ale `ybus.py` i `short_circuit_iec60909.py` ich nie przetwarzają. Status: TO-BE — wymaga implementacji `AdmittanceMatrixBuilder` dla składowej zerowej i ujemnej. |
+| 44 | Gałąź magnesująca transformatora pominięta w Y-bus | **BINDING** | Solver | `SPEC_CHAPTER_06_SOLVER_CONTRACTS_AND_MAPPING.md` (§6.11.4) | `TransformerBranch` posiada pola `i0_percent` i `p0_kw` (prąd jałowy, straty żelaza), ale `AdmittanceMatrixBuilder` NIE buduje gałęzi magnesującej (Y_m = G_Fe + jB_μ). Model AS-IS: wyłącznie impedancja zwarcia (R_T + jX_T). Konsekwencja: straty jałowe transformatora NIE są uwzględniane w PF. Wpływ na SC: pomijalny (impedancja magnesowania >> impedancja zwarcia). Status: TO-BE — pełny model T/π transformatora z Y_m. |
+| 45 | Kontrakt mapowania ENM→NetworkGraph niezdefiniowany w specyfikacji | **BINDING** | Architecture + Mapping | `SPEC_CHAPTER_06_SOLVER_CONTRACTS_AND_MAPPING.md` (§6.4) | Funkcja `map_enm_to_network_graph()` w `enm/mapping.py` jest kluczowym komponentem architektury — produkuje model obliczeniowy z modelu domenowego. SYSTEM_SPEC.md v3.0 nie wspomina o niej. Kontrakt: pure function, deterministyczna (sortowanie po ref_id, UUID5), jednokierunkowa (ENM → Solver, nigdy odwrotnie). Reguły mapowania per element (Bus→Node, Branch→LineBranch, Source→Virtual Node+impedance, Load/Generator→P/Q accumulation) są BINDING i opisane w §6.4.2. Kod AS-IS: `mapping.py` (~200 linii) — kompletny. |
+| 46 | Frozen Result API — pełny kontrakt ShortCircuitResult (21 pól) vs 4 w spec | **BINDING** | Results API | `SPEC_CHAPTER_06_SOLVER_CONTRACTS_AND_MAPPING.md` (§6.6.2) | Rozszerzenie Decyzji #4. SYSTEM_SPEC §5.4 opisuje 4 pola (`ikss_ka, ip_ka, ith_ka, white_box_trace`). Kod implementuje 21 pól kanonicznych (`EXPECTED_SHORT_CIRCUIT_RESULT_KEYS`): metadata zwarcia (type, node, c, Un, Zkk, R/X, κ, tk, tb), prądy (ikss_a, ip_a, ith_a, ib_a), moc (sk_mva), analiza wkładów (ik_thevenin_a, ik_inverters_a, ik_total_a), traceability (contributions, branch_contributions, white_box_trace). Jednostki: A (nie kA!). Aliasy wsteczne: ik_a→ikss_a, ip→ip_a, ith→ith_a, ib→ib_a, sk→sk_mva. Kontrakt pełny AS-IS opisany w §6.6.2. |
+| 47 | Frozen Result API — pełny kontrakt PowerFlowNewtonSolution (30+ pól) vs 4 w spec | **BINDING** | Results API | `SPEC_CHAPTER_06_SOLVER_CONTRACTS_AND_MAPPING.md` (§6.6.6) | Rozszerzenie Decyzji #5. SYSTEM_SPEC §5.4 opisuje 4 pola (`bus_voltages, branch_flows, losses, white_box_trace`). Kod implementuje 30+ pól: status zbieżności (converged, iterations, max_mismatch), napięcia węzłowe (4 formaty: complex pu, |U| pu, θ rad, kV), przepływy gałęziowe (6 formatów: pu/MVA/kA × from/to), bilans systemowy (losses, slack_power, sum_pq), diagnostyka (warnings, errors, slack_island, not_solved), White Box (ybus_trace, nr_trace, taps, shunts, pv_to_pq, init_state), metadata (solver_method, fallback_info). Kontrakt pełny AS-IS opisany w §6.6.6. |
+| 48 | Y-bus Builder — węzeł SLACK modelowany dużą admitancją uziemienia | **BINDING** | Solver | `SPEC_CHAPTER_06_SOLVER_CONTRACTS_AND_MAPPING.md` (§6.5.4) | `AdmittanceMatrixBuilder` (`ybus.py`) dodaje do elementu diagonalnego węzła SLACK dużą admitancję uziemienia (Y_ground ≈ 10⁶ pu) jako referencję napięciową. To zapewnia numeryczną stabilność inwersji Y→Z. Transformatory: brak gałęzi magnesującej w Y-bus (Decyzja #44). Linie/kable: schemat π z Y_shunt/2 na obu końcach. Łączniki zamknięte: Union-Find scalanie węzłów (zerowa impedancja, nie element macierzy). InverterSource: brak w Y-bus (model prądowy addytywny). Kod AS-IS: `ybus.py` — kompletny. |
+
+**Z decyzji #43, #44 wynika (składowe zerowe i gałąź magnesująca — BINDING, TO-BE):**
+- Solver AS-IS operuje WYŁĄCZNIE na składowej symetrycznej dodatniej (Y₁, Z₁).
+- Parametry zerowe (r0, x0, b0) są mapowane z ENM ale NIE przetwarzane przez solver.
+- Solver zwarć asymetrycznych (1F, 2F+G) wymaga osobnych macierzy Y₁, Y₂, Y₀ — TO-BE.
+- Gałąź magnesująca transformatora (i0%, P0) jest pominięta w Y-bus — TO-BE.
+- Wpływ na SC: pomijalny (Z_magnetizing >> Z_shortcircuit).
+- Wpływ na PF: straty jałowe nie uwzględniane — wpływ na dokładność bilansu.
+
+**Z decyzji #45 wynika (kontrakt mapowania — BINDING):**
+- `map_enm_to_network_graph()` jest **pure function** — brak efektów ubocznych, brak mutacji ENM.
+- Mapowanie jest **deterministyczne** — sortowanie po `ref_id`, UUID5 dla identyfikatorów solverowych.
+- Source → Virtual Ground Node + LineBranch z impedancją obliczoną z `sk3_mva`/`rx_ratio` lub `r_ohm`/`x_ohm`.
+- Load → P/Q accumulation (ujemny znak) na Node. Generator → P/Q accumulation (dodatni znak) na Node.
+- Substation, Bay, Corridor, Junction → POMIJANE (brak wpływu na obliczenia).
+- Bus z przyłączonym Source → NodeType.SLACK (v_mag=1.0 pu, θ=0.0 rad).
+
+**Z decyzji #46, #47 wynika (pełne Frozen API — BINDING):**
+- ShortCircuitResult: 21 pól kanonicznych, jednostki w A (nie kA), aliasy wstecznej kompatybilności.
+- PowerFlowNewtonSolution: 30+ pól, 4 formaty napięć, 6 formatów przepływów, pełna diagnostyka.
+- `EXPECTED_SHORT_CIRCUIT_RESULT_KEYS` — gwarantowany zbiór kluczy w `to_dict()`.
+- Serializacja: `complex` → `{"re", "im"}`, `Enum` → string, `numpy` → Python native.
+- Zmiana wymaga major version bump.
+
+**Z decyzji #48 wynika (Y-bus — BINDING):**
+- S_base = 100 MVA, V_base = voltage_level [kV], Z_base = V²/S.
+- Zamknięte łączniki → Union-Find → scalanie węzłów → zredukowany wymiar macierzy.
+- SLACK: duża admitancja uziemienia (Y ≈ 10⁶ pu) jako referencja napięciowa.
+- InverterSource: model prądowy (k_sc × In) — BEZ impedancji w Y-bus.
+- **DOMENA KONTRAKTÓW SOLVERÓW I MAPOWANIA W ROZDZIALE 6 JEST ZAMKNIĘTA (v1.0).**
+
 ---
 
 **KONIEC AUDYTU**
