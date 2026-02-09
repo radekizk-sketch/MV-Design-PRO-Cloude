@@ -57,6 +57,7 @@ docs/spec/
 ├── SPEC_CHAPTER_08_TYPE_VS_INSTANCE_AND_CATALOGS.md ← Typ vs Instancja + Katalogi Typów (GOTOWY, v1.1 — suplement GAP)
 ├── SPEC_CHAPTER_09_PROTECTION_SYSTEM.md              ← System Zabezpieczeń ETAP-Grade (GOTOWY, v1.1 — suplement GAP)
 ├── SPEC_CHAPTER_10_STUDY_CASES_AND_SCENARIOS.md      ← Scenariusze Obliczeniowe & Study Cases (GOTOWY, v1.1 — suplement GAP)
+├── SPEC_CHAPTER_11_REPORTING_AND_EXPORT.md            ← Raportowanie, Cross-Reference, Trace & Export (GOTOWY, v1.0)
 │
 │   ══════════════════════════════════════
 │   FAZA 0 — KONTRAKTY I WARSTWY
@@ -138,6 +139,10 @@ PREAMBUŁA — CEL, ZAKRES, DEFINICJE (UKOŃCZONA)
             └── Domena Scenariuszy Obliczeniowych ZAMKNIĘTA (§10.0–§10.22 + §10.A, Decyzje #72–#79, #84–#86)
             └── Obejmuje: hierarchia Project→ENM→StudyCase→AnalysisRun→Result, StudyCase(frozen, 13 pól, config-only), AnalysisRun(frozen, state machine 5 stanów), StudyCaseConfig(8 parametrów), cykl życia(NONE→FRESH→OUTDATED), invalidacja(6 zdarzeń), kanonicalizacja(SHA-256), deduplikacja(P20a), NetworkSnapshot(P10a), porównanie(StudyCaseComparison), P10 hierarchy(Study→Scenario→Run→Snapshot), PowerFlowOptions(6p), 7 Solver Input Specs, API(21 endpointów), walidacje(E-SC/W-SC/B-SC), Z-SC-01..09, INV-SC-01..09
             └── Suplement v1.1: StudyCaseOverlay(4 typy override: Switch/Load/Gen/Source), StudyCaseResultComparison(ΔU/ΔI/ΔP/ΔIk + 3-stopniowe severity), BESSModeOverride(per Case overlay), walidacje E-OV/E-CMP, inwarianty INV-SC-10..17
+
+  Krok 0k: SPEC_CHAPTER_11_REPORTING_AND_EXPORT.md          ✅ GOTOWY (v1.0)
+            └── Domena Raportowania i Eksportu ZAMKNIĘTA (§11.0–§11.12, Decyzje #87–#93)
+            └── Obejmuje: 3 klasy raportów (PRIMARY/COMPARATIVE/AUDIT), ReportHeader(TO-BE, 15 pól), ReportContext(TO-BE, 7 pól), CrossReference+CrossReferenceTable(AS-IS, frozen), ProofDocument(frozen, 8 pól, 12 ProofType), ProofStep(frozen, 9 pól), ProofPackBuilder(deterministyczny ZIP, manifest SHA-256, signature), InspectorExporter(json/tex/pdf), 6 formatów eksportu(JSON/JSONL/PDF/DOCX/LaTeX/CSV), determinizm DOCX(make_docx_deterministic), NumericDelta(5p)+ComplexDelta(10p), ResultSldOverlayBuilder, hash chain, walidacje E-RPT/W-RPT/I-RPT, INV-RPT-01..12, Z-RPT-01..05, API 14 AS-IS + 4 TO-BE, mapowanie 21 komponentów
 
 FAZA 0 — KONTRAKTY I WARSTWY (PRIORYTET NAJWYŻSZY)
   Krok 1:  SPEC_00_LAYERING.md
@@ -899,6 +904,7 @@ FINALIZACJA:
 | SPEC_CHAPTER_08_TYPE_VS_INSTANCE_AND_CATALOGS.md | Preambuła | ENM + Catalog + Resolver | 16 | ~1050 ✅ v1.1 |
 | SPEC_CHAPTER_09_PROTECTION_SYSTEM.md | Preambuła | Domain + Analysis + Presentation | 22 | ~1060 ✅ v1.1 |
 | SPEC_CHAPTER_10_STUDY_CASES_AND_SCENARIOS.md | Preambuła | Domain + Application + Infrastructure | 26 | ~1230 ✅ v1.1 |
+| SPEC_CHAPTER_11_REPORTING_AND_EXPORT.md | Preambuła | Presentation + WhiteBox + Infrastructure | 12 | ~980 ✅ v1.0 |
 | SPEC_00_LAYERING.md | 0 | Architecture | 11 | ~700 |
 | SPEC_01_GLOSSARY_NORMATIVE.md | 0 | Governance | 7 | ~290 |
 | SPEC_02_ENM_CORE.md | 0 | ENM Core | 19 | ~2020 |
@@ -917,12 +923,12 @@ FINALIZACJA:
 | SPEC_15_PERSISTENCE.md | 4 | Infrastructure | 6+1 TO-BE | ~380 |
 | SPEC_16_TESTS.md | 4 | Infrastructure | 10 | ~540 |
 | SPEC_INDEX.md | — | Index | 5 | ~150 |
-| **RAZEM** | | | **~377** | **~22 570** |
+| **RAZEM** | | | **~389** | **~23 550** |
 
 ### Porównanie:
 - **SYSTEM_SPEC.md v3.0:** ~487 linii
-- **Nowa specyfikacja:** ~22 570 linii (28 plików, w tym Rozdział 1-10 preambuły + suplementy R7/R8/R9/R10)
-- **Wzrost:** ~46× (4600%)
+- **Nowa specyfikacja:** ~23 550 linii (29 plików, w tym Rozdział 1-11 preambuły + suplementy)
+- **Wzrost:** ~48× (4800%)
 - **Pokrycie AS-IS:** ~95% (sekcje TO-BE wyraźnie oznaczone)
 
 ---

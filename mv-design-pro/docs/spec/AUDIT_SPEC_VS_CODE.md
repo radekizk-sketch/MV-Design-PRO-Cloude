@@ -841,6 +841,24 @@ Każda rozbieżność z §2 otrzymuje jednoznaczną dyspozycję.
 - BESSModeOverride: tryb BESS jako parametr overlay Case, nie stała ENM.
 - **SUPLEMENTY ROZDZIAŁU 10 (v1.1) SĄ ZAMKNIĘTE.**
 
+| 87 | Zasada nadrzędna raportowania: raport = projekcja AnalysisRun, deterministyczny artefakt | **BINDING** | Presentation | `SPEC_CHAPTER_11…` (§11.0) | Raport nie zawiera logiki obliczeniowej, nie zawiera danych „z ręki", jest deterministyczny (te same dane → identyczny raport). Raport czyta frozen results, NIGDY nie modyfikuje ENM/Solver/Case. Parytet ETAP: feature matrix ≥ ETAP ≥ PowerFactory. |
+| 88 | Trzy klasy raportów: PRIMARY (1 run), COMPARATIVE (delta), AUDIT (trace) | **BINDING** | Presentation | `SPEC_CHAPTER_11…` (§11.1) | PRIMARY: PF, SC, Protection, VoltageProfile, Loading — 1 AnalysisRun, pełny nagłówek, cross-ref. COMPARATIVE: Case vs Case, Run vs Run, z/bez OZE — NIGDY nie miesza solverów, wymaga ten sam ENM snapshot. AUDIT: ProofDocument, ProtectionTrace, macierze efektów — czysta interpretacja. NumericDelta(5 pól), ComplexDelta(10 pól) frozen AS-IS. |
+| 89 | Struktura kanoniczna raportu: ReportHeader + ReportContext + wyniki + cross-reference | **BINDING** | Presentation | `SPEC_CHAPTER_11…` (§11.2) | ReportHeader(TO-BE, 15 pól): report_id, report_type, project/case/run IDs, solver info, timestamps, enm_hash, case_hash, input_hash. ReportContext(TO-BE, 7 pól): scenario, boundary conditions, active sources/loads, BESS modes. Każdy wiersz wynikowy wymaga ref_id. Sortowanie deterministyczne. |
+| 90 | Cross-reference SLD: CrossReference + CrossReferenceTable — mapowanie raport↔SLD↔ENM | **BINDING** | Presentation + SLD | `SPEC_CHAPTER_11…` (§11.2.4) | CrossReference(frozen, 6 pól): enm_ref_id, enm_element_type, enm_element_name, sld_symbol_id, wizard_step_hint, report_section. CrossReferenceTable(frozen, 4 pól): entries, total_elements, mapped_to_sld, coverage_percent. Czysta funkcja: build_cross_reference_table(enm, sld). AS-IS: application/sld/cross_reference.py. |
+| 91 | ProofPack: deterministyczny ZIP z manifest + signature + proof (JSON/LaTeX/PDF) | **BINDING** | White Box + Infrastructure | `SPEC_CHAPTER_11…` (§11.5) | ProofDocument(frozen, 8 pól): document_id, artifact_id, created_at, proof_type(12 wariantów), title_pl, header, steps(ProofStep), summary. ProofPackBuilder: JSON canonical → LaTeX → PDF → manifest(SHA-256) → signature(pack_fingerprint) → ZIP(sorted entries, fixed timestamp 1980-01-01). ProofPackContext(frozen, 5 pól). InspectorExporter: export_json/tex/pdf/all. ExportResult(frozen, 5 pól). AS-IS. |
+| 92 | Formaty eksportu: JSON/JSONL/PDF/DOCX/LaTeX/CSV — deterministic na każdym | **BINDING** | Infrastructure | `SPEC_CHAPTER_11…` (§11.6) | 6 formatów, wszystkie deterministyczne. DOCX: make_docx_deterministic (fixed ZIP timestamps, sorted entries, normalized core.xml). PDF: reportlab A4. JSON: sort_keys, LF newlines. ProofPack: pdflatex 2-pass. Nazwa pliku: {project}_{case}_{analysis}_{timestamp}.{ext}. Wymóg: wszystkie formaty = te same dane logiczne. |
+| 93 | Walidacje raportów: E-RPT-01..05 (ERROR), W-RPT-01..03 (WARNING), I-RPT-01..02 (INFO) | **BINDING** | Validation + Presentation | `SPEC_CHAPTER_11…` (§11.8) | 5 ERROR: brak ref_id, brak hash, niespójność Case/Run, brak solver info, pusty result set. 3 WARNING: brak White Box, coverage<90%, OUTDATED results. 2 INFO: brak pdflatex, comparison z 1 Run. Inwarianty INV-RPT-01..12. Zakazy Z-RPT-01..05. API: 14 AS-IS + 4 TO-BE. |
+
+**Z decyzji #87–#93 wynika (Rozdział 11 — BINDING):**
+- Raport = deterministyczny artefakt, projekcja AnalysisRun, NIGDY nie zawiera logiki obliczeniowej.
+- 3 klasy: PRIMARY (1 run), COMPARATIVE (delta z NumericDelta/ComplexDelta), AUDIT (trace).
+- ProofPack: deterministyczny ZIP z manifest (SHA-256), signature (pack_fingerprint), proof (JSON/LaTeX/PDF).
+- 6 formatów eksportu, wszystkie deterministyczne (DOCX: make_docx_deterministic, PDF: reportlab, JSON: canonical).
+- Cross-reference: CrossReferenceTable mapuje raport ↔ SLD ↔ ENM (czysta funkcja, AS-IS).
+- Hash chain: ENM → input_hash → proof_fingerprint → pack_fingerprint → report_hash.
+- Walidacje: 5 ERROR + 3 WARNING + 2 INFO. Inwarianty INV-RPT-01..12. Zakazy Z-RPT-01..05.
+- **DOMENA RAPORTOWANIA I EKSPORTU W ROZDZIALE 11 JEST ZAMKNIĘTA (v1.0).**
+
 ---
 
 **KONIEC AUDYTU**
