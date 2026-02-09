@@ -820,6 +820,27 @@ Każda rozbieżność z §2 otrzymuje jednoznaczną dyspozycję.
 - 16 scenariuszy kanonicznych, walidacje E-SC/W-SC/B-SC, White Box per run.
 - **DOMENA SCENARIUSZY OBLICZENIOWYCH W ROZDZIALE 10 JEST ZAMKNIĘTA (v1.0).**
 
+| 80 | EventClass + EventScope na ProtectionTraceStep — klasyfikacja zdarzeń w łańcuchu przyczynowym | **BINDING** | Analysis + White Box | `SPEC_CHAPTER_09…` (§9.A.1) | EventClass: TECHNOLOGICAL (termiczna, Q>, COS>, f<, df/dt, FRT — zdarzenia wewnątrz urządzenia), NETWORK (50/51/50N/51N/67/67N — zdarzenia sieciowe). EventScope: LOCAL_DEVICE (jedno urządzenie), NETWORK_SECTION (odcinek sieci). Dodane do ProtectionTraceStep: event_class(EventClass), event_scope(EventScope). White Box MUSI raportować per step. Inwarianty INV-PROT-09..10. Walidacje W-P05..06. |
+| 81 | Dual SC z/bez OZE: DualSCResult z parą V1(z OZE) / V2(bez OZE) + ΔIk | **BINDING** | Solver + Analysis | `SPEC_CHAPTER_09…` (§9.A.2) | v1: dwa osobne AnalysisRun (jeden z include_inverter=True, drugi False). TO-BE: DualSCResult(frozen): variant_with_oze(ShortCircuitResult), variant_without_oze(ShortCircuitResult), delta_ik_percent(float), delta_sk_percent(float), dominant_variant(str), assessment(str). Automatyczne parowanie per bus_id. Walidacje E-P05..06. Inwarianty INV-PROT-11..12. |
+| 82 | CTType (11 pól) + VTType (10 pól) jako byty katalogowe | **BINDING** | Catalog + ENM | `SPEC_CHAPTER_09…` (§9.A.3) | CTType(frozen, 11 pól): id, manufacturer, model, ct_class(PN-EN 61869-2), rated_primary_a, rated_secondary_a(1/5), accuracy_class(0.2/0.2S/0.5/1.0/3/5P/10P), rated_burden_va, alf(ALF≥20 dla 5P), fs_factor, thermal_short_time_current_ka. VTType(frozen, 10 pól): id, manufacturer, model, vt_class(PN-EN 61869-3), rated_primary_kv, rated_secondary_v(100/√3), accuracy_class(0.2/0.5/1.0/3P/6P), rated_burden_va, rated_voltage_factor(1.2/1.5/1.9), thermal_rating_va. v1: brak implementacji, pole ct_ratio(float). TO-BE: ProtectionDevice → CTType + VTType. Walidacje W-P08..10. |
+| 83 | DirectionMode: FORWARD/REVERSE/NON_DIRECTIONAL — tryb kierunkowy zabezpieczenia | **BINDING** | Domain + Analysis | `SPEC_CHAPTER_09…` (§9.A.4) | DirectionMode enum: FORWARD (przepływ od źródła do odbioru), REVERSE (przepływ od odbioru do źródła — generacja rozproszona), NON_DIRECTIONAL (brak rozróżnienia — domyślne w v1). ProtectionFunctionSummary rozszerzone o: direction_mode(DirectionMode=NON_DIRECTIONAL), reference_angle_deg(Optional[float]). v1: wszystkie zabezpieczenia NON_DIRECTIONAL. TO-BE: FORWARD/REVERSE dla 67/67N. Inwarianty INV-PROT-13..14. Walidacja I-P03. |
+| 84 | StudyCaseOverlay: nakładka konfiguracyjna na ENM per Case (N-1, rekonfiguracja) | **BINDING** | Domain + Case | `SPEC_CHAPTER_10…` (§10.A.1) | StudyCaseOverlay(frozen): overlay_id(UUID), name(str), description(str), switch_overrides(list[SwitchOverride]), load_profiles(list[LoadProfile]), gen_profiles(list[GenProfile]), source_overrides(list[SourceOverride]). SwitchOverride: branch_ref_id + forced_status(open/closed). LoadProfile: load_ref_id + p_mw_override + q_mvar_override + scale_factor. GenProfile: gen_ref_id + p_mw_override + q_mvar_override + in_service. SourceOverride: source_ref_id + in_service. v1: NIEZAIMPLEMENTOWANE (zmiana łącznika = zmiana ENM → invalidacja ALL). Walidacje E-OV-01..05. Inwarianty INV-SC-10..12. |
+| 85 | StudyCaseResultComparison: porównanie wyników między Cases (ΔU, ΔI, ΔP, ΔIk) | **BINDING** | Analysis + Case | `SPEC_CHAPTER_10…` (§10.A.2) | StudyCaseResultComparison(frozen): comparison_id(UUID), base_case_id, compare_case_id, timestamp, bus_diffs(list[BusResultDiff]), branch_diffs(list[BranchResultDiff]), sc_diffs(list[SCResultDiff]), summary(ComparisonSummary). BusResultDiff: bus_id + delta_u_pu + delta_u_percent + delta_p_mw + delta_q_mvar + severity. BranchResultDiff: branch_id + delta_i_a + delta_loading_percent + delta_p_loss_kw + severity. SCResultDiff: bus_id + delta_ik_a + delta_ik_percent + delta_sk_mva + severity. Severity: |Δ|>20%=HIGH, 5-20%=MEDIUM, <5%=LOW. Walidacje E-CMP-01..04. Inwarianty INV-SC-13..15. |
+| 86 | BESSModeOverride: tryb BESS jako parametr Study Case, nie stała ENM | **BINDING** | Domain + Case + Solver | `SPEC_CHAPTER_10…` (§10.A.3) | v1: bess_mode implicit z p_mw na Generator (Decyzja #67). TO-BE: BESSModeOverride(frozen): gen_ref_id(str), forced_mode(BESSMode: DISCHARGE/CHARGE/IDLE), p_mw_override(Optional), q_mvar_override(Optional). Dodane do StudyCaseOverlay.bess_overrides: list[BESSModeOverride]. Solver korzysta z forced_mode ZAMIAST implicit z p_mw. White Box raportuje: bess_mode_source = OVERLAY vs IMPLICIT. Inwarianty INV-SC-16..17. |
+
+**Z decyzji #80–#83 wynika (Suplementy R9 v1.1 — BINDING):**
+- EventClass/EventScope: klasyfikacja per ProtectionTraceStep (TECHNOLOGICAL/NETWORK × LOCAL_DEVICE/NETWORK_SECTION).
+- Dual SC: DualSCResult paruje V1(z OZE) + V2(bez OZE) z ΔIk%. v1: dwa osobne runy.
+- CT/VT: pełne byty katalogowe (CTType 11 pól, VTType 10 pól) wg PN-EN 61869-2/3. v1: ct_ratio float.
+- DirectionMode: FORWARD/REVERSE/NON_DIRECTIONAL. v1: wszystkie NON_DIRECTIONAL.
+- **SUPLEMENTY ROZDZIAŁU 9 (v1.1) SĄ ZAMKNIĘTE.**
+
+**Z decyzji #84–#86 wynika (Suplementy R10 v1.1 — BINDING):**
+- StudyCaseOverlay: nakładka per Case (SwitchOverride, LoadProfile, GenProfile, SourceOverride). v1: NIEZAIMPLEMENTOWANE.
+- StudyCaseResultComparison: porównanie ΔU/ΔI/ΔP/ΔIk z 3-stopniowym severity (HIGH/MEDIUM/LOW).
+- BESSModeOverride: tryb BESS jako parametr overlay Case, nie stała ENM.
+- **SUPLEMENTY ROZDZIAŁU 10 (v1.1) SĄ ZAMKNIĘTE.**
+
 ---
 
 **KONIEC AUDYTU**

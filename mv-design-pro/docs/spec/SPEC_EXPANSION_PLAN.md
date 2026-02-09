@@ -55,8 +55,8 @@ docs/spec/
 ├── SPEC_CHAPTER_06_SOLVER_CONTRACTS_AND_MAPPING.md ← Kontrakty solverów & mapowanie ENM→Model Obliczeniowy (GOTOWY, v1.0)
 ├── SPEC_CHAPTER_07_SOURCES_GENERATORS_LOADS.md     ← Model Źródeł, Generatorów i Odbiorów (GOTOWY, v1.1 — suplement GAP)
 ├── SPEC_CHAPTER_08_TYPE_VS_INSTANCE_AND_CATALOGS.md ← Typ vs Instancja + Katalogi Typów (GOTOWY, v1.1 — suplement GAP)
-├── SPEC_CHAPTER_09_PROTECTION_SYSTEM.md              ← System Zabezpieczeń ETAP-Grade (GOTOWY, v1.0)
-├── SPEC_CHAPTER_10_STUDY_CASES_AND_SCENARIOS.md      ← Scenariusze Obliczeniowe & Study Cases (GOTOWY, v1.0)
+├── SPEC_CHAPTER_09_PROTECTION_SYSTEM.md              ← System Zabezpieczeń ETAP-Grade (GOTOWY, v1.1 — suplement GAP)
+├── SPEC_CHAPTER_10_STUDY_CASES_AND_SCENARIOS.md      ← Scenariusze Obliczeniowe & Study Cases (GOTOWY, v1.1 — suplement GAP)
 │
 │   ══════════════════════════════════════
 │   FAZA 0 — KONTRAKTY I WARSTWY
@@ -130,12 +130,14 @@ PREAMBUŁA — CEL, ZAKRES, DEFINICJE (UKOŃCZONA)
             └── Domena Typu vs Instancji ZAMKNIĘTA (§8.0–§8.12 + §8.A, Decyzje #54–#58, #69–#71)
             └── Obejmuje: formuła TYP+parametry+override+ilość, ParameterSource(3-poziomowa precedencja), CatalogRepository(9 kolekcji), resolver(3 funkcje), governance(manifest+fingerprint), tryb ekspercki(impedance_override)
             └── Suplement v1.1: AuditContract(7 pól), CompatibilityMatrix(5 relacji), macierz zmian między Cases, StudyCaseOverlay(TO-BE)
-  Krok 0i: SPEC_CHAPTER_09_PROTECTION_SYSTEM.md              ✅ GOTOWY (v1.0)
-            └── Domena Systemu Zabezpieczeń ZAMKNIĘTA (§9.0–§9.17, Decyzje #59–#64)
+  Krok 0i: SPEC_CHAPTER_09_PROTECTION_SYSTEM.md              ✅ GOTOWY (v1.1)
+            └── Domena Systemu Zabezpieczeń ZAMKNIĘTA (§9.0–§9.17 + §9.A, Decyzje #59–#64, #80–#83)
             └── Obejmuje: ProtectionDevice(frozen, 11 pól, 5 stopni nadprądowych), klasy TECHNOLOGICAL/NETWORK, krzywe IEC 60255+IEEE C37.112+producenckie, koordynacja(3 kanoniczne+4 I>>), White Box Protection Trace(9 kroków), porównanie A/B(StateChange, IssueCode), sanity checks(16 reguł), walidacje architektoniczne(E-P01..I-P02), UI ETAP-style(11 kolumn), API(12 endpointów)
-  Krok 0j: SPEC_CHAPTER_10_STUDY_CASES_AND_SCENARIOS.md      ✅ GOTOWY (v1.0)
-            └── Domena Scenariuszy Obliczeniowych ZAMKNIĘTA (§10.0–§10.22, Decyzje #72–#79)
+            └── Suplement v1.1: EventClass+EventScope na ProtectionTraceStep, DualSCResult(z/bez OZE + ΔIk%), CTType(11 pól)+VTType(10 pól) wg PN-EN 61869, DirectionMode(FORWARD/REVERSE/NON_DIRECTIONAL), walidacje W-P05..I-P03, inwarianty INV-PROT-09..14
+  Krok 0j: SPEC_CHAPTER_10_STUDY_CASES_AND_SCENARIOS.md      ✅ GOTOWY (v1.1)
+            └── Domena Scenariuszy Obliczeniowych ZAMKNIĘTA (§10.0–§10.22 + §10.A, Decyzje #72–#79, #84–#86)
             └── Obejmuje: hierarchia Project→ENM→StudyCase→AnalysisRun→Result, StudyCase(frozen, 13 pól, config-only), AnalysisRun(frozen, state machine 5 stanów), StudyCaseConfig(8 parametrów), cykl życia(NONE→FRESH→OUTDATED), invalidacja(6 zdarzeń), kanonicalizacja(SHA-256), deduplikacja(P20a), NetworkSnapshot(P10a), porównanie(StudyCaseComparison), P10 hierarchy(Study→Scenario→Run→Snapshot), PowerFlowOptions(6p), 7 Solver Input Specs, API(21 endpointów), walidacje(E-SC/W-SC/B-SC), Z-SC-01..09, INV-SC-01..09
+            └── Suplement v1.1: StudyCaseOverlay(4 typy override: Switch/Load/Gen/Source), StudyCaseResultComparison(ΔU/ΔI/ΔP/ΔIk + 3-stopniowe severity), BESSModeOverride(per Case overlay), walidacje E-OV/E-CMP, inwarianty INV-SC-10..17
 
 FAZA 0 — KONTRAKTY I WARSTWY (PRIORYTET NAJWYŻSZY)
   Krok 1:  SPEC_00_LAYERING.md
@@ -895,8 +897,8 @@ FINALIZACJA:
 | SPEC_CHAPTER_06_SOLVER_CONTRACTS_AND_MAPPING.md | Preambuła | Solver + Mapping + Results API | 12 | ~580 ✅ v1.0 |
 | SPEC_CHAPTER_07_SOURCES_GENERATORS_LOADS.md | Preambuła | ENM Domain + Solver Mapping | 15 | ~1130 ✅ v1.1 |
 | SPEC_CHAPTER_08_TYPE_VS_INSTANCE_AND_CATALOGS.md | Preambuła | ENM + Catalog + Resolver | 16 | ~1050 ✅ v1.1 |
-| SPEC_CHAPTER_09_PROTECTION_SYSTEM.md | Preambuła | Domain + Analysis + Presentation | 17 | ~890 ✅ v1.0 |
-| SPEC_CHAPTER_10_STUDY_CASES_AND_SCENARIOS.md | Preambuła | Domain + Application + Infrastructure | 22 | ~890 ✅ v1.0 |
+| SPEC_CHAPTER_09_PROTECTION_SYSTEM.md | Preambuła | Domain + Analysis + Presentation | 22 | ~1060 ✅ v1.1 |
+| SPEC_CHAPTER_10_STUDY_CASES_AND_SCENARIOS.md | Preambuła | Domain + Application + Infrastructure | 26 | ~1230 ✅ v1.1 |
 | SPEC_00_LAYERING.md | 0 | Architecture | 11 | ~700 |
 | SPEC_01_GLOSSARY_NORMATIVE.md | 0 | Governance | 7 | ~290 |
 | SPEC_02_ENM_CORE.md | 0 | ENM Core | 19 | ~2020 |
@@ -915,12 +917,12 @@ FINALIZACJA:
 | SPEC_15_PERSISTENCE.md | 4 | Infrastructure | 6+1 TO-BE | ~380 |
 | SPEC_16_TESTS.md | 4 | Infrastructure | 10 | ~540 |
 | SPEC_INDEX.md | — | Index | 5 | ~150 |
-| **RAZEM** | | | **~366** | **~22 060** |
+| **RAZEM** | | | **~377** | **~22 570** |
 
 ### Porównanie:
 - **SYSTEM_SPEC.md v3.0:** ~487 linii
-- **Nowa specyfikacja:** ~22 060 linii (28 plików, w tym Rozdział 1-10 preambuły + suplementy R7/R8)
-- **Wzrost:** ~45× (4500%)
+- **Nowa specyfikacja:** ~22 570 linii (28 plików, w tym Rozdział 1-10 preambuły + suplementy R7/R8/R9/R10)
+- **Wzrost:** ~46× (4600%)
 - **Pokrycie AS-IS:** ~95% (sekcje TO-BE wyraźnie oznaczone)
 
 ---

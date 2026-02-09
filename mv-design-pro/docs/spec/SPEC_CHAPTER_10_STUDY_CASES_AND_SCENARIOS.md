@@ -1,6 +1,6 @@
 # Rozdział 10 — Scenariusze Obliczeniowe & Study Cases (ETAP-Grade)
 
-**Wersja:** 1.0
+**Wersja:** 1.1
 **Status:** AS-IS (z sekcjami TO-BE jawnie oznaczonymi)
 **Warstwa:** Domain (StudyCase, AnalysisRun) + Application (Service, DTO) + Infrastructure (Persistence, Snapshot)
 **Zależności:** Rozdział 2 (ENM Domain), Rozdział 5 (§5.9 — Study Case architektura), Rozdział 6 (Solver Contracts), Rozdział 7 (§7.A.4 — StudyCaseContext), Rozdział 8 (§8.A.3 — Macierz zmian)
@@ -1055,7 +1055,292 @@ Wszystkie pola `*_jsonb` w ORM używają `DeterministicJSON` — custom SQLAlche
 
 ---
 
-**DOMENA SCENARIUSZY OBLICZENIOWYCH & STUDY CASES W ROZDZIALE 10 JEST ZAMKNIĘTA (v1.0).**
+## §10.A — Suplement v1.1: Domknięcie kontraktów TO-BE
+
+> **Cel:** Domknięcie GAP-ów z §10.22.2, przygotowanie kontraktów
+> dla implementacji nakładki Case, porównania wyników i BESS per Case.
+> **Status:** Kontrakty BINDING (definicje docelowe). NIE cofają ustaleń v1.0.
+
+---
+
+### §10.A.1 StudyCaseOverlay — nakładka Case (TO-BE — Decyzja #84)
+
+#### §10.A.1.1 Definicja
+
+> **StudyCaseOverlay = warstwa nadpisująca parametry zmienne ENM
+> na poziomie Study Case, BEZ mutacji snapshotu.**
+
+#### §10.A.1.2 Kontrakt StudyCaseOverlay (frozen dataclass, TO-BE)
+
+```python
+@dataclass(frozen=True)
+class SwitchOverride:
+    switch_id: str
+    status: str                        # "OPEN" | "CLOSED"
+    reason: str                        # Uzasadnienie (np. "N-1: linia L3 wyłączona")
+
+@dataclass(frozen=True)
+class LoadProfile:
+    load_id: str
+    p_mw: float
+    q_mvar: float
+    profile_name: str | None = None    # np. "szczyt letni", "minimum nocne"
+
+@dataclass(frozen=True)
+class GenProfile:
+    gen_id: str
+    p_mw: float
+    q_mvar: float
+    bess_mode: str | None = None       # DISCHARGE | CHARGE | IDLE (jeśli BESS)
+
+@dataclass(frozen=True)
+class SourceOverride:
+    source_id: str
+    in_service: bool
+
+@dataclass(frozen=True)
+class StudyCaseOverlay:
+    switch_overrides: tuple[SwitchOverride, ...] = ()
+    load_profiles: tuple[LoadProfile, ...] = ()
+    gen_profiles: tuple[GenProfile, ...] = ()
+    source_overrides: tuple[SourceOverride, ...] = ()
+```
+
+#### §10.A.1.3 Reguły overlay (BINDING)
+
+| Reguła | Opis |
+|--------|------|
+| Overlay NIE mutuje ENM | Snapshot pozostaje niezmieniony |
+| Overlay NIE tworzy nowego snapshotu | Jest częścią StudyCase, nie ENM |
+| Overlay jest frozen | Immutable, deterministyczny |
+| Overlay stosowany przy budowie StudyCaseContext | `build_context(snapshot, overlay) → merged_context` |
+| Overlay jest częścią input_snapshot | Kanonicalizacja obejmuje overlay → input_hash |
+| IDs w overlay MUSZĄ istnieć w snapshot | Walidacja referencyjna |
+| Overlay ma priorytet nad snapshot | `overlay.switch_overrides[id].status` nadpisuje `snapshot.switch[id].status` |
+
+#### §10.A.1.4 Zastosowania
+
+| Scenariusz | Overlay |
+|-----------|---------|
+| **N-1 (awaria linii)** | `switch_overrides: [{switch_id: "SW-L3", status: "OPEN", reason: "N-1"}]` |
+| **Rekonfiguracja** | `switch_overrides: [{…, status: "CLOSED"}, {…, status: "OPEN"}]` |
+| **Szczyt obciążeń** | `load_profiles: [{load_id: "LD-01", p_mw: 2.5, q_mvar: 0.8}]` |
+| **OZE noc** | `gen_profiles: [{gen_id: "PV-01", p_mw: 0.0, q_mvar: 0.0}]` |
+| **BESS ładowanie** | `gen_profiles: [{gen_id: "BESS-01", p_mw: -0.5, bess_mode: "CHARGE"}]` |
+| **Źródło wyłączone** | `source_overrides: [{source_id: "S-01", in_service: false}]` |
+
+#### §10.A.1.5 Integracja z StudyCase (TO-BE)
+
+```python
+# Rozszerzenie StudyCase (TO-BE)
+@dataclass(frozen=True)
+class StudyCase:
+    # ... pola AS-IS ...
+    overlay: StudyCaseOverlay | None = None   # NOWE POLE (TO-BE)
+```
+
+#### §10.A.1.6 White Box
+
+```
+[OVERLAY] Case="N-1 linia L3"
+  switch_overrides: SW-L3 → OPEN (reason: "N-1: awaria linii L3")
+  load_profiles: (brak — profil z ENM)
+  gen_profiles: (brak — profil z ENM)
+  source_overrides: (brak — stan z ENM)
+  merged_context_hash: SHA-256("…")
+```
+
+#### §10.A.1.7 Walidacje (TO-BE)
+
+| Kod | Severity | Warunek | Komunikat |
+|-----|----------|---------|-----------|
+| **E-OV-01** | ERROR | switch_id w overlay nie istnieje w snapshot | Nieznany łącznik w overlay |
+| **E-OV-02** | ERROR | load_id / gen_id w overlay nie istnieje w snapshot | Nieznany element w overlay |
+| **E-OV-03** | ERROR | source_id w overlay nie istnieje w snapshot | Nieznane źródło w overlay |
+| **W-OV-01** | WARNING | Overlay powoduje graf niespójny (wyspa bez Source) | Potencjalny graf niespójny po overlay |
+| **W-OV-02** | WARNING | BESS bess_mode sprzeczny z p_mw (CHARGE + p>0) | Sprzeczność trybu BESS z mocą |
+
+#### §10.A.1.8 Inwarianty (BINDING)
+
+| ID | Inwariant |
+|----|-----------|
+| **INV-SC-10** | Overlay jest frozen=True i deterministyczny |
+| **INV-SC-11** | IDs w overlay MUSZĄ istnieć w snapshot (referential integrity) |
+| **INV-SC-12** | Overlay jest częścią input_snapshot → wpływa na input_hash |
+
+---
+
+### §10.A.2 Porównanie wyników (ΔU, ΔI, ΔP, ΔIk) (TO-BE — Decyzja #85)
+
+#### §10.A.2.1 Kontrakt ResultComparison
+
+```python
+@dataclass(frozen=True)
+class BusResultDiff:
+    bus_id: str
+    bus_name: str
+    u_kv_a: float                     # Wynik Case A
+    u_kv_b: float                     # Wynik Case B
+    delta_u_kv: float                 # B − A
+    delta_u_percent: float            # (B − A) / A × 100
+    severity: str                     # CRITICAL | WARNING | INFO
+
+@dataclass(frozen=True)
+class BranchResultDiff:
+    branch_id: str
+    branch_name: str
+    i_a_case_a: float
+    i_a_case_b: float
+    delta_i_a: float
+    delta_i_percent: float
+    loading_pct_a: float
+    loading_pct_b: float
+    delta_loading_pct: float
+    severity: str
+
+@dataclass(frozen=True)
+class SCResultDiff:
+    target_id: str
+    target_name: str
+    fault_type: str
+    ikss_ka_a: float
+    ikss_ka_b: float
+    delta_ikss_ka: float
+    delta_ikss_percent: float
+    severity: str
+
+@dataclass(frozen=True)
+class StudyCaseResultComparison:
+    case_a_id: str
+    case_b_id: str
+    run_a_id: str
+    run_b_id: str
+    analysis_type: str                # PF | short_circuit_sn
+    bus_diffs: tuple[BusResultDiff, ...]
+    branch_diffs: tuple[BranchResultDiff, ...]
+    sc_diffs: tuple[SCResultDiff, ...]
+    summary: ResultComparisonSummary
+```
+
+#### §10.A.2.2 Severity mapping
+
+| Kategoria | CRITICAL | WARNING | INFO |
+|-----------|----------|---------|------|
+| **ΔU** | \|ΔU\| > 5% | 2% < \|ΔU\| ≤ 5% | \|ΔU\| ≤ 2% |
+| **ΔI (loading)** | Δloading > 20% lub nowe OVERLOADED | 10% < Δloading ≤ 20% | Δloading ≤ 10% |
+| **ΔIk** | \|ΔIk\| > 10% | 5% < \|ΔIk\| ≤ 10% | \|ΔIk\| ≤ 5% |
+| **Regresja** | Nowy element OVERLOADED / VIOLATION | Zmniejszenie marginesu | Poprawa marginesu |
+
+#### §10.A.2.3 Reguły porównania (BINDING)
+
+| Reguła | Opis |
+|--------|------|
+| Porównanie WYŁĄCZNIE na tym samym ENM (projekt) | Zakaz cross-ENM (Decyzja #72) |
+| Porównanie WYŁĄCZNIE tego samego analysis_type | PF vs PF, SC vs SC |
+| Elementy matchowane po ID | bus_id, branch_id, target_id |
+| Brakujący element w jednym z runów → CRITICAL | Zmiana topologii (overlay) |
+
+#### §10.A.2.4 UI (TO-BE)
+
+| Widok | Opis |
+|-------|------|
+| **Tabela diff** | Kolumny: Element, Wartość A, Wartość B, Δ, Δ%, Severity |
+| **SLD overlay** | Nakładka dwóch runów: kolor per ΔU/ΔI — zielony=INFO, pomarańczowy=WARNING, czerwony=CRITICAL |
+| **Filtr severity** | Filtr: pokaż tylko CRITICAL, WARNING+, ALL |
+| **Export** | CSV / PDF z tabelą diff |
+
+#### §10.A.2.5 API (TO-BE)
+
+| Metoda | Endpoint | Opis |
+|--------|----------|------|
+| POST | `/api/study-cases/compare-results` | Porównanie wyników dwóch runów |
+| GET | `/{comparison_id}/diffs/buses` | Diff per bus |
+| GET | `/{comparison_id}/diffs/branches` | Diff per branch |
+| GET | `/{comparison_id}/diffs/short-circuit` | Diff per SC target |
+
+#### §10.A.2.6 Inwarianty (BINDING)
+
+| ID | Inwariant |
+|----|-----------|
+| **INV-SC-13** | Porównanie wyników jest read-only (nie modyfikuje runów) |
+| **INV-SC-14** | Severity mapping jest deterministyczny (te same Δ → ten sam severity) |
+
+---
+
+### §10.A.3 BESS mode per Case (TO-BE — Decyzja #86)
+
+#### §10.A.3.1 Kontrakt
+
+> **Tryb pracy BESS (DISCHARGE/CHARGE/IDLE) jest parametrem Study Case,
+> nie parametrem stałym ENM.**
+
+#### §10.A.3.2 Rozszerzenie StudyCaseConfig (TO-BE)
+
+```python
+# Rozszerzenie StudyCaseConfig (TO-BE)
+@dataclass(frozen=True)
+class BESSModeOverride:
+    gen_id: str                        # Generator(gen_type="bess") ID
+    bess_mode: str                     # DISCHARGE | CHARGE | IDLE
+    p_mw: float | None = None         # Opcjonalne nadpisanie mocy
+    q_mvar: float | None = None
+
+@dataclass(frozen=True)
+class StudyCaseConfig:
+    # ... pola AS-IS (8 parametrów) ...
+    # --- NOWE POLE (TO-BE) ---
+    bess_overrides: tuple[BESSModeOverride, ...] = ()
+```
+
+**Alternatywnie:** BESS mode może być częścią `StudyCaseOverlay.gen_profiles` (§10.A.1).
+Obie ścieżki są kompatybilne — decyzja implementacyjna.
+
+#### §10.A.3.3 Reguły (BINDING)
+
+| Reguła | Opis |
+|--------|------|
+| bess_mode MUSI być jawny | Zakaz domyślnego (Decyzja #67, Z-BESS-01) |
+| Spójność mode ↔ p_mw | CHARGE → p_mw < 0, DISCHARGE → p_mw > 0, IDLE → p_mw = 0 |
+| BESS mode wpływa na mapper | DISCHARGE → bus_p += p_mw, CHARGE → bus_p += p_mw (p<0) |
+| BESS mode w White Box | Trace: `bess_mode=DISCHARGE, P_inject=+0.5MW` |
+| Zmiana BESS mode → Case OUTDATED | Jak każda zmiana config |
+
+#### §10.A.3.4 Walidacje (TO-BE)
+
+| Kod | Severity | Warunek | Komunikat |
+|-----|----------|---------|-----------|
+| **E-BESS-01** | ERROR | gen_id nie jest Generator(gen_type="bess") | Element nie jest BESS |
+| **W-BESS-01** | WARNING | bess_mode=CHARGE + p_mw > 0 | Sprzeczność: tryb CHARGE z p>0 |
+| **W-BESS-02** | WARNING | bess_mode=DISCHARGE + p_mw < 0 | Sprzeczność: tryb DISCHARGE z p<0 |
+| **W-BESS-03** | WARNING | bess_mode=IDLE + p_mw ≠ 0 | Tryb IDLE z niezerową mocą |
+
+#### §10.A.3.5 Inwarianty (BINDING)
+
+| ID | Inwariant |
+|----|-----------|
+| **INV-SC-15** | BESS mode jest parametrem Case, nie ENM |
+| **INV-SC-16** | Zmiana BESS mode → Case OUTDATED (invalidacja) |
+| **INV-SC-17** | White Box raportuje BESS mode jako element śladu |
+
+---
+
+### §10.A.4 Definition of Done (Suplement v1.1)
+
+| # | Kryterium | Status |
+|---|-----------|--------|
+| 1 | StudyCaseOverlay zdefiniowany (4 typy override + frozen + reguły) | ✅ |
+| 2 | Integracja overlay z StudyCase i StudyCaseContext | ✅ |
+| 3 | Walidacje overlay (E-OV-01..03, W-OV-01..02) | ✅ |
+| 4 | StudyCaseResultComparison z 3 typami diff (bus, branch, SC) | ✅ |
+| 5 | Severity mapping (CRITICAL/WARNING/INFO) z progami procentowymi | ✅ |
+| 6 | API porównania wyników (4 endpointy) | ✅ |
+| 7 | BESSModeOverride zdefiniowany z regułami spójności | ✅ |
+| 8 | Walidacje BESS (E-BESS-01, W-BESS-01..03) | ✅ |
+| 9 | Inwarianty INV-SC-10..17 sformułowane | ✅ |
+
+---
+
+**DOMENA SCENARIUSZY OBLICZENIOWYCH & STUDY CASES W ROZDZIALE 10 JEST ZAMKNIĘTA (v1.1).**
 
 ---
 

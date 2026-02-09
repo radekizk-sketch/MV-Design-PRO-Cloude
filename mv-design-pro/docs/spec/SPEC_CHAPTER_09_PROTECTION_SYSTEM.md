@@ -1,6 +1,6 @@
 # Rozdział 9 — System Zabezpieczeń (Protection System) — ETAP-Grade
 
-**Wersja:** 1.0
+**Wersja:** 1.1
 **Status:** AS-IS (z sekcjami TO-BE jawnie oznaczonymi)
 **Warstwa:** Domain (ProtectionDevice) + Analysis (Coordination, Comparison) + Presentation (TCC, Reports)
 **Zależności:** Rozdział 2 (§2.15–§2.21 — kanon architektoniczny zabezpieczeń), Rozdział 6 (Solver Contracts), Rozdział 7 (Source/Generator/Load), Rozdział 8 (Katalogi Typów)
@@ -884,7 +884,314 @@ Raporty zawierają:
 
 ---
 
-**DOMENA SYSTEMU ZABEZPIECZEŃ W ROZDZIALE 9 JEST ZAMKNIĘTA (v1.0).**
+## §9.A — Suplement v1.1: Domknięcie kontraktów TO-BE
+
+> **Cel:** Domknięcie GAP-ów zidentyfikowanych w §9.17.2,
+> przygotowanie kontraktów dla implementacji.
+> **Status:** Kontrakty BINDING (definicje docelowe). NIE cofają ustaleń v1.0.
+
+---
+
+### §9.A.1 ProtectionTrace — klasyfikacja zdarzeń (TO-BE — Decyzja #80)
+
+#### §9.A.1.1 Nowe pola na ProtectionTraceStep
+
+```python
+# Rozszerzenie ProtectionTraceStep (TO-BE)
+@dataclass(frozen=True)
+class ProtectionTraceStep:
+    step: int
+    description_pl: str
+    inputs: dict
+    outputs: dict
+    # --- NOWE POLA (TO-BE) ---
+    event_class: EventClass | None = None       # TECHNOLOGICAL | NETWORK
+    event_scope: EventScope | None = None       # LOCAL_DEVICE | NETWORK_SECTION
+```
+
+#### §9.A.1.2 EventClass (enum, TO-BE)
+
+| Wartość | Opis PL | Reguły przypisania |
+|---------|---------|-------------------|
+| `TECHNOLOGICAL` | Zabezpieczenie technologiczne (falownik, urządzenie) | device → Generator(inverter), ProtectionDevice z klasą TECHNOLOGICAL |
+| `NETWORK` | Zabezpieczenie sieciowe (przekaźnik, reklozer, bezpiecznik) | device → ProtectionDevice z klasą NETWORK |
+
+#### §9.A.1.3 EventScope (enum, TO-BE)
+
+| Wartość | Opis PL | Reguły przypisania |
+|---------|---------|-------------------|
+| `LOCAL_DEVICE` | Skutek lokalny — wyłączenie jednego urządzenia/falownika | event_class=TECHNOLOGICAL |
+| `NETWORK_SECTION` | Skutek sieciowy — wyłączenie odcinka/pola/sekcji | event_class=NETWORK |
+
+#### §9.A.1.4 Reguły klasyfikacji (BINDING)
+
+| Reguła | Opis |
+|--------|------|
+| TECHNOLOGICAL → LOCAL_DEVICE | Falownik odłącza się sam, skutek lokalny |
+| NETWORK → NETWORK_SECTION | Przekaźnik/reklozer wyłącza odcinek sieci |
+| event_class OBOWIĄZKOWE | Dla każdego kroku z decyzją TRIPS |
+| event_scope OBOWIĄZKOWE | Dla każdego kroku z decyzją TRIPS |
+| None dozwolone | Tylko dla kroków bez decyzji (step 1–5) lub NO_TRIP |
+
+#### §9.A.1.5 Raport „Kto zadziałał pierwszy" — rozszerzenie (TO-BE)
+
+```
+Sekwencja chronologiczna (posortowana po t_trip):
+─────────────────────────────────────────────────
+1. [TECHNOLOGICAL] Falownik PV-INV-01 (t=0.12s)
+   → event_scope: LOCAL_DEVICE
+   → skutek: odłączenie falownika (ΔIk = −125A)
+
+2. [NETWORK] Przekaźnik REL-F3 / I>> (t=0.35s)
+   → event_scope: NETWORK_SECTION
+   → skutek: wyłączenie pola F3 (Bus SN-02 → SN-03)
+
+3. [NETWORK] Przekaźnik REL-GPZ / I> (t=0.85s)
+   → event_scope: NETWORK_SECTION
+   → skutek: wyłączenie sekcji SN (Bus SN-01)
+```
+
+UI:
+- Raport filtruje i grupuje po `event_class`.
+- Kolumna „Klasa" w tabeli zadziałań.
+- Kolor: TECHNOLOGICAL = niebieski, NETWORK = czerwony.
+
+#### §9.A.1.6 Walidacje (TO-BE)
+
+| Kod | Severity | Warunek | Komunikat |
+|-----|----------|---------|-----------|
+| **W-P05** | WARNING | TRIPS step bez event_class | Brak klasyfikacji zdarzenia |
+| **W-P06** | WARNING | TRIPS step bez event_scope | Brak zakresu skutku |
+| **E-P05** | ERROR | event_class=TECHNOLOGICAL + event_scope=NETWORK_SECTION | Sprzeczność: zabezpieczenie technologiczne z zasięgiem sieciowym |
+| **E-P06** | ERROR | event_class=NETWORK + event_scope=LOCAL_DEVICE | Sprzeczność: zabezpieczenie sieciowe z zasięgiem lokalnym |
+
+#### §9.A.1.7 Inwarianty (BINDING)
+
+| ID | Inwariant |
+|----|-----------|
+| **INV-PROT-09** | event_class i event_scope MUSZĄ być jawne dla każdego kroku TRIPS |
+| **INV-PROT-10** | TECHNOLOGICAL → LOCAL_DEVICE (bijection), NETWORK → NETWORK_SECTION (bijection) |
+
+---
+
+### §9.A.2 Dual Short-Circuit „z OZE / bez OZE" (TO-BE — Decyzja #81)
+
+#### §9.A.2.1 Kontrakt
+
+> **Analiza Protection MOŻE uruchomić dwa warianty SC
+> dla tego samego scenariusza zwarciowego:**
+
+| Wariant | include_inverter_contribution | Opis |
+|---------|------------------------------|------|
+| **V1** (z OZE) | `True` | Pełny wkład InverterSource: Ik_total = Ik_Thevenin + Σ Ik_inv |
+| **V2** (bez OZE) | `False` | Brak wkładu: Ik_total = Ik_Thevenin (falowniki odłączone) |
+
+#### §9.A.2.2 Parowanie wyników
+
+```python
+@dataclass(frozen=True)
+class DualSCResult:
+    fault_target_id: str
+    fault_type: str                    # 3F / 2F / 1F
+    # Wariant V1 (z OZE)
+    ikss_with_oze_ka: float
+    ip_with_oze_ka: float
+    ith_with_oze_ka: float
+    # Wariant V2 (bez OZE)
+    ikss_without_oze_ka: float
+    ip_without_oze_ka: float
+    ith_without_oze_ka: float
+    # Różnice
+    delta_ikss_ka: float               # V1 − V2
+    delta_ip_ka: float
+    delta_ith_ka: float
+    delta_ikss_percent: float          # (V1 − V2) / V2 × 100
+```
+
+#### §9.A.2.3 White Box
+
+Trace zawiera oba warianty:
+
+```
+[SC_DUAL] fault=Bus-SN-02, type=3F
+  V1 (z OZE):  Ik''= 12.45 kA, ip= 31.2 kA, Ith= 12.1 kA
+  V2 (bez OZE): Ik''= 11.80 kA, ip= 29.6 kA, Ith= 11.5 kA
+  ΔIk''= +0.65 kA (+5.5%), wkład OZE: 3× InverterSource
+```
+
+#### §9.A.2.4 Wpływ na koordynację
+
+- Nastawy dobierane na **gorszy przypadek** (wyższy prąd z V1 lub V2).
+- SensitivityCheck: `i_fault_min` = min(V1, V2) — konserwatywne.
+- SelectivityCheck: marginesy z obu wariantów.
+
+#### §9.A.2.5 Walidacje (TO-BE)
+
+| Kod | Severity | Warunek | Komunikat |
+|-----|----------|---------|-----------|
+| **W-P07** | WARNING | Analiza Protection z jednym wariantem SC (brak dual) | Brak porównania z/bez OZE |
+| **I-P03** | INFO | ΔIk'' < 1% (wkład OZE pomijalny) | Wkład OZE pomijalny dla tego punktu |
+
+#### §9.A.2.6 UI (TO-BE)
+
+- Toggle „z OZE / bez OZE" na wynikach SC.
+- Tabela diff z kolumnami V1, V2, Δ, Δ%.
+- TCC overlay: dwie krzywe (z/bez OZE) na jednym wykresie.
+
+---
+
+### §9.A.3 CT/VT jako byty katalogowe (TO-BE — Decyzja #82)
+
+#### §9.A.3.1 CTType (frozen dataclass, TO-BE)
+
+```python
+@dataclass(frozen=True)
+class CTType:
+    id: str
+    name: str
+    manufacturer: str
+    # Parametry elektryczne
+    primary_current_a: float          # Prąd pierwotny [A], np. 400
+    secondary_current_a: float        # Prąd wtórny [A], np. 5 lub 1
+    ratio: str                        # Czytelna forma, np. "400/5"
+    accuracy_class: str               # Klasa dokładności, np. "0.5", "5P20"
+    burden_va: float                  # Obciążalność [VA]
+    saturation_factor: float | None   # Współczynnik nasycenia (Fs)
+    voltage_rating_kv: float          # Napięcie znamionowe izolacji [kV]
+    thermal_rating_ka_1s: float | None  # Wytrzymałość cieplna Ith (1s) [kA]
+```
+
+#### §9.A.3.2 VTType (frozen dataclass, TO-BE)
+
+```python
+@dataclass(frozen=True)
+class VTType:
+    id: str
+    name: str
+    manufacturer: str
+    # Parametry elektryczne
+    primary_voltage_kv: float         # Napięcie pierwotne [kV], np. 15.0
+    secondary_voltage_v: float        # Napięcie wtórne [V], np. 100
+    ratio: str                        # Czytelna forma, np. "15000/100"
+    accuracy_class: str               # Klasa dokładności, np. "0.5", "3P"
+    burden_va: float                  # Obciążalność [VA]
+    voltage_factor: float             # Współczynnik napięciowy (Fv)
+    connection_type: str              # "phase-to-phase" | "phase-to-ground"
+```
+
+#### §9.A.3.3 Migracja ct_ratio (backward compatibility)
+
+| Etap | Opis |
+|------|------|
+| v1 (AS-IS) | `ct_ratio: str` na ProtectionDevice (np. "400/5") |
+| v2 (migracja) | `ct_type_ref: str \| None` (referencja do CTType) + `ct_ratio: str` (zachowany, read-only) |
+| v3 (docelowy) | `ct_type_ref: str` (obowiązkowy), `vt_type_ref: str \| None`, `ct_ratio` deprecated |
+
+#### §9.A.3.4 Integracja z CatalogRepository (TO-BE)
+
+```python
+# Rozszerzenie CatalogRepository (TO-BE)
+ct_types: dict[str, CTType]         # Kolekcja #10
+vt_types: dict[str, VTType]         # Kolekcja #11
+```
+
+CatalogRepository: 9 kolekcji (AS-IS) → 11 kolekcji (TO-BE).
+
+#### §9.A.3.5 Walidacje (TO-BE)
+
+| Kod | Severity | Warunek | Komunikat |
+|-----|----------|---------|-----------|
+| **E-P07** | ERROR | Funkcja nadprądowa (50/51) bez CT | Brak przekładnika prądowego |
+| **E-P08** | ERROR | Funkcja napięciowa (27/59) bez VT | Brak przekładnika napięciowego |
+| **W-P08** | WARNING | CTType.accuracy_class ≠ "5P20" przy ochronie | Niska klasa dokładności CT |
+| **W-P09** | WARNING | CTType.saturation_factor < 10 przy I>> | Nasycenie CT przy prądach zwarciowych |
+
+#### §9.A.3.6 Inwarianty (BINDING)
+
+| ID | Inwariant |
+|----|-----------|
+| **INV-PROT-11** | CTType i VTType są frozen=True (immutable) |
+| **INV-PROT-12** | CT/VT w katalogu podlegają tym samym regułom governance (manifest, fingerprint) |
+
+---
+
+### §9.A.4 Kierunkowość (Directional Protection) (TO-BE — Decyzja #83)
+
+#### §9.A.4.1 Rozszerzenie OvercurrentStageSettings
+
+```python
+# Rozszerzenie OvercurrentStageSettings (TO-BE)
+@dataclass(frozen=True)
+class OvercurrentStageSettings:
+    enabled: bool
+    pickup_current_a: float
+    time_s: float | None = None
+    curve_settings: ProtectionCurveSettings | None = None
+    directional: bool = False               # AS-IS placeholder → TO-BE aktywne
+    # --- NOWE POLA (TO-BE) ---
+    direction_ref: str | None = None        # ID Bus/Branch definiujący kierunek „do"
+    direction_mode: DirectionMode | None = None  # FORWARD | REVERSE | NON_DIRECTIONAL
+```
+
+#### §9.A.4.2 DirectionMode (enum, TO-BE)
+
+| Wartość | Opis PL | Zastosowanie |
+|---------|---------|-------------|
+| `FORWARD` | Kierunek „do" — prąd płynący w stronę direction_ref | Ochrona linii w kierunku obciążenia |
+| `REVERSE` | Kierunek „od" — prąd płynący od direction_ref | Ochrona generacji rozproszonej (OZE) |
+| `NON_DIRECTIONAL` | Brak kierunkowości (domyślny) | Ochrona radialna bez OZE |
+
+#### §9.A.4.3 Reguły (BINDING)
+
+| Reguła | Opis |
+|--------|------|
+| Kierunkowość dotyczy WYŁĄCZNIE klasy NETWORK | Zabezpieczenia TECHNOLOGICAL nie mają kierunku |
+| `directional=True` wymaga `direction_ref` | Bez referencji → ERROR |
+| `direction_ref` MUSI wskazywać istniejący Bus lub Branch | Walidacja topologiczna |
+| Kierunkowość wpływa na TCC (overlay kierunkowy) | UI: strzałka kierunku na TCC |
+
+#### §9.A.4.4 Wpływ na koordynację
+
+- SelectivityCheck: pary (upstream, downstream) uwzględniają kierunek.
+- SensitivityCheck: prąd zwarciowy per kierunek (I_forward, I_reverse).
+- White Box: `direction = FORWARD/REVERSE` jako element śladu.
+
+#### §9.A.4.5 Walidacje (TO-BE)
+
+| Kod | Severity | Warunek | Komunikat |
+|-----|----------|---------|-----------|
+| **E-P09** | ERROR | `directional=True` bez `direction_ref` | Brak referencji kierunku |
+| **E-P10** | ERROR | `direction_ref` wskazuje nieistniejący element | Nieprawidłowa referencja kierunku |
+| **W-P10** | WARNING | Kierunkowość na zabezpieczeniu TECHNOLOGICAL | Kierunkowość nie dotyczy klasy TECHNOLOGICAL |
+
+#### §9.A.4.6 Inwarianty (BINDING)
+
+| ID | Inwariant |
+|----|-----------|
+| **INV-PROT-13** | directional=True ↔ direction_ref ≠ None (bijection) |
+| **INV-PROT-14** | Kierunkowość wyłącznie w klasie NETWORK |
+
+---
+
+### §9.A.5 Definition of Done (Suplement v1.1)
+
+| # | Kryterium | Status |
+|---|-----------|--------|
+| 1 | EventClass + EventScope zdefiniowane z regułami klasyfikacji | ✅ |
+| 2 | Raport „kto zadziałał pierwszy" rozszerzony o filtr klas | ✅ |
+| 3 | Walidacje W-P05, W-P06, E-P05, E-P06 sformułowane | ✅ |
+| 4 | Dual SC (z/bez OZE) — DualSCResult z parowanymi wynikami + Δ | ✅ |
+| 5 | White Box dual trace opisany | ✅ |
+| 6 | CTType (11 pól) + VTType (10 pól) zdefiniowane | ✅ |
+| 7 | Migracja ct_ratio → ct_type_ref opisana (v1→v2→v3) | ✅ |
+| 8 | CatalogRepository rozszerzenie 9→11 kolekcji | ✅ |
+| 9 | DirectionMode (FORWARD/REVERSE/NON_DIRECTIONAL) zdefiniowany | ✅ |
+| 10 | Walidacje kierunkowe E-P09, E-P10, W-P10 sformułowane | ✅ |
+| 11 | Inwarianty INV-PROT-09..14 sformułowane | ✅ |
+
+---
+
+**DOMENA SYSTEMU ZABEZPIECZEŃ W ROZDZIALE 9 JEST ZAMKNIĘTA (v1.1).**
 
 ---
 
