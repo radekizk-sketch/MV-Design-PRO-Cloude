@@ -660,6 +660,48 @@ Każda rozbieżność z §2 otrzymuje jednoznaczną dyspozycję.
 - InverterSource: model prądowy (k_sc × In) — BEZ impedancji w Y-bus.
 - **DOMENA KONTRAKTÓW SOLVERÓW I MAPOWANIA W ROZDZIALE 6 JEST ZAMKNIĘTA (v1.0).**
 
+| 49 | Source — kontrakt 13 pól, algorytm impedancji, mapowanie Virtual GND + Z_source | **BINDING** | ENM + Mapping | `SPEC_CHAPTER_07_SOURCES_GENERATORS_LOADS.md` (§7.2) | Source (`enm/models.py:180–192`) posiada 13 pól: bus_ref, model (thevenin/short_circuit_power/external_grid), sk3_mva, ik3_ka, r_ohm, x_ohm, rx_ratio, r0_ohm, x0_ohm, z0_z1_ratio, c_max, c_min. Mapper (`mapping.py:191–248`) oblicza impedancję: jeśli r_ohm/x_ohm podane → użyj bezpośrednio; jeśli sk3_mva > 0 → Z=Un²/Sk'', X=Z/√(1+rx²), R=X·rx (default rx=0.1). Source produkuje Virtual Ground Node + LineBranch(Z_source). Bus z Source → SLACK (v=1.0, θ=0.0). GAP: ik3_ka walidowane (E008) ale nieużywane przez mapper; c_max/c_min nieużywane (c_factor z opcji solvera); składowe zerowe (r0, x0, z0_z1_ratio) TO-BE. |
+| 50 | Generator — kontrakt 5 pól, mapowanie P/Q addytywne, brak rozróżnienia gen_type | **BINDING** | ENM + Mapping | `SPEC_CHAPTER_07_SOURCES_GENERATORS_LOADS.md` (§7.3) | Generator (`enm/models.py:212–217`) posiada 5 pól: bus_ref, p_mw, q_mvar (None→0.0), gen_type (synchronous/pv_inverter/wind_inverter/bess/None), limits (GenLimits: p_min/max, q_min/max). Mapper (`mapping.py:57–59`) traktuje WSZYSTKIE typy generatorów identycznie: P/Q addition na Node (bus_p += p_mw, bus_q += q_mvar or 0.0). gen_type NIE wpływa na algorytm mapowania. GenLimits NIE są egzekwowane przez solver. GAP: Generator → InverterSource mapping TO-BE (Decyzja #14); catalog_ref TO-BE (Decyzja #15); n_parallel TO-BE (Decyzja #17). |
+| 51 | Load — kontrakt 4 pola, model ZIP niezaimplementowany, P/Q subtraction | **BINDING** | ENM + Mapping | `SPEC_CHAPTER_07_SOURCES_GENERATORS_LOADS.md` (§7.4) | Load (`enm/models.py:200–204`) posiada 4 pola: bus_ref, p_mw, q_mvar, model (pq/zip, default pq). Mapper (`mapping.py:54–56`) ZAWSZE traktuje Load jako PQ: bus_p -= p_mw, bus_q -= q_mvar. Pole `model` jest IGNOROWANE — model ZIP jest zdefiniowany w Pydantic ale nie obsługiwany przez mapper ani solver. Load NIE wpływa na macierz Y-bus. Load NIE wpływa na obliczenia zwarciowe (IEC 60909 §1.5.2). Brak catalog_ref (LoadType opcjonalny, Decyzja #40). GAP: ZIP nie zaimplementowany; brak walidacji znaku p_mw. |
+| 52 | InverterSource — model prądowy SC, reguły per typ zwarcia, addytywny wkład | **BINDING** | Solver | `SPEC_CHAPTER_07_SOURCES_GENERATORS_LOADS.md` (§7.3.8–§7.3.11) | InverterSource (`inverter.py:12–36`) posiada 10 pól (dataclass): id, name, node_id, type_ref, converter_kind, in_rated_a, k_sc (default 1.1), contributes_negative/zero_sequence, in_service. Property ik_sc_a = k_sc × in_rated_a. Solver SC (`short_circuit_iec60909.py:426–458`): 3F→zawsze, 2F→if negative_seq, 1F/2F+G→if zero_seq. Wkład addytywny: Ik_total = Ik_Thevenin + Σ Ik_inv. InverterSource NIGDY w Y-bus (Decyzja #48). Katalogowe typy: ConverterType (13 pól, frozen), InverterType (11 pól, frozen), ConverterKind (PV/WIND/BESS). |
+| 53 | Konwencja znaków P/Q: Generator (+), Load (−), Source (SLACK) | **BINDING** | Mapping | `SPEC_CHAPTER_07_SOURCES_GENERATORS_LOADS.md` (§7.1.2) | Mapper (`mapping.py:54–59`) stosuje jednoznaczną konwencję: Load P/Q ODEJMOWANE od węzła (odbiór = ujemne injection), Generator P/Q DODAWANE do węzła (generacja = dodatnie injection). Source NIE wnosi P/Q — SLACK bilansuje niezależnie przez solver. Na jednym Bus może być wiele Load i/lub Generator — akumulacja addytywna. BESS: p_mw może być ujemne (ładowanie = pobór). Bilans: P_node = Σ P_gen − Σ P_load. |
+
+**Z decyzji #49 wynika (Source — BINDING):**
+- Source to zastępcze źródło napięciowe Thevenina z impedancją $Z_Q$ obliczaną z $S''_k$ lub z jawnych $R+jX$.
+- Mapper produkuje Virtual Ground Node (PQ, P=Q=0) + LineBranch(Z_source, length_km=1.0).
+- Bus z Source → NodeType.SLACK (v_mag=1.0 pu, θ=0.0 rad).
+- ik3_ka jest walidowane (E008) ale NIE konwertowane na impedancję w mapperze — GAP.
+- c_max/c_min NIE SĄ parametrami mappera — c_factor jest parametrem opcji solvera SC.
+- Składowe zerowe (r0, x0, z0_z1_ratio): istnieją w ENM ale NIE przetwarzane — TO-BE (Decyzja #43).
+
+**Z decyzji #50 wynika (Generator — BINDING):**
+- Generator to osobny byt ENM (Decyzja #3), niezależny od Source i Load.
+- Mapper: P/Q addition na Node, identyczne dla WSZYSTKICH gen_type (synchronous, pv_inverter, wind_inverter, bess).
+- gen_type NIE wpływa na mapowanie AS-IS — Generator → InverterSource mapping = TO-BE (Decyzja #14).
+- GenLimits (p_min/max, q_min/max) istnieją w ENM ale NIE są egzekwowane przez solver PF.
+- Brak catalog_ref → brak powiązania z ConverterType/InverterType — TO-BE (Decyzja #15).
+- Brak n_parallel → wielokrotne falowniki jako osobne instancje — TO-BE (Decyzja #17).
+
+**Z decyzji #51 wynika (Load — BINDING):**
+- Load to odbiór z ujemnym injection P/Q na Node.
+- model="zip" jest zdefiniowany ale NIEZAIMPLEMENTOWANY — mapper ignoruje pole model.
+- Load NIE wpływa na Y-bus, NIE wpływa na SC (IEC 60909 §1.5.2).
+- LoadType jest opcjonalny (Decyzja #40) — parametry bilansowe, nie konstrukcyjne.
+
+**Z decyzji #52 wynika (InverterSource — BINDING):**
+- InverterSource to ograniczone źródło prądowe IEC 60909 na poziomie solver layer.
+- Wkład: Ik = k_sc × In (default k_sc=1.1).
+- Per typ zwarcia: 3F=zawsze, 2F=if negative_seq, 1F/2F+G=if zero_seq.
+- NIGDY w Y-bus — wkład addytywny do Ik_Thevenin.
+- Dwa typy katalogowe: ConverterType (z kind, e_kwh) i InverterType (neutralny technologicznie).
+
+**Z decyzji #53 wynika (konwencja znaków — BINDING):**
+- Generator: bus_p += p_mw, bus_q += (q_mvar or 0.0).
+- Load: bus_p -= p_mw, bus_q -= q_mvar.
+- Source: NIE wnosi P/Q — SLACK bilansuje niezależnie.
+- BESS: p_mw < 0 oznacza ładowanie (pobór).
+- **DOMENA ŹRÓDEŁ, GENERATORÓW I ODBIORÓW W ROZDZIALE 7 JEST ZAMKNIĘTA (v1.0).**
+
 ---
 
 **KONIEC AUDYTU**
