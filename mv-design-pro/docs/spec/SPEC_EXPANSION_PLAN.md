@@ -54,6 +54,7 @@ docs/spec/
 ├── SPEC_CHAPTER_05_SYSTEM_CANONICAL_CONTRACTS.md  ← Kontrakty kanoniczne systemu: kreator, katalogi, stacje, zabezpieczenia, modele niedozwolone (GOTOWY)
 ├── SPEC_CHAPTER_06_SOLVER_CONTRACTS_AND_MAPPING.md ← Kontrakty solverów & mapowanie ENM→Model Obliczeniowy (GOTOWY, v1.0)
 ├── SPEC_CHAPTER_07_SOURCES_GENERATORS_LOADS.md     ← Model Źródeł, Generatorów i Odbiorów (GOTOWY, v1.0)
+├── SPEC_CHAPTER_08_TYPE_VS_INSTANCE_AND_CATALOGS.md ← Typ vs Instancja + Katalogi Typów (GOTOWY, v1.0)
 │
 │   ══════════════════════════════════════
 │   FAZA 0 — KONTRAKTY I WARSTWY
@@ -122,6 +123,9 @@ PREAMBUŁA — CEL, ZAKRES, DEFINICJE (UKOŃCZONA)
   Krok 0g: SPEC_CHAPTER_07_SOURCES_GENERATORS_LOADS.md      ✅ GOTOWY (v1.0)
             └── Domena Źródeł, Generatorów i Odbiorów ZAMKNIĘTA (§7.0–§7.10, Decyzje #49–#53)
             └── Obejmuje: Source (13 pól, impedancja, Virtual GND), Generator (5 pól, gen_type, InverterSource), Load (4 pola, PQ/ZIP), konwencja znaków, macierz pokrycia
+  Krok 0h: SPEC_CHAPTER_08_TYPE_VS_INSTANCE_AND_CATALOGS.md ✅ GOTOWY (v1.0)
+            └── Domena Typu vs Instancji ZAMKNIĘTA (§8.0–§8.12, Decyzje #54–#58)
+            └── Obejmuje: formuła TYP+parametry+override+ilość, ParameterSource(3-poziomowa precedencja), CatalogRepository(9 kolekcji), resolver(3 funkcje), governance(manifest+fingerprint), tryb ekspercki(impedance_override)
 
 FAZA 0 — KONTRAKTY I WARSTWY (PRIORYTET NAJWYŻSZY)
   Krok 1:  SPEC_00_LAYERING.md
@@ -880,6 +884,7 @@ FINALIZACJA:
 | SPEC_CHAPTER_05_SYSTEM_CANONICAL_CONTRACTS.md | Preambuła | Application + Catalog + Validation + WhiteBox | 19 | ~1150 ✅ SUPPLEMENT |
 | SPEC_CHAPTER_06_SOLVER_CONTRACTS_AND_MAPPING.md | Preambuła | Solver + Mapping + Results API | 12 | ~580 ✅ v1.0 |
 | SPEC_CHAPTER_07_SOURCES_GENERATORS_LOADS.md | Preambuła | ENM Domain + Solver Mapping | 10 | ~620 ✅ v1.0 |
+| SPEC_CHAPTER_08_TYPE_VS_INSTANCE_AND_CATALOGS.md | Preambuła | ENM + Catalog + Resolver | 12 | ~680 ✅ v1.0 |
 | SPEC_00_LAYERING.md | 0 | Architecture | 11 | ~700 |
 | SPEC_01_GLOSSARY_NORMATIVE.md | 0 | Governance | 7 | ~290 |
 | SPEC_02_ENM_CORE.md | 0 | ENM Core | 19 | ~2020 |
@@ -898,12 +903,12 @@ FINALIZACJA:
 | SPEC_15_PERSISTENCE.md | 4 | Infrastructure | 6+1 TO-BE | ~380 |
 | SPEC_16_TESTS.md | 4 | Infrastructure | 10 | ~540 |
 | SPEC_INDEX.md | — | Index | 5 | ~150 |
-| **RAZEM** | | | **~297** | **~18 630** |
+| **RAZEM** | | | **~309** | **~19 310** |
 
 ### Porównanie:
 - **SYSTEM_SPEC.md v3.0:** ~487 linii
-- **Nowa specyfikacja:** ~18 630 linii (25 plików, w tym Rozdział 1-7 preambuły)
-- **Wzrost:** ~38× (3800%)
+- **Nowa specyfikacja:** ~19 310 linii (26 plików, w tym Rozdział 1-8 preambuły)
+- **Wzrost:** ~40× (4000%)
 - **Pokrycie AS-IS:** ~95% (sekcje TO-BE wyraźnie oznaczone)
 
 ---

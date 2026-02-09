@@ -702,6 +702,42 @@ Każda rozbieżność z §2 otrzymuje jednoznaczną dyspozycję.
 - BESS: p_mw < 0 oznacza ładowanie (pobór).
 - **DOMENA ŹRÓDEŁ, GENERATORÓW I ODBIORÓW W ROZDZIALE 7 JEST ZAMKNIĘTA (v1.0).**
 
+| 54 | Formuła TYP vs INSTANCJA: instancja = TYP(katalog) + parametry_zmienne + [override] + ilość | **BINDING** | ENM + Catalog | `SPEC_CHAPTER_08_TYPE_VS_INSTANCE_AND_CATALOGS.md` (§8.1) | Zasada nadrzędna (Decyzja #39): żaden parametr znamionowy nie jest wpisywany ręcznie. TYP: frozen dataclass w katalogu, read-only, współdzielony, niezależny od topologii. INSTANCJA: pozycja w ENM, wskazuje typ przez `catalog_ref`, przechowuje parametry zmienne. Wyjątki: Source (parametry projektowe OSD), Load (parametry bilansowe), Bus (napięcie szyny). 9 klas typów AS-IS: LineType (16p), CableType (18p), TransformerType (14p), SwitchEquipmentType (9p), ConverterType (13p), InverterType (11p), ProtectionDeviceType (7p), ProtectionCurve (5p), ProtectionSettingTemplate (5p). |
+| 55 | ParameterSource enum: OVERRIDE > TYPE_REF > INSTANCE — 3-poziomowa precedencja resolvera | **BINDING** | Catalog + Resolver | `SPEC_CHAPTER_08_TYPE_VS_INSTANCE_AND_CATALOGS.md` (§8.6) | Resolver (`catalog/resolver.py:20–25`) definiuje `ParameterSource(Enum)`: OVERRIDE (impedance_override, najwyższy priorytet), TYPE_REF (catalog_ref → typ, domyślny), INSTANCE (parametry z instancji, fallback). 3 funkcje resolvera: `resolve_line_params()` (override>type_ref>instance), `resolve_transformer_params()` (type_ref>instance), `resolve_thermal_params()` (type_ref only, returns None). Zwracane typy frozen: ResolvedLineParams (5p), ResolvedTransformerParams (9p), ResolvedThermalParams (10p). TypeNotFoundError raised gdy type_ref nie znaleziony (linie, trafo); returns None (thermal). |
+| 56 | CatalogRepository — frozen immutable repozytorium 9 kolekcji typów | **BINDING** | Catalog | `SPEC_CHAPTER_08_TYPE_VS_INSTANCE_AND_CATALOGS.md` (§8.4.2) | CatalogRepository (`catalog/repository.py:20–201`): frozen=True dataclass, 9 kolekcji (line_types, cable_types, transformer_types, switch_equipment_types, converter_types, inverter_types, protection_device_types, protection_curves, protection_setting_templates). Fabrycznie: `from_records()` deserializacja. Domyślny katalog: `get_default_mv_catalog()` — 14+ typów linii, 90+ kabli, trafo WN/SN+SN/nn, łączniki, konwertery. Dostęp per typ: `get_line_type(id)`, `get_cable_type(id)`, etc. |
+| 57 | TypeLibraryManifest + ImportMode (MERGE/REPLACE) + deterministyczny fingerprint SHA-256 | **BINDING** | Governance | `SPEC_CHAPTER_08_TYPE_VS_INSTANCE_AND_CATALOGS.md` (§8.7) | TypeLibraryManifest (`catalog/governance.py:42–98`): library_id, name_pl, vendor, series, revision, schema_version, created_at, fingerprint (SHA-256). ImportMode: MERGE (dodaje, pomija istniejące) / REPLACE (zastępuje, blokowane jeśli typy w użyciu). TypeLibraryExport: deterministyczna serializacja (sorted keys) → fingerprint payload → SHA-256. Inwariant: ten sam katalog → identyczny fingerprint. Typ immutable — modyfikacja = nowy typ z nowym id (Decyzja #42). Usunięcie typu przy instancjach → TypeNotFoundError. |
+| 58 | Tryb ekspercki: impedance_override na LineBranch — jedyny zaimplementowany override AS-IS | **BINDING** | ENM + Resolver | `SPEC_CHAPTER_08_TYPE_VS_INSTANCE_AND_CATALOGS.md` (§8.5) | AS-IS: jedyny override = `impedance_override` na LineBranch (`branch.py:212`). Override = najwyższy priorytet w resolverze → ParameterSource.OVERRIDE. Override NIE zmienia typu w katalogu — dotyczy wyłącznie instancji. Override jest jawny (zapisany w modelu) i audytowalny (ParameterSource w White Box). TO-BE: rozszerzenie override na Transformer (uk%, pk — Decyzja #16), Generator falownikowy (k_sc, limity — Decyzja #16). Zakazy: cicha modyfikacja, brak ParameterSource, trwała zmiana katalogu z poziomu projektu. |
+
+**Z decyzji #54 wynika (TYP vs INSTANCJA — BINDING):**
+- Formuła: instancja ENM = TYP(katalog) + parametry_zmienne(kreator) + [override(ekspert)] + ilość.
+- TYP: frozen=True, read-only w projekcie, 9 klas, wspólne pola (id, name, manufacturer) + domenowe.
+- INSTANCJA: catalog_ref (opcjonalne AS-IS, docelowo obowiązkowe) + parametry zmienne (length_km, tap_position, p_mw, status, n_parallel).
+- Wyjątki: Source (parametry OSD), Load (bilansowe), Bus (napięcie szyny).
+- Zakaz duplikowania parametrów typu w instancji (docelowo — AS-IS: backward compatibility pozwala na oba).
+
+**Z decyzji #55 wynika (ParameterSource + Resolver — BINDING):**
+- ParameterSource: OVERRIDE > TYPE_REF > INSTANCE — 3-poziomowa precedencja, jednoznaczna.
+- Resolver wywoływany PRZED solverem, PO mapperze (mapper przekazuje surowe parametry).
+- Solver NIE zna katalogu, NIE wie o override — operuje na parametrach finalnych.
+- ResolvedLineParams, ResolvedTransformerParams, ResolvedThermalParams — frozen, z polem `source`.
+
+**Z decyzji #56 wynika (CatalogRepository — BINDING):**
+- Frozen immutable repozytorium — po utworzeniu nie może być zmodyfikowane.
+- 9 kolekcji typów z dostępem per id.
+- Domyślny katalog MV z typami producenckimi (NKT, Tele-Fonika, etc.).
+
+**Z decyzji #57 wynika (Governance — BINDING):**
+- TypeLibraryManifest: wersjonowanie bibliotek z SHA-256 fingerprint.
+- Import MERGE/REPLACE z ochroną istniejących instancji.
+- Deterministyczny fingerprint: ten sam katalog → ten sam hash.
+
+**Z decyzji #58 wynika (Override — BINDING):**
+- AS-IS: jedyny override = impedance_override na LineBranch.
+- Override = najwyższy priorytet w resolverze → ParameterSource.OVERRIDE.
+- Override NIE zmienia katalogu — instancja only.
+- TO-BE: rozszerzenie na Transformer i Generator (Decyzja #16).
+- **DOMENA TYPU VS INSTANCJI ORAZ KATALOGÓW TYPÓW W ROZDZIALE 8 JEST ZAMKNIĘTA (v1.0).**
+
 ---
 
 **KONIEC AUDYTU**
