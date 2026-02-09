@@ -738,6 +738,51 @@ Każda rozbieżność z §2 otrzymuje jednoznaczną dyspozycję.
 - TO-BE: rozszerzenie na Transformer i Generator (Decyzja #16).
 - **DOMENA TYPU VS INSTANCJI ORAZ KATALOGÓW TYPÓW W ROZDZIALE 8 JEST ZAMKNIĘTA (v1.0).**
 
+| 59 | ProtectionDevice — frozen model 11 pól, 5 stopni nadprądowych, NOT-A-SOLVER | **BINDING** | Domain (Protection) | `SPEC_CHAPTER_09_PROTECTION_SYSTEM.md` (§9.2) | ProtectionDevice (`domain/protection_device.py:256–288`): frozen dataclass, 11 pól (id, name, device_type, location_element_id, settings, manufacturer, model, location_description, ct_ratio, rated_current_a, created_at). ProtectionDeviceType(Enum): RELAY, FUSE, RECLOSER, CIRCUIT_BREAKER. OvercurrentProtectionSettings: 5 stopni nadprądowych (stage_51 I>, stage_50 I>>, stage_50_high I>>>, stage_51n I₀>, stage_50n I₀>>). OvercurrentStageSettings: enabled, pickup_current_a, time_s, curve_settings, directional (placeholder). ProtectionCurveSettings: 6 pól (standard IEC/IEEE/FUSE, variant, pickup_current_a, time_multiplier 0.05–10.0, definite_time_s, reset_time_s). Zabezpieczenie NIE jest elementem topologicznym ENM — jest logiką decyzyjną (NOT-A-SOLVER, Decyzja #25). Punkt pomiarowy: location_element_id + ct_ratio (jawny, bez domyślnych). |
+| 60 | Krzywe IEC 60255 + IEEE C37.112 + krzywe producenckie — formuły, stałe, rejestr | **BINDING** | Solver Support | `SPEC_CHAPTER_09_PROTECTION_SYSTEM.md` (§9.5) | IEC 60255-151 (`protection/curves/iec_curves.py`): t = TMS × A/(M^B − 1) + C. Warianty: SI(A=0.14,B=0.02), VI(A=13.5,B=1.0), EI(A=80.0,B=2.0), LTI(A=120.0,B=1.0), DT(czas stały). IECTrippingResult: 7 pól frozen (tripping_time_s, current_multiple, time_multiplier, m_power_b, denominator, base_time_s, will_trip). IEEE C37.112 (`protection/curves/ieee_curves.py`): t = TD × (A/(M^p − 1) + B). Warianty: MI, VI, EI, STI, DT. IEEETrippingResult: frozen. Krzywe producenckie (`domain/protection_vendors.py`): Manufacturer(12 wartości: ABB, SIEMENS, SCHNEIDER, ETANGO, EATON, GE, SEL, AREVA, ALSTOM, NOJA, ORMAZABAL, GENERIC, OTHER). CurveOrigin: IEC_STANDARD, DERIVED_VENDOR, VENDOR_NATIVE. VENDOR_CURVE_REGISTRY: 8+ definicji. generate_iec_curve_points(n=50), generate_ieee_curve_points(n=50) — logarithmic spacing 1.1×–20× pickup. |
+| 61 | Koordynacja: 3 kontrole kanoniczne + 4 kontrole I>> (FIX-12D), CoordinationVerdict | **BINDING** | Analysis | `SPEC_CHAPTER_09_PROTECTION_SYSTEM.md` (§9.6) | 3 kontrole kanoniczne: SensitivityCheck (I_fault_min/I_pickup ≥ 1.2 → margines ≥20%), SelectivityCheck (t_upstream − t_downstream ≥ Δt_wymagane), OverloadCheck (I_pickup/I_operating ≥ 1.2). Wszystkie frozen dataclasses z `domain/protection_device.py`. CoordinationVerdict(Enum): PASS, MARGINAL, FAIL, ERROR. 4 kontrole I>> (FIX-12D, `protection_device.py:592–774`): InstantaneousSelectivityCheck, InstantaneousSensitivityCheck, InstantaneousThermalCheck, SPZFromInstantaneousCheck. ProtectionCoordinationResult: frozen, agreguje devices + sensitivity + selectivity + overload + overall_verdict. Falownik NIE uczestniczy w selektywności sieciowej (Decyzja #22) — warunek brzegowy, t_tech ≤ 250ms < t_sieć. |
+| 62 | White Box Protection Trace — 9-krokowy łańcuch przyczynowy, frozen audit trail | **BINDING** | White Box | `SPEC_CHAPTER_09_PROTECTION_SYSTEM.md` (§9.9) | ProtectionTrace (`domain/protection_analysis.py`): frozen dataclass (run_id, sc_run_id, snapshot_id, template_ref, overrides, steps). ProtectionTraceStep: frozen (step 1–9, description_pl, inputs, outputs). 9 kroków łańcucha: (1) ENM identyfikacja, (2) Scenariusz (typ zwarcia), (3) Wielkość (prąd SC), (4) Funkcja (51/50/50N), (5) Nastawa (Is, TMS), (6) Decyzja (TRIPS/NO_TRIP/INVALID), (7) Czas (t_trip), (8) Aparat (wykonawczy), (9) Skutek (wyłączenie). Raport „kto zadziałał pierwszy": sekwencja chronologiczna po t_trip. GAP: brak event_class ∈ {TECHNOLOGICAL, NETWORK} i event_scope ∈ {LOCAL_DEVICE, NETWORK_SECTION} — TO-BE (Decyzja #23). |
+| 63 | Porównanie A/B — StateChange, IssueCode, severity ranking, ProtectionComparisonResult | **BINDING** | Analysis | `SPEC_CHAPTER_09_PROTECTION_SYSTEM.md` (§9.10) | ProtectionComparisonResult (`domain/protection_comparison.py`): frozen (comparison_id, run_a_id, run_b_id, project_id, rows, ranking, summary). StateChange(Enum): NO_CHANGE, TRIP_TO_NO_TRIP(=REGRESJA, severity 5), NO_TRIP_TO_TRIP(=ULEPSZENIE, severity 1), INVALID_CHANGE(severity 3). IssueCode(Enum): TRIP_LOST(5), TRIP_GAINED(1), DELAY_INCREASED(3), DELAY_DECREASED(2), INVALID_STATE(4), MARGIN_DECREASED(3), MARGIN_INCREASED(2). IssueSeverity: CRITICAL(5), MAJOR(4), MODERATE(3), MINOR(2), INFORMATIONAL(1). RankingIssue: deterministycznie posortowane per severity. API: 4 endpointy comparison (POST create, GET metadata, GET results, GET trace). |
+| 64 | Sanity checks (16 reguł) + walidacje architektoniczne (E-P01..I-P02) — pre-analysis gate | **BINDING** | Validation | `SPEC_CHAPTER_09_PROTECTION_SYSTEM.md` (§9.11) | 16 reguł sanity checks (`application/analyses/protection/sanity_checks/`): VOLT_MISSING_UN, VOLT_OVERLAP, VOLT_U_LT_TOO_LOW, VOLT_U_GT_TOO_HIGH, FREQ_OVERLAP, FREQ_F_LT_TOO_LOW, FREQ_F_GT_TOO_HIGH, ROCOF_NON_POSITIVE, ROCOF_TOO_HIGH, OC_MISSING_IN, OC_OVERLAP, OC_I_GT_TOO_LOW, OC_I_INST_TOO_LOW, SPZ_NO_TRIP_FUNCTION, SPZ_MISSING_CYCLE_DATA, GEN_NEGATIVE_SETPOINT, GEN_PARTIAL_ANALYSIS. Severity: ERROR (blokuje), WARN (ostrzega), INFO (informuje). 10 walidacji architektonicznych: E-P01 (brak pomiaru), E-P02 (mieszanie klas), E-P03 (brak aparatu), E-P04 (brak SC run), W-P01 (t_sieć<t_falownik), W-P02 (brak trace), W-P03 (I>>< Ik_min), W-P04 (I>>In_trafo), I-P01 (info tech), I-P02 (info OZE). Niezależne od ENM Validator (§6.10). |
+
+**Z decyzji #59 wynika (ProtectionDevice — BINDING):**
+- ProtectionDevice to frozen dataclass z 11 polami, NIE jest elementem topologicznym ENM.
+- 5 stopni nadprądowych: I> (51), I>> (50), I>>> (50_high), I₀> (51N), I₀>> (50N).
+- ProtectionCurveSettings: IEC/IEEE/FUSE standard z parametrami (pickup, TMS/TD, DT).
+- Punkt pomiarowy (location_element_id + ct_ratio) MUSI być jawny — zakaz implicit.
+- NOT-A-SOLVER: zabezpieczenie = logika decyzyjna operująca na wynikach solverów.
+- Dwie klasy TECHNOLOGICAL/NETWORK rozłączne (Decyzja #21) — zakaz mieszania w jednym urządzeniu.
+
+**Z decyzji #60 wynika (Krzywe — BINDING):**
+- IEC 60255: t = TMS × A/(M^B − 1) + C — 5 wariantów (SI, VI, EI, LTI, DT).
+- IEEE C37.112: t = TD × (A/(M^p − 1) + B) — 5 wariantów (MI, VI, EI, STI, DT).
+- Krzywe producenckie: 12 Manufacturer + 3 CurveOrigin + rejestr VENDOR_CURVE_REGISTRY.
+- IECTrippingResult i IEEETrippingResult: frozen, White Box (m_power_b, denominator, base_time_s).
+
+**Z decyzji #61 wynika (Koordynacja — BINDING):**
+- 3 kontrole kanoniczne: czułość (≥20% margines), selektywność (Δt ≥ wymagane), przeciążalność (≥20%).
+- 4 kontrole I>> (FIX-12D): instantaneous selectivity, sensitivity, thermal, SPZ.
+- CoordinationVerdict: PASS/MARGINAL/FAIL/ERROR — deterministyczny.
+- Falownik = warunek brzegowy (t_tech ≤ 250ms), NIE uczestnik selektywności sieciowej.
+
+**Z decyzji #62 wynika (White Box Protection — BINDING):**
+- ProtectionTrace: frozen audit trail z 9-krokowym łańcuchem przyczynowym.
+- Raport „kto zadziałał pierwszy": sekwencja chronologiczna per t_trip.
+- GAP: event_class (TECHNOLOGICAL/NETWORK) i event_scope (LOCAL_DEVICE/NETWORK_SECTION) — TO-BE.
+- Deterministyczny: te same dane wejściowe → identyczny trace.
+
+**Z decyzji #63 wynika (Porównanie A/B — BINDING):**
+- StateChange: TRIP_TO_NO_TRIP = REGRESJA (severity 5 — CRITICAL).
+- IssueCode: 7 kodów z deterministycznym severity ranking.
+- ProtectionComparisonResult: frozen, rows + ranking + summary.
+- API: 4 endpointy dla comparison (create, metadata, results, trace).
+
+**Z decyzji #64 wynika (Sanity checks + Walidacje — BINDING):**
+- 16 reguł sanity checks per funkcja: napięciowe (27/59), częstotliwościowe (81U/81O), ROCOF (81R), nadprądowe (50/51), SPZ (79), ogólne.
+- 10 walidacji architektonicznych: E-P01..E-P04 (ERROR, blokujące), W-P01..W-P04 (WARNING), I-P01..I-P02 (INFO).
+- Sanity checks niezależne od ENM Validator — dedykowana bramka pre-analysis.
+- **DOMENA SYSTEMU ZABEZPIECZEŃ W ROZDZIALE 9 JEST ZAMKNIĘTA (v1.0).**
+
 ---
 
 **KONIEC AUDYTU**

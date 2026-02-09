@@ -55,6 +55,7 @@ docs/spec/
 ├── SPEC_CHAPTER_06_SOLVER_CONTRACTS_AND_MAPPING.md ← Kontrakty solverów & mapowanie ENM→Model Obliczeniowy (GOTOWY, v1.0)
 ├── SPEC_CHAPTER_07_SOURCES_GENERATORS_LOADS.md     ← Model Źródeł, Generatorów i Odbiorów (GOTOWY, v1.0)
 ├── SPEC_CHAPTER_08_TYPE_VS_INSTANCE_AND_CATALOGS.md ← Typ vs Instancja + Katalogi Typów (GOTOWY, v1.0)
+├── SPEC_CHAPTER_09_PROTECTION_SYSTEM.md              ← System Zabezpieczeń ETAP-Grade (GOTOWY, v1.0)
 │
 │   ══════════════════════════════════════
 │   FAZA 0 — KONTRAKTY I WARSTWY
@@ -126,6 +127,9 @@ PREAMBUŁA — CEL, ZAKRES, DEFINICJE (UKOŃCZONA)
   Krok 0h: SPEC_CHAPTER_08_TYPE_VS_INSTANCE_AND_CATALOGS.md ✅ GOTOWY (v1.0)
             └── Domena Typu vs Instancji ZAMKNIĘTA (§8.0–§8.12, Decyzje #54–#58)
             └── Obejmuje: formuła TYP+parametry+override+ilość, ParameterSource(3-poziomowa precedencja), CatalogRepository(9 kolekcji), resolver(3 funkcje), governance(manifest+fingerprint), tryb ekspercki(impedance_override)
+  Krok 0i: SPEC_CHAPTER_09_PROTECTION_SYSTEM.md              ✅ GOTOWY (v1.0)
+            └── Domena Systemu Zabezpieczeń ZAMKNIĘTA (§9.0–§9.17, Decyzje #59–#64)
+            └── Obejmuje: ProtectionDevice(frozen, 11 pól, 5 stopni nadprądowych), klasy TECHNOLOGICAL/NETWORK, krzywe IEC 60255+IEEE C37.112+producenckie, koordynacja(3 kanoniczne+4 I>>), White Box Protection Trace(9 kroków), porównanie A/B(StateChange, IssueCode), sanity checks(16 reguł), walidacje architektoniczne(E-P01..I-P02), UI ETAP-style(11 kolumn), API(12 endpointów)
 
 FAZA 0 — KONTRAKTY I WARSTWY (PRIORYTET NAJWYŻSZY)
   Krok 1:  SPEC_00_LAYERING.md
@@ -885,6 +889,7 @@ FINALIZACJA:
 | SPEC_CHAPTER_06_SOLVER_CONTRACTS_AND_MAPPING.md | Preambuła | Solver + Mapping + Results API | 12 | ~580 ✅ v1.0 |
 | SPEC_CHAPTER_07_SOURCES_GENERATORS_LOADS.md | Preambuła | ENM Domain + Solver Mapping | 10 | ~620 ✅ v1.0 |
 | SPEC_CHAPTER_08_TYPE_VS_INSTANCE_AND_CATALOGS.md | Preambuła | ENM + Catalog + Resolver | 12 | ~680 ✅ v1.0 |
+| SPEC_CHAPTER_09_PROTECTION_SYSTEM.md | Preambuła | Domain + Analysis + Presentation | 17 | ~890 ✅ v1.0 |
 | SPEC_00_LAYERING.md | 0 | Architecture | 11 | ~700 |
 | SPEC_01_GLOSSARY_NORMATIVE.md | 0 | Governance | 7 | ~290 |
 | SPEC_02_ENM_CORE.md | 0 | ENM Core | 19 | ~2020 |
@@ -903,12 +908,12 @@ FINALIZACJA:
 | SPEC_15_PERSISTENCE.md | 4 | Infrastructure | 6+1 TO-BE | ~380 |
 | SPEC_16_TESTS.md | 4 | Infrastructure | 10 | ~540 |
 | SPEC_INDEX.md | — | Index | 5 | ~150 |
-| **RAZEM** | | | **~309** | **~19 310** |
+| **RAZEM** | | | **~326** | **~20 200** |
 
 ### Porównanie:
 - **SYSTEM_SPEC.md v3.0:** ~487 linii
-- **Nowa specyfikacja:** ~19 310 linii (26 plików, w tym Rozdział 1-8 preambuły)
-- **Wzrost:** ~40× (4000%)
+- **Nowa specyfikacja:** ~20 200 linii (27 plików, w tym Rozdział 1-9 preambuły)
+- **Wzrost:** ~41× (4100%)
 - **Pokrycie AS-IS:** ~95% (sekcje TO-BE wyraźnie oznaczone)
 
 ---
