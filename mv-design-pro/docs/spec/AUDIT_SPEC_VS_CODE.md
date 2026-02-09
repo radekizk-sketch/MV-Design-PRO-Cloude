@@ -859,6 +859,27 @@ Każda rozbieżność z §2 otrzymuje jednoznaczną dyspozycję.
 - Walidacje: 5 ERROR + 3 WARNING + 2 INFO. Inwarianty INV-RPT-01..12. Zakazy Z-RPT-01..05.
 - **DOMENA RAPORTOWANIA I EKSPORTU W ROZDZIALE 11 JEST ZAMKNIĘTA (v1.0).**
 
+| 94 | 6 warstw walidacji: W1(ENMValidator) → W2(NetworkValidator) → W3(WizardValidator) → W4(ProtectionSanity) → W5(PreCalc) → W6(EnergyValidation) | **BINDING** | Validation + Application + Analysis | `SPEC_CHAPTER_12…` (§12.1) | Warstwy W1–W5 PRZED solverem (INV-VAL-01). W6 PO solverze. BLOCKER/ERROR na W1–W5 BEZWZGLĘDNIE blokuje pipeline (INV-VAL-02). Kolejność jest inwariantem architektonicznym. |
+| 95 | ENMValidator: E001–E008 (BLOCKER), W001–W008 (IMPORTANT), I001–I005 (INFO) — 21 reguł na surowym ENM | **BINDING** | Validation | `SPEC_CHAPTER_12…` (§12.2) | ValidationIssue(Pydantic, 6 pól): code, severity(BLOCKER/IMPORTANT/INFO), message_pl, element_refs, wizard_step_hint, suggested_fix. ValidationResult: status(OK/WARN/FAIL), issues, analysis_available. AnalysisAvailability: SC3F(zawsze jeśli brak blokerów), SC1F(wymaga Z₀), LoadFlow(wymaga loads/gens). Graf connectivity via NetworkX. AS-IS: enm/validator.py. |
+| 96 | NetworkValidator: 13 reguł grafowych (ERROR/WARNING) — pre-solver gate na NetworkGraph | **BINDING** | Validation | `SPEC_CHAPTER_12…` (§12.3) | Severity(ERROR/WARNING). ValidationIssue(dataclass, 6 pól): code, message, severity, element_id, field, suggested_fix. ValidationReport(immutable, builder pattern with_error/with_warning). 13 reguł: empty, connectivity, source, dangling, bus voltages, branch endpoints, transformer voltages, SLACK, switch endpoints, inverter buses, impedance, polarity, voltage consistency. W1 i W2 komplementarne (INV-VAL-03). AS-IS: network_model/validation/validator.py. |
+| 97 | WizardValidator: K1–K10 step evaluation + ReadinessMatrix + overall_status | **BINDING** | Application | `SPEC_CHAPTER_12…` (§12.4) | StepStatus(empty/partial/complete/error). IssueSeverity(BLOCKER/IMPORTANT/INFO). WizardIssue(Pydantic, 6 pól). StepState(step_id, status, completion_percent, issues). ReadinessMatrix(SC3F/SC1F/LoadFlow). WizardStateResponse(steps, overall_status∈{empty,incomplete,ready,blocked}, readiness_matrix, element_counts). Deterministic: same ENM → identical response. 12 coded rules (K1_NO_NAME..K8_HAS_BLOCKERS). AS-IS: application/network_wizard/validator.py. |
+| 98 | ProtectionSanityChecks: 16 coded rules (ERROR/WARN/INFO) — walidacja nastaw zabezpieczeń | **BINDING** | Analysis | `SPEC_CHAPTER_12…` (§12.5) | SanityCheckSeverity(ERROR/WARN/INFO). SanityCheckCode(16 enum: VOLT_*, FREQ_*, ROCOF_*, OC_*, SPZ_*, GEN_*). ProtectionSanityCheckResult(frozen, 8 pól): severity, code, message_pl, element_id, element_type, function_ansi, function_code, evidence. run_sanity_checks(): deterministic sort (element_id, severity, code). Protection catalog validator: validate_requirement(req, cap) → violations. AS-IS: sanity_checks/ + catalog/validator.py. |
+| 99 | EnergyValidationBuilder: 5 post-solver QA checks (PASS/WARNING/FAIL/NOT_COMPUTED) | **BINDING** | Analysis | `SPEC_CHAPTER_12…` (§12.7) | EnergyCheckType(5): BRANCH_LOADING, TRANSFORMER_LOADING, VOLTAGE_DEVIATION, LOSS_BUDGET, REACTIVE_BALANCE. EnergyValidationStatus(4): PASS/WARNING/FAIL/NOT_COMPUTED. EnergyValidationConfig(frozen, 6 thresholds): loading 80%/100%, voltage 5%/10%, loss 5%/10%. EnergyValidationItem(frozen, 10 pól): check_type, target_id, observed_value, unit, limits, margin_pct, status, why_pl. Worst-item tracking. Deterministic sort. AS-IS: analysis/energy_validation/. |
+| 100 | Macierz severity: BLOCKER/ERROR=blokada, IMPORTANT/WARNING/WARN=ostrzeżenie, INFO/NOT_COMPUTED=informacja | **BINDING** | Validation | `SPEC_CHAPTER_12…` (§12.9) | Unifikacja 5 osobnych enumów severity (W1: BLOCKER/IMPORTANT/INFO, W2: ERROR/WARNING, W3: BLOCKER/IMPORTANT/INFO, W4: ERROR/WARN/INFO, W6: PASS/WARNING/FAIL/NOT_COMPUTED). TO-BE: jeden kanoniczny ValidationSeverity(BLOCKER, WARNING, INFO) — wymaga ADR. |
+| 101 | Determinizm walidacji: Z-VAL-01..05 — zakazy losowości, modyfikacji, fizyki w walidacji | **BINDING** | Validation | `SPEC_CHAPTER_12…` (§12.10) | Z-VAL-01: walidacja ≠ f(czas, RNG, kolejność HTTP). Z-VAL-02: walidacja NIE modyfikuje ENM/Graph. Z-VAL-03: walidacja ≠ solver (NOT-A-SOLVER). Z-VAL-04: walidacja produkuje TYLKO issues. Z-VAL-05: reguły blokujące NIE mogą być pominięte. INV-VAL-01..12 (12 inwariantów). |
+
+**Z decyzji #94–#101 wynika (Rozdział 12 — BINDING):**
+- 6 warstw walidacji: W1(ENM) → W2(Network) → W3(Wizard) → W4(Protection) → W5(PreCalc) → W6(Energy).
+- W1–W5 PRZED solverem, W6 PO solverze. BLOCKER/ERROR = bezwzględna blokada.
+- ENMValidator: 21 reguł (E001–I005), ValidationResult z AnalysisAvailability (SC3F/SC1F/LoadFlow).
+- NetworkValidator: 13 reguł grafowych, immutable ValidationReport, builder pattern.
+- WizardValidator: K1–K10 evaluation, ReadinessMatrix, deterministic.
+- ProtectionSanityChecks: 16 coded rules z evidence dict, deterministyczne sortowanie.
+- EnergyValidation: 5 post-solver checks z configurable thresholds i worst-item tracking.
+- Macierz severity: 5 osobnych enumów → kanoniczne mapowanie BLOCKER/WARNING/INFO.
+- Determinizm: Z-VAL-01..05, INV-VAL-01..12.
+- **DOMENA WALIDACJI I QA W ROZDZIALE 12 JEST ZAMKNIĘTA (v1.0).**
+
 ---
 
 **KONIEC AUDYTU**
