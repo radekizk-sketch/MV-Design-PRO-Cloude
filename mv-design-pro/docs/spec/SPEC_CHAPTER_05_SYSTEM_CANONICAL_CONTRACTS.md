@@ -1,10 +1,10 @@
 # ROZDZIAŁ 5 — KONTRAKTY KANONICZNE SYSTEMU: KREATOR, KATALOGI, STACJE, ZABEZPIECZENIA, MODELE NIEDOZWOLONE
 
-**Wersja:** 1.0 FINAL
+**Wersja:** 1.1 SUPPLEMENT
 **Data:** 2026-02-09
 **Status:** AS-IS (1:1 z kodem) + TO-BE (sekcje oznaczone)
 **Warstwa:** Application + Catalog + ENM Meta + Validation + White Box
-**Zależności:** Rozdział 2 (§2.3–§2.21), Rozdział 3 (§3.1–§3.11), Rozdział 4 (§4.1–§4.19), AUDIT §9 (Decyzje #15–#33, #34–#38)
+**Zależności:** Rozdział 2 (§2.3–§2.21), Rozdział 3 (§3.1–§3.11), Rozdział 4 (§4.1–§4.19), AUDIT §9 (Decyzje #15–#33, #34–#42)
 **Autor:** System Architect + PhD Energetyki
 
 ---
@@ -700,11 +700,460 @@ Każdy parametr MUSI być oznaczony: `ParameterSource.TYPE_REF` / `ParameterSour
 | 14 | Invalidacja wyników: zmiana ENM → OUTDATED na wszystkich Case | ✅ AS-IS (§5.11.4) |
 | 15 | White Box: pełny ślad per obiekt (TYP→OVERRIDE→PARAMS→SOLVER→WYNIK) | ✅ Dokumentacja (§5.11.3) |
 
-### Zamknięcie domeny
+### Zamknięcie domeny (v1.0)
 
-**DOMENA KONTRAKTÓW KANONICZNYCH SYSTEMU W ROZDZIALE 5 JEST ZAMKNIĘTA.**
+**DOMENA KONTRAKTÓW KANONICZNYCH SYSTEMU (§5.1–§5.12) JEST ZAMKNIĘTA.**
 
-Sekcje §5.1–§5.12 definiują kompletny kanon kontraktów systemowych MV-DESIGN-PRO na poziomie ETAP/PowerFactory. Dalsze modyfikacje wymagają ADR i wpisu do Macierzy Decyzji (AUDIT §9).
+Sekcje §5.1–§5.12 definiują kompletny kanon kontraktów systemowych MV-DESIGN-PRO na poziomie ETAP/PowerFactory.
+Sekcje §5.13–§5.19 (SUPPLEMENT v1.1) formalizują warstwę katalogów typów jako jedyne źródło parametrów znamionowych.
+
+Dalsze modyfikacje wymagają ADR i wpisu do Macierzy Decyzji (AUDIT §9).
+
+---
+
+## 5.13 Zasada nadrzędna katalogów — żaden parametr znamionowy nie jest wpisywany ręcznie (Decyzja #39)
+
+### 5.13.1 Kanon (BINDING)
+
+> **Żaden parametr znamionowy w MV-DESIGN-PRO nie jest wpisywany ręcznie.**
+> **Wszystkie parametry znamionowe pochodzą z katalogów typów.**
+
+Parametr znamionowy to wartość wynikająca z konstrukcji urządzenia:
+- impedancja (R′, X′, B′), prąd znamionowy (In), napięcie znamionowe (Un), moc znamionowa (Sn),
+- uk%, pk, i0%, P0, grupa połączeń (transformatory),
+- Ik (zwarciowy), Icw (wytrzymałość), medium gaszące (aparaty łączeniowe),
+- charakterystyki czasowo-prądowe, zakresy nastaw (zabezpieczenia),
+- przekładnie, klasy dokładności (przekładniki CT/VT).
+
+Parametr zmienny to wartość ustalana per instancja w projekcie:
+- długość linii/kabla (`length_km`),
+- pozycja zaczepu transformatora (`tap_position`),
+- moc czynna/bierna odbioru (`p_mw`, `q_mvar`),
+- stan łącznika (`status`: open/closed),
+- parametry sieci zasilającej Source (`sk3_mva`, `r_ohm`/`x_ohm`).
+
+### 5.13.2 Konsekwencje (BINDING)
+
+| Warstwa | Reguła |
+|---------|--------|
+| **Kreator** | NIE posiada pól do ręcznego wpisu parametrów znamionowych; wymusza wybór z katalogu |
+| **ENM** | Przechowuje `type_id` (referencję), NIE duplikuje danych katalogowych |
+| **Resolver** | Odczytuje parametry znamionowe z katalogu (`ParameterSource.TYPE_REF`) |
+| **Solver** | Operuje na parametrach finalnych (po resolwerze) — NIE zna katalogu |
+| **White Box** | Odtwarza pełny łańcuch: TYP(snapshot) → OVERRIDE(delta) → parametry finalne |
+| **SLD** | Wizualizuje elementy z referencjami do typów; NIE edytuje parametrów znamionowych |
+
+### 5.13.3 Stan AS-IS — zakres pokrycia
+
+| Element ENM | Posiada `catalog_ref` | Typ katalogowy | Pokrycie |
+|-------------|----------------------|---------------|----------|
+| OverheadLine | ✅ `BranchBase.catalog_ref` | `LineType` | AS-IS |
+| Cable | ✅ `BranchBase.catalog_ref` | `CableType` | AS-IS |
+| Transformer | ✅ `Transformer.catalog_ref` | `TransformerType` | AS-IS |
+| SwitchBranch | ✅ `BranchBase.catalog_ref` | `SwitchEquipmentType` | AS-IS (przypisanie przez API) |
+| FuseBranch | ✅ `BranchBase.catalog_ref` | — (brak dedykowanego FuseType) | AS-IS (częściowe — parametry ręczne) |
+| Generator | ❌ Brak `catalog_ref` | `ConverterType` / `InverterType` (istnieją w katalogu, ale niepowiązane) | **GAP** — TO-BE |
+| Load | ❌ Brak `catalog_ref` | — (brak `LoadType`) | **GAP** — TO-BE |
+| Source | ❌ Brak `catalog_ref` | — (brak `SourceType`) | **Celowe** — Source = sieć zasilająca (parametry projektowe, nie katalogowe) |
+| ProtectionDevice | Referencja przez `device_type_ref` | `ProtectionDeviceType` + `ProtectionCurve` + `ProtectionSettingTemplate` | AS-IS (warstwa domenowa) |
+
+### 5.13.4 Wyjątek: Source (sieć zasilająca)
+
+Source modeluje **sieć zasilającą** (grid equivalent), nie urządzenie fizyczne. Parametry Source (`sk3_mva`, `r_ohm`/`x_ohm`, `rx_ratio`, `c_max/c_min`) są danymi projektowymi wynikającymi z warunków przyłączenia (decyzja OSD), NIE z katalogu producenta.
+
+**Source NIE wymaga katalogu typów** — jest wyjątkiem od zasady §5.13.1. Parametry Source są wpisywane ręcznie w kreatorze (K2) na podstawie warunków przyłączenia / decyzji OSD.
+
+> **BINDING:** Wyjątek dotyczy WYŁĄCZNIE Source. Żaden inny element sieciowy (poza Source) NIE MOŻE mieć ręcznie wpisywanych parametrów znamionowych w trybie standardowym.
+
+---
+
+## 5.14 Zakres katalogów — 7 domen obowiązkowych (Decyzja #40)
+
+### 5.14.1 Domeny katalogowe (BINDING)
+
+System MUSI posiadać katalogi typów w następujących domenach:
+
+| # | Domena | Klasa(y) AS-IS | Plik | Status |
+|---|--------|---------------|------|--------|
+| 1 | **Linie napowietrzne** | `LineType` | `catalog/types.py:33` | ✅ AS-IS (14+ typów bazowych, Al/Al-St, 25–150mm²) |
+| 2 | **Kable SN/nn** | `CableType` | `catalog/types.py:166` | ✅ AS-IS (90+ typów: XLPE/EPR, Cu/Al, 1c/3c, 70–400mm², typy producenckie NKT/Tele-Fonika) |
+| 3 | **Transformatory** | `TransformerType` | `catalog/types.py:317` | ✅ AS-IS (WN/SN 16–63MVA + SN/nn 63–1000kVA) |
+| 4 | **Falowniki i przetwornice** | `ConverterType`, `InverterType` | `catalog/types.py:464, 562` | ✅ AS-IS (typy istnieją, ale Generator nie posiada `catalog_ref` — GAP) |
+| 5 | **Aparaty łączeniowe** | `SwitchEquipmentType` | `catalog/types.py:399` | ✅ AS-IS (wyłączniki, rozłączniki, odłączniki, reklozery, bezpieczniki) |
+| 6 | **Zabezpieczenia** | `ProtectionDeviceType`, `ProtectionCurve`, `ProtectionSettingTemplate` | `catalog/types.py:648, 704, 753` | ✅ AS-IS (typy + krzywe + szablony nastaw) |
+| 7 | **Przekładniki CT/VT** | — | — | ❌ **BRAK** — TO-BE |
+
+### 5.14.2 Domena 7: Przekładniki CT/VT (TO-BE — Decyzja #40)
+
+> **TO-BE** — nie zaimplementowane. Wymaga osobnej decyzji implementacyjnej.
+
+Przekładniki prądowe (CT) i napięciowe (VT) są **niezbędne** do:
+- koordynacji zabezpieczeń (punkt pomiarowy, nasycenie CT),
+- analizy White Box Protection (§2.17 — „źródło sygnału: CT/VT"),
+- walidacji kompatybilności zabezpieczenie ↔ przekładnik,
+- raportów ETAP-grade (kolumna „Źródło sygnału" w tabeli zabezpieczeń, §2.18).
+
+**Wymagane pola CT (TO-BE):**
+
+| Pole | Typ | Opis |
+|------|-----|------|
+| `id` | str | Identyfikator typu |
+| `name` | str | Nazwa producenta/modelu |
+| `manufacturer` | str \| None | Producent |
+| `ratio_primary_a` | float | Prąd pierwotny znamionowy [A] |
+| `ratio_secondary_a` | float | Prąd wtórny znamionowy [A] (1 lub 5) |
+| `accuracy_class` | str | Klasa dokładności (0.2, 0.5, 1, 5P, 10P) |
+| `burden_va` | float | Obciążalność znamionowa [VA] |
+| `saturation_factor` | float \| None | Współczynnik nasycenia ALF/FS |
+| `voltage_rating_kv` | float | Napięcie znamionowe izolacji [kV] |
+| `thermal_rating_ka_1s` | float \| None | Wytrzymałość cieplna Ith (1s) [kA] |
+
+**Wymagane pola VT (TO-BE):**
+
+| Pole | Typ | Opis |
+|------|-----|------|
+| `id` | str | Identyfikator typu |
+| `name` | str | Nazwa producenta/modelu |
+| `manufacturer` | str \| None | Producent |
+| `ratio_primary_kv` | float | Napięcie pierwotne znamionowe [kV] |
+| `ratio_secondary_v` | float | Napięcie wtórne znamionowe [V] (100 lub 100/√3) |
+| `accuracy_class` | str | Klasa dokładności (0.2, 0.5, 1, 3P) |
+| `burden_va` | float | Obciążalność znamionowa [VA] |
+| `voltage_factor` | float \| None | Współczynnik napięciowy (1.2/1.5/1.9) |
+
+**Stan AS-IS:** CT/VT istnieją WYŁĄCZNIE jako symbole SVG na schemacie SLD (`frontend/src/ui/sld/etap_symbols/ct.svg`, `vt.svg`) — brak jakiejkolwiek reprezentacji danych.
+
+### 5.14.3 Domena uzupełniająca: Odbiory / LoadType (TO-BE)
+
+> **TO-BE** — nie zaimplementowane. Wymaga osobnej decyzji implementacyjnej.
+
+Load (`enm/models.py:200`) NIE posiada `catalog_ref` i NIE istnieje `LoadType` w katalogu. Parametry odbioru (`p_mw`, `q_mvar`, `model`) są wpisywane ręcznie w kreatorze (K6).
+
+**Decyzja architektoniczna (BINDING — Decyzja #40):**
+
+W trybie standardowym odbiory MOGĄ nie posiadać katalogu typów, ponieważ:
+- parametry odbioru (`P`, `Q`, `cosφ`) są danymi projektowymi (bilans mocy), nie konstrukcyjnymi,
+- odbiory w sieciach SN są zazwyczaj agregowane (moc stacji transformatorowej), nie modelowane per urządzenie,
+- ETAP / PowerFactory modelują odbiory przez moc + model (PQ/ZIP), nie przez typ katalogowy.
+
+Opcjonalny `LoadType` (TO-BE) jest dopuszczalny jako rozszerzenie — np. dla powtarzalnych profili odbiorów w projektach typowych.
+
+### 5.14.4 Macierz pokrycia katalogowego (BINDING)
+
+| Domena | Klasy AS-IS | catalog_ref na ENM | Resolver | Frontend UI | Pokrycie |
+|--------|------------|-------------------|---------|------------|----------|
+| Linie | `LineType` | ✅ `BranchBase.catalog_ref` | ✅ `resolve_line_params()` | ✅ TypePicker + TypeLibraryBrowser | **100%** |
+| Kable | `CableType` | ✅ `BranchBase.catalog_ref` | ✅ `resolve_line_params()` | ✅ TypePicker + TypeLibraryBrowser | **100%** |
+| Transformatory | `TransformerType` | ✅ `Transformer.catalog_ref` | ✅ `resolve_transformer_params()` | ✅ TypePicker + TypeLibraryBrowser | **100%** |
+| Aparaty | `SwitchEquipmentType` | ✅ `BranchBase.catalog_ref` | ❌ Brak resolver | ✅ TypePicker + TypeLibraryBrowser | **75%** (brak resolver) |
+| Falowniki | `ConverterType`, `InverterType` | ❌ Brak `catalog_ref` na Generator | ❌ Brak resolver | ❌ Brak w frontend UI | **25%** (typy istnieją, reszta GAP) |
+| Zabezpieczenia | `PD Type` + `Curve` + `Template` | ✅ Referencja domenowa | ❌ Brak resolver | ❌ Brak w frontend catalog UI | **50%** (backend OK, frontend GAP) |
+| CT/VT | — | — | — | ❌ Tylko symbole SVG | **0%** |
+
+---
+
+## 5.15 Struktura kanoniczna typu (Decyzja #41)
+
+### 5.15.1 Pola obowiązkowe — wspólne dla wszystkich typów (BINDING)
+
+Każdy typ w katalogu MUSI zawierać:
+
+| Pole | Typ | Opis | Status |
+|------|-----|------|--------|
+| `id` | str | Jednoznaczny identyfikator (UUID lub slug) | ✅ AS-IS (wszystkie 9 klas) |
+| `name` | str | Nazwa typu (producent + model + parametry) | ✅ AS-IS (wszystkie 9 klas) |
+| `manufacturer` | str \| None | Producent urządzenia | ✅ AS-IS (LineType, CableType, TransformerType, SwitchEquipmentType, ConverterType, InverterType) |
+
+### 5.15.2 Pola obowiązkowe — TO-BE (wymagane rozszerzenie)
+
+> **TO-BE** — nie zaimplementowane. Wymaga osobnej decyzji implementacyjnej.
+
+| Pole | Typ | Opis | Status |
+|------|-----|------|--------|
+| `version` | str | Wersja definicji typu (np. „1.0", „2024.1") | ❌ BRAK — TO-BE |
+| `status` | `Literal["active", "retired"]` | Status aktywności typu | ❌ BRAK — TO-BE |
+| `created_at` | str (ISO 8601) | Data wprowadzenia do katalogu | ❌ BRAK — TO-BE |
+
+**Uzasadnienie:** ETAP i PowerFactory posiadają zarządzanie wersjami typów. Typ „wycofany" (retired) pozostaje dostępny w istniejących projektach, ale NIE jest oferowany przy tworzeniu nowych instancji. Pozwala to na migrację bez utraty danych historycznych.
+
+### 5.15.3 Pola domenowe — per kategoria (AS-IS)
+
+**LineType / CableType — parametry impedancyjne:**
+
+| Pole | LineType | CableType | Opis |
+|------|----------|-----------|------|
+| `r_ohm_per_km` | ✅ | ✅ | Rezystancja czynna [Ω/km] |
+| `x_ohm_per_km` | ✅ | ✅ | Reaktancja [Ω/km] |
+| `b_us_per_km` / `c_nf_per_km` | ✅ b_us | ✅ c_nf (→ b_us via property) | Susceptancja / pojemność |
+| `rated_current_a` | ✅ | ✅ | Obciążalność długotrwała [A] |
+| `voltage_rating_kv` | ✅ | ✅ | Napięcie znamionowe izolacji [kV] |
+| `conductor_material` | ✅ | ✅ | Materiał przewodzący (Cu/Al/Al-St) |
+| `cross_section_mm2` | ✅ | ✅ | Przekrój [mm²] |
+| `ith_1s_a` | ✅ | ✅ | Prąd cieplny 1s [A] |
+| `jth_1s_a_per_mm2` | ✅ | ✅ | Gęstość prądu cieplnego [A/mm²] |
+| `base_type_id` | ✅ | ✅ | Typ bazowy (dla typów producenckich) |
+| `trade_name` | ✅ | ✅ | Nazwa handlowa producenta |
+| `insulation_type` | — | ✅ | Typ izolacji (XLPE/EPR/PVC/PAPER) |
+| `number_of_cores` | — | ✅ | Liczba żył (1c/3c) |
+
+**TransformerType — parametry znamionowe:**
+
+| Pole | Opis |
+|------|------|
+| `rated_power_mva` | Moc znamionowa [MVA] |
+| `voltage_hv_kv` | Napięcie górne [kV] |
+| `voltage_lv_kv` | Napięcie dolne [kV] |
+| `uk_percent` | Napięcie zwarcia [%] |
+| `pk_kw` | Straty obciążeniowe [kW] |
+| `i0_percent` | Prąd jałowy [%] |
+| `p0_kw` | Straty jałowe [kW] |
+| `vector_group` | Grupa połączeń (Dyn11, Yyn0, ...) |
+| `cooling_class` | Klasa chłodzenia (ONAN, ONAF) |
+| `tap_min`, `tap_max`, `tap_step_percent` | Parametry regulatora zaczepów |
+
+**ConverterType / InverterType — parametry falownika:**
+
+| Pole | ConverterType | InverterType | Opis |
+|------|--------------|-------------|------|
+| `kind` | ✅ (PV/WIND/BESS) | — | Rodzaj przetwornika |
+| `un_kv` | ✅ | ✅ | Napięcie znamionowe nn [kV] |
+| `sn_mva` | ✅ | ✅ | Moc pozorna znamionowa [MVA] |
+| `pmax_mw` | ✅ | ✅ | Moc czynna maksymalna [MW] |
+| `qmin_mvar`, `qmax_mvar` | ✅ | ✅ | Zakres mocy biernej [Mvar] |
+| `cosphi_min`, `cosphi_max` | ✅ | ✅ | Zakres cosφ |
+| `e_kwh` | ✅ (BESS) | — | Pojemność magazynu [kWh] |
+
+**SwitchEquipmentType — parametry łącznikowe:**
+
+| Pole | Opis |
+|------|------|
+| `equipment_kind` | Rodzaj: CIRCUIT_BREAKER / LOAD_SWITCH / DISCONNECTOR / RECLOSER / FUSE |
+| `un_kv` | Napięcie znamionowe [kV] |
+| `in_a` | Prąd znamionowy [A] |
+| `ik_ka` | Zdolność łączeniowa zwarciowa [kA] |
+| `icw_ka` | Prąd wytrzymywany krótkotrwale [kA] |
+| `medium` | Medium gaszące (SF6, próżnia, powietrze, olej) |
+
+**ProtectionDeviceType — parametry zabezpieczenia:**
+
+| Pole | Opis |
+|------|------|
+| `name_pl` | Nazwa polska |
+| `vendor` | Producent |
+| `series` | Seria urządzenia |
+| `revision` | Rewizja |
+| `rated_current_a` | Prąd znamionowy [A] |
+| `notes_pl` | Uwagi |
+
+### 5.15.4 Zakaz typów niekompletnych (BINDING)
+
+- **ZAKAZ** tworzenia typu bez pól impedancyjnych (LineType/CableType bez R′, X′)
+- **ZAKAZ** tworzenia TransformerType bez uk_percent lub rated_power_mva
+- **ZAKAZ** tworzenia SwitchEquipmentType bez un_kv lub in_a
+- **ZAKAZ** tworzenia ConverterType/InverterType bez un_kv lub sn_mva
+
+**Implementacja AS-IS:** Typy są `@dataclass(frozen=True)` z obowiązkowymi polami — Python wymusza kompletność przy konstrukcji. Brak walidacji na poziomie danych wejściowych importu.
+
+---
+
+## 5.16 Relacja katalog ↔ kreator — formalizacja (Decyzja #39)
+
+### 5.16.1 Sekwencja kanoniczna per krok kreatora (BINDING)
+
+| Krok | Element | Katalog | Sekwencja |
+|------|---------|---------|-----------|
+| K2 | Source | **Brak katalogu** (wyjątek §5.13.4) | Użytkownik wpisuje sk3_mva, rx_ratio ręcznie |
+| K3 | Bus SN | **Brak katalogu** | Użytkownik podaje voltage_kv |
+| K4 | OverheadLine / Cable | `LineType` / `CableType` | 1. Wybór typu z TypePicker → 2. Parametry READ-ONLY → 3. Podanie length_km |
+| K5 | Transformer | `TransformerType` | 1. Wybór typu z TypePicker → 2. Parametry READ-ONLY → 3. Podanie tap_position, uziemienie |
+| K6 | Generator (falownik) | `ConverterType` / `InverterType` (TO-BE) | 1. Wybór typu → 2. Napięcie nn z katalogu → 3. n_parallel → 4. P, Q, tryb pracy |
+| K6 | Load | **Brak katalogu** (dopuszczalne §5.14.3) | Użytkownik podaje p_mw, q_mvar, model |
+| K6 | SwitchBranch | `SwitchEquipmentType` | 1. Wybór typu → 2. Podanie status (open/closed) |
+
+### 5.16.2 Zachowanie TypePicker (AS-IS)
+
+`TypePicker` (`ui/catalog/TypePicker.tsx`):
+1. Wyświetla listę dostępnych typów z filtrami (nazwa, producent, parametry)
+2. Użytkownik wybiera typ → `assignTypeToBranch()` / `assignTypeToTransformer()` / `assignEquipmentTypeToSwitch()`
+3. Parametry znamionowe wypełniane automatycznie (READ-ONLY)
+4. Użytkownik widzi WYŁĄCZNIE parametry zmienne instancji do edycji
+
+### 5.16.3 Blokada braku typu (TO-BE — wzmocnienie)
+
+> **TO-BE** — nie zaimplementowane. Wymaga osobnej decyzji implementacyjnej.
+
+Kreator POWINIEN blokować przejście dalej przy braku wybranego typu dla elementów z §5.13.3 (z wyjątkiem Source i Load).
+
+**Stan AS-IS:** Kreator NIE blokuje braku `catalog_ref` — element bez typu jest tworzony z `ParameterSource.INSTANCE` i raportowany jako INFO I002. System jest tolerancyjny wobec braku typu (backward compatibility).
+
+**Docelowo (TO-BE):** Brak typu → WARNING (IMPORTANT), nie BLOCKER. Uzasadnienie: projekty migrowane z wcześniejszych wersji mogą nie mieć typów; BLOCKER uniemożliwiłby pracę na istniejących danych.
+
+---
+
+## 5.17 Relacja katalog ↔ ENM — przechowywanie i rekonstrukcja
+
+### 5.17.1 Zasada minimalizacji danych (BINDING)
+
+ENM przechowuje per instancja:
+
+| Dane | Przykład | Źródło |
+|------|---------|--------|
+| `type_id` (catalog_ref) | `"nkt_yaky_3x240"` | Referencja do katalogu |
+| Parametry zmienne | `length_km=3.5`, `tap_position=0`, `status="closed"` | Kreator |
+| Override (tryb ekspert) | `{r_total_ohm: 0.45}` | Użytkownik |
+
+ENM **NIE duplikuje** danych katalogowych (R′, X′, In, uk%, itd.). Resolver odczytuje je z katalogu w momencie obliczeń.
+
+### 5.17.2 Rekonstrukcja pełna (BINDING)
+
+Każda instancja ENM MUSI być możliwa do pełnej rekonstrukcji:
+
+```
+type_id → CatalogRepository.get_*(type_id) → parametry znamionowe
++ parametry zmienne (z ENM)
++ override (z ENM, jeśli tryb ekspert)
+= parametry finalne (input do resolver → mapping → solver)
+```
+
+**Konsekwencja:** Usunięcie typu z katalogu przy istniejących instancjach → `TypeNotFoundError` z resolver (`catalog/resolver.py:116–125`). System MUSI zachowywać typy używane w istniejących projektach.
+
+### 5.17.3 Snapshot a rekonstrukcja
+
+White Box MUSI odtwarzać parametry użyte w obliczeniach **niezależnie** od aktualnego stanu katalogu. Dwa podejścia (BINDING — decyzja implementacyjna do podjęcia):
+
+| Podejście | Opis | Zalety | Wady |
+|-----------|------|--------|------|
+| **A. Snapshot per obliczenie** | White Box zapisuje snapshot parametrów typu w momencie obliczenia | Niezależny od zmian katalogu | Większy rozmiar danych |
+| **B. Wersjonowanie katalogu** | Katalog posiada wersje; White Box referencjonuje wersję | Kompaktowy, czytelny | Wymaga infrastruktury wersjonowania |
+
+**Stan AS-IS:** Brak jawnego mechanizmu — resolver odczytuje z aktualnego katalogu. White Box trace (`WhiteBoxTracer`) NIE zapisuje snapshotów typów.
+
+---
+
+## 5.18 Wersjonowanie i zarządzanie katalogami (Decyzja #42)
+
+### 5.18.1 Poziomy wersjonowania (BINDING)
+
+| Poziom | Mechanizm | Status |
+|--------|-----------|--------|
+| **Biblioteka** (zbiór typów) | `TypeLibraryManifest`: `library_id`, `revision`, `vendor`, `series`, `fingerprint` (SHA-256), `created_at` | ✅ AS-IS (P13b) |
+| **Indywidualny typ** | Pola `version`, `status`, `created_at` per typ | ❌ TO-BE |
+
+### 5.18.2 TypeLibraryManifest — governance (AS-IS)
+
+System AS-IS posiada mechanizm governance bibliotek typów na poziomie eksportu/importu:
+
+```python
+# Governance manifest (P13b)
+TypeLibraryManifest:
+    library_id: UUID
+    library_name_pl: str
+    vendor: str | None
+    series: str | None
+    revision: str
+    schema_version: str
+    description_pl: str | None
+    fingerprint: str  # SHA-256
+    created_at: str   # ISO 8601
+```
+
+**Import API:** `POST /api/catalog/import?mode=merge|replace`
+- `merge` — dodaje nowe typy, nie nadpisuje istniejących
+- `replace` — zastępuje cały katalog
+
+**Export API:** `GET /api/catalog/export` — eksportuje z manifestem
+
+### 5.18.3 Status typu — active / retired (TO-BE)
+
+> **TO-BE** — nie zaimplementowane. Wymaga osobnej decyzji implementacyjnej.
+
+**Reguły (BINDING):**
+1. Typ z `status="active"` jest oferowany w TypePicker przy tworzeniu nowych instancji
+2. Typ z `status="retired"` NIE jest oferowany przy nowych instancjach, ALE:
+   - pozostaje dostępny w istniejących projektach (instancje zachowują referencję),
+   - resolver odczytuje parametry normalnie,
+   - White Box raportuje: „typ wycofany" (informacja audytowa)
+3. Zmiana statusu `active → retired` **NIE wpływa** na istniejące projekty
+4. Zmiana typu (modyfikacja parametrów) wymaga nowej wersji — typy są immutable (frozen)
+
+### 5.18.4 Migracja i kompatybilność (BINDING)
+
+| Scenariusz | Zachowanie |
+|-----------|-----------|
+| Import nowej wersji katalogu | Nowe typy dodawane; istniejące NIE nadpisywane (mode=merge) |
+| Typ w katalogu usunięty | `TypeNotFoundError` przy próbie obliczenia → BLOCKER |
+| Typ zmodyfikowany (parametry zmienione) | NIE DOPUSZCZALNE — typy immutable. Nowy typ z nowym `id` |
+| Projekt z innego katalogu | Import + mapowanie `type_id` → typy w docelowym katalogu |
+
+### 5.18.5 Wieloprojekowość (BINDING)
+
+Katalog jest **niezależny od projektu** — jeden CatalogRepository jest współdzielony przez wszystkie projekty. Zmiana katalogu wpływa na WSZYSTKIE projekty (resolver odczytuje z jednego źródła).
+
+**Konsekwencja:** ResultInvalidator MUSI invalidować wyniki WSZYSTKICH projektów po zmianie katalogu (import/replace).
+
+> **Stan AS-IS:** `get_default_mv_catalog()` zwraca wbudowany katalog. Brak persystencji zmian — import jest per sesja. TO-BE: persystencja katalogu w bazie danych.
+
+---
+
+## 5.19 Walidacje systemowe katalogów (Decyzja #40)
+
+### 5.19.1 Walidacje AS-IS
+
+| Kod | Poziom | Warunek | Plik | Status |
+|-----|--------|---------|------|--------|
+| I002 | INFO | Branch bez `catalog_ref` | `validator.py:273` | ✅ AS-IS — TYLKO OverheadLine/Cable |
+| — | — | Transformer bez `catalog_ref` | — | ❌ Brak walidacji |
+| — | — | Generator bez `catalog_ref` | — | ❌ Brak walidacji (brak pola) |
+| — | — | Niezgodność `voltage_rating_kv` ↔ `voltage_kv` | — | ❌ Brak walidacji |
+
+### 5.19.2 Walidacje docelowe (TO-BE)
+
+> **TO-BE** — nie zaimplementowane. Wymaga osobnej decyzji implementacyjnej.
+
+| Kod | Poziom | Warunek | Opis |
+|-----|--------|---------|------|
+| I002 | INFO | Branch bez `catalog_ref` | **Rozszerzenie**: objąć Transformer, SwitchBranch (AS-IS: tylko linie/kable) |
+| W-C01 | IMPORTANT | `catalog_ref` wskazuje na typ z `status="retired"` | Typ wycofany — instancja zachowuje dane, ale raportowany audyt |
+| W-C02 | IMPORTANT | `voltage_rating_kv` typu ≠ `voltage_kv` szyny | Niezgodność napięciowa (spójne z §4.17 W-L04/W-L05) |
+| W-C03 | IMPORTANT | Override bez snapshotu typu (brak możliwości audytu) | Spójne z §5.5.5 W010 |
+| E-C01 | BLOCKER | `catalog_ref` wskazuje na nieistniejący typ | `TypeNotFoundError` z resolver |
+
+### 5.19.3 Walidacja kompatybilności typ ↔ element (TO-BE)
+
+| Kompatybilność | Reguła |
+|----------------|--------|
+| `LineType` → OverheadLine | `type.conductor_material ∈ {AL, AL_ST}` (linie napowietrzne = aluminium) |
+| `CableType` → Cable | `type.insulation_type` musi być zgodny z `Cable.insulation` |
+| `TransformerType` → Transformer | `type.voltage_hv_kv` musi odpowiadać `Bus(hv_bus_ref).voltage_kv` |
+| `SwitchEquipmentType` → SwitchBranch | `type.equipment_kind` musi być zgodny z `SwitchBranch.type` |
+| `ConverterType` → Generator(falownik) | `type.kind` musi odpowiadać `Generator.gen_type` (pv→PV, wind→WIND, bess→BESS) |
+
+---
+
+## 5.12a Definition of Done — UZUPEŁNIENIE (v1.1 SUPPLEMENT)
+
+### Dodatkowe kryteria akceptacji (ALL MUST PASS with §5.12)
+
+| # | Kryterium | Status |
+|---|----------|--------|
+| 16 | Zasada nadrzędna: żaden parametr znamionowy nie jest wpisywany ręcznie (z wyjątkiem Source) | ✅ Dokumentacja (§5.13) |
+| 17 | Macierz pokrycia katalogowego: 7 domen ze statusem AS-IS/TO-BE/GAP | ✅ Dokumentacja (§5.14) |
+| 18 | Struktura kanoniczna typu: pola obowiązkowe (id, name, manufacturer) + domenowe | ✅ AS-IS (§5.15) |
+| 19 | Relacja katalog ↔ kreator: TypePicker per krok, blokada braku typu (TO-BE) | ✅ Dokumentacja (§5.16) |
+| 20 | Relacja katalog ↔ ENM: type_id + parametry zmienne + override, bez duplikacji | ✅ Dokumentacja (§5.17) |
+| 21 | Wersjonowanie: TypeLibraryManifest (AS-IS) + indywidualny status active/retired (TO-BE) | ✅ Dokumentacja (§5.18) |
+| 22 | Walidacje systemowe: I002 (AS-IS), W-C01/W-C02/W-C03/E-C01 (TO-BE) | ✅ Dokumentacja (§5.19) |
+| 23 | CT/VT: wymagane pola zdefiniowane (TO-BE) | ✅ Dokumentacja (§5.14.2) |
+| 24 | Source = wyjątek od katalogu (parametry projektowe OSD, nie katalogowe) | ✅ Dokumentacja (§5.13.4) |
+| 25 | Load = dopuszczalny bez katalogu (parametry projektowe, bilansowe) | ✅ Dokumentacja (§5.14.3) |
+
+### Zamknięcie domeny (AKTUALIZACJA)
+
+**DOMENA KONTRAKTÓW KANONICZNYCH SYSTEMU W ROZDZIALE 5 JEST ZAMKNIĘTA (v1.1 SUPPLEMENT).**
+
+Sekcje §5.1–§5.12 definiują kanon kontraktów systemowych. Sekcje §5.13–§5.19 (SUPPLEMENT v1.1) formalizują warstwę katalogów typów jako jedyne źródło parametrów znamionowych, definiują 7 domen katalogowych, strukturę kanonicznych typów, relacje katalog↔kreator i katalog↔ENM, wersjonowanie bibliotek, oraz walidacje systemowe.
+
+Dalsze modyfikacje wymagają ADR i wpisu do Macierzy Decyzji (AUDIT §9).
 
 ---
 

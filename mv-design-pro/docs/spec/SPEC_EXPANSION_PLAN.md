@@ -111,8 +111,9 @@ PREAMBUŁA — CEL, ZAKRES, DEFINICJE (UKOŃCZONA)
             └── Domena Topologia ZAMKNIĘTA (§3.1–§3.11, Decyzje #26–#28)
   Krok 0d: SPEC_CHAPTER_04_LINES_CABLES_SN.md            ✅ GOTOWY (v1.1 SUPPLEMENT)
             └── Domena Linie/Kable SN ZAMKNIĘTA (§4.1–§4.14 + §4.15–§4.19, Decyzje #29–#33)
-  Krok 0e: SPEC_CHAPTER_05_SYSTEM_CANONICAL_CONTRACTS.md  ✅ GOTOWY (v1.0 FINAL)
+  Krok 0e: SPEC_CHAPTER_05_SYSTEM_CANONICAL_CONTRACTS.md  ✅ GOTOWY (v1.1 SUPPLEMENT)
             └── Domena Kontraktów Kanonicznych ZAMKNIĘTA (§5.1–§5.12, Decyzje #34–#38)
+            └── Domena Katalogów Typów ZAMKNIĘTA (§5.13–§5.19, Decyzje #39–#42)
 
 FAZA 0 — KONTRAKTY I WARSTWY (PRIORYTET NAJWYŻSZY)
   Krok 1:  SPEC_00_LAYERING.md
@@ -868,7 +869,7 @@ FINALIZACJA:
 | SPEC_CHAPTER_02_ENM_DOMAIN_MODEL.md | Preambuła | ENM Domain | 21 | ~1260 ✅ FINAL |
 | SPEC_CHAPTER_03_TOPOLOGY_CONNECTIVITY.md | Preambuła | Topology | 11 | ~550 ✅ FINAL |
 | SPEC_CHAPTER_04_LINES_CABLES_SN.md | Preambuła | ENM Core + Catalog + Bay | 19 | ~840 ✅ SUPPLEMENT |
-| SPEC_CHAPTER_05_SYSTEM_CANONICAL_CONTRACTS.md | Preambuła | Application + Catalog + Validation + WhiteBox | 12 | ~710 ✅ FINAL |
+| SPEC_CHAPTER_05_SYSTEM_CANONICAL_CONTRACTS.md | Preambuła | Application + Catalog + Validation + WhiteBox | 19 | ~1150 ✅ SUPPLEMENT |
 | SPEC_00_LAYERING.md | 0 | Architecture | 11 | ~700 |
 | SPEC_01_GLOSSARY_NORMATIVE.md | 0 | Governance | 7 | ~290 |
 | SPEC_02_ENM_CORE.md | 0 | ENM Core | 19 | ~2020 |
@@ -887,12 +888,12 @@ FINALIZACJA:
 | SPEC_15_PERSISTENCE.md | 4 | Infrastructure | 6+1 TO-BE | ~380 |
 | SPEC_16_TESTS.md | 4 | Infrastructure | 10 | ~540 |
 | SPEC_INDEX.md | — | Index | 5 | ~150 |
-| **RAZEM** | | | **~268** | **~16 990** |
+| **RAZEM** | | | **~275** | **~17 430** |
 
 ### Porównanie:
 - **SYSTEM_SPEC.md v3.0:** ~487 linii
-- **Nowa specyfikacja:** ~16 990 linii (23 plików, w tym Rozdział 1-5 preambuły)
-- **Wzrost:** ~35× (3500%)
+- **Nowa specyfikacja:** ~17 430 linii (23 plików, w tym Rozdział 1-5 preambuły)
+- **Wzrost:** ~36× (3600%)
 - **Pokrycie AS-IS:** ~95% (sekcje TO-BE wyraźnie oznaczone)
 
 ---
