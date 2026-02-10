@@ -167,3 +167,33 @@ class GeneratorPayload(BaseModel):
     p_mw: float
     q_mvar: float | None = None
     gen_type: str | None = None
+
+
+# ---------------------------------------------------------------------------
+# Step controller response schemas
+# ---------------------------------------------------------------------------
+
+
+class ApplyStepResponse(BaseModel):
+    """Odpowiedź z atomowego zastosowania kroku kreatora."""
+    success: bool = Field(..., description="Czy krok został zastosowany pomyślnie")
+    step_id: str = Field(..., description="Krok (K1-K10)")
+    precondition_issues: list[WizardIssue] = Field(default_factory=list)
+    postcondition_issues: list[WizardIssue] = Field(default_factory=list)
+    can_proceed: bool = Field(
+        default=False, description="Czy przejście do następnego kroku jest dozwolone"
+    )
+    current_step: str = Field(default="K1")
+    next_step: str | None = Field(default=None)
+    revision: int = Field(default=0, description="Rewizja ENM po zastosowaniu")
+    wizard_state: WizardStateResponse | None = Field(
+        default=None, description="Pełny stan kreatora po zastosowaniu"
+    )
+
+
+class CanProceedResponse(BaseModel):
+    """Odpowiedź na zapytanie o możliwość przejścia."""
+    allowed: bool
+    from_step: str
+    to_step: str
+    blocking_issues: list[WizardIssue] = Field(default_factory=list)
