@@ -146,7 +146,8 @@ async def get_enm_readiness(case_id: str) -> dict[str, Any]:
     """Zwróć macierz gotowości dla wszystkich typów analiz."""
     enm = _get_enm(case_id)
     validator = ENMValidator()
-    result = validator.validate(enm)
+    validation = validator.validate(enm)
+    readiness = validator.readiness(validation)
 
     has_protection_data = (
         bool(enm.protection_assignments)
@@ -158,12 +159,13 @@ async def get_enm_readiness(case_id: str) -> dict[str, Any]:
     return {
         "case_id": case_id,
         "enm_revision": enm.header.revision,
-        "validation_status": result.status,
+        "validation": validation.model_dump(mode="json"),
+        "readiness": readiness.model_dump(mode="json"),
         "analysis_readiness": {
-            "short_circuit_3f": result.analysis_available.short_circuit_3f,
-            "short_circuit_1f": result.analysis_available.short_circuit_1f,
-            "load_flow": result.analysis_available.load_flow,
-            "protection": has_protection_data and result.status != "FAIL",
+            "short_circuit_3f": validation.analysis_available.short_circuit_3f,
+            "short_circuit_1f": validation.analysis_available.short_circuit_1f,
+            "load_flow": validation.analysis_available.load_flow,
+            "protection": has_protection_data and readiness.ready,
         },
         "topology_completeness": {
             "has_substations": len(enm.substations) > 0,

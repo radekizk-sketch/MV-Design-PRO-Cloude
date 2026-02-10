@@ -1,4 +1,4 @@
-"""Tests for ENMValidator — blockers E001-E008, warnings W001-W004, Polish messages."""
+"""Tests for ENMValidator readiness semantics and validation issues."""
 
 import pytest
 
@@ -20,14 +20,38 @@ def _enm(**kwargs) -> EnergyNetworkModel:
 
 
 def _minimal_enm() -> EnergyNetworkModel:
-    """Minimal valid ENM: 1 bus + 1 source with Sk."""
+    """Minimal ENM with required catalog refs but warning-level gaps."""
     return _enm(
-        buses=[Bus(ref_id="bus_1", name="Szyna", voltage_kv=15)],
+        buses=[
+            Bus(ref_id="bus_1", name="Szyna", voltage_kv=15),
+            Bus(ref_id="bus_2", name="Szyna 2", voltage_kv=15),
+        ],
         sources=[Source(ref_id="src_1", name="Grid", bus_ref="bus_1", model="short_circuit_power", sk3_mva=220)],
+        branches=[
+            OverheadLine(
+                ref_id="ln_1", name="L1", from_bus_ref="bus_1", to_bus_ref="bus_2",
+                length_km=1, r_ohm_per_km=0.4, x_ohm_per_km=0.3, catalog_ref="CAT-LN-001"
+            ),
+        ],
     )
 
 
 class TestBlockers:
+    def test_e009_missing_catalog_ref(self):
+        result = ENMValidator().validate(_enm(
+            buses=[
+                Bus(ref_id="b1", name="B1", voltage_kv=15),
+                Bus(ref_id="b2", name="B2", voltage_kv=15),
+            ],
+            sources=[Source(ref_id="s1", name="S1", bus_ref="b1", model="short_circuit_power", sk3_mva=100)],
+            branches=[
+                Cable(ref_id="cab_1", name="C1", from_bus_ref="b1", to_bus_ref="b2",
+                      length_km=1, r_ohm_per_km=0.2, x_ohm_per_km=0.08),
+            ],
+        ))
+        assert result.status == "FAIL"
+        assert any(i.code == "E009" and i.severity == "BLOCKER" for i in result.issues)
+
     def test_e001_no_sources(self):
         result = ENMValidator().validate(_enm(
             buses=[Bus(ref_id="b1", name="B1", voltage_kv=15)],
@@ -134,11 +158,30 @@ class TestWarnings:
 
 
 class TestOKStatus:
-    def test_minimal_enm_not_fail(self):
-        result = ENMValidator().validate(_minimal_enm())
-        # Minimal has warnings but should not FAIL
-        assert result.status in ("OK", "WARN")
-        assert result.analysis_available.short_circuit_3f is True
+    def test_ready_with_warnings(self):
+        validation = ENMValidator().validate(_minimal_enm())
+        readiness = ENMValidator().readiness(validation)
+        assert validation.status == "WARN"
+        assert readiness.ready is True
+        assert readiness.blockers == []
+        assert validation.analysis_available.short_circuit_3f is True
+
+    def test_valid_but_not_ready(self):
+        validation = ENMValidator().validate(_enm(
+            buses=[
+                Bus(ref_id="b1", name="B1", voltage_kv=15),
+                Bus(ref_id="b2", name="B2", voltage_kv=15),
+            ],
+            sources=[Source(ref_id="s1", name="S1", bus_ref="b1", model="short_circuit_power", sk3_mva=100)],
+            branches=[
+                OverheadLine(ref_id="ln_1", name="L1", from_bus_ref="b1", to_bus_ref="b2",
+                             length_km=5, r_ohm_per_km=0.4, x_ohm_per_km=0.3),
+            ],
+        ))
+        readiness = ENMValidator().readiness(validation)
+        assert validation.status == "FAIL"
+        assert readiness.ready is False
+        assert any(i.code == "E009" for i in readiness.blockers)
 
     def test_messages_in_polish(self):
         result = ENMValidator().validate(_enm())
