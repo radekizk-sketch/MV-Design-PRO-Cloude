@@ -29,6 +29,16 @@ class AnalysisRun:
     white_box_trace: list[dict] | None = None
     error_message: str | None = None
 
+    @property
+    def results_valid(self) -> bool:
+        """
+        Explicit flag: are this run's results valid for use?
+
+        Returns True ONLY when result_status == "VALID" AND status == "FINISHED".
+        OUTDATED results MUST NOT be used for display, export, or further analysis.
+        """
+        return self.result_status == "VALID" and self.status == "FINISHED"
+
 
 def new_analysis_run(
     *,

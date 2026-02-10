@@ -51,6 +51,7 @@ class StudyCaseListItem:
     name: str
     description: str
     result_status: str
+    results_valid: bool  # PR-4: explicit validity flag
     is_active: bool
     updated_at: str
 
@@ -60,6 +61,7 @@ class StudyCaseListItem:
             "name": self.name,
             "description": self.description,
             "result_status": self.result_status,
+            "results_valid": self.results_valid,
             "is_active": self.is_active,
             "updated_at": self.updated_at,
         }
@@ -169,6 +171,7 @@ class StudyCaseService:
                     name=case.name,
                     description=case.description,
                     result_status=case.result_status.value,
+                    results_valid=case.results_valid,
                     is_active=case.is_active,
                     updated_at=case.updated_at.isoformat(),
                 )

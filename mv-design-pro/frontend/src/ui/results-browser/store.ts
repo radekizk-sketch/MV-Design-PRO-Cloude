@@ -43,6 +43,9 @@ interface ResultsBrowserState {
   caseId: string | null;
   runId: string | null;
 
+  // PR-4: Stale result blocking
+  resultsValid: boolean;
+
   // View mode
   viewMode: ResultsViewMode;
 
@@ -74,6 +77,7 @@ interface ResultsBrowserState {
 
   // Actions
   setContext: (projectId: string, caseId: string, runId: string) => void;
+  setResultsValid: (valid: boolean) => void;
   setViewMode: (mode: ResultsViewMode) => void;
   setFilters: (filters: FilterState) => void;
   setSortConfig: (config: SortConfig | null) => void;
@@ -101,6 +105,7 @@ const initialState = {
   projectId: null,
   caseId: null,
   runId: null,
+  resultsValid: true,
   viewMode: 'bus_voltages' as ResultsViewMode,
   busVoltages: [],
   branchFlows: [],
@@ -132,6 +137,17 @@ export const useResultsBrowserStore = create<ResultsBrowserState>((set, get) => 
     set({ projectId, caseId, runId, error: null });
     // Load data for current view
     get().loadCurrentViewData();
+  },
+
+  // PR-4: Set results validity flag
+  setResultsValid: (valid) => {
+    set({ resultsValid: valid });
+    if (!valid) {
+      // Clear loaded data when results become invalid
+      set({
+        error: 'Wyniki nieaktualne — wymagane ponowne obliczenie',
+      });
+    }
   },
 
   // View mode actions
@@ -254,7 +270,15 @@ export const useResultsBrowserStore = create<ResultsBrowserState>((set, get) => 
   },
 
   loadCurrentViewData: async () => {
-    const { viewMode } = get();
+    const { viewMode, resultsValid } = get();
+
+    // PR-4: Block loading stale results
+    if (!resultsValid) {
+      set({
+        error: 'Wyniki nieaktualne — wymagane ponowne obliczenie',
+      });
+      return;
+    }
 
     switch (viewMode) {
       case 'bus_voltages':
@@ -446,6 +470,27 @@ export function useCurrentViewData(): unknown[] {
         return [];
     }
   });
+}
+
+/**
+ * PR-4: Check if results are valid for display/export.
+ *
+ * Returns false when results are stale (model/config changed after calculation).
+ * UI MUST use this to block result access and export when false.
+ */
+export function useResultsValid(): boolean {
+  return useResultsBrowserStore((state) => state.resultsValid);
+}
+
+/**
+ * PR-4: Check if export is allowed.
+ *
+ * Export is blocked when results are stale.
+ */
+export function useCanExport(): boolean {
+  return useResultsBrowserStore(
+    (state) => state.resultsValid && state.runId !== null
+  );
 }
 
 /**

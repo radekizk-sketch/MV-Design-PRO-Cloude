@@ -44,6 +44,29 @@ def _build_inspector_service(uow_factory: Any) -> ResultsInspectorService:
     return ResultsInspectorService(uow_factory)
 
 
+def _guard_stale_results(run_id: UUID, uow_factory: Any) -> None:
+    """
+    PR-4: Guard against accessing stale/outdated results.
+
+    Raises HTTP 409 Conflict if the run's results are outdated.
+    This ensures that UI/API cannot use results after model/config changes.
+    """
+    service = _build_service(uow_factory)
+    try:
+        run = service.get_run(run_id)
+    except ValueError:
+        return  # Let the downstream handler raise 404
+    if not run.results_valid:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                f"Wyniki przebiegu {run_id} są nieaktualne "
+                f"(result_status: {run.result_status}). "
+                "Wymagane ponowne obliczenie."
+            ),
+        )
+
+
 @router.get("/projects/{project_id}/analysis-runs")
 def list_analysis_runs(
     project_id: UUID,
@@ -79,6 +102,7 @@ def list_analysis_runs(
                     input_hash=run.input_hash,
                     summary_json=minimize_summary(run.result_summary),
                     trace_summary=trace_summary,
+                    results_valid=run.results_valid,
             ).to_dict()
         )
     return canonicalize_json({"items": items, "count": len(runs)})
@@ -123,6 +147,7 @@ def get_analysis_run(
         input_hash=run.input_hash,
         summary_json=run.result_summary,
         trace_summary=trace_summary,
+        results_valid=run.results_valid,
         input_metadata=build_input_metadata(run.input_snapshot),
     )
     return canonicalize_json(dto.to_dict())
@@ -138,6 +163,7 @@ def get_analysis_run_results(
     run_id: UUID,
     uow_factory=Depends(get_uow_factory),
 ) -> dict[str, Any]:
+    _guard_stale_results(run_id, uow_factory)
     service = _build_service(uow_factory)
     results = service.get_results(run_id)
     items = []
@@ -230,6 +256,7 @@ def export_analysis_run_docx(
     run_id: UUID,
     uow_factory=Depends(get_uow_factory),
 ) -> Response:
+    _guard_stale_results(run_id, uow_factory)
     service = _build_export_service(uow_factory)
     try:
         bundle = service.export_run_bundle(run_id)
@@ -260,6 +287,7 @@ def export_analysis_run_pdf(
     run_id: UUID,
     uow_factory=Depends(get_uow_factory),
 ) -> Response:
+    _guard_stale_results(run_id, uow_factory)
     service = _build_export_service(uow_factory)
     try:
         bundle = service.export_run_bundle(run_id)
@@ -300,6 +328,7 @@ def get_results_index(
 
     Returns available result tables with column metadata and units.
     """
+    _guard_stale_results(run_id, uow_factory)
     service = _build_inspector_service(uow_factory)
     try:
         dto = service.get_results_index(run_id)
@@ -320,6 +349,7 @@ def get_bus_results(
 
     Returns deterministically sorted bus results (by name, then id).
     """
+    _guard_stale_results(run_id, uow_factory)
     service = _build_inspector_service(uow_factory)
     try:
         dto = service.get_bus_results(run_id)
@@ -340,6 +370,7 @@ def get_branch_results(
 
     Returns deterministically sorted branch results (by name, then id).
     """
+    _guard_stale_results(run_id, uow_factory)
     service = _build_inspector_service(uow_factory)
     try:
         dto = service.get_branch_results(run_id)
@@ -361,6 +392,7 @@ def get_short_circuit_results(
     Only available for short_circuit_sn analysis type.
     Returns deterministically sorted results (by target_id).
     """
+    _guard_stale_results(run_id, uow_factory)
     service = _build_inspector_service(uow_factory)
     try:
         dto = service.get_short_circuit_results(run_id)
@@ -381,6 +413,7 @@ def get_extended_trace(
 
     Returns white_box_trace + run metadata (snapshot_id, input_hash).
     """
+    _guard_stale_results(run_id, uow_factory)
     service = _build_inspector_service(uow_factory)
     try:
         dto = service.get_extended_trace(run_id)
