@@ -65,6 +65,7 @@ docs/spec/
 ├── SPEC_CHAPTER_16_EXTERNAL_INTEGRATIONS.md            ← Integracje Zewnętrzne, Interoperacyjność (GOTOWY, v1.0)
 ├── SPEC_CHAPTER_17_TESTING_AND_ACCEPTANCE.md           ← Testy Systemowe, Weryfikacja, Odbiór (GOTOWY, v1.0)
 ├── SPEC_CHAPTER_18_PRODUCTION_AND_MAINTENANCE.md       ← Wdrożenie Produkcyjne, Eksploatacja, Audyt (GOTOWY, v1.0) ★ FINAL
+├── SPEC_GAP_SUPPLEMENT_PROTECTION_WHITEBOX_LEGACY.md   ← Domknięcie GAP 1-3: Protection↔Case, WhiteBoxEventRegistry, OperatingCase legacy (GOTOWY, v1.0)
 │
 │   ══════════════════════════════════════
 │   FAZA 0 — KONTRAKTY I WARSTWY
@@ -179,6 +180,13 @@ PREAMBUŁA — CEL, ZAKRES, DEFINICJE (UKOŃCZONA)
             └── Domena Wdrożenia Produkcyjnego ZAMKNIĘTA (§18.0–§18.13, Decyzje #134–#140)
             └── Obejmuje: 6 usług Docker (backend, frontend, PostgreSQL, MongoDB, Redis, Celery), Dockerfile (python:3.11-slim, Poetry 1.7.1), volumes (postgres_data, mongodb_data, redis_data), ENV krytyczne (SECRET_KEY, DATABASE_URL, REDIS_URL — zakaz domyślnych Z-PRD-01..03), 9 migracji SQL (001_initial→009_result_status), Celery (json serializer, task_acks_late, Europe/Warsaw), logging structured (RequestIdMiddleware, X-Request-Id, severity routing), health checks 3-tier (basic/readiness/extended), security (Pydantic AS-IS, JWT/RBAC TO-BE), backup strategy (PostgreSQL pg_dump, MongoDB mongodump, Redis RDB), smoke test (scripts/smoke_local.sh), GO-LIVE Checklist (14 kategorii), dependency management (Poetry + npm, locked), INV-PRD-01..10, Z-PRD-01..07
             └── **SPECYFIKACJA ZAMKNIĘTA — ROZDZIAŁY 1–18 KOMPLETNE. 140 DECYZJI WIĄŻĄCYCH.**
+
+  Krok 0s: SPEC_GAP_SUPPLEMENT_PROTECTION_WHITEBOX_LEGACY.md ✅ GOTOWY (v1.0)
+            └── Domknięcie 3 luk kontraktowych (§G1–§G3, Decyzje #141–#149)
+            └── GAP 1: Protection↔StudyCase kaskadowa invalidacja (ProtectionConfig → OUTDATED runs, White Box fingerprint, Z-GAP1-01..02, INV-GAP1-01..03)
+            └── GAP 2: WhiteBoxEventRegistry globalny (event_domain×event_class×event_scope×severity, 4 domeny, v1 opcjonalne / v2 wymagane, Z-GAP2-01..03, INV-GAP2-01..05)
+            └── GAP 3: OperatingCase=LEGACY / StudyCase=kanon, migracja 3-fazowa M1→M2→M3 (każda wymaga ADR, Z-GAP3-01..03, INV-GAP3-01..05)
+            └── **149 DECYZJI WIĄŻĄCYCH. LUKI GAP 1–3 DOMKNIĘTE.**
 
 FAZA 0 — KONTRAKTY I WARSTWY (PRIORYTET NAJWYŻSZY)
   Krok 1:  SPEC_00_LAYERING.md
@@ -966,15 +974,16 @@ FINALIZACJA:
 | SPEC_15_PERSISTENCE.md | 4 | Infrastructure | 6+1 TO-BE | ~380 |
 | SPEC_16_TESTS.md | 4 | Infrastructure | 10 | ~540 |
 | SPEC_INDEX.md | — | Index | 5 | ~150 |
-| **RAZEM** | | | **~465** | **~26 308** |
+| SPEC_GAP_SUPPLEMENT_PROTECTION_WHITEBOX_LEGACY.md | Suplement | Protection + White Box + Study Cases | 5 | ~250 ✅ v1.0 |
+| **RAZEM** | | | **~470** | **~26 558** |
 
 ### Porównanie:
 - **SYSTEM_SPEC.md v3.0:** ~487 linii
-- **Nowa specyfikacja:** ~26 308 linii (36 plików, w tym Rozdział 1-18 preambuły + suplementy)
-- **Wzrost:** ~54× (5400%)
+- **Nowa specyfikacja:** ~26 558 linii (37 plików, w tym Rozdział 1-18 preambuły + suplementy + GAP)
+- **Wzrost:** ~55× (5500%)
 - **Pokrycie AS-IS:** ~95% (sekcje TO-BE wyraźnie oznaczone)
-- **Decyzje wiążące:** 140 (AUDIT_SPEC_VS_CODE.md)
-- **SPECYFIKACJA ZAMKNIĘTA** — Rozdziały 1–18 kompletne
+- **Decyzje wiążące:** 149 (AUDIT_SPEC_VS_CODE.md)
+- **Luki kontraktowe GAP 1–3:** DOMKNIĘTE
 
 ---
 

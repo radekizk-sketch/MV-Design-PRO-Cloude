@@ -983,6 +983,24 @@ Każda rozbieżność z §2 otrzymuje jednoznaczną dyspozycję.
 - **DOMENA WDROŻENIA PRODUKCYJNEGO W ROZDZIALE 18 JEST ZAMKNIĘTA (v1.0).**
 - **SPECYFIKACJA ZAMKNIĘTA — ROZDZIAŁY 1–18 KOMPLETNE. 140 DECYZJI WIĄŻĄCYCH.**
 
+| 141 | Zmiana ProtectionConfig kaskadowo unieważnia WSZYSTKIE powiązane ProtectionAnalysisRun (result_status→OUTDATED) | **BINDING** | Protection + Study Cases | `SPEC_GAP_SUPPLEMENT…` (§G1.2) | AS-IS: Case markowany OUTDATED, ALE brak kaskady do runów. TO-BE: kaskada invalidate_runs_for_case(case_id). INV-GAP1-01. Z-GAP1-01..02. |
+| 142 | White Box nowego runu MUSI zawierać: previous/current config fingerprint, config_change_detected, invalidated_run_ids | **BINDING** | Protection + White Box | `SPEC_GAP_SUPPLEMENT…` (§G1.4) | Pełna audytowalność zmiany nastaw. Zgodne z R14 (hash chain). INV-GAP1-03. |
+| 143 | ProtectionAnalysisRun z result_status=OUTDATED NIE MOŻE mieć statusu APPROVED | **BINDING** | Protection + Governance | `SPEC_GAP_SUPPLEMENT…` (§G1.5–§G1.6) | Zgodne z R15 §15.5 (zatwierdzenia). INV-GAP1-02. |
+| 144 | WhiteBoxEventRegistry — kanoniczny, globalny rejestr klas zdarzeń White Box (singleton, niezależny od domeny) | **BINDING** | White Box (Cross-cutting) | `SPEC_GAP_SUPPLEMENT…` (§G2.2) | Rozszerzalny wyłącznie przez ADR. Protection korzysta z rejestru (nie definiuje lokalnie). INV-GAP2-01, Z-GAP2-01..03. |
+| 145 | Taksonomia zdarzeń v1: event_domain (SOLVER/PROTECTION/VALIDATION/GOVERNANCE) × event_class (COMPUTATIONAL/TECHNOLOGICAL/NETWORK/SYSTEM) × event_scope (LOCAL_ELEMENT/LOCAL_DEVICE/NETWORK_SECTION/GLOBAL) × severity (TRACE/INFO/WARNING/ERROR) | **BINDING** | White Box (Cross-cutting) | `SPEC_GAP_SUPPLEMENT…` (§G2.3) | v1: opcjonalne pola (backward compat). v2: wymagane (po ADR). Protection event_class/scope z §9.A.1 = podzbiór rejestru. INV-GAP2-02..03. |
+| 146 | Istniejące struktury trace (WhiteBoxStep, PowerFlowTrace, ShortCircuitResult) TO-BE: + opcjonalne pola event_domain/class/scope/severity | **BINDING** | Solver + White Box | `SPEC_GAP_SUPPLEMENT…` (§G2.5) | Backward compatible. Stają się wymagane w v2. INV-GAP2-05. |
+| 147 | OperatingCase = byt LEGACY, NIE rozwijany, NIE dla nowych analiz; StudyCase = JEDYNY kanon | **BINDING** | Study Cases + Migration | `SPEC_GAP_SUPPLEMENT…` (§G3.2) | AS-IS: dual-model (OperatingCase dla solverów, StudyCase dla config). TO-BE: unifikacja na StudyCase. INV-GAP3-01..02, Z-GAP3-01..02. |
+| 148 | Migracja OperatingCase→StudyCase: 3 fazy (M1: koegzystencja, M2: przekierowanie solverów, M3: usunięcie) | **BINDING** | Study Cases + Infrastructure | `SPEC_GAP_SUPPLEMENT…` (§G3.3) | Każda faza wymaga ADR. M2: AnalysisRun.case_id → study_cases. M3: archiwizacja operating_cases. INV-GAP3-03. |
+| 149 | W fazie M1: solver execution via OperatingCase (kompatybilność), nowe features wyłącznie w StudyCase | **BINDING** | Study Cases | `SPEC_GAP_SUPPLEMENT…` (§G3.4) | Nowe typy analiz MUSZĄ korzystać z StudyCase. Z-GAP3-01..03. INV-GAP3-04..05. |
+
+**Z decyzji #141–#149 wynika (Suplement GAP — BINDING):**
+- **GAP 1:** Kaskadowa invalidacja ProtectionAnalysisRun przy zmianie ProtectionConfig. OUTDATED run ≠ APPROVED.
+- **GAP 2:** WhiteBoxEventRegistry jako singleton specyfikacyjny. Taksonomia 4-wymiarowa (domain × class × scope × severity). v1 opcjonalne, v2 wymagane.
+- **GAP 3:** OperatingCase = LEGACY (brak rozwoju). StudyCase = jedyny kanon. Migracja 3-fazowa (M1→M2→M3, każda wymaga ADR).
+- Brak konfliktów z decyzjami #1–#140.
+- INV-GAP1-01..03, INV-GAP2-01..05, INV-GAP3-01..05. Z-GAP1-01..02, Z-GAP2-01..03, Z-GAP3-01..03.
+- **LUKI KONTRAKTOWE GAP 1–3 DOMKNIĘTE.**
+
 ---
 
-**KONIEC AUDYTU**
+**KONIEC AUDYTU — 149 DECYZJI WIĄŻĄCYCH**
