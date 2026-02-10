@@ -64,6 +64,9 @@ const TREE_NODE_LABELS: Record<TreeNodeType, string> = {
   PROTECTION_COMPARISONS: 'Porównania A/B',  // P15c: Protection comparisons
   POWER_FLOW_RESULTS: 'Rozpływ mocy',  // P20b: Power flow results
   POWER_FLOW_RUNS: 'Rozpływy',  // P20b: Power flow runs
+  GENERATORS: 'Generatory / OZE',  // PR-9: Generators category
+  MEASUREMENTS: 'Przekładniki',  // PR-9: Measurement transformers (CT/VT)
+  PROTECTION_ASSIGNMENTS: 'Zabezpieczenia',  // PR-9: Protection assignments
   ELEMENT: '',
 };
 
@@ -79,6 +82,9 @@ const TREE_NODE_TO_ELEMENT_TYPE: Partial<Record<TreeNodeType, ElementType>> = {
   SWITCHES: 'Switch',
   SOURCES: 'Source',
   LOADS: 'Load',
+  GENERATORS: 'Generator',
+  MEASUREMENTS: 'Measurement',
+  PROTECTION_ASSIGNMENTS: 'ProtectionAssignment',
 };
 
 // ============================================================================
@@ -111,6 +117,9 @@ interface ProjectTreeProps {
     switches: NetworkElement[];
     sources: NetworkElement[];
     loads: NetworkElement[];
+    generators?: NetworkElement[];
+    measurements?: NetworkElement[];
+    protection_assignments?: NetworkElement[];
   };
   typeCounts?: {
     lineTypes: number;
@@ -285,6 +294,27 @@ export function ProjectTree({
               nodeType: 'LOADS',
               count: elements.loads.length,
               children: buildElementNodes(elements.loads, 'Load'),
+            },
+            {
+              id: 'generators',
+              label: TREE_NODE_LABELS.GENERATORS,
+              nodeType: 'GENERATORS',
+              count: (elements.generators ?? []).length,
+              children: buildElementNodes(elements.generators ?? [], 'Generator'),
+            },
+            {
+              id: 'measurements',
+              label: TREE_NODE_LABELS.MEASUREMENTS,
+              nodeType: 'MEASUREMENTS',
+              count: (elements.measurements ?? []).length,
+              children: buildElementNodes(elements.measurements ?? [], 'Measurement'),
+            },
+            {
+              id: 'protection-assignments',
+              label: TREE_NODE_LABELS.PROTECTION_ASSIGNMENTS,
+              nodeType: 'PROTECTION_ASSIGNMENTS',
+              count: (elements.protection_assignments ?? []).length,
+              children: buildElementNodes(elements.protection_assignments ?? [], 'ProtectionAssignment'),
             },
           ],
         },

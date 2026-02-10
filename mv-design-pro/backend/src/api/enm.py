@@ -1,12 +1,14 @@
 """
-ENM API — persistence + validation + run dispatch.
+ENM API — persistence + validation + run dispatch + topology operations.
 
 Routes:
   GET  /api/cases/{case_id}/enm              → current EnergyNetworkModel
   PUT  /api/cases/{case_id}/enm              → autosave (revision++, hash recomputed)
   GET  /api/cases/{case_id}/enm/validate     → ValidationResult
   GET  /api/cases/{case_id}/enm/topology     → TopologyGraph (substations, bays, junctions, corridors)
+  GET  /api/cases/{case_id}/enm/topology/summary → TopologySummary (graph view: adjacency, spine, laterals)
   GET  /api/cases/{case_id}/enm/readiness    → ReadinessMatrix (SC/PF/PR)
+  POST /api/cases/{case_id}/enm/ops          → Topology operations (atomic graph CRUD)
   POST /api/cases/{case_id}/runs/short-circuit → dispatch SC run via ENM
   POST /api/cases/{case_id}/runs/power-flow    → dispatch PF run via ENM
 """
@@ -18,9 +20,29 @@ from typing import Any
 
 from fastapi import APIRouter, HTTPException
 
+from pydantic import BaseModel, Field
+
 from enm.hash import compute_enm_hash
 from enm.mapping import map_enm_to_network_graph
 from enm.models import EnergyNetworkModel, ENMDefaults, ENMHeader
+from enm.topology_ops import (
+    TopologySummary,
+    attach_protection,
+    compute_topology_summary,
+    create_branch,
+    create_device,
+    create_measurement,
+    create_node,
+    delete_branch,
+    delete_device,
+    delete_measurement,
+    delete_node,
+    detach_protection,
+    update_branch,
+    update_device,
+    update_node,
+    update_protection,
+)
 from enm.validator import ENMValidator, ValidationResult
 
 from application.network_wizard.schema import (
@@ -126,8 +148,11 @@ async def get_enm_readiness(case_id: str) -> dict[str, Any]:
     validator = ENMValidator()
     result = validator.validate(enm)
 
-    has_protection_data = bool(enm.bays) and any(
-        b.protection_ref is not None for b in enm.bays
+    has_protection_data = (
+        bool(enm.protection_assignments)
+        or (bool(enm.bays) and any(
+            b.protection_ref is not None for b in enm.bays
+        ))
     )
 
     return {
@@ -157,7 +182,206 @@ async def get_enm_readiness(case_id: str) -> dict[str, Any]:
             "bays": len(enm.bays),
             "junctions": len(enm.junctions),
             "corridors": len(enm.corridors),
+            "measurements": len(enm.measurements),
+            "protection_assignments": len(enm.protection_assignments),
         },
+    }
+
+
+# ---------------------------------------------------------------------------
+# Topology Summary (graph view)
+# ---------------------------------------------------------------------------
+
+
+@router.get("/{case_id}/enm/topology/summary")
+async def get_topology_summary(case_id: str) -> dict[str, Any]:
+    """Zwróć podsumowanie topologiczne: adjacency, spine, laterals.
+
+    Używane przez Tree i SLD do wyświetlania struktury sieci.
+    DETERMINISTYCZNE: ten sam ENM → identyczny wynik.
+    """
+    enm = _get_enm(case_id)
+    enm_dict = enm.model_dump(mode="json")
+    summary = compute_topology_summary(enm_dict)
+    return {
+        "case_id": case_id,
+        "enm_revision": enm.header.revision,
+        "bus_count": summary.bus_count,
+        "branch_count": summary.branch_count,
+        "transformer_count": summary.transformer_count,
+        "source_count": summary.source_count,
+        "load_count": summary.load_count,
+        "generator_count": summary.generator_count,
+        "measurement_count": summary.measurement_count,
+        "protection_count": summary.protection_count,
+        "is_radial": summary.is_radial,
+        "has_cycles": summary.has_cycles,
+        "adjacency": [
+            {
+                "bus_ref": e.bus_ref,
+                "neighbor_ref": e.neighbor_ref,
+                "via_ref": e.via_ref,
+                "via_type": e.via_type,
+            }
+            for e in summary.adjacency
+        ],
+        "spine": [
+            {
+                "bus_ref": s.bus_ref,
+                "depth": s.depth,
+                "is_source": s.is_source,
+                "children_refs": list(s.children_refs),
+            }
+            for s in summary.spine
+        ],
+        "lateral_roots": list(summary.lateral_roots),
+    }
+
+
+# ---------------------------------------------------------------------------
+# Topology Operations (atomic graph CRUD)
+# ---------------------------------------------------------------------------
+
+
+class TopologyOpRequest(BaseModel):
+    """Żądanie operacji topologicznej."""
+    op: str = Field(..., description="Typ operacji (create_node, update_node, delete_node, "
+                    "create_branch, update_branch, delete_branch, "
+                    "create_device, update_device, delete_device, "
+                    "create_measurement, delete_measurement, "
+                    "attach_protection, update_protection, detach_protection)")
+    data: dict[str, Any] = Field(default_factory=dict, description="Dane operacji")
+
+
+_OP_DISPATCH = {
+    "create_node": lambda enm, data: create_node(enm, data),
+    "update_node": lambda enm, data: update_node(enm, data),
+    "delete_node": lambda enm, data: delete_node(enm, data.get("ref_id", "")),
+    "create_branch": lambda enm, data: create_branch(enm, data),
+    "update_branch": lambda enm, data: update_branch(enm, data),
+    "delete_branch": lambda enm, data: delete_branch(enm, data.get("ref_id", "")),
+    "create_device": lambda enm, data: create_device(enm, data),
+    "update_device": lambda enm, data: update_device(enm, data),
+    "delete_device": lambda enm, data: delete_device(
+        enm, data.get("device_type", ""), data.get("ref_id", ""),
+    ),
+    "create_measurement": lambda enm, data: create_measurement(enm, data),
+    "delete_measurement": lambda enm, data: delete_measurement(enm, data.get("ref_id", "")),
+    "attach_protection": lambda enm, data: attach_protection(enm, data),
+    "update_protection": lambda enm, data: update_protection(enm, data),
+    "detach_protection": lambda enm, data: detach_protection(enm, data.get("ref_id", "")),
+}
+
+
+@router.post("/{case_id}/enm/ops")
+async def topology_ops(case_id: str, req: TopologyOpRequest) -> dict[str, Any]:
+    """Atomic topology operation: validate → mutate → persist.
+
+    Supports: create/update/delete for nodes, branches, devices,
+    measurements, and protection assignments.
+    Returns operation result with issues and updated ENM revision.
+    """
+    handler = _OP_DISPATCH.get(req.op)
+    if not handler:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Nieznana operacja: '{req.op}'. "
+                   f"Dostępne: {', '.join(sorted(_OP_DISPATCH.keys()))}",
+        )
+
+    enm = _get_enm(case_id)
+    enm_dict = enm.model_dump(mode="json")
+
+    result = handler(enm_dict, req.data)
+
+    if result.success:
+        saved = _set_enm(case_id, EnergyNetworkModel.model_validate(result.enm))
+        return {
+            "success": True,
+            "op": req.op,
+            "created_ref": result.created_ref,
+            "issues": [
+                {"code": i.code, "severity": i.severity,
+                 "message_pl": i.message_pl, "element_ref": i.element_ref}
+                for i in result.issues
+            ],
+            "revision": saved.header.revision,
+        }
+
+    return {
+        "success": False,
+        "op": req.op,
+        "created_ref": None,
+        "issues": [
+            {"code": i.code, "severity": i.severity,
+             "message_pl": i.message_pl, "element_ref": i.element_ref}
+            for i in result.issues
+        ],
+        "revision": enm.header.revision,
+    }
+
+
+class BatchOpsRequest(BaseModel):
+    """Żądanie wielu operacji topologicznych (batch)."""
+    operations: list[TopologyOpRequest] = Field(
+        ..., description="Lista operacji do wykonania sekwencyjnie"
+    )
+
+
+@router.post("/{case_id}/enm/ops/batch")
+async def topology_ops_batch(case_id: str, req: BatchOpsRequest) -> dict[str, Any]:
+    """Batch topology operations: execute sequentially, rollback all on BLOCKER.
+
+    Each operation is applied sequentially on the result of the previous one.
+    If any operation fails with BLOCKER, ALL operations are rolled back.
+    """
+    enm = _get_enm(case_id)
+    enm_dict = enm.model_dump(mode="json")
+
+    results: list[dict[str, Any]] = []
+    current_enm = enm_dict
+
+    for op_req in req.operations:
+        handler = _OP_DISPATCH.get(op_req.op)
+        if not handler:
+            return {
+                "success": False,
+                "results": results,
+                "error": f"Nieznana operacja: '{op_req.op}'",
+                "revision": enm.header.revision,
+            }
+
+        result = handler(current_enm, op_req.data)
+        op_result = {
+            "op": op_req.op,
+            "success": result.success,
+            "created_ref": result.created_ref,
+            "issues": [
+                {"code": i.code, "severity": i.severity,
+                 "message_pl": i.message_pl, "element_ref": i.element_ref}
+                for i in result.issues
+            ],
+        }
+        results.append(op_result)
+
+        if not result.success:
+            # Rollback: return original ENM
+            return {
+                "success": False,
+                "results": results,
+                "error": f"Operacja '{op_req.op}' nie powiodła się — rollback",
+                "revision": enm.header.revision,
+            }
+
+        current_enm = result.enm
+
+    # All operations succeeded — persist
+    saved = _set_enm(case_id, EnergyNetworkModel.model_validate(current_enm))
+    return {
+        "success": True,
+        "results": results,
+        "error": None,
+        "revision": saved.header.revision,
     }
 
 

@@ -33,6 +33,22 @@ export interface GenLimits {
   q_max_mvar?: number | null;
 }
 
+export interface MeasurementRating {
+  ratio_primary: number;
+  ratio_secondary: number;
+  accuracy_class?: string | null;
+  burden_va?: number | null;
+}
+
+export interface ProtectionSetting {
+  function_type: 'overcurrent_50' | 'overcurrent_51' | 'earth_fault_50N'
+    | 'earth_fault_51N' | 'directional_67' | 'directional_67N';
+  threshold_a?: number | null;
+  time_delay_s?: number | null;
+  curve_type?: 'DT' | 'IEC_SI' | 'IEC_VI' | 'IEC_EI' | 'IEC_LI' | null;
+  is_directional?: boolean;
+}
+
 // ---------------------------------------------------------------------------
 // ENMElement — base for all elements
 // ---------------------------------------------------------------------------
@@ -237,6 +253,34 @@ export interface Corridor extends ENMElement {
 }
 
 // ---------------------------------------------------------------------------
+// Measurement (przekładnik CT/VT)
+// ---------------------------------------------------------------------------
+
+export interface Measurement extends ENMElement {
+  measurement_type: 'CT' | 'VT';
+  bus_ref: string;
+  bay_ref?: string | null;
+  rating: MeasurementRating;
+  connection: 'star' | 'delta' | 'single_phase';
+  purpose: 'protection' | 'metering' | 'combined';
+}
+
+// ---------------------------------------------------------------------------
+// ProtectionAssignment (przypięcie zabezpieczenia do wyłącznika)
+// ---------------------------------------------------------------------------
+
+export interface ProtectionAssignment extends ENMElement {
+  breaker_ref: string;
+  ct_ref?: string | null;
+  vt_ref?: string | null;
+  device_type: 'overcurrent' | 'earth_fault' | 'directional_overcurrent'
+    | 'distance' | 'differential' | 'custom';
+  catalog_ref?: string | null;
+  settings: ProtectionSetting[];
+  is_enabled: boolean;
+}
+
+// ---------------------------------------------------------------------------
 // ROOT
 // ---------------------------------------------------------------------------
 
@@ -252,6 +296,8 @@ export interface EnergyNetworkModel {
   bays: Bay[];
   junctions: Junction[];
   corridors: Corridor[];
+  measurements: Measurement[];
+  protection_assignments: ProtectionAssignment[];
 }
 
 // ---------------------------------------------------------------------------
@@ -323,6 +369,8 @@ export interface ElementCounts {
   bays: number;
   junctions: number;
   corridors: number;
+  measurements: number;
+  protection_assignments: number;
 }
 
 export interface ReadinessMatrix {
@@ -343,9 +391,65 @@ export interface SelectionRef {
   element_ref_id: string;
   /** Typ elementu */
   element_type: 'bus' | 'branch' | 'transformer' | 'source' | 'load' | 'generator'
-    | 'substation' | 'bay' | 'junction' | 'corridor';
+    | 'substation' | 'bay' | 'junction' | 'corridor'
+    | 'measurement' | 'protection_assignment';
   /** Krok kreatora powiązany z elementem */
   wizard_step_hint: string;
+}
+
+// ---------------------------------------------------------------------------
+// Topology Graph Summary (z GET /enm/topology/summary)
+// ---------------------------------------------------------------------------
+
+export interface AdjacencyEntry {
+  bus_ref: string;
+  neighbor_ref: string;
+  via_ref: string;
+  via_type: string;
+}
+
+export interface SpineNode {
+  bus_ref: string;
+  depth: number;
+  is_source: boolean;
+  children_refs: string[];
+}
+
+export interface TopologyGraphSummary {
+  case_id: string;
+  enm_revision: number;
+  bus_count: number;
+  branch_count: number;
+  transformer_count: number;
+  source_count: number;
+  load_count: number;
+  generator_count: number;
+  measurement_count: number;
+  protection_count: number;
+  is_radial: boolean;
+  has_cycles: boolean;
+  adjacency: AdjacencyEntry[];
+  spine: SpineNode[];
+  lateral_roots: string[];
+}
+
+// ---------------------------------------------------------------------------
+// Topology Operations (POST /enm/ops)
+// ---------------------------------------------------------------------------
+
+export interface TopologyOpIssue {
+  code: string;
+  severity: 'BLOCKER' | 'WARNING' | 'INFO';
+  message_pl: string;
+  element_ref?: string | null;
+}
+
+export interface TopologyOpResult {
+  success: boolean;
+  op: string;
+  created_ref?: string | null;
+  issues: TopologyOpIssue[];
+  revision: number;
 }
 
 // ---------------------------------------------------------------------------
