@@ -1,8 +1,8 @@
 # MV-DESIGN-PRO Agent Governance
 
-**Version:** 3.0
+**Version:** 4.0
 **Status:** CANONICAL & BINDING
-**Authority:** SYSTEM_SPEC.md > ARCHITECTURE.md > AGENTS.md > PLANS.md
+**Authority:** docs/spec/ > SYSTEM_SPEC.md > ARCHITECTURE.md > AGENTS.md > PLANS.md
 
 ---
 
@@ -10,12 +10,14 @@
 
 | Document | Purpose | Authority |
 |----------|---------|-----------|
-| **SYSTEM_SPEC.md** | Canonical system specification | BINDING (highest) |
-| **ARCHITECTURE.md** | Technical architecture reference | BINDING |
-| **AGENTS.md** | Agent governance rules (this file) | BINDING |
-| **PLANS.md** | Operational status & next steps | LIVING |
+| **[`docs/spec/`](docs/spec/)** | Detailed specification (18 chapters) | SOURCE OF TRUTH |
+| **[`docs/spec/AUDIT_SPEC_VS_CODE.md`](docs/spec/AUDIT_SPEC_VS_CODE.md)** | Spec-vs-code gap analysis + decision matrix | BINDING |
+| **[`SYSTEM_SPEC.md`](SYSTEM_SPEC.md)** | Executive overview + navigation hub | BINDING |
+| **[`ARCHITECTURE.md`](ARCHITECTURE.md)** | Technical architecture reference | BINDING |
+| **[`AGENTS.md`](AGENTS.md)** | Agent governance rules (this file) | BINDING |
+| **[`PLANS.md`](PLANS.md)** | Operational status & next steps | LIVING |
 
-In case of conflict: SYSTEM_SPEC.md wins. No other document overrides these four.
+In case of conflict: `docs/spec/` wins (it is the most detailed and authoritative). SYSTEM_SPEC.md summarizes the spec chapters. No other document overrides the above.
 
 ---
 
@@ -152,10 +154,11 @@ Cross-layer violations are architectural regressions requiring immediate fix.
 ### 6.1 Context Loading
 
 Before any implementation:
-1. Read SYSTEM_SPEC.md (canonical truth)
-2. Read ARCHITECTURE.md (layer details)
-3. Read PLANS.md (current status)
-4. Check relevant code before proposing changes
+1. Read SYSTEM_SPEC.md (executive overview + navigation to spec chapters)
+2. Consult relevant `docs/spec/SPEC_CHAPTER_*.md` for detailed contracts
+3. Read ARCHITECTURE.md (layer details)
+4. Read PLANS.md (current status)
+5. Check relevant code before proposing changes
 
 ### 6.2 Behavioral Rules
 

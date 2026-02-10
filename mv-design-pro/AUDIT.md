@@ -1,3 +1,8 @@
+> **DEPRECATED** — This document is superseded by
+> [`docs/spec/AUDIT_SPEC_VS_CODE.md`](docs/spec/AUDIT_SPEC_VS_CODE.md) (BINDING gap analysis)
+> and the 18-chapter specification in [`docs/spec/`](docs/spec/).
+> Retained for historical context only.
+
 # AUDIT.md — MV-DESIGN-PRO vs DIgSILENT PowerFactory
 
 **Data audytu:** 2026-02-01

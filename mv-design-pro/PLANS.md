@@ -1,8 +1,8 @@
 # MV-DESIGN-PRO Operational Plan
 
-**Version:** 4.0
+**Version:** 5.0
 **Status:** LIVING DOCUMENT
-**Reference:** SYSTEM_SPEC.md (authoritative)
+**Reference:** [`SYSTEM_SPEC.md`](SYSTEM_SPEC.md) (executive overview), [`docs/spec/`](docs/spec/) (detailed spec — source of truth)
 
 ---
 
@@ -75,19 +75,22 @@ MV-DESIGN-PRO is a functional Medium Voltage network design and analysis system 
 
 ## 3. Active Work
 
-### 3.1 Memory Canonization V3.0 (current)
+### 3.1 Docs Sync to Spec Canon (current)
 
-Objective: Transform repo documentation into clean, canonical Opus memory.
+Objective: Synchronize all repo documentation entrypoints with `docs/spec/` (18 chapters) as the source of truth.
 
 Tasks:
-- [x] Full repo scan
-- [x] Document chaos detection
-- [x] Rewrite AGENTS.md (192 lines, clean governance)
-- [x] Rewrite SYSTEM_SPEC.md (483 lines, full function map)
-- [x] Rewrite ARCHITECTURE.md (490 lines, true architecture)
+- [x] Full repo scan (RECON)
+- [x] Document chaos detection (20 inconsistencies identified)
+- [x] Rewrite AGENTS.md (clean governance)
+- [x] Rewrite SYSTEM_SPEC.md (executive overview + navigation to 18 spec chapters)
+- [x] Rewrite ARCHITECTURE.md (spec chapter references in every section)
 - [x] Rewrite PLANS.md (this file)
-- [ ] Move historical ExecPlans to archive
-- [ ] Clean duplicate docs
+- [x] Sync README.md (root + mv-design-pro) — removed prohibited terms, fixed paths, added spec links
+- [x] Sync docs/INDEX.md — added spec chapter table, fixed broken links
+- [x] Add docs_guard.py CI guard (PCC + broken link check)
+- [x] Clean remaining duplicate docs in docs/ outside docs/spec/
+- [x] Mark/move deprecated notes and operational files
 
 ---
 
@@ -128,6 +131,8 @@ Tasks:
 | Issue | Severity | Description |
 |-------|----------|-------------|
 | Node/Bus terminology | RESOLVED | DTOs, API, frontend types renamed with backward-compat aliases |
+| Stale root-level docs | RESOLVED | AUDIT.md, P13B_SUMMARY.md, AUDIT_PCC_REMOVAL.md marked DEPRECATED |
+| Duplicate DOCS_INDEX.md | RESOLVED | Deleted (superseded by docs/INDEX.md) |
 | Duplicate UI contract docs | LOW | Some contracts exist in both `docs/ui/` and root `docs/ui/` |
 | Large test fixtures | LOW | Some test files contain large inline fixtures |
 | ADR numbering conflicts | LOW | ADR-002, ADR-003, ADR-006, ADR-007, ADR-008 have duplicate numbers |
@@ -144,10 +149,23 @@ Tasks:
 | Result API drift | Frozen API rule + version bump requirement |
 | Proof determinism regression | SHA-256 fingerprint tests |
 | UI codename leaks | `no_codenames_guard.py` script |
+| Documentation drift | `docs_guard.py` — PCC prohibition + broken link check in entrypoints |
 
 ---
 
-## 7. Historical ExecPlans
+## 7. Canonical Documentation
+
+| Document | Location | Status |
+|----------|----------|--------|
+| Detailed Specification (18 chapters) | [`docs/spec/SPEC_CHAPTER_*.md`](docs/spec/) | SOURCE OF TRUTH |
+| Spec-vs-Code Audit | [`docs/spec/AUDIT_SPEC_VS_CODE.md`](docs/spec/AUDIT_SPEC_VS_CODE.md) | BINDING |
+| Spec Expansion Plan | [`docs/spec/SPEC_EXPANSION_PLAN.md`](docs/spec/SPEC_EXPANSION_PLAN.md) | REFERENCE |
+| System Spec (overview) | [`SYSTEM_SPEC.md`](SYSTEM_SPEC.md) | BINDING |
+| Architecture | [`ARCHITECTURE.md`](ARCHITECTURE.md) | BINDING |
+| Agent Governance | [`AGENTS.md`](AGENTS.md) | BINDING |
+| Documentation Index | [`docs/INDEX.md`](docs/INDEX.md) | REFERENCE |
+
+## 8. Historical ExecPlans
 
 All historical ExecPlans (01-16) are archived in `docs/audit/historical_execplans/`.
 They document the evolution of the project but are NOT part of the canonical plan.
