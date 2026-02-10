@@ -6,7 +6,8 @@ Checks:
 1. No "PCC" term in entrypoint documentation files (prohibited concept).
    Scans only entrypoint docs (SYSTEM_SPEC, ARCHITECTURE, README, AGENTS, PLANS).
    Excludes docs/spec/ (canonical, binding — not to be modified by guard).
-2. Broken markdown links in key entrypoints (SYSTEM_SPEC, README, ARCHITECTURE, INDEX).
+2. Broken markdown links in key entrypoints (SYSTEM_SPEC, README, ARCHITECTURE,
+   INDEX files at both project and repo-root level).
 
 Note: Project codenames in frontend UI strings are checked by the separate
 no_codenames_guard.py script. This guard focuses on documentation integrity.
@@ -25,18 +26,23 @@ import re
 import sys
 from pathlib import Path
 
-REPO_ROOT = Path(__file__).resolve().parents[1]
+# mv-design-pro/ directory (where the script lives under scripts/)
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+# Repo root (one level above mv-design-pro/)
+REPO_ROOT = PROJECT_ROOT.parent
 
 # ---------------------------------------------------------------------------
 # CHECK 1: PCC prohibition in entrypoint docs
 # ---------------------------------------------------------------------------
 
+# Tuples of (base_dir, relative_file)
 PCC_CHECK_FILES = [
-    "SYSTEM_SPEC.md",
-    "ARCHITECTURE.md",
-    "README.md",
-    "AGENTS.md",
-    "PLANS.md",
+    (PROJECT_ROOT, "SYSTEM_SPEC.md"),
+    (PROJECT_ROOT, "ARCHITECTURE.md"),
+    (PROJECT_ROOT, "README.md"),
+    (PROJECT_ROOT, "AGENTS.md"),
+    (PROJECT_ROOT, "PLANS.md"),
+    (REPO_ROOT, "README.md"),
 ]
 
 PCC_PATTERN = re.compile(r"\bPCC\b")
@@ -68,8 +74,8 @@ def check_pcc() -> list[str]:
     """Check for PCC term in entrypoint documentation."""
     violations = []
 
-    for rel_file in PCC_CHECK_FILES:
-        file_path = REPO_ROOT / rel_file
+    for base_dir, rel_file in PCC_CHECK_FILES:
+        file_path = base_dir / rel_file
         if not file_path.exists():
             continue
 
@@ -78,11 +84,15 @@ def check_pcc() -> list[str]:
         except (UnicodeDecodeError, OSError):
             continue
 
+        display_path = str(file_path.relative_to(REPO_ROOT))
+
         for line_num, line in enumerate(content.split("\n"), start=1):
             if PCC_PATTERN.search(line):
                 if any(ctx in line for ctx in PCC_ALLOWED_CONTEXTS):
                     continue
-                violations.append(f"  {rel_file}:{line_num}: {line.strip()[:100]}")
+                violations.append(
+                    f"  {display_path}:{line_num}: {line.strip()[:100]}"
+                )
 
     return violations
 
@@ -91,11 +101,14 @@ def check_pcc() -> list[str]:
 # CHECK 2: Broken links in key entrypoints
 # ---------------------------------------------------------------------------
 
+# Tuples of (base_dir, relative_file)
 LINK_CHECK_FILES = [
-    "SYSTEM_SPEC.md",
-    "README.md",
-    "ARCHITECTURE.md",
-    "docs/INDEX.md",
+    (PROJECT_ROOT, "SYSTEM_SPEC.md"),
+    (PROJECT_ROOT, "README.md"),
+    (PROJECT_ROOT, "ARCHITECTURE.md"),
+    (PROJECT_ROOT, "docs/INDEX.md"),
+    (REPO_ROOT, "README.md"),
+    (REPO_ROOT, "docs/INDEX.md"),
 ]
 
 MD_LINK_PATTERN = re.compile(r"\[([^\]]*)\]\(([^)]+)\)")
@@ -105,8 +118,8 @@ def check_broken_links() -> list[str]:
     """Check for broken relative links in key entrypoints."""
     violations = []
 
-    for rel_file in LINK_CHECK_FILES:
-        file_path = REPO_ROOT / rel_file
+    for base_dir, rel_file in LINK_CHECK_FILES:
+        file_path = base_dir / rel_file
         if not file_path.exists():
             continue
 
@@ -115,7 +128,8 @@ def check_broken_links() -> list[str]:
         except (UnicodeDecodeError, OSError):
             continue
 
-        base_dir = file_path.parent
+        link_base_dir = file_path.parent
+        display_path = str(file_path.relative_to(REPO_ROOT))
 
         for line_num, line in enumerate(content.split("\n"), start=1):
             for match in MD_LINK_PATTERN.finditer(line):
@@ -132,10 +146,10 @@ def check_broken_links() -> list[str]:
 
                 # Handle directory links (ending with /)
                 if link_path.endswith("/"):
-                    target = base_dir / link_path
+                    target = link_base_dir / link_path
                     if not target.exists():
                         violations.append(
-                            f"  {rel_file}:{line_num}: broken directory link -> {link_target}"
+                            f"  {display_path}:{line_num}: broken directory link -> {link_target}"
                         )
                     continue
 
@@ -143,10 +157,10 @@ def check_broken_links() -> list[str]:
                 if "*" in link_path:
                     continue
 
-                target = base_dir / link_path
+                target = link_base_dir / link_path
                 if not target.exists():
                     violations.append(
-                        f"  {rel_file}:{line_num}: broken link -> {link_target}"
+                        f"  {display_path}:{line_num}: broken link -> {link_target}"
                     )
 
     return violations

@@ -6,6 +6,26 @@ System do projektowania i analizy sieci SN (Srednie Napiecie) zgodny z architekt
 
 ---
 
+## Start Here
+
+| Entry Point | What It Is |
+|-------------|-----------|
+| [`mv-design-pro/docs/spec/`](mv-design-pro/docs/spec/) | **Detailed specification (18 chapters)** — the source of truth |
+| [`mv-design-pro/SYSTEM_SPEC.md`](mv-design-pro/SYSTEM_SPEC.md) | Executive overview + navigation hub to spec chapters |
+| [`mv-design-pro/ARCHITECTURE.md`](mv-design-pro/ARCHITECTURE.md) | Architecture reference (layers, flows, file map) |
+| [`mv-design-pro/docs/INDEX.md`](mv-design-pro/docs/INDEX.md) | Full documentation index (spec, UI contracts, proof engine, ADRs) |
+
+## Other Documentation
+
+| Document | Purpose |
+|----------|---------|
+| [`mv-design-pro/AGENTS.md`](mv-design-pro/AGENTS.md) | Agent governance rules |
+| [`mv-design-pro/PLANS.md`](mv-design-pro/PLANS.md) | Operational plan (living document) |
+| [`mv-design-pro/README.md`](mv-design-pro/README.md) | How to run, test, develop |
+| [`docs/INDEX.md`](docs/INDEX.md) | UI contracts index (Polish) |
+
+---
+
 ## Quick Start
 
 ```bash
@@ -16,19 +36,6 @@ docker-compose up -d
 - Frontend: http://localhost:3000
 - Backend API: http://localhost:8000
 - API Docs: http://localhost:8000/docs
-
-## Documentation
-
-All project documentation lives in `mv-design-pro/`:
-
-| Document | Purpose |
-|----------|---------|
-| [`mv-design-pro/SYSTEM_SPEC.md`](mv-design-pro/SYSTEM_SPEC.md) | System specification (executive overview + navigation) |
-| [`mv-design-pro/docs/spec/`](mv-design-pro/docs/spec/) | **Detailed specification (18 chapters)** — source of truth |
-| [`mv-design-pro/ARCHITECTURE.md`](mv-design-pro/ARCHITECTURE.md) | Architecture reference |
-| [`mv-design-pro/AGENTS.md`](mv-design-pro/AGENTS.md) | Agent governance rules |
-| [`mv-design-pro/PLANS.md`](mv-design-pro/PLANS.md) | Operational plan |
-| [`mv-design-pro/README.md`](mv-design-pro/README.md) | How to run, test, develop |
 
 ## Running Tests
 
