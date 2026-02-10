@@ -23,6 +23,18 @@ from enm.mapping import map_enm_to_network_graph
 from enm.models import EnergyNetworkModel, ENMDefaults, ENMHeader
 from enm.validator import ENMValidator, ValidationResult
 
+from application.network_wizard.schema import (
+    ApplyStepResponse,
+    CanProceedResponse,
+    WizardStateResponse,
+    WizardStepRequest,
+)
+from application.network_wizard.step_controller import (
+    apply_step as ctrl_apply_step,
+    can_proceed as ctrl_can_proceed,
+)
+from application.network_wizard.validator import validate_wizard_state
+
 router = APIRouter(prefix="/api/cases", tags=["enm"])
 
 # ---------------------------------------------------------------------------
@@ -221,3 +233,87 @@ async def run_short_circuit(case_id: str) -> dict[str, Any]:
 
     _run_cache[cache_key] = response
     return response
+
+
+# ---------------------------------------------------------------------------
+# Wizard step controller endpoints
+# ---------------------------------------------------------------------------
+
+
+@router.get("/{case_id}/wizard/state")
+async def get_wizard_state(case_id: str) -> dict[str, Any]:
+    """Return full wizard state for case (deterministic).
+
+    Computes K1-K10 step states, readiness matrix, element counts.
+    Used for restoring wizard state after refresh / deep-link.
+    """
+    enm = _get_enm(case_id)
+    enm_dict = enm.model_dump(mode="json")
+    ws = validate_wizard_state(enm_dict)
+    return ws.model_dump(mode="json")
+
+
+@router.post("/{case_id}/wizard/apply-step")
+async def wizard_apply_step(case_id: str, req: WizardStepRequest) -> dict[str, Any]:
+    """Atomic step application: preconditions → mutate → postconditions.
+
+    If preconditions fail → original ENM unchanged, success=False.
+    If postconditions fail → rollback, original ENM unchanged, success=False.
+    On success → ENM saved with revision++, returns new wizard state.
+    """
+    enm = _get_enm(case_id)
+    enm_dict = enm.model_dump(mode="json")
+
+    result = ctrl_apply_step(enm_dict, req.step_id, req.data)
+
+    if result.success:
+        # Persist mutated ENM
+        saved = _set_enm(case_id, EnergyNetworkModel.model_validate(result.enm))
+        saved_dict = saved.model_dump(mode="json")
+        ws = validate_wizard_state(saved_dict)
+        return ApplyStepResponse(
+            success=True,
+            step_id=result.step_id,
+            precondition_issues=result.precondition_issues,
+            postcondition_issues=result.postcondition_issues,
+            can_proceed=result.can_proceed,
+            current_step=result.current_step,
+            next_step=result.next_step,
+            revision=saved.header.revision,
+            wizard_state=ws,
+        ).model_dump(mode="json")
+
+    # Failure: return issues, ENM unchanged
+    ws = validate_wizard_state(enm_dict)
+    return ApplyStepResponse(
+        success=False,
+        step_id=result.step_id,
+        precondition_issues=result.precondition_issues,
+        postcondition_issues=result.postcondition_issues,
+        can_proceed=False,
+        current_step=result.current_step,
+        next_step=result.next_step,
+        revision=enm.header.revision,
+        wizard_state=ws,
+    ).model_dump(mode="json")
+
+
+@router.get("/{case_id}/wizard/can-proceed")
+async def wizard_can_proceed(
+    case_id: str, from_step: str = "K1", to_step: str = "K2"
+) -> dict[str, Any]:
+    """Check if step transition is allowed.
+
+    Forward transitions require no BLOCKER in current step
+    and no BLOCKER preconditions for target step.
+    Backward transitions are always allowed.
+    """
+    enm = _get_enm(case_id)
+    enm_dict = enm.model_dump(mode="json")
+    result = ctrl_can_proceed(from_step, to_step, enm_dict)
+    return CanProceedResponse(
+        allowed=result.allowed,
+        from_step=result.from_step,
+        to_step=result.to_step,
+        blocking_issues=result.blocking_issues,
+    ).model_dump(mode="json")

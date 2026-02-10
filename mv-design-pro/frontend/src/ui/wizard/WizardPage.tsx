@@ -23,6 +23,8 @@ import type {
 import { computeWizardState, getStepStatusColor, getOverallStatusLabel } from './wizardStateMachine';
 import type { WizardState } from './wizardStateMachine';
 import { WizardSldPreview } from './WizardSldPreview';
+import { useWizardStore } from './useWizardStore';
+import type { WizardIssueApi } from './useWizardStore';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -469,6 +471,26 @@ function StepIndicator({ step, isActive, stepState, onClick }: { step: WizardSte
 // Main WizardPage
 // ---------------------------------------------------------------------------
 
+/**
+ * Blocker banner — shows when forward transition is blocked.
+ */
+function BlockerBanner({ issues }: { issues: WizardIssueApi[] }) {
+  const blockers = issues.filter(i => i.severity === 'BLOCKER');
+  if (blockers.length === 0) return null;
+  return (
+    <div data-testid="wizard-blocker-banner" style={{ marginBottom: '16px', padding: '12px', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '6px' }}>
+      <div style={{ fontSize: '13px', fontWeight: 600, color: '#ef4444', marginBottom: '6px' }}>
+        Przejście do następnego kroku jest zablokowane:
+      </div>
+      <ul style={{ margin: 0, paddingLeft: '20px', fontSize: '12px', color: '#b91c1c' }}>
+        {blockers.map((b, i) => (
+          <li key={i}>{b.message_pl}{b.wizard_step_hint ? ` (${b.wizard_step_hint})` : ''}</li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
 export function WizardPage() {
   const [currentStep, setCurrentStep] = useState(() => {
     const m = window.location.hash.match(/\/k(\d+)/i);
@@ -482,22 +504,45 @@ export function WizardPage() {
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const caseId = getCaseId();
 
+  // Wizard store (Zustand) — syncs with backend step controller
+  const wizardStore = useWizardStore();
+
   // Wizard state machine — deterministic, recomputed on every ENM change
   const wizardState = useMemo<WizardState>(() => computeWizardState(enm), [enm]);
 
-  // Load ENM on mount
-  useEffect(() => { fetchENM(caseId).then(setEnm).catch(() => {}); }, [caseId]);
+  // Sync store whenever ENM changes (deterministic recomputation)
+  useEffect(() => { wizardStore.recomputeFromEnm(enm); }, [enm]);
+
+  // Sync store step index with local step
+  useEffect(() => { wizardStore.setCurrentStep(currentStep); }, [currentStep]);
+
+  // Load ENM on mount + restore wizard state from backend (deep-link resilience)
+  useEffect(() => {
+    fetchENM(caseId).then((loaded) => {
+      setEnm(loaded);
+      // Restore step from backend state if available
+      wizardStore.fetchWizardState(caseId).catch(() => {});
+    }).catch(() => {});
+  }, [caseId]);
 
   // Validate after load / save
   useEffect(() => { validateENM(caseId).then(setValidation).catch(() => {}); }, [caseId, enm.header.revision]);
 
-  // Autosave with debounce
+  // Autosave with debounce + model-updated event
   const handleChange = useCallback((newEnm: EnergyNetworkModel) => {
     setEnm(newEnm);
     if (timerRef.current) clearTimeout(timerRef.current);
     timerRef.current = setTimeout(() => {
       setSaveStatus('saving');
-      saveENM(caseId, newEnm).then((saved) => { setEnm(saved); setSaveStatus('saved'); validateENM(caseId).then(setValidation).catch(() => {}); }).catch(() => setSaveStatus('error'));
+      saveENM(caseId, newEnm).then((saved) => {
+        setEnm(saved);
+        setSaveStatus('saved');
+        validateENM(caseId).then(setValidation).catch(() => {});
+        // Emit model-updated for Tree/SLD reactivity
+        window.dispatchEvent(new CustomEvent('model-updated', {
+          detail: { revision: saved.header.revision, source: 'wizard' },
+        }));
+      }).catch(() => setSaveStatus('error'));
     }, AUTOSAVE_DEBOUNCE_MS);
   }, [caseId]);
 
@@ -513,9 +558,22 @@ export function WizardPage() {
     try { setRunResult(await runShortCircuit(caseId)); } catch (e) { setRunResult({ error: String(e) }); } finally { setIsRunning(false); }
   }, [caseId]);
 
+  // Gate: check if forward transition is allowed
+  const handleNext = useCallback(async () => {
+    if (currentStep >= 9) return;
+    const nextIdx = currentStep + 1;
+    // Check with backend if possible, fallback to client-side
+    const allowed = await wizardStore.checkCanProceed(caseId, currentStep, nextIdx);
+    if (allowed) {
+      setCurrentStep(nextIdx);
+    }
+    // If not allowed, transitionBlockers are set in store → banner shown
+  }, [currentStep, caseId, wizardStore]);
+
   const step = WIZARD_STEPS[currentStep];
   const overallLabel = getOverallStatusLabel(wizardState.overallStatus);
   const overallColor = wizardState.overallStatus === 'ready' ? '#22c55e' : wizardState.overallStatus === 'blocked' ? '#ef4444' : wizardState.overallStatus === 'incomplete' ? '#eab308' : '#d1d5db';
+  const canGoForward = wizardStore.canProceed && currentStep < 9;
 
   return (
     <div data-testid="wizard-page" style={{ display: 'flex', height: '100%', fontFamily: 'system-ui, sans-serif' }}>
@@ -542,6 +600,8 @@ export function WizardPage() {
             <h2 style={{ margin: '0 0 4px 0', fontSize: '20px' }}>{step.id}: {step.title}</h2>
             <p style={{ margin: 0, color: '#6b7280', fontSize: '14px' }}>{step.description}</p>
           </div>
+          {/* Blocker banner */}
+          <BlockerBanner issues={wizardStore.transitionBlockers} />
           {step.id === 'K1' && <StepK1 enm={enm} onChange={handleChange} />}
           {step.id === 'K2' && <StepK2 enm={enm} onChange={handleChange} />}
           {step.id === 'K3' && <StepK3 enm={enm} onChange={handleChange} />}
@@ -555,7 +615,7 @@ export function WizardPage() {
           {/* Nav */}
           <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '24px', gap: '12px' }}>
             <button onClick={() => setCurrentStep((p) => Math.max(0, p - 1))} disabled={currentStep === 0} style={{ padding: '8px 20px', border: '1px solid #d1d5db', borderRadius: '6px', background: '#fff', cursor: currentStep === 0 ? 'not-allowed' : 'pointer', opacity: currentStep === 0 ? 0.5 : 1, fontSize: '14px' }}>Wstecz</button>
-            <button onClick={() => setCurrentStep((p) => Math.min(9, p + 1))} disabled={currentStep === 9} style={{ padding: '8px 20px', border: 'none', borderRadius: '6px', background: currentStep === 9 ? '#9ca3af' : '#3b82f6', color: '#fff', cursor: currentStep === 9 ? 'not-allowed' : 'pointer', fontSize: '14px' }}>{currentStep === 9 ? 'Zakończ' : 'Dalej'}</button>
+            <button data-testid="wizard-next-btn" onClick={handleNext} disabled={!canGoForward} style={{ padding: '8px 20px', border: 'none', borderRadius: '6px', background: canGoForward ? '#3b82f6' : '#9ca3af', color: '#fff', cursor: canGoForward ? 'pointer' : 'not-allowed', fontSize: '14px' }}>{currentStep === 9 ? 'Zakończ' : 'Dalej'}</button>
           </div>
         </div>
       </div>
