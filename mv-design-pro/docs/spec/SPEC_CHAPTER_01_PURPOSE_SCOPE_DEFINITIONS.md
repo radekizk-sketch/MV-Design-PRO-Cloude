@@ -78,7 +78,28 @@ MV-DESIGN-PRO **NIE jest i NIE będzie**:
 - systemem czasu rzeczywistego (SCADA, EMS, DMS),
 - systemem sterowania siecią elektroenergetyczną,
 - systemem prognozowania obciążeń lub generacji,
-- narzędziem do automatycznego generowania projektów bez udziału inżyniera.
+- narzędziem do autonomicznego projektowania sieci elektroenergetycznych ani systemem podejmującym decyzje inżynierskie bez udziału człowieka.
+
+MV-DESIGN-PRO **JEST** narzędziem do generowania i weryfikacji projektów elektroenergetycznych z **AKTYWNYM** udziałem inżyniera, który:
+- wybiera topologię,
+- dobiera urządzenia,
+- zatwierdza założenia,
+- interpretuje wyniki,
+- ponosi odpowiedzialność projektową.
+
+### 1.2.4 Rola automatyzacji w MV-DESIGN-PRO
+
+Automatyzacja w systemie **dotyczy** (BINDING):
+- walidacji formalnej (kody E/W/I, NetworkValidator, ENMValidator),
+- generowania wariantów technicznych (Study Cases, scenariusze obliczeniowe),
+- obliczeń fizycznych (solvery IEC 60909, Newton-Raphson, Gauss-Seidel, FDLF),
+- raportowania (Proof Documents, raporty PDF/DOCX/JSON/LaTeX),
+- kontroli spójności normatywnej (guard tests, arch guard, golden tests).
+
+Automatyzacja **NIE dotyczy** (BINDING):
+- decyzji projektowych — każda decyzja wymaga zatwierdzenia inżyniera,
+- odpowiedzialności technicznej — odpowiedzialność ponosi projektant, nie system,
+- zatwierdzania rozwiązań — status Approved/Frozen wymaga jawnej akceptacji użytkownika.
 
 ---
 
@@ -150,7 +171,7 @@ System MV-DESIGN-PRO jednoznacznie **NIE realizuje** następujących funkcji:
 | Prognozowanie obciążeń lub generacji | System operuje na danych statycznych, nie prognozach |
 | Wymiarowanie fundamentów, obudów, tras kablowych | System modeluje obwód elektryczny, nie infrastrukturę fizyczną |
 | Generowanie kosztorysów | Poza zakresem — system dotyczy analizy elektrotechnicznej |
-| Automatyczne projektowanie bez decyzji inżyniera | System wspiera decyzje, nie zastępuje inżyniera |
+| Autonomiczne projektowanie lub podejmowanie decyzji inżynierskich bez udziału człowieka | System wspiera i automatyzuje obliczenia/walidację, ale decyzje projektowe, zatwierdzenia i odpowiedzialność techniczną ponosi inżynier (§1.2.4) |
 
 **Zasada fundamentalna:** Jeśli model jest niekompletny, system MUSI to jawnie wskazać (kody walidacji E/W/I) i MUSI zablokować obliczenia (kody E — blocker). System NIGDY nie domyśla się brakujących danych, nie stosuje wartości domyślnych w obliczeniach i nie kompensuje braków w modelu.
 
