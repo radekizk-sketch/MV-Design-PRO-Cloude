@@ -157,6 +157,20 @@ export const TREE_SYMBOL_MAP: Record<TreeNodeType, TreeSymbolDefinition> = {
     ariaLabel: 'Runy rozpływu',
   },
 
+  // PR-9: New network element categories
+  GENERATORS: {
+    symbolId: 'utility_feeder',
+    ariaLabel: 'Generatory / OZE',
+  },
+  MEASUREMENTS: {
+    symbolId: 'folder',
+    ariaLabel: 'Przekładniki pomiarowe',
+  },
+  PROTECTION_ASSIGNMENTS: {
+    symbolId: 'circuit_breaker',
+    ariaLabel: 'Zabezpieczenia',
+  },
+
   // Individual elements (fallback to folder)
   ELEMENT: {
     symbolId: 'folder',

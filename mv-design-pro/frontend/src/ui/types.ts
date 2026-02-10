@@ -30,7 +30,10 @@ export type ElementType =
   | 'TransformerBranch'
   | 'Switch'
   | 'Source'
-  | 'Load';
+  | 'Load'
+  | 'Generator'
+  | 'Measurement'
+  | 'ProtectionAssignment';
 
 /**
  * Switch state (per SYSTEM_SPEC.md § 2.4).
@@ -202,6 +205,9 @@ export type TreeNodeType =
   | 'PROTECTION_COMPARISONS'  // P15c: Protection comparisons subcategory
   | 'POWER_FLOW_RESULTS'  // P20b: Power flow results category
   | 'POWER_FLOW_RUNS'     // P20b: Power flow runs subcategory
+  | 'GENERATORS'           // PR-9: Generator / OZE category
+  | 'MEASUREMENTS'         // PR-9: Measurement transformers (CT/VT) category
+  | 'PROTECTION_ASSIGNMENTS' // PR-9: Protection assignment category
   | 'ELEMENT'; // Individual element node
 
 /**

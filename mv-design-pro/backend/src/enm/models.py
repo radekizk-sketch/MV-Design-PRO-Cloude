@@ -43,6 +43,27 @@ class GenLimits(BaseModel):
     q_max_mvar: float | None = None
 
 
+class MeasurementRating(BaseModel):
+    """Parametry znamionowe przekładnika CT/VT."""
+    ratio_primary: float
+    ratio_secondary: float
+    accuracy_class: str | None = None
+    burden_va: float | None = None
+
+
+class ProtectionSetting(BaseModel):
+    """Nastawa zabezpieczenia (stub — bez pełnego solvera ochrony)."""
+    function_type: Literal[
+        "overcurrent_50", "overcurrent_51",
+        "earth_fault_50N", "earth_fault_51N",
+        "directional_67", "directional_67N",
+    ]
+    threshold_a: float | None = None
+    time_delay_s: float | None = None
+    curve_type: Literal["DT", "IEC_SI", "IEC_VI", "IEC_EI", "IEC_LI"] | None = None
+    is_directional: bool = False
+
+
 # ---------------------------------------------------------------------------
 # ENMElement — base for all elements
 # ---------------------------------------------------------------------------
@@ -218,6 +239,42 @@ class Generator(ENMElement):
 
 
 # ---------------------------------------------------------------------------
+# Measurement (przekładnik CT/VT)
+# ---------------------------------------------------------------------------
+
+
+class Measurement(ENMElement):
+    """Przekładnik prądowy (CT) lub napięciowy (VT)."""
+
+    measurement_type: Literal["CT", "VT"]
+    bus_ref: str
+    bay_ref: str | None = None
+    rating: MeasurementRating
+    connection: Literal["star", "delta", "single_phase"] = "star"
+    purpose: Literal["protection", "metering", "combined"] = "protection"
+
+
+# ---------------------------------------------------------------------------
+# ProtectionAssignment (przypięcie zabezpieczenia do wyłącznika)
+# ---------------------------------------------------------------------------
+
+
+class ProtectionAssignment(ENMElement):
+    """Powiązanie zabezpieczenia z wyłącznikiem — modelowanie, nie solver."""
+
+    breaker_ref: str
+    ct_ref: str | None = None
+    vt_ref: str | None = None
+    device_type: Literal[
+        "overcurrent", "earth_fault", "directional_overcurrent",
+        "distance", "differential", "custom",
+    ]
+    catalog_ref: str | None = None
+    settings: list[ProtectionSetting] = []
+    is_enabled: bool = True
+
+
+# ---------------------------------------------------------------------------
 # Substation (stacja SN/nn — kontener logiczny z rozdzielnicami)
 # ---------------------------------------------------------------------------
 
@@ -288,3 +345,5 @@ class EnergyNetworkModel(BaseModel):
     bays: list[Bay] = []
     junctions: list[Junction] = []
     corridors: list[Corridor] = []
+    measurements: list[Measurement] = []
+    protection_assignments: list[ProtectionAssignment] = []
