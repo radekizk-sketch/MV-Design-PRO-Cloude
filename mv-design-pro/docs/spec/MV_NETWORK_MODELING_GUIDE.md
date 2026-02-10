@@ -6,6 +6,15 @@
 
 ---
 
+> **ZASADA KANONICZNA — CATALOG-FIRST**
+>
+> MV-DESIGN-PRO działa w trybie **CATALOG-FIRST**.
+> Żaden parametr elektryczny NIE JEST edytowalny ręcznie w trybie standardowym.
+> Wszystkie parametry techniczne pochodzą z katalogów typów.
+> Przepływ danych: **TYPE (katalog) → INSTANCE (ilość, lokalizacja, status) → SOLVER INPUT**.
+
+---
+
 ## 1. Wstęp
 
 Niniejszy dokument opisuje sposób modelowania typowej sieci SN w MV-DESIGN-PRO:
@@ -32,76 +41,98 @@ ewentualnych override'ów eksperckich). PR-9 **nie wykonuje żadnych obliczeń**
 - nie weryfikuje nastaw prądowo-czasowo,
 - nie „zgaduje" ani nie interpoluje parametrów technicznych.
 
-Zabezpieczenia, przekładniki, nastawy i parametry wprowadzone w PR-9 to
+Zabezpieczenia, przekładniki i pozostałe elementy wprowadzone w PR-9 to
 **konfiguracja wejściowa do przyszłych analiz**, nie wynik obliczeniowy.
 
 ---
 
-## 2. Zasady modelowania
+## 2. TYPE vs INSTANCE
 
-### 2.1 Tryb STANDARDOWY (domyślny): katalog-only
+### 2.1 TYPE (Katalog typów)
 
-W trybie standardowym każdy element sieci posiada referencję do katalogu (`catalog_ref`).
-Parametry techniczne (elektryczne, znamionowe, nastawy, klasy, krzywe) są
-**pobierane z katalogu i wyświetlane jako tylko do odczytu**.
+Katalog typów zawiera **100% parametrów technicznych** każdego elementu.
+Typy są wersjonowane i fingerprintowane (hash integralności).
 
-Użytkownik w trybie standardowym:
+Kategorie katalogowe:
+
+| Kategoria katalogu | Przykładowe identyfikatory |
+|---|---|
+| LineType | `AFL_120`, `AFL_70` |
+| CableType | `XRUHAKXS_120`, `XRUHAKXS_70` |
+| TransformerType | `TRANS_SN_630kVA_15_0p4_Dyn11` |
+| BreakerType | `WYL_SN_630A` |
+| DisconnectorType | `ROZL_SN_400A` |
+| FuseType | `BEZ_SN_63A` |
+| CTType | `CT_200_5_5P20_15VA` |
+| VTType | `VT_15000_100_05` |
+| ProtectionType | `PROT_SEL_751A` |
+| GeneratorType (OZE) | `PV_INV_100kW`, `BESS_250kWh` |
+| LoadType | `LOAD_KOMUNALNY_300kW` |
+
+Użytkownik **nie edytuje** parametrów w katalogu typów w ramach PR-9.
+Parametry techniczne w katalogu są dostępne wyłącznie do podglądu.
+
+### 2.2 INSTANCE (Element w modelu ENM)
+
+Instancja to konkretne wystąpienie typu katalogowego w topologii sieci.
+Instancja zawiera:
+
+- `catalog_ref` — referencja do typu katalogowego (obowiązkowa),
+- `quantity` / `n_parallel` — liczba identycznych egzemplarzy (mnożnik),
+- topologię — szyny od/do, powiązania z innymi instancjami,
+- status — `OPEN` / `CLOSED` / `IN_SERVICE`,
+- `overrides[]` — **wyłącznie w trybie EKSPERT** (patrz §3.2).
+
+Instancja **nie zawiera** parametrów technicznych — dziedziczy je z katalogu.
+
+---
+
+## 3. Tryby pracy
+
+### 3.1 Tryb STANDARDOWY (domyślny)
+
+W trybie standardowym użytkownik:
 - wybiera typ z katalogu (`catalog_ref`),
 - podaje topologię (szyny od/do, powiązania),
-- podaje parametry geometryczne/topologiczne (długość odcinka, stan łącznika),
+- podaje parametry geometryczne (długość odcinka) i status (stan łącznika),
 - podaje ilość identycznych instancji (`quantity` / `n_parallel`),
-- **nie wpisuje ręcznie żadnych wartości technicznych** (R′, X′, Sn, uk, nastaw itp.).
+- **nie wpisuje ręcznie żadnych wartości technicznych**.
 
-### 2.2 Tryb EKSPERT (jawny, kontrolowany): override instancji
+Pola techniczne w UI są **READ-ONLY** — wyświetlają wartości pobrane z katalogu.
+
+### 3.2 Tryb EKSPERT (opt-in, audytowany)
 
 Tryb EKSPERT pozwala na nadpisanie **wybranych** parametrów na poziomie instancji
 (nie modyfikuje katalogu). Wymagania:
 
 - Tryb EKSPERT nie jest domyślny; wymaga **świadomej aktywacji** przez użytkownika
-  i jest wizualnie oznaczony w UI (np. ikoną, kolorem pola).
+  i jest wizualnie oznaczony w UI (ikona, kolor pola).
 - Override dotyczy wyłącznie instancji i obejmuje tylko parametry wyraźnie
   dopuszczone przez system — nie „dowolne".
 - Każdy override jest:
   - jawnie zapisany jako lista `overrides` (parametr → wartość),
   - oznaczony źródłem `ParameterSource=OVERRIDE`,
-  - audytowalny — zapis do śladu/raportu dostępnego w późniejszych analizach.
+  - audytowalny — zapis do śladu/raportu dostępnego w późniejszych analizach,
+  - widoczny w SLD, Inspector i raportach.
 - Parametry bez override zachowują wartość z `catalog_ref` (`ParameterSource=CATALOG`).
+- Brak override → pełne dziedziczenie z katalogu.
 
-### 2.3 Ilość / sztuki / n_parallel
+### 3.3 Ilość / sztuki / n_parallel
 
 `quantity` lub `n_parallel` opisuje liczbę identycznych instancji danego typu
 katalogowego (mnożnik). Jest to parametr topologiczny, a nie elektryczny.
-Użytkownik nie podaje mocy/napięcia/prądów „sumarycznych" — system wyprowadza
-wartości zagregowane dopiero w analizach (PF/SC), poza zakresem PR-9.
+Użytkownik nie podaje wartości „sumarycznych" — system wyprowadza
+agregaty dopiero w analizach (PF/SC), poza zakresem PR-9.
 
-Przykład zapisu JSON (catalog-first z ilością):
-```json
-{
-  "catalog_ref": "PV_INVERTER_100kW_EN50549",
-  "quantity": 5
-}
-```
-
-### 2.4 Zakaz self-loop (pętla własna)
+### 3.4 Zakaz self-loop (pętla własna)
 
 Żadna gałąź ani element łączeniowy nie może łączyć szyny z tą samą szyną
 (`from_bus == to_bus`). Aparatura łączeniowa jest modelowana między dwoma
 **różnymi** szynami: `bus_in → device → bus_out`.
 
-### 2.5 Katalog obejmuje wszystkie elementy
-
-W trybie standardowym `catalog_ref` jest wymagany dla:
-- linii napowietrznych i kabli,
-- transformatorów,
-- aparatury łączeniowej (wyłącznik, rozłącznik, bezpiecznik),
-- przekładników CT i VT,
-- zabezpieczeń,
-- generatorów OZE (PV, wiatr) i magazynów energii (BESS),
-- odbiorów.
-
 ---
 
-## 3. Pojęcia
+## 4. Pojęcia
 
 | Pojęcie | Opis | ENM |
 |---------|------|-----|
@@ -116,11 +147,12 @@ W trybie standardowym `catalog_ref` jest wymagany dla:
 
 ---
 
-## 4. Krok po kroku: magistrala 3-odcinkowa
+## 5. Krok po kroku: magistrala 3-odcinkowa
 
 Poniższe operacje opisują logiczne kroki modelowania w UI.
+Każdy element wskazuje `catalog_ref` — parametry techniczne nie są wprowadzane ręcznie.
 
-### 4.1 Szyny (buses)
+### 5.1 Szyny (buses)
 
 Dodaj 5 szyn — topologia wymaga osobnej szyny wewnętrznej GPZ dla wyłącznika:
 
@@ -134,7 +166,7 @@ bus_t2      (15 kV)  ← punkt rozgałęzienia (T-node)
 bus_end     (15 kV)  ← koniec magistrali
 ```
 
-### 4.2 Wyłącznik na GPZ
+### 5.2 Wyłącznik na GPZ
 
 Wyłącznik łączy dwie **różne** szyny. Self-loop jest zabroniony.
 
@@ -144,7 +176,7 @@ Dodaj gałąź (breaker) × 1
 brk_1:  bus_gpz_in → bus_gpz  (breaker, catalog_ref="WYL_SN_630A", state=CLOSED)
 ```
 
-### 4.3 Odcinki magistrali
+### 5.3 Odcinki magistrali
 
 ```
 Dodaj gałąź (linia/kabel) × 3
@@ -154,14 +186,10 @@ line_2:  bus_t1  → bus_t2   (cable,         length_km=1.2, catalog_ref="XRUHAK
 line_3:  bus_t2  → bus_end  (line_overhead, length_km=4.0, catalog_ref="AFL_120")
 ```
 
-**Tryb standardowy**: parametry elektryczne (R′, X′, B′, Imax) są pobierane
-z katalogu i wyświetlane jako read-only.
+Parametry techniczne odcinka są pobierane z katalogu i wyświetlane jako podgląd (READ-ONLY).
+Użytkownik podaje wyłącznie: typ gałęzi, szyny od/do, `catalog_ref`, długość odcinka.
 
-**Tryb EKSPERT**: użytkownik może nadpisać wybrane parametry instancji
-(np. długość skorygowaną, temperaturę odniesienia). Override jest zapisywany
-jako `overrides: [{ param: "length_km", value: 3.7 }]` z `ParameterSource=OVERRIDE`.
-
-### 4.4 Odgałęzienie
+### 5.4 Odgałęzienie
 
 ```
 Dodaj szynę + gałąź
@@ -170,50 +198,76 @@ bus_lat_1   (15 kV)  ← koniec odgałęzienia
 line_lat:   bus_t2 → bus_lat_1  (cable, length_km=0.8, catalog_ref="XRUHAKXS_70")
 ```
 
-### 4.5 Stacja transformatorowa SN/nn
+### 5.5 Stacja transformatorowa SN/nn
 
 ```
 Dodaj szynę + transformator
 ───────────────────────────
-bus_lv      (0.4 kV)  ← szyna strony nn
-tr_1:       hv_bus=bus_end, lv_bus=bus_lv, catalog_ref="TR_630kVA_Dyn11"
+bus_lv  (0.4 kV)  ← szyna strony nn
+tr_1:   hv_bus=bus_end, lv_bus=bus_lv, catalog_ref="TRANS_SN_630kVA_15_0p4_Dyn11"
 ```
 
-**Tryb standardowy**: moc znamionowa (Sn), napięcie zwarcia (uk%), straty (Pk, P0),
-grupa wektorowa, zaczepy — z katalogu, read-only.
+Użytkownik podaje: szyny HV/LV, `catalog_ref`, `quantity`.
+Parametry techniczne transformatora są wyświetlane jako podgląd (READ-ONLY).
 
-**Tryb EKSPERT**: override wybranych parametrów instancji (np. pozycja zaczepu).
+Zapis JSON:
+```json
+{
+  "type": "transformer",
+  "catalog_ref": "TRANS_SN_630kVA_15_0p4_Dyn11",
+  "hv_bus_ref": "bus_end",
+  "lv_bus_ref": "bus_lv",
+  "quantity": 1
+}
+```
 
-### 4.6 Odbiory i OZE
+### 5.6 Odbiory i OZE
 
 ```
 Dodaj odbiór + generator
 ────────────────────────
-load_1:   bus_ref=bus_lv, catalog_ref="ODBIÓR_KOMUNALNY_300kW"
-pv_1:     bus_ref=bus_lv, catalog_ref="PV_INVERTER_100kW_EN50549", quantity=3
+load_1:   bus_ref=bus_lv, catalog_ref="LOAD_KOMUNALNY_300kW"
+pv_1:     bus_ref=bus_lv, catalog_ref="PV_INV_100kW", quantity=3
 ```
 
-**Tryb standardowy**: P, Q, cos φ, model odbioru, limity generatora — z katalogu.
+Użytkownik podaje: szynę, `catalog_ref`, `quantity`.
+Parametry techniczne są wyświetlane jako podgląd (READ-ONLY).
 
-**Tryb EKSPERT**: override wybranych parametrów (np. P operacyjne, cos φ ustawiony).
+Zapis JSON (OZE z ilością):
+```json
+{
+  "type": "generator",
+  "catalog_ref": "PV_INV_100kW",
+  "bus_ref": "bus_lv",
+  "quantity": 3
+}
+```
 
-Ilość (`quantity=3`) oznacza 3 identyczne instancje falownika PV o parametrach
-z katalogu. Moc sumaryczna jest wyprowadzana przez solver (poza zakresem PR-9).
+Ilość (`quantity=3`) oznacza 3 identyczne instancje o parametrach z katalogu.
 
-### 4.7 Przekładniki CT i VT
+### 5.7 Przekładniki CT i VT
 
 ```
 Dodaj przekładnik × 2
 ─────────────────────
-ct_1:   bus_ref=bus_gpz, type=CT, catalog_ref="CT_200_5A_5P20"
-vt_1:   bus_ref=bus_gpz, type=VT, catalog_ref="VT_15000_100V_05"
+ct_1:   bus_ref=bus_gpz, type=CT, catalog_ref="CT_200_5_5P20_15VA"
+vt_1:   bus_ref=bus_gpz, type=VT, catalog_ref="VT_15000_100_05"
 ```
 
-**Tryb standardowy**: przekładnia, klasa dokładności, obciążenie VA, połączenie — z katalogu.
+Użytkownik podaje: typ (CT/VT), szynę, `catalog_ref`.
+Parametry techniczne przekładnika są wyświetlane jako podgląd (READ-ONLY).
 
-**Tryb EKSPERT**: override wybranych parametrów instancji (np. obciążenie znamionowe VA).
+Zapis JSON:
+```json
+{
+  "type": "measurement",
+  "measurement_type": "CT",
+  "catalog_ref": "CT_200_5_5P20_15VA",
+  "bus_ref": "bus_gpz"
+}
+```
 
-### 4.8 Zabezpieczenie
+### 5.8 Zabezpieczenie
 
 ```
 Dodaj zabezpieczenie
@@ -221,17 +275,15 @@ Dodaj zabezpieczenie
 pa_1:   breaker_ref=brk_1, ct_ref=ct_1, catalog_ref="PROT_SEL_751A"
 ```
 
-**Tryb standardowy**: typ zabezpieczenia, funkcje ochronne, krzywe, nastawy — z katalogu.
+Użytkownik podaje: `catalog_ref`, przypisanie do wyłącznika, powiązanie z CT/VT.
+Parametry techniczne zabezpieczenia są wyświetlane jako podgląd (READ-ONLY).
 
-**Tryb EKSPERT**: override wybranych nastaw instancji. Każdy override jest
-zapisywany z `ParameterSource=OVERRIDE` i audytowany.
-
-Uwaga: PR-9 zapisuje konfigurację zabezpieczeń jako dane wejściowe.
+PR-9 zapisuje konfigurację zabezpieczeń jako dane wejściowe.
 Weryfikacja nastaw (koordynacja, selektywność) następuje w przyszłych analizach.
 
 ---
 
-## 5. Topology Summary
+## 6. Topology Summary
 
 Po zbudowaniu modelu system oblicza deterministyczne podsumowanie topologii:
 
@@ -253,7 +305,7 @@ Laterals to szyny poza magistralą, połączone z nią gałęziami.
 
 ---
 
-## 6. Walidacje i ograniczenia
+## 7. Walidacje i ograniczenia
 
 | Reguła | Opis |
 |--------|------|
@@ -267,7 +319,7 @@ Laterals to szyny poza magistralą, połączone z nią gałęziami.
 
 ---
 
-## 7. Deterministyczność
+## 8. Deterministyczność
 
 Wszystkie operacje topologiczne gwarantują:
 - Identyczne wejście → identyczny wynik (JSON-serializable)
@@ -277,28 +329,40 @@ Wszystkie operacje topologiczne gwarantują:
 
 ---
 
-## 8. Interfejs użytkownika
+## 9. Interfejs użytkownika
 
-### 8.1 Panel topologii
+### 9.1 Panel topologii
 - Toolbar z przyciskami: Szyna, Gałąź, Transformator, Odbiór/OZE, Przekładnik, Zabezpieczenie
 - Drzewo topologii: podział na spine (magistrala) i laterals (odgałęzienia)
 - Kliknięcie węzła → selekcja w SLD (dwukierunkowa synchronizacja)
 
-### 8.2 Modale edycji
+### 9.2 Modale edycji
 
-Każdy modal obsługuje tryb STANDARDOWY (katalog-only, pola techniczne read-only)
-i tryb EKSPERT (jawna aktywacja, override z audytem):
+Każdy modal obsługuje tryb STANDARDOWY (katalog-only, pola techniczne READ-ONLY)
+i tryb EKSPERT (jawna aktywacja, override z audytem).
 
-- **NodeModal** — identyfikator, nazwa, napięcie [kV], strefa
-- **BranchModal** — typ (7 wariantów), szyny od/do, `catalog_ref`, długość (dla linii/kabli), stan łącznika
-- **TransformerStationModal** — szyny HV/LV, `catalog_ref`; parametry z katalogu (read-only) lub override (EKSPERT)
-- **LoadDERModal** — szyna, `catalog_ref`, `quantity`; parametry z katalogu (read-only) lub override (EKSPERT)
-- **MeasurementModal** — typ CT/VT, szyna, `catalog_ref`; parametry z katalogu (read-only) lub override (EKSPERT)
-- **ProtectionModal** — wyłącznik, CT/VT, `catalog_ref`; nastawy z katalogu (read-only) lub override (EKSPERT)
+- **NodeModal** — identyfikator, nazwa, napięcie nominalne (z siatki napięciowej sieci), strefa
+- **BranchModal** — typ gałęzi, szyny od/do, `catalog_ref`, długość odcinka (linie/kable), stan łącznika; podgląd parametrów z katalogu (READ-ONLY)
+- **TransformerStationModal** — szyny HV/LV, `catalog_ref`, `quantity`; podgląd parametrów z katalogu (READ-ONLY)
+- **LoadDERModal** — szyna, `catalog_ref`, `quantity`; podgląd parametrów z katalogu (READ-ONLY)
+- **MeasurementModal** — typ CT/VT, szyna, `catalog_ref`; podgląd parametrów z katalogu (READ-ONLY)
+- **ProtectionModal** — `catalog_ref`, przypisanie do wyłącznika, powiązanie CT/VT; podgląd nastaw z katalogu (READ-ONLY); w trybie EKSPERT: override wybranych nastaw instancji z audytem
 
 ---
 
-## 9. Przekazanie do solverów (handoff)
+## 10. Zakaz interpretacji
+
+Dokument nie może być interpretowany jako sugerujący:
+- ręczne „dobieranie parametrów" technicznych,
+- zgadywanie lub interpolowanie wartości,
+- wpisywanie danych liczbowych w polach technicznych.
+
+Jeśli parametr ma wartość w instancji, **musi** pochodzić z katalogu (`ParameterSource=CATALOG`)
+albo z jawnego override w trybie EKSPERT (`ParameterSource=OVERRIDE`).
+
+---
+
+## 11. Przekazanie do solverów (handoff)
 
 Model topologiczny i konfiguracja katalogowa (z ewentualnymi override'ami) stanowią
 **wejście do analiz PF / SC / Protection** bez semantycznej transformacji.
