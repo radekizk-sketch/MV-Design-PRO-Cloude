@@ -49,6 +49,8 @@ export interface StudyCase {
   description: string;
   config: StudyCaseConfig;
   result_status: StudyCaseResultStatus;
+  /** PR-4: Explicit flag — true only when result_status === 'FRESH'. */
+  results_valid: boolean;
   is_active: boolean;
   result_refs: StudyCaseResultRef[];
   revision: number;
@@ -64,6 +66,8 @@ export interface StudyCaseListItem {
   name: string;
   description: string;
   result_status: StudyCaseResultStatus;
+  /** PR-4: Explicit flag — true only when result_status === 'FRESH'. */
+  results_valid: boolean;
   is_active: boolean;
   updated_at: string;
 }

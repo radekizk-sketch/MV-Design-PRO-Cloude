@@ -26,6 +26,7 @@ class AnalysisRunSummaryDTO:
     input_hash: str
     summary_json: dict[str, Any]
     trace_summary: dict[str, Any] | None = None
+    results_valid: bool = True  # PR-4: explicit validity flag
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -34,6 +35,7 @@ class AnalysisRunSummaryDTO:
             "analysis_type": self.analysis_type,
             "status": self.status,
             "result_status": self.result_status,
+            "results_valid": self.results_valid,
             "created_at": _format_datetime(self.created_at),
             "finished_at": _format_datetime(self.finished_at),
             "input_hash": self.input_hash,
@@ -55,6 +57,7 @@ class AnalysisRunDetailDTO:
     summary_json: dict[str, Any]
     trace_summary: dict[str, Any] | None
     input_metadata: dict[str, Any] = field(default_factory=dict)
+    results_valid: bool = True  # PR-4: explicit validity flag
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -63,6 +66,7 @@ class AnalysisRunDetailDTO:
             "analysis_type": self.analysis_type,
             "status": self.status,
             "result_status": self.result_status,
+            "results_valid": self.results_valid,
             "created_at": _format_datetime(self.created_at),
             "finished_at": _format_datetime(self.finished_at),
             "input_hash": self.input_hash,

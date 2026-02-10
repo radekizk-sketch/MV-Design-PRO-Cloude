@@ -71,6 +71,7 @@ class StudyCaseResponse(BaseModel):
     description: str
     config: dict[str, Any]
     result_status: str
+    results_valid: bool  # PR-4: explicit validity flag
     is_active: bool
     revision: int
     created_at: str
@@ -83,6 +84,7 @@ class StudyCaseListItemResponse(BaseModel):
     name: str
     description: str
     result_status: str
+    results_valid: bool  # PR-4: explicit validity flag
     is_active: bool
     updated_at: str
 

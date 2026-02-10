@@ -363,6 +363,18 @@ export function useActiveCaseStatusLabel(): string {
 }
 
 /**
+ * PR-4: Hook — Are active case results valid for use/export?
+ *
+ * Returns true ONLY when result_status === 'FRESH'.
+ * UI MUST check this before allowing result access or export.
+ */
+export function useActiveCaseResultsValid(): boolean {
+  return useStudyCasesStore(
+    (state) => state.activeCase?.results_valid ?? false
+  );
+}
+
+/**
  * Hook: Get cases sorted by name.
  */
 export function useSortedCases(): StudyCaseListItem[] {

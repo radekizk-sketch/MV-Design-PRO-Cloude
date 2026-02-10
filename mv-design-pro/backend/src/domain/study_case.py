@@ -218,6 +218,17 @@ class StudyCase:
     # For backward compatibility with study_payload field
     study_payload: dict[str, Any] = field(default_factory=dict)
 
+    @property
+    def results_valid(self) -> bool:
+        """
+        Explicit flag: are this case's results valid for use?
+
+        Returns True ONLY when result_status == FRESH.
+        NONE means no results exist, OUTDATED means results are stale.
+        UI/API MUST check this before allowing result access or export.
+        """
+        return self.result_status == StudyCaseResultStatus.FRESH
+
     def with_updated_config(self, config: StudyCaseConfig) -> StudyCase:
         """
         Create a new StudyCase with updated config.
@@ -454,6 +465,7 @@ class StudyCase:
             "config": self.config.to_dict(),
             "protection_config": self.protection_config.to_dict(),  # P14c
             "result_status": self.result_status.value,
+            "results_valid": self.results_valid,  # PR-4: explicit validity flag
             "is_active": self.is_active,
             "result_refs": [ref.to_dict() for ref in self.result_refs],
             "revision": self.revision,
