@@ -63,6 +63,8 @@ docs/spec/
 ├── SPEC_CHAPTER_14_DETERMINISM_AND_VERSIONING.md       ← Determinizm, Wersjonowanie, Reprodukowalność (GOTOWY, v1.0)
 ├── SPEC_CHAPTER_15_GOVERNANCE_AND_ADR.md               ← Governance, ADR, Zarządzanie Zmianą (GOTOWY, v1.0)
 ├── SPEC_CHAPTER_16_EXTERNAL_INTEGRATIONS.md            ← Integracje Zewnętrzne, Interoperacyjność (GOTOWY, v1.0)
+├── SPEC_CHAPTER_17_TESTING_AND_ACCEPTANCE.md           ← Testy Systemowe, Weryfikacja, Odbiór (GOTOWY, v1.0)
+├── SPEC_CHAPTER_18_PRODUCTION_AND_MAINTENANCE.md       ← Wdrożenie Produkcyjne, Eksploatacja, Audyt (GOTOWY, v1.0) ★ FINAL
 │
 │   ══════════════════════════════════════
 │   FAZA 0 — KONTRAKTY I WARSTWY
@@ -168,6 +170,15 @@ PREAMBUŁA — CEL, ZAKRES, DEFINICJE (UKOŃCZONA)
   Krok 0p: SPEC_CHAPTER_16_EXTERNAL_INTEGRATIONS.md        ✅ GOTOWY (v1.0)
             └── Domena Integracji Zewnętrznych ZAMKNIĘTA (§16.0–§16.9, Decyzje #121–#126)
             └── Obejmuje: 3 klasy integracji (MODEL: ENM/TypeLib/ProjectArchive, RESULT: raporty/ProofPack, PROCESS: CI/API), formaty wymiany (JSON/JSONL/CSV/XLSX/PDF/DOCX/ZIP), metadane integracyjne (9 pól obowiązkowych), OSD eksport (Approved/Frozen, zakaz modyfikacji), import pipeline (6 kroków: parse→map→W1→W2→mark→catalog), API security (TO-BE: JWT/RBAC), INV-INT-01..06, Z-INT-01..06
+
+  Krok 0q: SPEC_CHAPTER_17_TESTING_AND_ACCEPTANCE.md       ✅ GOTOWY (v1.0)
+            └── Domena Testów Systemowych ZAMKNIĘTA (§17.0–§17.12, Decyzje #127–#133)
+            └── Obejmuje: piramida testowa (Unit 1200+, Integration 300+, E2E 40+, Guard CI), ~237 plików / ~2117 funkcji, testy numeryczne solverów (pytest.approx abs=1e-12), parametryzacja NR/GS/FDLF, fixtures łańcuch (db_engine→db_session_factory→uow_factory→app_client), golden tests (canonical JSON/LaTeX vs reference, aktualizacja wymaga review), guard tests (codenames, alerts, arch, polish labels), CI/CD 4 workflows (pytest, Playwright smoke, arch guard, codenames guard), determinizm testów (brak random, sorted output, sequential CI), Vitest (jsdom, --no-file-parallelism), Playwright (chromium, sequential, data-testid), INV-TST-01..10, Z-TST-01..03
+
+  Krok 0r: SPEC_CHAPTER_18_PRODUCTION_AND_MAINTENANCE.md   ✅ GOTOWY (v1.0) ★ FINAL
+            └── Domena Wdrożenia Produkcyjnego ZAMKNIĘTA (§18.0–§18.13, Decyzje #134–#140)
+            └── Obejmuje: 6 usług Docker (backend, frontend, PostgreSQL, MongoDB, Redis, Celery), Dockerfile (python:3.11-slim, Poetry 1.7.1), volumes (postgres_data, mongodb_data, redis_data), ENV krytyczne (SECRET_KEY, DATABASE_URL, REDIS_URL — zakaz domyślnych Z-PRD-01..03), 9 migracji SQL (001_initial→009_result_status), Celery (json serializer, task_acks_late, Europe/Warsaw), logging structured (RequestIdMiddleware, X-Request-Id, severity routing), health checks 3-tier (basic/readiness/extended), security (Pydantic AS-IS, JWT/RBAC TO-BE), backup strategy (PostgreSQL pg_dump, MongoDB mongodump, Redis RDB), smoke test (scripts/smoke_local.sh), GO-LIVE Checklist (14 kategorii), dependency management (Poetry + npm, locked), INV-PRD-01..10, Z-PRD-01..07
+            └── **SPECYFIKACJA ZAMKNIĘTA — ROZDZIAŁY 1–18 KOMPLETNE. 140 DECYZJI WIĄŻĄCYCH.**
 
 FAZA 0 — KONTRAKTY I WARSTWY (PRIORYTET NAJWYŻSZY)
   Krok 1:  SPEC_00_LAYERING.md
@@ -935,6 +946,8 @@ FINALIZACJA:
 | SPEC_CHAPTER_14_DETERMINISM_AND_VERSIONING.md | Preambuła | Infrastructure + Solver + CI | 10 | ~289 ✅ v1.0 |
 | SPEC_CHAPTER_15_GOVERNANCE_AND_ADR.md | Preambuła | Governance + Process + Workflow | 9 | ~265 ✅ v1.0 |
 | SPEC_CHAPTER_16_EXTERNAL_INTEGRATIONS.md | Preambuła | Infrastructure + Application | 9 | ~260 ✅ v1.0 |
+| SPEC_CHAPTER_17_TESTING_AND_ACCEPTANCE.md | Preambuła | QA (Cross-cutting) | 12 | ~430 ✅ v1.0 |
+| SPEC_CHAPTER_18_PRODUCTION_AND_MAINTENANCE.md | Preambuła | Infrastructure + Operations | 13 | ~450 ✅ v1.0 ★ FINAL |
 | SPEC_00_LAYERING.md | 0 | Architecture | 11 | ~700 |
 | SPEC_01_GLOSSARY_NORMATIVE.md | 0 | Governance | 7 | ~290 |
 | SPEC_02_ENM_CORE.md | 0 | ENM Core | 19 | ~2020 |
@@ -953,13 +966,15 @@ FINALIZACJA:
 | SPEC_15_PERSISTENCE.md | 4 | Infrastructure | 6+1 TO-BE | ~380 |
 | SPEC_16_TESTS.md | 4 | Infrastructure | 10 | ~540 |
 | SPEC_INDEX.md | — | Index | 5 | ~150 |
-| **RAZEM** | | | **~440** | **~25 428** |
+| **RAZEM** | | | **~465** | **~26 308** |
 
 ### Porównanie:
 - **SYSTEM_SPEC.md v3.0:** ~487 linii
-- **Nowa specyfikacja:** ~25 428 linii (34 plików, w tym Rozdział 1-16 preambuły + suplementy)
-- **Wzrost:** ~52× (5200%)
+- **Nowa specyfikacja:** ~26 308 linii (36 plików, w tym Rozdział 1-18 preambuły + suplementy)
+- **Wzrost:** ~54× (5400%)
 - **Pokrycie AS-IS:** ~95% (sekcje TO-BE wyraźnie oznaczone)
+- **Decyzje wiążące:** 140 (AUDIT_SPEC_VS_CODE.md)
+- **SPECYFIKACJA ZAMKNIĘTA** — Rozdziały 1–18 kompletne
 
 ---
 

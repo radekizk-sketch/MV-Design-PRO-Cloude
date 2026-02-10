@@ -945,6 +945,44 @@ Każda rozbieżność z §2 otrzymuje jednoznaczną dyspozycję.
 - INV-INT-01..06, Z-INT-01..06.
 - **DOMENA INTEGRACJI ZEWNĘTRZNYCH W ROZDZIALE 16 JEST ZAMKNIĘTA (v1.0).**
 
+| 127 | Wielowarstwowa piramida testowa: Unit (1200+), Integration (300+), E2E (40+), Guard (compliance) | **BINDING** | QA | `SPEC_CHAPTER_17…` (§17.1) | ~237 plików testowych, ~2117 funkcji. Piramida: Unit (core physics) → Integration (API+DB) → E2E (determinism+browser) → Guard (CI gates). Z-TST-01..03. |
+| 128 | Testy numeryczne solverów: pytest.approx(abs=1e-12), parametryzacja NR/GS/FDLF, referencyjne wartości | **BINDING** | QA + Solver | `SPEC_CHAPTER_17…` (§17.2) | test_branch.py, test_short_circuit_iec60909.py (784 linii), test_power_flow_v2.py, test_ybus.py. Każdy solver z dedykowanym zestawem testów. INV-TST-01. |
+| 129 | Fixtures: łańcuch db_engine(tmp_path)→db_session_factory→uow_factory→app_client, izolacja per test | **BINDING** | QA + Infrastructure | `SPEC_CHAPTER_17…` (§17.3) | conftest.py: SQLite tmp_path (izolowany per test). api/conftest.py: FastAPI TestClient + dependency override. @pytest.mark.integration. INV-TST-02. |
+| 130 | Golden tests: canonical JSON/LaTeX vs zatwierdzone pliki referencyjne, aktualizacja wymaga review | **BINDING** | QA + Determinism | `SPEC_CHAPTER_17…` (§17.5) | test_sc_asymmetrical_golden.py, golden_network_sn.py (20-station SN). _canonicalize_proof(): FIXED_DOC_ID, FIXED_CREATED_AT. Workflow: FAIL→review→update→commit. INV-TST-04. |
+| 131 | Guard tests CI: codenames ban, alert ban, arch guard, polish labels — 4 workflows GitHub Actions | **BINDING** | QA + CI | `SPEC_CHAPTER_17…` (§17.6, §17.8) | python-tests.yml, frontend-e2e-smoke.yml, arch-guard.yml, no-codenames-guard.yml. Wszystkie MUSZĄ przejść przed merge. INV-TST-05, INV-TST-07. |
+| 132 | Frontend tests: Vitest (jsdom, --no-file-parallelism) + Playwright (chromium, sequential, data-testid) | **BINDING** | QA + Frontend | `SPEC_CHAPTER_17…` (§17.7) | 72 pliki Vitest, 3 spec Playwright. fullyParallel:false, workers:1 CI, reducedMotion:'reduce'. INV-TST-03, INV-TST-06. |
+| 133 | Determinizm testów: brak random, brak shared state, sorted output, sequential CI, xfail z reason | **BINDING** | QA + Determinism | `SPEC_CHAPTER_17…` (§17.9) | Bariety: timestamps→FIXED, UUIDs→FIXED, dict→sort_keys, float→approx. xfail(strict=False) dla PDF binary. INV-TST-08..10. |
+
+**Z decyzji #127–#133 wynika (Rozdział 17 — BINDING):**
+- Piramida testowa: Unit (1200+) → Integration (300+) → E2E (40+) → Guard (CI gates).
+- ~237 plików, ~2117 funkcji testowych. Testy NIE zawierają physics (Z-TST-01).
+- Fixtures: izolowane per test (SQLite tmp_path), łańcuch db_engine→uow_factory→app_client.
+- Golden tests: canonical comparison, aktualizacja wymaga review (INV-TST-04).
+- 4 CI workflows: pytest, Playwright smoke, arch guard, codenames guard — ALL must pass.
+- Determinizm: brak random, sorted output, sequential CI, xfail z reason.
+- INV-TST-01..10, Z-TST-01..03.
+- **DOMENA TESTÓW SYSTEMOWYCH W ROZDZIALE 17 JEST ZAMKNIĘTA (v1.0).**
+
+| 134 | Architektura wdrożeniowa: 6 usług Docker (backend, frontend, PostgreSQL, MongoDB, Redis, Celery) | **BINDING** | Infrastructure | `SPEC_CHAPTER_18…` (§18.1) | docker-compose.yml: python:3.11-slim, node:20-alpine, postgres:16-alpine, mongo:7.0, redis:7-alpine. Volumes: postgres_data, mongodb_data, redis_data. Network: mv-design-network (bridge). INV-PRD-01. |
+| 135 | Konfiguracja ENV: SECRET_KEY, DATABASE_URL, REDIS_URL krytyczne; DEBUG=false w produkcji | **BINDING** | Infrastructure | `SPEC_CHAPTER_18…` (§18.2) | Z-PRD-01: zakaz domyślnego SECRET_KEY. Z-PRD-02: zakaz DEBUG=true. Z-PRD-03: zakaz commit credentials. |
+| 136 | Baza danych: 9 migracji SQL, init_db() idempotentne, indeksy deterministyczne | **BINDING** | Infrastructure | `SPEC_CHAPTER_18…` (§18.3) | 001_initial→009_result_status. UNIQUE constraint na (project_id, case_id, analysis_type, input_hash). INV-PRD-02. |
+| 137 | Celery: json serializer, task_acks_late=True, Europe/Warsaw, worker_prefetch_multiplier=1 | **BINDING** | Infrastructure | `SPEC_CHAPTER_18…` (§18.4) | Z-PRD-04: zakaz pickle. Z-PRD-05: zakaz task_acks_late=False. INV-PRD-03. |
+| 138 | Logging: structured (timestamp+level+name+message), RequestIdMiddleware (X-Request-Id), 3 exception handlers | **BINDING** | Infrastructure | `SPEC_CHAPTER_18…` (§18.5) | Severity routing: 5xx→ERROR, 4xx→WARNING, 2xx→INFO. Full traceback z rid=. INV-PRD-04, INV-PRD-09. |
+| 139 | Health checks 3-tier: /health (basic), /ready (readiness), /api/health (extended: DB+solver+uptime) | **BINDING** | Infrastructure | `SPEC_CHAPTER_18…` (§18.5.4) | Status: "ok" (all healthy) / "degraded" (component down). Version 4.0.0. Solvers: sc_iec60909, pf_newton, pf_gauss_seidel, pf_fast_decoupled. INV-PRD-04. |
+| 140 | GO-LIVE Checklist: 14 kategorii (Core→Guards), AS-IS/TO-BE oznaczone, smoke test obowiązkowy | **BINDING** | Operations | `SPEC_CHAPTER_18…` (§18.11) | docs/GO-LIVE-CHECKLIST.md. Smoke: scripts/smoke_local.sh (6 checks). TO-BE: backup, rollback, auth/RBAC. INV-PRD-07, INV-PRD-08. |
+
+**Z decyzji #134–#140 wynika (Rozdział 18 — BINDING):**
+- 6 usług Docker (backend, frontend, PostgreSQL, MongoDB, Redis, Celery worker).
+- SECRET_KEY, DATABASE_URL, REDIS_URL krytyczne; zakaz domyślnych wartości (Z-PRD-01..03).
+- 9 migracji SQL, init_db() idempotentne, connection pooling TO-BE.
+- Celery: json-only serializer, task_acks_late=True, Europe/Warsaw TZ.
+- Logging: structured + request-ID correlation + severity routing.
+- Health checks 3-tier: basic, readiness, extended (DB+solver+uptime).
+- GO-LIVE Checklist: 14 kategorii, smoke test obowiązkowy post-deploy.
+- INV-PRD-01..10, Z-PRD-01..07.
+- **DOMENA WDROŻENIA PRODUKCYJNEGO W ROZDZIALE 18 JEST ZAMKNIĘTA (v1.0).**
+- **SPECYFIKACJA ZAMKNIĘTA — ROZDZIAŁY 1–18 KOMPLETNE. 140 DECYZJI WIĄŻĄCYCH.**
+
 ---
 
 **KONIEC AUDYTU**
