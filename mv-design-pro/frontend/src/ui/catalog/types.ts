@@ -84,9 +84,48 @@ export interface SwitchEquipmentType extends CatalogType {
 }
 
 /**
+ * Converter Type (PV/Wind/BESS inverter).
+ * Source: backend ConverterType dataclass.
+ */
+export interface ConverterType extends CatalogType {
+  kind: 'PV' | 'WIND' | 'BESS';
+  un_kv: number;
+  sn_mva: number;
+  pmax_mw: number;
+  qmin_mvar?: number;
+  qmax_mvar?: number;
+  cosphi_min?: number;
+  cosphi_max?: number;
+  e_kwh?: number;
+}
+
+/**
+ * Measurement Transformer Type (CT/VT).
+ * Derived from backend MeasurementRating + catalog patterns.
+ */
+export interface MeasurementTransformerType extends CatalogType {
+  measurement_kind: 'CT' | 'VT';
+  ratio_primary: number;
+  ratio_secondary: number;
+  accuracy_class: string;
+  burden_va: number;
+}
+
+/**
+ * Protection Device Type.
+ * Source: backend ProtectionDeviceType dataclass.
+ */
+export interface ProtectionDeviceType extends CatalogType {
+  vendor?: string;
+  series?: string;
+  rated_current_a?: number;
+}
+
+/**
  * Union of all catalog type categories.
  */
-export type TypeCategory = 'LINE' | 'CABLE' | 'TRANSFORMER' | 'SWITCH_EQUIPMENT';
+export type TypeCategory = 'LINE' | 'CABLE' | 'TRANSFORMER' | 'SWITCH_EQUIPMENT'
+  | 'CONVERTER' | 'MEASUREMENT_TRANSFORMER' | 'PROTECTION_DEVICE';
 
 /**
  * Type reference in element (points to catalog).

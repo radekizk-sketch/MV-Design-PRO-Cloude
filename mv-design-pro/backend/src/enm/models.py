@@ -69,6 +69,13 @@ class ProtectionSetting(BaseModel):
 # ---------------------------------------------------------------------------
 
 
+class ParameterOverride(BaseModel):
+    """Audytowalny override parametru katalogowego (tryb EKSPERT)."""
+    key: str
+    value: float | str
+    reason: str | None = None
+
+
 class ENMElement(BaseModel):
     id: UUID = Field(default_factory=uuid4)
     ref_id: str
@@ -122,6 +129,8 @@ class BranchBase(ENMElement):
     to_bus_ref: str
     status: Literal["closed", "open"] = "closed"
     catalog_ref: str | None = None
+    parameter_source: Literal["CATALOG", "OVERRIDE"] | None = None
+    overrides: list[ParameterOverride] = []
 
 
 class OverheadLine(BranchBase):
@@ -191,6 +200,8 @@ class Transformer(ENMElement):
     tap_max: int | None = None
     tap_step_percent: float | None = None
     catalog_ref: str | None = None
+    parameter_source: Literal["CATALOG", "OVERRIDE"] | None = None
+    overrides: list[ParameterOverride] = []
 
 
 # ---------------------------------------------------------------------------
@@ -223,6 +234,10 @@ class Load(ENMElement):
     p_mw: float
     q_mvar: float
     model: Literal["pq", "zip"] = "pq"
+    catalog_ref: str | None = None
+    quantity: int | None = None
+    parameter_source: Literal["CATALOG", "OVERRIDE"] | None = None
+    overrides: list[ParameterOverride] = []
 
 
 # ---------------------------------------------------------------------------
@@ -236,6 +251,11 @@ class Generator(ENMElement):
     q_mvar: float | None = None
     gen_type: Literal["synchronous", "pv_inverter", "wind_inverter", "bess"] | None = None
     limits: GenLimits | None = None
+    catalog_ref: str | None = None
+    quantity: int | None = None
+    n_parallel: int | None = None
+    parameter_source: Literal["CATALOG", "OVERRIDE"] | None = None
+    overrides: list[ParameterOverride] = []
 
 
 # ---------------------------------------------------------------------------
@@ -252,6 +272,9 @@ class Measurement(ENMElement):
     rating: MeasurementRating
     connection: Literal["star", "delta", "single_phase"] = "star"
     purpose: Literal["protection", "metering", "combined"] = "protection"
+    catalog_ref: str | None = None
+    parameter_source: Literal["CATALOG", "OVERRIDE"] | None = None
+    overrides: list[ParameterOverride] = []
 
 
 # ---------------------------------------------------------------------------
@@ -272,6 +295,8 @@ class ProtectionAssignment(ENMElement):
     catalog_ref: str | None = None
     settings: list[ProtectionSetting] = []
     is_enabled: bool = True
+    parameter_source: Literal["CATALOG", "OVERRIDE"] | None = None
+    overrides: list[ParameterOverride] = []
 
 
 # ---------------------------------------------------------------------------

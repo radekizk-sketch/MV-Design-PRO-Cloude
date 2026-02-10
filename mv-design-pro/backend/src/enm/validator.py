@@ -53,6 +53,7 @@ class ENMValidator:
         issues: list[ValidationIssue] = []
 
         self._check_blockers(enm, issues)
+        self._check_catalog_first(enm, issues)
         self._check_warnings(enm, issues)
         self._check_info(enm, issues)
         self._check_topology_entities(enm, issues)
@@ -249,6 +250,53 @@ class ENMValidator:
                     element_refs=[trafo.ref_id],
                     wizard_step_hint="K5",
                     suggested_fix="Wprowadź grupę połączeń (np. Dyn11).",
+                ))
+
+    # ------------------------------------------------------------------
+    # CATALOG-FIRST checks (E009-E010)
+    # ------------------------------------------------------------------
+
+    def _check_catalog_first(
+        self, enm: EnergyNetworkModel, issues: list[ValidationIssue]
+    ) -> None:
+        # E009: Transformator bez catalog_ref
+        for trafo in enm.transformers:
+            if not trafo.catalog_ref:
+                issues.append(ValidationIssue(
+                    code="E009",
+                    severity="BLOCKER",
+                    message_pl=(
+                        f"Transformator '{trafo.ref_id}' nie ma referencji "
+                        f"katalogowej (catalog_ref). Wybierz typ z katalogu."
+                    ),
+                    element_refs=[trafo.ref_id],
+                    wizard_step_hint="K5",
+                    suggested_fix="Wybierz typ transformatora z katalogu.",
+                ))
+
+        # E010: Overrides bez parameter_source=OVERRIDE
+        all_elements = [
+            *enm.branches,
+            *enm.transformers,
+            *enm.loads,
+            *enm.generators,
+            *enm.measurements,
+            *enm.protection_assignments,
+        ]
+        for elem in all_elements:
+            overrides = getattr(elem, "overrides", [])
+            param_source = getattr(elem, "parameter_source", None)
+            if overrides and param_source != "OVERRIDE":
+                issues.append(ValidationIssue(
+                    code="E010",
+                    severity="BLOCKER",
+                    message_pl=(
+                        f"Element '{elem.ref_id}' ma overrides, ale "
+                        f"parameter_source != 'OVERRIDE'."
+                    ),
+                    element_refs=[elem.ref_id],
+                    wizard_step_hint="K4",
+                    suggested_fix="Ustaw parameter_source='OVERRIDE' lub usuń overrides.",
                 ))
 
     # ------------------------------------------------------------------

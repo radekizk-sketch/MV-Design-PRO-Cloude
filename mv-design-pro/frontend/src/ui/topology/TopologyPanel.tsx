@@ -1,12 +1,14 @@
 /**
- * TopologyPanel — główny panel edycji topologii sieci SN.
+ * TopologyPanel — panel edycji topologii sieci SN.
  *
  * Integruje:
  * - TopologyTreeView (widok spine/laterals)
- * - Toolbar z akcjami (dodaj węzeł/gałąź/urządzenie/zabezpieczenie)
- * - Modale (NodeModal, BranchModal, ProtectionModal, etc.)
+ * - Toolbar z akcjami (dodaj element)
+ * - Modale catalog-first (NodeModal, BranchModal, etc.)
  * - Selection sync z SLD
  *
+ * CATALOG-FIRST: submit handlers przekazują catalog_ref + topology.
+ * Brak parametrów fizycznych w payload.
  * BINDING: PL labels, no codenames.
  */
 
@@ -99,15 +101,14 @@ export function TopologyPanel({
       await executeOp(caseId, 'create_branch', {
         ref_id: data.ref_id,
         name: data.name,
-        type: data.branch_type,
+        type: data.type,
         from_bus_ref: data.from_bus_ref,
         to_bus_ref: data.to_bus_ref,
         length_km: data.length_km,
-        r_ohm_per_km: data.r_ohm_per_km,
-        x_ohm_per_km: data.x_ohm_per_km,
-        b_siemens_per_km: data.b_siemens_per_km,
-        insulation: data.insulation || undefined,
-        status: 'closed',
+        catalog_ref: data.catalog_ref || undefined,
+        parameter_source: data.parameter_source,
+        overrides: data.overrides.length > 0 ? data.overrides : undefined,
+        status: data.status,
       });
       closeModal();
     },
@@ -123,7 +124,9 @@ export function TopologyPanel({
         ct_ref: data.ct_ref || undefined,
         vt_ref: data.vt_ref || undefined,
         device_type: data.device_type,
-        settings: data.settings,
+        catalog_ref: data.catalog_ref || undefined,
+        parameter_source: data.parameter_source,
+        overrides: data.overrides.length > 0 ? data.overrides : undefined,
       });
       closeModal();
     },
@@ -137,14 +140,11 @@ export function TopologyPanel({
         name: data.name,
         measurement_type: data.measurement_type,
         bus_ref: data.bus_ref,
-        rating: {
-          ratio_primary: data.ratio_primary,
-          ratio_secondary: data.ratio_secondary,
-          accuracy_class: data.accuracy_class || undefined,
-          burden_va: data.burden_va || undefined,
-        },
         connection: data.connection,
         purpose: data.purpose,
+        catalog_ref: data.catalog_ref || undefined,
+        parameter_source: data.parameter_source,
+        overrides: data.overrides.length > 0 ? data.overrides : undefined,
       });
       closeModal();
     },
@@ -159,18 +159,10 @@ export function TopologyPanel({
         name: data.name,
         hv_bus_ref: data.hv_bus_ref,
         lv_bus_ref: data.lv_bus_ref,
-        sn_mva: data.sn_mva,
-        uhv_kv: data.uhv_kv,
-        ulv_kv: data.ulv_kv,
-        uk_percent: data.uk_percent,
-        pk_kw: data.pk_kw,
-        p0_kw: data.p0_kw || undefined,
-        i0_percent: data.i0_percent || undefined,
-        vector_group: data.vector_group || undefined,
         tap_position: data.tap_position,
-        tap_min: data.tap_min,
-        tap_max: data.tap_max,
-        tap_step_percent: data.tap_step_percent || undefined,
+        catalog_ref: data.catalog_ref || undefined,
+        parameter_source: data.parameter_source,
+        overrides: data.overrides.length > 0 ? data.overrides : undefined,
       });
       closeModal();
     },
@@ -185,19 +177,15 @@ export function TopologyPanel({
         ref_id: data.ref_id,
         name: data.name,
         bus_ref: data.bus_ref,
-        p_mw: data.p_mw,
-        q_mvar: data.q_mvar,
+        catalog_ref: data.catalog_ref || undefined,
+        parameter_source: data.parameter_source,
+        overrides: data.overrides.length > 0 ? data.overrides : undefined,
       };
       if (device_kind === 'load') {
         payload.model = data.load_model;
       } else {
         payload.gen_type = data.gen_type;
-        payload.limits = {
-          p_min_mw: data.p_min_mw,
-          p_max_mw: data.p_max_mw,
-          q_min_mvar: data.q_min_mvar,
-          q_max_mvar: data.q_max_mvar,
-        };
+        payload.quantity = data.quantity;
       }
       await executeOp(caseId, 'create_device', payload);
       closeModal();
