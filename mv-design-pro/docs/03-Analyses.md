@@ -8,8 +8,8 @@
 - API endpoints for analysis runs are exposed by the backend (see `backend/src/api/`).
 
 ## 2. Protection status
-- **Protection is NOT IMPLEMENTED.**
-- Any references to protection in other documentation should be treated as prospective or roadmap items.
+- Protection analysis is implemented (overcurrent analysis, selectivity, IDMT curves).
+- See [`PLANS.md`](../PLANS.md) for current status of protection-related phases.
 
 ## 3. Operational guidance
 - Keep analysis-run orchestration deterministic and auditable.

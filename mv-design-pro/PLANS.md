@@ -89,8 +89,8 @@ Tasks:
 - [x] Sync README.md (root + mv-design-pro) — removed prohibited terms, fixed paths, added spec links
 - [x] Sync docs/INDEX.md — added spec chapter table, fixed broken links
 - [x] Add docs_guard.py CI guard (PCC + broken link check)
-- [ ] Clean remaining duplicate docs in docs/ outside docs/spec/
-- [ ] Mark/move deprecated notes and operational files
+- [x] Clean remaining duplicate docs in docs/ outside docs/spec/
+- [x] Mark/move deprecated notes and operational files
 
 ---
 
@@ -131,6 +131,8 @@ Tasks:
 | Issue | Severity | Description |
 |-------|----------|-------------|
 | Node/Bus terminology | RESOLVED | DTOs, API, frontend types renamed with backward-compat aliases |
+| Stale root-level docs | RESOLVED | AUDIT.md, P13B_SUMMARY.md, AUDIT_PCC_REMOVAL.md marked DEPRECATED |
+| Duplicate DOCS_INDEX.md | RESOLVED | Deleted (superseded by docs/INDEX.md) |
 | Duplicate UI contract docs | LOW | Some contracts exist in both `docs/ui/` and root `docs/ui/` |
 | Large test fixtures | LOW | Some test files contain large inline fixtures |
 | ADR numbering conflicts | LOW | ADR-002, ADR-003, ADR-006, ADR-007, ADR-008 have duplicate numbers |

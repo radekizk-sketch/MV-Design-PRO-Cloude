@@ -1,3 +1,8 @@
+> **DEPRECATED** — Historical audit of BoundaryNode removal (completed).
+> BoundaryNode prohibition is now enforced by architecture rules in
+> [`AGENTS.md`](AGENTS.md) §2.4–2.5 and [`docs/spec/AUDIT_SPEC_VS_CODE.md`](docs/spec/AUDIT_SPEC_VS_CODE.md).
+> Retained for historical context only.
+
 # AUDIT BoundaryNode REMOVAL
 
 - branch: fix/remove-connection_node-end-to-end

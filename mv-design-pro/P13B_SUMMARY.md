@@ -1,3 +1,7 @@
+> **DEPRECATED** — Historical implementation summary for a completed phase.
+> Current status is tracked in [`PLANS.md`](PLANS.md).
+> Retained for historical context only.
+
 # P13b: Type Library Governance — Implementation Summary
 
 **Status**: COMPLETE (Backend + Frontend + Tests)
