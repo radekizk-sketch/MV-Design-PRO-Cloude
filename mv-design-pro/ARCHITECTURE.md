@@ -1,8 +1,8 @@
 # MV-DESIGN-PRO Architecture
 
-**Version:** 3.0
+**Version:** 4.0
 **Status:** CANONICAL
-**Reference:** SYSTEM_SPEC.md (authoritative)
+**Reference:** SYSTEM_SPEC.md (authoritative), `docs/spec/` (detailed chapters)
 
 ---
 
@@ -54,7 +54,7 @@
 │                   INTERPRETATION LAYER                            │
 │  ┌──────────────┐  ┌──────────────┐  ┌────────────────────────┐ │
 │  │ PROOF ENGINE │  │   ANALYSIS   │  │ BOUNDARY IDENTIFIER    │ │
-│  │ (P11)        │  │ Protection   │  │ (BoundaryNode)                  │ │
+│  │              │  │ Protection   │  │ (BoundaryNode)         │ │
 │  │ TraceArtifact│  │ Voltage      │  └────────────────────────┘ │
 │  │ ProofDocument│  │ Thermal      │                              │
 │  │ Export       │  │ Normative    │                              │
@@ -68,13 +68,15 @@
 
 ---
 
-> Normatywne domknięcie IEC 60909-0:2016 (§4.1–§4.8) dla śladu i pakietu dowodowego SC asymetrycznych: `docs/proof/NORMATIVE_COMPLETION_PACK_IEC_60909.md`.
+> Normatywne domknięcie IEC 60909-0:2016 (§4.1–§4.8) dla śladu i pakietu dowodowego SC asymetrycznych: [`docs/proof/NORMATIVE_COMPLETION_PACK_IEC_60909.md`](docs/proof/NORMATIVE_COMPLETION_PACK_IEC_60909.md).
+
+> **Spec chapters:** see [`docs/spec/SPEC_CHAPTER_02_ENM_DOMAIN_MODEL.md`](docs/spec/SPEC_CHAPTER_02_ENM_DOMAIN_MODEL.md) (ENM domain), [`docs/spec/SPEC_CHAPTER_06_SOLVER_CONTRACTS_AND_MAPPING.md`](docs/spec/SPEC_CHAPTER_06_SOLVER_CONTRACTS_AND_MAPPING.md) (solver contracts).
 
 ## 2. Network Model Layer
 
 ### 2.1 Core Elements
 
-See SYSTEM_SPEC.md Section 2 for authoritative element definitions.
+See SYSTEM_SPEC.md Section 2 for authoritative element definitions. For the full ENM domain model, see [`docs/spec/SPEC_CHAPTER_02_ENM_DOMAIN_MODEL.md`](docs/spec/SPEC_CHAPTER_02_ENM_DOMAIN_MODEL.md).
 
 Key implementation classes:
 
@@ -112,6 +114,8 @@ Frozen snapshot of network state. Used for solver input and audit trail.
 
 ---
 
+> **Spec chapters:** see [`docs/spec/SPEC_CHAPTER_03_TOPOLOGY_CONNECTIVITY.md`](docs/spec/SPEC_CHAPTER_03_TOPOLOGY_CONNECTIVITY.md), [`docs/spec/SPEC_CHAPTER_04_LINES_CABLES_SN.md`](docs/spec/SPEC_CHAPTER_04_LINES_CABLES_SN.md).
+
 ## 3. Catalog Layer
 
 ### 3.1 Immutable Types
@@ -134,6 +138,8 @@ Instance → type_ref → Catalog lookup → resolved parameters
 ```
 
 Transparent source tracking via `ParameterSource` enum.
+
+> **Spec chapter:** see [`docs/spec/SPEC_CHAPTER_08_TYPE_VS_INSTANCE_AND_CATALOGS.md`](docs/spec/SPEC_CHAPTER_08_TYPE_VS_INSTANCE_AND_CATALOGS.md).
 
 ---
 
@@ -161,6 +167,8 @@ Implementation: `network_model/validation/validator.py`
 12. Transformer HV/LV polarity vs bus voltages
 13. Voltage level consistency on lines/cables
 
+> **Spec chapter:** see [`docs/spec/SPEC_CHAPTER_12_VALIDATION_AND_QA.md`](docs/spec/SPEC_CHAPTER_12_VALIDATION_AND_QA.md).
+
 ---
 
 ## 5. Case Layer
@@ -185,6 +193,8 @@ class StudyCase:
 Manages CRUD, clone, activate/deactivate, compare (read-only), invalidation.
 
 Implementation: `application/study_case/`, `application/active_case/`
+
+> **Spec chapter:** see [`docs/spec/SPEC_CHAPTER_10_STUDY_CASES_AND_SCENARIOS.md`](docs/spec/SPEC_CHAPTER_10_STUDY_CASES_AND_SCENARIOS.md).
 
 ---
 
@@ -232,6 +242,8 @@ class WhiteBoxTrace:
     def to_dict() -> dict            # Export for audit
 ```
 
+> **Spec chapter:** see [`docs/spec/SPEC_CHAPTER_06_SOLVER_CONTRACTS_AND_MAPPING.md`](docs/spec/SPEC_CHAPTER_06_SOLVER_CONTRACTS_AND_MAPPING.md).
+
 ---
 
 ## 7. Interpretation Layer
@@ -277,6 +289,8 @@ Key components:
 ### 7.3 Design Synthesis
 
 `application/analyses/design_synth/` - Connection study pipeline combining SC + PF + Protection into unified evidence trace.
+
+> **Spec chapters:** see [`docs/spec/SPEC_CHAPTER_09_PROTECTION_SYSTEM.md`](docs/spec/SPEC_CHAPTER_09_PROTECTION_SYSTEM.md), [`docs/spec/SPEC_CHAPTER_11_REPORTING_AND_EXPORT.md`](docs/spec/SPEC_CHAPTER_11_REPORTING_AND_EXPORT.md).
 
 ---
 
@@ -497,7 +511,17 @@ UI contracts define presentation rules and are maintained separately from this a
 | ADR-009 | XLSX Importer (future) |
 | ADR-010 | Unified Analysis Run Contract |
 
-Location: `docs/adr/ADR-*.md`
+Location: [`docs/adr/ADR-*.md`](docs/adr/)
+
+---
+
+## 15. Detailed Specification
+
+For the full detailed specification (18 chapters + supplements), see [`SYSTEM_SPEC.md`](SYSTEM_SPEC.md) Section 0 or browse [`docs/spec/`](docs/spec/) directly.
+
+Key entry points:
+- [`docs/spec/AUDIT_SPEC_VS_CODE.md`](docs/spec/AUDIT_SPEC_VS_CODE.md) — Spec-vs-code gap analysis
+- [`docs/spec/SPEC_EXPANSION_PLAN.md`](docs/spec/SPEC_EXPANSION_PLAN.md) — Spec expansion roadmap
 
 ---
 

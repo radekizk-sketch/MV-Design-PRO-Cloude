@@ -1,8 +1,10 @@
 # MV-DESIGN-PRO — Dokumentacja UI (INDEX)
 
 **Status**: CANONICAL
-**Wersja**: 1.0
-**Data**: 2026-01-28
+**Wersja**: 1.1
+**Data**: 2026-02-10
+
+> **Note:** This is the UI contracts index. For the full documentation index (including detailed specification, architecture, and proof engine), see [`mv-design-pro/docs/INDEX.md`](../mv-design-pro/docs/INDEX.md). For the detailed specification (18 chapters), see [`mv-design-pro/docs/spec/`](../mv-design-pro/docs/spec/).
 
 ---
 
@@ -124,7 +126,7 @@ Każdy kontrakt jest **BINDING** (wiążący) dla implementacji UI.
 
 ### 3.3. Switching State View
 
-**Plik:** [`docs/ui/SWITCHING_STATE_VIEW_CONTRACT.md`](./ui/SWITCHING_STATE_VIEW_CONTRACT.md)
+**Plik:** [`docs/ui/SWITCHING_STATE_EXPLORER_CONTRACT.md`](./ui/SWITCHING_STATE_EXPLORER_CONTRACT.md)
 
 **Opis:** Eksploracja stanów łączeniowych przełączników (OPEN/CLOSED) + identyfikacja izolowanych wysp (Islands).
 

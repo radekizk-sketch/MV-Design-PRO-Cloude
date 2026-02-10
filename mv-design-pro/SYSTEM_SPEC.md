@@ -1,10 +1,52 @@
 # MV-DESIGN-PRO System Specification
 
-**Version:** 3.0
+**Version:** 4.0
 **Status:** CANONICAL & BINDING
 **Architecture Model:** DIgSILENT PowerFactory (Conceptual Alignment)
 
-This document is the **single source of truth** for architecture, terminology, system boundaries, and function status in MV-DESIGN-PRO.
+This document is the **executive overview and navigation hub** for MV-DESIGN-PRO.
+The detailed specification lives in `docs/spec/` (18 chapters + supplements).
+This file provides the binding architectural rules, terminology, and pointers.
+
+---
+
+## 0. Detailed Specification (SOURCE OF TRUTH)
+
+The full system specification is maintained in **`docs/spec/`**:
+
+### Spec Chapters
+
+| # | Chapter | File |
+|---|---------|------|
+| 01 | Purpose, Scope, Definitions | [`docs/spec/SPEC_CHAPTER_01_PURPOSE_SCOPE_DEFINITIONS.md`](docs/spec/SPEC_CHAPTER_01_PURPOSE_SCOPE_DEFINITIONS.md) |
+| 02 | ENM Domain Model | [`docs/spec/SPEC_CHAPTER_02_ENM_DOMAIN_MODEL.md`](docs/spec/SPEC_CHAPTER_02_ENM_DOMAIN_MODEL.md) |
+| 03 | Topology & Connectivity | [`docs/spec/SPEC_CHAPTER_03_TOPOLOGY_CONNECTIVITY.md`](docs/spec/SPEC_CHAPTER_03_TOPOLOGY_CONNECTIVITY.md) |
+| 04 | Lines & Cables (MV) | [`docs/spec/SPEC_CHAPTER_04_LINES_CABLES_SN.md`](docs/spec/SPEC_CHAPTER_04_LINES_CABLES_SN.md) |
+| 05 | System Canonical Contracts | [`docs/spec/SPEC_CHAPTER_05_SYSTEM_CANONICAL_CONTRACTS.md`](docs/spec/SPEC_CHAPTER_05_SYSTEM_CANONICAL_CONTRACTS.md) |
+| 06 | Solver Contracts & ENM Mapping | [`docs/spec/SPEC_CHAPTER_06_SOLVER_CONTRACTS_AND_MAPPING.md`](docs/spec/SPEC_CHAPTER_06_SOLVER_CONTRACTS_AND_MAPPING.md) |
+| 07 | Sources, Generators, Loads | [`docs/spec/SPEC_CHAPTER_07_SOURCES_GENERATORS_LOADS.md`](docs/spec/SPEC_CHAPTER_07_SOURCES_GENERATORS_LOADS.md) |
+| 08 | Type vs Instance & Catalogs | [`docs/spec/SPEC_CHAPTER_08_TYPE_VS_INSTANCE_AND_CATALOGS.md`](docs/spec/SPEC_CHAPTER_08_TYPE_VS_INSTANCE_AND_CATALOGS.md) |
+| 09 | Protection System | [`docs/spec/SPEC_CHAPTER_09_PROTECTION_SYSTEM.md`](docs/spec/SPEC_CHAPTER_09_PROTECTION_SYSTEM.md) |
+| 10 | Study Cases & Scenarios | [`docs/spec/SPEC_CHAPTER_10_STUDY_CASES_AND_SCENARIOS.md`](docs/spec/SPEC_CHAPTER_10_STUDY_CASES_AND_SCENARIOS.md) |
+| 11 | Reporting & Export | [`docs/spec/SPEC_CHAPTER_11_REPORTING_AND_EXPORT.md`](docs/spec/SPEC_CHAPTER_11_REPORTING_AND_EXPORT.md) |
+| 12 | Validation & QA | [`docs/spec/SPEC_CHAPTER_12_VALIDATION_AND_QA.md`](docs/spec/SPEC_CHAPTER_12_VALIDATION_AND_QA.md) |
+| 13 | Reporting & Exports (formal) | [`docs/spec/SPEC_CHAPTER_13_REPORTING_AND_EXPORTS.md`](docs/spec/SPEC_CHAPTER_13_REPORTING_AND_EXPORTS.md) |
+| 14 | Determinism & Versioning | [`docs/spec/SPEC_CHAPTER_14_DETERMINISM_AND_VERSIONING.md`](docs/spec/SPEC_CHAPTER_14_DETERMINISM_AND_VERSIONING.md) |
+| 15 | Governance & ADR | [`docs/spec/SPEC_CHAPTER_15_GOVERNANCE_AND_ADR.md`](docs/spec/SPEC_CHAPTER_15_GOVERNANCE_AND_ADR.md) |
+| 16 | External Integrations | [`docs/spec/SPEC_CHAPTER_16_EXTERNAL_INTEGRATIONS.md`](docs/spec/SPEC_CHAPTER_16_EXTERNAL_INTEGRATIONS.md) |
+| 17 | Testing & Acceptance | [`docs/spec/SPEC_CHAPTER_17_TESTING_AND_ACCEPTANCE.md`](docs/spec/SPEC_CHAPTER_17_TESTING_AND_ACCEPTANCE.md) |
+| 18 | Production & Maintenance | [`docs/spec/SPEC_CHAPTER_18_PRODUCTION_AND_MAINTENANCE.md`](docs/spec/SPEC_CHAPTER_18_PRODUCTION_AND_MAINTENANCE.md) |
+
+### Supplements
+
+| Document | Purpose |
+|----------|---------|
+| [`docs/spec/AUDIT_SPEC_VS_CODE.md`](docs/spec/AUDIT_SPEC_VS_CODE.md) | Spec-vs-code gap analysis (BINDING decision matrix) |
+| [`docs/spec/SPEC_EXPANSION_PLAN.md`](docs/spec/SPEC_EXPANSION_PLAN.md) | Spec expansion roadmap & AS-IS/TO-BE policy |
+| [`docs/spec/SPEC_GAP_SUPPLEMENT_PROTECTION_WHITEBOX_LEGACY.md`](docs/spec/SPEC_GAP_SUPPLEMENT_PROTECTION_WHITEBOX_LEGACY.md) | Gap closure: Protection, WhiteBox, OperatingCase |
+| [`docs/spec/ENERGY_NETWORK_MODEL.md`](docs/spec/ENERGY_NETWORK_MODEL.md) | ENM reference model |
+| [`docs/spec/SLD_TOPOLOGICAL_ENGINE.md`](docs/spec/SLD_TOPOLOGICAL_ENGINE.md) | SLD engine spec |
+| [`docs/spec/WIZARD_FLOW.md`](docs/spec/WIZARD_FLOW.md) | Wizard workflow |
 
 ---
 
@@ -16,6 +58,8 @@ The system is aligned with DIgSILENT PowerFactory:
 - No fictional entities in solvers
 - All calculations WHITE BOX (auditable)
 - Strict layer separation: Solver / Analysis / Application / Presentation
+
+> **Detail:** see Chapter 01 (Purpose & Scope) and Chapter 05 (System Canonical Contracts).
 
 ---
 
@@ -31,140 +75,51 @@ There is exactly ONE NetworkModel per project. It contains only physical electri
 | **Line** | Overhead line (explicit branch) | Yes - R/X impedance |
 | **Cable** | Underground cable (explicit branch) | Yes - R/X + capacitance |
 | **Transformer2W** | Two-winding transformer | Yes - impedance transformation |
-| **Transformer3W** | Three-winding transformer | Yes - impedance transformation |
 | **Switch/Breaker** | Switching device | NO - topology only (OPEN/CLOSE) |
 | **Source** | External Grid / Generator / Inverter | Yes - power injection |
 | **Load** | Electrical load | Yes - power consumption |
 
 ### 2.2 NOT in NetworkModel
 
-- BoundaryNode (Point of Common Coupling) - interpretation, not physics
-- Boundary markers - belong to Analysis layer
-- Legal/contractual boundaries
+- BoundaryNode — interpretation, not physics (belongs to Analysis layer)
+- Boundary markers, legal/contractual boundaries
 - Station containers store no physics (logical grouping only)
 
-### 2.3 Element Specifications
-
-```
-Bus:
-  id: UUID, name: str, voltage_level_kv: float
-  node_type: SLACK | PQ | PV
-  voltage_magnitude_pu: float, voltage_angle_rad: float
-  active_power_mw: float, reactive_power_mvar: float
-
-LineBranch:
-  id: UUID, from_bus_id: UUID, to_bus_id: UUID
-  type_ref: UUID -> Catalog, length_km: float
-  r_ohm_per_km: float, x_ohm_per_km: float, b_us_per_km: float
-  rated_current_a: float, in_service: bool
-
-TransformerBranch:
-  id: UUID, from_bus_id: UUID (HV), to_bus_id: UUID (LV)
-  type_ref: UUID -> Catalog
-  rated_power_mva: float, voltage_hv_kv: float, voltage_lv_kv: float
-  uk_percent: float, pk_kw: float
-  tap_position: int, tap_step_percent: float, in_service: bool
-
-Switch:
-  id: UUID, from_bus_id: UUID, to_bus_id: UUID
-  switch_type: BREAKER | DISCONNECTOR | LOAD_SWITCH | FUSE
-  state: OPEN | CLOSED (NO impedance)
-
-Source:
-  id: UUID, bus_id: UUID
-  source_type: EXTERNAL_GRID | GENERATOR | INVERTER
-  p_mw: float, q_mvar: float, u_pu: float
-  sk_mva: float, rx_ratio: float, in_service: bool
-
-Load:
-  id: UUID, bus_id: UUID
-  p_mw: float, q_mvar: float, in_service: bool
-
-Station:
-  id: UUID, name: str, elements: List[ElementRef]
-  (logical container only, NO physics)
-```
-
-### 2.4 NetworkGraph
-
-- Uses NetworkX MultiGraph internally for topology
-- `get_effective_topology()` considers switch states
-- `find_islands()` identifies connected components
-- Immutable snapshots via `NetworkSnapshot` (frozen dataclass)
+> **Detail:** see Chapter 02 (ENM Domain Model), Chapter 03 (Topology), Chapter 04 (Lines & Cables), Chapter 07 (Sources & Loads).
+> **ENM vs Solver model distinction:** see [AUDIT_SPEC_VS_CODE.md](docs/spec/AUDIT_SPEC_VS_CODE.md) Section 2.
 
 ---
 
 ## 3. Type Catalog (Library)
 
-### 3.1 Principles
-
 - Types are **immutable** once created
 - Types are **shared** across projects
-- Instances store only: reference + local parameters (e.g., length)
 - Catalog manages PASSIVE elements only (Line, Cable, Transformer, Switch types)
 - Source, Load, Protection parameters are Case-dependent, NOT cataloged
-
-### 3.2 Parameter Precedence
-
-| Equipment | Precedence |
-|-----------|-----------|
-| Line/Cable | impedance_override > type_ref > instance |
-| Transformer | type_ref > instance |
-| Switch | type_ref > instance (metadata only) |
-
 - Centralized resolver: `network_model.catalog.resolver`
-- `type_ref` not found in catalog = `TypeNotFoundError` (no silent fallback)
+
+> **Detail:** see Chapter 08 (Type vs Instance & Catalogs).
 
 ---
 
 ## 4. Study Case Architecture
-
-### 4.1 Case Definition
 
 **Case != Model.** A Case is a calculation scenario that:
 - CANNOT mutate the NetworkModel
 - Stores ONLY calculation parameters
 - References the NetworkModel (read-only)
 
-### 4.2 Case Types
+Result Status Lifecycle: `NONE -> FRESH -> OUTDATED -> FRESH`
 
-| Case Type | Purpose | Standard |
-|-----------|---------|----------|
-| StudyCase | Generic calculation scenario | - |
-| ShortCircuitCase | Fault current calculations | IEC 60909 |
-| PowerFlowCase | Load flow analysis | Newton-Raphson |
-| ProtectionCase | Protection coordination | IEC 60255 (prospective) |
-
-### 4.3 Active Case Invariant
-
-Exactly ONE StudyCase can be active per project at any time.
-
-### 4.4 Result Status Lifecycle
-
-```
-NONE ──> FRESH (after successful calculation)
-FRESH ──> OUTDATED (after model or config change)
-OUTDATED ──> FRESH (after re-calculation)
-```
-
-### 4.5 Invalidation Rules
-
-| Event | Effect |
-|-------|--------|
-| NetworkModel change | ALL cases marked OUTDATED |
-| Case config change | ONLY that case marked OUTDATED |
-| Successful calculation | Case marked FRESH |
-| Case clone | New case has NONE status (no results copied) |
+> **Detail:** see Chapter 10 (Study Cases & Scenarios).
 
 ---
 
 ## 5. Solver Layer (WHITE BOX)
 
-### 5.1 Definition
-
 Solver = pure physics + computational algorithm. No interpretation, no limits, no normative assessment. Full white-box trace required.
 
-### 5.2 Implemented Solvers
+### 5.1 Implemented Solvers
 
 | Solver | Location | Status |
 |--------|----------|--------|
@@ -173,15 +128,7 @@ Solver = pure physics + computational algorithm. No interpretation, no limits, n
 | Gauss-Seidel Power Flow | `network_model.solvers.power_flow_gauss_seidel` | STABLE |
 | Fast Decoupled Power Flow | `network_model.solvers.power_flow_fast_decoupled` | STABLE |
 
-### 5.3 White Box Requirements (MANDATORY)
-
-All solvers MUST:
-1. Expose calculation steps (Y-bus, Z-thevenin, Jacobian, iterations)
-2. Provide all intermediate values
-3. Allow manual numerical audit
-4. Document assumptions explicitly
-
-### 5.4 Frozen Result API
+### 5.2 Frozen Result API
 
 ```python
 @dataclass(frozen=True)
@@ -201,57 +148,32 @@ class PowerFlowResult:
 
 FROZEN: These APIs cannot change without major version bump.
 
-### 5.5 Forbidden Practices
-
-- Black-box solvers
-- Hidden corrections
-- Undocumented simplifications
-- Implicit assumptions
+> **Detail:** see Chapter 06 (Solver Contracts & Mapping).
 
 ---
 
 ## 6. Analysis / Interpretation Layer
 
-### 6.1 Definition
-
 Analysis = interpretation of solver results. No physics. No model modification.
 
-### 6.1a Normative Completion Reference
+Implemented analyses: Protection, Voltage, Thermal/Overload, Normative Evaluator, Coverage Score, LF Sensitivity, Scenario Comparison, Auto Recommendations, Boundary Identifier.
 
-Wiążące mapowanie IEC 60909-0:2016 (§4.1–§4.8) dla asymetrycznych zwarć i pakietu dowodowego jest utrzymywane w `docs/proof/NORMATIVE_COMPLETION_PACK_IEC_60909.md`.
-
-### 6.2 Implemented Analyses
-
-| Analysis | Input | Output | Status |
-|----------|-------|--------|--------|
-| Protection Analysis | SC results | Coordination, settings | STABLE |
-| Protection Coordination | SC results, device params | Selectivity check | STABLE |
-| Protection Curves I-t | Device params | Time-current curves | STABLE |
-| Voltage Analysis | PF results | Voltage violations | STABLE |
-| Voltage Profile | PF results | Bus voltage profiles | STABLE |
-| Thermal/Overload Analysis | PF results | Branch overload warnings | STABLE |
-| Boundary Identifier (BoundaryNode) | Network topology | BoundaryNode bus identification | STABLE |
-| Normative Evaluator | All results | PN-EN compliance | STABLE |
-| Coverage Score | All results | Completeness assessment | STABLE |
-| LF Sensitivity | PF results | Sensitivity analysis | STABLE |
-| Scenario Comparison | Multiple cases | Delta analysis | STABLE |
-| Auto Recommendations | All results | Improvement suggestions | STABLE |
+> **Detail:** see Chapter 09 (Protection), Chapter 12 (Validation & QA).
+> **Normative completion (IEC 60909-0:2016 asymmetrical):** see [`docs/proof/NORMATIVE_COMPLETION_PACK_IEC_60909.md`](docs/proof/NORMATIVE_COMPLETION_PACK_IEC_60909.md).
 
 ---
 
 ## 7. Proof Engine
 
-### 7.1 Position in Architecture
-
 ```
-SOLVER (frozen) ──> WhiteBoxTrace + SolverResult (READ-ONLY)
-                          │
+SOLVER (frozen) --> WhiteBoxTrace + SolverResult (READ-ONLY)
+                          |
                     PROOF ENGINE (interpretation)
-                          │
-                    TraceArtifact ──> ProofDocument ──> Export (JSON/LaTeX/PDF/DOCX)
+                          |
+                    TraceArtifact --> ProofDocument --> Export (JSON/LaTeX/PDF/DOCX)
 ```
 
-### 7.2 Invariants (BINDING)
+### 7.1 Invariants (BINDING)
 
 | Invariant | Description |
 |-----------|-------------|
@@ -259,107 +181,35 @@ SOLVER (frozen) ──> WhiteBoxTrace + SolverResult (READ-ONLY)
 | Determinism | Same run_id = identical proof.json and proof.tex |
 | Pure interpretation | Proofs generated from existing trace/result data |
 | Step completeness | Each step: Formula > Data > Substitution > Result > Unit Check |
-| Traceability | Every value has mapping key to source in trace/result |
 | LaTeX-only math | Block `$$...$$` only, no inline `$...$` |
-| I_dyn mandatory | Dynamic current required in every SC3F proof |
-| I_th mandatory | Thermal equivalent current required in every SC3F proof |
 
-### 7.3 Implemented Proof Packs
+### 7.2 Implemented Proof Packs
 
-| Pack | Content | Status |
-|------|---------|--------|
-| SC3F (IEC 60909) | Three-phase short circuit proof | STABLE |
-| VDROP | Voltage drop proof | STABLE |
-| Equipment Proof | Equipment thermal/dynamic withstand | STABLE |
-| Power Flow | Load flow audit proof | STABLE |
-| Losses & Energy | Power losses proof | STABLE |
-| Protection Overcurrent | Protection settings proof | STABLE |
-| Earthing/Ground Fault | Ground fault proof (MV) | STABLE |
-| Load Flow Voltage | LF voltage profile proof | STABLE |
+SC3F (IEC 60909), VDROP, Equipment, Power Flow, Losses & Energy, Protection Overcurrent, Earthing/Ground Fault, Load Flow Voltage.
 
-### 7.4 Planned Proof Packs
-
-| Pack | Content | Status |
-|------|---------|--------|
-| SC Asymmetrical (1F, 2F) | Asymmetrical fault proofs | PLANNED |
-| Regulation Q(U) | Reactive power regulation proof | PLANNED |
-| Normative Completion (P20) | Full normative compliance proof | PLANNED |
-
-### 7.5 Equation Registries
-
-| Registry | Content | Location |
-|----------|---------|----------|
-| SC3F | EQ_SC3F_001..010 | `docs/proof_engine/EQUATIONS_IEC60909_SC3F.md` |
-| VDROP | EQ_VDROP_001..009 | `docs/proof_engine/EQUATIONS_VDROP.md` |
+> **Detail:** see [`docs/proof_engine/README.md`](docs/proof_engine/README.md) and [`docs/proof_engine/P11_OVERVIEW.md`](docs/proof_engine/P11_OVERVIEW.md).
 
 ---
 
 ## 8. Validation Layer
 
-NetworkValidator runs BEFORE any solver execution:
+NetworkValidator runs BEFORE any solver execution (13 PowerFactory-grade rules).
 
-| Rule | Description | Blocking |
-|------|-------------|----------|
-| network.connected | Graph must be connected | Yes |
-| network.source_present | At least one source | Yes |
-| network.no_dangling | No dangling elements | Yes |
-| bus.voltage_valid | Voltage > 0 | Yes |
-| branch.endpoints_exist | Both endpoints exist | Yes |
-| transformer.hv_lv_different | HV != LV voltage | Yes |
+> **Detail:** see Chapter 12 (Validation & QA).
 
 ---
 
 ## 9. Application Layer
 
-### 9.1 Wizard (Network Editor)
+- **Wizard**: Sequential controller for NetworkModel editing
+- **SLD**: Visualization of NetworkModel (1:1 mapping, auto-layout, overlays)
+- **Wizard/SLD Unity**: Both edit THE SAME NetworkModel instance
 
-- Sequential controller for NetworkModel access
-- Operates DIRECTLY on NetworkModel (no separate data store)
-- Steps: Project > Catalog > Buses > Lines > Transformers > Sources > Switches > Validate > Cases > Results
-
-### 9.2 SLD (Single Line Diagram)
-
-- ONLY a visualization of the NetworkModel
-- 1:1 mapping: one SLD symbol = one model object
-- Auto-layout engine with 5-phase pipeline
-- Result overlays (SC, PF, Protection)
-- Export: PNG, PDF, SVG
-- CAD geometry overrides (AUTO / CAD / HYBRID modes)
-
-### 9.3 Wizard/SLD Unity
-
-Both Wizard and SLD edit THE SAME NetworkModel instance. No state duplication, no auxiliary models, no pending-changes buffers.
+> **Detail:** see Chapter 05 (System Canonical Contracts), [`docs/spec/WIZARD_FLOW.md`](docs/spec/WIZARD_FLOW.md), [`docs/spec/SLD_TOPOLOGICAL_ENGINE.md`](docs/spec/SLD_TOPOLOGICAL_ENGINE.md).
 
 ---
 
-## 10. User Interaction Model
-
-### 10.1 Work Modes
-
-| Mode | Purpose | Model State | Results State |
-|------|---------|-------------|---------------|
-| Edit Mode | Modify NetworkModel | MUTABLE | N/A (invalidated) |
-| Study Case Mode | Configure Case params | READ-ONLY | CONFIGURABLE |
-| Result Mode | View calculation results | READ-ONLY | READ-ONLY + Overlays |
-
-### 10.2 PowerFactory Component Mapping
-
-| PowerFactory | MV-DESIGN-PRO | Description |
-|-------------|---------------|-------------|
-| Data Manager | Wizard | Sequential element entry |
-| Study Case | Case | Calculation scenario |
-| Calculation Command | Solver Run | Explicit invocation |
-| Result Browser | Results Browser | View solver output |
-| Type Library | Catalog | Immutable type defs |
-| Graphic (SLD) | SLD | Topological diagram |
-| Element Properties | Property Grid / Inspector | Field editor |
-| Check Network | NetworkValidator | Pre-solver validation |
-
----
-
-## 11. Canonical Terminology
-
-### 11.1 Binding Terms
+## 10. Canonical Terminology
 
 | Term | Definition | PowerFactory Equivalent |
 |------|------------|------------------------|
@@ -370,92 +220,13 @@ Both Wizard and SLD edit THE SAME NetworkModel instance. No state duplication, n
 | Case | Calculation scenario | Study Case |
 | Catalog | Type library | Type Library |
 
-### 11.2 Forbidden Terms in Core Model
+**Forbidden Terms in Core Model**: BoundaryNode, Connection Point, Virtual Node, Aggregated Element.
 
-- BoundaryNode (belongs to interpretation layer)
-- Connection Point (use Bus)
-- Virtual Node (no virtual entities)
-- Aggregated Element (no aggregation)
+> **Detail:** see Chapter 01 (Purpose, Scope, Definitions).
 
 ---
 
-## 12. Function Map
-
-### 12.1 STABLE (implemented and tested)
-
-| Function | Module | Tests |
-|----------|--------|-------|
-| Network Model (Bus, Branch, Switch, Source, Load) | `network_model.core` | Yes |
-| NetworkGraph (topology, islands) | `network_model.core.graph` | Yes |
-| Network Snapshot (immutable) | `network_model.core.snapshot` | Yes |
-| IEC 60909 Short Circuit Solver | `network_model.solvers` | Yes |
-| Newton-Raphson Power Flow | `network_model.solvers` | Yes |
-| Gauss-Seidel Power Flow | `network_model.solvers` | Yes |
-| Fast Decoupled Power Flow | `network_model.solvers` | Yes |
-| Y-bus Matrix Builder | `network_model.solvers` | Yes |
-| White Box Trace | `network_model.whitebox` | Yes |
-| Type Catalog (Line, Cable, Trafo types) | `network_model.catalog` | Yes |
-| Catalog Resolver (parameter precedence) | `network_model.catalog.resolver` | Yes |
-| Study Case Lifecycle (NONE/FRESH/OUTDATED) | `application.study_case` | Yes |
-| Active Case Management | `application.active_case` | Yes |
-| Network Wizard Service | `application.network_wizard` | Yes |
-| Wizard Actions & Runtime | `application.wizard_actions/runtime` | Yes |
-| SLD Projection | `application.sld` | Yes |
-| SLD Auto-Layout (5-phase pipeline) | Frontend engine | Yes |
-| Proof Engine (SC3F, VDROP, Equipment) | `proof_engine` | Yes |
-| Proof Pack Publication | `proof_engine` | Yes |
-| Protection Analysis (overcurrent, coordination) | `application.analyses.protection` | Yes |
-| Protection Library (vendor curves, IDMT) | `application.analyses.protection.catalog` | Yes |
-| Voltage Analysis / Profile | `analysis.voltage` | Yes |
-| Normative Evaluator | `analysis.normative` | Yes |
-| Coverage Score | `analysis.coverage_score` | Yes |
-| LF Sensitivity | `analysis.lf_sensitivity` | Yes |
-| Scenario Comparison | `analysis.scenario_comparison` | Yes |
-| Auto Recommendations | `analysis.recommendations` | Yes |
-| Boundary Identifier (BoundaryNode) | `analysis.boundary` | Yes |
-| Analysis Run Service (unified pipeline) | `application.analysis_run` | Yes |
-| Design Synthesis (connection study) | `application.analyses.design_synth` | Yes |
-| Project Archive (import/export ZIP) | `application.project_archive` | Yes |
-| PDF/DOCX Report Generation | `analysis.pdf_report` | Yes |
-| Power Flow Comparison | `analysis.power_flow` | Yes |
-| Reference Patterns | `application.reference_patterns` | Yes |
-| API Layer (FastAPI endpoints) | `api` | Yes |
-| Frontend SLD Editor + Symbols | `ui/sld` | Yes |
-| Frontend Results Browser | `ui/results-browser` | Yes |
-| Frontend Case Manager | `ui/case-manager` | Yes |
-| Frontend Proof Inspector | `proof-inspector` | Yes |
-| Frontend Protection Diagnostics | `ui/protection-diagnostics` | Yes |
-| Frontend Voltage Profile | `ui/voltage-profile` | Yes |
-| Frontend Power Flow Results | `ui/power-flow-results` | Yes |
-| Frontend Protection Curves | `ui/protection-curves` | Yes |
-| Frontend Designer / Wizard | `designer` | Yes |
-| Frontend Context Menu | `ui/context-menu` | Yes |
-| Frontend Issue Panel | `ui/issue-panel` | Yes |
-| Frontend Status Bar | `ui/status-bar` | Yes |
-| Frontend SLD Export (PNG/PDF) | `ui/sld/export` | Yes |
-
-### 12.2 COMPLETED (formerly IN PROGRESS)
-
-| Function | Status | Notes |
-|----------|--------|-------|
-| NetworkValidator (full PowerFactory-grade) | DONE | 13 rules, suggested_fix, Polish messages, switch/inverter/impedance/polarity/voltage checks. 29 tests. |
-| Bus terminology rename (Node -> Bus) | DONE | DTOs, API, frontend types renamed with backward-compat aliases. Zero regressions. |
-| Phase 6: Wizard/SLD Unity verification | DONE | 27 backend + 23 frontend formal verification tests. Single model, round-trip, determinism confirmed. |
-
-### 12.3 PLANNED
-
-| Function | Priority |
-|----------|----------|
-| SC Asymmetrical Proofs (1F, 2F) | HIGH |
-| Regulation Q(U) Proofs | MEDIUM |
-| Normative Completion Pack (P20) | HIGH |
-| XLSX Network Importer | LOW |
-| Cloud Backup Integration | LOW |
-| Incremental Archive Export | LOW |
-
----
-
-## 13. Immutable Invariants
+## 11. Immutable Invariants
 
 1. WHITE BOX Trace is foundational. All solvers expose intermediate values.
 2. Result API IEC 60909 is FROZEN: `ShortCircuitResult`, `to_dict()`, `white_box_trace`.
@@ -470,16 +241,24 @@ Both Wizard and SLD edit THE SAME NetworkModel instance. No state duplication, n
 
 ---
 
-## 14. Reference Documents
+## 12. Reference Documents
 
 | Category | Location |
 |----------|----------|
-| UI Contracts | `docs/ui/*.md` |
-| Proof Engine Specs | `docs/proof_engine/*.md` |
-| Architecture Decision Records | `docs/adr/ADR-*.md` |
-| Protection Specs | `docs/protection/*.md` |
-| Analysis Specs | `docs/analysis/*.md` |
-| Historical ExecPlans (archive) | `docs/audit/historical_execplans/` |
+| **Detailed Specification (18 chapters)** | [`docs/spec/SPEC_CHAPTER_*.md`](docs/spec/) |
+| **Spec vs Code Audit** | [`docs/spec/AUDIT_SPEC_VS_CODE.md`](docs/spec/AUDIT_SPEC_VS_CODE.md) |
+| **Spec Expansion Plan** | [`docs/spec/SPEC_EXPANSION_PLAN.md`](docs/spec/SPEC_EXPANSION_PLAN.md) |
+| Architecture | [`ARCHITECTURE.md`](ARCHITECTURE.md) |
+| Agent Governance | [`AGENTS.md`](AGENTS.md) |
+| Operational Plan | [`PLANS.md`](PLANS.md) |
+| UI Contracts | [`docs/ui/*.md`](docs/ui/) |
+| Proof Engine Specs | [`docs/proof_engine/*.md`](docs/proof_engine/) |
+| Architecture Decision Records | [`docs/adr/ADR-*.md`](docs/adr/) |
+| Protection Specs | [`docs/protection/*.md`](docs/protection/) |
+| Analysis Specs | [`docs/analysis/*.md`](docs/analysis/) |
+| PowerFactory Compliance | [`POWERFACTORY_COMPLIANCE.md`](POWERFACTORY_COMPLIANCE.md) |
+| Documentation Index | [`docs/INDEX.md`](docs/INDEX.md) |
+| Historical ExecPlans (archive) | [`docs/audit/historical_execplans/`](docs/audit/historical_execplans/) |
 
 ---
 
