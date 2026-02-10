@@ -1,10 +1,12 @@
 # MV-DESIGN-PRO — Dokumentacja UI (INDEX)
 
 **Status**: CANONICAL
-**Wersja**: 1.1
+**Wersja**: 2.0
 **Data**: 2026-02-10
 
-> **Note:** This is the UI contracts index. For the full documentation index (including detailed specification, architecture, and proof engine), see [`mv-design-pro/docs/INDEX.md`](../mv-design-pro/docs/INDEX.md). For the detailed specification (18 chapters), see [`mv-design-pro/docs/spec/`](../mv-design-pro/docs/spec/).
+> **Note:** This is the UI contracts index. All contracts live in the canonical location: [`mv-design-pro/docs/ui/`](../mv-design-pro/docs/ui/).
+> For the full documentation index, see [`mv-design-pro/docs/INDEX.md`](../mv-design-pro/docs/INDEX.md).
+> For the detailed specification (18 chapters), see [`mv-design-pro/docs/spec/`](../mv-design-pro/docs/spec/).
 
 ---
 
@@ -20,7 +22,7 @@ Każdy kontrakt jest **BINDING** (wiążący) dla implementacji UI.
 
 ### 2.1. Results Browser
 
-**Plik:** [`docs/ui/RESULTS_BROWSER_CONTRACT.md`](./ui/RESULTS_BROWSER_CONTRACT.md)
+**Plik:** [`mv-design-pro/docs/ui/RESULTS_BROWSER_CONTRACT.md`](../mv-design-pro/docs/ui/RESULTS_BROWSER_CONTRACT.md)
 
 **Opis:** Hierarchiczna eksploracja wyników obliczeń (Project → Case → Snapshot → Analysis → Target).
 
@@ -34,7 +36,7 @@ Każdy kontrakt jest **BINDING** (wiążący) dla implementacji UI.
 
 ### 2.2. Element Inspector
 
-**Plik:** [`docs/ui/ELEMENT_INSPECTOR_CONTRACT.md`](./ui/ELEMENT_INSPECTOR_CONTRACT.md)
+**Plik:** [`mv-design-pro/docs/ui/ELEMENT_INSPECTOR_CONTRACT.md`](../mv-design-pro/docs/ui/ELEMENT_INSPECTOR_CONTRACT.md)
 
 **Opis:** Inspekcja dowolnego elementu sieci (Bus, Line, Trafo, Source, Protection).
 
@@ -47,7 +49,7 @@ Każdy kontrakt jest **BINDING** (wiążący) dla implementacji UI.
 
 ### 2.3. Expert Modes
 
-**Plik:** [`docs/ui/EXPERT_MODES_CONTRACT.md`](./ui/EXPERT_MODES_CONTRACT.md)
+**Plik:** [`mv-design-pro/docs/ui/EXPERT_MODES_CONTRACT.md`](../mv-design-pro/docs/ui/EXPERT_MODES_CONTRACT.md)
 
 **Opis:** Tryby eksperckie (Operator, Designer, Analyst, Auditor) — dostosowanie UI do roli użytkownika.
 
@@ -60,7 +62,7 @@ Każdy kontrakt jest **BINDING** (wiążący) dla implementacji UI.
 
 ### 2.4. Global Context Bar
 
-**Plik:** [`docs/ui/GLOBAL_CONTEXT_BAR.md`](./ui/GLOBAL_CONTEXT_BAR.md)
+**Plik:** [`mv-design-pro/docs/ui/GLOBAL_CONTEXT_BAR.md`](../mv-design-pro/docs/ui/GLOBAL_CONTEXT_BAR.md)
 
 **Opis:** Kontekst zawsze widoczny (sticky top bar) — Project, Case, Snapshot, Analysis, Norma, Expert Mode, Element, Timestamp.
 
@@ -73,7 +75,7 @@ Każdy kontrakt jest **BINDING** (wiążący) dla implementacji UI.
 
 ### 2.5. UI ETAP / PowerFactory Parity
 
-**Plik:** [`docs/ui/UI_ETAP_POWERFACTORY_PARITY.md`](./ui/UI_ETAP_POWERFACTORY_PARITY.md)
+**Plik:** [`mv-design-pro/docs/ui/UI_ETAP_POWERFACTORY_PARITY.md`](../mv-design-pro/docs/ui/UI_ETAP_POWERFACTORY_PARITY.md)
 
 **Opis:** Macierz feature-by-feature: MV-DESIGN-PRO vs ETAP vs PowerFactory.
 
@@ -91,7 +93,7 @@ Każdy kontrakt jest **BINDING** (wiążący) dla implementacji UI.
 
 ### 3.1. SLD Render Layers
 
-**Plik:** [`docs/ui/SLD_RENDER_LAYERS_CONTRACT.md`](./ui/SLD_RENDER_LAYERS_CONTRACT.md)
+**Plik:** [`mv-design-pro/docs/ui/SLD_RENDER_LAYERS_CONTRACT.md`](../mv-design-pro/docs/ui/SLD_RENDER_LAYERS_CONTRACT.md)
 
 **Opis:** Rozdział semantyk renderingu SLD — CAD (statyczny schemat) vs SCADA (runtime monitoring).
 
@@ -108,7 +110,7 @@ Każdy kontrakt jest **BINDING** (wiążący) dla implementacji UI.
 
 ### 3.2. Topology Tree
 
-**Plik:** [`docs/ui/TOPOLOGY_TREE_CONTRACT.md`](./ui/TOPOLOGY_TREE_CONTRACT.md)
+**Plik:** [`mv-design-pro/docs/ui/TOPOLOGY_TREE_CONTRACT.md`](../mv-design-pro/docs/ui/TOPOLOGY_TREE_CONTRACT.md)
 
 **Opis:** Hierarchiczna eksploracja struktury sieci (Project → Station → Voltage Level → Elements).
 
@@ -126,7 +128,7 @@ Każdy kontrakt jest **BINDING** (wiążący) dla implementacji UI.
 
 ### 3.3. Switching State View
 
-**Plik:** [`docs/ui/SWITCHING_STATE_EXPLORER_CONTRACT.md`](./ui/SWITCHING_STATE_EXPLORER_CONTRACT.md)
+**Plik:** [`mv-design-pro/docs/ui/SWITCHING_STATE_EXPLORER_CONTRACT.md`](../mv-design-pro/docs/ui/SWITCHING_STATE_EXPLORER_CONTRACT.md)
 
 **Opis:** Eksploracja stanów łączeniowych przełączników (OPEN/CLOSED) + identyfikacja izolowanych wysp (Islands).
 
@@ -144,7 +146,7 @@ Każdy kontrakt jest **BINDING** (wiążący) dla implementacji UI.
 
 ### 3.4. SC Node Results
 
-**Plik:** [`docs/ui/SC_NODE_RESULTS_CONTRACT.md`](./ui/SC_NODE_RESULTS_CONTRACT.md)
+**Plik:** [`mv-design-pro/docs/ui/SC_NODE_RESULTS_CONTRACT.md`](../mv-design-pro/docs/ui/SC_NODE_RESULTS_CONTRACT.md)
 
 **Opis:** Wyniki zwarciowe WYŁĄCZNIE per BUS (węzłowo-centryczne).
 
@@ -162,7 +164,7 @@ Każdy kontrakt jest **BINDING** (wiążący) dla implementacji UI.
 
 ### 3.5. Catalog Browser (PASYWNE ELEMENTY TYLKO)
 
-**Plik:** [`docs/ui/CATALOG_BROWSER_CONTRACT.md`](./ui/CATALOG_BROWSER_CONTRACT.md)
+**Plik:** [`mv-design-pro/docs/ui/CATALOG_BROWSER_CONTRACT.md`](../mv-design-pro/docs/ui/CATALOG_BROWSER_CONTRACT.md)
 
 **Opis:** Przeglądanie katalogów typów PASYWNYCH elementów sieci (LineType, CableType, TransformerType, SwitchType) + relacja Type → Instances.
 
@@ -184,7 +186,7 @@ Każdy kontrakt jest **BINDING** (wiążący) dla implementacji UI.
 
 ### 3.6. Case Comparison UI
 
-**Plik:** [`docs/ui/CASE_COMPARISON_UI_CONTRACT.md`](./ui/CASE_COMPARISON_UI_CONTRACT.md)
+**Plik:** [`mv-design-pro/docs/ui/CASE_COMPARISON_UI_CONTRACT.md`](../mv-design-pro/docs/ui/CASE_COMPARISON_UI_CONTRACT.md)
 
 **Opis:** Porównanie dwóch lub trzech Case'ów (Case A vs Case B vs Case C) + wizualizacja różnic (Delta).
 
