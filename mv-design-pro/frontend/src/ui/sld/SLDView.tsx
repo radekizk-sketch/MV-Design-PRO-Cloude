@@ -52,6 +52,7 @@ import {
   type PdfOrientation,
   type ExportScope,
 } from './export';
+import { useOverlayRuntime, OverlayLegend } from '../sld-overlay';
 
 /**
  * Default canvas dimensions.
@@ -117,6 +118,9 @@ export const SLDView: React.FC<SLDViewProps> = ({
   // PR-SLD-09: Protection statistics
   const protectionStats = useProtectionStatistics();
   const hasProtectionData = protectionStats.total > 0;
+
+  // PR-16: Overlay Runtime Engine
+  const overlayRuntime = useOverlayRuntime(symbols);
 
   // Export dialog state
   const [exportDialogOpen, setExportDialogOpen] = useState(false);
@@ -846,6 +850,14 @@ export const SLDView: React.FC<SLDViewProps> = ({
             {/* Center dot */}
             <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-2 h-2 rounded-full bg-blue-500" />
           </div>
+        )}
+
+        {/* PR-16: Overlay Runtime Legend */}
+        {overlayRuntime.isActive && (
+          <OverlayLegend
+            overlay={overlayRuntime.overlay}
+            visible={overlayRuntime.isActive}
+          />
         )}
 
         {/* Diagnostics overlay layer */}

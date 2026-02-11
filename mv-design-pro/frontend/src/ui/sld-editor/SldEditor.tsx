@@ -28,6 +28,7 @@ import { useSldModeStore, SLD_MODE_LABELS_PL } from '../sld/sldModeStore';
 import { DiagnosticResultsLayer } from '../sld/DiagnosticResultsLayer';
 import type { AnySldSymbol } from './types';
 import { featureFlags } from '../config/featureFlags';
+import { useOverlayRuntime, OverlayLegend } from '../sld-overlay';
 
 /**
  * SLD Editor props.
@@ -82,6 +83,10 @@ export const SldEditor: React.FC<SldEditorProps> = ({
       CONFLICT: 'Konflikt geometrii CAD — część nadpisań nie pasuje do modelu',
     }[cadOverridesStatus.status]
     : null;
+
+  // PR-16: Overlay Runtime Engine
+  const currentSymbols = Array.from(sldStore.symbols.values());
+  const overlayRuntime = useOverlayRuntime(currentSymbols);
 
   // Combine mutation blocking with results mode
   const isEditBlocked = isMutationBlocked || isResultsMode;
@@ -198,9 +203,16 @@ export const SldEditor: React.FC<SldEditorProps> = ({
         {/* PR-SLD-06: Diagnostic layer overlay in WYNIKI mode */}
         {isResultsMode && diagnosticLayerVisible && (
           <DiagnosticResultsLayer
-            symbols={Array.from(sldStore.symbols.values())}
+            symbols={currentSymbols}
             viewport={{ offsetX: 0, offsetY: 0, zoom: 1 }}
             visible={diagnosticLayerVisible}
+          />
+        )}
+        {/* PR-16: Overlay Runtime Legend */}
+        {overlayRuntime.isActive && (
+          <OverlayLegend
+            overlay={overlayRuntime.overlay}
+            visible={overlayRuntime.isActive}
           />
         )}
       </div>
