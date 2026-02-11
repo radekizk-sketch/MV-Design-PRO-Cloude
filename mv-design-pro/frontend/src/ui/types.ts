@@ -498,3 +498,85 @@ export interface EngineeringReadinessResponse {
     load_flow: boolean;
   };
 }
+
+// ============================================================================
+// PR-17: Analysis Eligibility Matrix Types
+// ============================================================================
+
+/**
+ * Analysis type for eligibility matrix.
+ */
+export type EligibilityAnalysisType = 'SC_3F' | 'SC_2F' | 'SC_1F' | 'LOAD_FLOW';
+
+/**
+ * Eligibility status for a given analysis type.
+ */
+export type EligibilityStatus = 'ELIGIBLE' | 'INELIGIBLE';
+
+/**
+ * Eligibility issue severity.
+ */
+export type EligibilityIssueSeverity = 'BLOCKER' | 'WARNING' | 'INFO';
+
+/**
+ * Single eligibility issue with optional fix action.
+ */
+export interface AnalysisEligibilityIssue {
+  code: string;
+  severity: EligibilityIssueSeverity;
+  message_pl: string;
+  element_ref: string | null;
+  element_type: string | null;
+  fix_action: FixAction | null;
+}
+
+/**
+ * Eligibility result for one analysis type.
+ */
+export interface AnalysisEligibilityResult {
+  analysis_type: EligibilityAnalysisType;
+  status: EligibilityStatus;
+  blockers: AnalysisEligibilityIssue[];
+  warnings: AnalysisEligibilityIssue[];
+  info: AnalysisEligibilityIssue[];
+  by_severity: Record<EligibilityIssueSeverity, number>;
+  content_hash: string;
+}
+
+/**
+ * Overall eligibility summary.
+ */
+export interface EligibilityOverall {
+  eligible_any: boolean;
+  eligible_all: boolean;
+  blockers_total: number;
+}
+
+/**
+ * Full Analysis Eligibility Matrix API response.
+ */
+export interface AnalysisEligibilityMatrixResponse {
+  case_id: string;
+  enm_revision: number;
+  matrix: AnalysisEligibilityResult[];
+  overall: EligibilityOverall;
+  content_hash: string;
+}
+
+/**
+ * Polish labels for eligibility analysis types.
+ */
+export const ELIGIBILITY_ANALYSIS_LABELS: Record<EligibilityAnalysisType, string> = {
+  SC_3F: 'Zwarcie trójfazowe (3F)',
+  SC_2F: 'Zwarcie dwufazowe (2F)',
+  SC_1F: 'Zwarcie jednofazowe (1F)',
+  LOAD_FLOW: 'Rozpływ mocy',
+};
+
+/**
+ * Polish labels for eligibility status.
+ */
+export const ELIGIBILITY_STATUS_LABELS: Record<EligibilityStatus, string> = {
+  ELIGIBLE: 'Możliwe',
+  INELIGIBLE: 'Zablokowane',
+};

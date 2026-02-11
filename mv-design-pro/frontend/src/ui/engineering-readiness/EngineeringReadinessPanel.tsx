@@ -154,6 +154,8 @@ export interface EngineeringReadinessPanelProps {
   bySeverity: Record<ReadinessSeverity, number>;
   onNavigate: (elementRef: string) => void;
   onFix: (fixAction: FixAction) => void;
+  /** PR-17: Optional eligibility section rendered below readiness issues. */
+  eligibilitySection?: React.ReactNode;
 }
 
 export const EngineeringReadinessPanel: React.FC<EngineeringReadinessPanelProps> = ({
@@ -163,6 +165,7 @@ export const EngineeringReadinessPanel: React.FC<EngineeringReadinessPanelProps>
   bySeverity,
   onNavigate,
   onFix,
+  eligibilitySection,
 }) => {
   const [severityFilter, setSeverityFilter] = useState<ReadinessSeverity | null>(null);
 
@@ -241,6 +244,13 @@ export const EngineeringReadinessPanel: React.FC<EngineeringReadinessPanelProps>
           })}
         </div>
       </div>
+
+      {/* PR-17: Analysis Eligibility section */}
+      {eligibilitySection && (
+        <div className="border-b border-gray-200" data-testid="eligibility-section">
+          {eligibilitySection}
+        </div>
+      )}
 
       {/* Issue list */}
       <div className="flex-1 overflow-y-auto p-4">
