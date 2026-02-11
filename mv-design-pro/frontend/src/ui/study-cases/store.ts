@@ -25,6 +25,10 @@ import type {
   StudyCaseResultStatus,
   CreateStudyCaseRequest,
   UpdateStudyCaseRequest,
+  ExecutionRun,
+  ExecutionResultSet,
+  RunStatus,
+  CreateRunRequest,
 } from './types';
 import * as api from './api';
 
