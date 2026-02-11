@@ -26,6 +26,8 @@ import logging
 from typing import Any, Callable
 from uuid import UUID
 
+import numpy as np
+
 from domain.execution import (
     ExecutionAnalysisType,
     Run,
@@ -36,7 +38,15 @@ from domain.execution import (
     compute_solver_input_hash,
     new_run,
 )
-from domain.study_case import StudyCase as DomainStudyCase
+from domain.study_case import StudyCase as DomainStudyCase, StudyCaseConfig
+
+from application.solvers.short_circuit_binding import (
+    ShortCircuitBindingError,
+    execute_short_circuit,
+)
+from application.result_mapping.short_circuit_to_resultset_v1 import (
+    map_short_circuit_to_resultset_v1,
+)
 
 from .errors import (
     RunBlockedError,
@@ -257,6 +267,104 @@ class ExecutionEngineService:
         self._runs[run_id] = updated
         logger.warning("Failed run %s: %s", run_id, error_message)
         return updated
+
+    # =========================================================================
+    # Short-Circuit Execution (PR-18)
+    # =========================================================================
+
+    _SC_ANALYSIS_TYPES = {
+        ExecutionAnalysisType.SC_3F,
+        ExecutionAnalysisType.SC_1F,
+        ExecutionAnalysisType.SC_2F,
+    }
+
+    def execute_run_sc(
+        self,
+        run_id: UUID,
+        *,
+        graph: Any,
+        config: StudyCaseConfig,
+        fault_node_id: str,
+        readiness_snapshot: dict[str, Any],
+        validation_snapshot: dict[str, Any],
+        z0_bus: np.ndarray | None = None,
+    ) -> tuple[Run, ResultSet]:
+        """
+        Execute a short-circuit run end-to-end (PR-18 binding).
+
+        FLOW:
+        1. Get Run (must be PENDING)
+        2. Mark as RUNNING
+        3. Call short_circuit_binding with the correct SC variant
+        4. Map solver result → ResultSet v1
+        5. Store ResultSet, mark as DONE
+        6. On error → mark as FAILED
+
+        Args:
+            run_id: ID of a PENDING run.
+            graph: NetworkGraph to compute on.
+            config: StudyCaseConfig with c_factor, thermal_time, etc.
+            fault_node_id: Node where the fault occurs.
+            readiness_snapshot: Readiness state at run time.
+            validation_snapshot: Validation state at run time.
+            z0_bus: Zero-sequence bus matrix (required for SC_1F).
+
+        Returns:
+            Tuple of (completed Run in DONE status, ResultSet v1).
+
+        Raises:
+            RunNotFoundError: If run doesn't exist.
+            RunBlockedError: If analysis_type is not a short-circuit type.
+            ShortCircuitBindingError: If the solver fails.
+        """
+        run = self._get_run(run_id)
+
+        if run.analysis_type not in self._SC_ANALYSIS_TYPES:
+            raise RunBlockedError(
+                [f"Typ analizy {run.analysis_type.value} nie jest obsługiwany przez solver zwarciowy"]
+            )
+
+        # Transition PENDING → RUNNING
+        run = self.start_run(run_id)
+
+        try:
+            # Call the solver binding
+            binding_result = execute_short_circuit(
+                graph=graph,
+                analysis_type=run.analysis_type,
+                config=config,
+                fault_node_id=fault_node_id,
+                z0_bus=z0_bus,
+            )
+
+            # Map to ResultSet v1
+            result_set = map_short_circuit_to_resultset_v1(
+                binding_result=binding_result,
+                run_id=run.id,
+                graph=graph,
+                validation_snapshot=validation_snapshot,
+                readiness_snapshot=readiness_snapshot,
+            )
+
+            # Store ResultSet and mark DONE
+            updated_run = run.mark_done()
+            self._runs[run_id] = updated_run
+            self._result_sets[run_id] = result_set
+
+            logger.info(
+                "SC run %s completed: type=%s, Ik''=%.2f A, sig=%s",
+                run_id,
+                run.analysis_type.value,
+                binding_result.solver_result.ikss_a,
+                result_set.deterministic_signature[:16],
+            )
+
+            return updated_run, result_set
+
+        except (ShortCircuitBindingError, Exception) as exc:
+            error_msg = str(exc)
+            failed_run = self.fail_run(run_id, error_msg)
+            raise
 
     # =========================================================================
     # Query Operations

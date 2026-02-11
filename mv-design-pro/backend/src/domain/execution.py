@@ -52,6 +52,7 @@ class ExecutionAnalysisType(str, Enum):
 
     SC_3F = "SC_3F"
     SC_1F = "SC_1F"
+    SC_2F = "SC_2F"
     LOAD_FLOW = "LOAD_FLOW"
 
 
