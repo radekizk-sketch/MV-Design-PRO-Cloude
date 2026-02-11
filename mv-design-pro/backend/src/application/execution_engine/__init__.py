@@ -15,6 +15,7 @@ from .errors import (
     RunNotReadyError,
     RunBlockedError,
     ResultSetNotFoundError,
+    StudyCaseNotFoundError,
 )
 
 __all__ = [
@@ -24,4 +25,5 @@ __all__ = [
     "RunNotReadyError",
     "RunBlockedError",
     "ResultSetNotFoundError",
+    "StudyCaseNotFoundError",
 ]
