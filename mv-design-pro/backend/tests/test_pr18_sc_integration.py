@@ -1053,3 +1053,267 @@ class TestResultMapper:
         )
 
         assert rs1.deterministic_signature == rs2.deterministic_signature
+
+
+# =============================================================================
+# 7. HARDENING TESTS — industrial-grade invariants
+# =============================================================================
+
+
+class TestHardeningInvariants:
+    """Industrial-grade invariant enforcement per PR-18 spec."""
+
+    def test_execute_run_sc_blocks_done_run(self):
+        """Re-execution of a DONE run is blocked (no re-computation)."""
+        graph = _create_golden_graph()
+        config = _golden_config()
+        engine, case = _create_engine_with_case()
+
+        run = engine.create_run(
+            study_case_id=case.id,
+            analysis_type=ExecutionAnalysisType.SC_3F,
+            solver_input=_sample_solver_input(),
+        )
+        engine.execute_run_sc(
+            run.id,
+            graph=graph,
+            config=config,
+            fault_node_id="BUS_MV",
+            readiness_snapshot={"ready": True},
+            validation_snapshot={"is_valid": True},
+        )
+
+        # Attempt re-execution of DONE run
+        with pytest.raises(RunBlockedError, match="DONE"):
+            engine.execute_run_sc(
+                run.id,
+                graph=graph,
+                config=config,
+                fault_node_id="BUS_MV",
+                readiness_snapshot={"ready": True},
+                validation_snapshot={"is_valid": True},
+            )
+
+    def test_execute_run_sc_blocks_failed_run(self):
+        """Re-execution of a FAILED run is blocked (no retry)."""
+        graph = _create_golden_graph()
+        config = _golden_config()
+        engine, case = _create_engine_with_case()
+
+        run = engine.create_run(
+            study_case_id=case.id,
+            analysis_type=ExecutionAnalysisType.SC_1F,
+            solver_input=_sample_solver_input(),
+        )
+        # Execute without Z0 — causes FAILED
+        try:
+            engine.execute_run_sc(
+                run.id,
+                graph=graph,
+                config=config,
+                fault_node_id="BUS_MV",
+                readiness_snapshot={"ready": True},
+                validation_snapshot={"is_valid": True},
+            )
+        except ShortCircuitBindingError:
+            pass
+
+        # Verify run is FAILED
+        failed_run = engine.get_run(run.id)
+        assert failed_run.status == RunStatus.FAILED
+
+        # Attempt re-execution of FAILED run
+        with pytest.raises(RunBlockedError, match="FAILED"):
+            engine.execute_run_sc(
+                run.id,
+                graph=graph,
+                config=config,
+                fault_node_id="BUS_MV",
+                readiness_snapshot={"ready": True},
+                validation_snapshot={"is_valid": True},
+            )
+
+    def test_sc_1f_failure_marks_run_failed(self):
+        """SC_1F without Z0 marks the run as FAILED before re-raising."""
+        graph = _create_golden_graph()
+        config = _golden_config()
+        engine, case = _create_engine_with_case()
+
+        run = engine.create_run(
+            study_case_id=case.id,
+            analysis_type=ExecutionAnalysisType.SC_1F,
+            solver_input=_sample_solver_input(),
+        )
+        with pytest.raises(ShortCircuitBindingError):
+            engine.execute_run_sc(
+                run.id,
+                graph=graph,
+                config=config,
+                fault_node_id="BUS_MV",
+                readiness_snapshot={"ready": True},
+                validation_snapshot={"is_valid": True},
+            )
+
+        # Run must be FAILED, not stuck in RUNNING
+        failed_run = engine.get_run(run.id)
+        assert failed_run.status == RunStatus.FAILED
+        assert failed_run.error_message is not None
+        assert "Z₀" in failed_run.error_message
+
+    def test_dual_sc3f_runs_produce_identical_results(self):
+        """Two independent SC_3F runs on same network produce identical results."""
+        graph = _create_golden_graph()
+        config = _golden_config()
+
+        engine_a, case_a = _create_engine_with_case()
+        engine_b, case_b = _create_engine_with_case()
+
+        run_a = engine_a.create_run(
+            study_case_id=case_a.id,
+            analysis_type=ExecutionAnalysisType.SC_3F,
+            solver_input=_sample_solver_input(),
+        )
+        run_b = engine_b.create_run(
+            study_case_id=case_b.id,
+            analysis_type=ExecutionAnalysisType.SC_3F,
+            solver_input=_sample_solver_input(),
+        )
+
+        _, rs_a = engine_a.execute_run_sc(
+            run_a.id,
+            graph=graph,
+            config=config,
+            fault_node_id="BUS_MV",
+            readiness_snapshot={"ready": True},
+            validation_snapshot={"is_valid": True},
+        )
+        _, rs_b = engine_b.execute_run_sc(
+            run_b.id,
+            graph=graph,
+            config=config,
+            fault_node_id="BUS_MV",
+            readiness_snapshot={"ready": True},
+            validation_snapshot={"is_valid": True},
+        )
+
+        # Identical global results
+        assert rs_a.global_results == rs_b.global_results
+
+        # Identical element results (sorted by ref)
+        assert [er.to_dict() for er in rs_a.element_results] == [
+            er.to_dict() for er in rs_b.element_results
+        ]
+
+    def test_dual_sc2f_runs_produce_identical_results(self):
+        """Two independent SC_2F runs on same network produce identical results."""
+        graph = _create_golden_graph()
+        config = _golden_config()
+
+        engine_a, case_a = _create_engine_with_case()
+        engine_b, case_b = _create_engine_with_case()
+
+        run_a = engine_a.create_run(
+            study_case_id=case_a.id,
+            analysis_type=ExecutionAnalysisType.SC_2F,
+            solver_input=_sample_solver_input(),
+        )
+        run_b = engine_b.create_run(
+            study_case_id=case_b.id,
+            analysis_type=ExecutionAnalysisType.SC_2F,
+            solver_input=_sample_solver_input(),
+        )
+
+        _, rs_a = engine_a.execute_run_sc(
+            run_a.id,
+            graph=graph,
+            config=config,
+            fault_node_id="BUS_MV",
+            readiness_snapshot={"ready": True},
+            validation_snapshot={"is_valid": True},
+        )
+        _, rs_b = engine_b.execute_run_sc(
+            run_b.id,
+            graph=graph,
+            config=config,
+            fault_node_id="BUS_MV",
+            readiness_snapshot={"ready": True},
+            validation_snapshot={"is_valid": True},
+        )
+
+        assert rs_a.global_results == rs_b.global_results
+
+    def test_no_resultset_for_failed_run(self):
+        """No ResultSet is stored for a FAILED run."""
+        from application.execution_engine.errors import ResultSetNotFoundError
+
+        graph = _create_golden_graph()
+        config = _golden_config()
+        engine, case = _create_engine_with_case()
+
+        run = engine.create_run(
+            study_case_id=case.id,
+            analysis_type=ExecutionAnalysisType.SC_1F,
+            solver_input=_sample_solver_input(),
+        )
+        try:
+            engine.execute_run_sc(
+                run.id,
+                graph=graph,
+                config=config,
+                fault_node_id="BUS_MV",
+                readiness_snapshot={"ready": True},
+                validation_snapshot={"is_valid": True},
+            )
+        except ShortCircuitBindingError:
+            pass
+
+        with pytest.raises(ResultSetNotFoundError):
+            engine.get_result_set(run.id)
+
+    def test_source_contributions_all_positive(self):
+        """All source contributions in SC_3F have non-negative i_contrib_a."""
+        graph = _create_golden_graph()
+        config = _golden_config()
+        engine, case = _create_engine_with_case()
+
+        run = engine.create_run(
+            study_case_id=case.id,
+            analysis_type=ExecutionAnalysisType.SC_3F,
+            solver_input=_sample_solver_input(),
+        )
+        _, rs = engine.execute_run_sc(
+            run.id,
+            graph=graph,
+            config=config,
+            fault_node_id="BUS_MV",
+            readiness_snapshot={"ready": True},
+            validation_snapshot={"is_valid": True},
+        )
+
+        for er in rs.element_results:
+            if er.element_type == "source_contribution":
+                assert er.values["i_contrib_a"] >= 0, (
+                    f"Negative contribution from {er.element_ref}"
+                )
+
+    def test_white_box_trace_count_nonzero(self):
+        """SC_3F result has non-zero white-box trace steps (auditability)."""
+        graph = _create_golden_graph()
+        config = _golden_config()
+        engine, case = _create_engine_with_case()
+
+        run = engine.create_run(
+            study_case_id=case.id,
+            analysis_type=ExecutionAnalysisType.SC_3F,
+            solver_input=_sample_solver_input(),
+        )
+        _, rs = engine.execute_run_sc(
+            run.id,
+            graph=graph,
+            config=config,
+            fault_node_id="BUS_MV",
+            readiness_snapshot={"ready": True},
+            validation_snapshot={"is_valid": True},
+        )
+
+        assert rs.global_results["white_box_steps_count"] >= 7

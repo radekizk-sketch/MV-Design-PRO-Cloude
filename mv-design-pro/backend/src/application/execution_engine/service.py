@@ -319,6 +319,12 @@ class ExecutionEngineService:
         """
         run = self._get_run(run_id)
 
+        # Gate: Run must be PENDING (no re-execution of DONE/FAILED/RUNNING)
+        if run.status != RunStatus.PENDING:
+            raise RunBlockedError(
+                [f"Przebieg ma status {run.status.value} — wymagany PENDING"]
+            )
+
         if run.analysis_type not in self._SC_ANALYSIS_TYPES:
             raise RunBlockedError(
                 [f"Typ analizy {run.analysis_type.value} nie jest obsługiwany przez solver zwarciowy"]
