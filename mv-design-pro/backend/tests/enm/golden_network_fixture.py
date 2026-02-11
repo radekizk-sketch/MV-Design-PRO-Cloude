@@ -74,15 +74,19 @@ def build_golden_network() -> EnergyNetworkModel:
     ))
 
     # Transformatory WN/SN w GPZ
+    # catalog_ref: golden case jest przypadkiem READY (produkcyjnym),
+    # więc każdy transformator MUSI mieć referencję katalogową (E009).
     transformers.append(Transformer(
         ref_id="tr_gpz_t1", name="TR1 GPZ 110/15", hv_bus_ref="bus_gpz_110",
         lv_bus_ref="bus_gpz_15_s1", sn_mva=25.0, uhv_kv=110.0, ulv_kv=15.0,
         uk_percent=10.5, pk_kw=120.0, p0_kw=20.0, vector_group="Dyn11",
+        catalog_ref="TR_110_15_25MVA_Dyn11",
     ))
     transformers.append(Transformer(
         ref_id="tr_gpz_t2", name="TR2 GPZ 110/15", hv_bus_ref="bus_gpz_110",
         lv_bus_ref="bus_gpz_15_s2", sn_mva=25.0, uhv_kv=110.0, ulv_kv=15.0,
         uk_percent=10.5, pk_kw=120.0, p0_kw=20.0, vector_group="Dyn11",
+        catalog_ref="TR_110_15_25MVA_Dyn11",
     ))
 
     substations.append(Substation(
@@ -139,6 +143,7 @@ def build_golden_network() -> EnergyNetworkModel:
             hv_bus_ref=bus_sn, lv_bus_ref=bus_nn,
             sn_mva=0.63, uhv_kv=15.0, ulv_kv=0.4,
             uk_percent=4.5, pk_kw=6.5, p0_kw=1.0, vector_group="Dyn11",
+            catalog_ref="TR_15_04_630kVA_Dyn11",
         ))
 
         loads.append(Load(
@@ -183,10 +188,13 @@ def build_golden_network() -> EnergyNetworkModel:
     # Kable SN — 31 segmentów
     # =========================================================================
 
+    # catalog_ref: golden case jest przypadkiem READY (produkcyjnym),
+    # więc każdy kabel MUSI mieć referencję katalogową (E009).
     cable_template = dict(
         r_ohm_per_km=0.206, x_ohm_per_km=0.074,
         b_siemens_per_km=0.000054,
         r0_ohm_per_km=0.824, x0_ohm_per_km=0.296,
+        catalog_ref="CAT-CAB-YAKY-240",
     )
 
     cable_defs = [

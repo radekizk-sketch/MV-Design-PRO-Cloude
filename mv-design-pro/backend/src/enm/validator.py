@@ -54,13 +54,23 @@ class ReadinessResult(BaseModel):
 class ENMValidator:
     """Walidator energetyczny modelu sieci."""
 
+    _SEVERITY_RANK = {"BLOCKER": 0, "IMPORTANT": 1, "INFO": 2}
+
     def validate(self, enm: EnergyNetworkModel) -> ValidationResult:
         issues: list[ValidationIssue] = []
 
         self._check_blockers(enm, issues)
+        self._check_catalog_first(enm, issues)
         self._check_warnings(enm, issues)
         self._check_info(enm, issues)
         self._check_topology_entities(enm, issues)
+
+        # Deterministic sort: severity_rank → code → first element_ref
+        issues.sort(key=lambda i: (
+            self._SEVERITY_RANK.get(i.severity, 9),
+            i.code,
+            i.element_refs[0] if i.element_refs else "",
+        ))
 
         has_blockers = any(i.severity == "BLOCKER" for i in issues)
         has_warnings = any(i.severity == "IMPORTANT" for i in issues)
@@ -288,6 +298,40 @@ class ENMValidator:
                     element_refs=[trafo.ref_id],
                     wizard_step_hint="K5",
                     suggested_fix="Wprowadź grupę połączeń (np. Dyn11).",
+                ))
+
+    # ------------------------------------------------------------------
+    # CATALOG-FIRST checks (E010)
+    # ------------------------------------------------------------------
+
+    def _check_catalog_first(
+        self, enm: EnergyNetworkModel, issues: list[ValidationIssue]
+    ) -> None:
+        # E009 for branches + transformers is in _check_blockers (canonical).
+
+        # E010: Overrides bez parameter_source=OVERRIDE
+        all_elements = [
+            *enm.branches,
+            *enm.transformers,
+            *enm.loads,
+            *enm.generators,
+            *enm.measurements,
+            *enm.protection_assignments,
+        ]
+        for elem in all_elements:
+            overrides = getattr(elem, "overrides", [])
+            param_source = getattr(elem, "parameter_source", None)
+            if overrides and param_source != "OVERRIDE":
+                issues.append(ValidationIssue(
+                    code="E010",
+                    severity="BLOCKER",
+                    message_pl=(
+                        f"Element '{elem.ref_id}' ma overrides, ale "
+                        f"parameter_source != 'OVERRIDE'."
+                    ),
+                    element_refs=[elem.ref_id],
+                    wizard_step_hint="K4",
+                    suggested_fix="Ustaw parameter_source='OVERRIDE' lub usuń overrides.",
                 ))
 
     # ------------------------------------------------------------------

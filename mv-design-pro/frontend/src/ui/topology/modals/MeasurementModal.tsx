@@ -1,11 +1,20 @@
 /**
  * MeasurementModal — edytor przekładnika prądowego (CT) lub napięciowego (VT).
  *
- * Pola: typ, przekładnia, klasa dokładności, obciążenie, połączenie, przeznaczenie.
+ * CATALOG-FIRST:
+ * - Tryb STANDARDOWY: wybór typu z katalogu (catalog_ref)
+ *   + topologia (bus_ref) + typ przekładnika + połączenie + przeznaczenie.
+ *   Brak pól przekładni/klasy/obciążenia — pochodzą z katalogu.
+ * - Tryb EKSPERT: overrides[] z audytem.
+ * - Podgląd katalogowy READ-ONLY.
+ *
  * BINDING: PL labels, no codenames.
  */
 
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { CatalogPicker, type CatalogEntry } from './CatalogPicker';
+import { CatalogPreview, type CatalogPreviewSection } from './CatalogPreview';
+import { ExpertOverrides, type OverrideEntry } from './ExpertOverrides';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -20,12 +29,11 @@ export interface MeasurementFormData {
   name: string;
   measurement_type: MeasurementType;
   bus_ref: string;
-  ratio_primary: number;
-  ratio_secondary: number;
-  accuracy_class: string;
-  burden_va: number;
   connection: ConnectionType;
   purpose: PurposeType;
+  catalog_ref: string;
+  parameter_source: 'CATALOG' | 'OVERRIDE';
+  overrides: OverrideEntry[];
 }
 
 interface MeasurementModalProps {
@@ -33,6 +41,8 @@ interface MeasurementModalProps {
   mode: 'create' | 'edit';
   initialData?: Partial<MeasurementFormData>;
   busOptions: Array<{ ref_id: string; name: string; voltage_kv: number }>;
+  catalogEntries?: CatalogEntry[];
+  catalogPreviewData?: Record<string, { name: string; manufacturer?: string; sections: CatalogPreviewSection[] }>;
   onSubmit: (data: MeasurementFormData) => void;
   onCancel: () => void;
 }
@@ -63,37 +73,16 @@ const PURPOSE_LABELS: Record<PurposeType, string> = {
   combined: 'Kombinowany',
 };
 
-const CT_DEFAULTS: Partial<MeasurementFormData> = {
-  measurement_type: 'CT',
-  ratio_primary: 200,
-  ratio_secondary: 5,
-  accuracy_class: '5P20',
-  burden_va: 15,
-  connection: 'star',
-  purpose: 'protection',
-};
-
-const VT_DEFAULTS: Partial<MeasurementFormData> = {
-  measurement_type: 'VT',
-  ratio_primary: 15000,
-  ratio_secondary: 100,
-  accuracy_class: '0.5',
-  burden_va: 30,
-  connection: 'star',
-  purpose: 'protection',
-};
-
 const DEFAULT_DATA: MeasurementFormData = {
   ref_id: '',
   name: '',
   measurement_type: 'CT',
   bus_ref: '',
-  ratio_primary: 200,
-  ratio_secondary: 5,
-  accuracy_class: '5P20',
-  burden_va: 15,
   connection: 'star',
   purpose: 'protection',
+  catalog_ref: '',
+  parameter_source: 'CATALOG',
+  overrides: [],
 };
 
 // ---------------------------------------------------------------------------
@@ -112,14 +101,8 @@ function validateForm(data: MeasurementFormData): FieldError[] {
   if (!data.bus_ref) {
     errors.push({ field: 'bus_ref', message: 'Szyna jest wymagana' });
   }
-  if (data.ratio_primary <= 0) {
-    errors.push({ field: 'ratio_primary', message: 'Strona pierwotna musi być > 0' });
-  }
-  if (data.ratio_secondary <= 0) {
-    errors.push({ field: 'ratio_secondary', message: 'Strona wtórna musi być > 0' });
-  }
-  if (data.burden_va < 0) {
-    errors.push({ field: 'burden_va', message: 'Obciążenie nie może być ujemne' });
+  if (!data.catalog_ref) {
+    errors.push({ field: 'catalog_ref', message: 'Wybór typu z katalogu jest wymagany' });
   }
 
   return errors;
@@ -134,16 +117,20 @@ export function MeasurementModal({
   mode,
   initialData,
   busOptions,
+  catalogEntries = [],
+  catalogPreviewData = {},
   onSubmit,
   onCancel,
 }: MeasurementModalProps) {
   const [formData, setFormData] = useState<MeasurementFormData>({ ...DEFAULT_DATA, ...initialData });
   const [errors, setErrors] = useState<FieldError[]>([]);
+  const [isExpertMode, setIsExpertMode] = useState(false);
 
   useEffect(() => {
     if (isOpen) {
       setFormData({ ...DEFAULT_DATA, ...initialData });
       setErrors([]);
+      setIsExpertMode(false);
     }
   }, [isOpen, initialData]);
 
@@ -151,31 +138,36 @@ export function MeasurementModal({
     setFormData((prev) => ({ ...prev, [field]: value }));
   }, []);
 
-  const handleTypeChange = useCallback((newType: MeasurementType) => {
-    const defaults = newType === 'CT' ? CT_DEFAULTS : VT_DEFAULTS;
-    setFormData((prev) => ({
-      ...prev,
-      ...defaults,
-      ref_id: prev.ref_id,
-      name: prev.name,
-      bus_ref: prev.bus_ref,
-    }));
-  }, []);
-
   const handleSubmit = useCallback(() => {
     const validationErrors = validateForm(formData);
     setErrors(validationErrors);
     if (validationErrors.length === 0) {
-      onSubmit(formData);
+      onSubmit({
+        ...formData,
+        parameter_source: isExpertMode && formData.overrides.length > 0 ? 'OVERRIDE' : 'CATALOG',
+      });
     }
-  }, [formData, onSubmit]);
+  }, [formData, onSubmit, isExpertMode]);
 
   const getError = (field: string): string | undefined =>
     errors.find((e) => e.field === field)?.message;
 
-  const ratioDisplay = formData.measurement_type === 'CT'
-    ? `${formData.ratio_primary}/${formData.ratio_secondary} A`
-    : `${formData.ratio_primary}/${formData.ratio_secondary} V`;
+  const previewData = useMemo(
+    () => (formData.catalog_ref ? catalogPreviewData[formData.catalog_ref] : null),
+    [formData.catalog_ref, catalogPreviewData],
+  );
+
+  const expertAvailableKeys = useMemo(() => {
+    if (!previewData) return [];
+    return previewData.sections.flatMap((s) =>
+      s.params.map((p) => ({
+        key: p.label,
+        label: p.label,
+        catalogValue: p.value,
+        unit: p.unit,
+      })),
+    );
+  }, [previewData]);
 
   if (!isOpen) return null;
 
@@ -189,7 +181,7 @@ export function MeasurementModal({
         </div>
 
         <div className="px-6 py-4 space-y-4">
-          {/* Identyfikacja */}
+          {/* === SEKCJA A: Tożsamość i topologia === */}
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Identyfikator</label>
@@ -218,12 +210,11 @@ export function MeasurementModal({
             </div>
           </div>
 
-          {/* Typ przekładnika */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Typ przekładnika</label>
             <select
               value={formData.measurement_type}
-              onChange={(e) => handleTypeChange(e.target.value as MeasurementType)}
+              onChange={(e) => handleChange('measurement_type', e.target.value)}
               disabled={mode === 'edit'}
               className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
             >
@@ -233,7 +224,6 @@ export function MeasurementModal({
             </select>
           </div>
 
-          {/* Szyna */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Szyna</label>
             <select
@@ -253,73 +243,7 @@ export function MeasurementModal({
             {getError('bus_ref') && <p className="mt-1 text-xs text-red-600">{getError('bus_ref')}</p>}
           </div>
 
-          {/* Przekładnia */}
-          <div className="border-t border-gray-200 pt-4">
-            <h3 className="text-sm font-medium text-gray-900 mb-3">
-              Przekładnia: {ratioDisplay}
-            </h3>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-xs text-gray-600 mb-1">
-                  Strona pierwotna [{formData.measurement_type === 'CT' ? 'A' : 'V'}]
-                </label>
-                <input
-                  type="number"
-                  value={formData.ratio_primary}
-                  onChange={(e) => handleChange('ratio_primary', parseFloat(e.target.value) || 0)}
-                  className={`w-full px-2 py-1.5 border rounded text-sm ${
-                    getError('ratio_primary') ? 'border-red-500' : 'border-gray-300'
-                  }`}
-                />
-                {getError('ratio_primary') && (
-                  <p className="mt-0.5 text-xs text-red-600">{getError('ratio_primary')}</p>
-                )}
-              </div>
-              <div>
-                <label className="block text-xs text-gray-600 mb-1">
-                  Strona wtórna [{formData.measurement_type === 'CT' ? 'A' : 'V'}]
-                </label>
-                <input
-                  type="number"
-                  value={formData.ratio_secondary}
-                  onChange={(e) => handleChange('ratio_secondary', parseFloat(e.target.value) || 0)}
-                  className={`w-full px-2 py-1.5 border rounded text-sm ${
-                    getError('ratio_secondary') ? 'border-red-500' : 'border-gray-300'
-                  }`}
-                />
-                {getError('ratio_secondary') && (
-                  <p className="mt-0.5 text-xs text-red-600">{getError('ratio_secondary')}</p>
-                )}
-              </div>
-            </div>
-          </div>
-
-          {/* Parametry */}
-          <div className="grid grid-cols-3 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Klasa dokładności</label>
-              <input
-                type="text"
-                value={formData.accuracy_class}
-                onChange={(e) => handleChange('accuracy_class', e.target.value)}
-                placeholder={formData.measurement_type === 'CT' ? '5P20' : '0.5'}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Obciążenie [VA]</label>
-              <input
-                type="number"
-                value={formData.burden_va}
-                onChange={(e) => handleChange('burden_va', parseFloat(e.target.value) || 0)}
-                className={`w-full px-3 py-2 border rounded-md text-sm ${
-                  getError('burden_va') ? 'border-red-500' : 'border-gray-300'
-                }`}
-              />
-              {getError('burden_va') && (
-                <p className="mt-1 text-xs text-red-600">{getError('burden_va')}</p>
-              )}
-            </div>
+          <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Połączenie</label>
               <select
@@ -332,21 +256,51 @@ export function MeasurementModal({
                 ))}
               </select>
             </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Przeznaczenie</label>
+              <select
+                value={formData.purpose}
+                onChange={(e) => handleChange('purpose', e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+              >
+                {Object.entries(PURPOSE_LABELS).map(([val, label]) => (
+                  <option key={val} value={val}>{label}</option>
+                ))}
+              </select>
+            </div>
           </div>
 
-          {/* Przeznaczenie */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Przeznaczenie</label>
-            <select
-              value={formData.purpose}
-              onChange={(e) => handleChange('purpose', e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
-            >
-              {Object.entries(PURPOSE_LABELS).map(([val, label]) => (
-                <option key={val} value={val}>{label}</option>
-              ))}
-            </select>
+          {/* === SEKCJA B: Dobór z katalogu === */}
+          <div className="border-t border-gray-200 pt-4">
+            <CatalogPicker
+              label={formData.measurement_type === 'CT' ? 'Typ CT z katalogu' : 'Typ VT z katalogu'}
+              entries={catalogEntries}
+              selectedId={formData.catalog_ref}
+              onChange={(id) => handleChange('catalog_ref', id)}
+              required
+              error={getError('catalog_ref')}
+            />
           </div>
+
+          {/* === SEKCJA C: Podgląd katalogowy READ-ONLY === */}
+          {previewData && (
+            <CatalogPreview
+              typeName={previewData.name}
+              manufacturer={previewData.manufacturer}
+              sections={previewData.sections}
+            />
+          )}
+
+          {/* === SEKCJA D: EKSPERT overrides === */}
+          {formData.catalog_ref && (
+            <ExpertOverrides
+              isExpertMode={isExpertMode}
+              onToggleExpert={setIsExpertMode}
+              overrides={formData.overrides}
+              onOverridesChange={(o) => handleChange('overrides', o)}
+              availableKeys={expertAvailableKeys}
+            />
+          )}
         </div>
 
         <div className="px-6 py-4 border-t border-gray-200 flex justify-end gap-3">

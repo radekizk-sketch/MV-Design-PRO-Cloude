@@ -1,11 +1,20 @@
 /**
  * ProtectionModal — edytor zabezpieczenia powiązanego z wyłącznikiem.
  *
- * Wybór typu zabezpieczenia, nastawy, przypięcie CT, walidacje.
+ * CATALOG-FIRST:
+ * - Tryb STANDARDOWY: wybór typu zabezpieczenia z katalogu (catalog_ref)
+ *   + topologia (breaker_ref, ct_ref, vt_ref) + typ + status.
+ *   Brak pól nastaw/progów/krzywych — pochodzą z katalogu.
+ * - Tryb EKSPERT: overrides[] z audytem.
+ * - Podgląd katalogowy READ-ONLY.
+ *
  * BINDING: PL labels, no codenames.
  */
 
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { CatalogPicker, type CatalogEntry } from './CatalogPicker';
+import { CatalogPreview, type CatalogPreviewSection } from './CatalogPreview';
+import { ExpertOverrides, type OverrideEntry } from './ExpertOverrides';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -19,24 +28,6 @@ export type ProtectionDeviceType =
   | 'differential'
   | 'custom';
 
-export type FunctionType =
-  | 'overcurrent_50'
-  | 'overcurrent_51'
-  | 'earth_fault_50N'
-  | 'earth_fault_51N'
-  | 'directional_67'
-  | 'directional_67N';
-
-export type CurveType = 'DT' | 'IEC_SI' | 'IEC_VI' | 'IEC_EI' | 'IEC_LI';
-
-export interface ProtectionSettingForm {
-  function_type: FunctionType;
-  threshold_a: number;
-  time_delay_s: number;
-  curve_type: CurveType | '';
-  is_directional: boolean;
-}
-
 export interface ProtectionFormData {
   ref_id: string;
   name: string;
@@ -44,8 +35,10 @@ export interface ProtectionFormData {
   ct_ref: string;
   vt_ref: string;
   device_type: ProtectionDeviceType;
-  settings: ProtectionSettingForm[];
   is_enabled: boolean;
+  catalog_ref: string;
+  parameter_source: 'CATALOG' | 'OVERRIDE';
+  overrides: OverrideEntry[];
 }
 
 interface ProtectionModalProps {
@@ -55,6 +48,8 @@ interface ProtectionModalProps {
   breakerOptions: Array<{ ref_id: string; name: string }>;
   ctOptions: Array<{ ref_id: string; name: string; ratio: string }>;
   vtOptions: Array<{ ref_id: string; name: string }>;
+  catalogEntries?: CatalogEntry[];
+  catalogPreviewData?: Record<string, { name: string; manufacturer?: string; sections: CatalogPreviewSection[] }>;
   onSubmit: (data: ProtectionFormData) => void;
   onCancel: () => void;
 }
@@ -87,15 +82,8 @@ function validateForm(data: ProtectionFormData): FieldError[] {
   if (CT_REQUIRED_TYPES.has(data.device_type) && !data.ct_ref) {
     errors.push({ field: 'ct_ref', message: `Zabezpieczenie typu '${DEVICE_TYPE_LABELS[data.device_type]}' wymaga przekładnika CT` });
   }
-
-  for (let i = 0; i < data.settings.length; i++) {
-    const s = data.settings[i];
-    if (s.threshold_a <= 0) {
-      errors.push({ field: `setting_${i}_threshold`, message: `Nastawa ${i + 1}: próg musi być > 0 A` });
-    }
-    if (s.time_delay_s < 0) {
-      errors.push({ field: `setting_${i}_time`, message: `Nastawa ${i + 1}: czas nie może być ujemny` });
-    }
+  if (!data.catalog_ref) {
+    errors.push({ field: 'catalog_ref', message: 'Wybór typu z katalogu jest wymagany' });
   }
 
   return errors;
@@ -110,31 +98,6 @@ const DEVICE_TYPE_LABELS: Record<ProtectionDeviceType, string> = {
   custom: 'Niestandardowe',
 };
 
-const FUNCTION_TYPE_LABELS: Record<FunctionType, string> = {
-  overcurrent_50: '50 — zwarciowe bezzwłoczne',
-  overcurrent_51: '51 — zwarciowe czasowe',
-  earth_fault_50N: '50N — ziemnozwarciowe bezzwłoczne',
-  earth_fault_51N: '51N — ziemnozwarciowe czasowe',
-  directional_67: '67 — kierunkowe nadprądowe',
-  directional_67N: '67N — kierunkowe ziemnozwarciowe',
-};
-
-const CURVE_TYPE_LABELS: Record<CurveType, string> = {
-  DT: 'Czas zależny (DT)',
-  IEC_SI: 'IEC — Standard Inverse',
-  IEC_VI: 'IEC — Very Inverse',
-  IEC_EI: 'IEC — Extremely Inverse',
-  IEC_LI: 'IEC — Long Inverse',
-};
-
-const DEFAULT_SETTING: ProtectionSettingForm = {
-  function_type: 'overcurrent_51',
-  threshold_a: 200,
-  time_delay_s: 0.5,
-  curve_type: 'IEC_SI',
-  is_directional: false,
-};
-
 const DEFAULT_DATA: ProtectionFormData = {
   ref_id: '',
   name: '',
@@ -142,8 +105,10 @@ const DEFAULT_DATA: ProtectionFormData = {
   ct_ref: '',
   vt_ref: '',
   device_type: 'overcurrent',
-  settings: [{ ...DEFAULT_SETTING }],
   is_enabled: true,
+  catalog_ref: '',
+  parameter_source: 'CATALOG',
+  overrides: [],
 };
 
 // ---------------------------------------------------------------------------
@@ -157,16 +122,20 @@ export function ProtectionModal({
   breakerOptions,
   ctOptions,
   vtOptions,
+  catalogEntries = [],
+  catalogPreviewData = {},
   onSubmit,
   onCancel,
 }: ProtectionModalProps) {
   const [formData, setFormData] = useState<ProtectionFormData>({ ...DEFAULT_DATA, ...initialData });
   const [errors, setErrors] = useState<FieldError[]>([]);
+  const [isExpertMode, setIsExpertMode] = useState(false);
 
   useEffect(() => {
     if (isOpen) {
       setFormData({ ...DEFAULT_DATA, ...initialData });
       setErrors([]);
+      setIsExpertMode(false);
     }
   }, [isOpen, initialData]);
 
@@ -174,41 +143,36 @@ export function ProtectionModal({
     setFormData((prev) => ({ ...prev, [field]: value }));
   }, []);
 
-  const handleSettingChange = useCallback(
-    (index: number, field: keyof ProtectionSettingForm, value: unknown) => {
-      setFormData((prev) => {
-        const settings = [...prev.settings];
-        settings[index] = { ...settings[index], [field]: value };
-        return { ...prev, settings };
-      });
-    },
-    [],
-  );
-
-  const addSetting = useCallback(() => {
-    setFormData((prev) => ({
-      ...prev,
-      settings: [...prev.settings, { ...DEFAULT_SETTING }],
-    }));
-  }, []);
-
-  const removeSetting = useCallback((index: number) => {
-    setFormData((prev) => ({
-      ...prev,
-      settings: prev.settings.filter((_, i) => i !== index),
-    }));
-  }, []);
-
   const handleSubmit = useCallback(() => {
     const validationErrors = validateForm(formData);
     setErrors(validationErrors);
     if (validationErrors.length === 0) {
-      onSubmit(formData);
+      onSubmit({
+        ...formData,
+        parameter_source: isExpertMode && formData.overrides.length > 0 ? 'OVERRIDE' : 'CATALOG',
+      });
     }
-  }, [formData, onSubmit]);
+  }, [formData, onSubmit, isExpertMode]);
 
   const getError = (field: string): string | undefined =>
     errors.find((e) => e.field === field)?.message;
+
+  const previewData = useMemo(
+    () => (formData.catalog_ref ? catalogPreviewData[formData.catalog_ref] : null),
+    [formData.catalog_ref, catalogPreviewData],
+  );
+
+  const expertAvailableKeys = useMemo(() => {
+    if (!previewData) return [];
+    return previewData.sections.flatMap((s) =>
+      s.params.map((p) => ({
+        key: p.label,
+        label: p.label,
+        catalogValue: p.value,
+        unit: p.unit,
+      })),
+    );
+  }, [previewData]);
 
   if (!isOpen) return null;
 
@@ -222,7 +186,7 @@ export function ProtectionModal({
         </div>
 
         <div className="px-6 py-4 space-y-4">
-          {/* Identyfikacja */}
+          {/* === SEKCJA A: Tożsamość i topologia === */}
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Identyfikator</label>
@@ -250,7 +214,6 @@ export function ProtectionModal({
             </div>
           </div>
 
-          {/* Typ zabezpieczenia */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Typ zabezpieczenia</label>
             <select
@@ -264,7 +227,6 @@ export function ProtectionModal({
             </select>
           </div>
 
-          {/* Powiązania */}
           <div className="grid grid-cols-3 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Wyłącznik</label>
@@ -318,85 +280,37 @@ export function ProtectionModal({
             </div>
           </div>
 
-          {/* Nastawy */}
+          {/* === SEKCJA B: Dobór z katalogu === */}
           <div className="border-t border-gray-200 pt-4">
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="text-sm font-medium text-gray-900">Nastawy zabezpieczenia</h3>
-              <button
-                onClick={addSetting}
-                className="text-sm text-blue-600 hover:text-blue-700"
-              >
-                + Dodaj nastawę
-              </button>
-            </div>
-
-            {formData.settings.map((setting, idx) => (
-              <div key={idx} className="mb-4 p-3 bg-gray-50 rounded-md">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm font-medium text-gray-700">Nastawa {idx + 1}</span>
-                  {formData.settings.length > 1 && (
-                    <button
-                      onClick={() => removeSetting(idx)}
-                      className="text-xs text-red-500 hover:text-red-700"
-                    >
-                      Usuń
-                    </button>
-                  )}
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-xs text-gray-600 mb-1">Funkcja</label>
-                    <select
-                      value={setting.function_type}
-                      onChange={(e) => handleSettingChange(idx, 'function_type', e.target.value)}
-                      className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm"
-                    >
-                      {Object.entries(FUNCTION_TYPE_LABELS).map(([val, label]) => (
-                        <option key={val} value={val}>{label}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-xs text-gray-600 mb-1">Krzywa</label>
-                    <select
-                      value={setting.curve_type}
-                      onChange={(e) => handleSettingChange(idx, 'curve_type', e.target.value)}
-                      className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm"
-                    >
-                      <option value="">— brak —</option>
-                      {Object.entries(CURVE_TYPE_LABELS).map(([val, label]) => (
-                        <option key={val} value={val}>{label}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-xs text-gray-600 mb-1">Próg [A]</label>
-                    <input
-                      type="number"
-                      value={setting.threshold_a}
-                      onChange={(e) => handleSettingChange(idx, 'threshold_a', parseFloat(e.target.value) || 0)}
-                      className={`w-full px-2 py-1.5 border rounded text-sm ${
-                        getError(`setting_${idx}_threshold`) ? 'border-red-500' : 'border-gray-300'
-                      }`}
-                    />
-                    {getError(`setting_${idx}_threshold`) && (
-                      <p className="mt-0.5 text-xs text-red-600">{getError(`setting_${idx}_threshold`)}</p>
-                    )}
-                  </div>
-                  <div>
-                    <label className="block text-xs text-gray-600 mb-1">Opóźnienie [s]</label>
-                    <input
-                      type="number"
-                      value={setting.time_delay_s}
-                      onChange={(e) => handleSettingChange(idx, 'time_delay_s', parseFloat(e.target.value) || 0)}
-                      step="0.01"
-                      className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm"
-                    />
-                  </div>
-                </div>
-              </div>
-            ))}
+            <CatalogPicker
+              label="Typ zabezpieczenia z katalogu"
+              entries={catalogEntries}
+              selectedId={formData.catalog_ref}
+              onChange={(id) => handleChange('catalog_ref', id)}
+              required
+              error={getError('catalog_ref')}
+            />
           </div>
+
+          {/* === SEKCJA C: Podgląd katalogowy READ-ONLY === */}
+          {previewData && (
+            <CatalogPreview
+              typeName={previewData.name}
+              manufacturer={previewData.manufacturer}
+              sections={previewData.sections}
+            />
+          )}
+
+          {/* === SEKCJA D: EKSPERT overrides === */}
+          {formData.catalog_ref && (
+            <ExpertOverrides
+              isExpertMode={isExpertMode}
+              onToggleExpert={setIsExpertMode}
+              overrides={formData.overrides}
+              onOverridesChange={(o) => handleChange('overrides', o)}
+              availableKeys={expertAvailableKeys}
+            />
+          )}
 
           {/* Aktywne */}
           <div className="flex items-center gap-2">

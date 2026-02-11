@@ -206,15 +206,56 @@ class TestGoldenNetworkReferenceIntegrity:
 
 
 class TestGoldenNetworkValidation:
-    """Walidacja złotej sieci."""
+    """Walidacja złotej sieci.
 
-    def test_golden_network_validation(self, golden_enm: EnergyNetworkModel) -> None:
-        """Golden fixture without catalog refs musi dawać FAIL + E009."""
+    Golden case jest przypadkiem PRODUKCYJNYM (READY):
+    - Każdy transformator ma catalog_ref (E009 nie może wystąpić).
+    - Brak overrides z niepoprawnym parameter_source (E010 nie może wystąpić).
+    - Validation.status == OK lub WARN (nigdy FAIL).
+    - Analysis readiness: SC 3F dostępny, load_flow dostępny.
+    """
+
+    def test_golden_network_ready(self, golden_enm: EnergyNetworkModel) -> None:
+        """Golden fixture jest READY — wszystkie elementy mają catalog_ref.
+
+        Golden case jest przypadkiem PRODUKCYJNYM:
+        - validation.status == WARN (nie FAIL, brak blokerów)
+        - readiness.ready == True (brak blokerów E009/E010)
+        """
         validation = ENMValidator().validate(golden_enm)
         readiness = ENMValidator().readiness(validation)
-        assert validation.status == "FAIL"
-        assert readiness.ready is False
-        assert any(i.code == "E009" and i.severity == "BLOCKER" for i in readiness.blockers)
+        assert validation.status in ("OK", "WARN"), (
+            f"Expected OK/WARN, got {validation.status}; "
+            f"blockers: {[i.code for i in validation.issues if i.severity == 'BLOCKER']}"
+        )
+        assert readiness.ready is True
+        assert readiness.blockers == []
+
+    def test_all_transformers_have_catalog_ref(self, golden_enm: EnergyNetworkModel) -> None:
+        """Każdy transformator w golden case ma catalog_ref (kanon CATALOG-FIRST)."""
+        for trafo in golden_enm.transformers:
+            assert trafo.catalog_ref, f"{trafo.ref_id} brak catalog_ref"
+
+    def test_analysis_readiness_gates(self, golden_enm: EnergyNetworkModel) -> None:
+        """Golden case: SC 3F i load_flow powinny być dostępne."""
+        result = ENMValidator().validate(golden_enm)
+        assert result.analysis_available.short_circuit_3f is True
+        assert result.analysis_available.load_flow is True
+
+    def test_issues_deterministic_order(self, golden_enm: EnergyNetworkModel) -> None:
+        """Issues lista jest deterministycznie posortowana (severity → code → element_ref)."""
+        result1 = ENMValidator().validate(golden_enm)
+        result2 = ENMValidator().validate(golden_enm)
+        codes1 = [(i.severity, i.code, i.element_refs) for i in result1.issues]
+        codes2 = [(i.severity, i.code, i.element_refs) for i in result2.issues]
+        assert codes1 == codes2
+
+        # Verify sort order: severity rank ascending, then code, then element_ref
+        severity_rank = {"BLOCKER": 0, "IMPORTANT": 1, "INFO": 2}
+        for prev, curr in zip(result1.issues, result1.issues[1:]):
+            prev_key = (severity_rank[prev.severity], prev.code, prev.element_refs[0] if prev.element_refs else "")
+            curr_key = (severity_rank[curr.severity], curr.code, curr.element_refs[0] if curr.element_refs else "")
+            assert prev_key <= curr_key, f"Nieposortowane: {prev.code} > {curr.code}"
 
     def test_json_roundtrip(self, golden_enm: EnergyNetworkModel) -> None:
         """Serializacja → deserializacja zachowuje model."""

@@ -50,6 +50,18 @@ export interface ProtectionSetting {
 }
 
 // ---------------------------------------------------------------------------
+// Catalog-first: parameter source & overrides
+// ---------------------------------------------------------------------------
+
+export type ParameterSource = 'CATALOG' | 'OVERRIDE';
+
+export interface ParameterOverride {
+  key: string;
+  value: number | string;
+  reason?: string;
+}
+
+// ---------------------------------------------------------------------------
 // ENMElement — base for all elements
 // ---------------------------------------------------------------------------
 
@@ -103,6 +115,8 @@ export interface BranchBase extends ENMElement {
   to_bus_ref: string;
   status: 'closed' | 'open';
   catalog_ref?: string | null;
+  parameter_source?: ParameterSource | null;
+  overrides?: ParameterOverride[] | null;
 }
 
 export interface OverheadLine extends BranchBase {
@@ -166,6 +180,8 @@ export interface Transformer extends ENMElement {
   tap_max?: number | null;
   tap_step_percent?: number | null;
   catalog_ref?: string | null;
+  parameter_source?: ParameterSource | null;
+  overrides?: ParameterOverride[] | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -196,6 +212,10 @@ export interface Load extends ENMElement {
   p_mw: number;
   q_mvar: number;
   model: 'pq' | 'zip';
+  catalog_ref?: string | null;
+  quantity?: number | null;
+  parameter_source?: ParameterSource | null;
+  overrides?: ParameterOverride[] | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -208,6 +228,11 @@ export interface Generator extends ENMElement {
   q_mvar?: number | null;
   gen_type?: 'synchronous' | 'pv_inverter' | 'wind_inverter' | 'bess' | null;
   limits?: GenLimits | null;
+  catalog_ref?: string | null;
+  quantity?: number | null;
+  n_parallel?: number | null;
+  parameter_source?: ParameterSource | null;
+  overrides?: ParameterOverride[] | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -263,6 +288,9 @@ export interface Measurement extends ENMElement {
   rating: MeasurementRating;
   connection: 'star' | 'delta' | 'single_phase';
   purpose: 'protection' | 'metering' | 'combined';
+  catalog_ref?: string | null;
+  parameter_source?: ParameterSource | null;
+  overrides?: ParameterOverride[] | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -278,6 +306,8 @@ export interface ProtectionAssignment extends ENMElement {
   catalog_ref?: string | null;
   settings: ProtectionSetting[];
   is_enabled: boolean;
+  parameter_source?: ParameterSource | null;
+  overrides?: ParameterOverride[] | null;
 }
 
 // ---------------------------------------------------------------------------

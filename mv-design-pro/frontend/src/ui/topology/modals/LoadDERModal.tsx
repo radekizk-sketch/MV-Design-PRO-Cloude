@@ -1,11 +1,20 @@
 /**
  * LoadDERModal — edytor odbiorów (Load) i źródeł rozproszonych (DER/OZE).
  *
- * Tryby: load (P/Q/model), pv_inverter, wind_inverter, bess, synchronous.
+ * CATALOG-FIRST:
+ * - Tryb STANDARDOWY: wybór typu z katalogu (catalog_ref)
+ *   + topologia (bus_ref) + rodzaj + typ generatora + liczba sztuk.
+ *   Brak pól P/Q/cos_phi/limitów — pochodzą z katalogu.
+ * - Tryb EKSPERT: overrides[] z audytem.
+ * - PV/BESS: jawne pole quantity (liczba inwerterów/modułów).
+ *
  * BINDING: PL labels, no codenames.
  */
 
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { CatalogPicker, type CatalogEntry } from './CatalogPicker';
+import { CatalogPreview, type CatalogPreviewSection } from './CatalogPreview';
+import { ExpertOverrides, type OverrideEntry } from './ExpertOverrides';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -20,17 +29,12 @@ export interface LoadDERFormData {
   name: string;
   element_kind: ElementKind;
   bus_ref: string;
-  p_mw: number;
-  q_mvar: number;
-  // Load-specific
   load_model: LoadModel;
-  // Generator-specific
   gen_type: GenType;
-  p_min_mw: number;
-  p_max_mw: number;
-  q_min_mvar: number;
-  q_max_mvar: number;
-  cos_phi: number;
+  catalog_ref: string;
+  quantity: number;
+  parameter_source: 'CATALOG' | 'OVERRIDE';
+  overrides: OverrideEntry[];
 }
 
 interface LoadDERModalProps {
@@ -38,6 +42,8 @@ interface LoadDERModalProps {
   mode: 'create' | 'edit';
   initialData?: Partial<LoadDERFormData>;
   busOptions: Array<{ ref_id: string; name: string; voltage_kv: number }>;
+  catalogEntries?: CatalogEntry[];
+  catalogPreviewData?: Record<string, { name: string; manufacturer?: string; sections: CatalogPreviewSection[] }>;
   onSubmit: (data: LoadDERFormData) => void;
   onCancel: () => void;
 }
@@ -68,20 +74,19 @@ const GEN_TYPE_LABELS: Record<GenType, string> = {
   bess: 'Magazyn energii (BESS)',
 };
 
+const QUANTITY_GEN_TYPES = new Set<GenType>(['pv_inverter', 'wind_inverter', 'bess']);
+
 const DEFAULT_DATA: LoadDERFormData = {
   ref_id: '',
   name: '',
   element_kind: 'load',
   bus_ref: '',
-  p_mw: 0.5,
-  q_mvar: 0.15,
   load_model: 'pq',
   gen_type: 'pv_inverter',
-  p_min_mw: 0,
-  p_max_mw: 1.0,
-  q_min_mvar: -0.5,
-  q_max_mvar: 0.5,
-  cos_phi: 0.95,
+  catalog_ref: '',
+  quantity: 1,
+  parameter_source: 'CATALOG',
+  overrides: [],
 };
 
 // ---------------------------------------------------------------------------
@@ -100,22 +105,13 @@ function validateForm(data: LoadDERFormData): FieldError[] {
   if (!data.bus_ref) {
     errors.push({ field: 'bus_ref', message: 'Szyna jest wymagana' });
   }
-
-  if (data.element_kind === 'load') {
-    if (data.p_mw < 0) {
-      errors.push({ field: 'p_mw', message: 'Moc czynna odbioru nie może być ujemna' });
-    }
+  if (!data.catalog_ref) {
+    errors.push({ field: 'catalog_ref', message: 'Wybór typu z katalogu jest wymagany' });
   }
 
-  if (data.element_kind === 'generator') {
-    if (data.p_max_mw < data.p_min_mw) {
-      errors.push({ field: 'p_max_mw', message: 'Pmax musi być ≥ Pmin' });
-    }
-    if (data.q_max_mvar < data.q_min_mvar) {
-      errors.push({ field: 'q_max_mvar', message: 'Qmax musi być ≥ Qmin' });
-    }
-    if (data.cos_phi < 0 || data.cos_phi > 1) {
-      errors.push({ field: 'cos_phi', message: 'cos\u03C6 musi być w zakresie [0, 1]' });
+  if (data.element_kind === 'generator' && QUANTITY_GEN_TYPES.has(data.gen_type)) {
+    if (data.quantity < 1) {
+      errors.push({ field: 'quantity', message: 'Liczba sztuk musi wynosić co najmniej 1' });
     }
   }
 
@@ -131,16 +127,20 @@ export function LoadDERModal({
   mode,
   initialData,
   busOptions,
+  catalogEntries = [],
+  catalogPreviewData = {},
   onSubmit,
   onCancel,
 }: LoadDERModalProps) {
   const [formData, setFormData] = useState<LoadDERFormData>({ ...DEFAULT_DATA, ...initialData });
   const [errors, setErrors] = useState<FieldError[]>([]);
+  const [isExpertMode, setIsExpertMode] = useState(false);
 
   useEffect(() => {
     if (isOpen) {
       setFormData({ ...DEFAULT_DATA, ...initialData });
       setErrors([]);
+      setIsExpertMode(false);
     }
   }, [isOpen, initialData]);
 
@@ -152,15 +152,36 @@ export function LoadDERModal({
     const validationErrors = validateForm(formData);
     setErrors(validationErrors);
     if (validationErrors.length === 0) {
-      onSubmit(formData);
+      onSubmit({
+        ...formData,
+        parameter_source: isExpertMode && formData.overrides.length > 0 ? 'OVERRIDE' : 'CATALOG',
+      });
     }
-  }, [formData, onSubmit]);
+  }, [formData, onSubmit, isExpertMode]);
 
   const getError = (field: string): string | undefined =>
     errors.find((e) => e.field === field)?.message;
 
   const isLoad = formData.element_kind === 'load';
   const isGen = formData.element_kind === 'generator';
+  const showQuantity = isGen && QUANTITY_GEN_TYPES.has(formData.gen_type);
+
+  const previewData = useMemo(
+    () => (formData.catalog_ref ? catalogPreviewData[formData.catalog_ref] : null),
+    [formData.catalog_ref, catalogPreviewData],
+  );
+
+  const expertAvailableKeys = useMemo(() => {
+    if (!previewData) return [];
+    return previewData.sections.flatMap((s) =>
+      s.params.map((p) => ({
+        key: p.label,
+        label: p.label,
+        catalogValue: p.value,
+        unit: p.unit,
+      })),
+    );
+  }, [previewData]);
 
   if (!isOpen) return null;
 
@@ -176,7 +197,7 @@ export function LoadDERModal({
         </div>
 
         <div className="px-6 py-4 space-y-4">
-          {/* Identyfikacja */}
+          {/* === SEKCJA A: Tożsamość i topologia === */}
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Identyfikator</label>
@@ -205,7 +226,6 @@ export function LoadDERModal({
             </div>
           </div>
 
-          {/* Rodzaj elementu */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Rodzaj</label>
             <select
@@ -220,7 +240,6 @@ export function LoadDERModal({
             </select>
           </div>
 
-          {/* Szyna */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Szyna</label>
             <select
@@ -240,39 +259,7 @@ export function LoadDERModal({
             {getError('bus_ref') && <p className="mt-1 text-xs text-red-600">{getError('bus_ref')}</p>}
           </div>
 
-          {/* Moc czynna i bierna */}
-          <div className="border-t border-gray-200 pt-4">
-            <h3 className="text-sm font-medium text-gray-900 mb-3">Parametry mocy</h3>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-xs text-gray-600 mb-1">Moc czynna P [MW]</label>
-                <input
-                  type="number"
-                  value={formData.p_mw}
-                  onChange={(e) => handleChange('p_mw', parseFloat(e.target.value) || 0)}
-                  step="0.01"
-                  className={`w-full px-2 py-1.5 border rounded text-sm ${
-                    getError('p_mw') ? 'border-red-500' : 'border-gray-300'
-                  }`}
-                />
-                {getError('p_mw') && (
-                  <p className="mt-0.5 text-xs text-red-600">{getError('p_mw')}</p>
-                )}
-              </div>
-              <div>
-                <label className="block text-xs text-gray-600 mb-1">Moc bierna Q [Mvar]</label>
-                <input
-                  type="number"
-                  value={formData.q_mvar}
-                  onChange={(e) => handleChange('q_mvar', parseFloat(e.target.value) || 0)}
-                  step="0.01"
-                  className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm"
-                />
-              </div>
-            </div>
-          </div>
-
-          {/* Load-specific */}
+          {/* Load model (topological/operational property) */}
           {isLoad && (
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Model odbioru</label>
@@ -288,96 +275,73 @@ export function LoadDERModal({
             </div>
           )}
 
-          {/* Generator-specific */}
+          {/* Generator type */}
           {isGen && (
-            <>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Typ generatora</label>
-                <select
-                  value={formData.gen_type}
-                  onChange={(e) => handleChange('gen_type', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
-                >
-                  {Object.entries(GEN_TYPE_LABELS).map(([val, label]) => (
-                    <option key={val} value={val}>{label}</option>
-                  ))}
-                </select>
-              </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Typ generatora</label>
+              <select
+                value={formData.gen_type}
+                onChange={(e) => handleChange('gen_type', e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+              >
+                {Object.entries(GEN_TYPE_LABELS).map(([val, label]) => (
+                  <option key={val} value={val}>{label}</option>
+                ))}
+              </select>
+            </div>
+          )}
 
-              <div className="border-t border-gray-200 pt-4">
-                <h3 className="text-sm font-medium text-gray-900 mb-3">Ograniczenia mocy</h3>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-xs text-gray-600 mb-1">Pmin [MW]</label>
-                    <input
-                      type="number"
-                      value={formData.p_min_mw}
-                      onChange={(e) => handleChange('p_min_mw', parseFloat(e.target.value) || 0)}
-                      step="0.01"
-                      className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs text-gray-600 mb-1">Pmax [MW]</label>
-                    <input
-                      type="number"
-                      value={formData.p_max_mw}
-                      onChange={(e) => handleChange('p_max_mw', parseFloat(e.target.value) || 0)}
-                      step="0.01"
-                      className={`w-full px-2 py-1.5 border rounded text-sm ${
-                        getError('p_max_mw') ? 'border-red-500' : 'border-gray-300'
-                      }`}
-                    />
-                    {getError('p_max_mw') && (
-                      <p className="mt-0.5 text-xs text-red-600">{getError('p_max_mw')}</p>
-                    )}
-                  </div>
-                  <div>
-                    <label className="block text-xs text-gray-600 mb-1">Qmin [Mvar]</label>
-                    <input
-                      type="number"
-                      value={formData.q_min_mvar}
-                      onChange={(e) => handleChange('q_min_mvar', parseFloat(e.target.value) || 0)}
-                      step="0.01"
-                      className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs text-gray-600 mb-1">Qmax [Mvar]</label>
-                    <input
-                      type="number"
-                      value={formData.q_max_mvar}
-                      onChange={(e) => handleChange('q_max_mvar', parseFloat(e.target.value) || 0)}
-                      step="0.01"
-                      className={`w-full px-2 py-1.5 border rounded text-sm ${
-                        getError('q_max_mvar') ? 'border-red-500' : 'border-gray-300'
-                      }`}
-                    />
-                    {getError('q_max_mvar') && (
-                      <p className="mt-0.5 text-xs text-red-600">{getError('q_max_mvar')}</p>
-                    )}
-                  </div>
-                </div>
-              </div>
+          {/* Quantity for PV/BESS/Wind */}
+          {showQuantity && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Liczba sztuk (inwerterów/modułów)
+              </label>
+              <input
+                type="number"
+                value={formData.quantity}
+                onChange={(e) => handleChange('quantity', parseInt(e.target.value, 10) || 1)}
+                min="1"
+                step="1"
+                className={`w-full px-3 py-2 border rounded-md text-sm ${
+                  getError('quantity') ? 'border-red-500' : 'border-gray-300'
+                }`}
+                data-testid="quantity-input"
+              />
+              {getError('quantity') && <p className="mt-1 text-xs text-red-600">{getError('quantity')}</p>}
+            </div>
+          )}
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">cos&phi;</label>
-                <input
-                  type="number"
-                  value={formData.cos_phi}
-                  onChange={(e) => handleChange('cos_phi', parseFloat(e.target.value) || 0)}
-                  step="0.01"
-                  min="0"
-                  max="1"
-                  className={`w-full px-3 py-2 border rounded-md text-sm ${
-                    getError('cos_phi') ? 'border-red-500' : 'border-gray-300'
-                  }`}
-                />
-                {getError('cos_phi') && (
-                  <p className="mt-1 text-xs text-red-600">{getError('cos_phi')}</p>
-                )}
-              </div>
-            </>
+          {/* === SEKCJA B: Dobór z katalogu === */}
+          <div className="border-t border-gray-200 pt-4">
+            <CatalogPicker
+              label={isLoad ? 'Typ odbioru z katalogu' : 'Typ generatora/inwertera z katalogu'}
+              entries={catalogEntries}
+              selectedId={formData.catalog_ref}
+              onChange={(id) => handleChange('catalog_ref', id)}
+              required
+              error={getError('catalog_ref')}
+            />
+          </div>
+
+          {/* === SEKCJA C: Podgląd katalogowy READ-ONLY === */}
+          {previewData && (
+            <CatalogPreview
+              typeName={previewData.name}
+              manufacturer={previewData.manufacturer}
+              sections={previewData.sections}
+            />
+          )}
+
+          {/* === SEKCJA D: EKSPERT overrides === */}
+          {formData.catalog_ref && (
+            <ExpertOverrides
+              isExpertMode={isExpertMode}
+              onToggleExpert={setIsExpertMode}
+              overrides={formData.overrides}
+              onOverridesChange={(o) => handleChange('overrides', o)}
+              availableKeys={expertAvailableKeys}
+            />
           )}
         </div>
 

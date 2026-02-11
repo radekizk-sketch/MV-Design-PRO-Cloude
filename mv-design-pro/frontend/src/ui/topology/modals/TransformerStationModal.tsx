@@ -1,11 +1,20 @@
 /**
  * TransformerStationModal — edytor stacji transformatorowej SN/nn.
  *
- * Parametry transformatora, węzły stron HV/LV, grupa wektorowa, zaczepy.
+ * CATALOG-FIRST:
+ * - Tryb STANDARDOWY: wybór typu transformatora z katalogu (catalog_ref)
+ *   + topologia (HV/LV bus refs) + pozycja zaczepu.
+ *   Brak pól Sn/Uk/Pk/P0/I0/grupy wektorowej — pochodzą z katalogu.
+ * - Tryb EKSPERT: overrides[] z audytem.
+ * - Podgląd katalogowy READ-ONLY.
+ *
  * BINDING: PL labels, no codenames.
  */
 
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { CatalogPicker, type CatalogEntry } from './CatalogPicker';
+import { CatalogPreview, type CatalogPreviewSection } from './CatalogPreview';
+import { ExpertOverrides, type OverrideEntry } from './ExpertOverrides';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -16,18 +25,10 @@ export interface TransformerStationFormData {
   name: string;
   hv_bus_ref: string;
   lv_bus_ref: string;
-  sn_mva: number;
-  uhv_kv: number;
-  ulv_kv: number;
-  uk_percent: number;
-  pk_kw: number;
-  p0_kw: number;
-  i0_percent: number;
-  vector_group: string;
   tap_position: number;
-  tap_min: number;
-  tap_max: number;
-  tap_step_percent: number;
+  catalog_ref: string;
+  parameter_source: 'CATALOG' | 'OVERRIDE';
+  overrides: OverrideEntry[];
 }
 
 interface TransformerStationModalProps {
@@ -35,6 +36,8 @@ interface TransformerStationModalProps {
   mode: 'create' | 'edit';
   initialData?: Partial<TransformerStationFormData>;
   busOptions: Array<{ ref_id: string; name: string; voltage_kv: number }>;
+  catalogEntries?: CatalogEntry[];
+  catalogPreviewData?: Record<string, { name: string; manufacturer?: string; sections: CatalogPreviewSection[] }>;
   onSubmit: (data: TransformerStationFormData) => void;
   onCancel: () => void;
 }
@@ -43,33 +46,6 @@ interface FieldError {
   field: string;
   message: string;
 }
-
-// ---------------------------------------------------------------------------
-// Labels & Defaults
-// ---------------------------------------------------------------------------
-
-const VECTOR_GROUPS = [
-  'Dyn11', 'Dyn5', 'Dyn1', 'Yyn0', 'Yzn5', 'Dd0', 'Dy11', 'Dy5',
-];
-
-const DEFAULT_DATA: TransformerStationFormData = {
-  ref_id: '',
-  name: '',
-  hv_bus_ref: '',
-  lv_bus_ref: '',
-  sn_mva: 0.63,
-  uhv_kv: 15,
-  ulv_kv: 0.4,
-  uk_percent: 6.0,
-  pk_kw: 7.0,
-  p0_kw: 1.2,
-  i0_percent: 2.5,
-  vector_group: 'Dyn11',
-  tap_position: 0,
-  tap_min: -2,
-  tap_max: 2,
-  tap_step_percent: 2.5,
-};
 
 // ---------------------------------------------------------------------------
 // Validation
@@ -93,30 +69,23 @@ function validateForm(data: TransformerStationFormData): FieldError[] {
   if (data.hv_bus_ref && data.lv_bus_ref && data.hv_bus_ref === data.lv_bus_ref) {
     errors.push({ field: 'lv_bus_ref', message: 'Szyny GN i DN muszą być różne' });
   }
-  if (data.sn_mva <= 0) {
-    errors.push({ field: 'sn_mva', message: 'Moc znamionowa musi być > 0' });
-  }
-  if (data.uhv_kv <= 0) {
-    errors.push({ field: 'uhv_kv', message: 'Napięcie GN musi być > 0' });
-  }
-  if (data.ulv_kv <= 0) {
-    errors.push({ field: 'ulv_kv', message: 'Napięcie DN musi być > 0' });
-  }
-  if (data.uk_percent <= 0 || data.uk_percent > 100) {
-    errors.push({ field: 'uk_percent', message: 'Napięcie zwarcia musi być w zakresie (0, 100]%' });
-  }
-  if (data.pk_kw < 0) {
-    errors.push({ field: 'pk_kw', message: 'Straty obciążeniowe nie mogą być ujemne' });
-  }
-  if (data.tap_min > data.tap_max) {
-    errors.push({ field: 'tap_min', message: 'Zaczep min musi być ≤ zaczep max' });
-  }
-  if (data.tap_position < data.tap_min || data.tap_position > data.tap_max) {
-    errors.push({ field: 'tap_position', message: `Pozycja zaczepu musi być w zakresie [${data.tap_min}, ${data.tap_max}]` });
+  if (!data.catalog_ref) {
+    errors.push({ field: 'catalog_ref', message: 'Wybór typu z katalogu jest wymagany' });
   }
 
   return errors;
 }
+
+const DEFAULT_DATA: TransformerStationFormData = {
+  ref_id: '',
+  name: '',
+  hv_bus_ref: '',
+  lv_bus_ref: '',
+  tap_position: 0,
+  catalog_ref: '',
+  parameter_source: 'CATALOG',
+  overrides: [],
+};
 
 // ---------------------------------------------------------------------------
 // Component
@@ -127,16 +96,20 @@ export function TransformerStationModal({
   mode,
   initialData,
   busOptions,
+  catalogEntries = [],
+  catalogPreviewData = {},
   onSubmit,
   onCancel,
 }: TransformerStationModalProps) {
   const [formData, setFormData] = useState<TransformerStationFormData>({ ...DEFAULT_DATA, ...initialData });
   const [errors, setErrors] = useState<FieldError[]>([]);
+  const [isExpertMode, setIsExpertMode] = useState(false);
 
   useEffect(() => {
     if (isOpen) {
       setFormData({ ...DEFAULT_DATA, ...initialData });
       setErrors([]);
+      setIsExpertMode(false);
     }
   }, [isOpen, initialData]);
 
@@ -148,12 +121,32 @@ export function TransformerStationModal({
     const validationErrors = validateForm(formData);
     setErrors(validationErrors);
     if (validationErrors.length === 0) {
-      onSubmit(formData);
+      onSubmit({
+        ...formData,
+        parameter_source: isExpertMode && formData.overrides.length > 0 ? 'OVERRIDE' : 'CATALOG',
+      });
     }
-  }, [formData, onSubmit]);
+  }, [formData, onSubmit, isExpertMode]);
 
   const getError = (field: string): string | undefined =>
     errors.find((e) => e.field === field)?.message;
+
+  const previewData = useMemo(
+    () => (formData.catalog_ref ? catalogPreviewData[formData.catalog_ref] : null),
+    [formData.catalog_ref, catalogPreviewData],
+  );
+
+  const expertAvailableKeys = useMemo(() => {
+    if (!previewData) return [];
+    return previewData.sections.flatMap((s) =>
+      s.params.map((p) => ({
+        key: p.label,
+        label: p.label,
+        catalogValue: p.value,
+        unit: p.unit,
+      })),
+    );
+  }, [previewData]);
 
   if (!isOpen) return null;
 
@@ -167,7 +160,7 @@ export function TransformerStationModal({
         </div>
 
         <div className="px-6 py-4 space-y-4">
-          {/* Identyfikacja */}
+          {/* === SEKCJA A: Tożsamość i topologia === */}
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Identyfikator</label>
@@ -196,7 +189,6 @@ export function TransformerStationModal({
             </div>
           </div>
 
-          {/* Szyny HV / LV */}
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -240,179 +232,48 @@ export function TransformerStationModal({
             </div>
           </div>
 
-          {/* Parametry znamionowe */}
-          <div className="border-t border-gray-200 pt-4">
-            <h3 className="text-sm font-medium text-gray-900 mb-3">Parametry znamionowe</h3>
-            <div className="grid grid-cols-3 gap-4">
-              <div>
-                <label className="block text-xs text-gray-600 mb-1">Moc znamionowa [MVA]</label>
-                <input
-                  type="number"
-                  value={formData.sn_mva}
-                  onChange={(e) => handleChange('sn_mva', parseFloat(e.target.value) || 0)}
-                  step="0.01"
-                  className={`w-full px-2 py-1.5 border rounded text-sm ${
-                    getError('sn_mva') ? 'border-red-500' : 'border-gray-300'
-                  }`}
-                />
-                {getError('sn_mva') && (
-                  <p className="mt-0.5 text-xs text-red-600">{getError('sn_mva')}</p>
-                )}
-              </div>
-              <div>
-                <label className="block text-xs text-gray-600 mb-1">Napięcie GN [kV]</label>
-                <input
-                  type="number"
-                  value={formData.uhv_kv}
-                  onChange={(e) => handleChange('uhv_kv', parseFloat(e.target.value) || 0)}
-                  step="0.1"
-                  className={`w-full px-2 py-1.5 border rounded text-sm ${
-                    getError('uhv_kv') ? 'border-red-500' : 'border-gray-300'
-                  }`}
-                />
-                {getError('uhv_kv') && (
-                  <p className="mt-0.5 text-xs text-red-600">{getError('uhv_kv')}</p>
-                )}
-              </div>
-              <div>
-                <label className="block text-xs text-gray-600 mb-1">Napięcie DN [kV]</label>
-                <input
-                  type="number"
-                  value={formData.ulv_kv}
-                  onChange={(e) => handleChange('ulv_kv', parseFloat(e.target.value) || 0)}
-                  step="0.01"
-                  className={`w-full px-2 py-1.5 border rounded text-sm ${
-                    getError('ulv_kv') ? 'border-red-500' : 'border-gray-300'
-                  }`}
-                />
-                {getError('ulv_kv') && (
-                  <p className="mt-0.5 text-xs text-red-600">{getError('ulv_kv')}</p>
-                )}
-              </div>
-            </div>
-          </div>
-
-          {/* Parametry zwarciowe i straty */}
-          <div className="grid grid-cols-4 gap-4">
-            <div>
-              <label className="block text-xs text-gray-600 mb-1">uk [%]</label>
-              <input
-                type="number"
-                value={formData.uk_percent}
-                onChange={(e) => handleChange('uk_percent', parseFloat(e.target.value) || 0)}
-                step="0.1"
-                className={`w-full px-2 py-1.5 border rounded text-sm ${
-                  getError('uk_percent') ? 'border-red-500' : 'border-gray-300'
-                }`}
-              />
-              {getError('uk_percent') && (
-                <p className="mt-0.5 text-xs text-red-600">{getError('uk_percent')}</p>
-              )}
-            </div>
-            <div>
-              <label className="block text-xs text-gray-600 mb-1">Pk [kW]</label>
-              <input
-                type="number"
-                value={formData.pk_kw}
-                onChange={(e) => handleChange('pk_kw', parseFloat(e.target.value) || 0)}
-                step="0.1"
-                className={`w-full px-2 py-1.5 border rounded text-sm ${
-                  getError('pk_kw') ? 'border-red-500' : 'border-gray-300'
-                }`}
-              />
-              {getError('pk_kw') && (
-                <p className="mt-0.5 text-xs text-red-600">{getError('pk_kw')}</p>
-              )}
-            </div>
-            <div>
-              <label className="block text-xs text-gray-600 mb-1">P0 [kW]</label>
-              <input
-                type="number"
-                value={formData.p0_kw}
-                onChange={(e) => handleChange('p0_kw', parseFloat(e.target.value) || 0)}
-                step="0.01"
-                className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm"
-              />
-            </div>
-            <div>
-              <label className="block text-xs text-gray-600 mb-1">I0 [%]</label>
-              <input
-                type="number"
-                value={formData.i0_percent}
-                onChange={(e) => handleChange('i0_percent', parseFloat(e.target.value) || 0)}
-                step="0.1"
-                className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm"
-              />
-            </div>
-          </div>
-
-          {/* Grupa wektorowa */}
+          {/* Pozycja zaczepu — parametr operacyjny, nie fizyka */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Grupa wektorowa</label>
-            <select
-              value={formData.vector_group}
-              onChange={(e) => handleChange('vector_group', e.target.value)}
+            <label className="block text-sm font-medium text-gray-700 mb-1">Pozycja zaczepu</label>
+            <input
+              type="number"
+              value={formData.tap_position}
+              onChange={(e) => handleChange('tap_position', parseInt(e.target.value, 10) || 0)}
               className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
-            >
-              {VECTOR_GROUPS.map((vg) => (
-                <option key={vg} value={vg}>{vg}</option>
-              ))}
-            </select>
+            />
           </div>
 
-          {/* Zaczepy */}
+          {/* === SEKCJA B: Dobór z katalogu === */}
           <div className="border-t border-gray-200 pt-4">
-            <h3 className="text-sm font-medium text-gray-900 mb-3">Regulacja zaczepowa</h3>
-            <div className="grid grid-cols-4 gap-4">
-              <div>
-                <label className="block text-xs text-gray-600 mb-1">Pozycja zaczepu</label>
-                <input
-                  type="number"
-                  value={formData.tap_position}
-                  onChange={(e) => handleChange('tap_position', parseInt(e.target.value, 10) || 0)}
-                  className={`w-full px-2 py-1.5 border rounded text-sm ${
-                    getError('tap_position') ? 'border-red-500' : 'border-gray-300'
-                  }`}
-                />
-                {getError('tap_position') && (
-                  <p className="mt-0.5 text-xs text-red-600">{getError('tap_position')}</p>
-                )}
-              </div>
-              <div>
-                <label className="block text-xs text-gray-600 mb-1">Zaczep min</label>
-                <input
-                  type="number"
-                  value={formData.tap_min}
-                  onChange={(e) => handleChange('tap_min', parseInt(e.target.value, 10) || 0)}
-                  className={`w-full px-2 py-1.5 border rounded text-sm ${
-                    getError('tap_min') ? 'border-red-500' : 'border-gray-300'
-                  }`}
-                />
-                {getError('tap_min') && (
-                  <p className="mt-0.5 text-xs text-red-600">{getError('tap_min')}</p>
-                )}
-              </div>
-              <div>
-                <label className="block text-xs text-gray-600 mb-1">Zaczep max</label>
-                <input
-                  type="number"
-                  value={formData.tap_max}
-                  onChange={(e) => handleChange('tap_max', parseInt(e.target.value, 10) || 0)}
-                  className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm"
-                />
-              </div>
-              <div>
-                <label className="block text-xs text-gray-600 mb-1">Krok zaczepu [%]</label>
-                <input
-                  type="number"
-                  value={formData.tap_step_percent}
-                  onChange={(e) => handleChange('tap_step_percent', parseFloat(e.target.value) || 0)}
-                  step="0.1"
-                  className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm"
-                />
-              </div>
-            </div>
+            <CatalogPicker
+              label="Typ transformatora z katalogu"
+              entries={catalogEntries}
+              selectedId={formData.catalog_ref}
+              onChange={(id) => handleChange('catalog_ref', id)}
+              required
+              error={getError('catalog_ref')}
+            />
           </div>
+
+          {/* === SEKCJA C: Podgląd katalogowy READ-ONLY === */}
+          {previewData && (
+            <CatalogPreview
+              typeName={previewData.name}
+              manufacturer={previewData.manufacturer}
+              sections={previewData.sections}
+            />
+          )}
+
+          {/* === SEKCJA D: EKSPERT overrides === */}
+          {formData.catalog_ref && (
+            <ExpertOverrides
+              isExpertMode={isExpertMode}
+              onToggleExpert={setIsExpertMode}
+              overrides={formData.overrides}
+              onOverridesChange={(o) => handleChange('overrides', o)}
+              availableKeys={expertAvailableKeys}
+            />
+          )}
         </div>
 
         <div className="px-6 py-4 border-t border-gray-200 flex justify-end gap-3">

@@ -136,6 +136,46 @@ class TestReadinessEndpoint:
         assert data["element_counts"]["bays"] == 2
         assert data["element_counts"]["buses"] == 3
 
+    def test_readiness_contract_shape(self, client):
+        """Readiness endpoint always returns the canonical top-level keys (PR-11 canon)."""
+        resp = client.get("/api/cases/shape-test-1/enm/readiness")
+        assert resp.status_code == 200
+        data = resp.json()
+        # Top-level keys — order-independent (PR-11: validation + readiness as objects)
+        expected_top = {
+            "case_id", "enm_revision", "validation", "readiness",
+            "analysis_readiness", "topology_completeness", "element_counts",
+        }
+        assert set(data.keys()) == expected_top
+
+        # validation sub-keys
+        assert "status" in data["validation"]
+        assert "issues" in data["validation"]
+        assert data["validation"]["status"] in ("OK", "WARN", "FAIL")
+
+        # readiness sub-keys
+        assert "ready" in data["readiness"]
+        assert "blockers" in data["readiness"]
+        assert isinstance(data["readiness"]["ready"], bool)
+        assert isinstance(data["readiness"]["blockers"], list)
+
+        # analysis_readiness sub-keys
+        assert set(data["analysis_readiness"].keys()) == {
+            "short_circuit_3f", "short_circuit_1f", "load_flow", "protection",
+        }
+
+        # topology_completeness sub-keys
+        assert set(data["topology_completeness"].keys()) == {
+            "has_substations", "has_bays", "has_junctions", "has_corridors",
+        }
+
+        # element_counts sub-keys
+        assert set(data["element_counts"].keys()) == {
+            "buses", "branches", "transformers", "sources", "loads",
+            "generators", "substations", "bays", "junctions", "corridors",
+            "measurements", "protection_assignments",
+        }
+
 
     def test_readiness_false_blocker_e009(self, client):
         enm = _valid_enm_with_topology()
