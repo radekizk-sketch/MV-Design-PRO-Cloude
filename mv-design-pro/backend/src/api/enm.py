@@ -191,6 +191,61 @@ async def get_enm_readiness(case_id: str) -> dict[str, Any]:
 
 
 # ---------------------------------------------------------------------------
+# Engineering Readiness (aggregated UX endpoint)
+# ---------------------------------------------------------------------------
+
+
+@router.get("/{case_id}/engineering-readiness")
+async def get_engineering_readiness(case_id: str) -> dict[str, Any]:
+    """Agregacyjny endpoint inżynierskiej gotowości modelu.
+
+    Łączy walidację + readiness + fix_action w jeden response
+    dla Engineering Readiness Panel.
+    NIE zmienia istniejącego /readiness — to nowy endpoint UX.
+    Deterministyczny: ten sam ENM → identyczny wynik.
+    """
+    enm = _get_enm(case_id)
+    validator = ENMValidator()
+    validation = validator.validate(enm)
+    readiness = validator.readiness(validation)
+
+    issues_out: list[dict[str, Any]] = []
+    for issue in validation.issues:
+        item: dict[str, Any] = {
+            "code": issue.code,
+            "severity": issue.severity,
+            "element_ref": issue.element_refs[0] if issue.element_refs else None,
+            "element_refs": issue.element_refs,
+            "message_pl": issue.message_pl,
+            "wizard_step_hint": issue.wizard_step_hint,
+            "suggested_fix": issue.suggested_fix,
+            "fix_action": (
+                issue.fix_action.model_dump(mode="json")
+                if issue.fix_action
+                else None
+            ),
+        }
+        issues_out.append(item)
+
+    by_severity = {"BLOCKER": 0, "IMPORTANT": 0, "INFO": 0}
+    for issue in validation.issues:
+        by_severity[issue.severity] = by_severity.get(issue.severity, 0) + 1
+
+    return {
+        "case_id": case_id,
+        "enm_revision": enm.header.revision,
+        "status": validation.status,
+        "ready": readiness.ready,
+        "validation": validation.model_dump(mode="json"),
+        "readiness": readiness.model_dump(mode="json"),
+        "issues": issues_out,
+        "total_count": len(issues_out),
+        "by_severity": by_severity,
+        "analysis_available": validation.analysis_available.model_dump(mode="json"),
+    }
+
+
+# ---------------------------------------------------------------------------
 # Topology Summary (graph view)
 # ---------------------------------------------------------------------------
 

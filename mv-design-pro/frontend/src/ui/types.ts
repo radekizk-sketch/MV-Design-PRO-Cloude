@@ -441,3 +441,60 @@ export interface IssueFilter {
   /** Show only issues for currently selected element */
   selectedOnly: boolean;
 }
+
+// ============================================================================
+// PR-13: Engineering Readiness Panel Types
+// ============================================================================
+
+/**
+ * FixAction — deterministic fix suggestion (no mutation, no auto-fix).
+ */
+export type FixActionType =
+  | 'OPEN_MODAL'
+  | 'NAVIGATE_TO_ELEMENT'
+  | 'SELECT_CATALOG'
+  | 'ADD_MISSING_DEVICE';
+
+export interface FixAction {
+  action_type: FixActionType;
+  element_ref: string | null;
+  modal_type: string | null;
+  payload_hint: Record<string, unknown> | null;
+}
+
+/**
+ * Engineering Readiness severity (BLOCKER / IMPORTANT / INFO).
+ */
+export type ReadinessSeverity = 'BLOCKER' | 'IMPORTANT' | 'INFO';
+
+/**
+ * Single engineering readiness issue with optional fix action.
+ */
+export interface ReadinessIssue {
+  code: string;
+  severity: ReadinessSeverity;
+  element_ref: string | null;
+  element_refs: string[];
+  message_pl: string;
+  wizard_step_hint: string;
+  suggested_fix: string | null;
+  fix_action: FixAction | null;
+}
+
+/**
+ * Engineering Readiness API response.
+ */
+export interface EngineeringReadinessResponse {
+  case_id: string;
+  enm_revision: number;
+  status: 'OK' | 'WARN' | 'FAIL';
+  ready: boolean;
+  issues: ReadinessIssue[];
+  total_count: number;
+  by_severity: Record<ReadinessSeverity, number>;
+  analysis_available: {
+    short_circuit_3f: boolean;
+    short_circuit_1f: boolean;
+    load_flow: boolean;
+  };
+}
