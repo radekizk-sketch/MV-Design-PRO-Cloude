@@ -49,6 +49,8 @@ class ValidationResult(BaseModel):
 class ENMValidator:
     """Walidator energetyczny modelu sieci."""
 
+    _SEVERITY_RANK = {"BLOCKER": 0, "IMPORTANT": 1, "INFO": 2}
+
     def validate(self, enm: EnergyNetworkModel) -> ValidationResult:
         issues: list[ValidationIssue] = []
 
@@ -57,6 +59,13 @@ class ENMValidator:
         self._check_warnings(enm, issues)
         self._check_info(enm, issues)
         self._check_topology_entities(enm, issues)
+
+        # Deterministic sort: severity_rank → code → first element_ref
+        issues.sort(key=lambda i: (
+            self._SEVERITY_RANK.get(i.severity, 9),
+            i.code,
+            i.element_refs[0] if i.element_refs else "",
+        ))
 
         has_blockers = any(i.severity == "BLOCKER" for i in issues)
         has_warnings = any(i.severity == "IMPORTANT" for i in issues)
