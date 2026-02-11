@@ -16,6 +16,7 @@ from .sources import Source
 from .substation import SubstationMetadata
 from .units import BaseQuantities, UnitSystem
 from .validation import ValidationIssue, ValidationReport
+from .result_set import OverlayElement, OverlayLegendEntry, OverlayPayloadV1
 from .sld import SldAnnotation, SldBranchSymbol, SldDiagram, SldNodeSymbol
 
 __all__ = [
@@ -23,6 +24,9 @@ __all__ = [
     "Grounding",
     "AnalysisRun",
     "Limits",
+    "OverlayElement",
+    "OverlayLegendEntry",
+    "OverlayPayloadV1",
     "Network",
     "OperatingCase",
     "Project",
