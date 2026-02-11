@@ -40,7 +40,8 @@ def _valid_enm_with_topology():
         "branches": [
             {"ref_id": "line_1", "name": "Linia L1", "tags": [], "meta": {},
              "type": "line_overhead", "from_bus_ref": "bus_sn_a", "to_bus_ref": "bus_sn_b",
-             "status": "closed", "length_km": 10, "r_ohm_per_km": 0.443, "x_ohm_per_km": 0.34},
+             "status": "closed", "length_km": 10, "r_ohm_per_km": 0.443, "x_ohm_per_km": 0.34,
+             "catalog_ref": "CAT-CAB-001"},
         ],
         "transformers": [
             {"ref_id": "trafo_1", "name": "T1", "tags": [], "meta": {},
@@ -109,7 +110,9 @@ class TestReadinessEndpoint:
         resp = client.get("/api/cases/ready-test-1/enm/readiness")
         assert resp.status_code == 200
         data = resp.json()
-        assert data["validation_status"] == "FAIL"
+        assert data["validation"]["status"] == "FAIL"
+        assert data["readiness"]["ready"] is False
+        assert any(i["severity"] == "BLOCKER" for i in data["readiness"]["blockers"])
         assert data["analysis_readiness"]["short_circuit_3f"] is False
         assert data["topology_completeness"]["has_substations"] is False
 
@@ -120,7 +123,9 @@ class TestReadinessEndpoint:
         resp = client.get("/api/cases/ready-test-2/enm/readiness")
         assert resp.status_code == 200
         data = resp.json()
-        assert data["validation_status"] in ("OK", "WARN")
+        assert data["validation"]["status"] == "WARN"
+        assert data["readiness"]["ready"] is True
+        assert data["readiness"]["blockers"] == []
         assert data["analysis_readiness"]["short_circuit_3f"] is True
         assert data["analysis_readiness"]["load_flow"] is True
         assert data["topology_completeness"]["has_substations"] is True
@@ -159,6 +164,19 @@ class TestReadinessEndpoint:
             "generators", "substations", "bays", "junctions", "corridors",
             "measurements", "protection_assignments",
         }
+
+
+    def test_readiness_false_blocker_e009(self, client):
+        enm = _valid_enm_with_topology()
+        enm["branches"][0]["catalog_ref"] = None
+        client.put("/api/cases/ready-test-3/enm", json=enm)
+
+        resp = client.get("/api/cases/ready-test-3/enm/readiness")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["validation"]["status"] == "FAIL"
+        assert data["readiness"]["ready"] is False
+        assert any(i["code"] == "E009" for i in data["readiness"]["blockers"])
 
 
 class TestENMPutWithExtensions:

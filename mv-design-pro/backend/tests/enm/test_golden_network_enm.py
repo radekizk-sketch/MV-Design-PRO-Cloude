@@ -215,16 +215,13 @@ class TestGoldenNetworkValidation:
     - Analysis readiness: SC 3F dostępny, load_flow dostępny.
     """
 
-    def test_no_blockers(self, golden_enm: EnergyNetworkModel) -> None:
-        """Zero blokerów walidacyjnych."""
-        result = ENMValidator().validate(golden_enm)
-        blockers = [i for i in result.issues if i.severity == "BLOCKER"]
-        assert len(blockers) == 0, f"Blokery: {[i.code for i in blockers]}"
-
-    def test_validation_status_ok_or_warn(self, golden_enm: EnergyNetworkModel) -> None:
-        """Status walidacji = OK lub WARN (nie FAIL)."""
-        result = ENMValidator().validate(golden_enm)
-        assert result.status in ("OK", "WARN")
+    def test_golden_network_validation(self, golden_enm: EnergyNetworkModel) -> None:
+        """Golden fixture without catalog refs musi dawać FAIL + E009."""
+        validation = ENMValidator().validate(golden_enm)
+        readiness = ENMValidator().readiness(validation)
+        assert validation.status == "FAIL"
+        assert readiness.ready is False
+        assert any(i.code == "E009" and i.severity == "BLOCKER" for i in readiness.blockers)
 
     def test_all_transformers_have_catalog_ref(self, golden_enm: EnergyNetworkModel) -> None:
         """Każdy transformator w golden case ma catalog_ref (kanon CATALOG-FIRST)."""

@@ -46,6 +46,11 @@ class ValidationResult(BaseModel):
     analysis_available: AnalysisAvailability = AnalysisAvailability()
 
 
+class ReadinessResult(BaseModel):
+    ready: bool
+    blockers: list[ValidationIssue] = []
+
+
 class ENMValidator:
     """Walidator energetyczny modelu sieci."""
 
@@ -85,8 +90,13 @@ class ENMValidator:
             analysis_available=availability,
         )
 
+    def readiness(self, validation: ValidationResult) -> ReadinessResult:
+        blockers = [i for i in validation.issues if i.severity == "BLOCKER"]
+        ready = validation.status != "FAIL" and len(blockers) == 0
+        return ReadinessResult(ready=ready, blockers=blockers)
+
     # ------------------------------------------------------------------
-    # BLOCKERS (E001-E008)
+    # BLOCKERS (E001-E009)
     # ------------------------------------------------------------------
 
     def _check_blockers(self, enm: EnergyNetworkModel, issues: list[ValidationIssue]) -> None:
@@ -194,6 +204,35 @@ class ENMValidator:
                         f"Wprowadź moc zwarciową Sk'' lub impedancję R+jX "
                         f"źródła '{source.name}'."
                     ),
+                ))
+
+        # E009: Brak referencji katalogowej (CATALOG-FIRST)
+        for branch in enm.branches:
+            if isinstance(branch, (OverheadLine, Cable)) and not branch.catalog_ref:
+                issues.append(ValidationIssue(
+                    code="E009",
+                    severity="BLOCKER",
+                    message_pl=(
+                        f"Gałąź '{branch.ref_id}' nie ma referencji katalogowej "
+                        f"(catalog_ref)."
+                    ),
+                    element_refs=[branch.ref_id],
+                    wizard_step_hint="K4",
+                    suggested_fix="Przypisz element z katalogu i zapisz catalog_ref.",
+                ))
+
+        for trafo in enm.transformers:
+            if not trafo.catalog_ref:
+                issues.append(ValidationIssue(
+                    code="E009",
+                    severity="BLOCKER",
+                    message_pl=(
+                        f"Transformator '{trafo.ref_id}' nie ma referencji katalogowej "
+                        f"(catalog_ref)."
+                    ),
+                    element_refs=[trafo.ref_id],
+                    wizard_step_hint="K5",
+                    suggested_fix="Przypisz transformator z katalogu i zapisz catalog_ref.",
                 ))
 
     # ------------------------------------------------------------------
