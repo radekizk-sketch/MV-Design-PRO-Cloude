@@ -156,3 +156,92 @@ export const CONFIG_FIELD_LABELS: Record<keyof StudyCaseConfig, string> = {
   include_inverter_contribution: 'Wkład inwerterów',
   thermal_time_seconds: 'Czas cieplny [s]',
 };
+
+// =============================================================================
+// PR-14: Execution Layer Types (StudyCase → Run → ResultSet)
+// =============================================================================
+
+/**
+ * Analysis type for execution runs.
+ */
+export type ExecutionAnalysisType = 'SC_3F' | 'SC_1F' | 'LOAD_FLOW';
+
+/**
+ * Run lifecycle status.
+ */
+export type RunStatus = 'PENDING' | 'RUNNING' | 'DONE' | 'FAILED';
+
+/**
+ * Execution run record.
+ */
+export interface ExecutionRun {
+  id: string;
+  study_case_id: string;
+  analysis_type: ExecutionAnalysisType;
+  solver_input_hash: string;
+  status: RunStatus;
+  started_at: string | null;
+  finished_at: string | null;
+  error_message: string | null;
+}
+
+/**
+ * Per-element result.
+ */
+export interface ElementResult {
+  element_ref: string;
+  element_type: string;
+  values: Record<string, unknown>;
+}
+
+/**
+ * Result set for a completed run.
+ */
+export interface ExecutionResultSet {
+  run_id: string;
+  analysis_type: ExecutionAnalysisType;
+  validation_snapshot: Record<string, unknown>;
+  readiness_snapshot: Record<string, unknown>;
+  element_results: ElementResult[];
+  global_results: Record<string, unknown>;
+  deterministic_signature: string;
+}
+
+/**
+ * Polish labels for analysis types.
+ */
+export const ANALYSIS_TYPE_LABELS: Record<ExecutionAnalysisType, string> = {
+  SC_3F: 'Zwarcie trójfazowe (3F)',
+  SC_1F: 'Zwarcie jednofazowe (1F)',
+  LOAD_FLOW: 'Rozpływ mocy',
+};
+
+/**
+ * Polish labels for run statuses.
+ */
+export const RUN_STATUS_LABELS: Record<RunStatus, string> = {
+  PENDING: 'Oczekuje',
+  RUNNING: 'W trakcie',
+  DONE: 'Zakończony',
+  FAILED: 'Błąd',
+};
+
+/**
+ * CSS status styling for run status.
+ */
+export const RUN_STATUS_COLORS: Record<RunStatus, string> = {
+  PENDING: 'text-gray-500',
+  RUNNING: 'text-blue-500',
+  DONE: 'text-green-600',
+  FAILED: 'text-red-600',
+};
+
+/**
+ * Create execution run request.
+ */
+export interface CreateRunRequest {
+  analysis_type: ExecutionAnalysisType;
+  solver_input?: Record<string, unknown>;
+  readiness?: Record<string, unknown>;
+  eligibility?: Record<string, unknown>;
+}

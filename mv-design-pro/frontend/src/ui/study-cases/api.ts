@@ -10,6 +10,9 @@ import type {
   StudyCaseComparison,
   CreateStudyCaseRequest,
   UpdateStudyCaseRequest,
+  ExecutionRun,
+  ExecutionResultSet,
+  CreateRunRequest,
 } from './types';
 
 const API_BASE = '/api/study-cases';
@@ -215,4 +218,61 @@ export async function updateProtectionConfig(
     body: JSON.stringify(request),
   });
   return handleResponse<ProtectionConfig>(response);
+}
+
+// =============================================================================
+// PR-14: Execution Runs API
+// =============================================================================
+
+const EXECUTION_BASE = '/api/execution';
+
+/**
+ * Create a new execution run for a study case.
+ */
+export async function createRun(
+  caseId: string,
+  request: CreateRunRequest
+): Promise<ExecutionRun> {
+  const response = await fetch(`${EXECUTION_BASE}/study-cases/${caseId}/runs`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(request),
+  });
+  return handleResponse<ExecutionRun>(response);
+}
+
+/**
+ * List runs for a study case.
+ */
+export async function listRuns(
+  caseId: string
+): Promise<{ runs: ExecutionRun[]; count: number }> {
+  const response = await fetch(`${EXECUTION_BASE}/study-cases/${caseId}/runs`);
+  return handleResponse<{ runs: ExecutionRun[]; count: number }>(response);
+}
+
+/**
+ * Execute a pending run.
+ */
+export async function executeRun(runId: string): Promise<ExecutionRun> {
+  const response = await fetch(`${EXECUTION_BASE}/runs/${runId}/execute`, {
+    method: 'POST',
+  });
+  return handleResponse<ExecutionRun>(response);
+}
+
+/**
+ * Get run details.
+ */
+export async function getRun(runId: string): Promise<ExecutionRun> {
+  const response = await fetch(`${EXECUTION_BASE}/runs/${runId}`);
+  return handleResponse<ExecutionRun>(response);
+}
+
+/**
+ * Get result set for a run.
+ */
+export async function getRunResults(runId: string): Promise<ExecutionResultSet> {
+  const response = await fetch(`${EXECUTION_BASE}/runs/${runId}/results`);
+  return handleResponse<ExecutionResultSet>(response);
 }
