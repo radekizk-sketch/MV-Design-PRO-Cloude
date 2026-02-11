@@ -47,7 +47,7 @@ def _valid_enm_with_topology():
             {"ref_id": "trafo_1", "name": "T1", "tags": [], "meta": {},
              "hv_bus_ref": "bus_sn_b", "lv_bus_ref": "bus_nn_1",
              "sn_mva": 0.63, "uhv_kv": 15, "ulv_kv": 0.4, "uk_percent": 4.5, "pk_kw": 6.5,
-             "catalog_ref": "TR_15_04_630kVA_Dyn11"},
+             "catalog_ref": "CAT-TR-001"},
         ],
         "loads": [
             {"ref_id": "load_1", "name": "Odbiór 1", "tags": [], "meta": {},
@@ -137,16 +137,27 @@ class TestReadinessEndpoint:
         assert data["element_counts"]["buses"] == 3
 
     def test_readiness_contract_shape(self, client):
-        """Readiness endpoint always returns the canonical top-level keys."""
+        """Readiness endpoint always returns the canonical top-level keys (PR-11 canon)."""
         resp = client.get("/api/cases/shape-test-1/enm/readiness")
         assert resp.status_code == 200
         data = resp.json()
-        # Top-level keys — order-independent
+        # Top-level keys — order-independent (PR-11: validation + readiness as objects)
         expected_top = {
-            "case_id", "enm_revision", "validation_status",
+            "case_id", "enm_revision", "validation", "readiness",
             "analysis_readiness", "topology_completeness", "element_counts",
         }
         assert set(data.keys()) == expected_top
+
+        # validation sub-keys
+        assert "status" in data["validation"]
+        assert "issues" in data["validation"]
+        assert data["validation"]["status"] in ("OK", "WARN", "FAIL")
+
+        # readiness sub-keys
+        assert "ready" in data["readiness"]
+        assert "blockers" in data["readiness"]
+        assert isinstance(data["readiness"]["ready"], bool)
+        assert isinstance(data["readiness"]["blockers"], list)
 
         # analysis_readiness sub-keys
         assert set(data["analysis_readiness"].keys()) == {

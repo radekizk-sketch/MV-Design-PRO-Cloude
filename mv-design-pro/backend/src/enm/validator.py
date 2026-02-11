@@ -301,26 +301,13 @@ class ENMValidator:
                 ))
 
     # ------------------------------------------------------------------
-    # CATALOG-FIRST checks (E009-E010)
+    # CATALOG-FIRST checks (E010)
     # ------------------------------------------------------------------
 
     def _check_catalog_first(
         self, enm: EnergyNetworkModel, issues: list[ValidationIssue]
     ) -> None:
-        # E009: Transformator bez catalog_ref
-        for trafo in enm.transformers:
-            if not trafo.catalog_ref:
-                issues.append(ValidationIssue(
-                    code="E009",
-                    severity="BLOCKER",
-                    message_pl=(
-                        f"Transformator '{trafo.ref_id}' nie ma referencji "
-                        f"katalogowej (catalog_ref). Wybierz typ z katalogu."
-                    ),
-                    element_refs=[trafo.ref_id],
-                    wizard_step_hint="K5",
-                    suggested_fix="Wybierz typ transformatora z katalogu.",
-                ))
+        # E009 for branches + transformers is in _check_blockers (canonical).
 
         # E010: Overrides bez parameter_source=OVERRIDE
         all_elements = [

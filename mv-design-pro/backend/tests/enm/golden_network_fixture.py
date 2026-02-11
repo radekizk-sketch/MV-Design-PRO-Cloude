@@ -188,10 +188,13 @@ def build_golden_network() -> EnergyNetworkModel:
     # Kable SN — 31 segmentów
     # =========================================================================
 
+    # catalog_ref: golden case jest przypadkiem READY (produkcyjnym),
+    # więc każdy kabel MUSI mieć referencję katalogową (E009).
     cable_template = dict(
         r_ohm_per_km=0.206, x_ohm_per_km=0.074,
         b_siemens_per_km=0.000054,
         r0_ohm_per_km=0.824, x0_ohm_per_km=0.296,
+        catalog_ref="CAT-CAB-YAKY-240",
     )
 
     cable_defs = [
