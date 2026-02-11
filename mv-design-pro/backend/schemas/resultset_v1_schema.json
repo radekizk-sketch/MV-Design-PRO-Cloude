@@ -1,0 +1,357 @@
+{
+  "$defs": {
+    "ElementResultV1": {
+      "description": "Per-element typed result in ResultSetV1.\n\nMaps element_ref \u2192 analysis-specific result values.",
+      "properties": {
+        "element_ref": {
+          "description": "Element ref_id",
+          "title": "Element Ref",
+          "type": "string"
+        },
+        "element_type": {
+          "description": "Element type (Bus, Branch, Transformer, etc.)",
+          "title": "Element Type",
+          "type": "string"
+        },
+        "values": {
+          "additionalProperties": true,
+          "description": "Analysis-specific result values",
+          "title": "Values",
+          "type": "object"
+        }
+      },
+      "required": [
+        "element_ref",
+        "element_type"
+      ],
+      "title": "ElementResultV1",
+      "type": "object"
+    },
+    "OverlayBadgeV1": {
+      "description": "Badge for overlay element (e.g. readiness issues, validation errors).\n\nLabels MUST be in Polish, no project codenames.",
+      "properties": {
+        "code": {
+          "default": "",
+          "description": "Machine-stable badge code (e.g. 'NOT_READY', 'MISSING_CATALOG')",
+          "title": "Code",
+          "type": "string"
+        },
+        "label": {
+          "description": "Badge label (Polish, e.g. 'NIEGOTOWE', 'BRAK KATALOGU')",
+          "title": "Label",
+          "type": "string"
+        },
+        "severity": {
+          "$ref": "#/$defs/OverlaySeverity",
+          "default": "WARNING",
+          "description": "Badge severity for UI rendering"
+        }
+      },
+      "required": [
+        "label"
+      ],
+      "title": "OverlayBadgeV1",
+      "type": "object"
+    },
+    "OverlayElementKind": {
+      "description": "Kind of element in overlay.",
+      "enum": [
+        "bus",
+        "branch",
+        "device",
+        "substation",
+        "bay",
+        "junction",
+        "corridor",
+        "transformer",
+        "load",
+        "generator",
+        "measurement",
+        "protection_assignment"
+      ],
+      "title": "OverlayElementKind",
+      "type": "string"
+    },
+    "OverlayElementV1": {
+      "description": "Per-element overlay data.\n\nContains badges (readiness/validation), typed metrics (solver),\nand overall severity for UI coloring.",
+      "properties": {
+        "badges": {
+          "description": "Badges from readiness/validation",
+          "items": {
+            "$ref": "#/$defs/OverlayBadgeV1"
+          },
+          "title": "Badges",
+          "type": "array"
+        },
+        "kind": {
+          "$ref": "#/$defs/OverlayElementKind",
+          "description": "Element kind for rendering"
+        },
+        "metrics": {
+          "additionalProperties": {
+            "$ref": "#/$defs/OverlayMetricV1"
+          },
+          "description": "Typed metrics keyed by metric code",
+          "title": "Metrics",
+          "type": "object"
+        },
+        "ref_id": {
+          "description": "Element ref_id (matches ENM)",
+          "title": "Ref Id",
+          "type": "string"
+        },
+        "severity": {
+          "$ref": "#/$defs/OverlaySeverity",
+          "default": "INFO",
+          "description": "Aggregate severity for UI rendering"
+        }
+      },
+      "required": [
+        "ref_id",
+        "kind"
+      ],
+      "title": "OverlayElementV1",
+      "type": "object"
+    },
+    "OverlayLegendEntryV1": {
+      "description": "Single entry in the overlay legend.",
+      "properties": {
+        "description": {
+          "default": "",
+          "description": "Legend description (Polish)",
+          "title": "Description",
+          "type": "string"
+        },
+        "label": {
+          "description": "Legend label (Polish)",
+          "title": "Label",
+          "type": "string"
+        },
+        "severity": {
+          "$ref": "#/$defs/OverlaySeverity"
+        }
+      },
+      "required": [
+        "severity",
+        "label"
+      ],
+      "title": "OverlayLegendEntryV1",
+      "type": "object"
+    },
+    "OverlayLegendV1": {
+      "description": "Legend for overlay rendering.",
+      "properties": {
+        "entries": {
+          "items": {
+            "$ref": "#/$defs/OverlayLegendEntryV1"
+          },
+          "title": "Entries",
+          "type": "array"
+        },
+        "title": {
+          "default": "Legenda wynik\u00f3w",
+          "description": "Legend title (Polish)",
+          "title": "Title",
+          "type": "string"
+        }
+      },
+      "title": "OverlayLegendV1",
+      "type": "object"
+    },
+    "OverlayMetricSource": {
+      "description": "Source of an overlay metric value.",
+      "enum": [
+        "solver",
+        "validation",
+        "readiness"
+      ],
+      "title": "OverlayMetricSource",
+      "type": "string"
+    },
+    "OverlayMetricV1": {
+      "description": "Typed metric for overlay display.\n\nExamples:\n    code=\"U_kV\", value=20.5, unit=\"kV\", format_hint=\"fixed2\", source=\"solver\"\n    code=\"IK_3F_A\", value=12500.0, unit=\"A\", format_hint=\"fixed0\", source=\"solver\"",
+      "properties": {
+        "code": {
+          "description": "Metric code: U_kV, I_A, S_MVA, IK_3F_A, IK_1F_A, P_MW, Q_Mvar, LOADING_PCT, V_PU, ANGLE_DEG",
+          "title": "Code",
+          "type": "string"
+        },
+        "format_hint": {
+          "default": "fixed2",
+          "description": "UI format hint: fixed0, fixed2, fixed4, kilo, percent",
+          "title": "Format Hint",
+          "type": "string"
+        },
+        "source": {
+          "$ref": "#/$defs/OverlayMetricSource",
+          "default": "solver",
+          "description": "Data source: solver, validation, readiness"
+        },
+        "unit": {
+          "description": "Physical unit string (kV, A, MVA, MW, Mvar, %, p.u.)",
+          "title": "Unit",
+          "type": "string"
+        },
+        "value": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "integer"
+            },
+            {
+              "type": "string"
+            }
+          ],
+          "description": "Metric value",
+          "title": "Value"
+        }
+      },
+      "required": [
+        "code",
+        "value",
+        "unit"
+      ],
+      "title": "OverlayMetricV1",
+      "type": "object"
+    },
+    "OverlayPayloadV1": {
+      "description": "Complete overlay payload \u2014 the SOLE source for SLD overlay in PR-16.\n\nINVARIANT: Must work even with sparse solver data.\nMinimum viable: badges + legend (no metrics).",
+      "properties": {
+        "elements": {
+          "additionalProperties": {
+            "$ref": "#/$defs/OverlayElementV1"
+          },
+          "description": "Element overlays keyed by element ref_id",
+          "title": "Elements",
+          "type": "object"
+        },
+        "legend": {
+          "$ref": "#/$defs/OverlayLegendV1",
+          "description": "Overlay legend"
+        },
+        "warnings": {
+          "description": "UI-level warnings (not solver)",
+          "items": {
+            "$ref": "#/$defs/OverlayWarningV1"
+          },
+          "title": "Warnings",
+          "type": "array"
+        }
+      },
+      "title": "OverlayPayloadV1",
+      "type": "object"
+    },
+    "OverlaySeverity": {
+      "description": "Severity levels for overlay elements and badges.",
+      "enum": [
+        "INFO",
+        "WARNING",
+        "IMPORTANT",
+        "BLOCKER"
+      ],
+      "title": "OverlaySeverity",
+      "type": "string"
+    },
+    "OverlayWarningV1": {
+      "description": "UI-level warning in overlay payload.\n\nNOT from solver \u2014 from validation/readiness/builder logic.",
+      "properties": {
+        "code": {
+          "description": "Warning code (e.g. 'W-OVL-001')",
+          "title": "Code",
+          "type": "string"
+        },
+        "element_ref": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Affected element ref_id (optional)",
+          "title": "Element Ref"
+        },
+        "message": {
+          "description": "Warning message (Polish)",
+          "title": "Message",
+          "type": "string"
+        },
+        "severity": {
+          "$ref": "#/$defs/OverlaySeverity",
+          "default": "WARNING"
+        }
+      },
+      "required": [
+        "code",
+        "message"
+      ],
+      "title": "OverlayWarningV1",
+      "type": "object"
+    }
+  },
+  "description": "Canonical Result Set v1 \u2014 FROZEN contract.\n\nThis is the single stable format consumed by:\n- SLD overlay (PR-16) via overlay_payload\n- Results inspector UI\n- Proof Engine (future)\n- Export/reporting (future)\n\nINVARIANTS:\n- contract_version = \"1.0\" (bump = new model)\n- deterministic_signature = SHA-256 of canonical JSON (excludes created_at)\n- overlay_payload is ALWAYS present (may be sparse)\n- element_results sorted by element_ref\n- global_results sorted by key",
+  "properties": {
+    "analysis_type": {
+      "description": "Analysis type: SC_3F, SC_1F, LOAD_FLOW",
+      "title": "Analysis Type",
+      "type": "string"
+    },
+    "contract_version": {
+      "default": "1.0",
+      "description": "Contract version (frozen: 1.0)",
+      "title": "Contract Version",
+      "type": "string"
+    },
+    "created_at": {
+      "default": "",
+      "description": "UTC ISO timestamp (NOT in deterministic signature)",
+      "title": "Created At",
+      "type": "string"
+    },
+    "deterministic_signature": {
+      "default": "",
+      "description": "SHA-256 of canonical JSON (excludes transient fields)",
+      "title": "Deterministic Signature",
+      "type": "string"
+    },
+    "element_results": {
+      "description": "Per-element results (sorted by element_ref)",
+      "items": {
+        "$ref": "#/$defs/ElementResultV1"
+      },
+      "title": "Element Results",
+      "type": "array"
+    },
+    "global_results": {
+      "additionalProperties": true,
+      "description": "Analysis-wide summary values",
+      "title": "Global Results",
+      "type": "object"
+    },
+    "overlay_payload": {
+      "$ref": "#/$defs/OverlayPayloadV1",
+      "description": "Overlay payload for SLD (bridge to PR-16)"
+    },
+    "run_id": {
+      "description": "Run UUID",
+      "title": "Run Id",
+      "type": "string"
+    },
+    "solver_input_hash": {
+      "description": "SHA-256 of canonical solver input",
+      "title": "Solver Input Hash",
+      "type": "string"
+    }
+  },
+  "required": [
+    "run_id",
+    "analysis_type",
+    "solver_input_hash"
+  ],
+  "title": "ResultSetV1",
+  "type": "object"
+}
