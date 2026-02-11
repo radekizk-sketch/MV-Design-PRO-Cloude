@@ -143,13 +143,23 @@ class ExecutionEngineService:
             ) or "Sieć nie jest gotowa"
             raise RunNotReadyError(reason)
 
-        # Gate 2: Eligibility check
-        if eligibility is not None and not eligibility.get("eligible", True):
-            blockers = [
-                b.get("message", "Nieznany bloker")
-                for b in eligibility.get("blockers", [])
-            ]
-            if blockers:
+        # Gate 2: Eligibility check (PR-17: AnalysisEligibilityResult dict)
+        if eligibility is not None:
+            elig_status = eligibility.get("status", "ELIGIBLE")
+            is_eligible = (
+                eligibility.get("eligible", True)
+                if "eligible" in eligibility
+                else elig_status == "ELIGIBLE"
+            )
+            if not is_eligible:
+                blockers = [
+                    b.get("message_pl", b.get("message", "Nieznany bloker"))
+                    for b in eligibility.get("blockers", [])
+                ]
+                if not blockers:
+                    blockers = [
+                        f"Analiza zablokowana (status: {elig_status})"
+                    ]
                 raise RunBlockedError(blockers)
 
         # Freeze solver input (deep copy) and compute hash

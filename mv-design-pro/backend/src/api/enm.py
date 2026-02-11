@@ -45,6 +45,8 @@ from enm.topology_ops import (
 )
 from enm.validator import ENMValidator, ValidationResult
 
+from application.eligibility_service import EligibilityService
+
 from application.network_wizard.schema import (
     ApplyStepResponse,
     CanProceedResponse,
@@ -243,6 +245,39 @@ async def get_engineering_readiness(case_id: str) -> dict[str, Any]:
         "by_severity": by_severity,
         "analysis_available": validation.analysis_available.model_dump(mode="json"),
     }
+
+
+# ---------------------------------------------------------------------------
+# Analysis Eligibility Matrix (PR-17)
+# ---------------------------------------------------------------------------
+
+
+@router.get("/{case_id}/analysis-eligibility")
+async def get_analysis_eligibility(case_id: str) -> dict[str, Any]:
+    """Macierz zdolności uruchomienia analiz (eligibility).
+
+    Dla każdego typu analizy (SC_3F, SC_2F, SC_1F, LOAD_FLOW) zwraca:
+    - status: ELIGIBLE / INELIGIBLE
+    - blockers, warnings, info
+    - fix_actions (deklaratywne sugestie naprawcze)
+    - content_hash (deterministyczny SHA-256)
+
+    Niezależna od walidacji i readiness — osobna warstwa.
+    Deterministyczny: identyczny ENM -> identyczny wynik.
+    """
+    enm = _get_enm(case_id)
+    validator = ENMValidator()
+    validation = validator.validate(enm)
+    readiness = validator.readiness(validation)
+
+    service = EligibilityService()
+    matrix = service.compute_matrix(
+        enm=enm,
+        readiness=readiness,
+        case_id=case_id,
+    )
+
+    return matrix.to_dict()
 
 
 # ---------------------------------------------------------------------------

@@ -268,14 +268,19 @@ export function useIsRunInProgress(): boolean {
 
 /**
  * Hook: Check if the run button should be disabled.
- * Disabled when: no active case, run in progress, or results are FRESH.
+ * Disabled when: no active case, run in progress, readiness not ready,
+ * or eligibility INELIGIBLE for the selected analysis type (PR-17).
  */
-export function useIsRunButtonDisabled(readinessReady: boolean): boolean {
+export function useIsRunButtonDisabled(
+  readinessReady: boolean,
+  analysisEligible?: boolean,
+): boolean {
   const isInProgress = useIsRunInProgress();
   const activeStudyCaseId = useExecutionRunsStore(
     (state) => state.activeStudyCaseId
   );
-  return !activeStudyCaseId || isInProgress || !readinessReady;
+  const eligibilityBlocked = analysisEligible === false;
+  return !activeStudyCaseId || isInProgress || !readinessReady || eligibilityBlocked;
 }
 
 /**
