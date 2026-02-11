@@ -12,6 +12,7 @@ from typing import Literal
 import networkx as nx
 from pydantic import BaseModel
 
+from .fix_actions import FixAction
 from .models import (
     Cable,
     EnergyNetworkModel,
@@ -32,6 +33,7 @@ class ValidationIssue(BaseModel):
     element_refs: list[str] = []
     wizard_step_hint: str = ""
     suggested_fix: str | None = None
+    fix_action: FixAction | None = None
 
 
 class AnalysisAvailability(BaseModel):
@@ -108,6 +110,11 @@ class ENMValidator:
                 message_pl="Brak źródła zasilania w modelu sieci.",
                 wizard_step_hint="K2",
                 suggested_fix="Dodaj źródło zasilania (sieć zewnętrzna lub Thevenin) na szynie głównej.",
+                fix_action=FixAction(
+                    action_type="ADD_MISSING_DEVICE",
+                    modal_type="SourceModal",
+                    payload_hint={"required": "source"},
+                ),
             ))
 
         # E002: Brak szyn
@@ -118,6 +125,11 @@ class ENMValidator:
                 message_pl="Brak szyn (węzłów) w modelu sieci.",
                 wizard_step_hint="K3",
                 suggested_fix="Dodaj przynajmniej jedną szynę w kroku K2 lub K3.",
+                fix_action=FixAction(
+                    action_type="ADD_MISSING_DEVICE",
+                    modal_type="NodeModal",
+                    payload_hint={"required": "bus"},
+                ),
             ))
 
         # E003: Graf niespójny (wyspy odcięte od źródła)
@@ -134,6 +146,12 @@ class ENMValidator:
                     element_refs=[bus.ref_id],
                     wizard_step_hint="K3",
                     suggested_fix=f"Ustaw napięcie znamionowe szyny '{bus.name}'.",
+                    fix_action=FixAction(
+                        action_type="OPEN_MODAL",
+                        element_ref=bus.ref_id,
+                        modal_type="NodeModal",
+                        payload_hint={"required": "voltage_kv"},
+                    ),
                 ))
 
         # E005: Gałąź bez impedancji
@@ -150,6 +168,12 @@ class ENMValidator:
                         element_refs=[branch.ref_id],
                         wizard_step_hint="K4",
                         suggested_fix=f"Wprowadź parametry impedancji gałęzi '{branch.name}'.",
+                        fix_action=FixAction(
+                            action_type="OPEN_MODAL",
+                            element_ref=branch.ref_id,
+                            modal_type="BranchModal",
+                            payload_hint={"required": "impedance"},
+                        ),
                     ))
 
         # E006: Transformator bez napięcia zwarcia
@@ -164,6 +188,12 @@ class ENMValidator:
                     element_refs=[trafo.ref_id],
                     wizard_step_hint="K5",
                     suggested_fix=f"Wprowadź uk% transformatora '{trafo.name}'.",
+                    fix_action=FixAction(
+                        action_type="OPEN_MODAL",
+                        element_ref=trafo.ref_id,
+                        modal_type="TransformerModal",
+                        payload_hint={"required": "uk_percent"},
+                    ),
                 ))
 
         # E007: Transformator hv = lv
@@ -179,6 +209,12 @@ class ENMValidator:
                     element_refs=[trafo.ref_id],
                     wizard_step_hint="K5",
                     suggested_fix="Podłącz strony HV i LV do różnych szyn.",
+                    fix_action=FixAction(
+                        action_type="OPEN_MODAL",
+                        element_ref=trafo.ref_id,
+                        modal_type="TransformerModal",
+                        payload_hint={"required": "bus_assignment"},
+                    ),
                 ))
 
         # E008: Źródło bez parametrów zwarciowych
@@ -204,6 +240,12 @@ class ENMValidator:
                         f"Wprowadź moc zwarciową Sk'' lub impedancję R+jX "
                         f"źródła '{source.name}'."
                     ),
+                    fix_action=FixAction(
+                        action_type="OPEN_MODAL",
+                        element_ref=source.ref_id,
+                        modal_type="SourceModal",
+                        payload_hint={"required": "short_circuit_params"},
+                    ),
                 ))
 
         # E009: Brak referencji katalogowej (CATALOG-FIRST)
@@ -219,6 +261,12 @@ class ENMValidator:
                     element_refs=[branch.ref_id],
                     wizard_step_hint="K4",
                     suggested_fix="Przypisz element z katalogu i zapisz catalog_ref.",
+                    fix_action=FixAction(
+                        action_type="SELECT_CATALOG",
+                        element_ref=branch.ref_id,
+                        modal_type="BranchModal",
+                        payload_hint={"required": "catalog_ref"},
+                    ),
                 ))
 
         for trafo in enm.transformers:
@@ -233,6 +281,12 @@ class ENMValidator:
                     element_refs=[trafo.ref_id],
                     wizard_step_hint="K5",
                     suggested_fix="Przypisz transformator z katalogu i zapisz catalog_ref.",
+                    fix_action=FixAction(
+                        action_type="SELECT_CATALOG",
+                        element_ref=trafo.ref_id,
+                        modal_type="TransformerModal",
+                        payload_hint={"required": "catalog_ref"},
+                    ),
                 ))
 
     # ------------------------------------------------------------------
@@ -254,6 +308,12 @@ class ENMValidator:
                         element_refs=[branch.ref_id],
                         wizard_step_hint="K7",
                         suggested_fix="Wprowadź parametry R₀/X₀ w kroku K7.",
+                        fix_action=FixAction(
+                            action_type="OPEN_MODAL",
+                            element_ref=branch.ref_id,
+                            modal_type="BranchModal",
+                            payload_hint={"required": "zero_sequence"},
+                        ),
                     ))
 
         # W002: Brak Z₀ źródła
@@ -273,6 +333,12 @@ class ENMValidator:
                     element_refs=[source.ref_id],
                     wizard_step_hint="K2",
                     suggested_fix="Wprowadź parametry R₀/X₀ lub Z₀/Z₁ źródła.",
+                    fix_action=FixAction(
+                        action_type="OPEN_MODAL",
+                        element_ref=source.ref_id,
+                        modal_type="SourceModal",
+                        payload_hint={"required": "zero_sequence"},
+                    ),
                 ))
 
         # W003: Brak odbiorów/generacji
@@ -283,6 +349,11 @@ class ENMValidator:
                 message_pl="Brak odbiorów i generatorów — rozpływ mocy będzie pusty.",
                 wizard_step_hint="K6",
                 suggested_fix="Dodaj odbiory lub generatory w kroku K6.",
+                fix_action=FixAction(
+                    action_type="ADD_MISSING_DEVICE",
+                    modal_type="LoadModal",
+                    payload_hint={"required": "load_or_generator"},
+                ),
             ))
 
         # W004: Transformator bez grupy połączeń
@@ -298,6 +369,12 @@ class ENMValidator:
                     element_refs=[trafo.ref_id],
                     wizard_step_hint="K5",
                     suggested_fix="Wprowadź grupę połączeń (np. Dyn11).",
+                    fix_action=FixAction(
+                        action_type="OPEN_MODAL",
+                        element_ref=trafo.ref_id,
+                        modal_type="TransformerModal",
+                        payload_hint={"required": "vector_group"},
+                    ),
                 ))
 
     # ------------------------------------------------------------------
@@ -332,6 +409,11 @@ class ENMValidator:
                     element_refs=[elem.ref_id],
                     wizard_step_hint="K4",
                     suggested_fix="Ustaw parameter_source='OVERRIDE' lub usuń overrides.",
+                    fix_action=FixAction(
+                        action_type="NAVIGATE_TO_ELEMENT",
+                        element_ref=elem.ref_id,
+                        payload_hint={"required": "parameter_source"},
+                    ),
                 ))
 
     # ------------------------------------------------------------------
