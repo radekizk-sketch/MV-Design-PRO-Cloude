@@ -443,7 +443,7 @@ class FaultScenarioService:
                 AnalysisEligibilityIssue(
                     code="ELIG_SC2F_NO_Z2",
                     severity=IssueSeverity.BLOCKER,
-                    message_pl="Brak danych impedancji składowej przeciwnej — wymagane dla zwarcia dwufazowego",
+                    message_pl="Brak danych impedancji składowej przeciwnej (Z2) — wymagane dla zwarcia dwufazowego",
                     element_ref=scenario.location.element_ref,
                     element_type=scenario.location.location_type,
                     fix_action=FixAction(

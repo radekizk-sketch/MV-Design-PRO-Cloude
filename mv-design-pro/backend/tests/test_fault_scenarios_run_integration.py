@@ -128,9 +128,7 @@ class TestGoldenFixture:
 
     def test_golden_hash_determinism(self):
         """Two scenarios with same content have same content_hash."""
-        s1 = _create_scenario(name="Hash A", fault_type="SC_3F", element_ref="bus-1")
-        s2 = _create_scenario(name="Hash A", fault_type="SC_3F", element_ref="bus-1")
-        # They can't be created due to duplicate check, so test via domain
+        # Duplicate creation via API returns 409, so test via domain directly
         from domain.fault_scenario import (
             FaultLocation, FaultType, compute_scenario_content_hash, new_fault_scenario
         )

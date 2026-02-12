@@ -17,6 +17,8 @@ INVARIANTS UNDER TEST:
 - BUS position must be None
 - Deterministic sorting
 - No auto-completion
+
+PR-24 FIX: All calls pass required `name` parameter.
 """
 
 from __future__ import annotations
@@ -65,6 +67,9 @@ from network_model.core.ybus import AdmittanceMatrixBuilder
 
 MOCK_PROJECT_ID = uuid4()
 MOCK_CASE_ID = uuid4()
+
+# Default test scenario name (Polish, user-facing).
+DEFAULT_NAME = "Zwarcie testowe"
 
 
 def _create_golden_graph() -> NetworkGraph:
@@ -193,6 +198,7 @@ class TestFaultScenarioDomain:
         """FaultScenario is immutable."""
         scenario = new_fault_scenario(
             study_case_id=MOCK_CASE_ID,
+            name=DEFAULT_NAME,
             fault_type=FaultType.SC_3F,
             location=FaultLocation(element_ref="BUS_1", location_type="BUS"),
         )
@@ -203,6 +209,7 @@ class TestFaultScenarioDomain:
         """analysis_type is derived from fault_type."""
         scenario = new_fault_scenario(
             study_case_id=MOCK_CASE_ID,
+            name=DEFAULT_NAME,
             fault_type=FaultType.SC_3F,
             location=FaultLocation(element_ref="BUS_1", location_type="BUS"),
         )
@@ -212,6 +219,7 @@ class TestFaultScenarioDomain:
         """FaultScenario to_dict/from_dict roundtrip."""
         scenario = new_fault_scenario(
             study_case_id=MOCK_CASE_ID,
+            name=DEFAULT_NAME,
             fault_type=FaultType.SC_3F,
             location=FaultLocation(element_ref="BUS_MV", location_type="BUS"),
             config=ShortCircuitConfig(c_factor=1.05),
@@ -238,11 +246,13 @@ class TestContentHashDeterminism:
         cfg = ShortCircuitConfig(c_factor=1.10)
 
         s1 = new_fault_scenario(
-            study_case_id=MOCK_CASE_ID, fault_type=FaultType.SC_3F,
+            study_case_id=MOCK_CASE_ID, name="Hash test",
+            fault_type=FaultType.SC_3F,
             location=loc, config=cfg,
         )
         s2 = new_fault_scenario(
-            study_case_id=MOCK_CASE_ID, fault_type=FaultType.SC_3F,
+            study_case_id=MOCK_CASE_ID, name="Hash test",
+            fault_type=FaultType.SC_3F,
             location=loc, config=cfg,
         )
         assert s1.content_hash == s2.content_hash
@@ -251,11 +261,13 @@ class TestContentHashDeterminism:
         """Different fault_type → different content_hash."""
         loc = FaultLocation(element_ref="BUS_1", location_type="BUS")
         s1 = new_fault_scenario(
-            study_case_id=MOCK_CASE_ID, fault_type=FaultType.SC_3F,
+            study_case_id=MOCK_CASE_ID, name=DEFAULT_NAME,
+            fault_type=FaultType.SC_3F,
             location=loc,
         )
         s2 = new_fault_scenario(
-            study_case_id=MOCK_CASE_ID, fault_type=FaultType.SC_2F,
+            study_case_id=MOCK_CASE_ID, name=DEFAULT_NAME,
+            fault_type=FaultType.SC_2F,
             location=loc,
         )
         assert s1.content_hash != s2.content_hash
@@ -263,11 +275,13 @@ class TestContentHashDeterminism:
     def test_different_location_different_hash(self):
         """Different location → different content_hash."""
         s1 = new_fault_scenario(
-            study_case_id=MOCK_CASE_ID, fault_type=FaultType.SC_3F,
+            study_case_id=MOCK_CASE_ID, name=DEFAULT_NAME,
+            fault_type=FaultType.SC_3F,
             location=FaultLocation(element_ref="BUS_1", location_type="BUS"),
         )
         s2 = new_fault_scenario(
-            study_case_id=MOCK_CASE_ID, fault_type=FaultType.SC_3F,
+            study_case_id=MOCK_CASE_ID, name=DEFAULT_NAME,
+            fault_type=FaultType.SC_3F,
             location=FaultLocation(element_ref="BUS_2", location_type="BUS"),
         )
         assert s1.content_hash != s2.content_hash
@@ -276,11 +290,13 @@ class TestContentHashDeterminism:
         """Different config → different content_hash."""
         loc = FaultLocation(element_ref="BUS_1", location_type="BUS")
         s1 = new_fault_scenario(
-            study_case_id=MOCK_CASE_ID, fault_type=FaultType.SC_3F,
+            study_case_id=MOCK_CASE_ID, name=DEFAULT_NAME,
+            fault_type=FaultType.SC_3F,
             location=loc, config=ShortCircuitConfig(c_factor=1.10),
         )
         s2 = new_fault_scenario(
-            study_case_id=MOCK_CASE_ID, fault_type=FaultType.SC_3F,
+            study_case_id=MOCK_CASE_ID, name=DEFAULT_NAME,
+            fault_type=FaultType.SC_3F,
             location=loc, config=ShortCircuitConfig(c_factor=1.05),
         )
         assert s1.content_hash != s2.content_hash
@@ -288,7 +304,8 @@ class TestContentHashDeterminism:
     def test_hash_is_sha256(self):
         """Content hash is a valid SHA-256 hex string."""
         scenario = new_fault_scenario(
-            study_case_id=MOCK_CASE_ID, fault_type=FaultType.SC_3F,
+            study_case_id=MOCK_CASE_ID, name=DEFAULT_NAME,
+            fault_type=FaultType.SC_3F,
             location=FaultLocation(element_ref="B1", location_type="BUS"),
         )
         assert len(scenario.content_hash) == 64
@@ -297,7 +314,8 @@ class TestContentHashDeterminism:
     def test_hash_recompute_matches(self):
         """Recomputed hash matches stored hash."""
         scenario = new_fault_scenario(
-            study_case_id=MOCK_CASE_ID, fault_type=FaultType.SC_3F,
+            study_case_id=MOCK_CASE_ID, name=DEFAULT_NAME,
+            fault_type=FaultType.SC_3F,
             location=FaultLocation(element_ref="B1", location_type="BUS"),
         )
         assert compute_scenario_content_hash(scenario) == scenario.content_hash
@@ -306,10 +324,12 @@ class TestContentHashDeterminism:
         """study_case_id does NOT affect content_hash (same physics)."""
         loc = FaultLocation(element_ref="B1", location_type="BUS")
         s1 = new_fault_scenario(
-            study_case_id=uuid4(), fault_type=FaultType.SC_3F, location=loc,
+            study_case_id=uuid4(), name=DEFAULT_NAME,
+            fault_type=FaultType.SC_3F, location=loc,
         )
         s2 = new_fault_scenario(
-            study_case_id=uuid4(), fault_type=FaultType.SC_3F, location=loc,
+            study_case_id=uuid4(), name=DEFAULT_NAME,
+            fault_type=FaultType.SC_3F, location=loc,
         )
         assert s1.content_hash == s2.content_hash
 
@@ -326,7 +346,7 @@ class TestValidation:
         """SC_1F without z0_bus_data raises FaultScenarioValidationError."""
         with pytest.raises(FaultScenarioValidationError, match="impedancji zerowej"):
             new_fault_scenario(
-                study_case_id=MOCK_CASE_ID,
+                study_case_id=MOCK_CASE_ID, name=DEFAULT_NAME,
                 fault_type=FaultType.SC_1F,
                 location=FaultLocation(element_ref="BUS_1", location_type="BUS"),
             )
@@ -334,7 +354,7 @@ class TestValidation:
     def test_sc_1f_with_z0_passes(self):
         """SC_1F with z0_bus_data passes validation."""
         scenario = new_fault_scenario(
-            study_case_id=MOCK_CASE_ID,
+            study_case_id=MOCK_CASE_ID, name=DEFAULT_NAME,
             fault_type=FaultType.SC_1F,
             location=FaultLocation(element_ref="BUS_1", location_type="BUS"),
             z0_bus_data={"z0_11": 1.0},
@@ -346,7 +366,7 @@ class TestValidation:
         """BUS location with position raises."""
         with pytest.raises(FaultScenarioValidationError, match="BUS nie może mieć pozycji"):
             new_fault_scenario(
-                study_case_id=MOCK_CASE_ID,
+                study_case_id=MOCK_CASE_ID, name=DEFAULT_NAME,
                 fault_type=FaultType.SC_3F,
                 location=FaultLocation(element_ref="B1", location_type="BUS", position=0.5),
             )
@@ -355,7 +375,7 @@ class TestValidation:
         """BRANCH location without position raises."""
         with pytest.raises(FaultScenarioValidationError, match="wymaga pozycji"):
             new_fault_scenario(
-                study_case_id=MOCK_CASE_ID,
+                study_case_id=MOCK_CASE_ID, name=DEFAULT_NAME,
                 fault_type=FaultType.SC_3F,
                 location=FaultLocation(element_ref="C1", location_type="BRANCH"),
             )
@@ -364,7 +384,7 @@ class TestValidation:
         """BRANCH position outside (0,1) raises."""
         with pytest.raises(FaultScenarioValidationError, match="zakresie"):
             new_fault_scenario(
-                study_case_id=MOCK_CASE_ID,
+                study_case_id=MOCK_CASE_ID, name=DEFAULT_NAME,
                 fault_type=FaultType.SC_3F,
                 location=FaultLocation(element_ref="C1", location_type="BRANCH", position=0.0),
             )
@@ -373,7 +393,7 @@ class TestValidation:
         """BRANCH position = 1.0 raises (must be strictly < 1)."""
         with pytest.raises(FaultScenarioValidationError, match="zakresie"):
             new_fault_scenario(
-                study_case_id=MOCK_CASE_ID,
+                study_case_id=MOCK_CASE_ID, name=DEFAULT_NAME,
                 fault_type=FaultType.SC_3F,
                 location=FaultLocation(element_ref="C1", location_type="BRANCH", position=1.0),
             )
@@ -381,7 +401,7 @@ class TestValidation:
     def test_branch_valid_position_passes(self):
         """BRANCH location with valid position passes."""
         scenario = new_fault_scenario(
-            study_case_id=MOCK_CASE_ID,
+            study_case_id=MOCK_CASE_ID, name=DEFAULT_NAME,
             fault_type=FaultType.SC_3F,
             location=FaultLocation(element_ref="C1", location_type="BRANCH", position=0.5),
         )
@@ -391,7 +411,7 @@ class TestValidation:
         """Negative c_factor raises."""
         with pytest.raises(FaultScenarioValidationError, match="c_factor"):
             new_fault_scenario(
-                study_case_id=MOCK_CASE_ID,
+                study_case_id=MOCK_CASE_ID, name=DEFAULT_NAME,
                 fault_type=FaultType.SC_3F,
                 location=FaultLocation(element_ref="B1", location_type="BUS"),
                 config=ShortCircuitConfig(c_factor=-1.0),
@@ -401,7 +421,7 @@ class TestValidation:
         """Zero thermal_time_seconds raises."""
         with pytest.raises(FaultScenarioValidationError, match="thermal_time"):
             new_fault_scenario(
-                study_case_id=MOCK_CASE_ID,
+                study_case_id=MOCK_CASE_ID, name=DEFAULT_NAME,
                 fault_type=FaultType.SC_3F,
                 location=FaultLocation(element_ref="B1", location_type="BUS"),
                 config=ShortCircuitConfig(thermal_time_seconds=0.0),
@@ -410,7 +430,7 @@ class TestValidation:
     def test_sc_3f_no_z0_passes(self):
         """SC_3F does not require z0_bus_data."""
         scenario = new_fault_scenario(
-            study_case_id=MOCK_CASE_ID,
+            study_case_id=MOCK_CASE_ID, name=DEFAULT_NAME,
             fault_type=FaultType.SC_3F,
             location=FaultLocation(element_ref="B1", location_type="BUS"),
         )
@@ -430,6 +450,7 @@ class TestFaultScenarioService:
         service = FaultScenarioService()
         scenario = service.create_scenario(
             study_case_id=MOCK_CASE_ID,
+            name=DEFAULT_NAME,
             fault_type="SC_3F",
             location={"element_ref": "BUS_MV", "location_type": "BUS"},
         )
@@ -444,16 +465,19 @@ class TestFaultScenarioService:
         service = FaultScenarioService()
         service.create_scenario(
             study_case_id=MOCK_CASE_ID,
+            name="Scenariusz B",
             fault_type="SC_2F",
             location={"element_ref": "BUS_B", "location_type": "BUS"},
         )
         service.create_scenario(
             study_case_id=MOCK_CASE_ID,
+            name="Scenariusz A",
             fault_type="SC_3F",
             location={"element_ref": "BUS_A", "location_type": "BUS"},
         )
         service.create_scenario(
             study_case_id=MOCK_CASE_ID,
+            name="Scenariusz C",
             fault_type="SC_2F",
             location={"element_ref": "BUS_A", "location_type": "BUS"},
         )
@@ -467,6 +491,7 @@ class TestFaultScenarioService:
         service = FaultScenarioService()
         scenario = service.create_scenario(
             study_case_id=MOCK_CASE_ID,
+            name=DEFAULT_NAME,
             fault_type="SC_3F",
             location={"element_ref": "BUS_MV", "location_type": "BUS"},
         )
@@ -486,12 +511,14 @@ class TestFaultScenarioService:
         service = FaultScenarioService()
         service.create_scenario(
             study_case_id=MOCK_CASE_ID,
+            name=DEFAULT_NAME,
             fault_type="SC_3F",
             location={"element_ref": "BUS_MV", "location_type": "BUS"},
         )
         with pytest.raises(FaultScenarioDuplicateError):
             service.create_scenario(
                 study_case_id=MOCK_CASE_ID,
+                name=DEFAULT_NAME,
                 fault_type="SC_3F",
                 location={"element_ref": "BUS_MV", "location_type": "BUS"},
             )
@@ -501,6 +528,7 @@ class TestFaultScenarioService:
         service = FaultScenarioService()
         scenario = service.create_scenario(
             study_case_id=MOCK_CASE_ID,
+            name=DEFAULT_NAME,
             fault_type="SC_3F",
             location={"element_ref": "BUS_MV", "location_type": "BUS"},
         )
@@ -512,6 +540,7 @@ class TestFaultScenarioService:
         service = FaultScenarioService()
         scenario = service.create_scenario(
             study_case_id=MOCK_CASE_ID,
+            name=DEFAULT_NAME,
             fault_type="SC_3F",
             location={"element_ref": "BUS_MV", "location_type": "BUS"},
         )
@@ -527,6 +556,7 @@ class TestFaultScenarioService:
         service = FaultScenarioService()
         scenario = service.create_scenario(
             study_case_id=MOCK_CASE_ID,
+            name=DEFAULT_NAME,
             fault_type="SC_3F",
             location={"element_ref": "BUS_MV", "location_type": "BUS"},
             config={"c_factor": 0.95, "thermal_time_seconds": 2.0},
@@ -550,6 +580,7 @@ class TestExecutionEngineScenarioIntegration:
 
         scenario = new_fault_scenario(
             study_case_id=case.id,
+            name="Zwarcie 3F — BUS_MV",
             fault_type=FaultType.SC_3F,
             location=FaultLocation(element_ref="BUS_MV", location_type="BUS"),
         )
@@ -580,6 +611,7 @@ class TestExecutionEngineScenarioIntegration:
 
         scenario = new_fault_scenario(
             study_case_id=case.id,
+            name="Zwarcie 2F — BUS_MV",
             fault_type=FaultType.SC_2F,
             location=FaultLocation(element_ref="BUS_MV", location_type="BUS"),
         )
@@ -613,6 +645,7 @@ class TestExecutionEngineScenarioIntegration:
 
         scenario = new_fault_scenario(
             study_case_id=case.id,
+            name="Zwarcie 1F — BUS_MV",
             fault_type=FaultType.SC_1F,
             location=FaultLocation(element_ref="BUS_MV", location_type="BUS"),
             z0_bus_data={"placeholder": True},
@@ -641,6 +674,7 @@ class TestExecutionEngineScenarioIntegration:
         graph = _create_golden_graph()
         scenario = new_fault_scenario(
             study_case_id=MOCK_CASE_ID,
+            name="Determinizm — BUS_MV",
             fault_type=FaultType.SC_3F,
             location=FaultLocation(element_ref="BUS_MV", location_type="BUS"),
         )
@@ -677,11 +711,13 @@ class TestExecutionEngineScenarioIntegration:
         graph = _create_golden_graph()
 
         scenario_3f = new_fault_scenario(
-            study_case_id=MOCK_CASE_ID, fault_type=FaultType.SC_3F,
+            study_case_id=MOCK_CASE_ID, name="Porównanie 3F",
+            fault_type=FaultType.SC_3F,
             location=FaultLocation(element_ref="BUS_MV", location_type="BUS"),
         )
         scenario_2f = new_fault_scenario(
-            study_case_id=MOCK_CASE_ID, fault_type=FaultType.SC_2F,
+            study_case_id=MOCK_CASE_ID, name="Porównanie 2F",
+            fault_type=FaultType.SC_2F,
             location=FaultLocation(element_ref="BUS_MV", location_type="BUS"),
         )
 
@@ -739,8 +775,9 @@ class TestFaultScenarioApi:
         """POST creates a fault scenario."""
         case_id = str(uuid4())
         response = client.post(
-            f"/api/study-cases/{case_id}/fault-scenarios",
+            f"/api/execution/study-cases/{case_id}/fault-scenarios",
             json={
+                "name": DEFAULT_NAME,
                 "fault_type": "SC_3F",
                 "location": {
                     "element_ref": "BUS_MV",
@@ -752,14 +789,40 @@ class TestFaultScenarioApi:
         data = response.json()
         assert data["fault_type"] == "SC_3F"
         assert data["analysis_type"] == "SC_3F"
+        assert data["name"] == DEFAULT_NAME
         assert data["location"]["element_ref"] == "BUS_MV"
         assert len(data["content_hash"]) == 64
+
+    def test_create_scenario_missing_name_returns_422(self, client):
+        """POST without name returns 422 (Pydantic validation)."""
+        response = client.post(
+            f"/api/execution/study-cases/{uuid4()}/fault-scenarios",
+            json={
+                "fault_type": "SC_3F",
+                "location": {"element_ref": "B1", "location_type": "BUS"},
+            },
+        )
+        assert response.status_code == 422
+
+    def test_create_scenario_empty_name_returns_422(self, client):
+        """POST with empty name returns 422 (domain validation)."""
+        response = client.post(
+            f"/api/execution/study-cases/{uuid4()}/fault-scenarios",
+            json={
+                "name": "",
+                "fault_type": "SC_3F",
+                "location": {"element_ref": "B1", "location_type": "BUS"},
+            },
+        )
+        assert response.status_code == 422
+        assert "Nazwa scenariusza" in response.json()["detail"]
 
     def test_create_scenario_invalid_fault_type(self, client):
         """POST with invalid fault_type returns 400."""
         response = client.post(
-            f"/api/study-cases/{uuid4()}/fault-scenarios",
+            f"/api/execution/study-cases/{uuid4()}/fault-scenarios",
             json={
+                "name": DEFAULT_NAME,
                 "fault_type": "INVALID",
                 "location": {"element_ref": "B1", "location_type": "BUS"},
             },
@@ -769,8 +832,9 @@ class TestFaultScenarioApi:
     def test_create_scenario_sc1f_no_z0_returns_422(self, client):
         """POST SC_1F without z0_bus_data returns 422."""
         response = client.post(
-            f"/api/study-cases/{uuid4()}/fault-scenarios",
+            f"/api/execution/study-cases/{uuid4()}/fault-scenarios",
             json={
+                "name": DEFAULT_NAME,
                 "fault_type": "SC_1F",
                 "location": {"element_ref": "B1", "location_type": "BUS"},
             },
@@ -781,8 +845,9 @@ class TestFaultScenarioApi:
     def test_create_scenario_branch_no_position_returns_422(self, client):
         """POST BRANCH without position returns 422."""
         response = client.post(
-            f"/api/study-cases/{uuid4()}/fault-scenarios",
+            f"/api/execution/study-cases/{uuid4()}/fault-scenarios",
             json={
+                "name": DEFAULT_NAME,
                 "fault_type": "SC_3F",
                 "location": {"element_ref": "C1", "location_type": "BRANCH"},
             },
@@ -791,7 +856,7 @@ class TestFaultScenarioApi:
 
     def test_list_scenarios_empty(self, client):
         """GET returns empty list for new case."""
-        response = client.get(f"/api/study-cases/{uuid4()}/fault-scenarios")
+        response = client.get(f"/api/execution/study-cases/{uuid4()}/fault-scenarios")
         assert response.status_code == 200
         data = response.json()
         assert data["scenarios"] == []
@@ -801,21 +866,23 @@ class TestFaultScenarioApi:
         """GET returns created scenarios."""
         case_id = str(uuid4())
         client.post(
-            f"/api/study-cases/{case_id}/fault-scenarios",
+            f"/api/execution/study-cases/{case_id}/fault-scenarios",
             json={
+                "name": "Scenariusz A",
                 "fault_type": "SC_3F",
                 "location": {"element_ref": "BUS_A", "location_type": "BUS"},
             },
         )
         client.post(
-            f"/api/study-cases/{case_id}/fault-scenarios",
+            f"/api/execution/study-cases/{case_id}/fault-scenarios",
             json={
+                "name": "Scenariusz B",
                 "fault_type": "SC_2F",
                 "location": {"element_ref": "BUS_B", "location_type": "BUS"},
             },
         )
 
-        response = client.get(f"/api/study-cases/{case_id}/fault-scenarios")
+        response = client.get(f"/api/execution/study-cases/{case_id}/fault-scenarios")
         assert response.status_code == 200
         data = response.json()
         assert data["count"] == 2
@@ -824,39 +891,42 @@ class TestFaultScenarioApi:
         """DELETE removes a scenario."""
         case_id = str(uuid4())
         create_resp = client.post(
-            f"/api/study-cases/{case_id}/fault-scenarios",
+            f"/api/execution/study-cases/{case_id}/fault-scenarios",
             json={
+                "name": DEFAULT_NAME,
                 "fault_type": "SC_3F",
                 "location": {"element_ref": "BUS_A", "location_type": "BUS"},
             },
         )
         scenario_id = create_resp.json()["scenario_id"]
 
-        delete_resp = client.delete(f"/api/fault-scenarios/{scenario_id}")
+        delete_resp = client.delete(f"/api/execution/fault-scenarios/{scenario_id}")
         assert delete_resp.status_code == 204
 
         # Verify gone
-        list_resp = client.get(f"/api/study-cases/{case_id}/fault-scenarios")
+        list_resp = client.get(f"/api/execution/study-cases/{case_id}/fault-scenarios")
         assert list_resp.json()["count"] == 0
 
     def test_delete_scenario_not_found(self, client):
         """DELETE nonexistent scenario returns 404."""
-        response = client.delete(f"/api/fault-scenarios/{uuid4()}")
+        response = client.delete(f"/api/execution/fault-scenarios/{uuid4()}")
         assert response.status_code == 404
 
     def test_duplicate_scenario_returns_409(self, client):
         """POST duplicate scenario returns 409."""
         case_id = str(uuid4())
         client.post(
-            f"/api/study-cases/{case_id}/fault-scenarios",
+            f"/api/execution/study-cases/{case_id}/fault-scenarios",
             json={
+                "name": DEFAULT_NAME,
                 "fault_type": "SC_3F",
                 "location": {"element_ref": "BUS_A", "location_type": "BUS"},
             },
         )
         response = client.post(
-            f"/api/study-cases/{case_id}/fault-scenarios",
+            f"/api/execution/study-cases/{case_id}/fault-scenarios",
             json={
+                "name": DEFAULT_NAME,
                 "fault_type": "SC_3F",
                 "location": {"element_ref": "BUS_A", "location_type": "BUS"},
             },
