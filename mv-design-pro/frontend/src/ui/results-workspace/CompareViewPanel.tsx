@@ -179,7 +179,7 @@ function DeltaTable({
       allKeys.add(key);
     }
   }
-  const sortedKeys = Array.from(allKeys).sort();
+  const sortedKeys = Array.from(allKeys).sort((a, b) => a.localeCompare(b));
 
   return (
     <section className="mb-6" data-testid={testId}>

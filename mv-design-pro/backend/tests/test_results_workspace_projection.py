@@ -16,12 +16,15 @@ from domain.execution import Run, RunStatus, ExecutionAnalysisType
 from domain.batch_job import BatchJob, BatchJobStatus
 from application.read_models.results_workspace_projection import (
     build_workspace_projection,
+    compute_projection_hash,
     map_run_to_summary,
     map_batch_to_summary,
     RunSummary,
     BatchSummary,
     ComparisonSummary,
     ResultsWorkspaceProjection,
+    ProjectionMetadata,
+    PROJECTION_VERSION,
 )
 
 
@@ -288,9 +291,18 @@ class TestBuildWorkspaceProjection:
         assert "comparisons" in d
         assert "latest_done_run_id" in d
         assert "deterministic_hash" in d
+        assert "content_hash" in d
+        assert "source_run_ids" in d
+        assert "source_batch_ids" in d
+        assert "source_comparison_ids" in d
+        assert "metadata" in d
         assert isinstance(d["runs"], list)
         assert isinstance(d["batches"], list)
         assert isinstance(d["comparisons"], list)
+        assert isinstance(d["source_run_ids"], list)
+        assert isinstance(d["source_batch_ids"], list)
+        assert isinstance(d["source_comparison_ids"], list)
+        assert isinstance(d["metadata"], dict)
 
 
 # ---------------------------------------------------------------------------

@@ -24,6 +24,11 @@ vi.mock('../api', () => ({
     comparisons: [],
     latest_done_run_id: null,
     deterministic_hash: 'a'.repeat(64),
+    content_hash: 'a'.repeat(64),
+    source_run_ids: [],
+    source_batch_ids: [],
+    source_comparison_ids: [],
+    metadata: { projection_version: '1.0.0', created_utc: '2025-01-15T10:00:00Z' },
   }),
 }));
 
@@ -140,6 +145,11 @@ describe('ResultsWorkspacePage', () => {
         comparisons: [],
         latest_done_run_id: null,
         deterministic_hash: 'a'.repeat(64),
+    content_hash: 'a'.repeat(64),
+    source_run_ids: [],
+    source_batch_ids: [],
+    source_comparison_ids: [],
+    metadata: { projection_version: '1.0.0', created_utc: '2025-01-15T10:00:00Z' },
       },
     });
 
@@ -162,6 +172,11 @@ describe('ResultsWorkspacePage', () => {
         comparisons: [],
         latest_done_run_id: null,
         deterministic_hash: 'b'.repeat(64),
+        content_hash: 'b'.repeat(64),
+        source_run_ids: [],
+        source_batch_ids: [],
+        source_comparison_ids: [],
+        metadata: { projection_version: '1.0.0', created_utc: '2025-01-15T10:00:00Z' },
       },
     });
 
@@ -181,6 +196,11 @@ describe('ResultsWorkspacePage', () => {
         comparisons: [],
         latest_done_run_id: null,
         deterministic_hash: 'c'.repeat(64),
+        content_hash: 'c'.repeat(64),
+        source_run_ids: [],
+        source_batch_ids: [],
+        source_comparison_ids: [],
+        metadata: { projection_version: '1.0.0', created_utc: '2025-01-15T10:00:00Z' },
       },
     });
 
@@ -200,6 +220,11 @@ describe('ResultsWorkspacePage', () => {
         comparisons: [],
         latest_done_run_id: null,
         deterministic_hash: 'd'.repeat(64),
+        content_hash: 'd'.repeat(64),
+        source_run_ids: [],
+        source_batch_ids: [],
+        source_comparison_ids: [],
+        metadata: { projection_version: '1.0.0', created_utc: '2025-01-15T10:00:00Z' },
       },
     });
 
@@ -225,6 +250,11 @@ describe('ResultsWorkspacePage', () => {
         comparisons: [],
         latest_done_run_id: null,
         deterministic_hash: 'e'.repeat(64),
+        content_hash: 'e'.repeat(64),
+        source_run_ids: [],
+        source_batch_ids: [],
+        source_comparison_ids: [],
+        metadata: { projection_version: '1.0.0', created_utc: '2025-01-15T10:00:00Z' },
       },
     });
 

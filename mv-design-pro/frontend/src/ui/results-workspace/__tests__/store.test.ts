@@ -80,6 +80,14 @@ function makeProjection(
     comparisons: [makeComparisonSummary()],
     latest_done_run_id: 'run-1',
     deterministic_hash: 'a'.repeat(64),
+    content_hash: 'a'.repeat(64),
+    source_run_ids: ['run-1'],
+    source_batch_ids: ['batch-1'],
+    source_comparison_ids: ['cmp-1'],
+    metadata: {
+      projection_version: '1.0.0',
+      created_utc: '2025-01-15T10:00:00Z',
+    },
     ...overrides,
   };
 }

@@ -1,5 +1,5 @@
 /**
- * Results Workspace Store — PR-22 (Zustand)
+ * Results Workspace Store — PR-22 + PR-23 (Determinism Lock)
  *
  * State management for Unified Results Workspace.
  * Supports RUN / BATCH / COMPARE modes with deep-linking.
@@ -14,6 +14,12 @@
  * - Deterministic sorting (lexicographic, no Date.now, no Math.random)
  * - URL ↔ state synchronization (deep-linking)
  * - Mode determines which panel is active (RUN/BATCH/COMPARE)
+ *
+ * PR-23 URL DETERMINISM LOCK:
+ * - URL is the SOLE source of truth for mode/selection/overlay
+ * - buildUrlFromState() and parseStateFromUrl() are pure functions
+ * - serialize → parse → serialize must produce identical URL
+ * - No internal defaults override URL state
  */
 
 import { create } from 'zustand';
@@ -156,6 +162,91 @@ export function buildWorkspaceUrlParams(state: {
   }
 
   return params;
+}
+
+// =============================================================================
+// PR-23: URL Determinism Lock — buildUrlFromState / parseStateFromUrl
+// =============================================================================
+
+/**
+ * Workspace URL state — the minimal set of fields persisted in URL.
+ * This is the SOLE source of truth for view state after hard refresh.
+ */
+export interface WorkspaceUrlState {
+  mode: WorkspaceMode;
+  selectedRunId: string | null;
+  selectedBatchId: string | null;
+  selectedComparisonId: string | null;
+  overlayMode: OverlayDisplayMode;
+}
+
+/**
+ * PR-23: Build a deterministic URL search string from workspace state.
+ *
+ * Pure function. No side effects. Deterministic output.
+ * serialize(state) → parse(url) → serialize(state') must yield identical URL.
+ */
+export function buildUrlFromState(state: WorkspaceUrlState): string {
+  const params = new URLSearchParams();
+
+  // Mode is always explicit in URL (no implicit defaults)
+  params.set('mode', state.mode.toLowerCase());
+
+  if (state.selectedRunId) {
+    params.set(WORKSPACE_URL_PARAMS.RUN, state.selectedRunId);
+  }
+  if (state.selectedBatchId) {
+    params.set(WORKSPACE_URL_PARAMS.BATCH, state.selectedBatchId);
+  }
+  if (state.selectedComparisonId) {
+    params.set(WORKSPACE_URL_PARAMS.COMPARISON, state.selectedComparisonId);
+  }
+
+  // Overlay always explicit — no implicit 'result' default
+  params.set(WORKSPACE_URL_PARAMS.OVERLAY, state.overlayMode);
+
+  return params.toString();
+}
+
+/**
+ * PR-23: Parse workspace state from a URL search string.
+ *
+ * Pure function. No side effects. Deterministic output.
+ * Returns fully populated WorkspaceUrlState with explicit defaults.
+ */
+export function parseStateFromUrl(search: string): WorkspaceUrlState {
+  const params = new URLSearchParams(search);
+
+  const modeRaw = params.get('mode');
+  let mode: WorkspaceMode = 'RUN';
+  if (modeRaw === 'batch') mode = 'BATCH';
+  else if (modeRaw === 'compare') mode = 'COMPARE';
+  else if (modeRaw === 'run') mode = 'RUN';
+
+  const overlayRaw = params.get(WORKSPACE_URL_PARAMS.OVERLAY);
+  let overlayMode: OverlayDisplayMode = 'result';
+  if (overlayRaw === 'result' || overlayRaw === 'delta' || overlayRaw === 'none') {
+    overlayMode = overlayRaw;
+  }
+
+  // Infer mode from selection if mode param is absent
+  const runId = params.get(WORKSPACE_URL_PARAMS.RUN);
+  const batchId = params.get(WORKSPACE_URL_PARAMS.BATCH);
+  const comparisonId = params.get(WORKSPACE_URL_PARAMS.COMPARISON);
+
+  if (!modeRaw) {
+    if (comparisonId) mode = 'COMPARE';
+    else if (batchId) mode = 'BATCH';
+    else if (runId) mode = 'RUN';
+  }
+
+  return {
+    mode,
+    selectedRunId: runId,
+    selectedBatchId: batchId,
+    selectedComparisonId: comparisonId,
+    overlayMode,
+  };
 }
 
 // =============================================================================
