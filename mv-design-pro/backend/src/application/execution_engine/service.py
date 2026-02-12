@@ -47,6 +47,7 @@ from application.solvers.short_circuit_binding import (
 from application.result_mapping.short_circuit_to_resultset_v1 import (
     map_short_circuit_to_resultset_v1,
 )
+from domain.fault_scenario import FaultScenario
 
 from .errors import (
     RunBlockedError,
@@ -371,6 +372,54 @@ class ExecutionEngineService:
             error_msg = str(exc)
             failed_run = self.fail_run(run_id, error_msg)
             raise
+
+    # =========================================================================
+    # Scenario-based Short-Circuit Execution (PR-19)
+    # =========================================================================
+
+    def execute_run_by_scenario(
+        self,
+        run_id: UUID,
+        *,
+        fault_scenario: FaultScenario,
+        graph: Any,
+        readiness_snapshot: dict[str, Any],
+        validation_snapshot: dict[str, Any],
+        z0_bus: np.ndarray | None = None,
+    ) -> tuple[Run, ResultSet]:
+        """
+        Execute a short-circuit run via a FaultScenario object (PR-19).
+
+        All solver parameters are derived exclusively from the FaultScenario.
+        No additional fault parameters accepted.
+
+        Args:
+            run_id: ID of a PENDING run.
+            fault_scenario: Canonical FaultScenario domain object.
+            graph: NetworkGraph to compute on.
+            readiness_snapshot: Readiness state at run time.
+            validation_snapshot: Validation state at run time.
+            z0_bus: Precomputed Z0 bus matrix (required for SC_1F).
+
+        Returns:
+            Tuple of (completed Run, ResultSet v1).
+        """
+        # Derive parameters from FaultScenario exclusively
+        fault_node_id = fault_scenario.location.element_ref
+        config = StudyCaseConfig(
+            c_factor_max=fault_scenario.config.c_factor,
+            thermal_time_seconds=fault_scenario.config.thermal_time_seconds,
+        )
+
+        return self.execute_run_sc(
+            run_id,
+            graph=graph,
+            config=config,
+            fault_node_id=fault_node_id,
+            readiness_snapshot=readiness_snapshot,
+            validation_snapshot=validation_snapshot,
+            z0_bus=z0_bus,
+        )
 
     # =========================================================================
     # Query Operations

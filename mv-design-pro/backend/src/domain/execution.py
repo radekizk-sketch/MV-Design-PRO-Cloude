@@ -221,10 +221,14 @@ class ResultSet:
     element_results: tuple[ElementResult, ...] = field(default_factory=tuple)
     global_results: dict[str, Any] = field(default_factory=dict)
     deterministic_signature: str = ""
+    # PR-19: Fault scenario reference (additive, v1.1 — no contract break)
+    fault_scenario_id: str | None = None
+    fault_type: str | None = None
+    fault_location: dict[str, Any] | None = None
 
     def to_dict(self) -> dict[str, Any]:
         """Serialize to dictionary for API responses."""
-        return {
+        result: dict[str, Any] = {
             "run_id": str(self.run_id),
             "analysis_type": self.analysis_type.value,
             "validation_snapshot": self.validation_snapshot,
@@ -233,6 +237,14 @@ class ResultSet:
             "global_results": self.global_results,
             "deterministic_signature": self.deterministic_signature,
         }
+        # PR-19 fields (only included when set)
+        if self.fault_scenario_id is not None:
+            result["fault_scenario_id"] = self.fault_scenario_id
+        if self.fault_type is not None:
+            result["fault_type"] = self.fault_type
+        if self.fault_location is not None:
+            result["fault_location"] = self.fault_location
+        return result
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> ResultSet:
@@ -248,6 +260,9 @@ class ResultSet:
             ),
             global_results=data.get("global_results", {}),
             deterministic_signature=data.get("deterministic_signature", ""),
+            fault_scenario_id=data.get("fault_scenario_id"),
+            fault_type=data.get("fault_type"),
+            fault_location=data.get("fault_location"),
         )
 
 
@@ -307,11 +322,15 @@ def build_result_set(
     readiness_snapshot: dict[str, Any],
     element_results: list[ElementResult],
     global_results: dict[str, Any],
+    fault_scenario_id: str | None = None,
+    fault_type: str | None = None,
+    fault_location: dict[str, Any] | None = None,
 ) -> ResultSet:
     """
     Build a ResultSet with computed deterministic signature.
 
     Sorts element_results by element_ref for determinism.
+    PR-19: Optionally includes fault scenario reference fields.
     """
     sorted_results = tuple(
         sorted(element_results, key=lambda er: er.element_ref)
@@ -334,6 +353,9 @@ def build_result_set(
         element_results=sorted_results,
         global_results=global_results,
         deterministic_signature=signature,
+        fault_scenario_id=fault_scenario_id,
+        fault_type=fault_type,
+        fault_location=fault_location,
     )
 
 
