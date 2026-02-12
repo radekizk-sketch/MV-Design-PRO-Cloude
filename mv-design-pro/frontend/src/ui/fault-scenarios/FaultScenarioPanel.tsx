@@ -1,15 +1,18 @@
 /**
- * FaultScenarioPanel — PR-19
+ * FaultScenarioPanel — PR-19 → PR-24 compat
  *
  * Main container panel for fault scenario management.
  * Integrates ScenarioList and CreateScenarioModal.
+ *
+ * NOTE: This component is retained for backward compatibility.
+ * PR-24 primary panel is FaultScenariosPanel.tsx.
  *
  * All labels in Polish. No project codenames.
  * Deterministic display order.
  */
 
-import React, { useState, useCallback, useEffect } from 'react';
-import { useFaultScenarioStore } from './store';
+import { useState, useCallback, useEffect } from 'react';
+import { useFaultScenariosStore } from './store';
 import { ScenarioList } from './ScenarioList';
 import { CreateScenarioModal } from './CreateScenarioModal';
 import type { CreateFaultScenarioRequest } from './types';
@@ -29,17 +32,14 @@ export function FaultScenarioPanel({
     scenarios,
     selectedScenarioId,
     isLoading,
-    isCreating,
-    isDeleting,
     error,
     loadScenarios,
     createScenario,
     deleteScenario,
     selectScenario,
     clearError,
-  } = useFaultScenarioStore();
+  } = useFaultScenariosStore();
 
-  // Load scenarios when study case changes
   useEffect(() => {
     loadScenarios(studyCaseId);
   }, [studyCaseId, loadScenarios]);
@@ -71,7 +71,6 @@ export function FaultScenarioPanel({
         </button>
       </div>
 
-      {/* Error display */}
       {error && (
         <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 mb-4 rounded text-sm">
           {error}
@@ -84,7 +83,6 @@ export function FaultScenarioPanel({
         </div>
       )}
 
-      {/* Loading state */}
       {isLoading ? (
         <div className="text-sm text-gray-500 p-4 text-center">
           Ładowanie scenariuszy...
@@ -95,11 +93,10 @@ export function FaultScenarioPanel({
           selectedScenarioId={selectedScenarioId}
           onSelect={handleSelect}
           onDelete={deleteScenario}
-          isDeleting={isDeleting}
+          isDeleting={isLoading}
         />
       )}
 
-      {/* Scenario count */}
       {!isLoading && scenarios.length > 0 && (
         <div className="mt-3 text-xs text-gray-400 text-right">
           {scenarios.length}{' '}
@@ -107,12 +104,11 @@ export function FaultScenarioPanel({
         </div>
       )}
 
-      {/* Create modal */}
       {showCreateModal && (
         <CreateScenarioModal
           onSubmit={handleCreate}
           onClose={() => setShowCreateModal(false)}
-          isCreating={isCreating}
+          isCreating={isLoading}
         />
       )}
     </div>

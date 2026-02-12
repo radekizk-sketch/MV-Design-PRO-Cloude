@@ -1,25 +1,8 @@
 /**
- * Fault Scenarios Module — PR-19
- *
- * Public exports for fault scenario management.
+ * Fault Scenarios Module — PR-24
  */
-
-export { FaultScenarioPanel } from './FaultScenarioPanel';
-export { FaultLocationSelector } from './FaultLocationSelector';
-export { ScenarioList } from './ScenarioList';
-export { CreateScenarioModal } from './CreateScenarioModal';
-export { useFaultScenarioStore } from './store';
-export type {
-  FaultScenario,
-  FaultType,
-  FaultLocation,
-  LocationType,
-  ShortCircuitConfig,
-  CreateFaultScenarioRequest,
-} from './types';
-export {
-  FAULT_TYPE_LABELS,
-  LOCATION_TYPE_LABELS,
-  FAULT_TYPE_COLORS,
-  FAULT_TYPE_BG_COLORS,
-} from './types';
+export { FaultScenariosPanel } from './FaultScenariosPanel';
+export { FaultScenarioModal } from './FaultScenarioModal';
+export { FaultScenarioOverlayToggle } from './FaultScenarioOverlayToggle';
+export { useFaultScenariosStore, useSelectedScenario, useScenarioEligibility, useScenarioSldOverlay } from './store';
+export type { FaultScenario, FaultTypeValue, CreateFaultScenarioRequest, UpdateFaultScenarioRequest, ScenarioEligibilityResult, ScenarioSldOverlay } from './types';

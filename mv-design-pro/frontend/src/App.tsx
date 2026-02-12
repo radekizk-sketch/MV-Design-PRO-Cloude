@@ -38,6 +38,7 @@ import { ResultsWorkspacePage } from './ui/results-workspace';
 import { SLDViewPage, SldEditorPage } from './ui/sld';
 import { WizardPage } from './ui/wizard';
 import { EnmInspectorPage } from './ui/enm-inspector';
+import { FaultScenariosPanel, FaultScenarioModal } from './ui/fault-scenarios';
 import { PowerFactoryLayout } from './ui/layout';
 import { useAppStateStore } from './ui/app-state';
 import { ROUTES, useUrlSelectionSync, getCurrentHashRoute } from './ui/navigation';
@@ -259,6 +260,18 @@ function App() {
     return wrapWithReadyIndicator(
       <PowerFactoryLayout {...layoutProps}>
         <EnmInspectorPage />
+      </PowerFactoryLayout>
+    );
+  }
+
+  // PR-24: Scenariusze zwarciowe (Fault Scenarios)
+  if (route === '#fault-scenarios') {
+    return wrapWithReadyIndicator(
+      <PowerFactoryLayout {...layoutProps}>
+        <div className="flex flex-col h-full">
+          <FaultScenariosPanel studyCaseId={null} />
+          <FaultScenarioModal />
+        </div>
       </PowerFactoryLayout>
     );
   }

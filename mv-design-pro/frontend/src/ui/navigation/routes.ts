@@ -125,6 +125,13 @@ export const ROUTES: Record<string, RouteDefinition> = {
     icon: 'INS',
     requiredMode: undefined,
   },
+  FAULT_SCENARIOS: {
+    hash: '#fault-scenarios',
+    label: 'Scenariusze zwarciowe',
+    description: 'Zarzadzanie scenariuszami zwarc i uruchamianie analiz',
+    icon: 'SCN',
+    requiredMode: undefined,
+  },
 };
 
 /**
