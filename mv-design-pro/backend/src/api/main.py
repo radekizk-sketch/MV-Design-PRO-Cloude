@@ -41,6 +41,7 @@ from api.solver_input import router as solver_input_router
 from api.batch_execution import router as batch_execution_router
 from api.fault_scenarios import router as fault_scenarios_router
 from api.results_workspace import router as results_workspace_router
+from api.protection_engine_v1 import router as protection_engine_v1_router
 from infrastructure.persistence.db import (
     create_engine_from_url,
     create_session_factory,
@@ -132,6 +133,7 @@ app.include_router(solver_input_router)
 app.include_router(batch_execution_router)
 app.include_router(fault_scenarios_router)
 app.include_router(results_workspace_router)
+app.include_router(protection_engine_v1_router)
 
 
 @app.get("/")

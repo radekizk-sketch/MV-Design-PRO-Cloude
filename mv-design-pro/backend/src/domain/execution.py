@@ -54,6 +54,7 @@ class ExecutionAnalysisType(str, Enum):
     SC_1F = "SC_1F"
     SC_2F = "SC_2F"
     LOAD_FLOW = "LOAD_FLOW"
+    PROTECTION = "PROTECTION"
 
 
 # ---------------------------------------------------------------------------
@@ -371,6 +372,8 @@ _DETERMINISTIC_LIST_KEYS = {
     "switches",
     "element_results",
     "nodes",
+    "relay_results",
+    "test_points",
 }
 
 
