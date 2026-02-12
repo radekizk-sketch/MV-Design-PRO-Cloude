@@ -1,8 +1,14 @@
 /**
- * Fault Scenarios Types — PR-24
+ * Fault Scenarios Types — PR-24 + PR-25 (v2)
  *
  * All labels in Polish. No project codenames.
  * Deterministic sorting (lexicographic by name).
+ *
+ * PR-25 additions:
+ * - FaultModeValue: METALLIC | IMPEDANCE
+ * - FaultImpedance: { r_ohm, x_ohm }
+ * - LocationType: + NODE, BRANCH_POINT
+ * - arc_params: reserved (unsupported)
  */
 
 export type FaultTypeValue = 'SC_3F' | 'SC_2F' | 'SC_1F';
@@ -19,11 +25,28 @@ export const FAULT_IMPEDANCE_LABELS: Readonly<Record<FaultImpedanceTypeValue, st
   METALLIC: 'Zwarcie metaliczne',
 } as const;
 
-export type LocationType = 'BUS' | 'BRANCH';
+/** v2 (PR-25): Fault mode — metallic or through impedance */
+export type FaultModeValue = 'METALLIC' | 'IMPEDANCE';
+
+export const FAULT_MODE_LABELS: Readonly<Record<FaultModeValue, string>> = {
+  METALLIC: 'Metaliczne',
+  IMPEDANCE: 'Przez impedancję',
+} as const;
+
+/** v2 (PR-25): Fault impedance Zf — explicit R + X in Ohms */
+export interface FaultImpedanceData {
+  r_ohm: number;
+  x_ohm: number;
+}
+
+/** v1 + v2 location types */
+export type LocationType = 'BUS' | 'BRANCH' | 'NODE' | 'BRANCH_POINT';
 
 export const LOCATION_TYPE_LABELS: Readonly<Record<LocationType, string>> = {
   BUS: 'Szyna',
   BRANCH: 'Gałąź',
+  NODE: 'Węzeł',
+  BRANCH_POINT: 'Punkt na odcinku',
 } as const;
 
 export interface FaultLocation {
@@ -47,6 +70,12 @@ export interface FaultScenario {
   location: FaultLocation;
   config: ShortCircuitConfig;
   fault_impedance_type: FaultImpedanceTypeValue;
+  /** v2 (PR-25): fault mode */
+  fault_mode: FaultModeValue;
+  /** v2 (PR-25): explicit fault impedance Zf */
+  fault_impedance: FaultImpedanceData | null;
+  /** v2 (PR-25): reserved arc parameters (unsupported) */
+  arc_params: Record<string, unknown> | null;
   z0_bus_data: Record<string, unknown> | null;
   created_at: string;
   updated_at: string;
@@ -63,6 +92,12 @@ export interface CreateFaultScenarioRequest {
   fault_type: FaultTypeValue;
   location: FaultLocation;
   config?: ShortCircuitConfig;
+  /** v2 (PR-25) */
+  fault_mode?: FaultModeValue;
+  /** v2 (PR-25) */
+  fault_impedance?: FaultImpedanceData;
+  /** v2 (PR-25) — reserved, unsupported */
+  arc_params?: Record<string, unknown>;
   z0_bus_data?: Record<string, unknown>;
 }
 
@@ -71,6 +106,12 @@ export interface UpdateFaultScenarioRequest {
   fault_type?: FaultTypeValue;
   location?: FaultLocation;
   config?: ShortCircuitConfig;
+  /** v2 (PR-25) */
+  fault_mode?: FaultModeValue;
+  /** v2 (PR-25) */
+  fault_impedance?: FaultImpedanceData | null;
+  /** v2 (PR-25) — reserved, unsupported */
+  arc_params?: Record<string, unknown> | null;
   z0_bus_data?: Record<string, unknown> | null;
 }
 
@@ -100,6 +141,8 @@ export interface ScenarioEligibilityResult {
 export interface ScenarioSldOverlay {
   scenario_id: string;
   overlay_type: string;
+  /** v2 (PR-25): fault mode in overlay */
+  fault_mode?: FaultModeValue;
   elements: Array<{
     element_ref: string;
     element_type: string;
@@ -108,6 +151,10 @@ export interface ScenarioSldOverlay {
     stroke_token: string;
     animation_token: string | null;
     numeric_badges: Record<string, number | null>;
+    /** v2 (PR-25): branch point alpha for visual positioning */
+    branch_point_alpha?: number;
+    /** v2 (PR-25): fault impedance metadata */
+    fault_impedance?: FaultImpedanceData;
   }>;
   legend: Array<{
     color_token: string;
@@ -119,4 +166,12 @@ export interface ScenarioSldOverlay {
 
 export function getFaultTypeLabel(type: FaultTypeValue): string {
   return FAULT_TYPE_LABELS[type] ?? type;
+}
+
+export function getFaultModeLabel(mode: FaultModeValue): string {
+  return FAULT_MODE_LABELS[mode] ?? mode;
+}
+
+export function getLocationTypeLabel(type: LocationType): string {
+  return LOCATION_TYPE_LABELS[type] ?? type;
 }

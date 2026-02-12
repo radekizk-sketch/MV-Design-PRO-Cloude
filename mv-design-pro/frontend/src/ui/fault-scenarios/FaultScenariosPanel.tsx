@@ -5,7 +5,7 @@
 
 import { useCallback, useEffect } from 'react';
 import { useFaultScenariosStore, useSelectedScenario, useScenarioEligibility } from './store';
-import { FAULT_TYPE_LABELS, type FaultTypeValue } from './types';
+import { FAULT_TYPE_LABELS, FAULT_MODE_LABELS, type FaultTypeValue, type FaultModeValue } from './types';
 
 interface FaultScenariosPanelProps {
   studyCaseId: string | null;
@@ -111,8 +111,14 @@ export function FaultScenariosPanel({ studyCaseId, onHighlightElement }: FaultSc
                 <div className="text-sm font-medium text-slate-800 truncate">{scenario.name}</div>
                 <div className="text-xs text-slate-500 mt-0.5">
                   {FAULT_TYPE_LABELS[scenario.fault_type as FaultTypeValue] ?? scenario.fault_type}
+                  {scenario.fault_mode && scenario.fault_mode !== 'METALLIC' && (
+                    <> · {FAULT_MODE_LABELS[scenario.fault_mode as FaultModeValue] ?? scenario.fault_mode}</>
+                  )}
                   {' · '}
                   {scenario.location.element_ref}
+                  {scenario.location.location_type === 'BRANCH_POINT' && scenario.location.position != null && (
+                    <> (α={scenario.location.position})</>
+                  )}
                 </div>
               </div>
               <div className="flex items-center gap-1 ml-2">

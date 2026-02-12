@@ -34,6 +34,7 @@ from application.fault_scenario_service import (
 from domain.fault_scenario import (
     FaultScenarioValidationError,
     FaultType,
+    FaultMode,
 )
 
 router = APIRouter(tags=["fault-scenarios"])
@@ -64,6 +65,13 @@ class FaultLocationRequest(BaseModel):
     )
 
 
+class FaultImpedanceRequest(BaseModel):
+    """Fault impedance Zf — explicit R + X in Ohms (v2, PR-25)."""
+
+    r_ohm: float = Field(..., description="Rezystancja zwarcia [Ω]")
+    x_ohm: float = Field(..., description="Reaktancja zwarcia [Ω]")
+
+
 class ShortCircuitConfigRequest(BaseModel):
     """Short-circuit calculation configuration."""
 
@@ -75,7 +83,7 @@ class ShortCircuitConfigRequest(BaseModel):
 
 
 class CreateFaultScenarioRequest(BaseModel):
-    """Request to create a new fault scenario."""
+    """Request to create a new fault scenario (v1 + v2)."""
 
     name: str = Field(
         ..., description="Nazwa scenariusza zwarcia (PL)"
@@ -89,13 +97,22 @@ class CreateFaultScenarioRequest(BaseModel):
     config: ShortCircuitConfigRequest | None = Field(
         None, description="Konfiguracja obliczeń (opcjonalna)"
     )
+    fault_mode: str | None = Field(
+        None, description="Tryb zwarcia: METALLIC lub IMPEDANCE (v2, domyślnie METALLIC)"
+    )
+    fault_impedance: FaultImpedanceRequest | None = Field(
+        None, description="Impedancja zwarcia Zf [Ω] (wymagane dla IMPEDANCE)"
+    )
+    arc_params: dict[str, Any] | None = Field(
+        None, description="Parametry łuku (zarezerwowane — nieobsługiwane w v2)"
+    )
     z0_bus_data: dict[str, Any] | None = Field(
         None, description="Dane impedancji zerowej (wymagane dla SC_1F)"
     )
 
 
 class UpdateFaultScenarioRequest(BaseModel):
-    """Request to update an existing fault scenario."""
+    """Request to update an existing fault scenario (v1 + v2)."""
 
     name: str | None = Field(None, description="Nowa nazwa scenariusza")
     fault_type: str | None = Field(None, description="Nowy typ zwarcia")
@@ -105,13 +122,22 @@ class UpdateFaultScenarioRequest(BaseModel):
     config: ShortCircuitConfigRequest | None = Field(
         None, description="Nowa konfiguracja obliczeń"
     )
+    fault_mode: str | None = Field(
+        None, description="Nowy tryb zwarcia: METALLIC lub IMPEDANCE"
+    )
+    fault_impedance: FaultImpedanceRequest | None = Field(
+        None, description="Nowa impedancja zwarcia Zf [Ω]"
+    )
+    arc_params: dict[str, Any] | None = Field(
+        None, description="Parametry łuku (zarezerwowane — nieobsługiwane)"
+    )
     z0_bus_data: dict[str, Any] | None = Field(
         None, description="Nowe dane impedancji zerowej"
     )
 
 
 class FaultScenarioResponse(BaseModel):
-    """Fault scenario response model."""
+    """Fault scenario response model (v1 + v2)."""
 
     scenario_id: str
     study_case_id: str
@@ -121,6 +147,9 @@ class FaultScenarioResponse(BaseModel):
     location: dict[str, Any]
     config: dict[str, Any]
     fault_impedance_type: str
+    fault_mode: str = "METALLIC"
+    fault_impedance: dict[str, Any] | None = None
+    arc_params: dict[str, Any] | None = None
     z0_bus_data: dict[str, Any] | None = None
     created_at: str
     updated_at: str
@@ -189,6 +218,19 @@ def _parse_fault_type(value: str) -> str:
         ) from exc
 
 
+def _parse_fault_mode(value: str) -> str:
+    """Validate a fault mode string (v2)."""
+    try:
+        FaultMode(value)
+        return value
+    except ValueError as exc:
+        valid = ", ".join(m.value for m in FaultMode)
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Nieprawidłowy tryb zwarcia: {value}. Dozwolone: {valid}",
+        ) from exc
+
+
 # =============================================================================
 # Endpoints
 # =============================================================================
@@ -211,6 +253,8 @@ def create_fault_scenario(
     """
     parsed_case_id = _parse_uuid(case_id, "case_id")
     _parse_fault_type(request.fault_type)
+    if request.fault_mode is not None:
+        _parse_fault_mode(request.fault_mode)
     service = get_fault_scenario_service()
 
     location_dict = {
@@ -227,6 +271,13 @@ def create_fault_scenario(
             "include_branch_contributions": request.config.include_branch_contributions,
         }
 
+    fault_impedance_dict = None
+    if request.fault_impedance is not None:
+        fault_impedance_dict = {
+            "r_ohm": request.fault_impedance.r_ohm,
+            "x_ohm": request.fault_impedance.x_ohm,
+        }
+
     try:
         scenario = service.create_scenario(
             study_case_id=parsed_case_id,
@@ -234,6 +285,9 @@ def create_fault_scenario(
             fault_type=request.fault_type,
             location=location_dict,
             config=config_dict,
+            fault_mode=request.fault_mode,
+            fault_impedance=fault_impedance_dict,
+            arc_params=request.arc_params,
             z0_bus_data=request.z0_bus_data,
         )
         return scenario.to_dict()
@@ -327,6 +381,18 @@ def update_fault_scenario(
         _parse_fault_type(request.fault_type)
         fault_type_str = request.fault_type
 
+    fault_mode_str = None
+    if request.fault_mode is not None:
+        _parse_fault_mode(request.fault_mode)
+        fault_mode_str = request.fault_mode
+
+    fault_impedance_dict = None
+    if request.fault_impedance is not None:
+        fault_impedance_dict = {
+            "r_ohm": request.fault_impedance.r_ohm,
+            "x_ohm": request.fault_impedance.x_ohm,
+        }
+
     try:
         scenario = service.update_scenario(
             parsed_id,
@@ -334,6 +400,9 @@ def update_fault_scenario(
             fault_type=fault_type_str,
             location=location_dict,
             config=config_dict,
+            fault_mode=fault_mode_str,
+            fault_impedance=fault_impedance_dict,
+            arc_params=request.arc_params,
             z0_bus_data=request.z0_bus_data,
         )
         return scenario.to_dict()
