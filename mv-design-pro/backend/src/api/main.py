@@ -38,6 +38,7 @@ from api.enm import router as enm_router
 from api.execution_runs import router as execution_runs_router
 from api.result_contract_v1 import router as result_contract_v1_router
 from api.solver_input import router as solver_input_router
+from api.batch_execution import router as batch_execution_router
 from infrastructure.persistence.db import (
     create_engine_from_url,
     create_session_factory,
@@ -126,6 +127,7 @@ app.include_router(enm_router)
 app.include_router(execution_runs_router)
 app.include_router(result_contract_v1_router)
 app.include_router(solver_input_router)
+app.include_router(batch_execution_router)
 
 
 @app.get("/")
