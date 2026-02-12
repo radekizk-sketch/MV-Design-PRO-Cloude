@@ -1,123 +1,191 @@
 /**
- * Fault Scenario Store — PR-19 (Zustand)
+ * Fault Scenarios Store — PR-24
  *
- * State management for fault scenarios.
- * Deterministic sorting. Polish error messages.
- * No heuristics. No default physical values.
+ * Zustand state for fault scenario management.
+ * Deterministic sorting by name.
+ * No physics, no model mutations, no Date.now(), no Math.random().
  */
 
 import { create } from 'zustand';
 import type {
   FaultScenario,
   CreateFaultScenarioRequest,
+  UpdateFaultScenarioRequest,
+  ScenarioEligibilityResult,
+  ScenarioSldOverlay,
 } from './types';
 import * as api from './api';
 
-interface FaultScenarioStore {
-  // Data
+interface FaultScenariosState {
   studyCaseId: string | null;
   scenarios: FaultScenario[];
   selectedScenarioId: string | null;
-
-  // Loading states
+  eligibility: ScenarioEligibilityResult | null;
+  sldOverlay: ScenarioSldOverlay | null;
   isLoading: boolean;
-  isCreating: boolean;
-  isDeleting: boolean;
-
-  // Error
+  isModalOpen: boolean;
+  editingScenarioId: string | null;
   error: string | null;
 
-  // Actions
-  setStudyCaseId: (studyCaseId: string) => void;
+  setStudyCaseId: (id: string | null) => void;
   loadScenarios: (studyCaseId: string) => Promise<void>;
-  createScenario: (
-    studyCaseId: string,
-    request: CreateFaultScenarioRequest
-  ) => Promise<FaultScenario>;
-  deleteScenario: (scenarioId: string) => Promise<boolean>;
   selectScenario: (scenarioId: string | null) => void;
+  createScenario: (studyCaseId: string, data: CreateFaultScenarioRequest) => Promise<FaultScenario>;
+  updateScenario: (scenarioId: string, data: UpdateFaultScenarioRequest) => Promise<FaultScenario>;
+  deleteScenario: (scenarioId: string) => Promise<void>;
+  checkEligibility: (scenarioId: string) => Promise<void>;
+  loadSldOverlay: (scenarioId: string) => Promise<void>;
+  createRun: (scenarioId: string) => Promise<Record<string, unknown>>;
+  openModal: (scenarioId?: string) => void;
+  closeModal: () => void;
   clearError: () => void;
+  reset: () => void;
 }
 
-export const useFaultScenarioStore = create<FaultScenarioStore>(
-  (set, get) => ({
-    // Initial state
-    studyCaseId: null,
-    scenarios: [],
-    selectedScenarioId: null,
-    isLoading: false,
-    isCreating: false,
-    isDeleting: false,
-    error: null,
+function sortScenarios(scenarios: FaultScenario[]): FaultScenario[] {
+  return [...scenarios].sort((a, b) => a.name.localeCompare(b.name, 'pl'));
+}
 
-    setStudyCaseId: (studyCaseId) => {
-      set({ studyCaseId });
-      get().loadScenarios(studyCaseId);
-    },
+const initialState = {
+  studyCaseId: null as string | null,
+  scenarios: [] as FaultScenario[],
+  selectedScenarioId: null as string | null,
+  eligibility: null as ScenarioEligibilityResult | null,
+  sldOverlay: null as ScenarioSldOverlay | null,
+  isLoading: false,
+  isModalOpen: false,
+  editingScenarioId: null as string | null,
+  error: null as string | null,
+};
 
-    loadScenarios: async (studyCaseId) => {
-      set({ isLoading: true, error: null });
-      try {
-        const response = await api.listFaultScenarios(studyCaseId);
-        set({ scenarios: response.scenarios, isLoading: false });
-      } catch (err) {
-        const message =
-          err instanceof Error ? err.message : 'Błąd ładowania scenariuszy';
-        set({ error: message, isLoading: false });
-      }
-    },
+export const useFaultScenariosStore = create<FaultScenariosState>((set, get) => ({
+  ...initialState,
 
-    createScenario: async (studyCaseId, request) => {
-      set({ isCreating: true, error: null });
-      try {
-        const scenario = await api.createFaultScenario(
-          studyCaseId,
-          request
-        );
-        // Reload to get deterministic sorted list
-        const { studyCaseId: currentCaseId } = get();
-        if (currentCaseId) {
-          await get().loadScenarios(currentCaseId);
-        }
-        set({ isCreating: false });
-        return scenario;
-      } catch (err) {
-        const message =
-          err instanceof Error
-            ? err.message
-            : 'Błąd tworzenia scenariusza';
-        set({ error: message, isCreating: false });
-        throw err;
-      }
-    },
+  setStudyCaseId: (id) => {
+    const current = get().studyCaseId;
+    if (current !== id) {
+      set({ studyCaseId: id, scenarios: [], selectedScenarioId: null, error: null });
+      if (id) { get().loadScenarios(id); }
+    }
+  },
 
-    deleteScenario: async (scenarioId) => {
-      set({ isDeleting: true, error: null });
-      try {
-        await api.deleteFaultScenario(scenarioId);
-        const { studyCaseId, selectedScenarioId } = get();
-        if (studyCaseId) {
-          await get().loadScenarios(studyCaseId);
-        }
-        if (selectedScenarioId === scenarioId) {
-          set({ selectedScenarioId: null });
-        }
-        set({ isDeleting: false });
-        return true;
-      } catch (err) {
-        const message =
-          err instanceof Error
-            ? err.message
-            : 'Błąd usuwania scenariusza';
-        set({ error: message, isDeleting: false });
-        return false;
-      }
-    },
+  loadScenarios: async (studyCaseId) => {
+    set({ isLoading: true, error: null });
+    try {
+      const response = await api.fetchScenarios(studyCaseId);
+      set({ scenarios: sortScenarios(response.scenarios), isLoading: false });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Błąd ładowania scenariuszy';
+      set({ error: message, isLoading: false });
+    }
+  },
 
-    selectScenario: (scenarioId) => {
-      set({ selectedScenarioId: scenarioId });
-    },
+  selectScenario: (scenarioId) => {
+    set({ selectedScenarioId: scenarioId, eligibility: null, sldOverlay: null });
+    if (scenarioId) {
+      get().checkEligibility(scenarioId);
+      get().loadSldOverlay(scenarioId);
+    }
+  },
 
-    clearError: () => set({ error: null }),
-  })
-);
+  createScenario: async (studyCaseId, data) => {
+    set({ isLoading: true, error: null });
+    try {
+      const scenario = await api.createScenario(studyCaseId, data);
+      set((state) => ({
+        scenarios: sortScenarios([...state.scenarios, scenario]),
+        isLoading: false,
+        isModalOpen: false,
+        editingScenarioId: null,
+      }));
+      return scenario;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Błąd tworzenia scenariusza';
+      set({ error: message, isLoading: false });
+      throw err;
+    }
+  },
+
+  updateScenario: async (scenarioId, data) => {
+    set({ isLoading: true, error: null });
+    try {
+      const updated = await api.updateScenario(scenarioId, data);
+      set((state) => ({
+        scenarios: sortScenarios(state.scenarios.map((s) => (s.scenario_id === scenarioId ? updated : s))),
+        isLoading: false,
+        isModalOpen: false,
+        editingScenarioId: null,
+      }));
+      return updated;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Błąd aktualizacji scenariusza';
+      set({ error: message, isLoading: false });
+      throw err;
+    }
+  },
+
+  deleteScenario: async (scenarioId) => {
+    set({ isLoading: true, error: null });
+    try {
+      await api.deleteScenario(scenarioId);
+      set((state) => ({
+        scenarios: state.scenarios.filter((s) => s.scenario_id !== scenarioId),
+        selectedScenarioId: state.selectedScenarioId === scenarioId ? null : state.selectedScenarioId,
+        isLoading: false,
+      }));
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Błąd usuwania scenariusza';
+      set({ error: message, isLoading: false });
+    }
+  },
+
+  checkEligibility: async (scenarioId) => {
+    try {
+      const eligibility = await api.fetchScenarioEligibility(scenarioId);
+      set({ eligibility });
+    } catch { /* non-critical */ }
+  },
+
+  loadSldOverlay: async (scenarioId) => {
+    try {
+      const overlay = await api.fetchScenarioSldOverlay(scenarioId);
+      set({ sldOverlay: overlay });
+    } catch { /* non-critical */ }
+  },
+
+  createRun: async (scenarioId) => {
+    set({ isLoading: true, error: null });
+    try {
+      const result = await api.createRunFromScenario(scenarioId);
+      set({ isLoading: false });
+      return result;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Błąd uruchamiania analizy';
+      set({ error: message, isLoading: false });
+      throw err;
+    }
+  },
+
+  openModal: (scenarioId) => {
+    set({ isModalOpen: true, editingScenarioId: scenarioId ?? null, error: null });
+  },
+
+  closeModal: () => { set({ isModalOpen: false, editingScenarioId: null }); },
+  clearError: () => set({ error: null }),
+  reset: () => set(initialState),
+}));
+
+export function useSelectedScenario(): FaultScenario | null {
+  return useFaultScenariosStore((state) => {
+    if (!state.selectedScenarioId) return null;
+    return state.scenarios.find((s) => s.scenario_id === state.selectedScenarioId) ?? null;
+  });
+}
+
+export function useScenarioEligibility(): ScenarioEligibilityResult | null {
+  return useFaultScenariosStore((state) => state.eligibility);
+}
+
+export function useScenarioSldOverlay(): ScenarioSldOverlay | null {
+  return useFaultScenariosStore((state) => state.sldOverlay);
+}

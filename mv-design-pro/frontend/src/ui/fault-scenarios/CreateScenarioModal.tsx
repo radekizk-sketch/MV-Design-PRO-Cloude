@@ -1,18 +1,22 @@
 /**
- * CreateScenarioModal — PR-19
+ * CreateScenarioModal — PR-19 → PR-24 compat
  *
  * Modal form for creating a new fault scenario.
  * All labels in Polish. No heuristics. No default physical guessing.
  *
+ * NOTE: This component is retained for backward compatibility.
+ * PR-24 primary modal is FaultScenarioModal.tsx.
+ *
  * INVARIANTS:
+ * - name is required
  * - SC_1F requires z0_bus_data (validated by backend)
  * - BRANCH location requires position
  * - No auto-completion of missing data
  */
 
-import React, { useState, useCallback } from 'react';
+import { useState, useCallback } from 'react';
 import type {
-  FaultType,
+  FaultTypeValue,
   FaultLocation,
   CreateFaultScenarioRequest,
 } from './types';
@@ -25,14 +29,15 @@ interface CreateScenarioModalProps {
   isCreating: boolean;
 }
 
-const FAULT_TYPES: FaultType[] = ['SC_3F', 'SC_2F', 'SC_1F'];
+const FAULT_TYPES: FaultTypeValue[] = ['SC_3F', 'SC_2F', 'SC_1F'];
 
 export function CreateScenarioModal({
   onSubmit,
   onClose,
   isCreating,
 }: CreateScenarioModalProps) {
-  const [faultType, setFaultType] = useState<FaultType>('SC_3F');
+  const [name, setName] = useState('');
+  const [faultType, setFaultType] = useState<FaultTypeValue>('SC_3F');
   const [location, setLocation] = useState<FaultLocation | null>(null);
   const [cFactor, setCFactor] = useState('1.10');
   const [thermalTime, setThermalTime] = useState('1.0');
@@ -40,6 +45,11 @@ export function CreateScenarioModal({
 
   const handleSubmit = useCallback(async () => {
     setError(null);
+
+    if (!name.trim()) {
+      setError('Nazwa scenariusza jest wymagana');
+      return;
+    }
 
     if (!location) {
       setError('Lokalizacja zwarcia jest wymagana');
@@ -60,11 +70,13 @@ export function CreateScenarioModal({
     }
 
     const request: CreateFaultScenarioRequest = {
+      name: name.trim(),
       fault_type: faultType,
       location,
       config: {
         c_factor: parsedCFactor,
         thermal_time_seconds: parsedThermalTime,
+        include_branch_contributions: false,
       },
     };
 
@@ -76,7 +88,7 @@ export function CreateScenarioModal({
         err instanceof Error ? err.message : 'Błąd tworzenia scenariusza';
       setError(message);
     }
-  }, [faultType, location, cFactor, thermalTime, onSubmit, onClose]);
+  }, [name, faultType, location, cFactor, thermalTime, onSubmit, onClose]);
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
@@ -92,6 +104,20 @@ export function CreateScenarioModal({
         </div>
 
         <div className="space-y-4">
+          {/* Scenario name */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Nazwa scenariusza
+            </label>
+            <input
+              type="text"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="np. Zwarcie na szynie głównej SN"
+              className="w-full p-2 border border-gray-300 rounded text-sm"
+            />
+          </div>
+
           {/* Fault type */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">

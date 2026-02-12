@@ -235,6 +235,7 @@ export const WORKSPACE_URL_PARAMS = {
   BATCH: 'batch',
   COMPARISON: 'comparison',
   OVERLAY: 'overlay',
+  SCENARIO: 'scenario',
 } as const;
 
 // =============================================================================

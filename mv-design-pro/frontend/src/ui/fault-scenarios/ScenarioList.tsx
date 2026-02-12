@@ -1,24 +1,22 @@
 /**
- * ScenarioList — PR-19
+ * ScenarioList — PR-19 → PR-24 compat
  *
  * Displays fault scenarios for a study case in deterministic order.
  * All labels in Polish. No project codenames. No heuristics.
+ *
+ * NOTE: This component is retained for backward compatibility.
+ * PR-24 primary panel is FaultScenariosPanel.tsx.
  */
 
-import React, { useState, useCallback } from 'react';
+import { useState, useCallback } from 'react';
 import type { FaultScenario } from './types';
-import {
-  FAULT_TYPE_LABELS,
-  LOCATION_TYPE_LABELS,
-  FAULT_TYPE_BG_COLORS,
-  FAULT_TYPE_COLORS,
-} from './types';
+import { FAULT_TYPE_LABELS, LOCATION_TYPE_LABELS } from './types';
 
 interface ScenarioListProps {
   scenarios: FaultScenario[];
   selectedScenarioId: string | null;
   onSelect: (scenarioId: string) => void;
-  onDelete: (scenarioId: string) => Promise<boolean>;
+  onDelete: (scenarioId: string) => Promise<void>;
   isDeleting: boolean;
 }
 
@@ -33,10 +31,8 @@ export function ScenarioList({
 
   const handleDelete = useCallback(
     async (scenarioId: string) => {
-      const success = await onDelete(scenarioId);
-      if (success) {
-        setDeleteConfirmId(null);
-      }
+      await onDelete(scenarioId);
+      setDeleteConfirmId(null);
     },
     [onDelete]
   );
@@ -53,7 +49,6 @@ export function ScenarioList({
     <div className="space-y-2">
       {scenarios.map((scenario) => {
         const isSelected = selectedScenarioId === scenario.scenario_id;
-        const bgColor = FAULT_TYPE_BG_COLORS[scenario.fault_type];
 
         return (
           <div
@@ -61,17 +56,16 @@ export function ScenarioList({
             className={`p-3 border rounded cursor-pointer transition-colors ${
               isSelected
                 ? 'border-blue-500 bg-blue-50'
-                : `border-gray-200 hover:border-gray-400 ${bgColor}`
+                : 'border-gray-200 hover:border-gray-400'
             }`}
             onClick={() => onSelect(scenario.scenario_id)}
           >
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <span
-                  className={`text-sm font-bold ${
-                    FAULT_TYPE_COLORS[scenario.fault_type]
-                  }`}
-                >
+                <span className="text-sm font-bold">
+                  {scenario.name}
+                </span>
+                <span className="text-xs text-gray-500">
                   {FAULT_TYPE_LABELS[scenario.fault_type]}
                 </span>
               </div>

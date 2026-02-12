@@ -1,5 +1,5 @@
 """
-Fault Scenario Domain Model — PR-19
+Fault Scenario Domain Model — PR-19 + PR-24
 
 Canonical, deterministic model of a short-circuit fault scenario
 as a first-class domain object.
@@ -12,6 +12,12 @@ INVARIANTS:
 - location_type="BUS" requires position = None
 - ZERO auto-completion — missing data means upstream gating failed
 - ZERO randomness — identical input → identical content_hash
+
+PR-24 EXTENSIONS:
+- name (PL, required) — user-facing scenario name
+- fault_impedance_type — metallic fault (METALLIC) as enum
+- created_at, updated_at — controlled by application layer (deterministic)
+- with_updates() — copy-on-write for immutable updates
 """
 
 from __future__ import annotations
@@ -19,6 +25,7 @@ from __future__ import annotations
 import hashlib
 import json
 from dataclasses import dataclass, field
+from datetime import datetime, timezone
 from enum import Enum
 from typing import Any, Literal
 from uuid import UUID, uuid4
@@ -37,6 +44,12 @@ class FaultType(str, Enum):
     SC_3F = "SC_3F"
     SC_2F = "SC_2F"
     SC_1F = "SC_1F"
+
+
+class FaultImpedanceType(str, Enum):
+    """Fault impedance type (v1: metallic only)."""
+
+    METALLIC = "METALLIC"
 
 
 # Mapping FaultType → ExecutionAnalysisType
@@ -114,6 +127,20 @@ class ShortCircuitConfig:
 
 
 # ---------------------------------------------------------------------------
+# Sentinel for copy-on-write (distinguishes "not passed" from "passed None")
+# ---------------------------------------------------------------------------
+
+
+class _SentinelType:
+    """Internal sentinel — not part of public API."""
+
+    pass
+
+
+_SENTINEL: Any = _SentinelType()
+
+
+# ---------------------------------------------------------------------------
 # FaultScenario (Aggregate Root)
 # ---------------------------------------------------------------------------
 
@@ -122,7 +149,7 @@ class ShortCircuitConfig:
 class FaultScenario:
     """
     Fault Scenario — a canonical, deterministic definition of a short-circuit
-    fault scenario as a first-class domain object (PR-19).
+    fault scenario as a first-class domain object (PR-19 + PR-24).
 
     INVARIANTS:
     - Immutable (frozen dataclass)
@@ -131,14 +158,24 @@ class FaultScenario:
     - location validated at construction
     - ZERO auto-completion
     - ZERO randomness
+
+    PR-24 ADDITIONS:
+    - name: User-facing Polish name (required)
+    - fault_impedance_type: METALLIC (v1)
+    - created_at, updated_at: Application-controlled timestamps
+    - with_updates(): Copy-on-write for immutable transitions
     """
 
     scenario_id: UUID
     study_case_id: UUID
+    name: str
     fault_type: FaultType
     location: FaultLocation
     config: ShortCircuitConfig
+    fault_impedance_type: FaultImpedanceType = FaultImpedanceType.METALLIC
     z0_bus_data: dict[str, Any] | None = None
+    created_at: str = ""
+    updated_at: str = ""
     content_hash: str = ""
 
     @property
@@ -146,16 +183,52 @@ class FaultScenario:
         """Derived analysis type from fault_type."""
         return FAULT_TYPE_TO_ANALYSIS[self.fault_type]
 
+    def with_updates(
+        self,
+        *,
+        name: str | None = None,
+        fault_type: FaultType | None = None,
+        location: FaultLocation | None = None,
+        config: ShortCircuitConfig | None = None,
+        fault_impedance_type: FaultImpedanceType | None = None,
+        z0_bus_data: Any = _SENTINEL,
+        updated_at: str | None = None,
+    ) -> FaultScenario:
+        """Create a copy with updated fields (copy-on-write, immutable)."""
+        return FaultScenario(
+            scenario_id=self.scenario_id,
+            study_case_id=self.study_case_id,
+            name=name if name is not None else self.name,
+            fault_type=fault_type if fault_type is not None else self.fault_type,
+            location=location if location is not None else self.location,
+            config=config if config is not None else self.config,
+            fault_impedance_type=(
+                fault_impedance_type
+                if fault_impedance_type is not None
+                else self.fault_impedance_type
+            ),
+            z0_bus_data=(
+                z0_bus_data if not isinstance(z0_bus_data, _SentinelType) else self.z0_bus_data
+            ),
+            created_at=self.created_at,
+            updated_at=updated_at if updated_at is not None else self.updated_at,
+            content_hash="",  # Will be recomputed by service
+        )
+
     def to_dict(self) -> dict[str, Any]:
         """Serialize to dictionary for API responses."""
         return {
             "scenario_id": str(self.scenario_id),
             "study_case_id": str(self.study_case_id),
+            "name": self.name,
             "analysis_type": self.analysis_type.value,
             "fault_type": self.fault_type.value,
             "location": self.location.to_dict(),
             "config": self.config.to_dict(),
+            "fault_impedance_type": self.fault_impedance_type.value,
             "z0_bus_data": self.z0_bus_data,
+            "created_at": self.created_at,
+            "updated_at": self.updated_at,
             "content_hash": self.content_hash,
         }
 
@@ -165,10 +238,16 @@ class FaultScenario:
         return cls(
             scenario_id=UUID(data["scenario_id"]),
             study_case_id=UUID(data["study_case_id"]),
+            name=data.get("name", ""),
             fault_type=FaultType(data["fault_type"]),
             location=FaultLocation.from_dict(data["location"]),
             config=ShortCircuitConfig.from_dict(data.get("config", {})),
+            fault_impedance_type=FaultImpedanceType(
+                data.get("fault_impedance_type", "METALLIC")
+            ),
             z0_bus_data=data.get("z0_bus_data"),
+            created_at=data.get("created_at", ""),
+            updated_at=data.get("updated_at", ""),
             content_hash=data.get("content_hash", ""),
         )
 
@@ -189,13 +268,24 @@ def validate_fault_scenario(scenario: FaultScenario) -> None:
     Validate FaultScenario invariants. Raises on violation.
 
     Rules:
+    - name is required (non-empty)
     - SC_1F requires z0_bus_data
     - location_type="BRANCH" requires position in (0,1)
     - location_type="BUS" requires position = None
     - c_factor > 0
     - thermal_time_seconds > 0
     """
+    if not scenario.name or not scenario.name.strip():
+        raise FaultScenarioValidationError(
+            "Nazwa scenariusza jest wymagana"
+        )
+
     loc = scenario.location
+
+    if not loc.element_ref or not loc.element_ref.strip():
+        raise FaultScenarioValidationError(
+            "Identyfikator węzła zwarcia (element_ref) jest wymagany"
+        )
 
     if loc.location_type == "BUS" and loc.position is not None:
         raise FaultScenarioValidationError(
@@ -237,26 +327,36 @@ def compute_scenario_content_hash(scenario: FaultScenario) -> str:
     """
     Compute deterministic SHA-256 of scenario content.
 
-    Hash covers: fault_type, location, config, z0_bus_data, analysis_type.
+    Hash covers: name, fault_type, location, config, fault_impedance_type,
+    z0_bus_data, analysis_type.
     Sorted keys for determinism.
     """
     content = {
         "analysis_type": scenario.analysis_type.value,
+        "fault_impedance_type": scenario.fault_impedance_type.value,
         "fault_type": scenario.fault_type.value,
         "location": scenario.location.to_dict(),
         "config": scenario.config.to_dict(),
+        "name": scenario.name,
         "z0_bus_data": scenario.z0_bus_data,
     }
     payload = json.dumps(content, sort_keys=True, separators=(",", ":"))
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
 
+def _now_utc_iso() -> str:
+    """Deterministic UTC timestamp as ISO string."""
+    return datetime.now(timezone.utc).isoformat()
+
+
 def new_fault_scenario(
     *,
     study_case_id: UUID,
+    name: str,
     fault_type: FaultType,
     location: FaultLocation,
     config: ShortCircuitConfig | None = None,
+    fault_impedance_type: FaultImpedanceType = FaultImpedanceType.METALLIC,
     z0_bus_data: dict[str, Any] | None = None,
 ) -> FaultScenario:
     """
@@ -266,9 +366,11 @@ def new_fault_scenario(
 
     Args:
         study_case_id: UUID of the parent study case.
+        name: User-facing Polish name (required).
         fault_type: SC_3F, SC_2F, or SC_1F.
         location: Fault location (bus or branch).
         config: Short-circuit config (defaults to standard).
+        fault_impedance_type: METALLIC (v1 default).
         z0_bus_data: Zero-sequence impedance data (required for SC_1F).
 
     Returns:
@@ -278,15 +380,20 @@ def new_fault_scenario(
         FaultScenarioValidationError: If invariants are violated.
     """
     cfg = config if config is not None else ShortCircuitConfig()
+    now = _now_utc_iso()
 
     # Build scenario without hash first
     scenario = FaultScenario(
         scenario_id=uuid4(),
         study_case_id=study_case_id,
+        name=name,
         fault_type=fault_type,
         location=location,
         config=cfg,
+        fault_impedance_type=fault_impedance_type,
         z0_bus_data=z0_bus_data,
+        created_at=now,
+        updated_at=now,
         content_hash="",  # Placeholder
     )
 
@@ -300,9 +407,13 @@ def new_fault_scenario(
     return FaultScenario(
         scenario_id=scenario.scenario_id,
         study_case_id=scenario.study_case_id,
+        name=scenario.name,
         fault_type=scenario.fault_type,
         location=scenario.location,
         config=scenario.config,
+        fault_impedance_type=scenario.fault_impedance_type,
         z0_bus_data=scenario.z0_bus_data,
+        created_at=scenario.created_at,
+        updated_at=scenario.updated_at,
         content_hash=content_hash,
     )

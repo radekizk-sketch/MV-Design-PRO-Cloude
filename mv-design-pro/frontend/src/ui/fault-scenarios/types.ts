@@ -1,102 +1,122 @@
 /**
- * Fault Scenario Types — PR-19
+ * Fault Scenarios Types — PR-24
  *
- * Type definitions for fault scenario management.
  * All labels in Polish. No project codenames.
- * No default physical values. No heuristics.
+ * Deterministic sorting (lexicographic by name).
  */
 
-/**
- * Fault type (IEC 60909).
- */
-export type FaultType = 'SC_3F' | 'SC_2F' | 'SC_1F';
+export type FaultTypeValue = 'SC_3F' | 'SC_2F' | 'SC_1F';
 
-/**
- * Location type in the network.
- */
+export const FAULT_TYPE_LABELS: Readonly<Record<FaultTypeValue, string>> = {
+  SC_3F: 'Zwarcie trójfazowe',
+  SC_2F: 'Zwarcie dwufazowe',
+  SC_1F: 'Zwarcie jednofazowe',
+} as const;
+
+export type FaultImpedanceTypeValue = 'METALLIC';
+
+export const FAULT_IMPEDANCE_LABELS: Readonly<Record<FaultImpedanceTypeValue, string>> = {
+  METALLIC: 'Zwarcie metaliczne',
+} as const;
+
 export type LocationType = 'BUS' | 'BRANCH';
 
-/**
- * Fault location in the network.
- */
+export const LOCATION_TYPE_LABELS: Readonly<Record<LocationType, string>> = {
+  BUS: 'Szyna',
+  BRANCH: 'Gałąź',
+} as const;
+
 export interface FaultLocation {
   element_ref: string;
   location_type: LocationType;
   position: number | null;
 }
 
-/**
- * Short-circuit calculation configuration.
- */
 export interface ShortCircuitConfig {
   c_factor: number;
   thermal_time_seconds: number;
   include_branch_contributions: boolean;
 }
 
-/**
- * Fault scenario domain object.
- */
 export interface FaultScenario {
   scenario_id: string;
   study_case_id: string;
+  name: string;
   analysis_type: string;
-  fault_type: FaultType;
+  fault_type: FaultTypeValue;
   location: FaultLocation;
   config: ShortCircuitConfig;
+  fault_impedance_type: FaultImpedanceTypeValue;
   z0_bus_data: Record<string, unknown> | null;
+  created_at: string;
+  updated_at: string;
   content_hash: string;
 }
 
-/**
- * Request to create a fault scenario.
- */
-export interface CreateFaultScenarioRequest {
-  fault_type: FaultType;
-  location: FaultLocation;
-  config?: Partial<ShortCircuitConfig>;
-  z0_bus_data?: Record<string, unknown> | null;
-}
-
-/**
- * List response from API.
- */
 export interface FaultScenarioListResponse {
   scenarios: FaultScenario[];
   count: number;
 }
 
-/**
- * Polish labels for fault types.
- */
-export const FAULT_TYPE_LABELS: Record<FaultType, string> = {
-  SC_3F: 'Zwarcie trójfazowe',
-  SC_2F: 'Zwarcie dwufazowe',
-  SC_1F: 'Zwarcie jednofazowe',
-};
+export interface CreateFaultScenarioRequest {
+  name: string;
+  fault_type: FaultTypeValue;
+  location: FaultLocation;
+  config?: ShortCircuitConfig;
+  z0_bus_data?: Record<string, unknown>;
+}
 
-/**
- * Polish labels for location types.
- */
-export const LOCATION_TYPE_LABELS: Record<LocationType, string> = {
-  BUS: 'Szyna',
-  BRANCH: 'Gałąź',
-};
+export interface UpdateFaultScenarioRequest {
+  name?: string;
+  fault_type?: FaultTypeValue;
+  location?: FaultLocation;
+  config?: ShortCircuitConfig;
+  z0_bus_data?: Record<string, unknown> | null;
+}
 
-/**
- * CSS colors for fault types.
- */
-export const FAULT_TYPE_COLORS: Record<FaultType, string> = {
-  SC_3F: 'text-red-600',
-  SC_2F: 'text-orange-600',
-  SC_1F: 'text-yellow-600',
-};
+export interface FixAction {
+  action_type: 'OPEN_MODAL' | 'NAVIGATE_TO_ELEMENT' | 'SELECT_CATALOG' | 'ADD_MISSING_DEVICE';
+  element_ref: string | null;
+  modal_type: string | null;
+  payload_hint: Record<string, unknown> | null;
+}
 
-/**
- * Badge colors for fault types.
- */
-export const FAULT_TYPE_BG_COLORS: Record<FaultType, string> = {
-  SC_3F: 'bg-red-100 border-red-300',
-  SC_2F: 'bg-orange-100 border-orange-300',
-  SC_1F: 'bg-yellow-100 border-yellow-300',
-};
+export interface EligibilityIssue {
+  code: string;
+  severity: 'BLOCKER' | 'WARNING' | 'INFO';
+  message_pl: string;
+  element_ref: string | null;
+  element_type: string | null;
+  fix_action: FixAction | null;
+}
+
+export interface ScenarioEligibilityResult {
+  analysis_type: string;
+  status: 'ELIGIBLE' | 'INELIGIBLE';
+  blockers: EligibilityIssue[];
+  warnings: EligibilityIssue[];
+}
+
+export interface ScenarioSldOverlay {
+  scenario_id: string;
+  overlay_type: string;
+  elements: Array<{
+    element_ref: string;
+    element_type: string;
+    visual_state: string;
+    color_token: string;
+    stroke_token: string;
+    animation_token: string | null;
+    numeric_badges: Record<string, number | null>;
+  }>;
+  legend: Array<{
+    color_token: string;
+    label: string;
+    description: string;
+  }>;
+  label: string;
+}
+
+export function getFaultTypeLabel(type: FaultTypeValue): string {
+  return FAULT_TYPE_LABELS[type] ?? type;
+}

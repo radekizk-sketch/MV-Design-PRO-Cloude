@@ -1,76 +1,100 @@
 /**
- * Fault Scenario API Client — PR-19
- *
- * API functions for fault scenario CRUD operations.
- * Uses fetch API with Polish error messages from backend.
+ * Fault Scenarios API Client — PR-24
+ * ZERO physics, ZERO local interpretation.
  */
 
 import type {
   FaultScenario,
   FaultScenarioListResponse,
   CreateFaultScenarioRequest,
+  UpdateFaultScenarioRequest,
+  ScenarioEligibilityResult,
+  ScenarioSldOverlay,
 } from './types';
 
-const API_BASE = '/api/study-cases';
-const API_DELETE_BASE = '/api/fault-scenarios';
+const BASE_URL = '/api/execution';
 
-/**
- * Handle API response errors.
- */
-async function handleResponse<T>(response: Response): Promise<T> {
-  if (!response.ok) {
-    const errorData = await response.json().catch(() => ({}));
-    throw new Error(
-      errorData.detail || `Błąd HTTP: ${response.status}`
-    );
-  }
-  return response.json();
+export async function fetchScenarios(studyCaseId: string): Promise<FaultScenarioListResponse> {
+  const res = await fetch(`${BASE_URL}/study-cases/${studyCaseId}/fault-scenarios`);
+  if (!res.ok) throw new Error(`Błąd pobierania scenariuszy: ${res.status}`);
+  return res.json();
 }
 
-/**
- * Create a new fault scenario for a study case.
- */
-export async function createFaultScenario(
+export async function fetchScenario(scenarioId: string): Promise<FaultScenario> {
+  const res = await fetch(`${BASE_URL}/fault-scenarios/${scenarioId}`);
+  if (!res.ok) throw new Error(`Scenariusz nie znaleziony: ${res.status}`);
+  return res.json();
+}
+
+export async function createScenario(
   studyCaseId: string,
-  request: CreateFaultScenarioRequest
+  data: CreateFaultScenarioRequest,
 ): Promise<FaultScenario> {
-  const response = await fetch(
-    `${API_BASE}/${studyCaseId}/fault-scenarios`,
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(request),
-    }
-  );
-  return handleResponse<FaultScenario>(response);
-}
-
-/**
- * List all fault scenarios for a study case.
- */
-export async function listFaultScenarios(
-  studyCaseId: string
-): Promise<FaultScenarioListResponse> {
-  const response = await fetch(
-    `${API_BASE}/${studyCaseId}/fault-scenarios`
-  );
-  return handleResponse<FaultScenarioListResponse>(response);
-}
-
-/**
- * Delete a fault scenario by ID.
- */
-export async function deleteFaultScenario(
-  scenarioId: string
-): Promise<void> {
-  const response = await fetch(
-    `${API_DELETE_BASE}/${scenarioId}`,
-    { method: 'DELETE' }
-  );
-  if (!response.ok) {
-    const errorData = await response.json().catch(() => ({}));
-    throw new Error(
-      errorData.detail || `Błąd HTTP: ${response.status}`
-    );
+  const res = await fetch(`${BASE_URL}/study-cases/${studyCaseId}/fault-scenarios`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail ?? `Błąd tworzenia scenariusza: ${res.status}`);
   }
+  return res.json();
+}
+
+export async function updateScenario(
+  scenarioId: string,
+  data: UpdateFaultScenarioRequest,
+): Promise<FaultScenario> {
+  const res = await fetch(`${BASE_URL}/fault-scenarios/${scenarioId}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail ?? `Błąd aktualizacji scenariusza: ${res.status}`);
+  }
+  return res.json();
+}
+
+export async function deleteScenario(scenarioId: string): Promise<void> {
+  const res = await fetch(`${BASE_URL}/fault-scenarios/${scenarioId}`, {
+    method: 'DELETE',
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail ?? `Błąd usuwania scenariusza: ${res.status}`);
+  }
+}
+
+export async function fetchScenarioEligibility(
+  scenarioId: string,
+): Promise<ScenarioEligibilityResult> {
+  const res = await fetch(`${BASE_URL}/fault-scenarios/${scenarioId}/eligibility`);
+  if (!res.ok) throw new Error(`Błąd sprawdzania uprawnień: ${res.status}`);
+  return res.json();
+}
+
+export async function fetchScenarioSldOverlay(
+  scenarioId: string,
+): Promise<ScenarioSldOverlay> {
+  const res = await fetch(`${BASE_URL}/fault-scenarios/${scenarioId}/sld-overlay`);
+  if (!res.ok) throw new Error(`Błąd pobierania overlay: ${res.status}`);
+  return res.json();
+}
+
+export async function createRunFromScenario(
+  scenarioId: string,
+): Promise<Record<string, unknown>> {
+  const res = await fetch(`${BASE_URL}/fault-scenarios/${scenarioId}/runs`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({}),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail ?? `Błąd tworzenia przebiegu: ${res.status}`);
+  }
+  return res.json();
 }
