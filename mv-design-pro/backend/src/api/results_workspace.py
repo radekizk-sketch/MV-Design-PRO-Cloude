@@ -1,5 +1,5 @@
 """
-Results Workspace API — PR-22
+Results Workspace API — PR-22 + PR-23 (Contract Freeze)
 
 Single endpoint aggregating runs, batches, and comparisons
 for a study case into a unified workspace projection.
@@ -13,6 +13,13 @@ INVARIANTS:
 - ZERO model mutations
 - Pure read-only projection endpoint
 - Deterministic output
+
+PR-23 CONTRACT:
+Response schema MUST contain exactly:
+  { runs, batches, comparisons, metadata, content_hash,
+    study_case_id, latest_done_run_id, deterministic_hash,
+    source_run_ids, source_batch_ids, source_comparison_ids }
+No dynamic fields. No None where not explicitly allowed.
 """
 
 from __future__ import annotations

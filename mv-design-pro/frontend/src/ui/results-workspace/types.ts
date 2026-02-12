@@ -157,7 +157,18 @@ export interface ComparisonSummary {
 // =============================================================================
 
 /**
+ * Projection metadata from backend (PR-23).
+ */
+export interface ProjectionMetadata {
+  projection_version: string;
+  created_utc: string;
+}
+
+/**
  * Full workspace projection response from backend.
+ *
+ * PR-23 CONTRACT: This schema is FROZEN.
+ * All fields are required. No dynamic fields allowed.
  */
 export interface WorkspaceProjection {
   study_case_id: string;
@@ -166,7 +177,30 @@ export interface WorkspaceProjection {
   comparisons: ComparisonSummary[];
   latest_done_run_id: string | null;
   deterministic_hash: string;
+  content_hash: string;
+  source_run_ids: string[];
+  source_batch_ids: string[];
+  source_comparison_ids: string[];
+  metadata: ProjectionMetadata;
 }
+
+/**
+ * PR-23: Required top-level keys in workspace projection response.
+ * Used for contract validation in tests.
+ */
+export const WORKSPACE_PROJECTION_REQUIRED_KEYS: readonly string[] = [
+  'study_case_id',
+  'runs',
+  'batches',
+  'comparisons',
+  'latest_done_run_id',
+  'deterministic_hash',
+  'content_hash',
+  'source_run_ids',
+  'source_batch_ids',
+  'source_comparison_ids',
+  'metadata',
+] as const;
 
 // =============================================================================
 // Analysis Type Labels

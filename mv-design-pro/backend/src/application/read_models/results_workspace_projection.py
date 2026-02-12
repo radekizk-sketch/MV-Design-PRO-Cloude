@@ -1,5 +1,5 @@
 """
-Results Workspace Projection — PR-22
+Results Workspace Projection — PR-22 + PR-23 (Determinism Lock)
 
 READ-ONLY projection aggregating runs, batches, and comparisons
 for a single study case into a unified workspace view.
@@ -15,7 +15,15 @@ INVARIANTS:
 - ZERO changes to ResultSet v1 contract
 - Pure data aggregation from existing domain services
 - Deterministic output (sorted lexicographically)
-- Content hash computed from canonical JSON
+- Content hash computed from canonical JSON (SHA-256)
+
+PR-23 ADDITIONS:
+- content_hash (SHA-256 of canonical JSON, sorted keys)
+- source_run_ids (sorted tuple of contributing run IDs)
+- source_batch_ids (sorted tuple of contributing batch IDs)
+- source_comparison_ids (sorted tuple of contributing comparison IDs)
+- compute_projection_hash() standalone function
+- Metadata sub-structure with projection_version and created_utc
 """
 
 from __future__ import annotations
@@ -23,11 +31,15 @@ from __future__ import annotations
 import hashlib
 import json
 from dataclasses import dataclass, field
+from datetime import datetime, timezone
 from typing import Any
 from uuid import UUID
 
 from domain.execution import ExecutionAnalysisType, Run, RunStatus
 from domain.batch_job import BatchJob, BatchJobStatus
+
+# Projection contract version — bump on breaking schema changes only
+PROJECTION_VERSION = "1.0.0"
 
 
 # ---------------------------------------------------------------------------
@@ -108,12 +120,36 @@ class ComparisonSummary:
 
 
 @dataclass(frozen=True)
+class ProjectionMetadata:
+    """Metadata for workspace projection audit trail.
+
+    PR-23: Every projection carries metadata for external audit.
+    """
+
+    projection_version: str = PROJECTION_VERSION
+    created_utc: str = ""
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "projection_version": self.projection_version,
+            "created_utc": self.created_utc,
+        }
+
+
+@dataclass(frozen=True)
 class ResultsWorkspaceProjection:
     """
     Unified workspace projection for a single study case.
 
     Contains aggregated summaries of runs, batches, and comparisons.
     Fully deterministic — sorted lexicographically, content-hashed.
+
+    PR-23 additions:
+    - content_hash: SHA-256 of canonical JSON representation
+    - source_run_ids: sorted tuple of contributing run IDs
+    - source_batch_ids: sorted tuple of contributing batch IDs
+    - source_comparison_ids: sorted tuple of contributing comparison IDs
+    - metadata: projection version and creation timestamp
     """
 
     study_case_id: str
@@ -122,6 +158,12 @@ class ResultsWorkspaceProjection:
     comparisons: tuple[ComparisonSummary, ...] = ()
     latest_done_run_id: str | None = None
     deterministic_hash: str = ""
+    # PR-23: content hash and source ID tracking
+    content_hash: str = ""
+    source_run_ids: tuple[str, ...] = ()
+    source_batch_ids: tuple[str, ...] = ()
+    source_comparison_ids: tuple[str, ...] = ()
+    metadata: ProjectionMetadata = field(default_factory=ProjectionMetadata)
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -131,6 +173,11 @@ class ResultsWorkspaceProjection:
             "comparisons": [c.to_dict() for c in self.comparisons],
             "latest_done_run_id": self.latest_done_run_id,
             "deterministic_hash": self.deterministic_hash,
+            "content_hash": self.content_hash,
+            "source_run_ids": list(self.source_run_ids),
+            "source_batch_ids": list(self.source_batch_ids),
+            "source_comparison_ids": list(self.source_comparison_ids),
+            "metadata": self.metadata.to_dict(),
         }
 
 
@@ -180,6 +227,38 @@ def map_batch_to_summary(batch: BatchJob) -> BatchSummary:
     )
 
 
+def compute_projection_hash(
+    study_case_id: str,
+    runs: tuple[RunSummary, ...],
+    batches: tuple[BatchSummary, ...],
+    comparisons: tuple[ComparisonSummary, ...],
+) -> str:
+    """
+    Compute deterministic SHA-256 hash for a workspace projection.
+
+    PR-23: Standalone function for independent hash computation/verification.
+
+    Hash is computed from canonical JSON with sorted keys — the same data
+    in any order of runs produces the identical hash (runs are pre-sorted).
+
+    Args:
+        study_case_id: Study case identifier
+        runs: Sorted tuple of RunSummary
+        batches: Sorted tuple of BatchSummary
+        comparisons: Sorted tuple of ComparisonSummary
+
+    Returns:
+        SHA-256 hex digest (64 characters)
+    """
+    hash_input = {
+        "study_case_id": study_case_id,
+        "runs": [r.to_dict() for r in runs],
+        "batches": [b.to_dict() for b in batches],
+        "comparisons": [c.to_dict() for c in comparisons],
+    }
+    return _compute_content_hash(hash_input)
+
+
 def build_workspace_projection(
     study_case_id: UUID,
     runs: list[Run],
@@ -204,6 +283,8 @@ def build_workspace_projection(
     - Comparisons sorted by created_at descending
     - All sorting is lexicographic (string comparison) for determinism
     - latest_done_run_id = most recent run with status DONE
+    - source_*_ids sorted ascending for determinism
+    - content_hash == deterministic_hash (same computation)
     """
     # Map and sort runs (newest first, deterministic)
     run_summaries = sorted(
@@ -240,20 +321,41 @@ def build_workspace_projection(
     done_runs = [r for r in run_summaries if r.status == "DONE"]
     latest_done_run_id = done_runs[0].run_id if done_runs else None
 
-    # Compute deterministic hash
-    hash_input = {
-        "study_case_id": str(study_case_id),
-        "runs": [r.to_dict() for r in run_summaries],
-        "batches": [b.to_dict() for b in batch_summaries],
-        "comparisons": [c.to_dict() for c in comparison_summaries],
-    }
-    content_hash = _compute_content_hash(hash_input)
+    # PR-23: Extract and sort source IDs (ascending, deterministic, explicit key)
+    source_run_ids = tuple(sorted((r.run_id for r in run_summaries), key=str))
+    source_batch_ids = tuple(sorted((b.batch_id for b in batch_summaries), key=str))
+    source_comparison_ids = tuple(sorted((c.comparison_id for c in comparison_summaries), key=str))
+
+    # Convert to tuples for frozen dataclass
+    runs_tuple = tuple(run_summaries)
+    batches_tuple = tuple(batch_summaries)
+    comparisons_tuple = tuple(comparison_summaries)
+
+    # Compute deterministic hash via standalone function
+    content_hash = compute_projection_hash(
+        study_case_id=str(study_case_id),
+        runs=runs_tuple,
+        batches=batches_tuple,
+        comparisons=comparisons_tuple,
+    )
+
+    # PR-23: Metadata with deterministic timestamp
+    now_utc = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    metadata = ProjectionMetadata(
+        projection_version=PROJECTION_VERSION,
+        created_utc=now_utc,
+    )
 
     return ResultsWorkspaceProjection(
         study_case_id=str(study_case_id),
-        runs=tuple(run_summaries),
-        batches=tuple(batch_summaries),
-        comparisons=tuple(comparison_summaries),
+        runs=runs_tuple,
+        batches=batches_tuple,
+        comparisons=comparisons_tuple,
         latest_done_run_id=latest_done_run_id,
         deterministic_hash=content_hash,
+        content_hash=content_hash,
+        source_run_ids=source_run_ids,
+        source_batch_ids=source_batch_ids,
+        source_comparison_ids=source_comparison_ids,
+        metadata=metadata,
     )
