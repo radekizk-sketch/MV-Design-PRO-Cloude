@@ -95,12 +95,17 @@ export interface OverlayPayloadV1 {
 /**
  * Color token → CSS class mapping.
  * Deterministic, no physics, no heuristics.
+ * Includes delta overlay tokens (PR-21).
  */
 export const COLOR_TOKEN_MAP: Readonly<Record<string, string>> = {
   ok: 'sld-overlay-ok',
   warning: 'sld-overlay-warning',
   critical: 'sld-overlay-critical',
   inactive: 'sld-overlay-inactive',
+  // Delta overlay tokens (PR-21)
+  delta_none: 'sld-overlay-ok',
+  delta_change: 'sld-overlay-warning',
+  delta_inactive: 'sld-overlay-inactive',
 } as const;
 
 /**

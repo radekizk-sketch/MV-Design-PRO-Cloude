@@ -37,6 +37,10 @@ from application.sc_comparison_service import (
     RunNotDoneError,
     StudyCaseMismatchError,
 )
+from application.result_mapping.sc_comparison_to_overlay_v1 import (
+    map_sc_comparison_to_overlay_v1,
+    compute_delta_overlay_content_hash,
+)
 from application.execution_engine.errors import (
     RunNotFoundError,
     RunNotReadyError,
@@ -409,3 +413,61 @@ def get_comparison(comparison_id: str) -> dict[str, Any]:
             status_code=status.HTTP_404_NOT_FOUND,
             detail=str(exc),
         ) from exc
+
+
+# =============================================================================
+# SLD Delta Overlay Endpoint (PR-21)
+# =============================================================================
+
+
+@router.get(
+    "/api/execution/comparisons/{comparison_id}/sld-delta-overlay",
+)
+def get_sld_delta_overlay(comparison_id: str) -> dict[str, Any]:
+    """
+    Pobierz overlay delta SLD dla porownania.
+
+    Mapuje ShortCircuitComparison na OverlayPayloadV1 zgodny z PR-16.
+    Deterministyczny: ten sam comparison_id -> identyczny payload + hash.
+
+    GET /api/execution/comparisons/{comparison_id}/sld-delta-overlay
+    """
+    parsed_comparison_id = _parse_uuid(comparison_id, "comparison_id")
+    service = _get_comparison_service()
+
+    try:
+        comparison = service.get_comparison(parsed_comparison_id)
+    except ComparisonNotFoundError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(exc),
+        ) from exc
+
+    overlay = map_sc_comparison_to_overlay_v1(comparison)
+    content_hash = compute_delta_overlay_content_hash(overlay)
+
+    payload = overlay.model_dump(mode="json")
+    payload["content_hash"] = content_hash
+    # Serialize run_id (UUID) to string for JSON
+    payload["run_id"] = str(payload["run_id"])
+
+    return payload
+
+
+@router.get(
+    "/api/execution/study-cases/{case_id}/comparisons",
+)
+def list_comparisons(case_id: str) -> dict[str, Any]:
+    """
+    Lista porownan dla przypadku obliczeniowego.
+
+    GET /api/execution/study-cases/{case_id}/comparisons
+    """
+    parsed_case_id = _parse_uuid(case_id, "case_id")
+    service = _get_comparison_service()
+
+    comparisons = service.list_comparisons(parsed_case_id)
+    return {
+        "comparisons": [c.to_dict() for c in comparisons],
+        "count": len(comparisons),
+    }
