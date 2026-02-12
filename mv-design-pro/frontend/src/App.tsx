@@ -34,6 +34,7 @@ import { ProtectionResultsInspectorPage } from './ui/protection-results';
 import { PowerFlowResultsInspectorPage } from './ui/power-flow-results';
 import { ReferencePatternsPage } from './ui/reference-patterns';
 import { ResultsInspectorPage } from './ui/results-inspector';
+import { ResultsWorkspacePage } from './ui/results-workspace';
 import { SLDViewPage, SldEditorPage } from './ui/sld';
 import { WizardPage } from './ui/wizard';
 import { EnmInspectorPage } from './ui/enm-inspector';
@@ -74,6 +75,7 @@ function useAppReady(): boolean {
 function isResultsRoute(route: string): boolean {
   return (
     route === '#results' ||
+    route === '#results-workspace' ||
     route === '#proof' ||
     route === '#protection-results' ||
     route === '#power-flow-results' ||
@@ -188,6 +190,15 @@ function App() {
     onTreeCategoryClick: handleTreeCategoryClick,
     onTreeRunClick: handleTreeRunClick,
   };
+
+  // PR-22: Unified Results Workspace (Run / Batch / Compare / Overlay)
+  if (route === '#results-workspace') {
+    return wrapWithReadyIndicator(
+      <PowerFactoryLayout {...layoutProps} hideInspector={true}>
+        <ResultsWorkspacePage />
+      </PowerFactoryLayout>
+    );
+  }
 
   // UI_INTEGRATION_E2E + PROJECT_TREE_PARITY_V1: Przegląd wyników (Results Browser)
   if (route === '#results') {
