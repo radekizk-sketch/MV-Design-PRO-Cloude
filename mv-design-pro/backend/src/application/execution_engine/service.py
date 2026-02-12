@@ -422,6 +422,85 @@ class ExecutionEngineService:
         )
 
     # =========================================================================
+    # Protection Execution (PR-26)
+    # =========================================================================
+
+    def execute_run_protection(
+        self,
+        run_id: UUID,
+        *,
+        study_input: Any,
+        readiness_snapshot: dict[str, Any],
+        validation_snapshot: dict[str, Any],
+    ) -> tuple[Run, ResultSet]:
+        """
+        Execute a protection analysis run end-to-end (PR-26).
+
+        FLOW:
+        1. Get Run (must be PENDING)
+        2. Mark as RUNNING
+        3. Call Protection Engine v1 with explicit test points
+        4. Map result → ResultSet (PROTECTION)
+        5. Store ResultSet, mark as DONE
+        6. On error → mark as FAILED
+
+        Args:
+            run_id: ID of a PENDING run.
+            study_input: ProtectionStudyInputV1 with relays and test points.
+            readiness_snapshot: Readiness state at run time.
+            validation_snapshot: Validation state at run time.
+
+        Returns:
+            Tuple of (completed Run in DONE status, ResultSet).
+        """
+        from domain.protection_engine_v1 import execute_protection_v1
+        from application.result_mapping.protection_to_resultset_v1 import (
+            map_protection_to_resultset_v1,
+        )
+
+        run = self._get_run(run_id)
+
+        if run.status != RunStatus.PENDING:
+            raise RunBlockedError(
+                [f"Przebieg ma status {run.status.value} — wymagany PENDING"]
+            )
+
+        if run.analysis_type != ExecutionAnalysisType.PROTECTION:
+            raise RunBlockedError(
+                [f"Typ analizy {run.analysis_type.value} nie jest PROTECTION"]
+            )
+
+        run = self.start_run(run_id)
+
+        try:
+            protection_result = execute_protection_v1(study_input)
+
+            result_set = map_protection_to_resultset_v1(
+                protection_result=protection_result,
+                run_id=run.id,
+                validation_snapshot=validation_snapshot,
+                readiness_snapshot=readiness_snapshot,
+            )
+
+            updated_run = run.mark_done()
+            self._runs[run_id] = updated_run
+            self._result_sets[run_id] = result_set
+
+            logger.info(
+                "Protection run %s completed: relays=%d, sig=%s",
+                run_id,
+                len(protection_result.relay_results),
+                result_set.deterministic_signature[:16],
+            )
+
+            return updated_run, result_set
+
+        except Exception as exc:
+            error_msg = str(exc)
+            self.fail_run(run_id, error_msg)
+            raise
+
+    # =========================================================================
     # Query Operations
     # =========================================================================
 
