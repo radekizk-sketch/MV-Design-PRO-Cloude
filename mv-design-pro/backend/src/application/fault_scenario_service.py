@@ -22,8 +22,10 @@ from typing import Any
 from uuid import UUID
 
 from domain.fault_scenario import (
+    FaultImpedance,
     FaultImpedanceType,
     FaultLocation,
+    FaultMode,
     FaultScenario,
     FaultScenarioValidationError,
     FaultType,
@@ -105,6 +107,11 @@ FAULT_TYPE_LABELS_PL: dict[FaultType, str] = {
     FaultType.SC_1F: "1-fazowe",
 }
 
+FAULT_MODE_LABELS_PL: dict[FaultMode, str] = {
+    FaultMode.METALLIC: "metaliczne",
+    FaultMode.IMPEDANCE: "przez impedancję",
+}
+
 
 # ---------------------------------------------------------------------------
 # Service
@@ -142,6 +149,9 @@ class FaultScenarioService:
         fault_type: str,
         location: dict[str, Any],
         config: dict[str, Any] | None = None,
+        fault_mode: str | None = None,
+        fault_impedance: dict[str, Any] | None = None,
+        arc_params: dict[str, Any] | None = None,
         z0_bus_data: dict[str, Any] | None = None,
     ) -> FaultScenario:
         """
@@ -151,8 +161,11 @@ class FaultScenarioService:
             study_case_id: Parent study case UUID.
             name: User-facing Polish name (required).
             fault_type: "SC_3F", "SC_2F", or "SC_1F".
-            location: {"element_ref": str, "location_type": "BUS"|"BRANCH", "position": float|None}
+            location: {"element_ref": str, "location_type": ..., "position": float|None}
             config: Optional short-circuit config overrides.
+            fault_mode: "METALLIC" or "IMPEDANCE" (v2, default METALLIC).
+            fault_impedance: {"r_ohm": float, "x_ohm": float} (v2, required for IMPEDANCE).
+            arc_params: Reserved — unsupported in v2.
             z0_bus_data: Zero-sequence impedance data (required for SC_1F).
 
         Returns:
@@ -165,6 +178,8 @@ class FaultScenarioService:
         ft = FaultType(fault_type)
         loc = FaultLocation.from_dict(location)
         cfg = ShortCircuitConfig.from_dict(config) if config else ShortCircuitConfig()
+        fm = FaultMode(fault_mode) if fault_mode else FaultMode.METALLIC
+        fi = FaultImpedance.from_dict(fault_impedance) if fault_impedance else None
 
         scenario = new_fault_scenario(
             study_case_id=study_case_id,
@@ -172,6 +187,9 @@ class FaultScenarioService:
             fault_type=ft,
             location=loc,
             config=cfg,
+            fault_mode=fm,
+            fault_impedance=fi,
+            arc_params=arc_params,
             z0_bus_data=z0_bus_data,
         )
 
@@ -232,6 +250,9 @@ class FaultScenarioService:
         fault_type: str | None = None,
         location: dict[str, Any] | None = None,
         config: dict[str, Any] | None = None,
+        fault_mode: str | None = None,
+        fault_impedance: dict[str, Any] | None = None,
+        arc_params: Any = None,
         z0_bus_data: Any = None,
     ) -> FaultScenario:
         """
@@ -246,7 +267,10 @@ class FaultScenarioService:
             fault_type: New fault type (optional).
             location: New location dict (optional).
             config: New config dict (optional).
-            z0_bus_data: New z0_bus_data (optional, pass explicitly to update).
+            fault_mode: New fault mode (optional, v2).
+            fault_impedance: New fault impedance (optional, v2).
+            arc_params: Reserved — unsupported (v2).
+            z0_bus_data: New z0_bus_data (optional).
 
         Returns:
             Updated FaultScenario with new content_hash and updated_at.
@@ -267,6 +291,12 @@ class FaultScenarioService:
             update_kwargs["location"] = FaultLocation.from_dict(location)
         if config is not None:
             update_kwargs["config"] = ShortCircuitConfig.from_dict(config)
+        if fault_mode is not None:
+            update_kwargs["fault_mode"] = FaultMode(fault_mode)
+        if fault_impedance is not None:
+            update_kwargs["fault_impedance"] = FaultImpedance.from_dict(fault_impedance)
+        if arc_params is not None:
+            update_kwargs["arc_params"] = arc_params
         if z0_bus_data is not None:
             update_kwargs["z0_bus_data"] = z0_bus_data
 
@@ -289,6 +319,9 @@ class FaultScenarioService:
             location=updated.location,
             config=updated.config,
             fault_impedance_type=updated.fault_impedance_type,
+            fault_mode=updated.fault_mode,
+            fault_impedance=updated.fault_impedance,
+            arc_params=updated.arc_params,
             z0_bus_data=updated.z0_bus_data,
             created_at=updated.created_at,
             updated_at=updated.updated_at,
@@ -453,6 +486,45 @@ class FaultScenarioService:
                 )
             )
 
+        # v2 Rule 4: IMPEDANCE mode — binding unsupported (PR-25)
+        if scenario.fault_mode == FaultMode.IMPEDANCE:
+            blockers.append(
+                AnalysisEligibilityIssue(
+                    code="ELIG_BINDING_UNSUPPORTED_FAULT_IMPEDANCE",
+                    severity=IssueSeverity.BLOCKER,
+                    message_pl=(
+                        "Tryb zwarcia przez impedancję (Zf) nie jest jeszcze obsługiwany "
+                        "przez adapter obliczeniowy — użyj trybu metalicznego"
+                    ),
+                    element_ref=scenario.location.element_ref,
+                    element_type=scenario.location.location_type,
+                    fix_action=FixAction(
+                        action_type="OPEN_MODAL",
+                        modal_type="Zmień tryb zwarcia",
+                        payload_hint={"suggested_mode": "METALLIC"},
+                    ),
+                )
+            )
+
+        # v2 Rule 5: BRANCH_POINT location — binding unsupported (PR-25)
+        if scenario.location.location_type == "BRANCH_POINT":
+            blockers.append(
+                AnalysisEligibilityIssue(
+                    code="ELIG_BINDING_UNSUPPORTED_BRANCH_POINT",
+                    severity=IssueSeverity.BLOCKER,
+                    message_pl=(
+                        "Zwarcie w punkcie na gałęzi (BRANCH_POINT) nie jest jeszcze obsługiwane "
+                        "przez adapter obliczeniowy — wybierz lokalizację na węźle"
+                    ),
+                    element_ref=scenario.location.element_ref,
+                    element_type=scenario.location.location_type,
+                    fix_action=FixAction(
+                        action_type="NAVIGATE_TO_ELEMENT",
+                        payload_hint={"suggested_location_type": "NODE"},
+                    ),
+                )
+            )
+
         return build_eligibility_result(
             analysis_type=analysis_type,
             blockers=blockers,
@@ -478,27 +550,39 @@ class FaultScenarioService:
         scenario = self.get_scenario(scenario_id)
 
         fault_label = FAULT_TYPE_LABELS_PL.get(scenario.fault_type, scenario.fault_type.value)
+        mode_label = FAULT_MODE_LABELS_PL.get(scenario.fault_mode, scenario.fault_mode.value)
+
+        overlay_element: dict[str, Any] = {
+            "element_ref": scenario.location.element_ref,
+            "element_type": scenario.location.location_type,
+            "visual_state": "WARNING",
+            "color_token": "warning",
+            "stroke_token": "bold",
+            "animation_token": "pulse",
+            "numeric_badges": {},
+        }
+
+        # v2: BRANCH_POINT — include alpha for visual positioning
+        if scenario.location.location_type == "BRANCH_POINT" and scenario.location.position is not None:
+            overlay_element["branch_point_alpha"] = scenario.location.position
+
+        # v2: IMPEDANCE mode — include Zf in overlay metadata
+        if scenario.fault_mode == FaultMode.IMPEDANCE and scenario.fault_impedance is not None:
+            overlay_element["fault_impedance"] = scenario.fault_impedance.to_dict()
+
+        composite_label = f"Zwarcie: {scenario.name} ({fault_label}, {mode_label})"
 
         return {
             "scenario_id": str(scenario.scenario_id),
             "overlay_type": "fault_scenario",
-            "elements": [
-                {
-                    "element_ref": scenario.location.element_ref,
-                    "element_type": scenario.location.location_type,
-                    "visual_state": "WARNING",
-                    "color_token": "warning",
-                    "stroke_token": "bold",
-                    "animation_token": "pulse",
-                    "numeric_badges": {},
-                }
-            ],
+            "fault_mode": scenario.fault_mode.value,
+            "elements": [overlay_element],
             "legend": [
                 {
                     "color_token": "warning",
-                    "label": f"Zwarcie: {scenario.name} ({fault_label})",
+                    "label": composite_label,
                     "description": "Miejsce zwarcia dla wybranego scenariusza",
                 }
             ],
-            "label": f"Zwarcie: {scenario.name} ({fault_label})",
+            "label": composite_label,
         }
