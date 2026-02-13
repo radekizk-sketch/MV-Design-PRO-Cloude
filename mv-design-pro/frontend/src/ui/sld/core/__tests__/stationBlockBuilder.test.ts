@@ -212,8 +212,8 @@ function buildGN_OZE_SN(): TopologyInputV1 {
       { id: 'src_gpz', name: 'GPZ 110/15kV', nodeId: 'bus_sn', inService: true },
     ],
     generators: [
-      { id: 'gen_pv', name: 'PV Farma 5MW', kind: GeneratorKind.PV, nodeId: 'bus_sn', inService: true, ratedPowerMw: 5, catalogRef: 'cat_pv_001', blockingTransformerId: null },
-      { id: 'gen_bess', name: 'BESS 2MWh', kind: GeneratorKind.BESS, nodeId: 'bus_sn', inService: true, ratedPowerMw: 2, catalogRef: 'cat_bess_001', blockingTransformerId: null },
+      { id: 'gen_pv', name: 'PV Farma 5MW', kind: GeneratorKind.PV, nodeId: 'bus_sn', inService: true, ratedPowerMw: 5, catalogRef: 'cat_pv_001', blockingTransformerId: null, connectionVariant: 'block_transformer', stationRef: null },
+      { id: 'gen_bess', name: 'BESS 2MWh', kind: GeneratorKind.BESS, nodeId: 'bus_sn', inService: true, ratedPowerMw: 2, catalogRef: 'cat_bess_001', blockingTransformerId: null, connectionVariant: 'block_transformer', stationRef: null },
     ],
   });
 }
@@ -294,6 +294,8 @@ function buildGN_STRESS_50(): TopologyInputV1 {
         ratedPowerMw: 1 + i * 0.1,
         catalogRef: `cat_pv_${i}`,
         blockingTransformerId: null,
+        connectionVariant: 'block_transformer',
+        stationRef: null,
       });
     }
 
@@ -445,13 +447,63 @@ describe('Field/Device Building — RUN #3D', () => {
     expect(bessDev).toBeDefined();
   });
 
-  it('GN-OZE-SN: brak TR blokowego → FixAction', () => {
+  it('GN-OZE-SN: brak TR blokowego → FixAction (block_transformer variant)', () => {
     const input = buildGN_OZE_SN();
     const result = buildVisualGraphFromTopology(input);
     const blockTrFix = result.stationBlockDetails.fixActions.find(f =>
       f.code === FieldDeviceFixCodes.GENERATOR_BLOCK_TR_MISSING,
     );
     expect(blockTrFix).toBeDefined();
+  });
+
+  it('GN-OZE-SN: nn_side variant → no block TR FixAction', () => {
+    const input = makeBaseInput({
+      connectionNodes: [
+        { id: 'bus_sn', name: 'Szyna SN 15kV', voltageKv: 15, inService: true },
+      ],
+      stations: [
+        { id: 'sta_nn', name: 'Stacja NN', stationType: StationKind.DISTRIBUTION, voltageKv: 15, busIds: ['bus_sn'], switchIds: [], transformerIds: [] },
+      ],
+      sources: [
+        { id: 'src_gpz', name: 'GPZ 110/15kV', nodeId: 'bus_sn', inService: true },
+      ],
+      generators: [
+        { id: 'gen_pv_nn', name: 'PV nn_side', kind: GeneratorKind.PV, nodeId: 'bus_sn', inService: true, ratedPowerMw: 3, catalogRef: 'cat_pv', blockingTransformerId: null, connectionVariant: 'nn_side', stationRef: 'sta_nn' },
+      ],
+    });
+    const result = buildVisualGraphFromTopology(input);
+    const blockTrFix = result.stationBlockDetails.fixActions.find(f =>
+      f.code === FieldDeviceFixCodes.GENERATOR_BLOCK_TR_MISSING,
+    );
+    // nn_side variant does NOT require block transformer
+    expect(blockTrFix).toBeUndefined();
+  });
+
+  it('GN-OZE-SN: null variant → GENERATOR_CONNECTION_VARIANT_MISSING FixAction', () => {
+    const input = makeBaseInput({
+      connectionNodes: [
+        { id: 'bus_sn', name: 'Szyna SN 15kV', voltageKv: 15, inService: true },
+      ],
+      stations: [
+        { id: 'sta_oze', name: 'Stacja OZE', stationType: StationKind.DISTRIBUTION, voltageKv: 15, busIds: ['bus_sn'], switchIds: [], transformerIds: [] },
+      ],
+      sources: [
+        { id: 'src_gpz', name: 'GPZ', nodeId: 'bus_sn', inService: true },
+      ],
+      generators: [
+        { id: 'gen_pv_novar', name: 'PV bez wariantu', kind: GeneratorKind.PV, nodeId: 'bus_sn', inService: true, ratedPowerMw: 2, catalogRef: 'cat_pv', blockingTransformerId: null, connectionVariant: null, stationRef: null },
+      ],
+    });
+    const result = buildVisualGraphFromTopology(input);
+    const variantFix = result.stationBlockDetails.fixActions.find(f =>
+      f.code === FieldDeviceFixCodes.GENERATOR_CONNECTION_VARIANT_MISSING,
+    );
+    expect(variantFix).toBeDefined();
+    // No block TR fix should appear (variant not determined yet)
+    const blockTrFix = result.stationBlockDetails.fixActions.find(f =>
+      f.code === FieldDeviceFixCodes.GENERATOR_BLOCK_TR_MISSING,
+    );
+    expect(blockTrFix).toBeUndefined();
   });
 
   it('GN-STA-LEAF: device anchors computed', () => {

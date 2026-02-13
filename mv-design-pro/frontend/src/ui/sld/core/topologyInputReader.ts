@@ -149,6 +149,10 @@ export interface TopologyGeneratorV1 {
   readonly inService: boolean;
   readonly ratedPowerMw: number | null;
   readonly blockingTransformerId: string | null;
+  /** Wariant przylaczenia PV/BESS: nn_side | block_transformer | null (brak → FixAction). */
+  readonly connectionVariant: 'nn_side' | 'block_transformer' | null;
+  /** Referencja do stacji (wymagana przy nn_side). */
+  readonly stationRef: string | null;
 }
 
 /**
@@ -467,6 +471,13 @@ export function readTopologyFromENM(
   }));
 
   // --- Generators ---
+  const OZE_TYPES: GeneratorKind[] = [GeneratorKind.PV, GeneratorKind.WIND, GeneratorKind.BESS];
+  const VALID_CONNECTION_VARIANTS = new Set(['nn_side', 'block_transformer']);
+
+  // Build lookup maps for validation
+  const transformerRefSet = new Set(enm.transformers.map(t => t.ref_id));
+  const stationRefSet = new Set(enm.substations.map(s => s.ref_id));
+
   const generators: TopologyGeneratorV1[] = enm.generators.map((g) => {
     if (!g.gen_type) {
       fixActions.push({
@@ -476,15 +487,75 @@ export function readTopologyFromENM(
         fixHint: 'Ustaw gen_type na pv_inverter, wind_inverter, bess lub synchronous.',
       });
     }
+
+    const kind = enmGenKind(g);
+    const isOze = OZE_TYPES.includes(kind);
+    const connectionVariant = g.connection_variant ?? null;
+    const blockingTransformerId = g.blocking_transformer_ref ?? null;
+    const stationRef = g.station_ref ?? null;
+
+    // OZE-specific validation (PV, WIND, BESS)
+    if (isOze) {
+      if (!connectionVariant) {
+        fixActions.push({
+          code: 'generator.connection_variant_missing',
+          message: `Generator OZE '${g.name}' (${g.ref_id}) nie ma wariantu przylaczenia (connection_variant).`,
+          elementRef: g.ref_id,
+          fixHint: 'Ustaw connection_variant na nn_side lub block_transformer.',
+        });
+      } else if (!VALID_CONNECTION_VARIANTS.has(connectionVariant)) {
+        fixActions.push({
+          code: 'generator.connection_variant_invalid',
+          message: `Generator '${g.name}' (${g.ref_id}): wariant '${connectionVariant}' jest nieprawidlowy.`,
+          elementRef: g.ref_id,
+          fixHint: 'Wariant musi byc nn_side lub block_transformer.',
+        });
+      } else if (connectionVariant === 'block_transformer') {
+        if (!blockingTransformerId) {
+          fixActions.push({
+            code: 'generator.block_transformer_missing',
+            message: `Generator '${g.name}' (${g.ref_id}): wariant block_transformer wymaga blocking_transformer_ref.`,
+            elementRef: g.ref_id,
+            fixHint: 'Przypisz transformator blokowy do generatora.',
+          });
+        } else if (!transformerRefSet.has(blockingTransformerId)) {
+          fixActions.push({
+            code: 'generator.block_transformer_invalid',
+            message: `Generator '${g.name}' (${g.ref_id}): blocking_transformer_ref '${blockingTransformerId}' nie istnieje.`,
+            elementRef: g.ref_id,
+            fixHint: 'Sprawdz ref_id transformatora blokowego.',
+          });
+        }
+      } else if (connectionVariant === 'nn_side') {
+        if (!stationRef) {
+          fixActions.push({
+            code: 'generator.station_ref_missing',
+            message: `Generator '${g.name}' (${g.ref_id}): wariant nn_side wymaga station_ref.`,
+            elementRef: g.ref_id,
+            fixHint: 'Przypisz stacje SN/nN do generatora.',
+          });
+        } else if (!stationRefSet.has(stationRef)) {
+          fixActions.push({
+            code: 'generator.station_ref_invalid',
+            message: `Generator '${g.name}' (${g.ref_id}): station_ref '${stationRef}' nie istnieje.`,
+            elementRef: g.ref_id,
+            fixHint: 'Sprawdz ref_id stacji.',
+          });
+        }
+      }
+    }
+
     return {
       id: g.ref_id,
       name: g.name,
       nodeId: g.bus_ref,
-      kind: enmGenKind(g),
+      kind,
       catalogRef: g.catalog_ref ?? null,
       inService: true,
       ratedPowerMw: g.p_mw,
-      blockingTransformerId: null,
+      blockingTransformerId,
+      connectionVariant,
+      stationRef,
     };
   });
 
@@ -677,6 +748,8 @@ export function readTopologyFromSymbols(
           inService: s.inService,
           ratedPowerMw: null,
           blockingTransformerId: null,
+          connectionVariant: null,
+          stationRef: null,
         });
       } else {
         sources.push({

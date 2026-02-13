@@ -142,8 +142,8 @@ function buildGN_DOM_03_OZE(): TopologyInputV1 {
       { id: 'st_bess', name: 'Stacja z BESS', stationType: StationKind.DISTRIBUTION, voltageKv: 15, busIds: ['bus_st'], branchIds: [], switchIds: [], transformerIds: [] },
     ],
     generators: [
-      { id: 'gen_pv', name: 'Farma PV 2MW', nodeId: 'bus_pv', kind: GeneratorKind.PV, catalogRef: 'INV-500', inService: true, ratedPowerMw: 2.0, blockingTransformerId: null },
-      { id: 'gen_bess', name: 'BESS 1MW', nodeId: 'bus_st', kind: GeneratorKind.BESS, catalogRef: 'BESS-1000', inService: true, ratedPowerMw: 1.0, blockingTransformerId: null },
+      { id: 'gen_pv', name: 'Farma PV 2MW', nodeId: 'bus_pv', kind: GeneratorKind.PV, catalogRef: 'INV-500', inService: true, ratedPowerMw: 2.0, blockingTransformerId: null, connectionVariant: 'block_transformer', stationRef: null },
+      { id: 'gen_bess', name: 'BESS 1MW', nodeId: 'bus_st', kind: GeneratorKind.BESS, catalogRef: 'BESS-1000', inService: true, ratedPowerMw: 1.0, blockingTransformerId: null, connectionVariant: 'nn_side', stationRef: 'st_bess' },
     ],
     sources: [{ id: 'src_gpz', name: 'GPZ', nodeId: 'bus_gpz', inService: true }],
     loads: [],

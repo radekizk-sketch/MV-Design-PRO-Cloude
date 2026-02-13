@@ -501,6 +501,11 @@ export const FieldDeviceFixCodes = {
 
   // Generator
   GENERATOR_BLOCK_TR_MISSING: 'generator.block_transformer_missing',
+  GENERATOR_BLOCK_TR_INVALID: 'generator.block_transformer_invalid',
+  GENERATOR_CONNECTION_VARIANT_MISSING: 'generator.connection_variant_missing',
+  GENERATOR_CONNECTION_VARIANT_INVALID: 'generator.connection_variant_invalid',
+  GENERATOR_STATION_REF_MISSING: 'generator.station_ref_missing',
+  GENERATOR_STATION_REF_INVALID: 'generator.station_ref_invalid',
 
   // Model
   MODEL_NN_SCOPE_MISSING: 'model.nn_scope_missing',

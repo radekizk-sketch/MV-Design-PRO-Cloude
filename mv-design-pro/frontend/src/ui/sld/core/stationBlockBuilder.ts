@@ -335,6 +335,10 @@ function buildFieldsForStation(
   }
 
   // --- Pola OZE (PV/BESS) ---
+  // Warianty przylaczenia:
+  //   nn_side: generator po stronie nN stacji (przez TR stacji SN/nN)
+  //   block_transformer: generator przez TR blokowy do SN
+  //   null: brak informacji → FixAction (pole tworzone z domyslna rola *_SN)
   for (const gen of stationGenerators.sort((a, b) => a.id.localeCompare(b.id))) {
     let fieldRole: FieldRoleV1;
     let deviceType: DeviceTypeV1;
@@ -382,16 +386,29 @@ function buildFieldsForStation(
     });
     fieldDeviceIds.push(genDeviceId);
 
-    // Sprawdz TR blokowy
-    if (gen.blockingTransformerId) {
-      // TR blokowy istnieje w domenie — NIE fabrykuj, ale zarejestruj
-    } else {
-      // Brak TR blokowego — FixAction jesli wymagany
+    // Walidacja wariantu przylaczenia (z domeny, nie zgadywanie)
+    if (gen.connectionVariant === 'block_transformer') {
+      // Wariant B: TR blokowy wymagany
+      if (gen.blockingTransformerId) {
+        // TR blokowy istnieje w domenie — NIE fabrykuj, ale zarejestruj
+      } else {
+        fixActions.push({
+          code: FieldDeviceFixCodes.GENERATOR_BLOCK_TR_MISSING,
+          message: `Generator ${gen.id} (${gen.name}): wariant block_transformer wymaga transformatora blokowego`,
+          elementId: gen.id,
+          fixHint: `Dodaj transformator blokowy dla generatora ${gen.name}`,
+        });
+      }
+    } else if (gen.connectionVariant === 'nn_side') {
+      // Wariant A: po stronie nN — TR blokowy NIE wymagany
+      // station_ref walidowany w topologyInputReader
+    } else if (gen.connectionVariant === null) {
+      // Brak wariantu — FixAction (czytelnik juz emitowal, ale builder tez raportuje)
       fixActions.push({
-        code: FieldDeviceFixCodes.GENERATOR_BLOCK_TR_MISSING,
-        message: `Generator ${gen.id} (${gen.name}): brak transformatora blokowego`,
+        code: FieldDeviceFixCodes.GENERATOR_CONNECTION_VARIANT_MISSING,
+        message: `Generator ${gen.id} (${gen.name}): brak wariantu przylaczenia (connection_variant)`,
         elementId: gen.id,
-        fixHint: `Dodaj transformator blokowy dla generatora ${gen.name}`,
+        fixHint: `Ustaw connection_variant na nn_side lub block_transformer dla ${gen.name}`,
       });
     }
 
