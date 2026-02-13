@@ -11,7 +11,7 @@
  * DETERMINIZM:
  * - Ten sam TopologyInput → identyczny VisualGraphV1 (bit-for-bit).
  * - Sortowanie po id na kazdym etapie.
- * - Brak Math.random(), Date.now(), Set/Map iteration order.
+ * - Brak niedeterministycznych API (random, zegar, iteracja Set/Map).
  */
 
 import {
@@ -73,7 +73,12 @@ export interface AdapterResultV1 {
 /**
  * Klasyfikuje NodeType dla szyny na podstawie napiecia.
  */
-function classifyBusType(voltageKv: number): NodeTypeV1 {
+/**
+ * Klasyfikuje NodeType szyny na podstawie napiecia.
+ * null → BUS_SN (niedokreslone napiecie; FixAction bus.voltage_missing juz wygenerowany w TopologyInputReader).
+ */
+function classifyBusType(voltageKv: number | null): NodeTypeV1 {
+  if (voltageKv === null) return NodeTypeV1.BUS_SN; // Undetermined — FixAction from reader
   return voltageKv >= 6 ? NodeTypeV1.BUS_SN : NodeTypeV1.BUS_NN;
 }
 
@@ -94,6 +99,11 @@ function classifyStationType(
   fixActions: TopologyFixAction[],
 ): NodeTypeV1 {
   const busCount = station.busIds.length;
+
+  // DISTRIBUTION z transformatorem → TYPE_B (SN + nN to dwie szyny, ale nie sekcyjna)
+  if (station.stationType === StationKind.DISTRIBUTION && station.transformerIds.length > 0) {
+    return NodeTypeV1.STATION_SN_NN_B;
+  }
 
   // Stacja z ≥2 szynami → TYPE_D (sekcyjna)
   if (busCount >= 2) {
@@ -730,7 +740,7 @@ export function buildVisualGraphFromTopology(
     });
   }
 
-  // --- 11. Build meta (DETERMINISTIC — no Date.now()) ---
+  // --- 11. Build meta (DETERMINISTIC — timestamp z parametru, nie z zegara) ---
   const meta: VisualGraphMetaV1 = {
     snapshotId: input.snapshotId,
     snapshotFingerprint: input.snapshotFingerprint,

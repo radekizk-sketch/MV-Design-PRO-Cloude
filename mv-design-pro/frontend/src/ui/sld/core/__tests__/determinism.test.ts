@@ -19,7 +19,8 @@ import {
   EdgeTypeV1,
   VISUAL_GRAPH_VERSION,
 } from '../visualGraph';
-import { convertToVisualGraph } from '../topologyAdapterV1';
+import { convertToVisualGraph, type TopologyAdapterOptions } from '../topologyAdapterV1';
+import { GeneratorKind } from '../topologyInputReader';
 import type { AnySldSymbol, BusSymbol, BranchSymbol, SwitchSymbol, SourceSymbol, LoadSymbol } from '../../../sld-editor/types';
 
 // =============================================================================
@@ -425,6 +426,50 @@ function buildGoldenNetworkOze03(): AnySldSymbol[] {
 }
 
 // =============================================================================
+// METADATA BUILDERS (generatorTypes + voltageOverrides for OZE fixtures)
+// =============================================================================
+
+function buildOze01Metadata(): TopologyAdapterOptions {
+  return {
+    metadata: {
+      generatorTypes: new Map<string, GeneratorKind>([
+        ['src_pv', GeneratorKind.PV],
+      ]),
+      voltageOverrides: new Map<string, number>([
+        ['bus_sn', 15],
+      ]),
+    },
+  };
+}
+
+function buildOze02Metadata(): TopologyAdapterOptions {
+  return {
+    metadata: {
+      generatorTypes: new Map<string, GeneratorKind>([
+        ['src_bess', GeneratorKind.BESS],
+      ]),
+      voltageOverrides: new Map<string, number>([
+        ['bus_sn', 15],
+      ]),
+    },
+  };
+}
+
+function buildOze03Metadata(): TopologyAdapterOptions {
+  return {
+    metadata: {
+      generatorTypes: new Map<string, GeneratorKind>([
+        ['src_pv', GeneratorKind.PV],
+        ['src_bess', GeneratorKind.BESS],
+      ]),
+      voltageOverrides: new Map<string, number>([
+        ['bus_sn', 15],
+      ]),
+    },
+  };
+}
+
+// =============================================================================
 // UTILITY: Shuffle (deterministyczny seed — Fisher-Yates z PRNG)
 // =============================================================================
 
@@ -554,21 +599,21 @@ describe('Determinism Suite — invarianty', () => {
   });
 
   it('GN-OZE-01: PV jest GENERATOR_PV', () => {
-    const graph = convertToVisualGraph(buildGoldenNetworkOze01());
+    const graph = convertToVisualGraph(buildGoldenNetworkOze01(), buildOze01Metadata());
     const pv = graph.nodes.find(n => n.attributes.elementName.includes('PV'));
     expect(pv).toBeDefined();
     expect(pv!.nodeType).toBe(NodeTypeV1.GENERATOR_PV);
   });
 
   it('GN-OZE-02: BESS jest GENERATOR_BESS', () => {
-    const graph = convertToVisualGraph(buildGoldenNetworkOze02());
+    const graph = convertToVisualGraph(buildGoldenNetworkOze02(), buildOze02Metadata());
     const bess = graph.nodes.find(n => n.attributes.elementName.includes('BESS'));
     expect(bess).toBeDefined();
     expect(bess!.nodeType).toBe(NodeTypeV1.GENERATOR_BESS);
   });
 
   it('GN-OZE-03: PV i BESS sa zrodlami w tej samej stacji', () => {
-    const graph = convertToVisualGraph(buildGoldenNetworkOze03());
+    const graph = convertToVisualGraph(buildGoldenNetworkOze03(), buildOze03Metadata());
     const pv = graph.nodes.find(n => n.nodeType === NodeTypeV1.GENERATOR_PV);
     const bess = graph.nodes.find(n => n.nodeType === NodeTypeV1.GENERATOR_BESS);
     expect(pv).toBeDefined();
@@ -612,7 +657,9 @@ describe('Determinism Suite — golden network statistics', () => {
     expect(symbols.length).toBe(53);
 
     const graph = convertToVisualGraph(symbols);
-    expect(graph.nodes.length).toBe(53);
+    // V2 pipeline: branches (LineBranch, TransformerBranch) become edges, not nodes.
+    // Nodes: src_gpz(1) + bus_sn_main(1) + 10*(bus_sn + bus_nn + load) = 32
+    expect(graph.nodes.length).toBe(32);
   });
 
   it('GN-SLD-02: GPZ + 2 sekcje + 4 stacje B + ring', () => {

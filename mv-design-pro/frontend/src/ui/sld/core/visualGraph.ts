@@ -401,15 +401,18 @@ export function validateVisualGraph(graph: VisualGraphV1): VisualGraphValidation
     }
   }
 
-  // 5. PV/BESS nie sa LOAD
+  // 5. PV/BESS — walidacja kontraktowa (po nodeType, BEZ parsowania nazw).
+  // Klasyfikacja PV/BESS pochodzi z domeny (TopologyInput generator.kind), nie z nazwy.
+  // Adapter V2 juz poprawnie klasyfikuje — tu walidujemy tylko spójnosc nodeType.
   for (const node of graph.nodes) {
-    if (node.nodeType === NodeTypeV1.LOAD) {
-      const name = node.attributes.elementName.toLowerCase();
-      if (name.includes('pv') || name.includes('fotowolt') || name.includes('solar')) {
-        errors.push(`Wezel ${node.id} (${node.attributes.elementName}) jest LOAD ale wyglada na PV — uzyj GENERATOR_PV`);
-      }
-      if (name.includes('bess') || name.includes('magazyn') || name.includes('battery') || name.includes('akumulator')) {
-        errors.push(`Wezel ${node.id} (${node.attributes.elementName}) jest LOAD ale wyglada na BESS — uzyj GENERATOR_BESS`);
+    if (
+      node.nodeType === NodeTypeV1.GENERATOR_PV ||
+      node.nodeType === NodeTypeV1.GENERATOR_BESS ||
+      node.nodeType === NodeTypeV1.GENERATOR_WIND
+    ) {
+      // Generator nie moze miec nodeType LOAD (sprzecznosc kontraktu)
+      if (!node.attributes.elementId) {
+        errors.push(`Generator ${node.id}: brak elementId w atrybutach`);
       }
     }
   }

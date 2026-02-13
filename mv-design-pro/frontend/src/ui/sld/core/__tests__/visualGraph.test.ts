@@ -24,7 +24,8 @@ import {
   computeVisualGraphHash,
   validateVisualGraph,
 } from '../visualGraph';
-import { convertToVisualGraph } from '../topologyAdapterV1';
+import { convertToVisualGraph, type TopologyAdapterOptions } from '../topologyAdapterV1';
+import { GeneratorKind } from '../topologyInputReader';
 import type { AnySldSymbol, BusSymbol, BranchSymbol, SwitchSymbol, SourceSymbol, LoadSymbol } from '../../../sld-editor/types';
 
 // =============================================================================
@@ -117,6 +118,27 @@ function buildMinimalNetwork(): AnySldSymbol[] {
     makeSource('src_pv', 'PV Farma Solarna 2MW', 'bus_sn_2'),
     makeSource('src_bess', 'BESS Magazyn Energii 1MWh', 'bus_sn_2'),
   ];
+}
+
+/**
+ * Metadane do poprawnej klasyfikacji PV/BESS i napiec.
+ * ZERO heurystyk stringowych — klasyfikacja z jawnych metadanych.
+ */
+function buildMinimalMetadata(): TopologyAdapterOptions {
+  return {
+    metadata: {
+      generatorTypes: new Map<string, GeneratorKind>([
+        ['src_pv', GeneratorKind.PV],
+        ['src_bess', GeneratorKind.BESS],
+      ]),
+      voltageOverrides: new Map<string, number>([
+        ['bus_sn_1', 15],
+        ['bus_sn_2', 15],
+        ['bus_sn_3', 15],
+        ['bus_nn_1', 0.4],
+      ]),
+    },
+  };
 }
 
 // =============================================================================
@@ -217,52 +239,50 @@ describe('VisualGraphV1 — typologia stacji A/B/C/D', () => {
 describe('VisualGraphV1 — PV i BESS sa zrodlami, nie odbiorcami', () => {
   it('PV jest klasyfikowane jako GENERATOR_PV', () => {
     const symbols = buildMinimalNetwork();
-    const graph = convertToVisualGraph(symbols);
+    const graph = convertToVisualGraph(symbols, buildMinimalMetadata());
 
-    const pvNode = graph.nodes.find(n => n.attributes.elementName.includes('PV'));
+    const pvNode = graph.nodes.find(n => n.attributes.elementId === 'src_pv');
     expect(pvNode).toBeDefined();
     expect(pvNode!.nodeType).toBe(NodeTypeV1.GENERATOR_PV);
   });
 
   it('BESS jest klasyfikowane jako GENERATOR_BESS', () => {
     const symbols = buildMinimalNetwork();
-    const graph = convertToVisualGraph(symbols);
+    const graph = convertToVisualGraph(symbols, buildMinimalMetadata());
 
-    const bessNode = graph.nodes.find(n => n.attributes.elementName.includes('BESS'));
+    const bessNode = graph.nodes.find(n => n.attributes.elementId === 'src_bess');
     expect(bessNode).toBeDefined();
     expect(bessNode!.nodeType).toBe(NodeTypeV1.GENERATOR_BESS);
   });
 
   it('zaden PV/BESS nie jest LOAD', () => {
     const symbols = buildMinimalNetwork();
-    const graph = convertToVisualGraph(symbols);
+    const graph = convertToVisualGraph(symbols, buildMinimalMetadata());
 
     const loads = graph.nodes.filter(n => n.nodeType === NodeTypeV1.LOAD);
+    const generatorIds = new Set(['src_pv', 'src_bess']);
     for (const load of loads) {
-      const name = load.attributes.elementName.toLowerCase();
-      expect(name).not.toContain('pv');
-      expect(name).not.toContain('fotowolt');
-      expect(name).not.toContain('solar');
-      expect(name).not.toContain('bess');
-      expect(name).not.toContain('magazyn');
-      expect(name).not.toContain('battery');
+      // Walidacja kontraktowa (po elementId), BEZ heurystyk stringowych — Guard #9.
+      expect(generatorIds.has(load.attributes.elementId)).toBe(false);
     }
   });
 
-  it('walidator odrzuca PV otypowane jako LOAD', () => {
+  it('walidator odrzuca generator bez elementId', () => {
+    // Walidacja kontraktowa: generator MUSI miec elementId.
+    // ZAKAZ heurystyk stringowych (Guard #9) — nie sprawdzamy nazw.
     const badGraph: VisualGraphV1 = {
       version: VISUAL_GRAPH_VERSION,
       nodes: [
         {
           id: 'pv_bad',
-          nodeType: NodeTypeV1.LOAD,
+          nodeType: NodeTypeV1.GENERATOR_PV,
           ports: [],
           attributes: {
             label: 'PV Farma Solarna',
             voltageKv: null,
             inService: true,
-            elementId: 'pv_bad',
-            elementType: 'Load',
+            elementId: '',
+            elementType: 'Generator',
             elementName: 'PV Farma Solarna',
             switchState: null,
             branchType: null,
@@ -286,7 +306,7 @@ describe('VisualGraphV1 — PV i BESS sa zrodlami, nie odbiorcami', () => {
 
     const result = validateVisualGraph(badGraph);
     expect(result.valid).toBe(false);
-    expect(result.errors.some(e => e.includes('GENERATOR_PV'))).toBe(true);
+    expect(result.errors.some(e => e.includes('Generator'))).toBe(true);
   });
 });
 
@@ -471,11 +491,13 @@ describe('VisualGraphV1 — walidacja', () => {
 // =============================================================================
 
 describe('TopologyAdapterV1 — convertToVisualGraph', () => {
-  it('kazdy symbol wejsciowy mapuje sie na wezel', () => {
+  it('symbole mapuja sie na wezly (V2: switch jest krawedzia, nie wezlem)', () => {
     const symbols = buildMinimalNetwork();
-    const graph = convertToVisualGraph(symbols);
+    const graph = convertToVisualGraph(symbols, buildMinimalMetadata());
 
-    expect(graph.nodes.length).toBe(symbols.length);
+    // V2 pipeline: buses(4) + sources(1 GPZ) + generators(2 PV+BESS) + loads(1) = 8
+    // Switch to BUS_LINK edge, branch to edge — nie sa wezlami
+    expect(graph.nodes.length).toBe(8);
   });
 
   it('transformer jest otypowany jako TRANSFORMER_LINK edge', () => {
@@ -488,15 +510,15 @@ describe('TopologyAdapterV1 — convertToVisualGraph', () => {
 
   it('szyna SN jest otypowana jako BUS_SN', () => {
     const symbols = buildMinimalNetwork();
-    const graph = convertToVisualGraph(symbols);
+    const graph = convertToVisualGraph(symbols, buildMinimalMetadata());
 
     const snBuses = graph.nodes.filter(n => n.nodeType === NodeTypeV1.BUS_SN);
     expect(snBuses.length).toBeGreaterThanOrEqual(1);
   });
 
-  it('szyna nN jest otypowana jako BUS_NN', () => {
+  it('szyna nN jest otypowana jako BUS_NN (z voltageOverrides)', () => {
     const symbols = buildMinimalNetwork();
-    const graph = convertToVisualGraph(symbols);
+    const graph = convertToVisualGraph(symbols, buildMinimalMetadata());
 
     const nnBuses = graph.nodes.filter(n => n.nodeType === NodeTypeV1.BUS_NN);
     expect(nnBuses.length).toBeGreaterThanOrEqual(1);
@@ -504,32 +526,29 @@ describe('TopologyAdapterV1 — convertToVisualGraph', () => {
 
   it('GPZ Source jest GRID_SOURCE', () => {
     const symbols = buildMinimalNetwork();
-    const graph = convertToVisualGraph(symbols);
+    const graph = convertToVisualGraph(symbols, buildMinimalMetadata());
 
-    const gpz = graph.nodes.find(n => n.attributes.elementName.includes('GPZ'));
+    const gpz = graph.nodes.find(n => n.attributes.elementId === 'src_gpz');
     expect(gpz).toBeDefined();
     expect(gpz!.nodeType).toBe(NodeTypeV1.GRID_SOURCE);
   });
 
   it('Load jest LOAD', () => {
     const symbols = buildMinimalNetwork();
-    const graph = convertToVisualGraph(symbols);
+    const graph = convertToVisualGraph(symbols, buildMinimalMetadata());
 
     const loads = graph.nodes.filter(n => n.nodeType === NodeTypeV1.LOAD);
     expect(loads.length).toBeGreaterThanOrEqual(1);
   });
 
-  it('Switch BREAKER jest SWITCH_BREAKER lub SWITCH_DISCONNECTOR', () => {
+  it('Switch NOP tworzy krawedz z isNormallyOpen=true (V2: switch jest krawedzia, nie wezlem)', () => {
     const symbols = buildMinimalNetwork();
-    const graph = convertToVisualGraph(symbols);
+    const graph = convertToVisualGraph(symbols, buildMinimalMetadata());
 
-    const switchNodes = graph.nodes.filter(n =>
-      n.nodeType === NodeTypeV1.SWITCH_BREAKER ||
-      n.nodeType === NodeTypeV1.SWITCH_DISCONNECTOR ||
-      n.nodeType === NodeTypeV1.SWITCH_LOAD_SWITCH ||
-      n.nodeType === NodeTypeV1.SWITCH_FUSE
-    );
-    expect(switchNodes.length).toBeGreaterThanOrEqual(1);
+    // V2 pipeline: switch (BUS_LINK branch) tworzy krawedz z isNormallyOpen.
+    // NOP (OPEN) switch ma isNormallyOpen=true.
+    const nopEdge = graph.edges.find(e => e.isNormallyOpen === true);
+    expect(nopEdge).toBeDefined();
   });
 
   it('meta zawiera version V1', () => {

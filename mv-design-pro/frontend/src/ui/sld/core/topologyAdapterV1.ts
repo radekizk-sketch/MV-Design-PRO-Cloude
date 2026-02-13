@@ -12,12 +12,12 @@
  * - Typ wezla z danych strukturalnych (elementType, switchType, etc.), nie z nazw.
  * - Segmentacja trunk/branch/secondary: BFS spanning tree z deterministycznym tie-break.
  * - PV/BESS z jawnych metadanych (generatorTypes), nie z heurystyk stringowych.
- * - Brak Date.now() w meta (timestamp deterministyczny).
+ * - Brak niedeterministycznych zrodel w meta (timestamp przekazany jawnie).
  *
  * DETERMINIZM:
  * - Ten sam zestaw symboli → identyczny VisualGraphV1 (bit-for-bit).
  * - Sortowanie po id na kazdym etapie.
- * - Brak Math.random(), Date.now(), Set/Map iteration order.
+ * - Brak niedeterministycznych API (random, zegar, iteracja Set/Map).
  */
 
 import type { AnySldSymbol } from '../../sld-editor/types';

@@ -84,7 +84,8 @@ export type StationKind = (typeof StationKind)[keyof typeof StationKind];
 export interface ConnectionNodeV1 {
   readonly id: string;
   readonly name: string;
-  readonly voltageKv: number;
+  /** Napiecie znamionowe [kV]. null = brak danych → FixAction bus.voltage_missing. */
+  readonly voltageKv: number | null;
   readonly stationId: string | null;
   readonly busIndex: number | null;
   readonly inService: boolean;
@@ -128,7 +129,8 @@ export interface TopologyStationV1 {
   readonly id: string;
   readonly name: string;
   readonly stationType: StationKind;
-  readonly voltageKv: number;
+  /** Napiecie znamionowe [kV]. null = brak danych (dziedziczone z busow). */
+  readonly voltageKv: number | null;
   readonly busIds: readonly string[];
   readonly branchIds: readonly string[];
   readonly switchIds: readonly string[];
@@ -345,8 +347,8 @@ export function readTopologyFromENM(
       name: sub.name,
       stationType: enmStationKind(sub),
       voltageKv: sub.bus_refs.length > 0
-        ? (busVoltageMap.get(sub.bus_refs[0]) ?? 15)
-        : 15,
+        ? (busVoltageMap.get(sub.bus_refs[0]) ?? null)
+        : null,
       busIds: [...sub.bus_refs].sort(),
       branchIds: [],
       switchIds: [],
@@ -578,8 +580,8 @@ export function readTopologyFromSymbols(
       const voltage = voltageOverrides?.get(s.elementId) ?? null;
       if (voltage === null) {
         fixActions.push({
-          code: 'catalog.reference_missing',
-          message: `Szyna '${s.elementName}' (${s.elementId}) nie ma jawnego napiecia.`,
+          code: 'bus.voltage_missing',
+          message: `Szyna '${s.elementName}' (${s.elementId}) nie ma jawnego napiecia — zero fabrication.`,
           elementRef: s.elementId,
           fixHint: 'Podaj napiecie znamionowe w metadanych (voltageOverrides).',
         });
@@ -587,7 +589,7 @@ export function readTopologyFromSymbols(
       connectionNodes.push({
         id: s.elementId,
         name: s.elementName,
-        voltageKv: voltage ?? 15, // domyslne SN jesli brak
+        voltageKv: voltage,
         stationId: stationMembership?.get(s.elementId) ?? null,
         busIndex: null,
         inService: s.inService,
