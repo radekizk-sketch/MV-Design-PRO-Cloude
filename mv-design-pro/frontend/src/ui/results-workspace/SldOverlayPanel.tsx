@@ -1,35 +1,74 @@
 /**
- * SLD Overlay Panel — PR-22
+ * SLD Overlay Panel — PR-22 + LF Overlay
  *
  * Right panel embedding SLD viewer with overlay controls.
- * Integrates with PR-16 overlay store and PR-21 delta overlay store.
+ * Integrates with PR-16 overlay store, PR-21 delta overlay store,
+ * and Load Flow overlay adapter.
  *
  * INVARIANTS:
  * - No physics calculations
  * - No model mutations
  * - Overlay data from stores (PR-16 / PR-21)
+ * - LF overlay from adapter (token-only)
  * - Polish labels only
+ * - Sort element_id before render
+ * - Stable React keys
  */
 
-import { useResultsWorkspaceStore } from './store';
+import { useEffect } from 'react';
+import { useResultsWorkspaceStore, useSelectedRunDetail } from './store';
 import { useOverlayStore } from '../sld-overlay/overlayStore';
 import { useSldDeltaOverlayStore } from '../sld-overlay/sldDeltaOverlayStore';
+import { usePowerFlowResultsStore } from '../power-flow-results/store';
+import { buildLoadFlowOverlay } from '../sld-overlay/LoadFlowOverlayAdapter';
 import type { OverlayDisplayMode } from './types';
 import { OVERLAY_MODE_LABELS } from './types';
+import type { LoadFlowOverlayMode } from '../power-flow-results/types';
+import { LOAD_FLOW_OVERLAY_MODE_LABELS } from '../power-flow-results/types';
 
 const OVERLAY_MODES: OverlayDisplayMode[] = ['result', 'delta', 'none'];
+const LF_OVERLAY_MODES: LoadFlowOverlayMode[] = ['voltage', 'loading', 'flow'];
 
 export function SldOverlayPanel() {
   const overlayMode = useResultsWorkspaceStore((s) => s.overlayMode);
   const setOverlayMode = useResultsWorkspaceStore((s) => s.setOverlayMode);
   const mode = useResultsWorkspaceStore((s) => s.mode);
 
+  const selectedRun = useSelectedRunDetail();
+
   const overlayEnabled = useOverlayStore((s) => s.enabled);
   const overlayRunId = useOverlayStore((s) => s.activeRunId);
-  const toggleOverlay = useOverlayStore((s) => s.toggleOverlay);
+  const loadOverlay = useOverlayStore((s) => s.loadOverlay);
 
   const deltaEnabled = useSldDeltaOverlayStore((s) => s.enabled);
   const deltaComparisonId = useSldDeltaOverlayStore((s) => s.activeComparisonId);
+
+  // LF overlay state
+  const lfOverlayMode = usePowerFlowResultsStore((s) => s.overlayMode);
+  const setLfOverlayMode = usePowerFlowResultsStore((s) => s.setOverlayMode);
+  const lfResults = usePowerFlowResultsStore((s) => s.results);
+  const lfInterpretation = usePowerFlowResultsStore((s) => s.interpretation);
+  const lfRunId = usePowerFlowResultsStore((s) => s.selectedRunId);
+
+  const isLoadFlowRun = selectedRun?.analysis_type === 'LOAD_FLOW';
+
+  // Build and apply LF overlay when mode/results change
+  useEffect(() => {
+    if (
+      isLoadFlowRun &&
+      overlayMode === 'result' &&
+      lfResults &&
+      lfRunId
+    ) {
+      const payload = buildLoadFlowOverlay(
+        lfResults,
+        lfInterpretation,
+        lfOverlayMode,
+        lfRunId
+      );
+      loadOverlay(payload);
+    }
+  }, [isLoadFlowRun, overlayMode, lfResults, lfInterpretation, lfOverlayMode, lfRunId, loadOverlay]);
 
   return (
     <div
@@ -62,8 +101,33 @@ export function SldOverlayPanel() {
           ))}
         </div>
 
+        {/* LF overlay mode selector (only for LOAD_FLOW runs in result mode) */}
+        {isLoadFlowRun && overlayMode === 'result' && (
+          <div className="mt-2" data-testid="lf-overlay-mode-selector">
+            <div className="text-xs text-slate-500 mb-1">Tryb rozpływu mocy</div>
+            <div className="flex gap-1" role="radiogroup" aria-label="Tryb nakładki rozpływu mocy">
+              {LF_OVERLAY_MODES.map((m) => (
+                <button
+                  key={m}
+                  role="radio"
+                  aria-checked={lfOverlayMode === m}
+                  className={`flex-1 px-2 py-1 text-xs rounded transition-colors ${
+                    lfOverlayMode === m
+                      ? 'bg-blue-700 text-white'
+                      : 'bg-blue-50 text-blue-700 hover:bg-blue-100'
+                  }`}
+                  onClick={() => setLfOverlayMode(m)}
+                  data-testid={`lf-overlay-mode-${m}`}
+                >
+                  {LOAD_FLOW_OVERLAY_MODE_LABELS[m]}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Overlay status */}
-        <div className="text-xs text-slate-500 space-y-1">
+        <div className="text-xs text-slate-500 space-y-1 mt-2">
           {overlayMode === 'result' && (
             <div className="flex items-center gap-2">
               <span

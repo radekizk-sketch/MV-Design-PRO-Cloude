@@ -31,16 +31,25 @@ interface LoadFlowRunSectionProps {
 
 export function LoadFlowRunSection({ runId }: LoadFlowRunSectionProps) {
   const results = usePowerFlowResultsStore((s) => s.results);
-  const runHeader = usePowerFlowResultsStore((s) => s.runHeader);
   const isLoading = usePowerFlowResultsStore((s) => s.isLoadingResults);
   const selectRun = usePowerFlowResultsStore((s) => s.selectRun);
+  const loadResults = usePowerFlowResultsStore((s) => s.loadResults);
+  const loadInterpretation = usePowerFlowResultsStore((s) => s.loadInterpretation);
 
-  // Load results when runId changes
+  // Load header when runId changes
   useEffect(() => {
     if (runId) {
       selectRun(runId);
     }
   }, [runId, selectRun]);
+
+  // Load results + interpretation after header is loaded
+  useEffect(() => {
+    if (runId) {
+      loadResults();
+      loadInterpretation();
+    }
+  }, [runId, loadResults, loadInterpretation]);
 
   if (isLoading) {
     return (

@@ -89,7 +89,7 @@ export function RunViewPanel() {
 
       {/* Load Flow specific section */}
       {selectedRun.analysis_type === 'LOAD_FLOW' && (
-        <LoadFlowRunSection runId={selectedRun.id} />
+        <LoadFlowRunSection runId={selectedRun.run_id} />
       )}
 
       {/* SC/Generic section — shown only for non-LOAD_FLOW analysis types */}
