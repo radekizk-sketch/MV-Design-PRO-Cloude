@@ -50,6 +50,10 @@ jobs:
         working-directory: mv-design-pro/frontend
         run: npx vitest run src/ui/sld/core/__tests__/layoutPipeline.test.ts --reporter=verbose
 
+      - name: Run TopologyAdapterV2 domain-driven tests
+        working-directory: mv-design-pro/frontend
+        run: npx vitest run src/ui/sld/core/__tests__/topologyAdapterV2.test.ts --reporter=verbose
+
       - name: Upload test results
         if: always()
         uses: actions/upload-artifact@v4

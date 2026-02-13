@@ -1,7 +1,7 @@
 # SLD Test Matrix
 
-**Status:** KANONICZNY | **Wersja:** 1.0 | **Data:** 2026-02-13
-**Kontekst:** RUN #3A PR-3A-03 — Macierz testow SLD jako CI gate
+**Status:** KANONICZNY | **Wersja:** 1.1 | **Data:** 2026-02-13
+**Kontekst:** RUN #3A PR-3A-03 + RUN #3C (topology hardening) — Macierz testow SLD jako CI gate
 
 ---
 
@@ -30,7 +30,7 @@
 | VG-19 | Walidacja: bledna wersja wykrywana | j.w. | CI |
 | VG-20 | Wersja kontraktu = V1 | j.w. | CI |
 
-## 2. Testy adaptera TopologyAdapterV1
+## 2. Testy adaptera TopologyAdapterV1 (legacy, deleguje do V2)
 
 | ID | Test | Plik | Gate |
 |----|------|------|------|
@@ -43,6 +43,31 @@
 | TA-07 | Switch → SWITCH_* | j.w. | CI |
 | TA-08 | Meta.version = V1 | j.w. | CI |
 | TA-09 | Atrybuty kompletne (brak undefined) | j.w. | CI |
+
+## 2b. Testy TopologyAdapterV2 — domain-driven (RUN #3C)
+
+| ID | Test | Plik | Gate |
+|----|------|------|------|
+| TV2-01 | GN-DOM-01 (radial 3 stacje): brak self-edges | `core/__tests__/topologyAdapterV2.test.ts` | CI |
+| TV2-02 | GN-DOM-02 (ring+NOP): brak self-edges | j.w. | CI |
+| TV2-03 | GN-DOM-03 (OZE PV+BESS): brak self-edges | j.w. | CI |
+| TV2-04 | GN-DOM-04 (TYPE_D sekcyjna): brak self-edges | j.w. | CI |
+| TV2-05 | GN-DOM-05 (self-edge w danych): FixAction, nie w grafie | j.w. | CI |
+| TV2-06 | GN-DOM-06 (multi-source): brak self-edges | j.w. | CI |
+| TV2-07 | GN-DOM-07 (brak catalog): FixAction | j.w. | CI |
+| TV2-08 | Bridge migration: AnySldSymbol → VisualGraphV1 | j.w. | CI |
+| TV2-09 | Station TYPE_D: busCount >= 2 | j.w. | CI |
+| TV2-10 | Station TYPE_B: DISTRIBUTION z transformerIds | j.w. | CI |
+| TV2-11 | Segmentacja: NOP → SECONDARY_CONNECTOR | j.w. | CI |
+| TV2-12 | Segmentacja: trunk istnieje w radial | j.w. | CI |
+| TV2-13 | Segmentacja: bus coupler z BUS_LINK w stacji | j.w. | CI |
+| TV2-14 | PV z GeneratorKind.PV → GENERATOR_PV | j.w. | CI |
+| TV2-15 | BESS z GeneratorKind.BESS → GENERATOR_BESS | j.w. | CI |
+| TV2-16 | PV z SymbolBridgeMetadata (bridge) | j.w. | CI |
+| TV2-17 | Hash stability 100x (6 golden networks) | j.w. | CI |
+| TV2-18 | Permutation invariance 50x (4 golden networks) | j.w. | CI |
+| TV2-19 | Multi-source tie-break deterministyczny | j.w. | CI |
+| TV2-20 | Stress test 500+ nodes: stability + no self-edges | j.w. | CI |
 
 ## 3. Testy determinizmu
 
@@ -77,8 +102,15 @@
 | GRD-03 | Overlay no layout imports | j.w. | CI |
 | GRD-04 | PCC grep-zero | j.w. | CI |
 | GRD-05 | No codenames in contract | j.w. | CI |
+| GRD-06 | No Date.now() in SLD core | j.w. | CI |
+| GRD-07 | No Math.random() in SLD core | j.w. | CI |
+| GRD-08 | No self-edges in adapter (RUN #3C) | j.w. | CI |
+| GRD-09 | No string typology heuristics (RUN #3C) | j.w. | CI |
+| GRD-10 | No legacy adapter patterns (RUN #3C) | j.w. | CI |
 
 ## 5. Golden Networks
+
+### 5.1 VisualGraph (RUN #3A)
 
 | ID | Siec | Symbole | Cel |
 |----|------|---------|-----|
@@ -88,3 +120,15 @@
 | GN-OZE-02 | BESS na SN | 3 | OZE klasyfikacja |
 | GN-OZE-03 | PV + BESS wielofunkcyjna | 5 | Stacja wielofunkcyjna |
 | GN-STRESS-500 | 100 feederow | 500+ | Perf, stress, determinism |
+
+### 5.2 TopologyAdapterV2 Domain Networks (RUN #3C)
+
+| ID | Siec | Nodes | Cel |
+|----|------|-------|-----|
+| GN-DOM-01 | Radial: GPZ + 3 stacje | 8 | Radial, segmentacja, station types |
+| GN-DOM-02 | Ring+NOP: 3 szyny + ring | 5 | NOP → SECONDARY_CONNECTOR, ring detection |
+| GN-DOM-03 | OZE: PV + BESS | 6 | GeneratorKind → NodeType, zero heurystyk |
+| GN-DOM-04 | TYPE_D: 2 szyny sekcyjne | 4 | Station TYPE_D, bus coupler |
+| GN-DOM-05 | Self-edge w danych | 3 | FixAction emitted, edge filtered |
+| GN-DOM-06 | Multi-source: 2 GPZ | 5 | Tie-break deterministyczny |
+| GN-DOM-07 | Brak catalog ref | 3 | FixAction catalog.reference_missing |

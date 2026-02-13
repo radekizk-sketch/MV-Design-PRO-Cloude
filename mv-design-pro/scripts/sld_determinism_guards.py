@@ -13,7 +13,12 @@ Guards:
 
 Exit code: 0 = OK, 1 = violations found.
 
-PR-3A-03 RUN #3A + RUN #3B
+PR-3A-03 RUN #3A + RUN #3B + RUN #3C
+
+Guards dodane w RUN #3C:
+8. No self-edges in VisualGraph adapter (fromPortRef.nodeId != toPortRef.nodeId)
+9. No string-based typology heuristics (includes('station'), name-based detection)
+10. No legacy adapter patterns (extractVoltageFromName, classifyNodeType with name)
 """
 
 import os
@@ -388,6 +393,159 @@ def guard_layout_result_immutability() -> List[str]:
 
 
 # =========================================================================
+# GUARD 8: No self-edges in adapter output (RUN #3C)
+# =========================================================================
+
+def guard_no_self_edges_in_adapter() -> List[str]:
+    """
+    Sprawdz ze pliki adaptera nie generuja self-edges.
+    Self-edge = fromPortRef.nodeId i toPortRef.nodeId wskazuja na ten sam wezel.
+    Szukaj wzorcow: { nodeId: s.id, portId: ... } powtorzonych w fromPortRef i toPortRef.
+    """
+    violations = []
+    adapter_files = [
+        FRONTEND_SRC / "ui" / "sld" / "core" / "topologyAdapterV1.ts",
+        FRONTEND_SRC / "ui" / "sld" / "core" / "topologyAdapterV2.ts",
+    ]
+
+    for f in adapter_files:
+        if not f.exists():
+            continue
+        try:
+            content = f.read_text(encoding="utf-8")
+        except Exception:
+            continue
+
+        rel = str(f.relative_to(FRONTEND_SRC))
+
+        # Szukaj wzorca: fromPortRef: { nodeId: X, ... }, toPortRef: { nodeId: X, ... }
+        # gdzie X jest ta sama zmienna (np. s.id)
+        lines = content.split('\n')
+        i = 0
+        while i < len(lines):
+            line = lines[i].strip()
+            # Szukaj linii z fromPortRef i toPortRef z tym samym nodeId
+            if 'fromPortRef' in line and 'nodeId' in line:
+                # Pobierz nodeId
+                m = re.search(r'nodeId:\s*(\S+)', line)
+                if m:
+                    from_node = m.group(1).rstrip(',')
+                    # Sprawdz nastepna linie (toPortRef)
+                    for j in range(i + 1, min(i + 5, len(lines))):
+                        to_line = lines[j].strip()
+                        if 'toPortRef' in to_line and 'nodeId' in to_line:
+                            m2 = re.search(r'nodeId:\s*(\S+)', to_line)
+                            if m2:
+                                to_node = m2.group(1).rstrip(',')
+                                if from_node == to_node and from_node not in ('branch.fromNodeId', 'branch.toNodeId', 'source.id', 'source.nodeId', 'gen.id', 'gen.nodeId', 'load.id', 'load.nodeId'):
+                                    violations.append(
+                                        f"  Mozliwy self-edge: fromPortRef.nodeId={from_node}, "
+                                        f"toPortRef.nodeId={to_node} w {rel}:{i + 1}"
+                                    )
+                            break
+            i += 1
+
+    return violations
+
+
+# =========================================================================
+# GUARD 9: No string-based typology heuristics (RUN #3C)
+# =========================================================================
+
+def guard_no_string_typology_heuristics() -> List[str]:
+    """
+    Sprawdz brak heurystyk stringowych do wykrywania stacji/typow.
+    Zabronione wzorce w plikach kontraktu (nie testach):
+    - name.includes('station'), name.includes('stacja')
+    - .replace('station_', ''), .replace('bus_sn_st_', '')
+    - extractVoltageFromName (legacy)
+    - classifyNodeType z uzyciem elementName.toLowerCase()
+    """
+    violations = []
+    contract_dir = FRONTEND_SRC / "ui" / "sld" / "core"
+
+    if not contract_dir.exists():
+        return violations
+
+    ts_files = find_files(contract_dir, (".ts",))
+
+    forbidden_patterns = [
+        (r"\.includes\(['\"]station", "includes('station')"),
+        (r"\.includes\(['\"]stacja", "includes('stacja')"),
+        (r"\.replace\(['\"]station_", "replace('station_')"),
+        (r"\.replace\(['\"]bus_sn_st_", "replace('bus_sn_st_')"),
+        (r"\bextractVoltageFromName\b", "extractVoltageFromName()"),
+        (r"elementName\.toLowerCase\(\)", "elementName.toLowerCase()"),
+        (r"\.includes\(['\"]pv['\"]", "includes('pv') — heurystyka PV"),
+        (r"\.includes\(['\"]bess['\"]", "includes('bess') — heurystyka BESS"),
+        (r"\.includes\(['\"]fotowolt", "includes('fotowolt') — heurystyka PV"),
+        (r"\.includes\(['\"]magazyn", "includes('magazyn') — heurystyka BESS"),
+    ]
+
+    for f in ts_files:
+        rel = str(f.relative_to(FRONTEND_SRC))
+        if "__tests__" in rel or ".test." in rel or ".spec." in rel:
+            continue
+
+        try:
+            content = f.read_text(encoding="utf-8")
+        except Exception:
+            continue
+
+        for pattern, label in forbidden_patterns:
+            matches = re.finditer(pattern, content)
+            for m in matches:
+                line_no = content[:m.start()].count('\n') + 1
+                violations.append(
+                    f"  Heurystyka stringowa: '{label}' w {rel}:{line_no}"
+                )
+
+    return violations
+
+
+# =========================================================================
+# GUARD 10: No legacy adapter patterns (RUN #3C)
+# =========================================================================
+
+def guard_no_legacy_adapter() -> List[str]:
+    """
+    Sprawdz brak legacy wzorcow adaptera V1 (przed migracja RUN #3C).
+    Zabronione w plikach kontraktu (nie testach):
+    - Bezposrednie uzycie buildVoltageMap, buildAdjacency, buildSpanningTree
+      jako lokalnych funkcji (powinny byc w V2 pipeline)
+    - new Date() w meta (niedeterminizm)
+    """
+    violations = []
+    adapter_file = FRONTEND_SRC / "ui" / "sld" / "core" / "topologyAdapterV1.ts"
+
+    if not adapter_file.exists():
+        return violations
+
+    try:
+        content = adapter_file.read_text(encoding="utf-8")
+    except Exception:
+        return violations
+
+    legacy_patterns = [
+        (r'\bfunction\s+buildVoltageMap\b', "buildVoltageMap (legacy)"),
+        (r'\bfunction\s+buildAdjacency\b', "buildAdjacency (legacy)"),
+        (r'\bfunction\s+extractVoltageFromName\b', "extractVoltageFromName (legacy)"),
+        (r'\bfunction\s+classifyNodeType\b', "classifyNodeType (legacy)"),
+        (r'\bnew\s+Date\(\)', "new Date() (nondeterministic)"),
+    ]
+
+    for pattern, label in legacy_patterns:
+        matches = re.finditer(pattern, content)
+        for m in matches:
+            line_no = content[:m.start()].count('\n') + 1
+            violations.append(
+                f"  Legacy pattern: '{label}' w topologyAdapterV1.ts:{line_no}"
+            )
+
+    return violations
+
+
+# =========================================================================
 # MAIN
 # =========================================================================
 
@@ -400,6 +558,9 @@ def main() -> int:
         ("GUARD 5: No codenames in contract", guard_no_codenames_in_contract()),
         ("GUARD 6: Layout hash camera-independent (no nondeterminism)", guard_layout_no_nondeterminism()),
         ("GUARD 7: LayoutResultV1 immutability (readonly)", guard_layout_result_immutability()),
+        ("GUARD 8: No self-edges in adapter (RUN #3C)", guard_no_self_edges_in_adapter()),
+        ("GUARD 9: No string typology heuristics (RUN #3C)", guard_no_string_typology_heuristics()),
+        ("GUARD 10: No legacy adapter patterns (RUN #3C)", guard_no_legacy_adapter()),
     ]
 
     total_violations = 0

@@ -1,0 +1,714 @@
+/**
+ * TopologyInputReader — Jedyne miejsce prawdy dla wejscia adaptera SLD.
+ *
+ * CANONICAL CONTRACT (BINDING — RUN #3C):
+ * - Definiuje kanoniczne typy wejsciowe adaptera topologii.
+ * - Dwa zrodla: EnergyNetworkModel (API) lub AnySldSymbol[] (bridge migracyjny).
+ * - Kazdy rekord ma stabilne ID, stabilne sortowanie (leksykograficzne po id).
+ * - Zero heurystyk — braki danych → ValidationError + FixAction.
+ * - Determinizm: ten sam wejsciowy model → identyczny TopologyInput (bit-for-bit).
+ *
+ * REGULY:
+ * - PV/BESS sa GENERATOR (PV/BESS), nigdy LOAD — typ z domeny, nie z nazwy.
+ * - Stacje maja jawny stationType z domeny (lub derivedType z topologii + FixAction).
+ * - Napiecie z pola numerycznego voltage_kv, nigdy z parsowania nazwy.
+ * - Kazda referencja katalogowa jest jawna (null → FixAction).
+ */
+
+import type {
+  EnergyNetworkModel,
+  Bus as ENMBus,
+  Branch as ENMBranch,
+  Transformer as ENMTransformer,
+  Source as ENMSource,
+  Load as ENMLoad,
+  Generator as ENMGenerator,
+  Substation as ENMSubstation,
+  Bay as ENMBay,
+  Measurement as ENMMeasurement,
+  ProtectionAssignment as ENMProtectionAssignment,
+} from '../../../types/enm';
+import type { AnySldSymbol, BusSymbol, BranchSymbol, SwitchSymbol, SourceSymbol, LoadSymbol } from '../../sld-editor/types';
+
+// =============================================================================
+// ENUMS
+// =============================================================================
+
+/** Rodzaj galezi topologicznej. */
+export const BranchKind = {
+  LINE: 'LINE',
+  CABLE: 'CABLE',
+  BUS_LINK: 'BUS_LINK',
+  TR_LINK: 'TR_LINK',
+} as const;
+export type BranchKind = (typeof BranchKind)[keyof typeof BranchKind];
+
+/** Rodzaj urzadzenia. */
+export const DeviceKind = {
+  CB: 'CB',
+  DS: 'DS',
+  ES: 'ES',
+  CT: 'CT',
+  VT: 'VT',
+  RELAY: 'RELAY',
+  LOAD_SWITCH: 'LOAD_SWITCH',
+  FUSE: 'FUSE',
+} as const;
+export type DeviceKind = (typeof DeviceKind)[keyof typeof DeviceKind];
+
+/** Rodzaj generatora. */
+export const GeneratorKind = {
+  PV: 'PV',
+  WIND: 'WIND',
+  BESS: 'BESS',
+  SYNCHRONOUS: 'SYNCHRONOUS',
+} as const;
+export type GeneratorKind = (typeof GeneratorKind)[keyof typeof GeneratorKind];
+
+/** Typ stacji z domeny. */
+export const StationKind = {
+  MAIN_SUBSTATION: 'MAIN_SUBSTATION',
+  DISTRIBUTION: 'DISTRIBUTION',
+  TRANSFORMER: 'TRANSFORMER',
+  SWITCHING: 'SWITCHING',
+} as const;
+export type StationKind = (typeof StationKind)[keyof typeof StationKind];
+
+// =============================================================================
+// TOPOLOGY INPUT TYPES
+// =============================================================================
+
+/**
+ * Wezel polaczeniowy — odpowiednik Bus/Terminal w NetworkModel.
+ */
+export interface ConnectionNodeV1 {
+  readonly id: string;
+  readonly name: string;
+  readonly voltageKv: number;
+  readonly stationId: string | null;
+  readonly busIndex: number | null;
+  readonly inService: boolean;
+}
+
+/**
+ * Galaz topologiczna — polaczenie miedzy dwoma wezlami.
+ */
+export interface TopologyBranchV1 {
+  readonly id: string;
+  readonly name: string;
+  readonly fromNodeId: string;
+  readonly toNodeId: string;
+  readonly kind: BranchKind;
+  readonly isNormallyOpen: boolean;
+  readonly inService: boolean;
+  readonly catalogRef: string | null;
+  readonly lengthKm: number | null;
+  readonly ratedPowerMva: number | null;
+  readonly voltageHvKv: number | null;
+  readonly voltageLvKv: number | null;
+}
+
+/**
+ * Urzadzenie polowe — aparat na wezle lub galezi.
+ */
+export interface TopologyDeviceV1 {
+  readonly id: string;
+  readonly name: string;
+  readonly nodeId: string;
+  readonly kind: DeviceKind;
+  readonly catalogRef: string | null;
+  readonly state: 'OPEN' | 'CLOSED' | null;
+  readonly inService: boolean;
+}
+
+/**
+ * Stacja — kontener logiczny (BEZ fizyki).
+ */
+export interface TopologyStationV1 {
+  readonly id: string;
+  readonly name: string;
+  readonly stationType: StationKind;
+  readonly voltageKv: number;
+  readonly busIds: readonly string[];
+  readonly branchIds: readonly string[];
+  readonly switchIds: readonly string[];
+  readonly transformerIds: readonly string[];
+}
+
+/**
+ * Generator (OZE/synchroniczny).
+ */
+export interface TopologyGeneratorV1 {
+  readonly id: string;
+  readonly name: string;
+  readonly nodeId: string;
+  readonly kind: GeneratorKind;
+  readonly catalogRef: string | null;
+  readonly inService: boolean;
+  readonly ratedPowerMw: number | null;
+  readonly blockingTransformerId: string | null;
+}
+
+/**
+ * Zrodlo zewnetrzne (zasilanie z sieci WN).
+ */
+export interface TopologySourceV1 {
+  readonly id: string;
+  readonly name: string;
+  readonly nodeId: string;
+  readonly inService: boolean;
+}
+
+/**
+ * Odbiorca.
+ */
+export interface TopologyLoadV1 {
+  readonly id: string;
+  readonly name: string;
+  readonly nodeId: string;
+  readonly inService: boolean;
+  readonly pMw: number | null;
+  readonly qMvar: number | null;
+}
+
+/**
+ * Przyporzadkowanie zabezpieczenia do wylacznika.
+ */
+export interface TopologyProtectionV1 {
+  readonly id: string;
+  readonly breakerRef: string;
+  readonly ctRef: string | null;
+  readonly vtRef: string | null;
+  readonly functions: readonly TopologyProtectionFunctionV1[];
+  readonly isEnabled: boolean;
+}
+
+export interface TopologyProtectionFunctionV1 {
+  readonly functionType: string;
+  readonly settings: Readonly<Record<string, unknown>>;
+}
+
+// =============================================================================
+// FIX ACTION
+// =============================================================================
+
+/**
+ * Blad walidacji adaptera z sugestia naprawy.
+ */
+export interface TopologyFixAction {
+  readonly code: string;
+  readonly message: string;
+  readonly elementRef: string | null;
+  readonly fixHint: string;
+}
+
+// =============================================================================
+// TOPOLOGY INPUT (AGGREGATE)
+// =============================================================================
+
+/**
+ * TopologyInput — kanoniczny zestaw danych wejsciowych adaptera.
+ *
+ * Wszystkie tablice sa posortowane leksykograficznie po id.
+ * Zrodlo: ENM (primary) lub AnySldSymbol[] (bridge).
+ */
+export interface TopologyInputV1 {
+  readonly snapshotId: string;
+  readonly snapshotFingerprint: string;
+  readonly connectionNodes: readonly ConnectionNodeV1[];
+  readonly branches: readonly TopologyBranchV1[];
+  readonly devices: readonly TopologyDeviceV1[];
+  readonly stations: readonly TopologyStationV1[];
+  readonly generators: readonly TopologyGeneratorV1[];
+  readonly sources: readonly TopologySourceV1[];
+  readonly loads: readonly TopologyLoadV1[];
+  readonly protectionBindings: readonly TopologyProtectionV1[];
+  readonly fixActions: readonly TopologyFixAction[];
+}
+
+// =============================================================================
+// SYMBOL BRIDGE METADATA
+// =============================================================================
+
+/**
+ * Dodatkowe metadane dostarczane razem z symbolami SLD.
+ * Pozwala na klasyfikacje bez heurystyk stringowych.
+ */
+export interface SymbolBridgeMetadata {
+  /** Mapa elementId → typ generatora (dla Sources ktore sa generatorami). */
+  readonly generatorTypes?: ReadonlyMap<string, GeneratorKind>;
+  /** Mapa elementId → napiecie [kV] (dla szyn bez jawnego napiecia). */
+  readonly voltageOverrides?: ReadonlyMap<string, number>;
+  /** Mapa elementId → ID stacji. */
+  readonly stationMembership?: ReadonlyMap<string, string>;
+}
+
+// =============================================================================
+// READER: ENM → TopologyInput
+// =============================================================================
+
+function sortById<T extends { readonly id: string }>(arr: readonly T[]): T[] {
+  return [...arr].sort((a, b) => a.id.localeCompare(b.id));
+}
+
+/**
+ * Mapuje ENM Branch.type na BranchKind.
+ */
+function enmBranchKind(b: ENMBranch): BranchKind {
+  switch (b.type) {
+    case 'line_overhead': return BranchKind.LINE;
+    case 'cable': return BranchKind.CABLE;
+    case 'switch':
+    case 'breaker':
+    case 'bus_coupler':
+    case 'disconnector':
+      return BranchKind.BUS_LINK;
+    case 'fuse':
+      return BranchKind.BUS_LINK;
+    default:
+      return BranchKind.LINE;
+  }
+}
+
+/**
+ * Mapuje ENM Branch.type na DeviceKind (dla switching branches).
+ */
+function enmSwitchKind(b: ENMBranch): DeviceKind | null {
+  switch (b.type) {
+    case 'breaker': return DeviceKind.CB;
+    case 'switch': return DeviceKind.LOAD_SWITCH;
+    case 'disconnector': return DeviceKind.DS;
+    case 'bus_coupler': return DeviceKind.CB;
+    case 'fuse': return DeviceKind.FUSE;
+    default: return null;
+  }
+}
+
+/**
+ * Mapuje ENM Generator.gen_type na GeneratorKind.
+ */
+function enmGenKind(g: ENMGenerator): GeneratorKind {
+  switch (g.gen_type) {
+    case 'pv_inverter': return GeneratorKind.PV;
+    case 'wind_inverter': return GeneratorKind.WIND;
+    case 'bess': return GeneratorKind.BESS;
+    case 'synchronous': return GeneratorKind.SYNCHRONOUS;
+    default: return GeneratorKind.SYNCHRONOUS;
+  }
+}
+
+/**
+ * Mapuje ENM Substation.station_type na StationKind.
+ */
+function enmStationKind(s: ENMSubstation): StationKind {
+  switch (s.station_type) {
+    case 'gpz': return StationKind.MAIN_SUBSTATION;
+    case 'mv_lv': return StationKind.DISTRIBUTION;
+    case 'switching': return StationKind.SWITCHING;
+    case 'customer': return StationKind.TRANSFORMER;
+    default: return StationKind.DISTRIBUTION;
+  }
+}
+
+/**
+ * Czyta TopologyInput z EnergyNetworkModel (sciezka primary).
+ * Zero heurystyk — wszystkie dane z domeny.
+ */
+export function readTopologyFromENM(
+  enm: EnergyNetworkModel,
+  snapshotId: string = 'enm',
+): TopologyInputV1 {
+  const fixActions: TopologyFixAction[] = [];
+
+  // --- Connection Nodes (buses) ---
+  const busVoltageMap = new Map<string, number>();
+  const connectionNodes: ConnectionNodeV1[] = enm.buses.map((bus) => {
+    busVoltageMap.set(bus.ref_id, bus.voltage_kv);
+    return {
+      id: bus.ref_id,
+      name: bus.name,
+      voltageKv: bus.voltage_kv,
+      stationId: null, // uzupelniamy ponizej
+      busIndex: null,
+      inService: true,
+    };
+  });
+
+  // --- Substations ---
+  const stationBusMap = new Map<string, string>(); // busRef → stationId
+  const stations: TopologyStationV1[] = enm.substations.map((sub) => {
+    for (const busRef of sub.bus_refs) {
+      stationBusMap.set(busRef, sub.ref_id);
+    }
+    return {
+      id: sub.ref_id,
+      name: sub.name,
+      stationType: enmStationKind(sub),
+      voltageKv: sub.bus_refs.length > 0
+        ? (busVoltageMap.get(sub.bus_refs[0]) ?? 15)
+        : 15,
+      busIds: [...sub.bus_refs].sort(),
+      branchIds: [],
+      switchIds: [],
+      transformerIds: [...sub.transformer_refs].sort(),
+    };
+  });
+
+  // Uzupelnij stationId na connection nodes
+  const connectionNodesWithStation = connectionNodes.map((cn) => ({
+    ...cn,
+    stationId: stationBusMap.get(cn.id) ?? null,
+  }));
+
+  // --- Branches (lines + cables) ---
+  const branches: TopologyBranchV1[] = [];
+  const devices: TopologyDeviceV1[] = [];
+
+  for (const b of enm.branches) {
+    const kind = enmBranchKind(b);
+    const switchKind = enmSwitchKind(b);
+
+    if (switchKind !== null) {
+      // Switching branch → device + BUS_LINK branch
+      devices.push({
+        id: `dev_${b.ref_id}`,
+        name: b.name,
+        nodeId: b.from_bus_ref,
+        kind: switchKind,
+        catalogRef: b.catalog_ref ?? null,
+        state: b.status === 'closed' ? 'CLOSED' : 'OPEN',
+        inService: true,
+      });
+    }
+
+    branches.push({
+      id: b.ref_id,
+      name: b.name,
+      fromNodeId: b.from_bus_ref,
+      toNodeId: b.to_bus_ref,
+      kind,
+      isNormallyOpen: b.status === 'open',
+      inService: true,
+      catalogRef: b.catalog_ref ?? null,
+      lengthKm: 'length_km' in b ? (b as { length_km: number }).length_km : null,
+      ratedPowerMva: null,
+      voltageHvKv: null,
+      voltageLvKv: null,
+    });
+
+    if (!b.catalog_ref && (kind === BranchKind.LINE || kind === BranchKind.CABLE)) {
+      fixActions.push({
+        code: 'catalog.reference_missing',
+        message: `Galaz '${b.name}' (${b.ref_id}) nie ma referencji katalogowej.`,
+        elementRef: b.ref_id,
+        fixHint: 'Przypisz typ katalogowy do galezi w modelu sieci.',
+      });
+    }
+  }
+
+  // --- Transformers ---
+  for (const tr of enm.transformers) {
+    branches.push({
+      id: tr.ref_id,
+      name: tr.name,
+      fromNodeId: tr.hv_bus_ref,
+      toNodeId: tr.lv_bus_ref,
+      kind: BranchKind.TR_LINK,
+      isNormallyOpen: false,
+      inService: true,
+      catalogRef: tr.catalog_ref ?? null,
+      lengthKm: null,
+      ratedPowerMva: tr.sn_mva,
+      voltageHvKv: tr.uhv_kv,
+      voltageLvKv: tr.ulv_kv,
+    });
+
+    if (!tr.catalog_ref) {
+      fixActions.push({
+        code: 'catalog.reference_missing',
+        message: `Transformator '${tr.name}' (${tr.ref_id}) nie ma referencji katalogowej.`,
+        elementRef: tr.ref_id,
+        fixHint: 'Przypisz typ katalogowy do transformatora.',
+      });
+    }
+  }
+
+  // --- Measurements (CT/VT) ---
+  for (const m of enm.measurements) {
+    devices.push({
+      id: m.ref_id,
+      name: m.name,
+      nodeId: m.bus_ref,
+      kind: m.measurement_type === 'CT' ? DeviceKind.CT : DeviceKind.VT,
+      catalogRef: m.catalog_ref ?? null,
+      state: null,
+      inService: true,
+    });
+  }
+
+  // --- Sources ---
+  const sources: TopologySourceV1[] = enm.sources.map((s) => ({
+    id: s.ref_id,
+    name: s.name,
+    nodeId: s.bus_ref,
+    inService: true,
+  }));
+
+  // --- Loads ---
+  const loads: TopologyLoadV1[] = enm.loads.map((l) => ({
+    id: l.ref_id,
+    name: l.name,
+    nodeId: l.bus_ref,
+    inService: true,
+    pMw: l.p_mw,
+    qMvar: l.q_mvar,
+  }));
+
+  // --- Generators ---
+  const generators: TopologyGeneratorV1[] = enm.generators.map((g) => {
+    if (!g.gen_type) {
+      fixActions.push({
+        code: 'generator.type_missing',
+        message: `Generator '${g.name}' (${g.ref_id}) nie ma typu (gen_type).`,
+        elementRef: g.ref_id,
+        fixHint: 'Ustaw gen_type na pv_inverter, wind_inverter, bess lub synchronous.',
+      });
+    }
+    return {
+      id: g.ref_id,
+      name: g.name,
+      nodeId: g.bus_ref,
+      kind: enmGenKind(g),
+      catalogRef: g.catalog_ref ?? null,
+      inService: true,
+      ratedPowerMw: g.p_mw,
+      blockingTransformerId: null,
+    };
+  });
+
+  // --- Protection Bindings ---
+  const protectionBindings: TopologyProtectionV1[] = enm.protection_assignments.map((pa) => ({
+    id: pa.ref_id,
+    breakerRef: pa.breaker_ref,
+    ctRef: pa.ct_ref ?? null,
+    vtRef: pa.vt_ref ?? null,
+    functions: pa.settings.map((s) => ({
+      functionType: s.function_type,
+      settings: {
+        threshold_a: s.threshold_a,
+        time_delay_s: s.time_delay_s,
+        curve_type: s.curve_type,
+      },
+    })),
+    isEnabled: pa.is_enabled,
+  }));
+
+  return {
+    snapshotId,
+    snapshotFingerprint: enm.header.hash_sha256,
+    connectionNodes: sortById(connectionNodesWithStation),
+    branches: sortById(branches),
+    devices: sortById(devices),
+    stations: sortById(stations),
+    generators: sortById(generators),
+    sources: sortById(sources),
+    loads: sortById(loads),
+    protectionBindings: sortById(protectionBindings),
+    fixActions: [...fixActions].sort((a, b) => a.code.localeCompare(b.code) || (a.elementRef ?? '').localeCompare(b.elementRef ?? '')),
+  };
+}
+
+// =============================================================================
+// READER: AnySldSymbol[] → TopologyInput (BRIDGE MIGRACYJNY)
+// =============================================================================
+
+function isBus(s: AnySldSymbol): s is BusSymbol {
+  return s.elementType === 'Bus';
+}
+function isBranch(s: AnySldSymbol): s is BranchSymbol {
+  return s.elementType === 'LineBranch' || s.elementType === 'TransformerBranch';
+}
+function isSwitch(s: AnySldSymbol): s is SwitchSymbol {
+  return s.elementType === 'Switch';
+}
+function isSource(s: AnySldSymbol): s is SourceSymbol {
+  return s.elementType === 'Source';
+}
+function isLoad(s: AnySldSymbol): s is LoadSymbol {
+  return s.elementType === 'Load';
+}
+
+/**
+ * Czyta TopologyInput z AnySldSymbol[] (bridge migracyjny).
+ *
+ * Uzywamy WYLACZNIE danych strukturalnych symboli:
+ * - elementType, elementId, switchType, switchState, fromNodeId, toNodeId
+ * - NIE uzywamy elementName do klasyfikacji (zero heurystyk stringowych)
+ * - Brakujace dane → FixAction
+ *
+ * @param symbols Symbole SLD
+ * @param metadata Dodatkowe metadane (typy generatorow, napiecia, przynaleznosc do stacji)
+ */
+export function readTopologyFromSymbols(
+  symbols: readonly AnySldSymbol[],
+  metadata: SymbolBridgeMetadata = {},
+): TopologyInputV1 {
+  const sorted = [...symbols].sort((a, b) => a.id.localeCompare(b.id));
+  const fixActions: TopologyFixAction[] = [];
+  const { generatorTypes, voltageOverrides, stationMembership } = metadata;
+
+  const connectionNodes: ConnectionNodeV1[] = [];
+  const branches: TopologyBranchV1[] = [];
+  const devices: TopologyDeviceV1[] = [];
+  const sources: TopologySourceV1[] = [];
+  const loads: TopologyLoadV1[] = [];
+  const generators: TopologyGeneratorV1[] = [];
+  const stations: TopologyStationV1[] = [];
+
+  // Zbierz ID szyn (potrzebne do identyfikacji polaczen)
+  const busElementIds = new Set<string>();
+  for (const s of sorted) {
+    if (isBus(s)) {
+      busElementIds.add(s.elementId);
+    }
+  }
+
+  for (const s of sorted) {
+    if (isBus(s)) {
+      const voltage = voltageOverrides?.get(s.elementId) ?? null;
+      if (voltage === null) {
+        fixActions.push({
+          code: 'catalog.reference_missing',
+          message: `Szyna '${s.elementName}' (${s.elementId}) nie ma jawnego napiecia.`,
+          elementRef: s.elementId,
+          fixHint: 'Podaj napiecie znamionowe w metadanych (voltageOverrides).',
+        });
+      }
+      connectionNodes.push({
+        id: s.elementId,
+        name: s.elementName,
+        voltageKv: voltage ?? 15, // domyslne SN jesli brak
+        stationId: stationMembership?.get(s.elementId) ?? null,
+        busIndex: null,
+        inService: s.inService,
+      });
+    }
+
+    if (isBranch(s)) {
+      if (s.fromNodeId === s.toNodeId) {
+        fixActions.push({
+          code: 'topology.self_edge_forbidden',
+          message: `Galaz '${s.elementName}' (${s.elementId}) laczy wezel sam ze soba (${s.fromNodeId}).`,
+          elementRef: s.elementId,
+          fixHint: 'Popraw polaczenia galezi — fromNodeId i toNodeId musza byc rozne.',
+        });
+      }
+
+      const isTr = s.elementType === 'TransformerBranch';
+      branches.push({
+        id: s.elementId,
+        name: s.elementName,
+        fromNodeId: s.fromNodeId,
+        toNodeId: s.toNodeId,
+        kind: isTr ? BranchKind.TR_LINK : (s.branchType === 'CABLE' ? BranchKind.CABLE : BranchKind.LINE),
+        isNormallyOpen: false,
+        inService: s.inService,
+        catalogRef: null,
+        lengthKm: null,
+        ratedPowerMva: null,
+        voltageHvKv: null,
+        voltageLvKv: null,
+      });
+    }
+
+    if (isSwitch(s)) {
+      if (s.fromNodeId === s.toNodeId) {
+        fixActions.push({
+          code: 'topology.self_edge_forbidden',
+          message: `Lacznik '${s.elementName}' (${s.elementId}) laczy wezel sam ze soba (${s.fromNodeId}).`,
+          elementRef: s.elementId,
+          fixHint: 'Popraw polaczenia lacznika — fromNodeId i toNodeId musza byc rozne.',
+        });
+      }
+
+      // Switch = device + branch (BUS_LINK)
+      const deviceKind = s.switchType === 'BREAKER' ? DeviceKind.CB
+        : s.switchType === 'DISCONNECTOR' ? DeviceKind.DS
+        : s.switchType === 'LOAD_SWITCH' ? DeviceKind.LOAD_SWITCH
+        : DeviceKind.FUSE;
+
+      devices.push({
+        id: `dev_${s.elementId}`,
+        name: s.elementName,
+        nodeId: s.fromNodeId,
+        kind: deviceKind,
+        catalogRef: null,
+        state: s.switchState,
+        inService: s.inService,
+      });
+
+      branches.push({
+        id: s.elementId,
+        name: s.elementName,
+        fromNodeId: s.fromNodeId,
+        toNodeId: s.toNodeId,
+        kind: BranchKind.BUS_LINK,
+        isNormallyOpen: s.switchState === 'OPEN',
+        inService: s.inService,
+        catalogRef: null,
+        lengthKm: null,
+        ratedPowerMva: null,
+        voltageHvKv: null,
+        voltageLvKv: null,
+      });
+    }
+
+    if (isSource(s)) {
+      const genKind = generatorTypes?.get(s.elementId) ?? null;
+      if (genKind) {
+        generators.push({
+          id: s.elementId,
+          name: s.elementName,
+          nodeId: s.connectedToNodeId,
+          kind: genKind,
+          catalogRef: null,
+          inService: s.inService,
+          ratedPowerMw: null,
+          blockingTransformerId: null,
+        });
+      } else {
+        sources.push({
+          id: s.elementId,
+          name: s.elementName,
+          nodeId: s.connectedToNodeId,
+          inService: s.inService,
+        });
+      }
+    }
+
+    if (isLoad(s)) {
+      loads.push({
+        id: s.elementId,
+        name: s.elementName,
+        nodeId: s.connectedToNodeId,
+        inService: s.inService,
+        pMw: null,
+        qMvar: null,
+      });
+    }
+  }
+
+  return {
+    snapshotId: 'symbols-bridge',
+    snapshotFingerprint: 'none',
+    connectionNodes: sortById(connectionNodes),
+    branches: sortById(branches),
+    devices: sortById(devices),
+    stations: sortById(stations),
+    generators: sortById(generators),
+    sources: sortById(sources),
+    loads: sortById(loads),
+    protectionBindings: [],
+    fixActions: [...fixActions].sort((a, b) => a.code.localeCompare(b.code) || (a.elementRef ?? '').localeCompare(b.elementRef ?? '')),
+  };
+}

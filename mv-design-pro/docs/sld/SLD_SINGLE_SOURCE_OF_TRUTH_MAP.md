@@ -1,7 +1,7 @@
 # SLD Single Source of Truth Map
 
-**Status:** KANONICZNY | **Wersja:** 1.0 | **Data:** 2026-02-13
-**Kontekst:** RUN #3A PR-3A-01 — Mapa pojedynczych zrodel prawdy dla kazdego podsystemu SLD
+**Status:** KANONICZNY | **Wersja:** 1.1 | **Data:** 2026-02-13
+**Kontekst:** RUN #3A PR-3A-01 + RUN #3C (topology hardening) — Mapa pojedynczych zrodel prawdy dla kazdego podsystemu SLD
 
 ---
 
@@ -48,16 +48,23 @@ Pipeline C: Backend Layout (backend)
 - **Brak jednego orkiestratora** laczacego A+B. Potrzebny w 3B.
 - `SLD_AUTO_LAYOUT_V1` feature flag w Pipeline B — rozwazyc deprecation w 3B.
 
-### 2.2 Topology Adapter
+### 2.2 Topology Adapter — DOMAIN-DRIVEN (RUN #3C)
 
 | Aspekt | Single Source of Truth | Sciezka |
 |--------|------------------------|---------|
-| **Frontend: snapshot → visual** | `assignTopologicalRoles()` | `frontend/src/ui/sld-editor/utils/topological-layout/roleAssigner.ts` |
+| **Kontrakt wejsciowy adaptera** | `TopologyInputV1` (typ) | `frontend/src/ui/sld/core/topologyInputReader.ts` |
+| **Czytnik domeny: ENM → TopologyInput** | `readTopologyFromENM()` | `frontend/src/ui/sld/core/topologyInputReader.ts` |
+| **Bridge migracyjny: symbole → TopologyInput** | `readTopologyFromSymbols()` | `frontend/src/ui/sld/core/topologyInputReader.ts` |
+| **Adapter V2: TopologyInput → VisualGraphV1** | `buildVisualGraphFromTopology()` | `frontend/src/ui/sld/core/topologyAdapterV2.ts` |
+| **Adapter V1 (deleguje do V2)** | `convertToVisualGraph()` | `frontend/src/ui/sld/core/topologyAdapterV1.ts` |
 | **Backend: graph → SLD payload** | `convert_graph_to_sld_payload()` | `backend/src/application/sld/network_graph_to_sld.py` |
 | **Backend: snapshot → SLD elements** | `project_snapshot_to_sld()` | `backend/src/network_model/sld_projection.py` |
 
-**Uwaga:** Frontend adapter operuje na AnySldSymbol[], backend na NetworkGraph.
-Docelowo: VisualGraphV1 jako ujednolicony kontrakt (PR-3A-02).
+**Zmiana RUN #3C:** Frontend adapter jest teraz **domain-driven** (NetworkGraph/ENM), nie symbol-driven.
+- Sciezka glowna: `readTopologyFromENM()` → `buildVisualGraphFromTopology()`
+- Sciezka bridge: `readTopologyFromSymbols()` → `buildVisualGraphFromTopology()`
+- Legacy `assignTopologicalRoles()` jest nadal uzywane w topologicalLayoutEngine, ale topologia pochodzi z adaptera V2.
+- AdapterV1 deleguje w calosci do V2 pipeline — zero legacy kodu.
 
 ### 2.3 Symbol Registry
 
@@ -122,17 +129,24 @@ Docelowo: VisualGraphV1 jako ujednolicony kontrakt (PR-3A-02).
 | **Layer boundaries** | `arch_guard.py` | `scripts/arch_guard.py` |
 | **Overlay no physics** | `overlay_no_physics_guard.py` | `scripts/overlay_no_physics_guard.py` |
 | **Solver boundary** | `solver_boundary_guard.py` | `scripts/solver_boundary_guard.py` |
+| **SLD determinism (Guards 1-7)** | `sld_determinism_guards.py` | `scripts/sld_determinism_guards.py` |
+| **No self-edges (Guard 8)** | `sld_determinism_guards.py` | `scripts/sld_determinism_guards.py` (RUN #3C) |
+| **No string typology (Guard 9)** | `sld_determinism_guards.py` | `scripts/sld_determinism_guards.py` (RUN #3C) |
+| **No legacy adapter (Guard 10)** | `sld_determinism_guards.py` | `scripts/sld_determinism_guards.py` (RUN #3C) |
 
-**Status:** Jedno zrodlo per regula.
+**Status:** Jedno zrodlo per regula. Guards 8-10 dodane w RUN #3C.
 
 ### 2.9 Golden Networks
 
 | Aspekt | Single Source of Truth | Sciezka |
 |--------|------------------------|---------|
 | **Backend golden SN** | `golden_network_sn.py` | `backend/tests/golden/golden_network_sn.py` |
-| **Frontend golden** | **BRAK** | Potrzebne w PR-3A-03 |
+| **Frontend golden: VisualGraph** | `visualGraph.test.ts` + `determinism.test.ts` | `frontend/src/ui/sld/core/__tests__/` |
+| **Frontend golden: TopologyAdapter V2 (domain)** | `topologyAdapterV2.test.ts` | `frontend/src/ui/sld/core/__tests__/topologyAdapterV2.test.ts` |
 
-**Status:** Backend ma golden fixture (609 linii, 20 stacji, OZE). Frontend nie ma golden fixtures.
+**Status (RUN #3C):** Frontend ma 2 zestawy golden fixtures:
+- VisualGraph: GN-SLD-01..02, GN-OZE-01..03, GN-STRESS-500 (RUN #3A)
+- TopologyAdapterV2: GN-DOM-01..07 (RUN #3C) — 7 golden domain networks
 
 ### 2.10 Dokumentacja kanoniczna
 
@@ -175,7 +189,7 @@ Docelowo: VisualGraphV1 jako ujednolicony kontrakt (PR-3A-02).
 
 ---
 
-## 4. Docelowa architektura (po RUN #3A + 3B)
+## 4. Docelowa architektura (po RUN #3A + 3C)
 
 ```
 NetworkModel (backend)
@@ -183,11 +197,30 @@ NetworkModel (backend)
        ▼
    Snapshot (frozen, fingerprint SHA-256)
        │
-       ▼
-   TopologyAdapterV1 (frontend)
-   Snapshot → VisualGraphV1 (zamrozony kontrakt)
-       │
-       ▼
+       ├──────────────────────────────────────────────┐
+       ▼                                              ▼
+   EnergyNetworkModel (API)                 AnySldSymbol[] (editor)
+       │                                              │
+       ▼                                              ▼
+   readTopologyFromENM()              readTopologyFromSymbols()
+   (sciezka glowna)                   (bridge migracyjny)
+       │                                              │
+       └──────────────┬───────────────────────────────┘
+                      ▼
+              TopologyInputV1 (kanoniczny kontrakt)
+                      │
+                      ▼
+          buildVisualGraphFromTopology()  ← TopologyAdapterV2
+          - ZERO self-edges (throw Error)
+          - ZERO string heuristics
+          - BFS spanning tree segmentacja
+          - Stacje A/B/C/D z domeny
+          - PV/BESS z GeneratorKind
+                      │
+                      ▼
+              VisualGraphV1 (zamrozony kontrakt)
+                      │
+                      ▼
    Layout Engine (single orchestrator)
    VisualGraphV1 → LayoutResult (positions, paths)
        │

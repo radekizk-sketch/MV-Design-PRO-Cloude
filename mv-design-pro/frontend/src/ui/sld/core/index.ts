@@ -1,7 +1,8 @@
 /**
- * SLD Core — VisualGraphV1 + LayoutResultV1 + Layout Pipeline.
+ * SLD Core — VisualGraphV1 + LayoutResultV1 + Layout Pipeline + TopologyInput.
  *
  * CANONICAL: Jedyne miejsce prawdy dla kontraktow SLD.
+ * RUN #3C: Domain-driven adapter + TopologyInputReader.
  */
 
 // VisualGraph contract types
@@ -27,9 +28,38 @@ export type {
   VisualGraphValidationResult,
 } from './visualGraph';
 
-// Topology Adapter
+// Topology Adapter (public API — delegates to V2 pipeline)
 export { convertToVisualGraph } from './topologyAdapterV1';
 export type { TopologyAdapterOptions } from './topologyAdapterV1';
+
+// TopologyInputReader (domain types + readers)
+export {
+  BranchKind,
+  DeviceKind,
+  GeneratorKind,
+  StationKind,
+  readTopologyFromENM,
+  readTopologyFromSymbols,
+} from './topologyInputReader';
+
+export type {
+  TopologyInputV1,
+  ConnectionNodeV1,
+  TopologyBranchV1,
+  TopologyDeviceV1,
+  TopologyStationV1,
+  TopologyGeneratorV1,
+  TopologySourceV1,
+  TopologyLoadV1,
+  TopologyProtectionV1,
+  TopologyProtectionFunctionV1,
+  TopologyFixAction,
+  SymbolBridgeMetadata,
+} from './topologyInputReader';
+
+// TopologyAdapterV2 (domain-driven builder)
+export { buildVisualGraphFromTopology } from './topologyAdapterV2';
+export type { AdapterResultV1 } from './topologyAdapterV2';
 
 // LayoutResult contract types
 export {

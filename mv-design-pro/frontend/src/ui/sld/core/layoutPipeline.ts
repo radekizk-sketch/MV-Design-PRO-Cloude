@@ -390,7 +390,21 @@ function phase2_detect_and_reserve_blocks(
       );
     }
 
-    // Zbierz wewnetrzne wezly (transformator SN/nN, szyna nN, odbiorca)
+    // Zbierz wewnetrzne wezly na podstawie krawedzi (DOMAIN-DRIVEN, bez heurystyk stringowych)
+    // Wezel jest wewnetrzny jesli: (a) jest podlaczony do szyny nalezacej do stacji
+    // przez krawedz TRANSFORMER_LINK, INTERNAL_SWITCHGEAR lub BRANCH
+    const stationBusIds = new Set<string>();
+    // Szyny nalezace do stacji: szyna z atrybutem connectedToNodeId == station.id
+    // lub szyna bezposrednio polaczona do wezla stacji
+    for (const edge of graph.edges) {
+      if (
+        (edge.fromPortRef.nodeId === station.id || edge.toPortRef.nodeId === station.id)
+      ) {
+        const otherId = edge.fromPortRef.nodeId === station.id
+          ? edge.toPortRef.nodeId : edge.fromPortRef.nodeId;
+        stationBusIds.add(otherId);
+      }
+    }
     const internalIds: string[] = [];
     for (const node of graph.nodes) {
       if (
@@ -398,9 +412,14 @@ function phase2_detect_and_reserve_blocks(
         node.nodeType === NodeTypeV1.BUS_NN ||
         node.nodeType === NodeTypeV1.LOAD
       ) {
-        // Heurystyka: wezel nalezy do stacji jesli jego ID zawiera ID stacji
-        // lub jest podlaczony do szyny nN nalezacej do stacji
-        if (node.id.includes(station.id.replace('station_', '').replace('bus_sn_st_', 'st_'))) {
+        // Wezel jest wewnetrzny jesli jest polaczony do szyny stacji
+        const isConnected = graph.edges.some(e =>
+          (e.fromPortRef.nodeId === node.id && stationBusIds.has(e.toPortRef.nodeId)) ||
+          (e.toPortRef.nodeId === node.id && stationBusIds.has(e.fromPortRef.nodeId)) ||
+          (e.fromPortRef.nodeId === node.id && e.toPortRef.nodeId === station.id) ||
+          (e.toPortRef.nodeId === node.id && e.fromPortRef.nodeId === station.id)
+        );
+        if (isConnected) {
           internalIds.push(node.id);
         }
       }

@@ -1,33 +1,41 @@
 # SLD RUN 3B+ Roadmap
 
-**Status:** PLANOWANY | **Wersja:** 1.0 | **Data:** 2026-02-13
-**Kontekst:** RUN #3A → mapa zaleznosci dla kolejnych etapow SLD ETAP-grade
+**Status:** PLANOWANY | **Wersja:** 1.1 | **Data:** 2026-02-13
+**Kontekst:** RUN #3A + RUN #3C → mapa zaleznosci dla kolejnych etapow SLD ETAP-grade
 
 ---
 
 ## 1. Dependency Map
 
 ```
-RUN #3A (CURRENT — kontrakty + determinism)
+RUN #3A (DONE — kontrakty + determinism)
   ├─ PR-3A-01: docs (pipeline map, gap audit, SSOT)
   ├─ PR-3A-02: VisualGraphV1 contract + TopologyAdapterV1
   └─ PR-3A-03: determinism suite + guards + golden networks
         │
         ▼
-RUN #3B (embedded switchgear blocks + pelna segmentacja)
-  ├─ Wymaga: VisualGraphV1 zamrozony (PR-3A-02)
-  ├─ Wymaga: golden networks (PR-3A-03)
-  └─ Wymaga: determinism suite passing (PR-3A-03)
+RUN #3C (DONE — topology hardening, domain-driven adapter)
+  ├─ TopologyInputReader (ENM + bridge)
+  ├─ TopologyAdapterV2 (domain-driven, zero self-edges)
+  ├─ Segmentacja trunk/branch/secondary (BFS spanning tree)
+  ├─ Stacje A/B/C/D z domeny (classifyStationType)
+  ├─ OZE PV/BESS z GeneratorKind (zero heurystyk)
+  ├─ Validations + FixActions (stable PL codes)
+  ├─ Migration: V1 deleguje do V2, grep-zero legacy
+  ├─ Tests: 7 golden domain networks, 100x hash, 50x permutation
+  └─ Guards: no-self-edges, no-string-typology, no-legacy
         │
         ▼
-RUN #3C (LayoutSpec vs LayoutResult, Undo/Redo, routing)
-  ├─ Wymaga: embedded blocks z 3B
-  └─ Wymaga: unified layout orchestrator z 3B
+RUN #3B (NEXT — embedded switchgear blocks + layout rendering)
+  ├─ Wymaga: VisualGraphV1 zamrozony (PR-3A-02) ✓
+  ├─ Wymaga: golden networks (PR-3A-03) ✓
+  ├─ Wymaga: domain-driven adapter (RUN #3C) ✓
+  └─ Wymaga: determinism suite passing (PR-3A-03) ✓
         │
         ▼
 RUN #3D (Export E2E + CI artifacts + perf budgets)
-  ├─ Wymaga: stabilny layout z 3C
-  └─ Wymaga: golden network render artifacts z 3A/3B
+  ├─ Wymaga: stabilny layout z 3B
+  └─ Wymaga: golden network render artifacts z 3A/3C
 ```
 
 ---
@@ -79,7 +87,7 @@ RUN #3D (Export E2E + CI artifacts + perf budgets)
 
 ---
 
-## 3. RUN #3C: LayoutSpec vs LayoutResult, Undo/Redo, Routing
+## 3. RUN #3D (dawniej 3C): LayoutSpec vs LayoutResult, Undo/Redo, Routing
 
 ### 3.1 Wejscie
 - Embedded switchgear blocks z RUN #3B
@@ -178,19 +186,24 @@ RUN #3A ────────────────────────
   │ kontrakty, determinism, guards
   │
   ▼
-RUN #3B ─────────────────────────────── NEXT
-  │ embedded blocks, segmentacja, unified orchestrator
-  │ Zalezy od: PR-3A-02 (kontrakt), PR-3A-03 (testy)
+RUN #3C ─────────────────────────────── DONE
+  │ topology hardening, domain-driven adapter
+  │ zero self-edges, zero heurystyk, segmentacja
   │
   ▼
-RUN #3C ─────────────────────────────── PLANNED
+RUN #3B ─────────────────────────────── NEXT
+  │ embedded blocks, layout rendering, unified orchestrator
+  │ Zalezy od: RUN #3A (kontrakt), RUN #3C (adapter)
+  │
+  ▼
+RUN #3D ─────────────────────────────── PLANNED
   │ LayoutSpec/Result, Undo/Redo, routing, incremental
   │ Zalezy od: RUN #3B (blocks, orchestrator)
   │
   ▼
-RUN #3D ─────────────────────────────── PLANNED
+RUN #3E ─────────────────────────────── PLANNED
     Export E2E, CI artifacts, perf budgets
-    Zalezy od: RUN #3C (stabilny layout)
+    Zalezy od: RUN #3D (stabilny layout)
 ```
 
 ---

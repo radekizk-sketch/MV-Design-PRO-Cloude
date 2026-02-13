@@ -1,7 +1,7 @@
 # SLD E2E Pipeline Map
 
-**Status:** KANONICZNY | **Wersja:** 1.0 | **Data:** 2026-02-13
-**Kontekst:** RUN #3A PR-3A-01 — Mapa przeplywa danych E2E dla systemu SLD
+**Status:** KANONICZNY | **Wersja:** 1.1 | **Data:** 2026-02-13
+**Kontekst:** RUN #3A PR-3A-01 + RUN #3C (topology hardening) — Mapa przeplywa danych E2E dla systemu SLD
 
 ---
 
@@ -190,12 +190,23 @@ NetworkModel (backend)
 | `backend/src/application/sld/network_graph_to_sld.py` | `convert_graph_to_sld_payload(graph)` | NetworkGraph | SldPayload + id_map (UUID5 deterministic) |
 | `backend/src/application/sld/layout.py` | `build_auto_layout_diagram(payload)` | SldPayload | SldDiagram z pozycjami (BFS od SLACK) |
 
-### 2.3 Topology Adapter (frontend)
+### 2.3 Topology Adapter (frontend) — DOMAIN-DRIVEN (RUN #3C)
 
 | Plik | Funkcja | Wejscie | Wyjscie |
 |------|---------|---------|---------|
-| `frontend/src/ui/sld-editor/utils/topological-layout/roleAssigner.ts` | `assignTopologicalRoles(symbols)` | AnySldSymbol[] | RoleAssignment map + feederChains + stationIds |
-| Buduje wewnetrzny `TopologyGraph` | `buildTopologyGraph()` | AnySldSymbol[] | TopologyGraph (nodes, edges, adjacency) |
+| `frontend/src/ui/sld/core/topologyInputReader.ts` | `readTopologyFromENM(enm)` | EnergyNetworkModel | TopologyInputV1 (kanoniczny, domain-driven) |
+| `frontend/src/ui/sld/core/topologyInputReader.ts` | `readTopologyFromSymbols(symbols, metadata?)` | AnySldSymbol[] + SymbolBridgeMetadata? | TopologyInputV1 (bridge migracyjny) |
+| `frontend/src/ui/sld/core/topologyAdapterV2.ts` | `buildVisualGraphFromTopology(input, options?)` | TopologyInputV1 | AdapterResultV1 { graph: VisualGraphV1, fixActions, stats } |
+| `frontend/src/ui/sld/core/topologyAdapterV1.ts` | `convertToVisualGraph(symbols, options?)` | AnySldSymbol[] + TopologyAdapterOptions | VisualGraphV1 (deleguje do V2 pipeline) |
+
+**Zmiana RUN #3C:** Adapter jest teraz **NetworkGraph-driven** (domain-driven), nie symbol-driven.
+- Sciezka glowna: `readTopologyFromENM()` → `buildVisualGraphFromTopology()`
+- Sciezka bridge: `readTopologyFromSymbols()` → `buildVisualGraphFromTopology()`
+- **ZERO self-edges** — twardy invariant (throw Error)
+- **ZERO string heuristics** — typy z pól strukturalnych (voltageKv, kind, stationType)
+- **Deterministyczna segmentacja** — BFS spanning tree → trunk/branch/secondary
+- **Stacje A/B/C/D** z analizy topologicznej domeny (busCount, branchCount, switchIds)
+- **PV/BESS** z jawnego pola `kind` (GeneratorKind), nie z nazw
 
 ### 2.4 Layout Engine (frontend)
 
@@ -316,7 +327,7 @@ NetworkModel (backend)
 | python-tests | `.github/workflows/python-tests.yml` | `poetry run pytest -q` (backend) |
 | docs-guard | `.github/workflows/docs-guard.yml` | `python scripts/docs_guard.py` (PCC, linki) |
 
-### 3.4 Guard scripts (17 sztuk)
+### 3.4 Guard scripts (20 sztuk)
 
 | Guard | Plik | Sprawdza |
 |-------|------|----------|
@@ -327,6 +338,9 @@ NetworkModel (backend)
 | solver_boundary | `scripts/solver_boundary_guard.py` | Izolacja solverow |
 | trace_determinism | `scripts/trace_determinism_guard.py` | Determinizm trace |
 | resultset_v1_schema | `scripts/resultset_v1_schema_guard.py` | Schema ResultSet |
+| **no_self_edges** | `scripts/sld_determinism_guards.py` (Guard 8) | Brak self-edges w adapterze (RUN #3C) |
+| **no_string_typology** | `scripts/sld_determinism_guards.py` (Guard 9) | Brak heurystyk stringowych (RUN #3C) |
+| **no_legacy_adapter** | `scripts/sld_determinism_guards.py` (Guard 10) | Brak legacy kodu w adapterze (RUN #3C) |
 | + 10 kolejnych | `scripts/*.py` | Rozne regualy architektoniczne |
 
 ---
