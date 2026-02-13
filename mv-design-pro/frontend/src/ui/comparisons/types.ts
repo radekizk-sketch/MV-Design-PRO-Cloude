@@ -95,9 +95,9 @@ export interface DeltaOverlayLegendEntry {
 }
 
 /**
- * Polish labels for global delta keys.
+ * Polish labels for SC delta keys.
  */
-export const GLOBAL_DELTA_KEY_LABELS: Record<string, string> = {
+export const SC_DELTA_KEY_LABELS: Record<string, string> = {
   ikss_a: 'Prad zwarciowy poczatkowy Ik"',
   ip_a: 'Prad udarowy ip',
   ith_a: 'Prad cieplny Ith',
@@ -105,6 +105,36 @@ export const GLOBAL_DELTA_KEY_LABELS: Record<string, string> = {
   sk_mva: 'Moc zwarciowa Sk',
   kappa: 'Wspolczynnik udarowy kappa',
   zkk_ohm: 'Impedancja zwarciowa Zkk',
+};
+
+/**
+ * Polish labels for Load Flow delta keys.
+ */
+export const LF_DELTA_KEY_LABELS: Record<string, string> = {
+  v_pu: 'Napięcie [p.u.]',
+  angle_deg: 'Kąt [°]',
+  p_injected_mw: 'P iniekcja [MW]',
+  q_injected_mvar: 'Q iniekcja [Mvar]',
+  p_from_mw: 'P od [MW]',
+  q_from_mvar: 'Q od [Mvar]',
+  p_to_mw: 'P do [MW]',
+  q_to_mvar: 'Q do [Mvar]',
+  losses_p_mw: 'Straty P [MW]',
+  losses_q_mvar: 'Straty Q [Mvar]',
+  total_losses_p_mw: 'Straty całkowite P [MW]',
+  total_losses_q_mvar: 'Straty całkowite Q [Mvar]',
+  min_v_pu: 'U min [p.u.]',
+  max_v_pu: 'U max [p.u.]',
+  slack_p_mw: 'P bilansujący [MW]',
+  slack_q_mvar: 'Q bilansujący [Mvar]',
+};
+
+/**
+ * Unified Polish labels for all delta keys (SC + LF).
+ */
+export const GLOBAL_DELTA_KEY_LABELS: Record<string, string> = {
+  ...SC_DELTA_KEY_LABELS,
+  ...LF_DELTA_KEY_LABELS,
 };
 
 /**
