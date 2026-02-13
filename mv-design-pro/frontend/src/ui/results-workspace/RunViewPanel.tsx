@@ -15,6 +15,7 @@ import { useSelectedRunDetail } from './store';
 import { useResultsInspectorStore } from '../results-inspector/store';
 import type { RunStatusValue } from './types';
 import { RUN_STATUS_LABELS, RUN_STATUS_STYLES, getAnalysisTypeLabel } from './types';
+import { LoadFlowRunSection } from './LoadFlowRunSection';
 
 /**
  * Global metric card display.
@@ -86,109 +87,119 @@ export function RunViewPanel() {
         )}
       </div>
 
-      {/* Global Metrics (from short-circuit results if available) */}
-      {shortCircuitResults && shortCircuitResults.rows.length > 0 && (
-        <section className="mb-6" data-testid="run-global-metrics">
-          <h3 className="text-sm font-semibold text-slate-700 mb-2">
-            Metryki globalne
-          </h3>
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
-            {shortCircuitResults.rows.slice(0, 1).map((row) => {
-              const metrics: MetricItem[] = [];
-              if (row.ikss_ka != null) {
-                metrics.push({ label: "Ik''", value: row.ikss_ka.toFixed(3), unit: 'kA' });
-              }
-              if (row.ip_ka != null) {
-                metrics.push({ label: 'ip', value: row.ip_ka.toFixed(3), unit: 'kA' });
-              }
-              if (row.ith_ka != null) {
-                metrics.push({ label: 'Ith', value: row.ith_ka.toFixed(3), unit: 'kA' });
-              }
-              if (row.sk_mva != null) {
-                metrics.push({ label: "Sk''", value: row.sk_mva.toFixed(1), unit: 'MVA' });
-              }
-              return metrics.map((m) => (
-                <MetricCard key={m.label} label={m.label} value={m.value} unit={m.unit} />
-              ));
-            })}
-          </div>
-        </section>
+      {/* Load Flow specific section */}
+      {selectedRun.analysis_type === 'LOAD_FLOW' && (
+        <LoadFlowRunSection runId={selectedRun.id} />
       )}
 
-      {/* Bus Results Table */}
-      {isLoadingBuses ? (
-        <LoadingIndicator text="Ładowanie wyników węzłowych..." />
-      ) : (
-        busResults &&
-        busResults.rows.length > 0 && (
-          <ResultsTable
-            title="Szyny"
-            testId="run-bus-table"
-            columns={['Nazwa', 'Un [kV]', 'U [kV]', 'U [j.w.]']}
-            rows={busResults.rows.map((row) => [
-              row.name,
-              row.un_kv.toFixed(1),
-              row.u_kv != null ? row.u_kv.toFixed(3) : '-',
-              row.u_pu != null ? row.u_pu.toFixed(4) : '-',
-            ])}
-          />
-        )
-      )}
+      {/* SC/Generic section — shown only for non-LOAD_FLOW analysis types */}
+      {selectedRun.analysis_type !== 'LOAD_FLOW' && (
+        <>
+          {/* Global Metrics (from short-circuit results if available) */}
+          {shortCircuitResults && shortCircuitResults.rows.length > 0 && (
+            <section className="mb-6" data-testid="run-global-metrics">
+              <h3 className="text-sm font-semibold text-slate-700 mb-2">
+                Metryki globalne
+              </h3>
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
+                {shortCircuitResults.rows.slice(0, 1).map((row) => {
+                  const metrics: MetricItem[] = [];
+                  if (row.ikss_ka != null) {
+                    metrics.push({ label: "Ik''", value: row.ikss_ka.toFixed(3), unit: 'kA' });
+                  }
+                  if (row.ip_ka != null) {
+                    metrics.push({ label: 'ip', value: row.ip_ka.toFixed(3), unit: 'kA' });
+                  }
+                  if (row.ith_ka != null) {
+                    metrics.push({ label: 'Ith', value: row.ith_ka.toFixed(3), unit: 'kA' });
+                  }
+                  if (row.sk_mva != null) {
+                    metrics.push({ label: "Sk''", value: row.sk_mva.toFixed(1), unit: 'MVA' });
+                  }
+                  return metrics.map((m) => (
+                    <MetricCard key={m.label} label={m.label} value={m.value} unit={m.unit} />
+                  ));
+                })}
+              </div>
+            </section>
+          )}
 
-      {/* Branch Results Table */}
-      {isLoadingBranches ? (
-        <LoadingIndicator text="Ładowanie wyników gałęziowych..." />
-      ) : (
-        branchResults &&
-        branchResults.rows.length > 0 && (
-          <ResultsTable
-            title="Gałęzie"
-            testId="run-branch-table"
-            columns={['Nazwa', 'I [A]', 'P [MW]', 'Q [Mvar]', 'Obciążenie [%]']}
-            rows={branchResults.rows.map((row) => [
-              row.name,
-              row.i_a != null ? row.i_a.toFixed(1) : '-',
-              row.p_mw != null ? row.p_mw.toFixed(3) : '-',
-              row.q_mvar != null ? row.q_mvar.toFixed(3) : '-',
-              row.loading_pct != null ? row.loading_pct.toFixed(1) : '-',
-            ])}
-          />
-        )
-      )}
+          {/* Bus Results Table */}
+          {isLoadingBuses ? (
+            <LoadingIndicator text="Ładowanie wyników węzłowych..." />
+          ) : (
+            busResults &&
+            busResults.rows.length > 0 && (
+              <ResultsTable
+                title="Szyny"
+                testId="run-bus-table"
+                columns={['Nazwa', 'Un [kV]', 'U [kV]', 'U [j.w.]']}
+                rows={busResults.rows.map((row) => [
+                  row.name,
+                  row.un_kv.toFixed(1),
+                  row.u_kv != null ? row.u_kv.toFixed(3) : '-',
+                  row.u_pu != null ? row.u_pu.toFixed(4) : '-',
+                ])}
+              />
+            )
+          )}
 
-      {/* Short Circuit Results Table */}
-      {isLoadingShortCircuit ? (
-        <LoadingIndicator text="Ładowanie wyników zwarciowych..." />
-      ) : (
-        shortCircuitResults &&
-        shortCircuitResults.rows.length > 0 && (
-          <ResultsTable
-            title="Zwarcia"
-            testId="run-sc-table"
-            columns={['Element', "Ik'' [kA]", 'ip [kA]', 'Ith [kA]', "Sk'' [MVA]"]}
-            rows={shortCircuitResults.rows.map((row) => [
-              row.target_name ?? row.target_id,
-              row.ikss_ka != null ? row.ikss_ka.toFixed(3) : '-',
-              row.ip_ka != null ? row.ip_ka.toFixed(3) : '-',
-              row.ith_ka != null ? row.ith_ka.toFixed(3) : '-',
-              row.sk_mva != null ? row.sk_mva.toFixed(1) : '-',
-            ])}
-          />
-        )
-      )}
+          {/* Branch Results Table */}
+          {isLoadingBranches ? (
+            <LoadingIndicator text="Ładowanie wyników gałęziowych..." />
+          ) : (
+            branchResults &&
+            branchResults.rows.length > 0 && (
+              <ResultsTable
+                title="Gałęzie"
+                testId="run-branch-table"
+                columns={['Nazwa', 'I [A]', 'P [MW]', 'Q [Mvar]', 'Obciążenie [%]']}
+                rows={branchResults.rows.map((row) => [
+                  row.name,
+                  row.i_a != null ? row.i_a.toFixed(1) : '-',
+                  row.p_mw != null ? row.p_mw.toFixed(3) : '-',
+                  row.q_mvar != null ? row.q_mvar.toFixed(3) : '-',
+                  row.loading_pct != null ? row.loading_pct.toFixed(1) : '-',
+                ])}
+              />
+            )
+          )}
 
-      {/* No results message */}
-      {!isLoadingBuses &&
-        !isLoadingBranches &&
-        !isLoadingShortCircuit &&
-        !busResults &&
-        !branchResults &&
-        !shortCircuitResults &&
-        selectedRun.status === 'DONE' && (
-          <div className="text-center text-slate-400 text-sm py-8">
-            Brak danych wynikowych dla tego obliczenia
-          </div>
-        )}
+          {/* Short Circuit Results Table */}
+          {isLoadingShortCircuit ? (
+            <LoadingIndicator text="Ładowanie wyników zwarciowych..." />
+          ) : (
+            shortCircuitResults &&
+            shortCircuitResults.rows.length > 0 && (
+              <ResultsTable
+                title="Zwarcia"
+                testId="run-sc-table"
+                columns={['Element', "Ik'' [kA]", 'ip [kA]', 'Ith [kA]', "Sk'' [MVA]"]}
+                rows={shortCircuitResults.rows.map((row) => [
+                  row.target_name ?? row.target_id,
+                  row.ikss_ka != null ? row.ikss_ka.toFixed(3) : '-',
+                  row.ip_ka != null ? row.ip_ka.toFixed(3) : '-',
+                  row.ith_ka != null ? row.ith_ka.toFixed(3) : '-',
+                  row.sk_mva != null ? row.sk_mva.toFixed(1) : '-',
+                ])}
+              />
+            )
+          )}
+
+          {/* No results message */}
+          {!isLoadingBuses &&
+            !isLoadingBranches &&
+            !isLoadingShortCircuit &&
+            !busResults &&
+            !branchResults &&
+            !shortCircuitResults &&
+            selectedRun.status === 'DONE' && (
+              <div className="text-center text-slate-400 text-sm py-8">
+                Brak danych wynikowych dla tego obliczenia
+              </div>
+            )}
+        </>
+      )}
     </div>
   );
 }

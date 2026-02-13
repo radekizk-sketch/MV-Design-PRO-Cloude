@@ -159,6 +159,25 @@ export interface PowerFlowTrace {
 export type PowerFlowResultsTab = 'BUSES' | 'BRANCHES' | 'SUMMARY' | 'TRACE' | 'INTERPRETATION';
 
 /**
+ * SLD Overlay display mode for Load Flow results.
+ *
+ * INVARIANTS:
+ * - No implicit default — must be explicitly selected
+ * - Each mode determines which data is shown on the overlay
+ * - Token-only coloring (no hex colors, no hardcoded thresholds in UI)
+ */
+export type LoadFlowOverlayMode = 'voltage' | 'loading' | 'flow';
+
+/**
+ * Polish labels for overlay modes.
+ */
+export const LOAD_FLOW_OVERLAY_MODE_LABELS: Record<LoadFlowOverlayMode, string> = {
+  voltage: 'Napięcia',
+  loading: 'Obciążenie',
+  flow: 'Kierunek przepływu',
+};
+
+/**
  * Polish tab labels.
  * P22: Added Interpretacja tab.
  */

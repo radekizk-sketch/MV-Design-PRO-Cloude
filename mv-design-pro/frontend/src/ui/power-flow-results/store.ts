@@ -26,6 +26,7 @@ import type {
   PowerFlowTrace,
   PowerFlowResultsTab,
   PowerFlowInterpretation,
+  LoadFlowOverlayMode,
 } from './types';
 import * as api from './api';
 
@@ -46,6 +47,7 @@ interface PowerFlowResultsState {
 
   // SLD overlay
   overlayVisible: boolean;
+  overlayMode: LoadFlowOverlayMode;
 
   // Active tab
   activeTab: PowerFlowResultsTab;
@@ -68,6 +70,7 @@ interface PowerFlowResultsState {
   setActiveTab: (tab: PowerFlowResultsTab) => void;
   setSearchQuery: (query: string) => void;
   toggleOverlay: (visible?: boolean) => void;
+  setOverlayMode: (mode: LoadFlowOverlayMode) => void;
   loadResults: () => Promise<void>;
   loadTrace: () => Promise<void>;
   loadInterpretation: () => Promise<void>;  // P22
@@ -84,6 +87,7 @@ const initialState = {
   trace: null,
   interpretation: null,  // P22
   overlayVisible: true,
+  overlayMode: 'voltage' as LoadFlowOverlayMode,
   activeTab: 'BUSES' as PowerFlowResultsTab,
   searchQuery: '',
   isLoadingHeader: false,
@@ -153,6 +157,13 @@ export const usePowerFlowResultsStore = create<PowerFlowResultsState>((set, get)
     set((state) => ({
       overlayVisible: visible !== undefined ? visible : !state.overlayVisible,
     }));
+  },
+
+  /**
+   * Set overlay display mode (voltage/loading/flow).
+   */
+  setOverlayMode: (mode) => {
+    set({ overlayMode: mode });
   },
 
   /**
