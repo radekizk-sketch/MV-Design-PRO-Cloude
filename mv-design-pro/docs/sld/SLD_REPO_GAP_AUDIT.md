@@ -1,0 +1,204 @@
+# SLD Repo Gap Audit
+
+**Status:** KANONICZNY | **Wersja:** 1.0 | **Data:** 2026-02-13
+**Kontekst:** RUN #3A PR-3A-01 — Audyt luk miedzy stanem AS-IS a wymaganiami kanonicznymi
+
+---
+
+## 1. Metodyka
+
+Audyt porownuje stan AS-IS repozytorium z wymaganiami kanonicznymi zdefiniowanymi w:
+- `KANON_SLD_SYSTEM.md` (inwarianty 1–8)
+- `SLD_AUTO_LAYOUT.md` (fazy 1–5, reguly D1–D7)
+- `SLD_SYSTEM_SPEC_CANONICAL.md` (docelowy)
+- `SLD_ALGORITHM_LAYOUT_SPEC.md` (docelowy)
+- `SLD_SYMBOLS_CANONICAL.md` (docelowy)
+- `SLD_TEST_MATRIX.md` (docelowy)
+- `SLD_REPO_HYGIENE_RULES.md` (docelowy)
+
+Kazda luka ma przypisany PR do realizacji (3A-02, 3A-03 lub przyszly 3B+).
+
+---
+
+## 2. Tabela luk
+
+### 2.1 Kontrakt VisualGraph
+
+| # | Wymaganie kanoniczne | Stan AS-IS | Luka | PR |
+|---|----------------------|------------|------|----|
+| G-01 | Zamrozony kontrakt VisualGraphV1 jako jedyne wejscie layoutu | Brak jawnego kontraktu. Layout przyjmuje `AnySldSymbol[]` (typy edytorowe). Brak wersjonowania. | **KRYTYCZNA**: Brak zamrozonego, wersjonowanego kontraktu miedzy Topology Adapter a Layout Engine. Typy sa edytorowe, nie kontraktowe. | **PR-3A-02** |
+| G-02 | Typy wezlow: GRID_SOURCE, STATION_SN_NN_A/B/C/D, SWITCHGEAR_BLOCK, TRANSFORMER_WN_SN/SN_NN, BUS_SN/NN, FEEDER_JUNCTION, LOAD, GENERATOR_PV, GENERATOR_BESS | RoleAssigner rozpoznaje: POWER_SOURCE, BUSBAR, SECTION, FEEDER, AXIAL_ELEMENT, INLINE_ELEMENT. Brak jawnego rozroznienia typow stacji A/B/C/D. PV/BESS wykrywane po nazwie, ale brak dedykowanego enum. | **ISTOTNA**: Role topologiczne sa generyczne. Brak typologii stacji A/B/C/D jako pierwszorzednych typow. PV/BESS nie maja dedykowanego NodeType — wykrywane heurystycznie. | **PR-3A-02** |
+| G-03 | Typy krawedzi: TRUNK, BRANCH, SECONDARY_CONNECTOR, BUS_COUPLER, TRANSFORMER_LINK, INTERNAL_SWITCHGEAR | TopologyEdge ma: symbolId, fromElementId, toElementId, elementType. Brak jawnej klasyfikacji trunk/branch/secondary. | **ISTOTNA**: Segmentacja trunk/branch/secondary istnieje w feeder chain detection, ale nie jest wyrazona jako enum EdgeType w kontrakcie. | **PR-3A-02** |
+| G-04 | Porty z jawna rola (IN, OUT, BRANCH, BUS, FIELD_IN, FIELD_OUT, COUPLER_A/B) | ports.json definiuje top/bottom/left/right. Brak semantycznych rol portow. | **UMIARKOWANA**: Porty sa geometryczne (pozycyjne), nie semantyczne. Wystarczajace dla layoutu, ale nie dla pelnej typologii stacji. | **PR-3A-02** (minimalne) / **3B** (pelne) |
+| G-05 | Nodes i edges sortowane leksykograficznie po id w canonical serializer | Sortowanie po id istnieje w wielu miejscach (roleAssigner, geometricSkeleton). Brak jednego canonical serializer. | **UMIARKOWANA**: Deterministyczne, ale rozproszone. Potrzebny jeden canonical serializer w kontrakcie. | **PR-3A-02** |
+| G-06 | Stabilne id (element_id ze Snapshot lub deterministyczna kompozycja) | UUID5 w backend (namespace + element_id). Frontend: symbolId z edytora. Brak kontraktu na stabilnosc id miedzy sesjami. | **NISKA**: Stabilne w ramach sesji. Backend UUID5 jest deterministyczny. | **PR-3A-02** (dokumentacja) |
+
+### 2.2 Trunk / Branch / Secondary segmentacja
+
+| # | Wymaganie kanoniczne | Stan AS-IS | Luka | PR |
+|---|----------------------|------------|------|----|
+| S-01 | Jawna segmentacja TRUNK (magistrala od GPZ) | `TrunkPath` istnieje w KANON_SLD_SYSTEM.md. Backend `topology.py` ma `TrunkSegment`. Frontend roleAssigner wykrywa feeder chains, ale nie oznacza trunk vs branch. | **ISTOTNA**: Segmentacja istnieje koncepcyjnie i w backendzie, ale frontend layout nie ma jawnego TRUNK vs BRANCH w swoich typach. | **PR-3A-02** (enum) / **3B** (pelna implementacja) |
+| S-02 | BRANCH jako odgalezienie od trunk | Feeder chain detection w roleAssigner identyfikuje lancuchy feederow, ale nie rozroznia trunk od branch. | **ISTOTNA**: j.w. | **PR-3A-02** / **3B** |
+| S-03 | SECONDARY_CONNECTOR dla krawedzi spoza drzewa (ring, NOP) | Brak jawnego typu. Switch NOP (OPEN) jest wykrywany, ale nie jest oznaczony jako secondary connector w grafie. | **ISTOTNA**: Potrzebny typ SECONDARY_CONNECTOR w EdgeTypeV1. | **PR-3A-02** |
+
+### 2.3 Stacje A/B/C/D jako embedded switchgear blocks
+
+| # | Wymaganie kanoniczne | Stan AS-IS | Luka | PR |
+|---|----------------------|------------|------|----|
+| ST-01 | Stacja typ A (SN/nN z 1 TR, linia zasilajaca, rozdzielnia nN) — jako SWITCHGEAR_BLOCK z portami IN/OUT | roleAssigner wykrywa stacje jako transformer-fed installations. `stationSymbolIds` jest zbiorem, ale brak typologii A/B/C/D. | **ISTOTNA**: Stacje sa wykrywane, ale nie klasyfikowane wg typologii A/B/C/D. Brak podgrafu switchgear block z portami. | **3B** (layout) / **PR-3A-02** (enum) |
+| ST-02 | Stacja typ B (jak A + pole pomiarowe + zabezpieczenie nadpradowe) | j.w. | **ISTOTNA**: j.w. | **3B** / **PR-3A-02** (enum) |
+| ST-03 | Stacja typ C (jak B + pole odgalezieniowe, branch) | j.w. | **ISTOTNA**: j.w. | **3B** / **PR-3A-02** (enum) |
+| ST-04 | Stacja typ D (sekcyjna — 2 szynozbiorcze, sprzeglo, lacznik sekcyjny) | j.w. | **ISTOTNA**: j.w. | **3B** / **PR-3A-02** (enum) |
+| ST-05 | StationBoundingBox jako NO_ROUTE_RECT | KANON_SLD_SYSTEM.md definiuje StationBoundingBox. Brak implementacji w layoucie — routing nie omija stacji. | **ISTOTNA**: Definiowane w spec, brak w kodzie. | **3B** |
+
+### 2.4 OZE (PV / BESS) jako zrodla
+
+| # | Wymaganie kanoniczne | Stan AS-IS | Luka | PR |
+|---|----------------------|------------|------|----|
+| OZE-01 | PV jako GENERATOR_PV (zrodlo), NIGDY jako LOAD | Backend: InverterSource z converter_kind. Frontend: SymbolResolver mapuje Source → utility_feeder, ale pv.svg istnieje. roleAssigner wykrywa PV po nazwie heurystycznie. | **UMIARKOWANA**: PV jest traktowane jako Source, nie jako Load. Ale brak jawnego GENERATOR_PV w enum. Heurystyka po nazwie zamiast po typie. | **PR-3A-02** |
+| OZE-02 | BESS jako GENERATOR_BESS (zrodlo) | j.w. (bess.svg istnieje, converter_kind w backendzie) | **UMIARKOWANA**: j.w. | **PR-3A-02** |
+| OZE-03 | PV/BESS w stacji wielofunkcyjnej — porty OZE | Brak jawnych portow OZE w stacji. Stacja z PV/BESS jest wykrywana, ale nie ma dedykowanych portow FIELD_IN/FIELD_OUT. | **UMIARKOWANA**: Potrzebne w pelnej typologii stacji. | **3B** |
+
+### 2.5 Camera no-reflow
+
+| # | Wymaganie kanoniczne | Stan AS-IS | Luka | PR |
+|---|----------------------|------------|------|----|
+| CAM-01 | Zmiana zoom/pan NIE powoduje reflow layoutu | Camera jest ViewportState { offsetX, offsetY, zoom } — transformacja afiniczna na SVG. Layout nie jest wyzwalany przez zmiane kamery. | **BRAK LUKI** (spelnione) | — |
+| CAM-02 | Test: zmien camera state, layout hash identyczny | Brak jawnego testu potwierdzajacego. Architektura to gwarantuje (camera i layout sa niezalezne), ale brak testu guard. | **NISKA**: Potrzebny test guard. | **PR-3A-03** |
+
+### 2.6 Single layout engine
+
+| # | Wymaganie kanoniczne | Stan AS-IS | Luka | PR |
+|---|----------------------|------------|------|----|
+| ENG-01 | Jeden layout engine, brak dual-engine | Istnieja DWA pipeline'y layoutu: (1) topologicalLayoutEngine (Phase 1–6), (2) busbar feeder auto-layout (sld/layout/). Sa komplementarne, nie konkurencyjne — (1) pozycjonuje symbole, (2) routuje sciezki feederow. Ale brak jawnego entrypointa laczacego oba. | **UMIARKOWANA**: Nie sa dual-engine w sensie konkurencyjnym, ale brak jednego orkiestratora. `SLD_AUTO_LAYOUT_V1` feature flag sugeruje opcjonalnosc. | **PR-3A-03** (guard) / **3B** (unified entrypoint) |
+| ENG-02 | Brak feature flags layoutu (layout_v2, experimental_layout) | `SLD_AUTO_LAYOUT_V1` istnieje (default OFF). Brak layout_v2/experimental_layout. | **NISKA**: `SLD_AUTO_LAYOUT_V1` jest opt-in dla busbar feeders, nie alternatywny engine. Ale nazwa sugeruje wersjonowanie. Rozwazyc rename lub deprecation. | **PR-3A-03** (guard/dokumentacja) |
+
+### 2.7 Overlay isolation
+
+| # | Wymaganie kanoniczne | Stan AS-IS | Luka | PR |
+|---|----------------------|------------|------|----|
+| OV-01 | Overlay NIE modyfikuje geometrii | OverlayEngine.ts jest PURE FUNCTION (element → style token). Overlay nie importuje layout mutatorow. | **BRAK LUKI** (spelnione) | — |
+| OV-02 | Guard: overlay nie importuje layout mutatorow | Brak jawnego import guard. Architektura to zapewnia (oddzielne moduly), ale brak automatycznego sprawdzania. | **NISKA**: Potrzebny import guard. | **PR-3A-03** |
+
+### 2.8 Determinism
+
+| # | Wymaganie kanoniczne | Stan AS-IS | Luka | PR |
+|---|----------------------|------------|------|----|
+| DET-01 | Hash stability: 100x layout → identyczny hash | `verifyDeterminism()` w topologicalLayoutEngine.ts porownuje 2 uruchomienia. Testy layoutDeterminism.test.ts istnieja. Ale: (a) tylko 2 uruchomienia, nie 100, (b) brak hash — porownanie pozycji. | **UMIARKOWANA**: Determinizm weryfikowany, ale slabo (2 runs, nie 100). Brak hash layoutu. | **PR-3A-03** |
+| DET-02 | Permutation invariance: permutuj wejscie → identyczny hash | Sortowanie po id istnieje, ale BRAK testu permutacji wejscia. | **ISTOTNA**: Brak testu permutation invariance. Krytyczne dla ETAP-grade. | **PR-3A-03** |
+| DET-03 | Invarianty: symbol-symbol overlap == 0 | collisionGuard.ts: `detectSymbolCollisions()` istnieje. Ale brak testu CI gate (zero-tolerance). | **UMIARKOWANA**: Mechanizm istnieje, brak CI gate. | **PR-3A-03** |
+| DET-04 | Invarianty: crossing_trunk_without_node == 0 | Brak takiego testu. Routing nie sprawdza przejsc trunk bez wezla. | **ISTOTNA**: Potrzebny invariant test. | **PR-3A-03** |
+| DET-05 | Golden networks podpiete do CI z artefaktami renderu | Backend: golden_network_sn.py istnieje z 40+ testami. Frontend: brak golden network fixtures. CI nie generuje artefaktow renderu SLD. | **ISTOTNA**: Backend ma golden network, frontend nie. CI nie generuje SVG/PNG. | **PR-3A-03** |
+
+### 2.9 CI artefakty
+
+| # | Wymaganie kanoniczne | Stan AS-IS | Luka | PR |
+|---|----------------------|------------|------|----|
+| CI-01 | CI generuje render artifacts (SVG/PNG) dla golden networks | CI uruchamia pytest + docs_guard. Brak generowania artefaktow renderu SLD. | **ISTOTNA**: Brak artefaktow renderu w CI. | **PR-3A-03** |
+| CI-02 | Hash artefaktow w testach snapshot | Brak. | **UMIARKOWANA**: Potrzebne po ustabilizowaniu layoutu. | **3D** |
+
+### 2.10 PCC grep-zero
+
+| # | Wymaganie kanoniczne | Stan AS-IS | Luka | PR |
+|---|----------------------|------------|------|----|
+| PCC-01 | PCC grep-zero w calym repo | Backend src: brak PCC. docs_guard.py sprawdza PCC w entrypoint docs. Frontend: roleAssigner.ts ma `filterPccNodes()` — filtruje PCC/BoundaryNode z wejscia. | **NISKA**: PCC nie istnieje w modelu. filterPccNodes jest obrona defensywna (gdyby dane wejsciowe zawieraly PCC). Akceptowalne. Guard istnieje w docs_guard.py. | — (monitorowanie) |
+
+### 2.11 Dokumenty kanoniczne
+
+| # | Wymaganie kanoniczne | Stan AS-IS | Luka | PR |
+|---|----------------------|------------|------|----|
+| DOC-01 | SLD_SYSTEM_SPEC_CANONICAL.md | Brak. Istnieje KANON_SLD_SYSTEM.md i SLD_AUTO_LAYOUT.md — pokrywaja czesc wymagan. | **NISKA**: Istniejace dokumenty pokrywaja wiekszosc wymagan. Mozna skonsolidowac pozniej. | **3B** |
+| DOC-02 | SLD_ALGORITHM_LAYOUT_SPEC.md | Brak osobnego. SLD_AUTO_LAYOUT.md + LAYOUT_RULES.md pokrywaja. | **NISKA**: j.w. | **3B** |
+| DOC-03 | SLD_SYMBOLS_CANONICAL.md | Brak. etap_symbols/README.md + ports.json + SymbolResolver.ts pelniacza te role. | **NISKA**: Rozproszone, ale kompletne. | **3B** |
+| DOC-04 | SLD_TEST_MATRIX.md | Brak. Testy istnieja, ale nie ma macierzy testow. | **UMIARKOWANA**: Potrzebna macierz testow. | **PR-3A-03** (minimalna) |
+| DOC-05 | SLD_REPO_HYGIENE_RULES.md | Brak. 17 guard scripts istnieje, ale brak zebranego dokumentu hygiene rules. | **NISKA**: Guard scripts sa dokumentacja. | **3B** |
+
+---
+
+## 3. Podsumowanie luk wg priorytetu
+
+### KRYTYCZNE (blokuja ETAP-grade)
+
+| # | Luka | PR |
+|---|------|----|
+| G-01 | Brak zamrozonego kontraktu VisualGraphV1 | PR-3A-02 |
+| DET-02 | Brak testu permutation invariance | PR-3A-03 |
+| DET-05 | Brak golden networks frontend + CI artefaktow renderu | PR-3A-03 |
+
+### ISTOTNE (wplywaja na jakosc)
+
+| # | Luka | PR |
+|---|------|----|
+| G-02 | Brak jawnych typow wezlow (stacje A/B/C/D, PV, BESS) | PR-3A-02 |
+| G-03 | Brak jawnych typow krawedzi (trunk/branch/secondary) | PR-3A-02 |
+| S-01..S-03 | Segmentacja trunk/branch/secondary nie wyrazona w typach | PR-3A-02 |
+| ST-01..ST-05 | Stacje A/B/C/D bez typologii i portow | PR-3A-02 (enum) / 3B (layout) |
+| DET-01 | Hash stability: za malo uruchomien (2 zamiast 100) | PR-3A-03 |
+| DET-04 | Brak invariantu crossing_trunk_without_node | PR-3A-03 |
+| CI-01 | Brak artefaktow renderu w CI | PR-3A-03 |
+
+### UMIARKOWANE
+
+| # | Luka | PR |
+|---|------|----|
+| G-04 | Porty geometryczne, nie semantyczne | PR-3A-02 (min) / 3B |
+| G-05 | Brak jednego canonical serializer | PR-3A-02 |
+| OZE-01..03 | PV/BESS bez jawnego enum, heurystyka po nazwie | PR-3A-02 |
+| ENG-01 | Dwa pipeline'y layoutu bez jednego orkiestratora | PR-3A-03 / 3B |
+| DET-03 | Collision guard bez CI gate | PR-3A-03 |
+| DOC-04 | Brak macierzy testow | PR-3A-03 |
+
+### NISKIE
+
+| # | Luka | PR |
+|---|------|----|
+| G-06 | Stabilnosc id miedzy sesjami — udokumentowac | PR-3A-02 |
+| CAM-02 | Brak testu camera no-reflow | PR-3A-03 |
+| ENG-02 | SLD_AUTO_LAYOUT_V1 flag — rename/deprecation | PR-3A-03 |
+| OV-02 | Brak import guard overlay → layout | PR-3A-03 |
+| PCC-01 | filterPccNodes defensywne — akceptowalne | — |
+| DOC-01..03 | Konsolidacja dokumentow | 3B |
+| DOC-05 | Hygiene rules dokument | 3B |
+| CI-02 | Hash snapshot artefaktow | 3D |
+
+---
+
+## 4. Plan realizacji
+
+```
+PR-3A-02 (kontrakt + adapter):
+  ├─ G-01: VisualGraphV1 contract (typy zamrozone)
+  ├─ G-02: NodeTypeV1 enum z PV/BESS/stacje
+  ├─ G-03: EdgeTypeV1 enum z trunk/branch/secondary
+  ├─ G-04: PortRoleV1 enum (minimalny)
+  ├─ G-05: Canonical serializer
+  ├─ G-06: Dokumentacja stabilnosci id
+  ├─ S-01..S-03: Segmentacja w EdgeTypeV1
+  ├─ ST-01..ST-04: Typologia stacji w NodeTypeV1
+  ├─ OZE-01..02: GENERATOR_PV / GENERATOR_BESS w NodeTypeV1
+  └─ Testy: bijekcja, sortowanie, brak PCC, typologia
+
+PR-3A-03 (determinism + guards):
+  ├─ DET-01: Hash stability (100 runs)
+  ├─ DET-02: Permutation invariance (50 permutacji)
+  ├─ DET-03: Collision guard jako CI gate
+  ├─ DET-04: crossing_trunk_without_node invariant
+  ├─ DET-05: Golden networks frontend + CI artefakty
+  ├─ CAM-02: Camera no-reflow test
+  ├─ ENG-01: Single engine guard
+  ├─ ENG-02: Layout feature flag guard
+  ├─ OV-02: Overlay import guard
+  ├─ CI-01: CI artefakty renderu
+  └─ DOC-04: Macierz testow (minimalna)
+
+3B (embedded blocks + pelna segmentacja):
+  ├─ ST-05: StationBoundingBox jako NO_ROUTE_RECT
+  ├─ G-04: Pelne porty semantyczne
+  ├─ OZE-03: Porty OZE w stacji wielofunkcyjnej
+  ├─ ENG-01: Unified layout orchestrator
+  ├─ DOC-01..03,05: Konsolidacja dokumentow
+
+3D (export E2E + perf):
+  ├─ CI-02: Hash snapshot artefaktow
+  └─ Perf budgets jako nightly gate
+```
