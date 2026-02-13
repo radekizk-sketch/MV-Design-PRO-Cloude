@@ -187,17 +187,40 @@ Supported element types:
 | `LineBranch` | Line/cable | `fromNodeId`, `toNodeId` |
 | `Switch` | Circuit breaker/switch | `fromNodeId`, `toNodeId` |
 
+## Port Semantics (RUN #3D-FIX)
+
+Edge creation uses semantic port roles resolved via `resolvePortId(nodeType, role)`:
+
+| Node Type | IN port | OUT port | BRANCH port |
+|-----------|---------|----------|-------------|
+| BUS_SN / BUS_NN | `left` | `right` | - |
+| GRID_SOURCE | - | `bottom` | - |
+| GENERATOR_* | - | `bottom` | - |
+| LOAD | `top` | - | - |
+| STATION_SN_NN_* | `in` | `out` | `branch` |
+| FEEDER_JUNCTION | `top` | `bottom` | `left` |
+
+Port IDs are geometric (backward compatible) but resolved from semantic roles
+(`PortRoleV1.IN`, `PortRoleV1.OUT`, `PortRoleV1.BRANCH`).
+
+## Voltage Handling (RUN #3D-FIX)
+
+Voltages are read from the model, never fabricated:
+- `ConnectionNodeV1.voltageKv` is `number | null`
+- Missing voltage → FixAction `bus.voltage_missing` (not default 15kV)
+- `classifyBusType(null)` → `BUS_SN` (conservative fallback for rendering)
+
 ## Determinism Rules
 
 The engine guarantees deterministic output:
 
-1. **D1**: No `Math.random()`
-2. **D2**: No `Date.now()` as seed
-3. **D3**: No iteration order from Set/Map - always sorted
-4. **D4**: No DOM layout dependencies
-5. **D5**: Tiebreaker = `element.id` (string sort)
-6. **D6**: Floating point: `Math.round(x * 100) / 100`
-7. **D7**: Test: `computeLayout(model) === computeLayout(model)` BIT-FOR-BIT
+1. **D1**: No niedeterministyczne API (random, zegar)
+2. **D2**: No iteration order from Set/Map - always sorted by id
+3. **D3**: No DOM layout dependencies
+4. **D4**: Tiebreaker = `element.id` (string sort)
+5. **D5**: Floating point: `Math.round(x * 100) / 100`
+6. **D6**: Test: `computeLayout(model) === computeLayout(model)` BIT-FOR-BIT
+7. **D7**: 100x hash stability + 50x permutation invariance verified (154 tests)
 
 ```typescript
 import { verifyDeterminism } from '@/engine/sld-layout';
@@ -280,7 +303,10 @@ Test coverage includes:
 ## Architecture Principles
 
 1. **DYNAMIC VOLTAGES**: Read from model, never hardcode 15kV/0.4kV
-2. **NO AUTO-LAYOUT BUTTON**: Layout runs automatically on model changes
-3. **DETERMINISM**: Same model = identical pixel output
-4. **INCREMENTAL**: Small changes don't reset entire schema
-5. **PROFESSIONAL OUTPUT**: ETAP/PowerFactory-grade diagrams
+2. **ZERO FABRICATION** (RUN #3D-FIX): Missing voltage → `null` + FixAction, never default
+3. **NO AUTO-LAYOUT BUTTON**: Layout runs automatically on model changes
+4. **DETERMINISM**: Same model = identical pixel output (bit-for-bit, 154 tests)
+5. **INCREMENTAL**: Small changes don't reset entire schema
+6. **PROFESSIONAL OUTPUT**: ETAP/PowerFactory-grade diagrams
+7. **SEMANTIC PORTS** (RUN #3D-FIX): Port roles IN/OUT/BRANCH resolved via `resolvePortId`
+8. **ZERO STRING HEURISTICS** (RUN #3D-FIX): Typology from domain data, never from name parsing

@@ -167,7 +167,7 @@ Deterministyczny fixture do testów integracyjnych:
 
 ## 8. Invarianty (BINDING)
 
-1. **Determinizm**: Ten sam ENM → identyczny SLD, bit-po-bicie
+1. **Determinizm**: Ten sam ENM → identyczny SLD, bit-po-bicie (154 testy, 100x hash, 50x permutacja)
 2. **Bijection**: Każdy symbol SLD ↔ dokładnie jeden element ENM
 3. **NO_ROUTE_RECT**: Trasy kablowe nie przechodzą przez ramki stacji
 4. **SelectionRef**: Klik na SLD zawsze generuje poprawny SelectionRef
@@ -175,3 +175,7 @@ Deterministyczny fixture do testów integracyjnych:
 6. **Polish labels**: Etykiety UI wyłącznie po polsku, bez nazw kodowych
 7. **White Box**: Obliczenia solverów audytowalne (nie dotyczy SLD)
 8. **FROZEN solvers**: Warstwa SLD NIE dotyka solverów (IEC 60909, Newton-Raphson)
+9. **Zero fabrication** (RUN #3D-FIX): Brak danych → FixAction, nigdy domyslna wartosc (np. voltageKv: null, nie 15)
+10. **Zero string heuristics** (RUN #3D-FIX): Typologia z danych domenowych (nodeType, generatorKind), nie z nazw
+11. **Semantic ports** (RUN #3D-FIX): Porty szyn: IN/OUT (nie generyczne BUS), rozwiazywane przez resolvePortId
+12. **Station typology validation** (RUN #3D-FIX): validateEmbeddingVsDomain → station.typology_conflict FixAction
