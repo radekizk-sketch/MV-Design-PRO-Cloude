@@ -8,10 +8,12 @@ Guards:
 3. Overlay cannot import layout mutators / geometry writers
 4. PCC grep-zero (entire repo)
 5. No codenames in VisualGraph contract
+6. Layout hash independent of camera (no Date.now/Math.random in pipeline)
+7. LayoutResultV1 contract immutability (no mutable fields)
 
 Exit code: 0 = OK, 1 = violations found.
 
-PR-3A-03 RUN #3A
+PR-3A-03 RUN #3A + RUN #3B
 """
 
 import os
@@ -82,6 +84,7 @@ def guard_single_layout_engine() -> List[str]:
         "computeBusbarAutoLayout",
         "computeSldAutoLayout",  # alias
         "computeIncrementalLayout",
+        "computeLayout",  # RUN #3B — canonical 6-phase pipeline
     }
 
     for path, func_name in layout_entrypoints:
@@ -274,6 +277,117 @@ def guard_no_codenames_in_contract() -> List[str]:
 
 
 # =========================================================================
+# GUARD 6: Layout hash independent of camera (no nondeterminism sources)
+# =========================================================================
+
+def guard_layout_no_nondeterminism() -> List[str]:
+    """
+    Sprawdz brak zrodel niedeterminizmu w pipeline layoutu i kontraktach.
+    Zabronione w plikach kontraktu/pipeline:
+    - Date.now(), Math.random(), new Date(), performance.now()
+    - crypto.randomUUID(), crypto.getRandomValues()
+    """
+    violations = []
+    contract_dir = FRONTEND_SRC / "ui" / "sld" / "core"
+
+    if not contract_dir.exists():
+        return violations
+
+    ts_files = find_files(contract_dir, (".ts",))
+
+    forbidden_patterns = [
+        (r'\bDate\.now\s*\(\)', "Date.now()"),
+        (r'\bMath\.random\s*\(\)', "Math.random()"),
+        (r'\bnew\s+Date\s*\(\)', "new Date()"),
+        (r'\bperformance\.now\s*\(\)', "performance.now()"),
+        (r'\bcrypto\.randomUUID\s*\(\)', "crypto.randomUUID()"),
+        (r'\bcrypto\.getRandomValues\b', "crypto.getRandomValues()"),
+    ]
+
+    for f in ts_files:
+        rel = str(f.relative_to(FRONTEND_SRC))
+        # Testy moga uzywac PRNG do permutacji (Fisher-Yates)
+        if "__tests__" in rel or ".test." in rel or ".spec." in rel:
+            continue
+
+        try:
+            content = f.read_text(encoding="utf-8")
+        except Exception:
+            continue
+
+        for pattern, label in forbidden_patterns:
+            matches = re.finditer(pattern, content)
+            for m in matches:
+                line_no = content[:m.start()].count('\n') + 1
+                violations.append(
+                    f"  Zrodlo niedeterminizmu: '{label}' w {rel}:{line_no}"
+                )
+
+    return violations
+
+
+# =========================================================================
+# GUARD 7: LayoutResultV1 contract immutability (readonly fields)
+# =========================================================================
+
+def guard_layout_result_immutability() -> List[str]:
+    """
+    Sprawdz ze plik layoutResult.ts nie zawiera mutowalnych pol w interfejsach.
+    Kazde pole interfejsu MUSI byc readonly.
+    """
+    violations = []
+    layout_result_file = FRONTEND_SRC / "ui" / "sld" / "core" / "layoutResult.ts"
+
+    if not layout_result_file.exists():
+        return violations
+
+    try:
+        content = layout_result_file.read_text(encoding="utf-8")
+    except Exception:
+        return violations
+
+    in_interface = False
+    brace_depth = 0
+    interface_name = ""
+
+    for line_no, line in enumerate(content.split('\n'), 1):
+        stripped = line.strip()
+
+        # Wykryj poczatek interfejsu
+        iface_match = re.match(r'export\s+interface\s+(\w+)', stripped)
+        if iface_match:
+            in_interface = True
+            interface_name = iface_match.group(1)
+            brace_depth = 0
+
+        if in_interface:
+            brace_depth += stripped.count('{') - stripped.count('}')
+            if brace_depth <= 0 and '{' not in stripped and '}' in stripped:
+                in_interface = False
+                continue
+
+            # Sprawdz czy pole jest readonly (pomijaj puste linie, komentarze, nawiasy)
+            if (
+                stripped
+                and not stripped.startswith('//')
+                and not stripped.startswith('*')
+                and not stripped.startswith('/**')
+                and not stripped.startswith('{')
+                and not stripped.startswith('}')
+                and ':' in stripped
+                and not stripped.startswith('readonly')
+                and not stripped.startswith('export')
+                and not stripped.startswith('interface')
+            ):
+                violations.append(
+                    f"  Mutowalne pole w {interface_name}: '{stripped[:60]}' "
+                    f"w layoutResult.ts:{line_no}"
+                )
+
+    return violations
+
+
+# =========================================================================
 # MAIN
 # =========================================================================
 
@@ -284,6 +398,8 @@ def main() -> int:
         ("GUARD 3: Overlay no layout imports", guard_overlay_no_layout_imports()),
         ("GUARD 4: PCC grep-zero", guard_pcc_grep_zero()),
         ("GUARD 5: No codenames in contract", guard_no_codenames_in_contract()),
+        ("GUARD 6: Layout hash camera-independent (no nondeterminism)", guard_layout_no_nondeterminism()),
+        ("GUARD 7: LayoutResultV1 immutability (readonly)", guard_layout_result_immutability()),
     ]
 
     total_violations = 0

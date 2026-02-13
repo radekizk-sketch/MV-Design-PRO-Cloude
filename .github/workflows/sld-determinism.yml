@@ -40,7 +40,15 @@ jobs:
 
       - name: Run VisualGraph contract tests
         working-directory: mv-design-pro/frontend
-        run: npx vitest run src/ui/sld/core/__tests__/ --reporter=verbose
+        run: npx vitest run src/ui/sld/core/__tests__/visualGraph.test.ts --reporter=verbose
+
+      - name: Run VisualGraph determinism tests
+        working-directory: mv-design-pro/frontend
+        run: npx vitest run src/ui/sld/core/__tests__/determinism.test.ts --reporter=verbose
+
+      - name: Run LayoutPipeline contract tests
+        working-directory: mv-design-pro/frontend
+        run: npx vitest run src/ui/sld/core/__tests__/layoutPipeline.test.ts --reporter=verbose
 
       - name: Upload test results
         if: always()

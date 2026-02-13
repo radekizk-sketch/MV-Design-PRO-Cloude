@@ -1,10 +1,10 @@
 /**
- * SLD Core — VisualGraphV1 Contract & Topology Adapter.
+ * SLD Core — VisualGraphV1 + LayoutResultV1 + Layout Pipeline.
  *
- * CANONICAL: Jedyne miejsce prawdy dla kontraktu miedzy Topology Adapter a Layout Engine.
+ * CANONICAL: Jedyne miejsce prawdy dla kontraktow SLD.
  */
 
-// Contract types
+// VisualGraph contract types
 export {
   VISUAL_GRAPH_VERSION,
   NodeTypeV1,
@@ -30,3 +30,32 @@ export type {
 // Topology Adapter
 export { convertToVisualGraph } from './topologyAdapterV1';
 export type { TopologyAdapterOptions } from './topologyAdapterV1';
+
+// LayoutResult contract types
+export {
+  LAYOUT_RESULT_VERSION,
+  StationBlockType,
+  CatalogCategory,
+  canonicalizeLayoutResult,
+  computeLayoutResultHash,
+  validateLayoutResult,
+} from './layoutResult';
+
+export type {
+  LayoutResultV1,
+  NodePlacementV1,
+  EdgeRouteV1,
+  SwitchgearBlockV1,
+  SwitchgearPortV1,
+  CatalogRefV1,
+  RelayBindingV1,
+  LayoutValidationErrorV1,
+  PointV1,
+  RectangleV1,
+  PathSegmentV1,
+  LayoutResultValidationResult,
+} from './layoutResult';
+
+// Layout Pipeline
+export { computeLayout, DEFAULT_LAYOUT_CONFIG } from './layoutPipeline';
+export type { LayoutGeometryConfigV1 } from './layoutPipeline';
