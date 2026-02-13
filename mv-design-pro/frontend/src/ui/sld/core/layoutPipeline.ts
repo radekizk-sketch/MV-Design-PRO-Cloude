@@ -432,6 +432,7 @@ function phase2_detect_and_reserve_blocks(
       ports,
       internalNodes: internalIds.sort(),
       label: station.attributes.label,
+      detail: null,
     });
 
     // Umieszczaj stacje jako placement

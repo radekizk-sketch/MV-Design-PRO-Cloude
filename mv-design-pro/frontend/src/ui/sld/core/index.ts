@@ -3,6 +3,7 @@
  *
  * CANONICAL: Jedyne miejsce prawdy dla kontraktow SLD.
  * RUN #3C: Domain-driven adapter + TopologyInputReader.
+ * RUN #3D: Field/Device modeling + formal trunk↔station embedding.
  */
 
 // VisualGraph contract types
@@ -89,3 +90,35 @@ export type {
 // Layout Pipeline
 export { computeLayout, DEFAULT_LAYOUT_CONFIG } from './layoutPipeline';
 export type { LayoutGeometryConfigV1 } from './layoutPipeline';
+
+// Field & Device Modeling Contracts (RUN #3D)
+export {
+  FieldRoleV1,
+  EmbeddingRoleV1,
+  DeviceElectricalRoleV1,
+  DevicePowerPathPositionV1,
+  DeviceTypeV1,
+  DeviceRequirementLevel,
+  CatalogCategoryV1,
+  FieldDeviceFixCodes,
+  DEVICE_REQUIREMENT_SETS,
+  validateFieldDevices,
+  validateStationBlock,
+} from './fieldDeviceContracts';
+
+export type {
+  FieldV1,
+  DeviceV1,
+  BusSectionV1,
+  StationBlockDetailV1,
+  StationBlockPortsV1,
+  DeviceAnchorV1,
+  FieldTerminalsV1,
+  DeviceLogicalBindingsV1,
+  DeviceParametersV1,
+  CatalogRefDetailV1,
+  CatalogRatingsV1,
+  DeviceRequirementV1,
+  DeviceRequirementSetV1,
+  FieldDeviceFixActionV1,
+} from './fieldDeviceContracts';

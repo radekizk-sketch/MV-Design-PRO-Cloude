@@ -18,6 +18,8 @@
  * - bounds deterministyczne.
  */
 
+import type { StationBlockDetailV1 } from './fieldDeviceContracts';
+
 // =============================================================================
 // VERSION
 // =============================================================================
@@ -141,6 +143,8 @@ export interface SwitchgearBlockV1 {
   readonly internalNodes: readonly string[];
   /** Label stacji */
   readonly label: string;
+  /** Szczegoly pol/urzadzen/kotwiców (RUN #3D; opcjonalne dla kompatybilnosci) */
+  readonly detail: StationBlockDetailV1 | null;
 }
 
 /** Port bloku switchgear z absolutna pozycja. */
