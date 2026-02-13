@@ -422,7 +422,7 @@ class ExecutionEngineService:
         )
 
     # =========================================================================
-    # Protection Execution (PR-26)
+    # Protection Execution (PR-26 + PR-27)
     # =========================================================================
 
     def execute_run_protection(
@@ -432,28 +432,36 @@ class ExecutionEngineService:
         study_input: Any,
         readiness_snapshot: dict[str, Any],
         validation_snapshot: dict[str, Any],
+        current_source: Any | None = None,
+        sc_result_set: Any | None = None,
     ) -> tuple[Run, ResultSet]:
         """
-        Execute a protection analysis run end-to-end (PR-26).
+        Execute a protection analysis run end-to-end (PR-26 + PR-27).
 
         FLOW:
         1. Get Run (must be PENDING)
         2. Mark as RUNNING
-        3. Call Protection Engine v1 with explicit test points
-        4. Map result → ResultSet (PROTECTION)
-        5. Store ResultSet, mark as DONE
-        6. On error → mark as FAILED
+        3. If current_source provided (PR-27): resolve test points
+        4. Call Protection Engine v1 with resolved test points
+        5. Map result → ResultSet (PROTECTION)
+        6. Store ResultSet, mark as DONE
+        7. On error → mark as FAILED
 
         Args:
             run_id: ID of a PENDING run.
             study_input: ProtectionStudyInputV1 with relays and test points.
             readiness_snapshot: Readiness state at run time.
             validation_snapshot: Validation state at run time.
+            current_source: ProtectionCurrentSource (PR-27, optional).
+            sc_result_set: SC ResultSet for SC_RESULT mode (PR-27, read-only).
 
         Returns:
             Tuple of (completed Run in DONE status, ResultSet).
         """
-        from domain.protection_engine_v1 import execute_protection_v1
+        from domain.protection_engine_v1 import (
+            ProtectionStudyInputV1,
+            execute_protection_v1,
+        )
         from application.result_mapping.protection_to_resultset_v1 import (
             map_protection_to_resultset_v1,
         )
@@ -473,7 +481,29 @@ class ExecutionEngineService:
         run = self.start_run(run_id)
 
         try:
-            protection_result = execute_protection_v1(study_input)
+            # PR-27: If current_source is provided, resolve test points
+            effective_input = study_input
+            if current_source is not None:
+                from application.protection_current_resolver import (
+                    ProtectionCurrentResolver,
+                )
+
+                resolver = ProtectionCurrentResolver()
+                relay_ids = tuple(r.relay_id for r in study_input.relays)
+
+                resolved_test_points = resolver.resolve(
+                    current_source=current_source,
+                    relay_ids=relay_ids,
+                    test_points=study_input.test_points,
+                    sc_result_set=sc_result_set,
+                )
+
+                effective_input = ProtectionStudyInputV1(
+                    relays=study_input.relays,
+                    test_points=resolved_test_points,
+                )
+
+            protection_result = execute_protection_v1(effective_input)
 
             result_set = map_protection_to_resultset_v1(
                 protection_result=protection_result,

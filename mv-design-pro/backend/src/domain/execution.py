@@ -374,6 +374,9 @@ _DETERMINISTIC_LIST_KEYS = {
     "nodes",
     "relay_results",
     "test_points",
+    "target_ref_mapping",
+    "margin_points",
+    "pairs",
 }
 
 
@@ -395,7 +398,8 @@ def _canonicalize(value: Any, *, current_key: str | None = None) -> Any:
 def _stable_sort_key(item: Any) -> str:
     """Stable sort key for deterministic list ordering."""
     if isinstance(item, dict):
-        for key in ("ref_id", "id", "element_ref", "node_id", "branch_id"):
+        for key in ("ref_id", "id", "element_ref", "node_id", "branch_id",
+                     "relay_id", "point_id", "pair_id"):
             if key in item and item[key] is not None:
                 return str(item[key])
     return str(item)
