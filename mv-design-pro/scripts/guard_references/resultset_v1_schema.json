@@ -1,0 +1,94 @@
+{
+  "backend/src/domain/execution.py": {
+    "ElementResult": [
+      {
+        "name": "element_ref",
+        "type": "str"
+      },
+      {
+        "name": "element_type",
+        "type": "str"
+      },
+      {
+        "name": "values",
+        "type": "dict[str, Any]"
+      }
+    ],
+    "ResultSet": [
+      {
+        "name": "run_id",
+        "type": "UUID"
+      },
+      {
+        "name": "analysis_type",
+        "type": "ExecutionAnalysisType"
+      },
+      {
+        "name": "validation_snapshot",
+        "type": "dict[str, Any]"
+      },
+      {
+        "name": "readiness_snapshot",
+        "type": "dict[str, Any]"
+      },
+      {
+        "name": "element_results",
+        "type": "tuple[ElementResult, ...]"
+      },
+      {
+        "name": "global_results",
+        "type": "dict[str, Any]"
+      },
+      {
+        "name": "deterministic_signature",
+        "type": "str"
+      },
+      {
+        "name": "fault_scenario_id",
+        "type": "str | None"
+      },
+      {
+        "name": "fault_type",
+        "type": "str | None"
+      },
+      {
+        "name": "fault_location",
+        "type": "dict[str, Any] | None"
+      }
+    ],
+    "Run": [
+      {
+        "name": "id",
+        "type": "UUID"
+      },
+      {
+        "name": "study_case_id",
+        "type": "UUID"
+      },
+      {
+        "name": "analysis_type",
+        "type": "ExecutionAnalysisType"
+      },
+      {
+        "name": "solver_input_hash",
+        "type": "str"
+      },
+      {
+        "name": "status",
+        "type": "RunStatus"
+      },
+      {
+        "name": "started_at",
+        "type": "datetime | None"
+      },
+      {
+        "name": "finished_at",
+        "type": "datetime | None"
+      },
+      {
+        "name": "error_message",
+        "type": "str | None"
+      }
+    ]
+  }
+}
