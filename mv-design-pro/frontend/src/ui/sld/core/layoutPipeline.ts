@@ -37,6 +37,8 @@ import {
   computeLayoutResultHash,
   canonicalizeLayoutResult,
 } from './layoutResult';
+import type { StationBlockDetailV1 } from './fieldDeviceContracts';
+import type { StationBlockBuildResult } from './stationBlockBuilder';
 
 // =============================================================================
 // GEOMETRY CONFIG
@@ -117,6 +119,8 @@ interface MutableBlock {
   ports: SwitchgearPortV1[];
   internalNodes: string[];
   label: string;
+  /** RUN #3D: Szczegoly pol/urzadzen/anchorow (null jesli brak stationBlockDetails) */
+  detail: StationBlockDetailV1 | null;
 }
 
 interface PipelineState {
@@ -756,11 +760,14 @@ function phase6_enforce_invariants_and_finalize(
  *
  * @param graph VisualGraphV1 — zamrozony kontrakt wejscia
  * @param config Konfiguracja geometrii (opcjonalna, domyslna ETAP)
+ * @param stationBlockDetails Opcjonalne szczegoly pol/urzadzen (RUN #3D). Jesli podane,
+ *   detail per stacja jest dolaczony do SwitchgearBlockV1.
  * @returns LayoutResultV1 — zamrozony wynik layoutu
  */
 export function computeLayout(
   graph: VisualGraphV1,
   config: LayoutGeometryConfigV1 = DEFAULT_LAYOUT_CONFIG,
+  stationBlockDetails?: StationBlockBuildResult,
 ): LayoutResultV1 {
   // Inicjalizacja stanu pipeline (mutable wewnatrz, frozen na wyjsciu)
   const state: PipelineState = {
@@ -772,9 +779,24 @@ export function computeLayout(
     validationErrors: [],
   };
 
+  // Build lookup map for station block details (RUN #3D)
+  const detailsByBlockId = new Map<string, StationBlockDetailV1>();
+  if (stationBlockDetails) {
+    for (const block of stationBlockDetails.stationBlocks) {
+      detailsByBlockId.set(block.blockId, block);
+    }
+  }
+
   // Wykonaj 6 faz
   phase1_place_trunk(graph, config, state);
   phase2_detect_and_reserve_blocks(graph, config, state);
+
+  // RUN #3D: Attach station block details to detected blocks
+  for (const block of state.blocks) {
+    const detail = detailsByBlockId.get(block.blockId) ?? null;
+    block.detail = detail;
+  }
+
   phase3_embed_switchgear_blocks(graph, config, state);
   phase4_place_branches_in_bands(graph, config, state);
   phase5_route_edges_manhattan_with_channels(graph, config, state);

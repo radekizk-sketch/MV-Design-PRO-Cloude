@@ -44,16 +44,26 @@ import type {
 } from './topologyInputReader';
 import { BranchKind, DeviceKind, GeneratorKind, StationKind } from './topologyInputReader';
 
+import {
+  buildStationBlocks,
+  type StationBlockBuildResult,
+  type SegmentationEdgeSets,
+} from './stationBlockBuilder';
+
 // =============================================================================
 // ADAPTER RESULT
 // =============================================================================
 
 /**
- * Wynik adaptera — VisualGraph + walidacje + FixActions.
+ * Wynik adaptera — VisualGraph + walidacje + FixActions + StationBlockDetails.
+ *
+ * RUN #3D: Rozszerzono o stationBlockDetails (pola/urzadzenia/anchory per stacja).
  */
 export interface AdapterResultV1 {
   readonly graph: VisualGraphV1;
   readonly fixActions: readonly TopologyFixAction[];
+  /** Szczegoly pol/urzadzen/anchorow per stacja (RUN #3D) */
+  readonly stationBlockDetails: StationBlockBuildResult;
 }
 
 // =============================================================================
@@ -747,11 +757,31 @@ export function buildVisualGraphFromTopology(
     }
   }
 
+  // --- 13. Build station block details (RUN #3D: field/device modeling) ---
+  const segmentationEdgeSets: SegmentationEdgeSets = {
+    trunkEdgeIds: segmentation.trunkEdgeIds,
+    branchEdgeIds: segmentation.branchEdgeIds,
+    secondaryEdgeIds: segmentation.secondaryEdgeIds,
+  };
+
+  const stationBlockDetails = buildStationBlocks(input, segmentationEdgeSets);
+
+  // Merge field/device fixActions into adapter fixActions (with stable code mapping)
+  for (const fa of stationBlockDetails.fixActions) {
+    fixActions.push({
+      code: fa.code,
+      message: fa.message,
+      elementRef: fa.elementId,
+      fixHint: fa.fixHint,
+    });
+  }
+
   return {
     graph: canonicalizeVisualGraph(graph),
     fixActions: [...fixActions].sort(
       (a, b) => a.code.localeCompare(b.code) || (a.elementRef ?? '').localeCompare(b.elementRef ?? ''),
     ),
+    stationBlockDetails,
   };
 }
 

@@ -91,6 +91,17 @@ export type {
 export { computeLayout, DEFAULT_LAYOUT_CONFIG } from './layoutPipeline';
 export type { LayoutGeometryConfigV1 } from './layoutPipeline';
 
+// Station Block Builder (RUN #3D: adapter mapping + embedding role derivation)
+export {
+  buildStationBlocks,
+  deriveEmbeddingRole,
+} from './stationBlockBuilder';
+
+export type {
+  SegmentationEdgeSets,
+  StationBlockBuildResult,
+} from './stationBlockBuilder';
+
 // Field & Device Modeling Contracts (RUN #3D)
 export {
   FieldRoleV1,
