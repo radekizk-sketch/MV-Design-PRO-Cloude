@@ -419,14 +419,33 @@ function buildFieldsForStation(
       stationBusIds.has(b.toNodeId),
     ).sort((a, b) => a.id.localeCompare(b.id));
 
+    const sortedBusIds = [...station.busIds].sort();
+
     for (const cb of couplerBranches) {
       const fieldId = `field_${station.id}_coupler_${fieldIndex}`;
       const requirements = DEVICE_REQUIREMENT_SETS[FieldRoleV1.COUPLER_SN];
 
+      // busSectionId: przypisz do szyny o nizszym indeksie (deterministycznie)
+      const fromIdx = sortedBusIds.indexOf(cb.fromNodeId);
+      const toIdx = sortedBusIds.indexOf(cb.toNodeId);
+      const busSectionId = sortedBusIds[Math.min(fromIdx >= 0 ? fromIdx : 0, toIdx >= 0 ? toIdx : 0)];
+
+      // Zbierz urzadzenia na sprzegle (CB, DS na wezlach sprzegla)
+      const couplerDeviceIds: string[] = [];
+      const couplerDeviceCandidates = stationDevices.filter(d =>
+        d.nodeId === cb.fromNodeId || d.nodeId === cb.toNodeId,
+      ).sort((a, b) => a.id.localeCompare(b.id));
+
+      for (const dev of couplerDeviceCandidates) {
+        const device = buildDeviceFromDomain(dev, fieldId, protectionByBreaker, fixActions);
+        devices.push(device);
+        couplerDeviceIds.push(device.id);
+      }
+
       fields.push({
         id: fieldId,
         stationId: station.id,
-        busSectionId: station.busIds[0],
+        busSectionId,
         fieldRole: FieldRoleV1.COUPLER_SN,
         terminals: {
           incomingNodeId: cb.fromNodeId,
@@ -435,7 +454,7 @@ function buildFieldsForStation(
           generatorNodeId: null,
         },
         requiredDevices: requirements,
-        deviceIds: [],
+        deviceIds: couplerDeviceIds,
         catalogRef: null,
       });
 
@@ -472,12 +491,12 @@ function buildDeviceFromDomain(
       ctInputIds = binding.ctRef ? [binding.ctRef] : [];
     }
   } else if (deviceType === DeviceTypeV1.RELAY) {
-    // Relay: find the protection binding that references this relay
-    // Protection bindings are keyed by breaker — find binding where relay is assigned
+    // Relay → CB binding: relay jest na tym samym wezle (nodeId) co jego CB.
+    // Szukamy protection binding dla CB na tym samym wezle.
     let foundBinding = false;
     for (const [breakerId, binding] of [...protectionByBreaker.entries()].sort((a, b) => a[0].localeCompare(b[0]))) {
-      // The relay device maps to the protection binding via its breaker
-      if (binding.breakerRef === domainDevice.nodeId || breakerId === domainDevice.nodeId) {
+      if (breakerId === domainDevice.nodeId) {
+        // Relay i CB na tym samym wezle — jawne powiazanie
         boundCbId = breakerId;
         ctInputIds = binding.ctRef ? [binding.ctRef] : [];
         foundBinding = true;
@@ -487,9 +506,9 @@ function buildDeviceFromDomain(
     if (!foundBinding) {
       fixActions.push({
         code: FieldDeviceFixCodes.PROTECTION_RELAY_BINDING_MISSING,
-        message: `Relay ${domainDevice.id} (${domainDevice.name}): brak powiazania z protection`,
+        message: `Relay ${domainDevice.id} (${domainDevice.name}): brak powiazania z CB na wezle ${domainDevice.nodeId}`,
         elementId: domainDevice.id,
-        fixHint: `Przypisz relay ${domainDevice.name} do ProtectionBinding`,
+        fixHint: `Przypisz relay ${domainDevice.name} do ProtectionBinding z breakerRef na tym samym wezle`,
       });
     }
   }
@@ -511,6 +530,32 @@ function buildDeviceFromDomain(
       message: `Urzadzenie ${domainDevice.id} (${domainDevice.name}): brak referencji katalogowej`,
       elementId: domainDevice.id,
       fixHint: `Przypisz typ z katalogu do urzadzenia ${domainDevice.name}`,
+    });
+  }
+
+  // Walidacja parametrow krytycznych per typ urzadzenia
+  if (deviceType === DeviceTypeV1.CB) {
+    fixActions.push({
+      code: FieldDeviceFixCodes.DEVICE_CB_RATING_MISSING,
+      message: `CB ${domainDevice.id}: brak zdolnosci wylaczania (breakingCapacityKa) — wymagane do obliczen SC`,
+      elementId: domainDevice.id,
+      fixHint: 'Uzupelnij zdolnosc wylaczania z katalogu lub recznie.',
+    });
+  }
+  if (deviceType === DeviceTypeV1.CT) {
+    fixActions.push({
+      code: FieldDeviceFixCodes.DEVICE_CT_RATIO_MISSING,
+      message: `CT ${domainDevice.id}: brak przekladni (ctRatio) — wymagane do konfiguracji zabezpieczen`,
+      elementId: domainDevice.id,
+      fixHint: 'Uzupelnij przekladnie CT z katalogu lub recznie.',
+    });
+  }
+  if (deviceType === DeviceTypeV1.RELAY) {
+    fixActions.push({
+      code: FieldDeviceFixCodes.DEVICE_RELAY_SETTINGS_MISSING,
+      message: `Relay ${domainDevice.id}: brak nastaw zabezpieczen — wymagane do koordynacji`,
+      elementId: domainDevice.id,
+      fixHint: 'Uzupelnij nastawy relay z katalogu lub recznie.',
     });
   }
 
@@ -623,6 +668,12 @@ export function buildStationBlocks(
   const allFields: FieldV1[] = [];
   const allDevices: DeviceV1[] = [];
 
+  // Protection bindings (breakerRef → binding) — dostepne na poziomie buildStationBlocks
+  const protectionByBreaker = new Map<string, TopologyProtectionV1>();
+  for (const pb of input.protectionBindings) {
+    protectionByBreaker.set(pb.breakerRef, pb);
+  }
+
   for (const station of [...input.stations].sort((a, b) => a.id.localeCompare(b.id))) {
     const stationBusIds = new Set(station.busIds);
 
@@ -649,8 +700,10 @@ export function buildStationBlocks(
     // 4. Validate fields/devices (per-field)
     for (const field of fields) {
       const hasRelay = devices.some(d => d.fieldId === field.id && d.deviceType === DeviceTypeV1.RELAY);
-      const domainProtection = input.protectionBindings.length > 0;
-      const fieldFixActions = validateFieldDevices(field, devices, hasRelay, domainProtection);
+      // Walidacja per-field: sprawdz czy CB tego pola ma protection binding
+      const fieldCbs = devices.filter(d => d.fieldId === field.id && d.deviceType === DeviceTypeV1.CB);
+      const fieldHasProtection = fieldCbs.some(cb => protectionByBreaker.has(cb.id));
+      const fieldFixActions = validateFieldDevices(field, devices, hasRelay, fieldHasProtection);
       fixActions.push(...fieldFixActions);
     }
 
