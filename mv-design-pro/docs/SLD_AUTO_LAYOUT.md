@@ -13,6 +13,9 @@ The SLD (Single Line Diagram) Auto-Layout Engine provides automatic positioning 
 - **Orthogonal Routing**: Professional-grade edge routing
 - **Grid Alignment**: All positions snapped to configurable grid
 - **Incremental Layout**: Small changes don't reset entire schema
+- **Device & Field Modeling** (RUN #3D): ETAP-grade field/device details with
+  embedding role derivation, device requirement validation, and anchor mapping.
+  See [SLD_DEVICE_MODELING_SPEC.md](./SLD_DEVICE_MODELING_SPEC.md) for details.
 
 ## Installation
 
