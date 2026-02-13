@@ -174,8 +174,8 @@ function generatePorts(nodeType: NodeTypeV1): VisualPortV1[] {
     case NodeTypeV1.BUS_SN:
     case NodeTypeV1.BUS_NN:
       return [
-        { id: 'left', role: PortRoleV1.BUS, relativeX: 0, relativeY: 0.5 },
-        { id: 'right', role: PortRoleV1.BUS, relativeX: 1, relativeY: 0.5 },
+        { id: 'left', role: PortRoleV1.IN, relativeX: 0, relativeY: 0.5 },
+        { id: 'right', role: PortRoleV1.OUT, relativeX: 1, relativeY: 0.5 },
       ];
 
     case NodeTypeV1.GRID_SOURCE:
@@ -428,6 +428,8 @@ export function buildVisualGraphFromTopology(
 
   // Set of all VisualNode IDs for port reference validation
   const nodeIdSet = new Set<string>();
+  // Map: nodeId → NodeTypeV1 (do semantycznego wyboru portow)
+  const nodeTypeMap = new Map<string, NodeTypeV1>();
 
   // Map: connectionNode ID → index in stations (for station membership)
   const busToStation = new Map<string, string>();
@@ -454,6 +456,7 @@ export function buildVisualGraphFromTopology(
   for (const cn of input.connectionNodes) {
     const nodeType = classifyBusType(cn.voltageKv);
     nodeIdSet.add(cn.id);
+    nodeTypeMap.set(cn.id, nodeType);
 
     nodes.push({
       id: cn.id,
@@ -483,6 +486,7 @@ export function buildVisualGraphFromTopology(
     const branchCount = branchCountByStation.get(station.id) ?? 0;
     const nodeType = classifyStationType(station, branchCount, fixActions);
     nodeIdSet.add(station.id);
+    nodeTypeMap.set(station.id, nodeType);
 
     nodes.push({
       id: station.id,
@@ -511,6 +515,7 @@ export function buildVisualGraphFromTopology(
   for (const source of input.sources) {
     const nodeType = NodeTypeV1.GRID_SOURCE;
     nodeIdSet.add(source.id);
+    nodeTypeMap.set(source.id, nodeType);
 
     nodes.push({
       id: source.id,
@@ -539,6 +544,7 @@ export function buildVisualGraphFromTopology(
   for (const gen of input.generators) {
     const nodeType = classifyGeneratorType(gen.kind);
     nodeIdSet.add(gen.id);
+    nodeTypeMap.set(gen.id, nodeType);
 
     nodes.push({
       id: gen.id,
@@ -567,6 +573,7 @@ export function buildVisualGraphFromTopology(
   for (const load of input.loads) {
     const nodeType = NodeTypeV1.LOAD;
     nodeIdSet.add(load.id);
+    nodeTypeMap.set(load.id, nodeType);
 
     nodes.push({
       id: load.id,
@@ -641,9 +648,11 @@ export function buildVisualGraphFromTopology(
 
     const edgeType = classifyEdgeType(branch, segmentation, busCouplerBranchIds);
 
-    // Wybierz porty na podstawie edge type
-    const fromPort = selectSourcePort(branch, edgeType);
-    const toPort = selectTargetPort(branch, edgeType);
+    // Wybierz porty semantycznie (po roli, nie po geometrii)
+    const fromNodeType = nodeTypeMap.get(branch.fromNodeId) ?? NodeTypeV1.BUS_SN;
+    const toNodeType = nodeTypeMap.get(branch.toNodeId) ?? NodeTypeV1.BUS_SN;
+    const fromPort = selectSourcePort(branch, edgeType, fromNodeType);
+    const toPort = selectTargetPort(branch, edgeType, toNodeType);
 
     edges.push({
       id: `edge_${branch.id}`,
@@ -675,8 +684,8 @@ export function buildVisualGraphFromTopology(
     }
     edges.push({
       id: `edge_src_${source.id}`,
-      fromPortRef: { nodeId: source.id, portId: 'bottom' },
-      toPortRef: { nodeId: source.nodeId, portId: 'left' },
+      fromPortRef: { nodeId: source.id, portId: resolvePortId(NodeTypeV1.GRID_SOURCE, PortRoleV1.OUT) },
+      toPortRef: { nodeId: source.nodeId, portId: resolvePortId(nodeTypeMap.get(source.nodeId) ?? NodeTypeV1.BUS_SN, PortRoleV1.IN) },
       edgeType: EdgeTypeV1.TRUNK,
       isNormallyOpen: false,
       attributes: {
@@ -701,8 +710,8 @@ export function buildVisualGraphFromTopology(
     }
     edges.push({
       id: `edge_gen_${gen.id}`,
-      fromPortRef: { nodeId: gen.id, portId: 'bottom' },
-      toPortRef: { nodeId: gen.nodeId, portId: 'right' },
+      fromPortRef: { nodeId: gen.id, portId: resolvePortId(nodeTypeMap.get(gen.id) ?? NodeTypeV1.GENERATOR_PV, PortRoleV1.OUT) },
+      toPortRef: { nodeId: gen.nodeId, portId: resolvePortId(nodeTypeMap.get(gen.nodeId) ?? NodeTypeV1.BUS_SN, PortRoleV1.OUT) },
       edgeType: EdgeTypeV1.BRANCH,
       isNormallyOpen: false,
       attributes: {
@@ -727,8 +736,8 @@ export function buildVisualGraphFromTopology(
     }
     edges.push({
       id: `edge_load_${load.id}`,
-      fromPortRef: { nodeId: load.nodeId, portId: 'right' },
-      toPortRef: { nodeId: load.id, portId: 'top' },
+      fromPortRef: { nodeId: load.nodeId, portId: resolvePortId(nodeTypeMap.get(load.nodeId) ?? NodeTypeV1.BUS_SN, PortRoleV1.OUT) },
+      toPortRef: { nodeId: load.id, portId: resolvePortId(NodeTypeV1.LOAD, PortRoleV1.IN) },
       edgeType: EdgeTypeV1.BRANCH,
       isNormallyOpen: false,
       attributes: {
@@ -796,15 +805,51 @@ export function buildVisualGraphFromTopology(
 }
 
 // =============================================================================
-// PORT SELECTION HELPERS
+// PORT SELECTION HELPERS (semantyczne — po roli, nie po geometrii)
 // =============================================================================
 
-function selectSourcePort(branch: TopologyBranchV1, edgeType: EdgeTypeV1): string {
-  if (edgeType === EdgeTypeV1.TRANSFORMER_LINK) return 'left'; // HV bus port
-  return 'right'; // Default: right port of source bus
+/**
+ * Mapuje (nodeType, PortRoleV1) → portId.
+ * Pozwala na wybor portu po roli semantycznej zamiast po pozycji geometrycznej.
+ */
+function resolvePortId(nodeType: NodeTypeV1, role: PortRoleV1): string {
+  const portMap: Partial<Record<NodeTypeV1, Partial<Record<PortRoleV1, string>>>> = {
+    [NodeTypeV1.BUS_SN]: { [PortRoleV1.IN]: 'left', [PortRoleV1.OUT]: 'right' },
+    [NodeTypeV1.BUS_NN]: { [PortRoleV1.IN]: 'left', [PortRoleV1.OUT]: 'right' },
+    [NodeTypeV1.GRID_SOURCE]: { [PortRoleV1.OUT]: 'bottom' },
+    [NodeTypeV1.GENERATOR_PV]: { [PortRoleV1.OUT]: 'bottom' },
+    [NodeTypeV1.GENERATOR_BESS]: { [PortRoleV1.OUT]: 'bottom' },
+    [NodeTypeV1.GENERATOR_WIND]: { [PortRoleV1.OUT]: 'bottom' },
+    [NodeTypeV1.LOAD]: { [PortRoleV1.IN]: 'top' },
+    [NodeTypeV1.TRANSFORMER_WN_SN]: { [PortRoleV1.TRANSFORMER_HV]: 'top', [PortRoleV1.TRANSFORMER_LV]: 'bottom' },
+    [NodeTypeV1.TRANSFORMER_SN_NN]: { [PortRoleV1.TRANSFORMER_HV]: 'top', [PortRoleV1.TRANSFORMER_LV]: 'bottom' },
+    [NodeTypeV1.STATION_SN_NN_A]: { [PortRoleV1.IN]: 'in', [PortRoleV1.OUT]: 'out', [PortRoleV1.BRANCH]: 'branch' },
+    [NodeTypeV1.STATION_SN_NN_B]: { [PortRoleV1.IN]: 'in', [PortRoleV1.OUT]: 'out', [PortRoleV1.BRANCH]: 'branch' },
+    [NodeTypeV1.STATION_SN_NN_C]: { [PortRoleV1.IN]: 'in', [PortRoleV1.OUT]: 'out', [PortRoleV1.BRANCH]: 'branch' },
+    [NodeTypeV1.STATION_SN_NN_D]: { [PortRoleV1.IN]: 'in', [PortRoleV1.OUT]: 'out', [PortRoleV1.BRANCH]: 'branch' },
+    [NodeTypeV1.SWITCHGEAR_BLOCK]: { [PortRoleV1.IN]: 'in', [PortRoleV1.OUT]: 'out', [PortRoleV1.BRANCH]: 'branch' },
+    [NodeTypeV1.FEEDER_JUNCTION]: { [PortRoleV1.IN]: 'top', [PortRoleV1.OUT]: 'bottom', [PortRoleV1.BRANCH]: 'left' },
+  };
+  return portMap[nodeType]?.[role] ?? 'left';
 }
 
-function selectTargetPort(branch: TopologyBranchV1, edgeType: EdgeTypeV1): string {
-  if (edgeType === EdgeTypeV1.TRANSFORMER_LINK) return 'left'; // LV bus port
-  return 'left'; // Default: left port of target bus
+/**
+ * Wybiera portId na wezle FROM (zrodlowym) dla krawedzi branch.
+ * Semantyka: rola portu zalezy od typu krawedzi, nie od pozycji geometrycznej.
+ */
+function selectSourcePort(branch: TopologyBranchV1, edgeType: EdgeTypeV1, fromNodeType: NodeTypeV1): string {
+  if (edgeType === EdgeTypeV1.TRANSFORMER_LINK) {
+    return resolvePortId(fromNodeType, PortRoleV1.IN);
+  }
+  return resolvePortId(fromNodeType, PortRoleV1.OUT);
+}
+
+/**
+ * Wybiera portId na wezle TO (docelowym) dla krawedzi branch.
+ */
+function selectTargetPort(branch: TopologyBranchV1, edgeType: EdgeTypeV1, toNodeType: NodeTypeV1): string {
+  if (edgeType === EdgeTypeV1.TRANSFORMER_LINK) {
+    return resolvePortId(toNodeType, PortRoleV1.IN);
+  }
+  return resolvePortId(toNodeType, PortRoleV1.IN);
 }

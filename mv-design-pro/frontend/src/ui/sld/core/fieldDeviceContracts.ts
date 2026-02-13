@@ -477,6 +477,7 @@ export const FieldDeviceFixCodes = {
 
   // Stacje
   STATION_EMBEDDING_UNDETERMINED: 'station.embedding_role_undetermined',
+  STATION_TYPOLOGY_CONFLICT: 'station.typology_conflict',
   STATION_COUPLER_MISSING: 'station.coupler_missing',
   STATION_TRANSFORMER_MISSING: 'station.transformer_missing_for_sn_nn',
   STATION_MULTIPLE_BRANCHES: 'station.multiple_branches_requires_explicit_ports',

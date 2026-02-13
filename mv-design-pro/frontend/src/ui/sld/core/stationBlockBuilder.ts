@@ -51,7 +51,7 @@ import type {
   TopologyStationV1,
   TopologyProtectionV1,
 } from './topologyInputReader';
-import { BranchKind, DeviceKind, GeneratorKind } from './topologyInputReader';
+import { BranchKind, DeviceKind, GeneratorKind, StationKind } from './topologyInputReader';
 
 // =============================================================================
 // SEGMENTATION EDGE SETS (from topologyAdapterV2)
@@ -105,60 +105,94 @@ export function deriveEmbeddingRole(
   const trunkCount = incidentTrunkEdges.length;
   const branchCount = incidentBranchEdges.length;
 
-  // Reguła 1: LOCAL_SECTIONAL — 2+ busSections lub jawny coupler
-  if (station.busIds.length >= 2) {
-    return EmbeddingRoleV1.LOCAL_SECTIONAL;
-  }
+  // --- Derive role from topology ---
+  let derivedRole: EmbeddingRoleV1;
 
-  // Szukaj coupler device
+  // Reguła 1: LOCAL_SECTIONAL — 2+ busSections lub jawny coupler
   const hasCouplerDevice = branches.some(b =>
     b.kind === BranchKind.BUS_LINK &&
     stationBusIds.has(b.fromNodeId) &&
     stationBusIds.has(b.toNodeId),
   );
-  if (hasCouplerDevice) {
-    return EmbeddingRoleV1.LOCAL_SECTIONAL;
+  if (station.busIds.length >= 2 || hasCouplerDevice) {
+    derivedRole = EmbeddingRoleV1.LOCAL_SECTIONAL;
   }
-
   // Reguła 2: TRUNK_INLINE — 2 trunk edges, 0 branch edges
-  if (trunkCount === 2 && branchCount === 0) {
-    return EmbeddingRoleV1.TRUNK_INLINE;
+  else if (trunkCount === 2 && branchCount === 0) {
+    derivedRole = EmbeddingRoleV1.TRUNK_INLINE;
   }
-
   // Reguła 3: TRUNK_LEAF — 1 trunk edge, 0 branch edges
-  if (trunkCount === 1 && branchCount === 0) {
-    return EmbeddingRoleV1.TRUNK_LEAF;
+  else if (trunkCount === 1 && branchCount === 0) {
+    derivedRole = EmbeddingRoleV1.TRUNK_LEAF;
   }
-
   // Reguła 4: TRUNK_BRANCH — trunk >= 1, branch >= 1
-  if (trunkCount >= 1 && branchCount >= 1) {
-    return EmbeddingRoleV1.TRUNK_BRANCH;
+  else if (trunkCount >= 1 && branchCount >= 1) {
+    derivedRole = EmbeddingRoleV1.TRUNK_BRANCH;
   }
-
-  // Resztkowy przypadek: brak trunk = TRUNK_LEAF z FixAction (nie fabricacja — blad topologii)
-  if (trunkCount === 0 && branchCount === 0) {
+  // Resztkowy: 0 trunk + branch edges
+  else if (trunkCount === 0 && branchCount === 0) {
     fixActions.push({
       code: FieldDeviceFixCodes.STATION_EMBEDDING_UNDETERMINED,
       message: `Stacja ${station.id} (${station.name}): brak krawedzi trunk i branch — nie mozna wyznaczyc roli`,
       elementId: station.id,
       fixHint: 'Sprawdz polaczenia stacji z magistrala.',
     });
-    return EmbeddingRoleV1.TRUNK_LEAF;
+    derivedRole = EmbeddingRoleV1.TRUNK_LEAF;
   }
-
-  // Resztkowy: 0 trunk edges + branch edges → TRUNK_BRANCH
-  if (trunkCount === 0 && branchCount >= 1) {
-    return EmbeddingRoleV1.TRUNK_BRANCH;
+  // Resztkowy: 0 trunk + branch edges → TRUNK_BRANCH
+  else if (trunkCount === 0 && branchCount >= 1) {
+    derivedRole = EmbeddingRoleV1.TRUNK_BRANCH;
   }
-
   // Safety fallback
-  fixActions.push({
-    code: FieldDeviceFixCodes.STATION_EMBEDDING_UNDETERMINED,
-    message: `Stacja ${station.id}: nieoczekiwana kombinacja trunk=${trunkCount}, branch=${branchCount}`,
-    elementId: station.id,
-    fixHint: 'Sprawdz topologie stacji.',
-  });
-  return EmbeddingRoleV1.TRUNK_LEAF;
+  else {
+    fixActions.push({
+      code: FieldDeviceFixCodes.STATION_EMBEDDING_UNDETERMINED,
+      message: `Stacja ${station.id}: nieoczekiwana kombinacja trunk=${trunkCount}, branch=${branchCount}`,
+      elementId: station.id,
+      fixHint: 'Sprawdz topologie stacji.',
+    });
+    derivedRole = EmbeddingRoleV1.TRUNK_LEAF;
+  }
+
+  // --- Walidacja: derived role vs domain stationType ---
+  validateEmbeddingVsDomain(station, derivedRole, fixActions);
+
+  return derivedRole;
+}
+
+/**
+ * Walidacja spójności: czy rola topologiczna (embedding) zgadza sie z domenowym stationType.
+ * Konflikt → FixAction `station.typology_conflict` (nie zmienia wyniku — topologia jest ground truth).
+ */
+function validateEmbeddingVsDomain(
+  station: TopologyStationV1,
+  derivedRole: EmbeddingRoleV1,
+  fixActions: FieldDeviceFixActionV1[],
+): void {
+  const { stationType } = station;
+  let conflict = false;
+  let reason = '';
+
+  // SWITCHING powinno byc LOCAL_SECTIONAL (sekcyjna z couplerem)
+  if (stationType === StationKind.SWITCHING && derivedRole !== EmbeddingRoleV1.LOCAL_SECTIONAL) {
+    conflict = true;
+    reason = `stationType=SWITCHING oczekuje LOCAL_SECTIONAL, topologia dala ${derivedRole}`;
+  }
+
+  // DISTRIBUTION nie powinna byc LOCAL_SECTIONAL (chyba ze ma 2+ szyny SN na tym samym poziomie)
+  if (stationType === StationKind.DISTRIBUTION && derivedRole === EmbeddingRoleV1.LOCAL_SECTIONAL) {
+    conflict = true;
+    reason = `stationType=DISTRIBUTION nie powinna byc LOCAL_SECTIONAL — sprawdz szyny SN/nN`;
+  }
+
+  if (conflict) {
+    fixActions.push({
+      code: FieldDeviceFixCodes.STATION_TYPOLOGY_CONFLICT,
+      message: `Stacja '${station.name}' (${station.id}): ${reason}`,
+      elementId: station.id,
+      fixHint: 'Zweryfikuj stationType w modelu domenowym wzgledem topologii.',
+    });
+  }
 }
 
 // =============================================================================
