@@ -111,12 +111,12 @@ Tasks:
 | Item | Description | Status |
 |------|-------------|--------|
 | Regulation Q(U) Proofs | Reactive power regulation proof pack | DONE |
-| PR-27: SC ↔ Protection Bridge | Current source resolution (TEST_POINTS / SC_RESULT), FixActions | PLANNED |
-| PR-28: Coordination v1 | Selectivity margins (explicit pairs, numbers only) | PLANNED |
+| PR-27: SC ↔ Protection Bridge | Current source resolution (TEST_POINTS / SC_RESULT), FixActions | DONE |
+| PR-28: Coordination v1 | Selectivity margins (explicit pairs, numbers only) | DONE |
 | PR-29: Topology Links | Unified relay↔CB↔target_ref IDs (optional) | PLANNED |
-| PR-30: Protection SLD Overlay Pro | Token-only overlay (t51, margins) | PLANNED |
-| PR-31: Protection Report Model | Export-ready data model (PDF/DOCX) | PLANNED |
-| PR-32: Governance & Determinism Guards | Solver diff-guard, schema guard, no-heuristics guard | PLANNED |
+| PR-30: Protection SLD Overlay Pro | Token-only overlay (t51, margins) | DONE |
+| PR-31: Protection Report Model | Export-ready data model (PDF/DOCX) | DONE |
+| PR-32: Governance & Determinism Guards | Solver diff-guard, schema guard, no-heuristics guard | DONE |
 | Frontend Test Coverage | Increase Vitest + Playwright coverage | PLANNED |
 | CI Pipeline Enhancement | Add frontend type-check and lint to CI | PLANNED |
 
@@ -151,9 +151,9 @@ Tasks:
 |------|------------|
 | Shadow data stores | Enforced by Single Model Rule + code review |
 | Physics leaking into non-solver layers | NOT-A-SOLVER rule + test guards + arch_guard.py |
-| Protection heuristics/auto-selection | protection_no_heuristics_guard.py (PR-32) |
-| SC solver modification by Protection PRs | solver_diff_guard.py (PR-32) |
-| SC ResultSet v1 drift | resultset_v1_schema_guard.py (PR-32) |
+| Protection heuristics/auto-selection | protection_no_heuristics_guard.py (PR-32, DONE) |
+| SC solver modification by Protection PRs | solver_diff_guard.py (PR-32, DONE) |
+| SC ResultSet v1 drift | resultset_v1_schema_guard.py (PR-32, DONE) |
 | Result API drift | Frozen API rule + version bump requirement |
 | Proof determinism regression | SHA-256 fingerprint tests |
 | UI codename leaks | `no_codenames_guard.py` script |
