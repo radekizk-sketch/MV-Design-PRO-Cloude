@@ -1,0 +1,51 @@
+name: SLD Determinism Guards
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  sld-guards:
+    name: SLD Guards (Python)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11.x'
+
+      - name: Run SLD determinism guards
+        run: python mv-design-pro/scripts/sld_determinism_guards.py
+
+  sld-contract-tests:
+    name: SLD Contract Tests (Vitest)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: mv-design-pro/frontend/package-lock.json
+
+      - name: Install dependencies
+        working-directory: mv-design-pro/frontend
+        run: npm ci
+
+      - name: Run VisualGraph contract tests
+        working-directory: mv-design-pro/frontend
+        run: npx vitest run src/ui/sld/core/__tests__/ --reporter=verbose
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sld-contract-test-results
+          path: mv-design-pro/frontend/test-results/
+          retention-days: 30
