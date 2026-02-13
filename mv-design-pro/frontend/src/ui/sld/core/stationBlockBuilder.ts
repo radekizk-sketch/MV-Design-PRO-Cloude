@@ -91,10 +91,13 @@ export function deriveEmbeddingRole(
   fixActions: FieldDeviceFixActionV1[],
 ): EmbeddingRoleV1 {
   // Oblicz incident edges (krawedzie dotykajace szyn stacji)
+  // Wyklucz TR_LINK i BUS_LINK — to polaczenia wewnetrzne stacji, nie trunk/branch.
   const incidentBranches = branches.filter(b =>
     (stationBusIds.has(b.fromNodeId) || stationBusIds.has(b.toNodeId)) &&
     b.fromNodeId !== b.toNodeId &&
-    b.inService,
+    b.inService &&
+    b.kind !== BranchKind.TR_LINK &&
+    b.kind !== BranchKind.BUS_LINK,
   );
 
   const incidentTrunkEdges = incidentBranches.filter(b => segmentation.trunkEdgeIds.has(b.id));
