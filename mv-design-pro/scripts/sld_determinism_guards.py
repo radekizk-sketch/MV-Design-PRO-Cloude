@@ -19,6 +19,13 @@ Guards dodane w RUN #3C:
 8. No self-edges in VisualGraph adapter (fromPortRef.nodeId != toPortRef.nodeId)
 9. No string-based typology heuristics (includes('station'), name-based detection)
 10. No legacy adapter patterns (extractVoltageFromName, classifyNodeType with name)
+
+Guards dodane w RUN #3D:
+11. Station block builder generates fields for every station (station-has-members)
+12. Field device requirements enforced per FieldRole (field-has-required-devices)
+13. Device catalog ref validation present (device-catalogRef-present)
+14. Relay binding fix actions generated for CB without protection (relay-binding-present)
+15. No auto-default/fabrication in stationBlockBuilder (zero-fabrication)
 """
 
 import os
@@ -28,9 +35,11 @@ from pathlib import Path
 from typing import List, Tuple
 
 # Sciezka do repo
+# __file__ jest w mv-design-pro/scripts/ → parent.parent = mv-design-pro/
+# FRONTEND_SRC = mv-design-pro/frontend/src
 REPO_ROOT = Path(__file__).resolve().parent.parent
-FRONTEND_SRC = REPO_ROOT / "mv-design-pro" / "frontend" / "src"
-BACKEND_SRC = REPO_ROOT / "mv-design-pro" / "backend" / "src"
+FRONTEND_SRC = REPO_ROOT / "frontend" / "src"
+BACKEND_SRC = REPO_ROOT / "backend" / "src"
 
 # Kolory ANSI
 RED = "\033[91m"
@@ -546,6 +555,216 @@ def guard_no_legacy_adapter() -> List[str]:
 
 
 # =========================================================================
+# GUARD 11: Station block builder generates fields (station-has-members) (RUN #3D)
+# =========================================================================
+
+def guard_station_has_members() -> List[str]:
+    """
+    Sprawdz ze stationBlockBuilder buduje pola (fields) dla kazdej stacji.
+    Builder MUSI iterowac po stacjach i tworzyc pola — nigdy pusta lista.
+    Szukaj: buildFieldsForStation lub ekwiwalentu — musi istniec.
+    """
+    violations = []
+    builder_file = FRONTEND_SRC / "ui" / "sld" / "core" / "stationBlockBuilder.ts"
+
+    if not builder_file.exists():
+        violations.append("  BRAK pliku stationBlockBuilder.ts — CI BLOCKED")
+        return violations
+
+    try:
+        content = builder_file.read_text(encoding="utf-8")
+    except Exception:
+        violations.append("  Nie mozna odczytac stationBlockBuilder.ts")
+        return violations
+
+    # Builder MUSI zawierac funkcje budujaca pola
+    if "buildFieldsForStation" not in content and "buildFields" not in content:
+        violations.append(
+            "  stationBlockBuilder.ts nie zawiera buildFieldsForStation — "
+            "stacje nie beda mialy pol (brak field generation)"
+        )
+
+    # Builder MUSI iterowac po stacjach
+    if "for (const station of" not in content and "stations.map" not in content:
+        violations.append(
+            "  stationBlockBuilder.ts nie iteruje po stacjach — "
+            "brak przetwarzania stacji w builderze"
+        )
+
+    return violations
+
+
+# =========================================================================
+# GUARD 12: Field device requirements enforced (field-has-required-devices) (RUN #3D)
+# =========================================================================
+
+def guard_field_has_required_devices() -> List[str]:
+    """
+    Sprawdz ze fieldDeviceContracts.ts definiuje DEVICE_REQUIREMENT_SETS
+    i ze validateFieldDevices istnieje i sprawdza wymagania.
+    """
+    violations = []
+    contracts_file = FRONTEND_SRC / "ui" / "sld" / "core" / "fieldDeviceContracts.ts"
+
+    if not contracts_file.exists():
+        violations.append("  BRAK pliku fieldDeviceContracts.ts — CI BLOCKED")
+        return violations
+
+    try:
+        content = contracts_file.read_text(encoding="utf-8")
+    except Exception:
+        violations.append("  Nie mozna odczytac fieldDeviceContracts.ts")
+        return violations
+
+    # DEVICE_REQUIREMENT_SETS musi istniec
+    if "DEVICE_REQUIREMENT_SETS" not in content:
+        violations.append(
+            "  BRAK DEVICE_REQUIREMENT_SETS w fieldDeviceContracts.ts — "
+            "brak definicji wymagan urzadzen per FieldRole"
+        )
+
+    # validateFieldDevices musi istniec
+    if "function validateFieldDevices" not in content:
+        violations.append(
+            "  BRAK validateFieldDevices w fieldDeviceContracts.ts — "
+            "brak walidacji urzadzen w polach"
+        )
+
+    # FieldRoleV1 musi miec wymagane role
+    required_roles = ["LINE_IN", "LINE_OUT", "TRANSFORMER_SN_NN", "PV_SN", "BESS_SN"]
+    for role in required_roles:
+        if role not in content:
+            violations.append(
+                f"  BRAK roli {role} w fieldDeviceContracts.ts"
+            )
+
+    return violations
+
+
+# =========================================================================
+# GUARD 13: Device catalog ref validation (device-catalogRef-present) (RUN #3D)
+# =========================================================================
+
+def guard_device_catalog_ref_present() -> List[str]:
+    """
+    Sprawdz ze stationBlockBuilder generuje FixAction dla brakujacych catalogRef.
+    Builder NIE moze fabricowac referencji katalogowych — musi generowac CATALOG_REF_MISSING.
+    """
+    violations = []
+    builder_file = FRONTEND_SRC / "ui" / "sld" / "core" / "stationBlockBuilder.ts"
+
+    if not builder_file.exists():
+        return violations
+
+    try:
+        content = builder_file.read_text(encoding="utf-8")
+    except Exception:
+        return violations
+
+    # Builder MUSI sprawdzac catalogRef i generowac FixAction
+    if "CATALOG_REF_MISSING" not in content and "catalog.ref_missing" not in content:
+        violations.append(
+            "  stationBlockBuilder.ts nie generuje CATALOG_REF_MISSING FixAction — "
+            "brak walidacji referencji katalogowej urzadzen"
+        )
+
+    # ZAKAZ auto-defaults: szukaj wzorcow fabricacji
+    forbidden = [
+        (r"catalogRef:\s*['\"]default", "catalogRef: 'default' (fabricated)"),
+        (r"catalogRef:\s*['\"]auto", "catalogRef: 'auto' (fabricated)"),
+        (r"catalogRef:\s*['\"]unknown", "catalogRef: 'unknown' (fabricated)"),
+    ]
+
+    for pattern, label in forbidden:
+        matches = re.finditer(pattern, content)
+        for m in matches:
+            line_no = content[:m.start()].count('\n') + 1
+            violations.append(
+                f"  Fabricated catalog ref: '{label}' w stationBlockBuilder.ts:{line_no}"
+            )
+
+    return violations
+
+
+# =========================================================================
+# GUARD 14: Relay binding fix actions (relay-binding-present) (RUN #3D)
+# =========================================================================
+
+def guard_relay_binding_present() -> List[str]:
+    """
+    Sprawdz ze stationBlockBuilder generuje FixAction dla brakujacych relay bindings.
+    CB bez relay → PROTECTION_RELAY_BINDING_MISSING.
+    """
+    violations = []
+    builder_file = FRONTEND_SRC / "ui" / "sld" / "core" / "stationBlockBuilder.ts"
+
+    if not builder_file.exists():
+        return violations
+
+    try:
+        content = builder_file.read_text(encoding="utf-8")
+    except Exception:
+        return violations
+
+    # Builder MUSI generowac FixAction dla brakujacej ochrony
+    if "PROTECTION_RELAY_BINDING_MISSING" not in content and "protection.relay_binding_missing" not in content:
+        violations.append(
+            "  stationBlockBuilder.ts nie generuje PROTECTION_RELAY_BINDING_MISSING — "
+            "brak walidacji powiazania relay z CB"
+        )
+
+    return violations
+
+
+# =========================================================================
+# GUARD 15: No auto-default/fabrication (zero-fabrication) (RUN #3D)
+# =========================================================================
+
+def guard_zero_fabrication() -> List[str]:
+    """
+    Sprawdz brak auto-default / fabricacji w stationBlockBuilder i fieldDeviceContracts.
+    ZAKAZ: fallback do domyslnych wartosci, fabricowanie urzadzen, auto-uzupelnianie.
+    """
+    violations = []
+    files_to_check = [
+        FRONTEND_SRC / "ui" / "sld" / "core" / "stationBlockBuilder.ts",
+        FRONTEND_SRC / "ui" / "sld" / "core" / "fieldDeviceContracts.ts",
+    ]
+
+    forbidden_patterns = [
+        (r"//\s*auto[- ]?default", "auto-default comment (suggests fabrication)"),
+        (r"//\s*fallback", "fallback comment (suggests fabrication)"),
+        (r"\bfallbackDevice\b", "fallbackDevice variable"),
+        (r"\bdefaultDevice\b", "defaultDevice variable"),
+        (r"\bautoCreate\w*Device\b", "autoCreateDevice function"),
+        (r"\bfabricat", "fabricat* (fabrication reference)"),
+    ]
+
+    for f in files_to_check:
+        if not f.exists():
+            continue
+        try:
+            content = f.read_text(encoding="utf-8")
+        except Exception:
+            continue
+
+        rel = f.name
+        for pattern, label in forbidden_patterns:
+            matches = re.finditer(pattern, content, re.IGNORECASE)
+            for m in matches:
+                line_no = content[:m.start()].count('\n') + 1
+                # Pomijaj komentarze dokumentujace ZAKAZ
+                context_line = content.split('\n')[line_no - 1].strip()
+                if any(kw in context_line.lower() for kw in ("zakaz", "never", "nie", "prohibited", "forbidden")):
+                    continue
+                violations.append(
+                    f"  Auto-default/fabrication: '{label}' w {rel}:{line_no}"
+                )
+
+    return violations
+
+
+# =========================================================================
 # MAIN
 # =========================================================================
 
@@ -561,6 +780,11 @@ def main() -> int:
         ("GUARD 8: No self-edges in adapter (RUN #3C)", guard_no_self_edges_in_adapter()),
         ("GUARD 9: No string typology heuristics (RUN #3C)", guard_no_string_typology_heuristics()),
         ("GUARD 10: No legacy adapter patterns (RUN #3C)", guard_no_legacy_adapter()),
+        ("GUARD 11: Station has members / fields (RUN #3D)", guard_station_has_members()),
+        ("GUARD 12: Field device requirements enforced (RUN #3D)", guard_field_has_required_devices()),
+        ("GUARD 13: Device catalog ref validation (RUN #3D)", guard_device_catalog_ref_present()),
+        ("GUARD 14: Relay binding fix actions (RUN #3D)", guard_relay_binding_present()),
+        ("GUARD 15: Zero fabrication in builder (RUN #3D)", guard_zero_fabrication()),
     ]
 
     total_violations = 0

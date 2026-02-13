@@ -135,7 +135,7 @@ export function deriveEmbeddingRole(
     return EmbeddingRoleV1.TRUNK_BRANCH;
   }
 
-  // Fallback: brak trunk = TRUNK_LEAF z FixAction
+  // Resztkowy przypadek: brak trunk = TRUNK_LEAF z FixAction (nie fabricacja — blad topologii)
   if (trunkCount === 0 && branchCount === 0) {
     fixActions.push({
       code: FieldDeviceFixCodes.STATION_EMBEDDING_UNDETERMINED,
@@ -146,7 +146,7 @@ export function deriveEmbeddingRole(
     return EmbeddingRoleV1.TRUNK_LEAF;
   }
 
-  // Fallback: 0 trunk edges but has branch edges = TRUNK_BRANCH
+  // Resztkowy: 0 trunk edges + branch edges → TRUNK_BRANCH
   if (trunkCount === 0 && branchCount >= 1) {
     return EmbeddingRoleV1.TRUNK_BRANCH;
   }
