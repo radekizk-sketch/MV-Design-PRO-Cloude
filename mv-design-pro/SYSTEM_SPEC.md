@@ -158,6 +158,17 @@ Analysis = interpretation of solver results. No physics. No model modification.
 
 Implemented analyses: Protection, Voltage, Thermal/Overload, Normative Evaluator, Coverage Score, LF Sensitivity, Scenario Comparison, Auto Recommendations, Boundary Identifier.
 
+### 6.1 Protection Analysis (AnalysisType: PROTECTION)
+
+Protection is a separate AnalysisType in the execution pipeline. It does NOT reside in the Solver layer — it is purely interpretive.
+
+- **Engine**: Protection Engine v1 (ANSI 50/51, IEC IDMT curves) — `domain/protection_engine_v1.py`
+- **Current source**: Explicit selection — `TEST_POINTS` (user-defined) or `SC_RESULT` (read-only from SC ResultSet)
+- **Coordination**: Explicit relay pairs (upstream/downstream), numerical margins only, no verdicts
+- **Boundary**: Protection READS SC results. Protection NEVER modifies SC solver or SC ResultSet v1.
+- **Contracts**: See [`docs/analysis/PROTECTION_CONTRACTS.md`](docs/analysis/PROTECTION_CONTRACTS.md)
+- **Architecture**: See [`docs/analysis/PROTECTION_CANONICAL_ARCHITECTURE.md`](docs/analysis/PROTECTION_CANONICAL_ARCHITECTURE.md)
+
 > **Detail:** see Chapter 09 (Protection), Chapter 12 (Validation & QA).
 > **Normative completion (IEC 60909-0:2016 asymmetrical):** see [`docs/proof/NORMATIVE_COMPLETION_PACK_IEC_60909.md`](docs/proof/NORMATIVE_COMPLETION_PACK_IEC_60909.md).
 
@@ -255,6 +266,11 @@ NetworkValidator runs BEFORE any solver execution (13 PowerFactory-grade rules).
 | Proof Engine Specs | [`docs/proof_engine/*.md`](docs/proof_engine/) |
 | Architecture Decision Records | [`docs/adr/ADR-*.md`](docs/adr/) |
 | Protection Specs | [`docs/protection/*.md`](docs/protection/) |
+| Protection Architecture | [`docs/analysis/PROTECTION_CANONICAL_ARCHITECTURE.md`](docs/analysis/PROTECTION_CANONICAL_ARCHITECTURE.md) |
+| Protection Contracts | [`docs/analysis/PROTECTION_CONTRACTS.md`](docs/analysis/PROTECTION_CONTRACTS.md) |
+| Protection Dependency Graph | [`docs/analysis/PROTECTION_DEPENDENCY_GRAPH.md`](docs/analysis/PROTECTION_DEPENDENCY_GRAPH.md) |
+| Protection Determinism Guards | [`docs/analysis/PROTECTION_DETERMINISM_GUARDS.md`](docs/analysis/PROTECTION_DETERMINISM_GUARDS.md) |
+| Protection AS-IS Map | [`docs/analysis/PROTECTION_ASIS_MAP.md`](docs/analysis/PROTECTION_ASIS_MAP.md) |
 | Analysis Specs | [`docs/analysis/*.md`](docs/analysis/) |
 | PowerFactory Compliance | [`POWERFACTORY_COMPLIANCE.md`](POWERFACTORY_COMPLIANCE.md) |
 | Documentation Index | [`docs/INDEX.md`](docs/INDEX.md) |

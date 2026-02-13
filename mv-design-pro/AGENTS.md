@@ -31,7 +31,7 @@ Only dedicated solvers compute physics. Everything else is forbidden from physic
 |-----------|-------|----------------|
 | IEC 60909 Short Circuit | Solver | YES |
 | Newton-Raphson Power Flow | Solver | YES |
-| Protection | Analysis | NO |
+| Protection Engine v1 | Domain (interpretation) | NO — consumes SC results read-only |
 | Proof Engine | Interpretation | NO |
 | Wizard | Application | NO |
 | SLD | Application | NO |
@@ -169,7 +169,18 @@ Before any implementation:
 5. Preserve all existing functionality (no regressions)
 6. Follow existing code patterns and conventions
 
-### 6.3 Proof Engine Rules (BINDING)
+### 6.3 Protection Rules (BINDING)
+
+1. Protection is AnalysisType `PROTECTION` — separate from SC in execution pipeline
+2. Protection READS SC results (read-only) — NEVER modifies solver or SC ResultSet v1
+3. Current source is EXPLICIT user selection (`TEST_POINTS` or `SC_RESULT`) — no auto-mapping
+4. Ambiguous mapping → deterministic error + FixAction candidates — no fallback
+5. Coordination pairs are EXPLICIT (upstream + downstream relay IDs) — no auto-detection
+6. Coordination produces numerical margins ONLY — no OK/FAIL verdicts
+7. All Protection results are deterministic (hash + permutation invariant)
+8. See [`docs/analysis/PROTECTION_CANONICAL_ARCHITECTURE.md`](docs/analysis/PROTECTION_CANONICAL_ARCHITECTURE.md)
+
+### 6.4 Proof Engine Rules (BINDING)
 
 1. Take definitions, JSON schemas, LaTeX equations LITERALLY
 2. Do NOT modify solvers or Result API

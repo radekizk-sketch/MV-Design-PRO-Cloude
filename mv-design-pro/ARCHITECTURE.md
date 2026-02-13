@@ -276,6 +276,9 @@ Key components:
 | Component | Location | Purpose |
 |-----------|----------|---------|
 | Protection Analysis | `application/analyses/protection/` | Overcurrent settings, coordination, selectivity |
+| Protection Engine v1 | `domain/protection_engine_v1.py` | ANSI 50/51, IEC IDMT curves (WHITE BOX) |
+| Protection Analysis Model | `domain/protection_analysis.py` | Evaluation, trace, summary (interpretation only) |
+| Protection → ResultSet | `application/result_mapping/protection_to_resultset_v1.py` | Mapper to canonical ResultSet |
 | Protection Library | `application/analyses/protection/catalog/` | Vendor curves (Elektrometal ETango), IDMT |
 | Voltage Analysis | `analysis/voltage/` | Voltage violations, profiles |
 | Power Flow Interpretation | `analysis/power_flow/` | PF result analysis |
@@ -489,6 +492,10 @@ UI contracts define presentation rules and are maintained separately from this a
 | Expert Modes | `docs/ui/EXPERT_MODES_CONTRACT.md` | Operator/Designer/Analyst/Auditor |
 | Global Context Bar | `docs/ui/GLOBAL_CONTEXT_BAR.md` | Sticky context bar |
 | Protection Curves | `docs/ui/PROTECTION_CURVES_IT_SUPERIOR_CONTRACT.md` | I-t curves |
+| Protection Architecture | `docs/analysis/PROTECTION_CANONICAL_ARCHITECTURE.md` | Canonical layer model |
+| Protection Contracts | `docs/analysis/PROTECTION_CONTRACTS.md` | Type definitions, API contracts |
+| Protection Dependency | `docs/analysis/PROTECTION_DEPENDENCY_GRAPH.md` | PR-27→PR-32 order + gating |
+| Protection Guards | `docs/analysis/PROTECTION_DETERMINISM_GUARDS.md` | Determinism invariants |
 | Protection Insight | `docs/ui/PROTECTION_INSIGHT_CONTRACT.md` | Selectivity explainer |
 | PDF Report | `docs/ui/PDF_REPORT_SUPERIOR_CONTRACT.md` | Report generation |
 | Voltage Profile | `docs/ui/VOLTAGE_PROFILE_BUS_CONTRACT.md` | Bus voltage profiles |
