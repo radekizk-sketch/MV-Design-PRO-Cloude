@@ -1,11 +1,16 @@
 #!/usr/bin/env python3
-"""ResultSetContractGuard — chroni kontrakty ResultSet v1 SC/Protection przed zmianami."""
+"""SolverBoundaryGuard — blokuje PR-y LF modyfikujące solvery SC/Protection.
+
+Sprawdza git diff i failuje jeśli dotknięte są chronione pliki solverów.
+"""
 import subprocess
 import sys
 
-PROTECTED_FILES = [
-    "backend/src/application/result_mapping/sc_to_resultset_v1.py",
-    "backend/src/application/result_mapping/protection_to_resultset_v1.py",
+WATCHED_PATHS = [
+    "backend/src/network_model/solvers/short_circuit_iec60909.py",
+    "backend/src/network_model/solvers/short_circuit_iec60909_internal.py",
+    "backend/src/network_model/solvers/short_circuit_contributions.py",
+    "backend/src/domain/protection_engine_v1.py",
 ]
 
 def get_changed_files() -> list[str]:
@@ -26,20 +31,20 @@ def main() -> int:
     changed = get_changed_files()
     violations = []
     for path in changed:
-        for protected in PROTECTED_FILES:
-            if path.endswith(protected) or protected in path:
+        for watched in WATCHED_PATHS:
+            if path.endswith(watched) or watched in path:
                 violations.append(path)
 
     if violations:
-        print("BŁĄD [ResultSetContractGuard]: Kontrakt ResultSet v1 został zmieniony.")
-        print("Pliki chronione (zamrożone):")
+        print("BŁĄD [SolverBoundaryGuard]: PR modyfikuje pliki solvera SC/Protection.")
+        print("Zmienione pliki chronione:")
         for v in sorted(set(violations)):
             print(f"  - {v}")
         print()
-        print("Kontrakt SC/Protection ResultSet v1 jest zamrożony i NIE MOŻE być modyfikowany.")
+        print("Load Flow PR NIE MOŻE modyfikować solverów zwarciowych ani zabezpieczeń.")
         return 1
 
-    print("OK [ResultSetContractGuard]: Kontrakty ResultSet v1 niezmienione.")
+    print("OK [SolverBoundaryGuard]: Brak zmian w chronionych plikach solverów.")
     return 0
 
 if __name__ == "__main__":
