@@ -257,6 +257,30 @@ class Generator(ENMElement):
     parameter_source: Literal["CATALOG", "OVERRIDE"] | None = None
     overrides: list[ParameterOverride] = []
 
+    # PV/BESS connection variant (KROK 2: explicit, no guessing)
+    connection_variant: Literal["nn_side", "block_transformer"] | None = None
+    """
+    Wariant przylaczenia PV/BESS:
+    - 'nn_side': po stronie nN stacji (przez transformator stacji SN/nN)
+    - 'block_transformer': przez transformator blokowy do SN
+    - None: brak informacji → FixAction generator.connection_variant_missing
+    Dotyczy TYLKO gen_type in ('pv_inverter', 'wind_inverter', 'bess').
+    Generatory synchroniczne nie wymagaja wariantu.
+    """
+
+    blocking_transformer_ref: str | None = None
+    """
+    Referencja do transformatora blokowego (ref_id).
+    Wymagana TYLKO gdy connection_variant == 'block_transformer'.
+    Brak przy wariancie 'block_transformer' → FixAction generator.block_transformer_missing.
+    """
+
+    station_ref: str | None = None
+    """
+    Referencja do stacji (ref_id substacji).
+    Wymagana dla wariantu 'nn_side' (wskazuje stacje SN/nN).
+    """
+
 
 # ---------------------------------------------------------------------------
 # Measurement (przekładnik CT/VT)

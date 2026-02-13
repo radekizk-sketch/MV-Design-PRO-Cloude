@@ -233,6 +233,20 @@ export interface Generator extends ENMElement {
   n_parallel?: number | null;
   parameter_source?: ParameterSource | null;
   overrides?: ParameterOverride[] | null;
+
+  /**
+   * Wariant przylaczenia PV/BESS:
+   * - 'nn_side': po stronie nN stacji (przez transformator stacji SN/nN)
+   * - 'block_transformer': przez transformator blokowy do SN
+   * - null: brak informacji → FixAction generator.connection_variant_missing
+   */
+  connection_variant?: 'nn_side' | 'block_transformer' | null;
+
+  /** Referencja do transformatora blokowego (ref_id). Wymagana przy 'block_transformer'. */
+  blocking_transformer_ref?: string | null;
+
+  /** Referencja do stacji (ref_id substacji). Wymagana przy 'nn_side'. */
+  station_ref?: string | null;
 }
 
 // ---------------------------------------------------------------------------
