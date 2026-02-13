@@ -133,3 +133,42 @@ export type {
   DeviceRequirementSetV1,
   FieldDeviceFixActionV1,
 } from './fieldDeviceContracts';
+
+// ElementRefV1 — Unified Element Identity Contract (SYSTEM-WIDE)
+export {
+  ElementTypeV1,
+  ElementScopeV1,
+  buildElementRefIndex,
+} from './elementRef';
+
+export type {
+  ElementRefV1,
+  CatalogRefV1 as ElementCatalogRefV1,
+} from './elementRef';
+
+// ReadinessProfileV1 — Per-analysis readiness with FixActions
+export {
+  ReadinessAreaV1,
+  ReadinessPriority,
+  groupIssuesByArea,
+  getBlockers,
+} from './readinessProfile';
+
+export type {
+  ReadinessIssueV1,
+  ReadinessProfileV1,
+} from './readinessProfile';
+
+// ResultJoinV1 — Bridge: Snapshot + ResultSet → SLD tokens + Inspector facts
+export {
+  OverlayTokenKindV1,
+  InspectorFactSourceV1,
+  joinResults,
+} from './resultJoin';
+
+export type {
+  SldOverlayTokenV1,
+  InspectorFactV1,
+  ResultJoinV1,
+  ElementResultInput,
+} from './resultJoin';
