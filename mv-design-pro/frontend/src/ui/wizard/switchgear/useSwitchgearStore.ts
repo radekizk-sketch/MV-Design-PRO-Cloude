@@ -28,7 +28,7 @@ import {
   mapConfigResponse,
   mapValidateConfigResponse,
 } from '../../sld/core/switchgearConfigApi';
-import { emptyConfig } from '../../sld/core/switchgearConfig';
+import type { SwitchgearConfigV1, SwitchgearConfigValidationResultV1 } from '../../sld/core/switchgearConfig';
 
 // ---------------------------------------------------------------------------
 // Screen enum
@@ -103,6 +103,10 @@ export interface SwitchgearStoreState {
   readonly configDirty: boolean;
   readonly geometryModified: boolean;
   setGeometryModified: (modified: boolean) => void;
+
+  // Canonical config loaded from backend (RUN #3I N3)
+  readonly lastLoadedConfig: SwitchgearConfigV1 | null;
+  readonly lastValidationIssues: SwitchgearConfigValidationResultV1 | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -125,6 +129,8 @@ const initialState = {
   configHash: null as string | null,
   configDirty: false,
   geometryModified: false,
+  lastLoadedConfig: null as SwitchgearConfigV1 | null,
+  lastValidationIssues: null as SwitchgearConfigValidationResultV1 | null,
 };
 
 export const useSwitchgearStore = create<SwitchgearStoreState>()((set) => ({
@@ -193,13 +199,14 @@ export const useSwitchgearStore = create<SwitchgearStoreState>()((set) => ({
   // Focus
   clearFocusTarget: () => set({ focusTarget: null }),
 
-  // Backend sync (RUN #3I)
+  // Backend sync (RUN #3I: source of truth = backend)
   loadFromBackend: async (stationId: string) => {
     set({ isLoading: true, errorMessage: null });
     try {
       const response = await fetchSwitchgearConfig(stationId);
-      const _config = mapConfigResponse(response);
+      const config = mapConfigResponse(response);
       set({
+        lastLoadedConfig: config,
         configHash: response.canonical_hash,
         configDirty: false,
         isLoading: false,
@@ -211,11 +218,17 @@ export const useSwitchgearStore = create<SwitchgearStoreState>()((set) => ({
   },
 
   saveToBackend: async (stationId: string) => {
+    const { lastLoadedConfig } = useSwitchgearStore.getState();
+    if (!lastLoadedConfig) {
+      set({ errorMessage: 'Brak konfiguracji do zapisu — najpierw wczytaj dane' });
+      return;
+    }
     set({ isLoading: true, errorMessage: null });
     try {
-      const config = emptyConfig(stationId);
-      const response = await saveSwitchgearConfig(stationId, config);
+      const response = await saveSwitchgearConfig(stationId, lastLoadedConfig);
+      const config = mapConfigResponse(response);
       set({
+        lastLoadedConfig: config,
         configHash: response.canonical_hash,
         configDirty: false,
         isLoading: false,
@@ -227,12 +240,19 @@ export const useSwitchgearStore = create<SwitchgearStoreState>()((set) => ({
   },
 
   validateWithBackend: async (stationId: string) => {
+    const { lastLoadedConfig } = useSwitchgearStore.getState();
+    if (!lastLoadedConfig) {
+      set({ errorMessage: 'Brak konfiguracji do walidacji — najpierw wczytaj dane' });
+      return;
+    }
     set({ isLoading: true, errorMessage: null });
     try {
-      const config = emptyConfig(stationId);
-      const response = await validateSwitchgearConfigApi(stationId, config);
-      const _result = mapValidateConfigResponse(response);
-      set({ isLoading: false });
+      const response = await validateSwitchgearConfigApi(stationId, lastLoadedConfig);
+      const result = mapValidateConfigResponse(response);
+      set({
+        lastValidationIssues: result,
+        isLoading: false,
+      });
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Blad walidacji konfiguracji';
       set({ errorMessage: msg, isLoading: false });

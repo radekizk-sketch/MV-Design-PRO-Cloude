@@ -462,6 +462,12 @@ export const SldToolbar: React.FC = () => {
               disabled={projectLoading || projectOverrides === null}
             />
           </div>
+          {/* RUN #3I N4: Blocker message from domain validation */}
+          {useSldProjectModeStore((s) => s.error) && (
+            <div className="text-xs text-red-600 font-medium ml-2 max-w-sm truncate" title={useSldProjectModeStore.getState().error ?? undefined}>
+              {useSldProjectModeStore((s) => s.error)}
+            </div>
+          )}
         </>
       )}
 

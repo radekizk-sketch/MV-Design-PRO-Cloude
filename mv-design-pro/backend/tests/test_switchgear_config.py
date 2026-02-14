@@ -609,8 +609,8 @@ class TestValidation:
         assert len(prot_issues) == 1
         assert prot_issues[0].device_id == "dev_relay"
 
-    def test_pv_bess_transformer_warning(self) -> None:
-        """PV_SN field without transformer -> PV_BESS_TRANSFORMER_MISSING (WARNING)."""
+    def test_pv_bess_transformer_blocker(self) -> None:
+        """PV_SN field without transformer -> PV_BESS_TRANSFORMER_MISSING (BLOCKER)."""
         config = SwitchgearConfigV1(
             station_id="s1",
             fields=(
@@ -670,14 +670,21 @@ class TestValidation:
             ),
         )
         result = validate_switchgear_config(config)
-        # Should be valid (no blockers) but have a WARNING
-        assert result.valid is True
+        # Should now be invalid (BLOCKER)
+        assert result.valid is False
         pv_issues = [
             i for i in result.issues
             if i.code == SwitchgearConfigValidationCode.PV_BESS_TRANSFORMER_MISSING
         ]
         assert len(pv_issues) == 1
-        assert pv_issues[0].severity == ConfigIssueSeverity.WARNING
+        assert pv_issues[0].severity == ConfigIssueSeverity.BLOCKER
+        # FixAction present
+        pv_fixes = [
+            fa for fa in result.fix_actions
+            if fa.code == SwitchgearConfigValidationCode.PV_BESS_TRANSFORMER_MISSING
+        ]
+        assert len(pv_fixes) == 1
+        assert pv_fixes[0].action == FixActionType.NAVIGATE_TO_WIZARD_FIELD
 
     def test_device_orphan(self) -> None:
         """Device referencing non-existent field -> DEVICE_ORPHAN."""

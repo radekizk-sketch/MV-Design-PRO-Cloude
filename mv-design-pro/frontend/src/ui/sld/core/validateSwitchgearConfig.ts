@@ -185,9 +185,17 @@ export function validateSwitchgearConfig(
       if (!hasTransformer) {
         issues.push({
           code: SwitchgearConfigValidationCode.PV_BESS_TRANSFORMER_MISSING,
-          severity: ConfigIssueSeverity.WARNING,
-          messagePl: `Pole ${f.fieldId} (${f.poleType}): generator PV/BESS wymaga transformatora (SN/nN lub blokowego)`,
+          severity: ConfigIssueSeverity.BLOCKER,
+          messagePl: `Pole ${f.fieldId} (${f.poleType}): zrodlo PV/BESS wymaga transformatora — brak transformatora w torze przylaczenia`,
           elementId: f.fieldId,
+          fieldId: f.fieldId,
+          deviceId: null,
+        });
+        fixActions.push({
+          code: SwitchgearConfigValidationCode.PV_BESS_TRANSFORMER_MISSING,
+          action: FixActionType.NAVIGATE_TO_WIZARD_FIELD,
+          messagePl: `Dodaj transformator do pola ${f.fieldId}`,
+          stationId: config.stationId,
           fieldId: f.fieldId,
           deviceId: null,
         });

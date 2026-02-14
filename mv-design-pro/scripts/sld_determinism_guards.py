@@ -2503,6 +2503,175 @@ def guard_golden_config_overrides_test_exists() -> List[str]:
 
 
 # =========================================================================
+# RUN #3I NAPRAWCZY GUARDS (N1–N6)
+# =========================================================================
+
+
+def guard_hash_sha256_in_fe() -> List[str]:
+    """GUARD 55: SwitchgearConfig hash algorithm must be SHA-256 in FE (no FNV-1a)."""
+    violations: List[str] = []
+
+    fe_file = FRONTEND_SRC / "ui" / "sld" / "core" / "switchgearConfig.ts"
+    if not fe_file.exists():
+        violations.append("BRAK switchgearConfig.ts")
+        return violations
+
+    content = fe_file.read_text(encoding="utf-8")
+    if "fnv1a" in content.lower():
+        violations.append("  switchgearConfig.ts zawiera FNV-1a — wymagany SHA-256")
+    if "sha256" not in content.lower() and "sha-256" not in content.lower():
+        violations.append("  switchgearConfig.ts brak SHA-256 hash implementation")
+
+    return violations
+
+
+def guard_hash_parity_test_exists() -> List[str]:
+    """GUARD 56: Hash parity test exists (FE fixture == BE fixture)."""
+    violations: List[str] = []
+
+    fe_test = FRONTEND_SRC / "ui" / "sld" / "core" / "__tests__" / "switchgearConfig.hashParity.test.ts"
+    if not fe_test.exists():
+        violations.append("BRAK switchgearConfig.hashParity.test.ts (FE)")
+
+    be_test = REPO_ROOT / "backend" / "tests" / "test_switchgear_config_hash_parity.py"
+    if not be_test.exists():
+        violations.append("BRAK test_switchgear_config_hash_parity.py (BE)")
+
+    # Shared fixture
+    fe_fixture = FRONTEND_SRC / "ui" / "sld" / "core" / "__tests__" / "fixtures" / "switchgear_config_fixture_01.json"
+    be_fixture = REPO_ROOT / "backend" / "tests" / "fixtures" / "switchgear_config_fixture_01.json"
+    if not fe_fixture.exists():
+        violations.append("BRAK FE fixture switchgear_config_fixture_01.json")
+    if not be_fixture.exists():
+        violations.append("BRAK BE fixture switchgear_config_fixture_01.json")
+
+    return violations
+
+
+def guard_pv_bess_blocker_severity() -> List[str]:
+    """GUARD 57: PV/BESS must be BLOCKER (not WARNING) in both BE and FE."""
+    violations: List[str] = []
+
+    # Backend
+    be_file = BACKEND_SRC / "domain" / "switchgear_config.py"
+    if be_file.exists():
+        content = be_file.read_text(encoding="utf-8")
+        # Find PV_BESS_TRANSFORMER_MISSING with BLOCKER
+        if "PV_BESS_TRANSFORMER_MISSING" in content:
+            # Check that the severity near this code is BLOCKER not WARNING
+            lines = content.split("\n")
+            for i, line in enumerate(lines):
+                if "PV_BESS_TRANSFORMER_MISSING" in line and "severity" in line:
+                    continue
+                if "PV_BESS_TRANSFORMER_MISSING" in line:
+                    # Look at nearby lines for severity
+                    block = "\n".join(lines[max(0, i - 2):i + 5])
+                    if "WARNING" in block and "BLOCKER" not in block:
+                        violations.append(
+                            f"  switchgear_config.py:{i + 1} PV_BESS_TRANSFORMER_MISSING uses WARNING not BLOCKER"
+                        )
+
+    # Frontend
+    fe_file = FRONTEND_SRC / "ui" / "sld" / "core" / "validateSwitchgearConfig.ts"
+    if fe_file.exists():
+        content = fe_file.read_text(encoding="utf-8")
+        lines = content.split("\n")
+        for i, line in enumerate(lines):
+            if "PV_BESS_TRANSFORMER_MISSING" in line:
+                block = "\n".join(lines[max(0, i - 2):i + 5])
+                if "WARNING" in block and "BLOCKER" not in block:
+                    violations.append(
+                        f"  validateSwitchgearConfig.ts:{i + 1} PV_BESS_TRANSFORMER_MISSING uses WARNING not BLOCKER"
+                    )
+
+    return violations
+
+
+def guard_pv_bess_transformer_ui_section() -> List[str]:
+    """GUARD 58: Wizard FieldEditScreen shows transformer-required section for PV/BESS."""
+    violations: List[str] = []
+
+    fe_file = FRONTEND_SRC / "ui" / "wizard" / "switchgear" / "FieldEditScreen.tsx"
+    if not fe_file.exists():
+        violations.append("BRAK FieldEditScreen.tsx")
+        return violations
+
+    content = fe_file.read_text(encoding="utf-8")
+    if "section-transformer-required" not in content:
+        violations.append("  FieldEditScreen.tsx brak sekcji 'section-transformer-required' dla PV/BESS")
+    if "PV_BESS_SN_ROLES" not in content:
+        violations.append("  FieldEditScreen.tsx brak importu PV_BESS_SN_ROLES")
+    if "Dodaj transformator" not in content:
+        violations.append("  FieldEditScreen.tsx brak przycisku 'Dodaj transformator'")
+
+    return violations
+
+
+def guard_wizard_store_saves_actual_config() -> List[str]:
+    """GUARD 59: Wizard store saveToBackend saves actual config (not emptyConfig)."""
+    violations: List[str] = []
+
+    store_file = FRONTEND_SRC / "ui" / "wizard" / "switchgear" / "useSwitchgearStore.ts"
+    if not store_file.exists():
+        violations.append("BRAK useSwitchgearStore.ts")
+        return violations
+
+    content = store_file.read_text(encoding="utf-8")
+
+    # Should NOT use emptyConfig in save/validate
+    lines = content.split("\n")
+    in_save_method = False
+    for i, line in enumerate(lines):
+        if "saveToBackend" in line and "async" in line:
+            in_save_method = True
+        if in_save_method and "emptyConfig" in line:
+            violations.append(f"  useSwitchgearStore.ts:{i + 1} saveToBackend uses emptyConfig — should use lastLoadedConfig")
+        if in_save_method and line.strip().startswith("},"):
+            in_save_method = False
+
+    # Must have lastLoadedConfig
+    if "lastLoadedConfig" not in content:
+        violations.append("  useSwitchgearStore.ts brak lastLoadedConfig — config nie jest przechowywany po zaladowaniu")
+
+    return violations
+
+
+def guard_overrides_domain_validation() -> List[str]:
+    """GUARD 60: CAD overrides save validates domain (no bypass)."""
+    violations: List[str] = []
+
+    store_file = FRONTEND_SRC / "ui" / "sld" / "sldProjectModeStore.ts"
+    if not store_file.exists():
+        violations.append("BRAK sldProjectModeStore.ts")
+        return violations
+
+    content = store_file.read_text(encoding="utf-8")
+    if "validateSwitchgearConfig" not in content:
+        violations.append("  sldProjectModeStore.ts brak walidacji domenowej (validateSwitchgearConfig) przed zapisem overrides")
+
+    return violations
+
+
+def guard_inspector_no_null_placeholder() -> List[str]:
+    """GUARD 61: Inspector has no TODO null placeholders in diagnostics."""
+    violations: List[str] = []
+
+    inspector_dir = FRONTEND_SRC / "ui" / "sld" / "inspector"
+    if not inspector_dir.exists():
+        return violations
+
+    for f in list(inspector_dir.glob("*.ts")) + list(inspector_dir.glob("*.tsx")):
+        content = f.read_text(encoding="utf-8")
+        lines = content.split("\n")
+        for i, line in enumerate(lines):
+            stripped = line.strip()
+            if "placeholder" in stripped.lower() and "null" in stripped.lower():
+                violations.append(f"  {f.name}:{i + 1} — placeholder null found: {stripped[:80]}")
+
+    return violations
+
+
+# =========================================================================
 # MAIN
 # =========================================================================
 
@@ -2562,6 +2731,13 @@ def main() -> int:
         ("GUARD 52: FixAction catalog picker exists (RUN #3I)", guard_fixaction_catalog_picker_exists()),
         ("GUARD 53: No TODO in wizard/inspector key files (RUN #3I)", guard_no_new_todo_in_key_files()),
         ("GUARD 54: Golden Config+Overrides E2E test (RUN #3I)", guard_golden_config_overrides_test_exists()),
+        ("GUARD 55: Hash SHA-256 in FE (no FNV-1a) (RUN #3I N1)", guard_hash_sha256_in_fe()),
+        ("GUARD 56: Hash parity test exists FE==BE (RUN #3I N1)", guard_hash_parity_test_exists()),
+        ("GUARD 57: PV/BESS severity=BLOCKER (RUN #3I N2)", guard_pv_bess_blocker_severity()),
+        ("GUARD 58: PV/BESS transformer UI section (RUN #3I N2)", guard_pv_bess_transformer_ui_section()),
+        ("GUARD 59: Wizard saves actual config (RUN #3I N3)", guard_wizard_store_saves_actual_config()),
+        ("GUARD 60: Overrides domain validation (RUN #3I N4)", guard_overrides_domain_validation()),
+        ("GUARD 61: Inspector no null placeholder (RUN #3I N5)", guard_inspector_no_null_placeholder()),
     ]
 
     total_violations = 0
