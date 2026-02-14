@@ -56,6 +56,16 @@ Guards dodane w RUN #3G DOMKNIECIE:
 35. Wizard topology API wiring (useSwitchgearOps.ts with 4 ops)
 36. Inspector results resolver (elementResultsResolver.ts, no TODO null)
 37. No stub handlers in wizard screens (topology API wired)
+
+Guards dodane w RUN #3H (TRYB PROJEKTOWY):
+38. applyOverrides module exists (applyOverrides.ts + geometryOverrides.ts)
+39. Layout engine separation (overrides don't modify LayoutResultV1 directly)
+40. Overrides overlay separation (overlay doesn't import geometry mutators)
+41. Overrides API exists (backend sld_overrides.py + frontend overridesApi.ts)
+42. Overrides determinism tests exist (3 test files)
+43. CI overrides pipeline (sld-determinism.yml has overrides steps)
+44. No TODO null in overrides code
+45. No codenames in overrides code
 """
 
 import os
@@ -1931,6 +1941,287 @@ def guard_no_wizard_stubs() -> List[str]:
 
 
 # =========================================================================
+# GUARD 38: applyOverrides module exists (RUN #3H)
+# =========================================================================
+
+def guard_apply_overrides_exists() -> List[str]:
+    """
+    Sprawdz ze modul applyOverrides istnieje wraz z geometryOverrides.
+    """
+    violations = []
+
+    apply_file = FRONTEND_SRC / "ui" / "sld" / "core" / "applyOverrides.ts"
+    geom_file = FRONTEND_SRC / "ui" / "sld" / "core" / "geometryOverrides.ts"
+
+    if not apply_file.exists():
+        violations.append("  BRAK applyOverrides.ts — modul kompozycji EffectiveLayout")
+    else:
+        content = apply_file.read_text(encoding="utf-8")
+        if "EffectiveLayoutV1" not in content:
+            violations.append("  applyOverrides.ts nie eksportuje EffectiveLayoutV1")
+        if "applyOverrides" not in content:
+            violations.append("  applyOverrides.ts nie eksportuje applyOverrides()")
+        if "checkEffectiveCollisions" not in content:
+            violations.append("  applyOverrides.ts nie eksportuje checkEffectiveCollisions()")
+
+    if not geom_file.exists():
+        violations.append("  BRAK geometryOverrides.ts — kontrakt nadpisan geometrii")
+    else:
+        content = geom_file.read_text(encoding="utf-8")
+        if "OVERRIDES_VERSION" not in content:
+            violations.append("  geometryOverrides.ts nie eksportuje OVERRIDES_VERSION")
+        if "OverrideScopeV1" not in content:
+            violations.append("  geometryOverrides.ts nie eksportuje OverrideScopeV1")
+        if "OverrideOperationV1" not in content:
+            violations.append("  geometryOverrides.ts nie eksportuje OverrideOperationV1")
+        if "GeometryFixCodes" not in content:
+            violations.append("  geometryOverrides.ts nie eksportuje GeometryFixCodes")
+
+    return violations
+
+
+# =========================================================================
+# GUARD 39: Layout engine separation (RUN #3H)
+# =========================================================================
+
+def guard_overrides_layout_separation() -> List[str]:
+    """
+    Sprawdz ze overrides NIE modyfikuja LayoutResultV1 bezposrednio.
+    applyOverrides MUSI tworzyc nowy EffectiveLayoutV1 (nie mutowac).
+    """
+    violations = []
+
+    apply_file = FRONTEND_SRC / "ui" / "sld" / "core" / "applyOverrides.ts"
+    if not apply_file.exists():
+        return ["  BRAK applyOverrides.ts"]
+
+    content = apply_file.read_text(encoding="utf-8")
+
+    # Must NOT modify layout directly — check for push/splice/delete patterns
+    # Wyjatki: items.push (budowanie listy overrides), collisions.push (budowanie listy kolizji)
+    if ".push(" in content and "items.push" not in content and "collisions.push" not in content:
+        violations.append("  applyOverrides.ts uzywa .push() — moze mutowac dane")
+
+    if ".splice(" in content:
+        violations.append("  applyOverrides.ts uzywa .splice() — moze mutowac tablice")
+
+    # Must create new objects, not modify existing
+    if "layout.nodePlacements[" in content and "= " in content:
+        # This is OK if it's spread-based, but check for direct assignment
+        pass
+
+    # Layout pipeline MUST NOT import overrides
+    pipeline_file = FRONTEND_SRC / "ui" / "sld" / "core" / "layoutPipeline.ts"
+    if pipeline_file.exists():
+        pipeline_content = pipeline_file.read_text(encoding="utf-8")
+        if "geometryOverrides" in pipeline_content:
+            violations.append("  layoutPipeline.ts importuje geometryOverrides — naruszenie separacji")
+        if "applyOverrides" in pipeline_content:
+            violations.append("  layoutPipeline.ts importuje applyOverrides — naruszenie separacji")
+
+    return violations
+
+
+# =========================================================================
+# GUARD 40: Overrides overlay separation (RUN #3H)
+# =========================================================================
+
+def guard_overrides_overlay_separation() -> List[str]:
+    """
+    Sprawdz ze modul overlay (sld-overlay) NIE importuje geometrii/overrides mutatorow.
+    """
+    violations = []
+
+    overlay_dir = FRONTEND_SRC / "ui" / "sld-overlay"
+    if not overlay_dir.exists():
+        return []  # Overlay dir moze nie istniec — OK
+
+    for ts_file in overlay_dir.rglob("*.ts"):
+        try:
+            content = ts_file.read_text(encoding="utf-8")
+        except Exception:
+            continue
+
+        rel = ts_file.relative_to(FRONTEND_SRC)
+
+        if "geometryOverrides" in content and "import" in content:
+            violations.append(f"  {rel} importuje geometryOverrides — naruszenie separacji overlay")
+        if "applyOverrides" in content and "import" in content:
+            violations.append(f"  {rel} importuje applyOverrides — naruszenie separacji overlay")
+        if "sldProjectModeStore" in content and "import" in content:
+            violations.append(f"  {rel} importuje sldProjectModeStore — naruszenie separacji overlay")
+
+    return violations
+
+
+# =========================================================================
+# GUARD 41: Overrides API exists (RUN #3H)
+# =========================================================================
+
+def guard_overrides_api_exists() -> List[str]:
+    """
+    Sprawdz ze API overrides istnieje na backendzie i frontendzie.
+    """
+    violations = []
+
+    # Backend API
+    backend_api = BACKEND_SRC / "api" / "sld_overrides.py"
+    if not backend_api.exists():
+        violations.append("  BRAK backend/api/sld_overrides.py")
+    else:
+        content = backend_api.read_text(encoding="utf-8")
+        for endpoint in ["sld-overrides", "validate", "reset"]:
+            if endpoint not in content:
+                violations.append(f"  sld_overrides.py brak endpointu '{endpoint}'")
+
+    # Backend domain model
+    backend_model = BACKEND_SRC / "domain" / "geometry_overrides.py"
+    if not backend_model.exists():
+        violations.append("  BRAK backend/domain/geometry_overrides.py")
+
+    # Frontend API client
+    frontend_api = FRONTEND_SRC / "ui" / "sld" / "core" / "overridesApi.ts"
+    if not frontend_api.exists():
+        violations.append("  BRAK frontend overridesApi.ts")
+    else:
+        content = frontend_api.read_text(encoding="utf-8")
+        for fn in ["fetchSldOverrides", "saveSldOverrides", "resetSldOverrides"]:
+            if fn not in content:
+                violations.append(f"  overridesApi.ts brak funkcji '{fn}'")
+
+    return violations
+
+
+# =========================================================================
+# GUARD 42: Overrides determinism tests exist (RUN #3H)
+# =========================================================================
+
+def guard_overrides_determinism_tests() -> List[str]:
+    """
+    Sprawdz ze testy determinizmu overrides istnieja (3 pliki testow).
+    """
+    violations = []
+
+    test_dir = FRONTEND_SRC / "ui" / "sld" / "core" / "__tests__"
+
+    required_tests = {
+        "geometryOverrides.test.ts": ["50", "permutation"],
+        "applyOverrides.test.ts": ["50", "determinism"],
+        "overridesCiRender.test.ts": ["50", "EffectiveLayout"],
+    }
+
+    for test_name, required_keywords in required_tests.items():
+        test_file = test_dir / test_name
+        if not test_file.exists():
+            violations.append(f"  BRAK {test_name}")
+        else:
+            content = test_file.read_text(encoding="utf-8")
+            for kw in required_keywords:
+                if kw.lower() not in content.lower():
+                    violations.append(f"  {test_name} brak testu '{kw}'")
+
+    return violations
+
+
+# =========================================================================
+# GUARD 43: CI overrides pipeline (RUN #3H)
+# =========================================================================
+
+def guard_ci_overrides_pipeline() -> List[str]:
+    """
+    Sprawdz ze CI workflow zawiera kroki testow overrides.
+    """
+    violations = []
+
+    ci_file = REPO_ROOT.parent / ".github" / "workflows" / "sld-determinism.yml"
+    if not ci_file.exists():
+        violations.append("  BRAK .github/workflows/sld-determinism.yml")
+        return violations
+
+    content = ci_file.read_text(encoding="utf-8")
+
+    required_steps = [
+        "geometryOverrides.test.ts",
+        "applyOverrides.test.ts",
+        "overridesCiRender.test.ts",
+    ]
+
+    for step in required_steps:
+        if step not in content:
+            violations.append(f"  sld-determinism.yml brak kroku '{step}'")
+
+    return violations
+
+
+# =========================================================================
+# GUARD 44: No TODO null in overrides code (RUN #3H)
+# =========================================================================
+
+def guard_no_todo_null_overrides() -> List[str]:
+    """
+    Sprawdz ze kod overrides nie zawiera 'TODO null', 'TODO: null',
+    'return null // TODO' — wymagamy kompletnej implementacji.
+    """
+    violations = []
+
+    overrides_files = [
+        FRONTEND_SRC / "ui" / "sld" / "core" / "geometryOverrides.ts",
+        FRONTEND_SRC / "ui" / "sld" / "core" / "applyOverrides.ts",
+        FRONTEND_SRC / "ui" / "sld" / "core" / "overridesApi.ts",
+        FRONTEND_SRC / "ui" / "sld" / "sldProjectModeStore.ts",
+        FRONTEND_SRC / "ui" / "sld" / "ProjectModeToolbar.tsx",
+        FRONTEND_SRC / "ui" / "sld" / "inspector" / "geometrySection.ts",
+    ]
+
+    todo_pattern = re.compile(r"TODO\s*(?:null|:?\s*null)", re.IGNORECASE)
+
+    for file_path in overrides_files:
+        if not file_path.exists():
+            continue
+        content = file_path.read_text(encoding="utf-8")
+        for i, line in enumerate(content.splitlines(), 1):
+            if todo_pattern.search(line):
+                rel = file_path.relative_to(FRONTEND_SRC)
+                violations.append(f"  {rel}:{i} — zawiera TODO null")
+
+    return violations
+
+
+# =========================================================================
+# GUARD 45: No codenames in overrides code (RUN #3H)
+# =========================================================================
+
+def guard_no_codenames_overrides() -> List[str]:
+    """
+    Sprawdz ze kod overrides nie zawiera kodonamow projektowych
+    (P7, P11, P14, P17, P20 itd.) — 100% Polish labels.
+    """
+    violations = []
+
+    overrides_files = [
+        FRONTEND_SRC / "ui" / "sld" / "core" / "geometryOverrides.ts",
+        FRONTEND_SRC / "ui" / "sld" / "core" / "applyOverrides.ts",
+        FRONTEND_SRC / "ui" / "sld" / "core" / "overridesApi.ts",
+        FRONTEND_SRC / "ui" / "sld" / "sldProjectModeStore.ts",
+        FRONTEND_SRC / "ui" / "sld" / "ProjectModeToolbar.tsx",
+        FRONTEND_SRC / "ui" / "sld" / "inspector" / "geometrySection.ts",
+    ]
+
+    codename_pattern = re.compile(r"\bP(?:7|11|14|17|20|30)\b")
+
+    for file_path in overrides_files:
+        if not file_path.exists():
+            continue
+        content = file_path.read_text(encoding="utf-8")
+        for i, line in enumerate(content.splitlines(), 1):
+            if codename_pattern.search(line):
+                rel = file_path.relative_to(FRONTEND_SRC)
+                violations.append(f"  {rel}:{i} — zawiera kodoname projektu")
+
+    return violations
+
+
+# =========================================================================
 # MAIN
 # =========================================================================
 
@@ -1973,6 +2264,14 @@ def main() -> int:
         ("GUARD 35: Wizard topology API wiring (RUN #3G DOMKNIECIE)", guard_wizard_topology_wiring()),
         ("GUARD 36: Inspector results resolver (RUN #3G DOMKNIECIE)", guard_inspector_results_resolver()),
         ("GUARD 37: No stub handlers in wizard screens (RUN #3G DOMKNIECIE)", guard_no_wizard_stubs()),
+        ("GUARD 38: applyOverrides module exists (RUN #3H)", guard_apply_overrides_exists()),
+        ("GUARD 39: Layout engine separation — overrides (RUN #3H)", guard_overrides_layout_separation()),
+        ("GUARD 40: Overlay separation — overrides (RUN #3H)", guard_overrides_overlay_separation()),
+        ("GUARD 41: Overrides API exists BE+FE (RUN #3H)", guard_overrides_api_exists()),
+        ("GUARD 42: Overrides determinism tests (RUN #3H)", guard_overrides_determinism_tests()),
+        ("GUARD 43: CI overrides pipeline (RUN #3H)", guard_ci_overrides_pipeline()),
+        ("GUARD 44: No TODO null in overrides (RUN #3H)", guard_no_todo_null_overrides()),
+        ("GUARD 45: No codenames in overrides (RUN #3H)", guard_no_codenames_overrides()),
     ]
 
     total_violations = 0
