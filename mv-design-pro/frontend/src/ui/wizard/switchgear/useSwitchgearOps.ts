@@ -176,11 +176,23 @@ export function useSwitchgearOps(caseId: string | null) {
     [runOp],
   );
 
+  // ---------------------------------------------------------------------------
+  // Config backend sync (RUN #3I)
+  // ---------------------------------------------------------------------------
+
+  const loadConfig = useSwitchgearStore((s) => s.loadFromBackend);
+  const saveConfig = useSwitchgearStore((s) => s.saveToBackend);
+  const validateConfig = useSwitchgearStore((s) => s.validateWithBackend);
+
   return {
     addField,
     addDevice,
     removeDevice,
     assignCatalog,
+    /** Config backend operations (RUN #3I) */
+    loadConfig,
+    saveConfig,
+    validateConfig,
     /** Whether any operation is currently running */
     isReady: caseId !== null,
   } as const;

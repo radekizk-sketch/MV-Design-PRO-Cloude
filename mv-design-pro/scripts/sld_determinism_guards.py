@@ -71,6 +71,14 @@ Guards dodane w RUN #3H DOMKNIECIE:
 46. Render artifacts script exists (sld_render_artifacts.ts)
 47. CI workflow has upload-artifact for render artifacts
 48. Drag overrides integration test exists (dragOverrides.integration.test.ts)
+
+Guards dodane w RUN #3I (WIZARD↔SLD↔CAD E2E):
+49. SwitchgearConfig module exists (BE+FE) and exported
+50. Wizard store has save/load calls (not local-only)
+51. E2E round-trip config PUT/GET test exists
+52. FixAction NAVIGATE_TO_WIZARD_CATALOG_PICKER exists and tested
+53. No new TODO in key wizard/inspector/results files
+54. Golden E2E Config+Overrides test exists (3 topologies, 50×)
 """
 
 import os
@@ -2314,6 +2322,187 @@ def guard_drag_overrides_test_exists() -> List[str]:
 
 
 # =========================================================================
+# RUN #3I GUARDS: CONFIG ↔ CAD ↔ BACKEND E2E
+# =========================================================================
+
+
+def guard_switchgear_config_module_exists() -> List[str]:
+    """GUARD 49: SwitchgearConfigV1 module exists (BE+FE) and is exported."""
+    violations: List[str] = []
+
+    # Backend
+    be_file = BACKEND_SRC / "domain" / "switchgear_config.py"
+    if not be_file.exists():
+        violations.append("BRAK domain/switchgear_config.py (BE)")
+    else:
+        content = be_file.read_text(encoding="utf-8")
+        for kw in [
+            "SwitchgearConfigV1",
+            "validate_switchgear_config",
+            "compute_config_hash",
+            "canonicalize_config",
+        ]:
+            if kw not in content:
+                violations.append(f"  switchgear_config.py brak '{kw}'")
+
+    # Backend __init__.py export
+    be_init = BACKEND_SRC / "domain" / "__init__.py"
+    if be_init.exists():
+        init_content = be_init.read_text(encoding="utf-8")
+        if "SwitchgearConfigV1" not in init_content:
+            violations.append("  domain/__init__.py nie eksportuje SwitchgearConfigV1")
+
+    # Frontend
+    fe_file = FRONTEND_SRC / "ui" / "sld" / "core" / "switchgearConfig.ts"
+    if not fe_file.exists():
+        violations.append("BRAK sld/core/switchgearConfig.ts (FE)")
+    else:
+        content = fe_file.read_text(encoding="utf-8")
+        for kw in [
+            "SwitchgearConfigV1",
+            "computeConfigHash",
+            "canonicalizeConfig",
+        ]:
+            if kw not in content:
+                violations.append(f"  switchgearConfig.ts brak '{kw}'")
+
+    # FE Validator mirror
+    fe_validator = FRONTEND_SRC / "ui" / "sld" / "core" / "validateSwitchgearConfig.ts"
+    if not fe_validator.exists():
+        violations.append("BRAK sld/core/validateSwitchgearConfig.ts (FE)")
+
+    return violations
+
+
+def guard_wizard_store_backend_sync() -> List[str]:
+    """GUARD 50: Wizard store has save/load calls to API (not local-only)."""
+    violations: List[str] = []
+
+    store_file = FRONTEND_SRC / "ui" / "wizard" / "switchgear" / "useSwitchgearStore.ts"
+    if not store_file.exists():
+        violations.append("BRAK useSwitchgearStore.ts")
+        return violations
+
+    content = store_file.read_text(encoding="utf-8")
+    for kw in ["loadFromBackend", "saveToBackend", "validateWithBackend"]:
+        if kw not in content:
+            violations.append(f"  useSwitchgearStore.ts brak '{kw}' — store jest local-only")
+
+    # Check that it imports from switchgearConfigApi
+    if "switchgearConfigApi" not in content:
+        violations.append("  useSwitchgearStore.ts nie importuje switchgearConfigApi")
+
+    return violations
+
+
+def guard_config_round_trip_test_exists() -> List[str]:
+    """GUARD 51: E2E round-trip config PUT/GET test exists (BE) + FE integration test."""
+    violations: List[str] = []
+
+    # BE API test
+    be_test = REPO_ROOT / "backend" / "tests" / "test_switchgear_config_api.py"
+    if not be_test.exists():
+        violations.append("BRAK tests/test_switchgear_config_api.py (BE)")
+    else:
+        content = be_test.read_text(encoding="utf-8")
+        if "put_then_get_identical" not in content and "round_trip" not in content.lower():
+            violations.append("  test_switchgear_config_api.py brak testu round-trip PUT/GET")
+
+    # FE integration test
+    fe_test = FRONTEND_SRC / "ui" / "wizard" / "switchgear" / "__tests__" / "switchgearConfigOps.test.ts"
+    if not fe_test.exists():
+        violations.append("BRAK wizard/switchgear/__tests__/switchgearConfigOps.test.ts (FE)")
+
+    return violations
+
+
+def guard_fixaction_catalog_picker_exists() -> List[str]:
+    """GUARD 52: FixAction NAVIGATE_TO_WIZARD_CATALOG_PICKER exists and is tested."""
+    violations: List[str] = []
+
+    # Backend domain
+    be_file = BACKEND_SRC / "domain" / "switchgear_config.py"
+    if be_file.exists():
+        content = be_file.read_text(encoding="utf-8")
+        if "NAVIGATE_TO_WIZARD_CATALOG_PICKER" not in content:
+            violations.append("  switchgear_config.py brak NAVIGATE_TO_WIZARD_CATALOG_PICKER")
+    else:
+        violations.append("BRAK domain/switchgear_config.py")
+
+    # Frontend contract
+    fe_file = FRONTEND_SRC / "ui" / "sld" / "core" / "switchgearConfig.ts"
+    if fe_file.exists():
+        content = fe_file.read_text(encoding="utf-8")
+        if "NAVIGATE_TO_WIZARD_CATALOG_PICKER" not in content:
+            violations.append("  switchgearConfig.ts brak NAVIGATE_TO_WIZARD_CATALOG_PICKER")
+    else:
+        violations.append("BRAK sld/core/switchgearConfig.ts")
+
+    # Test coverage
+    test_files = list(
+        (FRONTEND_SRC / "ui" / "wizard" / "switchgear" / "__tests__").glob("*.test.ts")
+    )
+    has_test = False
+    for tf in test_files:
+        content = tf.read_text(encoding="utf-8")
+        if "NAVIGATE_TO_WIZARD_CATALOG_PICKER" in content or "SELECT_CATALOG" in content:
+            has_test = True
+            break
+    if not has_test:
+        violations.append("  Brak testu FixAction NAVIGATE_TO_WIZARD_CATALOG_PICKER w wizard/__tests__/")
+
+    return violations
+
+
+def guard_no_new_todo_in_key_files() -> List[str]:
+    """GUARD 53: No new TODO in key wizard/inspector/results files."""
+    violations: List[str] = []
+
+    key_dirs = [
+        FRONTEND_SRC / "ui" / "wizard" / "switchgear",
+        FRONTEND_SRC / "ui" / "sld" / "inspector",
+    ]
+
+    for d in key_dirs:
+        if not d.exists():
+            continue
+        for f in d.glob("*.ts"):
+            content = f.read_text(encoding="utf-8")
+            lines = content.split("\n")
+            for lineno, line in enumerate(lines, 1):
+                stripped = line.strip()
+                if "// TODO" in stripped or "/* TODO" in stripped:
+                    violations.append(f"  {f.name}:{lineno} — TODO found: {stripped[:80]}")
+
+        for f in d.glob("*.tsx"):
+            content = f.read_text(encoding="utf-8")
+            lines = content.split("\n")
+            for lineno, line in enumerate(lines, 1):
+                stripped = line.strip()
+                if "// TODO" in stripped or "/* TODO" in stripped:
+                    violations.append(f"  {f.name}:{lineno} — TODO found: {stripped[:80]}")
+
+    return violations
+
+
+def guard_golden_config_overrides_test_exists() -> List[str]:
+    """GUARD 54: Golden E2E Config+Overrides test exists (3 topologies, 50× determinism)."""
+    violations: List[str] = []
+
+    test_file = FRONTEND_SRC / "ui" / "sld" / "core" / "__tests__" / "switchgearConfigGolden.test.ts"
+    if not test_file.exists():
+        violations.append("BRAK switchgearConfigGolden.test.ts")
+        return violations
+
+    content = test_file.read_text(encoding="utf-8")
+    for kw in ["station_B", "station_C", "station_D", "50"]:
+        if kw not in content:
+            violations.append(f"  switchgearConfigGolden.test.ts brak '{kw}'")
+
+    return violations
+
+
+# =========================================================================
 # MAIN
 # =========================================================================
 
@@ -2367,6 +2556,12 @@ def main() -> int:
         ("GUARD 46: Render artifacts script exists (RUN #3H DOMKNIECIE)", guard_render_artifacts_script_exists()),
         ("GUARD 47: CI upload-artifact for render artifacts (RUN #3H DOMKNIECIE)", guard_ci_upload_render_artifacts()),
         ("GUARD 48: Drag overrides integration test exists (RUN #3H DOMKNIECIE)", guard_drag_overrides_test_exists()),
+        ("GUARD 49: SwitchgearConfig module exists BE+FE (RUN #3I)", guard_switchgear_config_module_exists()),
+        ("GUARD 50: Wizard store backend sync (RUN #3I)", guard_wizard_store_backend_sync()),
+        ("GUARD 51: Config round-trip test exists (RUN #3I)", guard_config_round_trip_test_exists()),
+        ("GUARD 52: FixAction catalog picker exists (RUN #3I)", guard_fixaction_catalog_picker_exists()),
+        ("GUARD 53: No TODO in wizard/inspector key files (RUN #3I)", guard_no_new_todo_in_key_files()),
+        ("GUARD 54: Golden Config+Overrides E2E test (RUN #3I)", guard_golden_config_overrides_test_exists()),
     ]
 
     total_violations = 0

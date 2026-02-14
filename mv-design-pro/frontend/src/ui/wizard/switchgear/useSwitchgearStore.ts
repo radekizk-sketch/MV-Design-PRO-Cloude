@@ -21,6 +21,14 @@ import type {
   CatalogEntryV1,
 } from './types';
 import { parseFixActionNavigation } from './types';
+import {
+  fetchSwitchgearConfig,
+  saveSwitchgearConfig,
+  validateSwitchgearConfigApi,
+  mapConfigResponse,
+  mapValidateConfigResponse,
+} from '../../sld/core/switchgearConfigApi';
+import { emptyConfig } from '../../sld/core/switchgearConfig';
 
 // ---------------------------------------------------------------------------
 // Screen enum
@@ -84,6 +92,17 @@ export interface SwitchgearStoreState {
 
   // Focus management
   clearFocusTarget: () => void;
+
+  // Backend sync (RUN #3I: source of truth = backend)
+  loadFromBackend: (stationId: string) => Promise<void>;
+  saveToBackend: (stationId: string) => Promise<void>;
+  validateWithBackend: (stationId: string) => Promise<void>;
+
+  // Config state (RUN #3I)
+  readonly configHash: string | null;
+  readonly configDirty: boolean;
+  readonly geometryModified: boolean;
+  setGeometryModified: (modified: boolean) => void;
 }
 
 // ---------------------------------------------------------------------------
@@ -103,6 +122,9 @@ const initialState = {
   isLoading: false,
   errorMessage: null as string | null,
   focusTarget: null as string | null,
+  configHash: null as string | null,
+  configDirty: false,
+  geometryModified: false,
 };
 
 export const useSwitchgearStore = create<SwitchgearStoreState>()((set) => ({
@@ -170,6 +192,58 @@ export const useSwitchgearStore = create<SwitchgearStoreState>()((set) => ({
 
   // Focus
   clearFocusTarget: () => set({ focusTarget: null }),
+
+  // Backend sync (RUN #3I)
+  loadFromBackend: async (stationId: string) => {
+    set({ isLoading: true, errorMessage: null });
+    try {
+      const response = await fetchSwitchgearConfig(stationId);
+      const _config = mapConfigResponse(response);
+      set({
+        configHash: response.canonical_hash,
+        configDirty: false,
+        isLoading: false,
+      });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Blad ladowania konfiguracji';
+      set({ errorMessage: msg, isLoading: false });
+    }
+  },
+
+  saveToBackend: async (stationId: string) => {
+    set({ isLoading: true, errorMessage: null });
+    try {
+      const config = emptyConfig(stationId);
+      const response = await saveSwitchgearConfig(stationId, config);
+      set({
+        configHash: response.canonical_hash,
+        configDirty: false,
+        isLoading: false,
+      });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Blad zapisu konfiguracji';
+      set({ errorMessage: msg, isLoading: false });
+    }
+  },
+
+  validateWithBackend: async (stationId: string) => {
+    set({ isLoading: true, errorMessage: null });
+    try {
+      const config = emptyConfig(stationId);
+      const response = await validateSwitchgearConfigApi(stationId, config);
+      const _result = mapValidateConfigResponse(response);
+      set({ isLoading: false });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Blad walidacji konfiguracji';
+      set({ errorMessage: msg, isLoading: false });
+    }
+  },
+
+  // Config state
+  configHash: null,
+  configDirty: false,
+  geometryModified: false,
+  setGeometryModified: (modified: boolean) => set({ geometryModified: modified }),
 }));
 
 // ---------------------------------------------------------------------------

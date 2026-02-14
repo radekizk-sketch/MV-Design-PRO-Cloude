@@ -41,6 +41,16 @@ import type {
   InspectorPropertyField,
 } from './types';
 
+import type {
+  SwitchgearConfigValidationResultV1,
+  ConfigValidationIssueV1,
+} from '../core/switchgearConfig';
+import { ConfigIssueSeverity } from '../core/switchgearConfig';
+
+import type {
+  GeometryOverrideItemV1,
+} from '../core/geometryOverrides';
+
 // ---------------------------------------------------------------------------
 // Polish labels for positions/roles
 // ---------------------------------------------------------------------------
@@ -420,6 +430,90 @@ export interface FieldDeviceResultDataV1 {
   readonly rated_current_a: number | null;
   /** Breaking capacity adequate */
   readonly breaking_capacity_ok: boolean | null;
+}
+
+// ---------------------------------------------------------------------------
+// Geometry section builder (RUN #3I COMMIT 5)
+// ---------------------------------------------------------------------------
+
+/**
+ * Build geometry overrides section for an element.
+ * Shows override data (dx, dy, label position) if present.
+ */
+export function buildGeometrySection(
+  elementId: string,
+  overrides: readonly GeometryOverrideItemV1[],
+): InspectorPropertySection {
+  const elementOverrides = overrides.filter(o => o.elementId === elementId);
+
+  if (elementOverrides.length === 0) {
+    return {
+      id: 'element_geometry',
+      label: 'Geometria',
+      fields: [{ key: 'no_overrides', label: 'Nadpisania geometrii', value: 'Brak (układ domyślny)' }],
+    };
+  }
+
+  const fields: InspectorPropertyField[] = elementOverrides
+    .sort((a, b) => a.scope.localeCompare(b.scope))
+    .map((o, idx) => ({
+      key: `override_${idx}`,
+      label: `${o.scope} / ${o.operation}`,
+      value: JSON.stringify(o.payload),
+      source: 'instance' as const,
+    }));
+
+  return {
+    id: 'element_geometry',
+    label: `Geometria (${elementOverrides.length} nadpisań)`,
+    fields,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Validation section builder (RUN #3I COMMIT 5)
+// ---------------------------------------------------------------------------
+
+/**
+ * Build validation issues section for an element.
+ * Shows config validation issues and readiness status.
+ */
+export function buildValidationSection(
+  elementId: string,
+  validationResult: SwitchgearConfigValidationResultV1 | null,
+): InspectorPropertySection {
+  if (!validationResult) {
+    return {
+      id: 'element_validation',
+      label: 'Walidacje',
+      fields: [{ key: 'no_validation', label: 'Stan', value: 'Brak wyników walidacji — uruchom walidację' }],
+    };
+  }
+
+  const elementIssues = validationResult.issues.filter(
+    i => i.elementId === elementId || i.fieldId === elementId || i.deviceId === elementId,
+  );
+
+  if (elementIssues.length === 0) {
+    return {
+      id: 'element_validation',
+      label: 'Walidacje',
+      fields: [{ key: 'valid', label: 'Stan', value: 'OK — brak problemów' }],
+    };
+  }
+
+  const fields: InspectorPropertyField[] = elementIssues.map((issue, idx) => ({
+    key: `issue_${idx}`,
+    label: issue.code,
+    value: issue.messagePl,
+    highlight: issue.severity === ConfigIssueSeverity.BLOCKER ? 'error' as const : 'warning' as const,
+  }));
+
+  return {
+    id: 'element_validation',
+    label: `Walidacje (${elementIssues.length} problemów)`,
+    fields,
+  };
 }
 
 /**

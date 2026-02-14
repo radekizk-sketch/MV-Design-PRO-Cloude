@@ -308,6 +308,20 @@ export type {
 // SwitchgearConfig Validator — FE mirror (RUN #3I §2)
 export { validateSwitchgearConfig } from './validateSwitchgearConfig';
 
+// SwitchgearConfig API Client (RUN #3I §2)
+export {
+  fetchSwitchgearConfig,
+  saveSwitchgearConfig,
+  validateSwitchgearConfigApi,
+  mapConfigResponse,
+  mapValidateConfigResponse,
+} from './switchgearConfigApi';
+
+export type {
+  ConfigApiResponse,
+  ValidateConfigApiResponse,
+} from './switchgearConfigApi';
+
 // Overrides API Client (RUN #3H §3)
 export {
   fetchSldOverrides,

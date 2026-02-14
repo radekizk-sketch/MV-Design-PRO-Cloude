@@ -86,6 +86,22 @@ jobs:
         working-directory: mv-design-pro/frontend
         run: npx vitest run src/ui/sld/core/__tests__/dragOverrides.integration.test.ts --reporter=verbose
 
+      - name: Run SwitchgearConfig contract tests (RUN #3I)
+        working-directory: mv-design-pro/frontend
+        run: npx vitest run src/ui/sld/core/__tests__/switchgearConfig.test.ts --reporter=verbose
+
+      - name: Run SwitchgearConfig golden E2E tests (RUN #3I)
+        working-directory: mv-design-pro/frontend
+        run: npx vitest run src/ui/sld/core/__tests__/switchgearConfigGolden.test.ts --reporter=verbose
+
+      - name: Run Wizard config ops integration tests (RUN #3I)
+        working-directory: mv-design-pro/frontend
+        run: npx vitest run src/ui/wizard/switchgear/__tests__/switchgearConfigOps.test.ts --reporter=verbose
+
+      - name: Run Inspector config sections tests (RUN #3I)
+        working-directory: mv-design-pro/frontend
+        run: npx vitest run src/ui/sld/inspector/__tests__/inspectorConfigSections.test.ts --reporter=verbose
+
       - name: Upload test results
         if: always()
         uses: actions/upload-artifact@v4
