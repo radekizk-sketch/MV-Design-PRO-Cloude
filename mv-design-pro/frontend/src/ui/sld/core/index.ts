@@ -182,6 +182,8 @@ export {
   requireFieldsComplete,
   requireDevicesParametrized,
   requireProtectionBindings,
+  // PV/BESS transformer gate (RUN #3G)
+  requirePvBessTransformerRule,
 } from './readinessProfile';
 
 export type {

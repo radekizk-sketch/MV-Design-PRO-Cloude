@@ -395,3 +395,20 @@ def require_protection_bindings(profile: ReadinessProfileV1) -> None:
     if not blockers:
         return
     raise ReadinessGateError("protection_bindings", blockers)
+
+
+def require_pv_bess_transformer_rule(profile: ReadinessProfileV1) -> None:
+    """Gate: PV/BESS always through transformer (variant A or B).
+
+    RUN #3G §2.3: Blocks when generator.connection_variant_missing,
+    generator.station_ref_missing, generator.block_transformer_missing,
+    or any other generator.* BLOCKER.
+    """
+    blockers = [
+        i for i in profile.issues
+        if i.priority == ReadinessPriority.BLOCKER
+        and i.code.startswith("generator.")
+    ]
+    if not blockers:
+        return
+    raise ReadinessGateError("pv_bess_transformer_rule", blockers)

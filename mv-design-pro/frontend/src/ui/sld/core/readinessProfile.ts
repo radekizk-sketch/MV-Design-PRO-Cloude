@@ -226,3 +226,19 @@ export function requireProtectionBindings(profile: ReadinessProfileV1): void {
   if (blockers.length === 0) return;
   throw new ReadinessGateError('protection_bindings', blockers);
 }
+
+/**
+ * Gate: PV/BESS always through transformer (variant A or B).
+ * Blocks when generator.connection_variant_missing, generator.station_ref_missing,
+ * generator.block_transformer_missing, or any generator.* BLOCKER.
+ * RUN #3G §2.3.
+ * @throws ReadinessGateError
+ */
+export function requirePvBessTransformerRule(profile: ReadinessProfileV1): void {
+  const blockers = profile.issues.filter(
+    i => i.priority === ReadinessPriority.BLOCKER &&
+      i.code.startsWith('generator.'),
+  );
+  if (blockers.length === 0) return;
+  throw new ReadinessGateError('pv_bess_transformer_rule', blockers);
+}
