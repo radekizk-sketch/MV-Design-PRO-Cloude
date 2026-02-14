@@ -66,6 +66,11 @@ Guards dodane w RUN #3H (TRYB PROJEKTOWY):
 43. CI overrides pipeline (sld-determinism.yml has overrides steps)
 44. No TODO null in overrides code
 45. No codenames in overrides code
+
+Guards dodane w RUN #3H DOMKNIECIE:
+46. Render artifacts script exists (sld_render_artifacts.ts)
+47. CI workflow has upload-artifact for render artifacts
+48. Drag overrides integration test exists (dragOverrides.integration.test.ts)
 """
 
 import os
@@ -2222,6 +2227,93 @@ def guard_no_codenames_overrides() -> List[str]:
 
 
 # =========================================================================
+# GUARD 46: Render artifacts script exists (RUN #3H DOMKNIECIE)
+# =========================================================================
+
+def guard_render_artifacts_script_exists() -> List[str]:
+    """
+    Sprawdz ze skrypt sld_render_artifacts.ts istnieje.
+    """
+    violations = []
+
+    script_file = REPO_ROOT / "scripts" / "sld_render_artifacts.ts"
+    if not script_file.exists():
+        violations.append("  BRAK scripts/sld_render_artifacts.ts")
+    else:
+        content = script_file.read_text(encoding="utf-8")
+        if "applyOverrides" not in content:
+            violations.append("  sld_render_artifacts.ts nie uzywa applyOverrides")
+        if "artifacts" not in content.lower():
+            violations.append("  sld_render_artifacts.ts nie generuje artefaktow")
+        if "computeOverridesHash" not in content:
+            violations.append("  sld_render_artifacts.ts nie uzywa computeOverridesHash")
+
+    return violations
+
+
+# =========================================================================
+# GUARD 47: CI workflow has upload-artifact for render artifacts (RUN #3H DOMKNIECIE)
+# =========================================================================
+
+def guard_ci_upload_render_artifacts() -> List[str]:
+    """
+    Sprawdz ze CI workflow zawiera upload-artifact dla render artefaktow.
+    """
+    violations = []
+
+    ci_file = REPO_ROOT.parent / ".github" / "workflows" / "sld-determinism.yml"
+    if not ci_file.exists():
+        violations.append("  BRAK .github/workflows/sld-determinism.yml")
+        return violations
+
+    content = ci_file.read_text(encoding="utf-8")
+
+    if "upload-artifact" not in content:
+        violations.append("  sld-determinism.yml brak upload-artifact")
+
+    if "sld-render-artifacts" not in content:
+        violations.append("  sld-determinism.yml brak jobu sld-render-artifacts")
+
+    if "sld_render_artifacts.ts" not in content:
+        violations.append("  sld-determinism.yml nie uruchamia sld_render_artifacts.ts")
+
+    return violations
+
+
+# =========================================================================
+# GUARD 48: Drag overrides integration test exists (RUN #3H DOMKNIECIE)
+# =========================================================================
+
+def guard_drag_overrides_test_exists() -> List[str]:
+    """
+    Sprawdz ze test integracyjny drag overrides istnieje.
+    """
+    violations = []
+
+    test_file = FRONTEND_SRC / "ui" / "sld" / "core" / "__tests__" / "dragOverrides.integration.test.ts"
+    if not test_file.exists():
+        violations.append("  BRAK dragOverrides.integration.test.ts")
+    else:
+        content = test_file.read_text(encoding="utf-8")
+        for kw in ["applyDelta", "applyOverrides", "EffectiveLayout", "50"]:
+            if kw not in content:
+                violations.append(f"  dragOverrides.integration.test.ts brak '{kw}'")
+
+    # Also check that useSldDragCad hook exists
+    hook_file = FRONTEND_SRC / "ui" / "sld-editor" / "hooks" / "useSldDragCad.ts"
+    if not hook_file.exists():
+        violations.append("  BRAK useSldDragCad.ts hook")
+    else:
+        content = hook_file.read_text(encoding="utf-8")
+        if "projectModeActive" not in content:
+            violations.append("  useSldDragCad.ts nie sprawdza projectModeActive")
+        if "snapDeltaToGrid" not in content:
+            violations.append("  useSldDragCad.ts nie uzywa snapDeltaToGrid")
+
+    return violations
+
+
+# =========================================================================
 # MAIN
 # =========================================================================
 
@@ -2272,6 +2364,9 @@ def main() -> int:
         ("GUARD 43: CI overrides pipeline (RUN #3H)", guard_ci_overrides_pipeline()),
         ("GUARD 44: No TODO null in overrides (RUN #3H)", guard_no_todo_null_overrides()),
         ("GUARD 45: No codenames in overrides (RUN #3H)", guard_no_codenames_overrides()),
+        ("GUARD 46: Render artifacts script exists (RUN #3H DOMKNIECIE)", guard_render_artifacts_script_exists()),
+        ("GUARD 47: CI upload-artifact for render artifacts (RUN #3H DOMKNIECIE)", guard_ci_upload_render_artifacts()),
+        ("GUARD 48: Drag overrides integration test exists (RUN #3H DOMKNIECIE)", guard_drag_overrides_test_exists()),
     ]
 
     total_violations = 0

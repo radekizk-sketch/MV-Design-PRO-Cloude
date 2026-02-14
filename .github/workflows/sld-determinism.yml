@@ -82,10 +82,48 @@ jobs:
         working-directory: mv-design-pro/frontend
         run: npx vitest run src/ui/sld/core/__tests__/overridesCiRender.test.ts --reporter=verbose
 
+      - name: Run Drag Overrides integration tests (RUN #3H DOMKNIECIE)
+        working-directory: mv-design-pro/frontend
+        run: npx vitest run src/ui/sld/core/__tests__/dragOverrides.integration.test.ts --reporter=verbose
+
       - name: Upload test results
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: sld-contract-test-results
           path: mv-design-pro/frontend/test-results/
+          retention-days: 30
+
+  sld-render-artifacts:
+    name: SLD Render Artifacts (RUN #3H DOMKNIECIE)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: mv-design-pro/frontend/package-lock.json
+
+      - name: Install dependencies
+        working-directory: mv-design-pro/frontend
+        run: npm ci
+
+      - name: Install tsx
+        working-directory: mv-design-pro
+        run: npm install -g tsx
+
+      - name: Generate SLD render artifacts
+        working-directory: mv-design-pro
+        run: npx tsx scripts/sld_render_artifacts.ts
+
+      - name: Upload SLD render artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sld-render-artifacts
+          path: mv-design-pro/artifacts/
           retention-days: 30
