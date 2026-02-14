@@ -168,21 +168,38 @@ export function renderSwitchgearBlock(
     });
 
     // 3. Render devices in field
+    //    Slot allocation: each device gets a unique (row, xLane) slot.
+    //    On-path devices stack vertically starting from their base row.
+    //    Off-path devices stack similarly but at offset X.
+    //    CRITICAL: no two devices may share the same pixel area.
     const fieldDevices = [...block.devices]
       .filter(d => d.fieldId === field.id)
       .sort((a, b) => a.id.localeCompare(b.id));
 
-    for (const device of fieldDevices) {
-      const row = deviceRowForPosition(device.powerPathPosition);
-      if (row > maxDeviceRow) maxDeviceRow = row;
+    // Track occupied rows per X lane (on-path vs off-path) to prevent overlap
+    const occupiedOnPath = new Set<number>();
+    const occupiedOffPath = new Set<number>();
 
+    for (const device of fieldDevices) {
+      const baseRow = deviceRowForPosition(device.powerPathPosition);
       const isOffPath = device.powerPathPosition === DevicePowerPathPositionV1.OFF_PATH;
+      const occupied = isOffPath ? occupiedOffPath : occupiedOnPath;
 
       const symbolType = DEVICE_TO_SYMBOL[device.deviceType as DeviceTypeV1] ?? null;
 
       const deviceX = fieldX + FIELD_COLUMN_PITCH / 2 - DEVICE_SYMBOL_WIDTH / 2
         + (isOffPath ? OFF_PATH_OFFSET_X : 0);
-      const deviceY = BUS_BAR_HEIGHT + row * DEVICE_SLOT_HEIGHT;
+
+      // Find next free row starting from baseRow
+      let actualRow = baseRow;
+      while (occupied.has(actualRow)) {
+        actualRow++;
+      }
+      occupied.add(actualRow);
+
+      if (actualRow > maxDeviceRow) maxDeviceRow = actualRow;
+
+      const deviceY = BUS_BAR_HEIGHT + actualRow * DEVICE_SLOT_HEIGHT;
 
       elements.push({
         elementId: device.id,

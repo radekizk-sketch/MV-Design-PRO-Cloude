@@ -1496,6 +1496,221 @@ def guard_field_device_tests_exist() -> List[str]:
 
 
 # =========================================================================
+# GUARD 29: Switchgear renderer exists + exports (RUN #3G)
+# =========================================================================
+
+def guard_switchgear_renderer_exists() -> List[str]:
+    """
+    Sprawdz ze switchgearRenderer.ts istnieje i eksportuje wymagane funkcje.
+    """
+    violations = []
+    renderer_file = FRONTEND_SRC / "ui" / "sld" / "core" / "switchgearRenderer.ts"
+
+    if not renderer_file.exists():
+        violations.append("  BRAK switchgearRenderer.ts — switchgear renderer missing")
+        return violations
+
+    try:
+        content = renderer_file.read_text(encoding="utf-8")
+    except Exception:
+        violations.append("  Nie mozna odczytac switchgearRenderer.ts")
+        return violations
+
+    required_exports = [
+        "renderSwitchgearBlock",
+        "checkSymbolOverlap",
+        "validateSymbolRegistry",
+        "findElementById",
+        "findDevicesInField",
+        "FIELD_COLUMN_PITCH",
+        "DEVICE_SLOT_HEIGHT",
+    ]
+    for exp in required_exports:
+        if exp not in content:
+            violations.append(f"  BRAK '{exp}' w switchgearRenderer.ts")
+
+    # Must be exported from index.ts
+    index_file = FRONTEND_SRC / "ui" / "sld" / "core" / "index.ts"
+    if index_file.exists():
+        try:
+            idx_content = index_file.read_text(encoding="utf-8")
+        except Exception:
+            idx_content = ""
+        if "switchgearRenderer" not in idx_content:
+            violations.append("  BRAK eksportu switchgearRenderer w core/index.ts")
+
+    return violations
+
+
+# =========================================================================
+# GUARD 30: Switchgear E2E tests exist (RUN #3G)
+# =========================================================================
+
+def guard_switchgear_e2e_tests_exist() -> List[str]:
+    """
+    Sprawdz ze testy E2E switchgear istnieja z 4 golden station blocks.
+    """
+    violations = []
+    e2e_file = FRONTEND_SRC / "ui" / "sld" / "core" / "__tests__" / "switchgearE2E.test.ts"
+
+    if not e2e_file.exists():
+        violations.append("  BRAK switchgearE2E.test.ts — brak E2E tests")
+        return violations
+
+    try:
+        content = e2e_file.read_text(encoding="utf-8")
+    except Exception:
+        violations.append("  Nie mozna odczytac switchgearE2E.test.ts")
+        return violations
+
+    required_blocks = [
+        ("GS-E2E-01", "LINE_IN field"),
+        ("GS-E2E-02", "TRANSFORMER_SN_NN field"),
+        ("GS-E2E-03", "PV_SN field"),
+        ("GS-E2E-04", "Multi-field station"),
+    ]
+    for code, desc in required_blocks:
+        if code not in content:
+            violations.append(f"  BRAK golden station block {code} ({desc})")
+
+    if "hash stability" not in content.lower():
+        violations.append("  BRAK testow hash stability w switchgearE2E.test.ts")
+
+    if "overlap invariant" not in content.lower():
+        violations.append("  BRAK testow overlap invariant w switchgearE2E.test.ts")
+
+    return violations
+
+
+# =========================================================================
+# GUARD 31: Field/device inspector exists (RUN #3G)
+# =========================================================================
+
+def guard_field_device_inspector_exists() -> List[str]:
+    """
+    Sprawdz ze inspektor pol/aparatow istnieje z wymaganymi funkcjami.
+    """
+    violations = []
+    inspector_file = FRONTEND_SRC / "ui" / "sld" / "inspector" / "fieldDeviceInspector.ts"
+
+    if not inspector_file.exists():
+        violations.append("  BRAK fieldDeviceInspector.ts — field/device inspector missing")
+        return violations
+
+    try:
+        content = inspector_file.read_text(encoding="utf-8")
+    except Exception:
+        violations.append("  Nie mozna odczytac fieldDeviceInspector.ts")
+        return violations
+
+    required_functions = [
+        "buildFieldInspectorSections",
+        "buildDeviceInspectorSections",
+        "buildCatalogRefSection",
+        "resolveFieldOrDevice",
+        "buildInspectorSectionsForElement",
+        "buildResultsSection",
+    ]
+    for fn in required_functions:
+        if fn not in content:
+            violations.append(f"  BRAK '{fn}' w fieldDeviceInspector.ts")
+
+    # Must be exported from inspector/index.ts
+    index_file = FRONTEND_SRC / "ui" / "sld" / "inspector" / "index.ts"
+    if index_file.exists():
+        try:
+            idx_content = index_file.read_text(encoding="utf-8")
+        except Exception:
+            idx_content = ""
+        if "fieldDeviceInspector" not in idx_content:
+            violations.append("  BRAK eksportu fieldDeviceInspector w inspector/index.ts")
+
+    return violations
+
+
+# =========================================================================
+# GUARD 32: Switchgear wizard exists (RUN #3G)
+# =========================================================================
+
+def guard_switchgear_wizard_exists() -> List[str]:
+    """
+    Sprawdz ze kreator rozdzielnicy istnieje (3 ekrany + store + types).
+    """
+    violations = []
+    wizard_dir = FRONTEND_SRC / "ui" / "wizard" / "switchgear"
+
+    required_files = [
+        "types.ts",
+        "useSwitchgearStore.ts",
+        "StationListScreen.tsx",
+        "StationEditScreen.tsx",
+        "FieldEditScreen.tsx",
+        "CatalogPicker.tsx",
+        "SwitchgearWizardPage.tsx",
+        "index.ts",
+    ]
+    for fname in required_files:
+        fpath = wizard_dir / fname
+        if not fpath.exists():
+            violations.append(f"  BRAK {fname} w wizard/switchgear/")
+
+    # Route must exist
+    routes_file = FRONTEND_SRC / "ui" / "navigation" / "routes.ts"
+    if routes_file.exists():
+        try:
+            content = routes_file.read_text(encoding="utf-8")
+        except Exception:
+            content = ""
+        if "SWITCHGEAR" not in content or "#switchgear" not in content:
+            violations.append("  BRAK route SWITCHGEAR w routes.ts")
+    else:
+        violations.append("  BRAK routes.ts — navigation missing")
+
+    return violations
+
+
+# =========================================================================
+# GUARD 33: Station field validation backend (RUN #3G)
+# =========================================================================
+
+def guard_station_field_validation_backend() -> List[str]:
+    """
+    Sprawdz ze walidacja stacji/pol istnieje w backendzie.
+    """
+    violations = []
+    validation_file = BACKEND_SRC / "domain" / "station_field_validation.py"
+
+    if not validation_file.exists():
+        violations.append("  BRAK station_field_validation.py — backend validation missing")
+        return violations
+
+    try:
+        content = validation_file.read_text(encoding="utf-8")
+    except Exception:
+        violations.append("  Nie mozna odczytac station_field_validation.py")
+        return violations
+
+    required = [
+        "validate_station_fields",
+        "validate_pv_bess_variant_a",
+        "validate_pv_bess_variant_b",
+        "REQUIRED_DEVICES_PER_ROLE",
+        "StationFieldV1",
+        "FieldDeviceV1",
+    ]
+    for req in required:
+        if req not in content:
+            violations.append(f"  BRAK '{req}' w station_field_validation.py")
+
+    # Tests must exist
+    test_file = REPO_ROOT / "backend" / "tests" / "test_station_field_validation.py"
+    if not test_file.exists():
+        violations.append("  BRAK test_station_field_validation.py — backend tests missing")
+
+    return violations
+
+
+# =========================================================================
 # MAIN
 # =========================================================================
 
@@ -1529,6 +1744,11 @@ def main() -> int:
         ("GUARD 26: Symbol registry completeness (RUN #3F)", guard_symbol_registry_completeness()),
         ("GUARD 27: No decorative symbols (RUN #3F)", guard_no_decorative_symbols()),
         ("GUARD 28: Field device tests exist (RUN #3F)", guard_field_device_tests_exist()),
+        ("GUARD 29: Switchgear renderer exists (RUN #3G)", guard_switchgear_renderer_exists()),
+        ("GUARD 30: Switchgear E2E tests exist (RUN #3G)", guard_switchgear_e2e_tests_exist()),
+        ("GUARD 31: Field/device inspector exists (RUN #3G)", guard_field_device_inspector_exists()),
+        ("GUARD 32: Switchgear wizard exists (RUN #3G)", guard_switchgear_wizard_exists()),
+        ("GUARD 33: Station field validation backend (RUN #3G)", guard_station_field_validation_backend()),
     ]
 
     total_violations = 0
