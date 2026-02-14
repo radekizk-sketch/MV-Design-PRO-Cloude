@@ -112,26 +112,71 @@ class ValidateResponse(BaseModel):
 
 
 # =============================================================================
-# In-memory store (per study case)
+# Persistent storage (file-backed + in-memory cache) — RUN #3I §I2
 # =============================================================================
 
-# In production this would use a repository/DB.
-# For RUN #3H we use an in-memory dict keyed by study_case_id.
+import json as _json
+import os as _os
+from pathlib import Path as _Path
+
+# Storage dir: configurable via env, defaults to in-memory only.
+# Set SLD_OVERRIDES_DIR to enable file persistence.
+_STORAGE_DIR: _Path | None = (
+    _Path(_os.environ["SLD_OVERRIDES_DIR"])
+    if "SLD_OVERRIDES_DIR" in _os.environ
+    else None
+)
+
 _overrides_store: dict[str, ProjectGeometryOverridesV1] = {}
 
 
+def _storage_path(case_id: str) -> _Path | None:
+    """Get file path for persistent storage (None if no dir configured)."""
+    if _STORAGE_DIR is None:
+        return None
+    _STORAGE_DIR.mkdir(parents=True, exist_ok=True)
+    # Sanitize case_id for filename (replace non-alphanumeric with _)
+    safe_id = "".join(c if c.isalnum() or c in "-_" else "_" for c in case_id)
+    return _STORAGE_DIR / f"overrides_{safe_id}.json"
+
+
 def _get_overrides(case_id: str) -> ProjectGeometryOverridesV1:
-    """Get overrides for a case (empty if none saved)."""
+    """Get overrides for a case (from cache, file, or empty)."""
     if case_id in _overrides_store:
         return _overrides_store[case_id]
+
+    # Try loading from file
+    path = _storage_path(case_id)
+    if path is not None and path.exists():
+        try:
+            data = _json.loads(path.read_text(encoding="utf-8"))
+            overrides = ProjectGeometryOverridesV1.from_dict(data)
+            _overrides_store[case_id] = overrides
+            return overrides
+        except Exception:
+            pass  # Fall through to empty
+
     return ProjectGeometryOverridesV1(study_case_id=case_id)
 
 
 def _save_overrides(
     case_id: str, overrides: ProjectGeometryOverridesV1
 ) -> None:
-    """Save overrides for a case."""
+    """Save overrides for a case (cache + file if configured)."""
     _overrides_store[case_id] = overrides
+
+    # Persist to file if configured
+    path = _storage_path(case_id)
+    if path is not None:
+        path.write_text(
+            _json.dumps(overrides.to_dict(), sort_keys=True, indent=2),
+            encoding="utf-8",
+        )
+
+
+def clear_overrides_cache() -> None:
+    """Clear in-memory cache (for testing). Does NOT delete files."""
+    _overrides_store.clear()
 
 
 def _parse_items(
