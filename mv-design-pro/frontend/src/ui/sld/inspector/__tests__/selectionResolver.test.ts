@@ -123,7 +123,7 @@ describe('resolveSelectionRef', () => {
     it('resolves source bus to K2', () => {
       const result = resolveSelectionRef('bus_gpz_110', 'Bus', enm);
       expect(result).not.toBeNull();
-      expect(result!.selectionRef.element_ref_id).toBe('bus_gpz_110');
+      expect(result!.selectionRef.elementId).toBe('bus_gpz_110');
       expect(result!.selectionRef.element_type).toBe('bus');
       expect(result!.wizardStepId).toBe('K2');
     });
@@ -131,7 +131,7 @@ describe('resolveSelectionRef', () => {
     it('resolves non-source bus to K3', () => {
       const result = resolveSelectionRef('bus_gpz_15', 'Bus', enm);
       expect(result).not.toBeNull();
-      expect(result!.selectionRef.element_ref_id).toBe('bus_gpz_15');
+      expect(result!.selectionRef.elementId).toBe('bus_gpz_15');
       expect(result!.wizardStepId).toBe('K3');
     });
 
@@ -238,7 +238,7 @@ describe('resolveSelectionRef', () => {
       const result = resolveSelectionRef('connection_source', 'Source', enm);
       expect(result).not.toBeNull();
       expect(result!.selectionRef.element_type).toBe('source');
-      expect(result!.selectionRef.element_ref_id).toBe('src_grid');
+      expect(result!.selectionRef.elementId).toBe('src_grid');
     });
   });
 

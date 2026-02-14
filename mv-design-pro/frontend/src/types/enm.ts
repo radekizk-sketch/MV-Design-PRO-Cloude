@@ -233,6 +233,20 @@ export interface Generator extends ENMElement {
   n_parallel?: number | null;
   parameter_source?: ParameterSource | null;
   overrides?: ParameterOverride[] | null;
+
+  /**
+   * Wariant przylaczenia PV/BESS:
+   * - 'nn_side': po stronie nN stacji (przez transformator stacji SN/nN)
+   * - 'block_transformer': przez transformator blokowy do SN
+   * - null: brak informacji → FixAction generator.connection_variant_missing
+   */
+  connection_variant?: 'nn_side' | 'block_transformer' | null;
+
+  /** Referencja do transformatora blokowego (ref_id). Wymagana przy 'block_transformer'. */
+  blocking_transformer_ref?: string | null;
+
+  /** Referencja do stacji (ref_id substacji). Wymagana przy 'nn_side'. */
+  station_ref?: string | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -336,7 +350,7 @@ export interface EnergyNetworkModel {
 
 export interface ValidationIssue {
   code: string;
-  severity: 'BLOCKER' | 'IMPORTANT' | 'INFO';
+  severity: 'BLOCKER' | 'WARNING' | 'INFO';
   message_pl: string;
   element_refs: string[];
   wizard_step_hint: string;
@@ -417,9 +431,9 @@ export interface ReadinessMatrix {
 // ---------------------------------------------------------------------------
 
 export interface SelectionRef {
-  /** ref_id elementu ENM */
-  element_ref_id: string;
-  /** Typ elementu */
+  /** Kanoniczny elementId (= ENMElement.ref_id = ElementRefV1.elementId) */
+  elementId: string;
+  /** Typ elementu (align z ElementTypeV1) */
   element_type: 'bus' | 'branch' | 'transformer' | 'source' | 'load' | 'generator'
     | 'substation' | 'bay' | 'junction' | 'corridor'
     | 'measurement' | 'protection_assignment';

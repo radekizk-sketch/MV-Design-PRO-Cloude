@@ -87,3 +87,30 @@ export type {
 
 // Etykiety porównania
 export { COMPARE_LABELS_PL, COMPARE_SECTION_LABELS_PL } from './compare';
+
+// =============================================================================
+// RUN #3G §4: Inspektor pól i aparatów
+// =============================================================================
+
+// Field/Device inspector builders (pure functions)
+export {
+  buildFieldInspectorSections,
+  buildDeviceInspectorSections,
+  buildCatalogRefSection,
+  resolveFieldOrDevice,
+  buildInspectorSectionsForElement,
+  buildResultsSection,
+} from './fieldDeviceInspector';
+
+// Field/Device inspector types
+export type {
+  FieldDeviceResolution,
+  FieldDeviceResultDataV1,
+} from './fieldDeviceInspector';
+
+// Element results resolver (RUN #3G §4 COMMIT C)
+export {
+  resolveElementResults,
+  resolveFieldDeviceResults,
+  NO_RESULTS_DATA,
+} from './elementResultsResolver';

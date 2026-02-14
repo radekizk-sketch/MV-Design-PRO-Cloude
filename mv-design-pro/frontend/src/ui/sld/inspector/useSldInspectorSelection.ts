@@ -22,12 +22,16 @@ import { useMemo, useCallback } from 'react';
 import { useSelectionStore } from '../../selection/store';
 import { useSldEditorStore } from '../../sld-editor/SldEditorStore';
 import { useSldModeStore, type SldMode } from '../sldModeStore';
+import { useResultsInspectorStore } from '../../results-inspector/store';
+import { resolveElementResults } from './elementResultsResolver';
 import {
   selectProtectionSummaryByElementId,
   type ProtectionSummary,
   OC_CHARACTERISTIC_LABELS_PL,
   VERIFICATION_STATUS_LABELS_PL,
 } from '../protection';
+import { useSldProjectModeStore } from '../sldProjectModeStore';
+import { buildGeometrySection } from './geometrySection';
 import type {
   InspectorSelection,
   InspectorElementSelection,
@@ -788,18 +792,23 @@ export function useSldInspectorSelection(): UseSldInspectorSelectionResult {
     return { type: 'none' };
   }, [selectedElement, symbols]);
 
-  // Mock wyników (w rzeczywistości byłyby pobierane z results store)
-  // PR-SLD-07: Read-only, dane z istniejącego store
+  // Resolve results from ResultsInspectorStore by elementId
+  const busResults = useResultsInspectorStore((s) => s.busResults);
+  const branchResults = useResultsInspectorStore((s) => s.branchResults);
+  const shortCircuitResults = useResultsInspectorStore((s) => s.shortCircuitResults);
+
   const results = useMemo<InspectorResultData | null>(() => {
     if (!isResultsMode || selection.type !== 'element') {
       return null;
     }
 
-    // TODO: Pobierz rzeczywiste wyniki z ResultsStore
-    // Na razie zwróć null - wyniki będą dostępne gdy będzie zintegrowany
-    // z ResultsInspectorStore
-    return null;
-  }, [isResultsMode, selection]);
+    return resolveElementResults(
+      selection.elementId,
+      busResults,
+      branchResults,
+      shortCircuitResults,
+    );
+  }, [isResultsMode, selection, busResults, branchResults, shortCircuitResults]);
 
   // Mock diagnostyki (w rzeczywistości byłyby pobierane z diagnostics store)
   const diagnostics = useMemo<InspectorDiagnosticData | null>(() => {
@@ -810,6 +819,11 @@ export function useSldInspectorSelection(): UseSldInspectorSelectionResult {
     // TODO: Pobierz rzeczywistą diagnostykę z DiagnosticsStore
     return null;
   }, [isResultsMode, selection]);
+
+  // RUN #3H: Dane trybu projektowego (overrides + bledy walidacji)
+  const projectModeActive = useSldProjectModeStore((s) => s.projectModeActive);
+  const projectOverrides = useSldProjectModeStore((s) => s.overrides);
+  const projectValidationErrors = useSldProjectModeStore((s) => s.validationErrors);
 
   // PR-SLD-09: Dane zabezpieczeń dla elementu
   const protection = useMemo<ProtectionSummary | null>(() => {
@@ -868,6 +882,18 @@ export function useSldInspectorSelection(): UseSldInspectorSelectionResult {
         elementSections.push(...protectionSections);
       }
 
+      // RUN #3H: Dodaj sekcje geometrii jeśli tryb projektowy aktywny
+      if (projectModeActive) {
+        const geometrySection = buildGeometrySection(
+          selection.elementId,
+          projectOverrides,
+          projectValidationErrors,
+        );
+        if (geometrySection) {
+          elementSections.push(geometrySection);
+        }
+      }
+
       return elementSections;
     }
 
@@ -881,7 +907,7 @@ export function useSldInspectorSelection(): UseSldInspectorSelectionResult {
     }
 
     return [];
-  }, [selection, results, diagnostics, protection, isProtectionMode]);
+  }, [selection, results, diagnostics, protection, isProtectionMode, projectModeActive, projectOverrides, projectValidationErrors]);
 
   // Funkcja zamykania inspektora
   const closeInspector = useCallback(() => {

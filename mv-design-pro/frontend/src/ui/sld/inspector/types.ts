@@ -186,6 +186,7 @@ export const INSPECTOR_SECTION_LABELS_PL: Record<string, string> = {
   protection_oc_instant: 'Zabezpieczenie nadpradowe I>> (50)',
   protection_ct: 'Przekladnik',
   protection_verification: 'Weryfikacja kryterium',
+  geometry: 'Geometria',
 };
 
 /**

@@ -160,13 +160,23 @@ class LoadPayload(BaseModel):
 
 
 class GeneratorPayload(BaseModel):
-    """Generator / OZE — payload kreatora."""
+    """Generator / OZE — payload kreatora.
+
+    PV/BESS WYMAGA jawnego connection_variant:
+    - 'nn_side': po stronie nN stacji (przez transformator stacji SN/nN)
+    - 'block_transformer': przez transformator blokowy do SN
+    Brak connection_variant dla PV/BESS → FixAction generator.connection_variant_missing.
+    """
     ref_id: str
     name: str
     bus_ref: str
     p_mw: float
     q_mvar: float | None = None
     gen_type: str | None = None
+    catalog_ref: str | None = None
+    connection_variant: str | None = None
+    blocking_transformer_ref: str | None = None
+    station_ref: str | None = None
 
 
 # ---------------------------------------------------------------------------

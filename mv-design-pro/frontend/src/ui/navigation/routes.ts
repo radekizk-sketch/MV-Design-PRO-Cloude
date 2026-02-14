@@ -132,6 +132,13 @@ export const ROUTES: Record<string, RouteDefinition> = {
     icon: 'SCN',
     requiredMode: undefined,
   },
+  SWITCHGEAR: {
+    hash: '#switchgear',
+    label: 'Rozdzielnica: pola i aparaty',
+    description: 'Kreator definicji pol i aparatow rozdzielnic SN/nN',
+    icon: 'SWG',
+    requiredMode: 'MODEL_EDIT',
+  },
 };
 
 /**
@@ -202,4 +209,11 @@ export function navigateToProof(): void {
  */
 export function navigateToCompare(): void {
   navigateTo(ROUTES.COMPARE);
+}
+
+/**
+ * Navigate to Switchgear wizard (Rozdzielnica: pola i aparaty).
+ */
+export function navigateToSwitchgear(): void {
+  navigateTo(ROUTES.SWITCHGEAR);
 }

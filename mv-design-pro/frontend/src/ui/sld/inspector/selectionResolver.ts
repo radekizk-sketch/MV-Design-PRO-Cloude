@@ -27,7 +27,9 @@ export type SldElementType =
   | 'TransformerBranch'
   | 'Switch'
   | 'Source'
-  | 'Load';
+  | 'Load'
+  | 'STATION'
+  | 'GENERATOR';
 
 /**
  * Rozszerzone dane selekcji z powiązaniem do ENM.
@@ -95,6 +97,8 @@ const SLD_TO_ENM_TYPE: Record<SldElementType, SelectionRef['element_type']> = {
   Switch: 'branch',
   Source: 'source',
   Load: 'load',
+  STATION: 'substation',
+  GENERATOR: 'generator',
 };
 
 /**
@@ -156,7 +160,7 @@ export function resolveSelectionRef(
 
   // 4. Zbuduj SelectionRef
   const selectionRef: SelectionRef = {
-    element_ref_id: enmRefId,
+    elementId: enmRefId,
     element_type: enmType,
     wizard_step_hint: stepMapping?.stepId ?? 'K1',
   };
@@ -209,6 +213,14 @@ function findEnmRefId(
     case 'Load': {
       const load = enm.loads.find((l) => l.ref_id === elementId || l.id === elementId);
       return load?.ref_id ?? null;
+    }
+    case 'STATION': {
+      const sub = enm.substations.find((s) => s.ref_id === elementId || s.id === elementId);
+      return sub?.ref_id ?? null;
+    }
+    case 'GENERATOR': {
+      const gen = enm.generators.find((g) => g.ref_id === elementId || g.id === elementId);
+      return gen?.ref_id ?? null;
     }
     default:
       return null;
@@ -336,6 +348,36 @@ function buildEnmProperties(
           { key: 'model', label: 'Model', value: load.model },
         ],
       });
+      break;
+    }
+    case 'STATION': {
+      const sub = enm.substations.find((s) => s.ref_id === refId);
+      if (!sub) break;
+      sections.push({
+        id: 'enm_substation',
+        label: 'Parametry stacji (ENM)',
+        fields: [
+          { key: 'ref_id', label: 'Identyfikator', value: sub.ref_id },
+          { key: 'station_type', label: 'Typ stacji', value: sub.station_type },
+          { key: 'bus_count', label: 'Liczba szyn', value: sub.bus_refs.length },
+          { key: 'transformer_count', label: 'Liczba transformatorow', value: sub.transformer_refs.length },
+        ],
+      });
+      break;
+    }
+    case 'GENERATOR': {
+      const gen = enm.generators.find((g) => g.ref_id === refId);
+      if (!gen) break;
+      const fields: EnmPropertyField[] = [
+        { key: 'ref_id', label: 'Identyfikator', value: gen.ref_id },
+        { key: 'bus_ref', label: 'Szyna', value: gen.bus_ref },
+        { key: 'p_mw', label: 'Moc czynna', value: gen.p_mw, unit: 'MW' },
+        { key: 'gen_type', label: 'Typ generatora', value: gen.gen_type ?? '—' },
+      ];
+      if (gen.connection_variant) {
+        fields.push({ key: 'connection_variant', label: 'Wariant przylaczenia', value: gen.connection_variant });
+      }
+      sections.push({ id: 'enm_generator', label: 'Parametry generatora (ENM)', fields });
       break;
     }
   }
