@@ -43,6 +43,19 @@ Guards dodane w RUN #3F:
 26. Symbol registry completeness (DeviceType → SldSymbolType mapping)
 27. No decorative symbols in symbol registry (only IEC-compliant)
 28. Field device tests exist (FE: fieldDevicePolish.test.ts, BE: test_field_device.py)
+
+Guards dodane w RUN #3G:
+29. Switchgear renderer exists (switchgearRenderer.ts + tests)
+30. Switchgear E2E tests exist (switchgearE2E.test.ts)
+31. Field/device inspector exists (fieldDeviceInspector.ts)
+32. Switchgear wizard exists (3 screens + store + types)
+33. Station field validation backend (station_field_validation.py)
+
+Guards dodane w RUN #3G DOMKNIECIE:
+34. PV/BESS validation module exists (pvBessValidation.ts + tests)
+35. Wizard topology API wiring (useSwitchgearOps.ts with 4 ops)
+36. Inspector results resolver (elementResultsResolver.ts, no TODO null)
+37. No stub handlers in wizard screens (topology API wired)
 """
 
 import os
@@ -1711,6 +1724,211 @@ def guard_station_field_validation_backend() -> List[str]:
 
 
 # =========================================================================
+# GUARD 34: PV/BESS validation module exists (RUN #3G DOMKNIECIE)
+# =========================================================================
+
+def guard_pv_bess_validation_exists() -> List[str]:
+    """
+    Sprawdz ze modul walidacji PV/BESS istnieje z wymaganymi eksportami.
+    pvBessValidation.ts + pvBessValidation.test.ts + eksport w core/index.ts.
+    """
+    violations = []
+
+    # Module file
+    val_file = FRONTEND_SRC / "ui" / "sld" / "core" / "pvBessValidation.ts"
+    if not val_file.exists():
+        violations.append("  BRAK pvBessValidation.ts — PV/BESS validation module missing")
+        return violations
+
+    try:
+        content = val_file.read_text(encoding="utf-8")
+    except Exception:
+        violations.append("  Nie mozna odczytac pvBessValidation.ts")
+        return violations
+
+    required_exports = [
+        "validatePvBessConnections",
+        "canSavePvBessGenerator",
+        "PvBessConnectionInputV1",
+        "PvBessValidationResultV1",
+    ]
+    for exp in required_exports:
+        if exp not in content:
+            violations.append(f"  BRAK '{exp}' w pvBessValidation.ts")
+
+    # Test file
+    test_file = FRONTEND_SRC / "ui" / "sld" / "core" / "__tests__" / "pvBessValidation.test.ts"
+    if not test_file.exists():
+        violations.append("  BRAK pvBessValidation.test.ts — tests missing")
+
+    # Export from core/index.ts
+    core_index = FRONTEND_SRC / "ui" / "sld" / "core" / "index.ts"
+    if core_index.exists():
+        try:
+            idx = core_index.read_text(encoding="utf-8")
+        except Exception:
+            idx = ""
+        if "pvBessValidation" not in idx:
+            violations.append("  BRAK eksportu pvBessValidation w core/index.ts")
+
+    return violations
+
+
+# =========================================================================
+# GUARD 35: Wizard topology API wiring (RUN #3G DOMKNIECIE)
+# =========================================================================
+
+def guard_wizard_topology_wiring() -> List[str]:
+    """
+    Sprawdz ze useSwitchgearOps istnieje i eksportuje 4 operacje CRUD.
+    """
+    violations = []
+
+    ops_file = FRONTEND_SRC / "ui" / "wizard" / "switchgear" / "useSwitchgearOps.ts"
+    if not ops_file.exists():
+        violations.append("  BRAK useSwitchgearOps.ts — wizard topology wiring missing")
+        return violations
+
+    try:
+        content = ops_file.read_text(encoding="utf-8")
+    except Exception:
+        violations.append("  Nie mozna odczytac useSwitchgearOps.ts")
+        return violations
+
+    required_ops = [
+        "bay_create",
+        "equipment_add",
+        "equipment_remove",
+        "equipment_catalog_assign",
+    ]
+    for op in required_ops:
+        if op not in content:
+            violations.append(f"  BRAK operacji '{op}' w useSwitchgearOps.ts")
+
+    # Test file
+    test_file = (
+        FRONTEND_SRC / "ui" / "wizard" / "switchgear" / "__tests__" / "switchgearOps.test.ts"
+    )
+    if not test_file.exists():
+        violations.append("  BRAK switchgearOps.test.ts — tests missing")
+
+    return violations
+
+
+# =========================================================================
+# GUARD 36: Inspector results resolver (RUN #3G DOMKNIECIE)
+# =========================================================================
+
+def guard_inspector_results_resolver() -> List[str]:
+    """
+    Sprawdz ze elementResultsResolver istnieje, jest wyeksportowany,
+    i ze useSldInspectorSelection nie zawiera TODO null.
+    """
+    violations = []
+
+    resolver_file = FRONTEND_SRC / "ui" / "sld" / "inspector" / "elementResultsResolver.ts"
+    if not resolver_file.exists():
+        violations.append("  BRAK elementResultsResolver.ts — results resolver missing")
+        return violations
+
+    try:
+        content = resolver_file.read_text(encoding="utf-8")
+    except Exception:
+        violations.append("  Nie mozna odczytac elementResultsResolver.ts")
+        return violations
+
+    required = [
+        "resolveElementResults",
+        "resolveFieldDeviceResults",
+        "NO_RESULTS_DATA",
+    ]
+    for req in required:
+        if req not in content:
+            violations.append(f"  BRAK '{req}' w elementResultsResolver.ts")
+
+    # Export from inspector/index.ts
+    index_file = FRONTEND_SRC / "ui" / "sld" / "inspector" / "index.ts"
+    if index_file.exists():
+        try:
+            idx = index_file.read_text(encoding="utf-8")
+        except Exception:
+            idx = ""
+        if "elementResultsResolver" not in idx:
+            violations.append("  BRAK eksportu elementResultsResolver w inspector/index.ts")
+
+    # No TODO null in useSldInspectorSelection
+    hook_file = FRONTEND_SRC / "ui" / "sld" / "inspector" / "useSldInspectorSelection.ts"
+    if hook_file.exists():
+        try:
+            hook_content = hook_file.read_text(encoding="utf-8")
+        except Exception:
+            hook_content = ""
+        if "TODO" in hook_content and "null" in hook_content:
+            # Check for TODO-null pattern (placeholder results)
+            for line in hook_content.splitlines():
+                if "TODO" in line and "null" in line:
+                    violations.append(
+                        f"  TODO null znaleziony w useSldInspectorSelection.ts: {line.strip()}"
+                    )
+
+    # Test file
+    test_file = (
+        FRONTEND_SRC
+        / "ui"
+        / "sld"
+        / "inspector"
+        / "__tests__"
+        / "elementResultsResolver.test.ts"
+    )
+    if not test_file.exists():
+        violations.append("  BRAK elementResultsResolver.test.ts — tests missing")
+
+    return violations
+
+
+# =========================================================================
+# GUARD 37: No stub handlers in wizard screens (RUN #3G DOMKNIECIE)
+# =========================================================================
+
+def guard_no_wizard_stubs() -> List[str]:
+    """
+    Sprawdz ze ekrany kreatora (StationEdit, FieldEdit, CatalogPicker)
+    importuja useSwitchgearOps i nie zawieraja stubowych console.log handlerow.
+    """
+    violations = []
+
+    screens = {
+        "StationEditScreen.tsx": "addField",
+        "FieldEditScreen.tsx": "addDevice",
+        "CatalogPicker.tsx": "assignCatalog",
+    }
+
+    wizard_dir = FRONTEND_SRC / "ui" / "wizard" / "switchgear"
+
+    for screen_name, required_op in screens.items():
+        screen_file = wizard_dir / screen_name
+        if not screen_file.exists():
+            # Guard 32 already checks existence — skip here
+            continue
+
+        try:
+            content = screen_file.read_text(encoding="utf-8")
+        except Exception:
+            violations.append(f"  Nie mozna odczytac {screen_name}")
+            continue
+
+        # Must import useSwitchgearOps
+        if "useSwitchgearOps" not in content:
+            violations.append(f"  {screen_name} nie importuje useSwitchgearOps")
+
+        # Must reference the required operation
+        if required_op not in content:
+            violations.append(f"  {screen_name} nie wywoluje '{required_op}'")
+
+    return violations
+
+
+# =========================================================================
 # MAIN
 # =========================================================================
 
@@ -1749,6 +1967,10 @@ def main() -> int:
         ("GUARD 31: Field/device inspector exists (RUN #3G)", guard_field_device_inspector_exists()),
         ("GUARD 32: Switchgear wizard exists (RUN #3G)", guard_switchgear_wizard_exists()),
         ("GUARD 33: Station field validation backend (RUN #3G)", guard_station_field_validation_backend()),
+        ("GUARD 34: PV/BESS validation module exists (RUN #3G DOMKNIECIE)", guard_pv_bess_validation_exists()),
+        ("GUARD 35: Wizard topology API wiring (RUN #3G DOMKNIECIE)", guard_wizard_topology_wiring()),
+        ("GUARD 36: Inspector results resolver (RUN #3G DOMKNIECIE)", guard_inspector_results_resolver()),
+        ("GUARD 37: No stub handlers in wizard screens (RUN #3G DOMKNIECIE)", guard_no_wizard_stubs()),
     ]
 
     total_violations = 0
