@@ -22,6 +22,8 @@ import { useMemo, useCallback } from 'react';
 import { useSelectionStore } from '../../selection/store';
 import { useSldEditorStore } from '../../sld-editor/SldEditorStore';
 import { useSldModeStore, type SldMode } from '../sldModeStore';
+import { useResultsInspectorStore } from '../../results-inspector/store';
+import { resolveElementResults } from './elementResultsResolver';
 import {
   selectProtectionSummaryByElementId,
   type ProtectionSummary,
@@ -788,18 +790,23 @@ export function useSldInspectorSelection(): UseSldInspectorSelectionResult {
     return { type: 'none' };
   }, [selectedElement, symbols]);
 
-  // Mock wyników (w rzeczywistości byłyby pobierane z results store)
-  // PR-SLD-07: Read-only, dane z istniejącego store
+  // Resolve results from ResultsInspectorStore by elementId
+  const busResults = useResultsInspectorStore((s) => s.busResults);
+  const branchResults = useResultsInspectorStore((s) => s.branchResults);
+  const shortCircuitResults = useResultsInspectorStore((s) => s.shortCircuitResults);
+
   const results = useMemo<InspectorResultData | null>(() => {
     if (!isResultsMode || selection.type !== 'element') {
       return null;
     }
 
-    // TODO: Pobierz rzeczywiste wyniki z ResultsStore
-    // Na razie zwróć null - wyniki będą dostępne gdy będzie zintegrowany
-    // z ResultsInspectorStore
-    return null;
-  }, [isResultsMode, selection]);
+    return resolveElementResults(
+      selection.elementId,
+      busResults,
+      branchResults,
+      shortCircuitResults,
+    );
+  }, [isResultsMode, selection, busResults, branchResults, shortCircuitResults]);
 
   // Mock diagnostyki (w rzeczywistości byłyby pobierane z diagnostics store)
   const diagnostics = useMemo<InspectorDiagnosticData | null>(() => {

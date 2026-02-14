@@ -107,3 +107,10 @@ export type {
   FieldDeviceResolution,
   FieldDeviceResultDataV1,
 } from './fieldDeviceInspector';
+
+// Element results resolver (RUN #3G §4 COMMIT C)
+export {
+  resolveElementResults,
+  resolveFieldDeviceResults,
+  NO_RESULTS_DATA,
+} from './elementResultsResolver';
