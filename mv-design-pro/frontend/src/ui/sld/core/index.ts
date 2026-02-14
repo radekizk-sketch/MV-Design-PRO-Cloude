@@ -231,3 +231,14 @@ export type {
   SwitchgearRenderResultV1,
   OverlapCheckResultV1,
 } from './switchgearRenderer';
+
+// PV/BESS Validation — hard transformer contract (RUN #3G §2)
+export {
+  validatePvBessConnections,
+  canSavePvBessGenerator,
+} from './pvBessValidation';
+
+export type {
+  PvBessConnectionInputV1,
+  PvBessValidationResultV1,
+} from './pvBessValidation';

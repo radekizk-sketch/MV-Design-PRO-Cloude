@@ -516,6 +516,10 @@ export const FieldDeviceFixCodes = {
   GENERATOR_CONNECTION_VARIANT_INVALID: 'generator.connection_variant_invalid',
   GENERATOR_STATION_REF_MISSING: 'generator.station_ref_missing',
   GENERATOR_STATION_REF_INVALID: 'generator.station_ref_invalid',
+  // Generator: hard PV/BESS transformer enforcement (RUN #3G §2)
+  GENERATOR_NN_VARIANT_REQUIRES_STATION_TR: 'generator.nn_variant_requires_station_transformer',
+  GENERATOR_BLOCK_VARIANT_REQUIRES_BLOCK_TR: 'generator.block_variant_requires_block_transformer',
+  GENERATOR_DIRECT_SN_FORBIDDEN: 'generator.direct_sn_connection_forbidden',
 
   // Model
   MODEL_NN_SCOPE_MISSING: 'model.nn_scope_missing',
