@@ -70,6 +70,18 @@ jobs:
         working-directory: mv-design-pro/frontend
         run: npx vitest run src/ui/sld/core/__tests__/exportManifest.test.ts --reporter=verbose
 
+      - name: Run GeometryOverrides contract tests (RUN #3H)
+        working-directory: mv-design-pro/frontend
+        run: npx vitest run src/ui/sld/core/__tests__/geometryOverrides.test.ts --reporter=verbose
+
+      - name: Run ApplyOverrides contract tests (RUN #3H)
+        working-directory: mv-design-pro/frontend
+        run: npx vitest run src/ui/sld/core/__tests__/applyOverrides.test.ts --reporter=verbose
+
+      - name: Run Overrides CI Render artifacts tests (RUN #3H)
+        working-directory: mv-design-pro/frontend
+        run: npx vitest run src/ui/sld/core/__tests__/overridesCiRender.test.ts --reporter=verbose
+
       - name: Upload test results
         if: always()
         uses: actions/upload-artifact@v4
