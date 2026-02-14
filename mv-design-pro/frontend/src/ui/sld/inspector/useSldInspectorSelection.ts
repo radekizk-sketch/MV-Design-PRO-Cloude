@@ -30,6 +30,8 @@ import {
   OC_CHARACTERISTIC_LABELS_PL,
   VERIFICATION_STATUS_LABELS_PL,
 } from '../protection';
+import { useSldProjectModeStore } from '../sldProjectModeStore';
+import { buildGeometrySection } from './geometrySection';
 import type {
   InspectorSelection,
   InspectorElementSelection,
@@ -818,6 +820,11 @@ export function useSldInspectorSelection(): UseSldInspectorSelectionResult {
     return null;
   }, [isResultsMode, selection]);
 
+  // RUN #3H: Dane trybu projektowego (overrides + bledy walidacji)
+  const projectModeActive = useSldProjectModeStore((s) => s.projectModeActive);
+  const projectOverrides = useSldProjectModeStore((s) => s.overrides);
+  const projectValidationErrors = useSldProjectModeStore((s) => s.validationErrors);
+
   // PR-SLD-09: Dane zabezpieczeń dla elementu
   const protection = useMemo<ProtectionSummary | null>(() => {
     if (selection.type !== 'element') {
@@ -875,6 +882,18 @@ export function useSldInspectorSelection(): UseSldInspectorSelectionResult {
         elementSections.push(...protectionSections);
       }
 
+      // RUN #3H: Dodaj sekcje geometrii jeśli tryb projektowy aktywny
+      if (projectModeActive) {
+        const geometrySection = buildGeometrySection(
+          selection.elementId,
+          projectOverrides,
+          projectValidationErrors,
+        );
+        if (geometrySection) {
+          elementSections.push(geometrySection);
+        }
+      }
+
       return elementSections;
     }
 
@@ -888,7 +907,7 @@ export function useSldInspectorSelection(): UseSldInspectorSelectionResult {
     }
 
     return [];
-  }, [selection, results, diagnostics, protection, isProtectionMode]);
+  }, [selection, results, diagnostics, protection, isProtectionMode, projectModeActive, projectOverrides, projectValidationErrors]);
 
   // Funkcja zamykania inspektora
   const closeInspector = useCallback(() => {

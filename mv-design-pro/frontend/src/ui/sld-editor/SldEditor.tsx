@@ -29,6 +29,8 @@ import { DiagnosticResultsLayer } from '../sld/DiagnosticResultsLayer';
 import type { AnySldSymbol } from './types';
 import { featureFlags } from '../config/featureFlags';
 import { useOverlayRuntime, OverlayLegend } from '../sld-overlay';
+import { ProjectModeToolbar } from '../sld/ProjectModeToolbar';
+import { useIsProjectMode } from '../sld/sldProjectModeStore';
 
 /**
  * SLD Editor props.
@@ -87,6 +89,9 @@ export const SldEditor: React.FC<SldEditorProps> = ({
   // PR-16: Overlay Runtime Engine
   const currentSymbols = Array.from(sldStore.symbols.values());
   const overlayRuntime = useOverlayRuntime(currentSymbols);
+
+  // RUN #3H: Project mode
+  const isProjectMode = useIsProjectMode();
 
   // Combine mutation blocking with results mode
   const isEditBlocked = isMutationBlocked || isResultsMode;
@@ -196,6 +201,11 @@ export const SldEditor: React.FC<SldEditorProps> = ({
 
       {/* Toolbar (hidden in WYNIKI mode) */}
       {showToolbar && !isResultsMode && <SldToolbar />}
+
+      {/* RUN #3H: Project Mode Toolbar */}
+      {!isResultsMode && (
+        <ProjectModeToolbar caseId={projectId ?? null} />
+      )}
 
       {/* Canvas */}
       <div className="flex-1 overflow-auto p-4 relative">
