@@ -8,6 +8,7 @@
 
 import { useState, useMemo, useCallback } from 'react';
 import { useSwitchgearStore } from './useSwitchgearStore';
+import { useSwitchgearOps } from './useSwitchgearOps';
 import { APARAT_TYPE_LABELS_PL, AparatTypeV1 } from '../../sld/core/fieldDeviceContracts';
 import type { CatalogEntryV1 } from './types';
 
@@ -15,11 +16,18 @@ import type { CatalogEntryV1 } from './types';
 // Component
 // ---------------------------------------------------------------------------
 
-export function CatalogPicker(): JSX.Element | null {
+export interface CatalogPickerProps {
+  /** Active study case ID for backend operations */
+  readonly caseId?: string | null;
+}
+
+export function CatalogPicker({ caseId = null }: CatalogPickerProps): JSX.Element | null {
   const catalogPickerOpen = useSwitchgearStore((s) => s.catalogPickerOpen);
+  const catalogPickerDeviceId = useSwitchgearStore((s) => s.catalogPickerDeviceId);
   const catalogPickerAparatType = useSwitchgearStore((s) => s.catalogPickerAparatType);
   const catalogEntries = useSwitchgearStore((s) => s.catalogEntries);
   const closeCatalogPicker = useSwitchgearStore((s) => s.closeCatalogPicker);
+  const { assignCatalog } = useSwitchgearOps(caseId);
 
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedEntry, setSelectedEntry] = useState<CatalogEntryV1 | null>(null);
@@ -48,13 +56,13 @@ export function CatalogPicker(): JSX.Element | null {
   }, [catalogEntries, catalogPickerAparatType, searchQuery]);
 
   const handleConfirm = useCallback(() => {
-    if (selectedEntry) {
-      // Will be wired to domain mutation in COMMIT 2
+    if (selectedEntry && catalogPickerDeviceId) {
+      void assignCatalog(catalogPickerDeviceId, selectedEntry.catalogId);
       closeCatalogPicker();
       setSelectedEntry(null);
       setSearchQuery('');
     }
-  }, [selectedEntry, closeCatalogPicker]);
+  }, [selectedEntry, catalogPickerDeviceId, assignCatalog, closeCatalogPicker]);
 
   const handleCancel = useCallback(() => {
     closeCatalogPicker();

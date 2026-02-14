@@ -14,6 +14,7 @@
 
 import { useCallback } from 'react';
 import { useSwitchgearStore, useCurrentFieldData, useFocusTarget } from './useSwitchgearStore';
+import { useSwitchgearOps } from './useSwitchgearOps';
 import {
   POLE_TYPE_LABELS_PL,
   APARAT_TYPE_LABELS_PL,
@@ -169,12 +170,18 @@ function FixActionRow({
 // Main Component
 // ---------------------------------------------------------------------------
 
-export function FieldEditScreen(): JSX.Element {
+export interface FieldEditScreenProps {
+  /** Active study case ID for backend operations */
+  readonly caseId?: string | null;
+}
+
+export function FieldEditScreen({ caseId = null }: FieldEditScreenProps): JSX.Element {
   const fieldData = useCurrentFieldData();
   const focusTarget = useFocusTarget();
   const navigateToStationEdit = useSwitchgearStore((s) => s.navigateToStationEdit);
   const navigateByFixAction = useSwitchgearStore((s) => s.navigateByFixAction);
   const openCatalogPicker = useSwitchgearStore((s) => s.openCatalogPicker);
+  const { addDevice, removeDevice } = useSwitchgearOps(caseId);
 
   const handleBack = useCallback(() => {
     if (fieldData) {
@@ -189,13 +196,21 @@ export function FieldEditScreen(): JSX.Element {
     [openCatalogPicker],
   );
 
-  const handleRemoveDevice = useCallback((_deviceId: string) => {
-    // Will be connected in COMMIT 2 (domain mutation)
-  }, []);
+  const handleRemoveDevice = useCallback(
+    (deviceId: string) => {
+      void removeDevice(deviceId);
+    },
+    [removeDevice],
+  );
 
-  const handleAddDevice = useCallback((_aparatType: string) => {
-    // Will be connected in COMMIT 2 (domain mutation)
-  }, []);
+  const handleAddDevice = useCallback(
+    (aparatType: string) => {
+      if (fieldData) {
+        void addDevice(fieldData.fieldId, aparatType);
+      }
+    },
+    [fieldData, addDevice],
+  );
 
   // Scroll to focused element after render
   if (focusTarget && typeof document !== 'undefined') {

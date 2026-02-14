@@ -10,6 +10,7 @@
 
 import { useCallback, useState } from 'react';
 import { useSwitchgearStore, useCurrentStationData } from './useSwitchgearStore';
+import { useSwitchgearOps } from './useSwitchgearOps';
 import { PoleTypeV1, POLE_TYPE_LABELS_PL } from '../../sld/core/fieldDeviceContracts';
 import type { FieldSummaryV1, GeneratorSourceEntryV1, ReadinessStatus } from './types';
 
@@ -152,10 +153,16 @@ function AddFieldDialog({
 // Main Component
 // ---------------------------------------------------------------------------
 
-export function StationEditScreen(): JSX.Element {
+export interface StationEditScreenProps {
+  /** Active study case ID for backend operations */
+  readonly caseId?: string | null;
+}
+
+export function StationEditScreen({ caseId = null }: StationEditScreenProps): JSX.Element {
   const stationData = useCurrentStationData();
   const navigateToStationList = useSwitchgearStore((s) => s.navigateToStationList);
   const navigateToFieldEdit = useSwitchgearStore((s) => s.navigateToFieldEdit);
+  const { addField } = useSwitchgearOps(caseId);
 
   const [addFieldSection, setAddFieldSection] = useState<'SN' | 'nN' | null>(null);
 
@@ -169,11 +176,13 @@ export function StationEditScreen(): JSX.Element {
   );
 
   const handleAddField = useCallback(
-    (_poleType: PoleTypeV1) => {
-      // Dispatch to domain — will be connected in COMMIT 2
+    (poleType: PoleTypeV1) => {
       setAddFieldSection(null);
+      if (stationData) {
+        void addField(stationData.stationId, poleType);
+      }
     },
-    [],
+    [stationData, addField],
   );
 
   if (!stationData) {
