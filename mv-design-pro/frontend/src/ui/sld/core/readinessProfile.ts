@@ -103,3 +103,80 @@ export function getBlockers(
 ): readonly ReadinessIssueV1[] {
   return issues.filter(i => i.priority === ReadinessPriority.BLOCKER);
 }
+
+// =============================================================================
+// Readiness Gates — hard blocking (RUN #3E §3)
+// =============================================================================
+
+/**
+ * Error thrown when an operation is blocked by readiness requirements.
+ */
+export class ReadinessGateError extends Error {
+  readonly gate: string;
+  readonly blockers: readonly ReadinessIssueV1[];
+
+  constructor(gate: string, blockers: readonly ReadinessIssueV1[]) {
+    const codes = blockers.slice(0, 5).map(b => b.code).join(', ');
+    super(`Readiness gate '${gate}' BLOCKED: ${blockers.length} blocker(s) [${codes}]`);
+    this.gate = gate;
+    this.blockers = blockers;
+    this.name = 'ReadinessGateError';
+  }
+}
+
+/**
+ * Gate: SLD rendering requires sldReady=true.
+ * @throws ReadinessGateError if SLD is not ready.
+ */
+export function requireSldReady(profile: ReadinessProfileV1): void {
+  if (profile.sldReady) return;
+  const blockers = profile.issues.filter(
+    i => i.priority === ReadinessPriority.BLOCKER &&
+      (i.area === ReadinessAreaV1.TOPOLOGY ||
+       i.area === ReadinessAreaV1.STATIONS ||
+       i.area === ReadinessAreaV1.GENERATORS),
+  );
+  throw new ReadinessGateError('sld_ready', blockers);
+}
+
+/**
+ * Gate: Short circuit analysis requires shortCircuitReady=true.
+ * @throws ReadinessGateError if short circuit analysis is not ready.
+ */
+export function requireShortCircuitReady(profile: ReadinessProfileV1): void {
+  if (profile.shortCircuitReady) return;
+  const blockers = profile.issues.filter(
+    i => i.priority === ReadinessPriority.BLOCKER &&
+      (i.area === ReadinessAreaV1.TOPOLOGY ||
+       i.area === ReadinessAreaV1.SOURCES ||
+       i.area === ReadinessAreaV1.CATALOGS),
+  );
+  throw new ReadinessGateError('short_circuit_ready', blockers);
+}
+
+/**
+ * Gate: Load flow analysis requires loadFlowReady=true.
+ * @throws ReadinessGateError if load flow analysis is not ready.
+ */
+export function requireLoadFlowReady(profile: ReadinessProfileV1): void {
+  if (profile.loadFlowReady) return;
+  const blockers = profile.issues.filter(
+    i => i.priority === ReadinessPriority.BLOCKER &&
+      (i.area === ReadinessAreaV1.TOPOLOGY ||
+       i.area === ReadinessAreaV1.SOURCES ||
+       i.area === ReadinessAreaV1.CATALOGS),
+  );
+  throw new ReadinessGateError('load_flow_ready', blockers);
+}
+
+/**
+ * Gate: Export requires ALL readiness flags=true.
+ * @throws ReadinessGateError if any blockers exist.
+ */
+export function requireExportReady(profile: ReadinessProfileV1): void {
+  const allBlockers = profile.issues.filter(
+    i => i.priority === ReadinessPriority.BLOCKER,
+  );
+  if (allBlockers.length === 0) return;
+  throw new ReadinessGateError('export_ready', allBlockers);
+}

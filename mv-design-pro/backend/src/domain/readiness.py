@@ -266,3 +266,79 @@ def build_readiness_profile(
         issues=sorted_issues,
         content_hash=content_hash,
     )
+
+
+# ---------------------------------------------------------------------------
+# Readiness Gate — hard blocking mechanisms (RUN #3E §3)
+# ---------------------------------------------------------------------------
+
+
+class ReadinessGateError(Exception):
+    """Raised when an operation is blocked by readiness requirements."""
+
+    def __init__(self, gate: str, blockers: list[ReadinessIssueV1]) -> None:
+        self.gate = gate
+        self.blockers = blockers
+        codes = ", ".join(b.code for b in blockers[:5])
+        super().__init__(
+            f"Readiness gate '{gate}' BLOCKED: {len(blockers)} blocker(s) [{codes}]"
+        )
+
+
+def require_sld_ready(profile: ReadinessProfileV1) -> None:
+    """Gate: SLD rendering requires sld_ready=True. Raises ReadinessGateError if not."""
+    if profile.sld_ready:
+        return
+    blockers = [
+        i for i in profile.issues
+        if i.priority == ReadinessPriority.BLOCKER
+        and i.area in (
+            ReadinessAreaV1.TOPOLOGY,
+            ReadinessAreaV1.STATIONS,
+            ReadinessAreaV1.GENERATORS,
+        )
+    ]
+    raise ReadinessGateError("sld_ready", blockers)
+
+
+def require_short_circuit_ready(profile: ReadinessProfileV1) -> None:
+    """Gate: Short circuit analysis requires short_circuit_ready=True."""
+    if profile.short_circuit_ready:
+        return
+    blockers = [
+        i for i in profile.issues
+        if i.priority == ReadinessPriority.BLOCKER
+        and i.area in (
+            ReadinessAreaV1.TOPOLOGY,
+            ReadinessAreaV1.SOURCES,
+            ReadinessAreaV1.CATALOGS,
+        )
+    ]
+    raise ReadinessGateError("short_circuit_ready", blockers)
+
+
+def require_load_flow_ready(profile: ReadinessProfileV1) -> None:
+    """Gate: Load flow analysis requires load_flow_ready=True."""
+    if profile.load_flow_ready:
+        return
+    blockers = [
+        i for i in profile.issues
+        if i.priority == ReadinessPriority.BLOCKER
+        and i.area in (
+            ReadinessAreaV1.TOPOLOGY,
+            ReadinessAreaV1.SOURCES,
+            ReadinessAreaV1.CATALOGS,
+        )
+    ]
+    raise ReadinessGateError("load_flow_ready", blockers)
+
+
+def require_export_ready(profile: ReadinessProfileV1) -> None:
+    """Gate: Export requires ALL readiness flags=True (no BLOCKERs anywhere)."""
+    all_blockers = [
+        i for i in profile.issues
+        if i.priority == ReadinessPriority.BLOCKER
+    ]
+    if not all_blockers:
+        return
+    raise ReadinessGateError("export_ready", all_blockers)

@@ -34,6 +34,12 @@ class ExportManifestV1:
     analysis_types: tuple[str, ...] = field(default_factory=tuple)
     """Analysis types included (SC_3F, LOAD_FLOW, etc.; sorted)."""
 
+    readiness_status: str = "UNKNOWN"
+    """Readiness status at export time: READY | PARTIAL | BLOCKED | UNKNOWN."""
+
+    spec_version: str = "1.1"
+    """ExportManifest spec version."""
+
     created_at: str = ""
     """ISO-8601 timestamp of export creation."""
 
@@ -48,6 +54,7 @@ def build_export_manifest(
     run_hash: str | None = None,
     element_ids: list[str] | tuple[str, ...],
     analysis_types: list[str] | tuple[str, ...],
+    readiness_status: str = "UNKNOWN",
 ) -> ExportManifestV1:
     """Build an ExportManifestV1 with computed content_hash.
 
@@ -68,11 +75,12 @@ def build_export_manifest(
     # Canonical JSON for hashing (deterministic key order)
     canonical = json.dumps(
         {
-            "snapshot_hash": snapshot_hash,
-            "layout_hash": layout_hash,
-            "run_hash": run_hash,
-            "element_ids": list(sorted_ids),
             "analysis_types": list(sorted_types),
+            "element_ids": list(sorted_ids),
+            "layout_hash": layout_hash,
+            "readiness_status": readiness_status,
+            "run_hash": run_hash,
+            "snapshot_hash": snapshot_hash,
         },
         sort_keys=True,
         separators=(",", ":"),
@@ -85,6 +93,7 @@ def build_export_manifest(
         run_hash=run_hash,
         element_ids=sorted_ids,
         analysis_types=sorted_types,
+        readiness_status=readiness_status,
         created_at=created_at,
         content_hash=content_hash,
     )

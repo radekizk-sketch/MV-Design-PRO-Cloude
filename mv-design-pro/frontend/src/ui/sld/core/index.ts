@@ -150,8 +150,13 @@ export type {
 export {
   ReadinessAreaV1,
   ReadinessPriority,
+  ReadinessGateError,
   groupIssuesByArea,
   getBlockers,
+  requireSldReady,
+  requireShortCircuitReady,
+  requireLoadFlowReady,
+  requireExportReady,
 } from './readinessProfile';
 
 export type {

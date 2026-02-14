@@ -497,7 +497,7 @@ export function buildVisualGraphFromTopology(
         voltageKv: station.voltageKv,
         inService: true,
         elementId: station.id,
-        elementType: 'Bus', // Stacja jest kontenerem logicznym
+        elementType: 'STATION', // ElementTypeV1.STATION — kontener logiczny
         elementName: station.name,
         switchState: null,
         branchType: null,
@@ -555,7 +555,7 @@ export function buildVisualGraphFromTopology(
         voltageKv: null,
         inService: gen.inService,
         elementId: gen.id,
-        elementType: 'Source',
+        elementType: 'GENERATOR', // ElementTypeV1.GENERATOR — nie Source
         elementName: gen.name,
         switchState: null,
         branchType: null,

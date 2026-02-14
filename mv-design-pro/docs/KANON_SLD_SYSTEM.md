@@ -62,7 +62,7 @@ Kliknięcie elementu na SLD generuje `SelectionRef`:
 
 ```typescript
 interface SelectionRef {
-  element_ref_id: string;     // ref_id elementu ENM
+  elementId: string;           // kanoniczny elementId (= ENMElement.ref_id)
   element_type: string;       // bus | branch | transformer | ...
   wizard_step_hint: string;   // K1-K10 — krok kreatora
 }

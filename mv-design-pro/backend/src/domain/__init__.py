@@ -15,10 +15,15 @@ from .grounding import Grounding
 from .limits import Limits
 from .readiness import (
     ReadinessAreaV1,
+    ReadinessGateError,
     ReadinessIssueV1,
     ReadinessPriority,
     ReadinessProfileV1,
     build_readiness_profile,
+    require_export_ready,
+    require_load_flow_ready,
+    require_short_circuit_ready,
+    require_sld_ready,
 )
 from .export_manifest import ExportManifestV1, build_export_manifest
 from .result_join import (
@@ -53,6 +58,7 @@ __all__ = [
     "Project",
     "ProjectDesignMode",
     "ReadinessAreaV1",
+    "ReadinessGateError",
     "ReadinessIssueV1",
     "ReadinessPriority",
     "ReadinessProfileV1",
@@ -73,4 +79,8 @@ __all__ = [
     "build_export_manifest",
     "build_readiness_profile",
     "join_results",
+    "require_export_ready",
+    "require_load_flow_ready",
+    "require_short_circuit_ready",
+    "require_sld_ready",
 ]

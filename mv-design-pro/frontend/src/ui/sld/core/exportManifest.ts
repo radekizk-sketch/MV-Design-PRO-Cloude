@@ -22,6 +22,10 @@ export interface ExportManifestV1 {
   readonly elementIds: readonly string[];
   /** Analysis types included (SC_3F, LOAD_FLOW, etc.; sorted). */
   readonly analysisTypes: readonly string[];
+  /** Readiness status at export time: READY | PARTIAL | BLOCKED | UNKNOWN. */
+  readonly readinessStatus: string;
+  /** ExportManifest spec version. */
+  readonly specVersion: string;
   /** ISO-8601 timestamp of export creation. */
   readonly createdAt: string;
   /** SHA-256 of the canonical JSON representation (determinism seal). */
@@ -44,9 +48,11 @@ export function buildExportManifest(params: {
   runHash?: string | null;
   elementIds: readonly string[];
   analysisTypes: readonly string[];
+  readinessStatus?: string;
 }): ExportManifestV1 {
   const sortedIds = [...new Set(params.elementIds)].sort();
   const sortedTypes = [...new Set(params.analysisTypes)].sort();
+  const readinessStatus = params.readinessStatus ?? 'UNKNOWN';
   const createdAt = new Date().toISOString();
 
   // Canonical JSON for hashing (deterministic key order)
@@ -54,6 +60,7 @@ export function buildExportManifest(params: {
     analysis_types: sortedTypes,
     element_ids: sortedIds,
     layout_hash: params.layoutHash,
+    readiness_status: readinessStatus,
     run_hash: params.runHash ?? null,
     snapshot_hash: params.snapshotHash,
   });
@@ -67,6 +74,8 @@ export function buildExportManifest(params: {
     runHash: params.runHash ?? null,
     elementIds: sortedIds,
     analysisTypes: sortedTypes,
+    readinessStatus,
+    specVersion: '1.1',
     createdAt,
     contentHash,
   };

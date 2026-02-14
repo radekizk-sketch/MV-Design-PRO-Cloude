@@ -350,7 +350,7 @@ export interface EnergyNetworkModel {
 
 export interface ValidationIssue {
   code: string;
-  severity: 'BLOCKER' | 'IMPORTANT' | 'INFO';
+  severity: 'BLOCKER' | 'WARNING' | 'INFO';
   message_pl: string;
   element_refs: string[];
   wizard_step_hint: string;
@@ -431,9 +431,9 @@ export interface ReadinessMatrix {
 // ---------------------------------------------------------------------------
 
 export interface SelectionRef {
-  /** ref_id elementu ENM */
-  element_ref_id: string;
-  /** Typ elementu */
+  /** Kanoniczny elementId (= ENMElement.ref_id = ElementRefV1.elementId) */
+  elementId: string;
+  /** Typ elementu (align z ElementTypeV1) */
   element_type: 'bus' | 'branch' | 'transformer' | 'source' | 'load' | 'generator'
     | 'substation' | 'bay' | 'junction' | 'corridor'
     | 'measurement' | 'protection_assignment';

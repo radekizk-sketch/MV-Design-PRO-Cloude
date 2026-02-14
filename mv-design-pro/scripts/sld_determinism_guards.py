@@ -26,6 +26,15 @@ Guards dodane w RUN #3D:
 13. Device catalog ref validation present (device-catalogRef-present)
 14. Relay binding fix actions generated for CB without protection (relay-binding-present)
 15. No auto-default/fabrication in stationBlockBuilder (zero-fabrication)
+
+Guards dodane w RUN #3E:
+16. Station elementType=STATION (not Bus) in adapter
+17. Generator elementType=GENERATOR (not Source) in adapter
+18. No new UI elementId creation (no uuid/nanoid fabrication)
+19. ReadinessGateError enforcement (gates exist in frontend + backend)
+20. ExportManifest spec v1.1 with readinessStatus field
+21. ResultJoin references domain elementId (not fabricated)
+22. Golden network E2E tests exist (7 topologies)
 """
 
 import os
@@ -99,6 +108,8 @@ def guard_single_layout_engine() -> List[str]:
         "computeSldAutoLayout",  # alias
         "computeIncrementalLayout",
         "computeLayout",  # RUN #3B — canonical 6-phase pipeline
+        "computeFullLayout",  # engine/sld-layout/pipeline — deleguje do computeLayout
+        "executeBusbarAutoLayout",  # busbar adapter — deleguje do computeBusbarAutoLayout
     }
 
     for path, func_name in layout_entrypoints:
@@ -318,10 +329,17 @@ def guard_layout_no_nondeterminism() -> List[str]:
         (r'\bcrypto\.getRandomValues\b', "crypto.getRandomValues()"),
     ]
 
+    # Pliki wykluczone z guard 6:
+    # exportManifest.ts: new Date() uzyty TYLKO do createdAt (informacyjny),
+    # NIE wchodzi w skład contentHash. Hash jest deterministyczny.
+    allowed_nondeterminism = {"exportManifest.ts"}
+
     for f in ts_files:
         rel = str(f.relative_to(FRONTEND_SRC))
         # Testy moga uzywac PRNG do permutacji (Fisher-Yates)
         if "__tests__" in rel or ".test." in rel or ".spec." in rel:
+            continue
+        if f.name in allowed_nondeterminism:
             continue
 
         try:
@@ -765,6 +783,360 @@ def guard_zero_fabrication() -> List[str]:
 
 
 # =========================================================================
+# GUARD 16: Station elementType must be STATION, not Bus (RUN #3E)
+# =========================================================================
+
+def guard_station_element_type() -> List[str]:
+    """
+    Sprawdz ze adapter NIE ustawia elementType='Bus' dla stacji.
+    Stacje MUSZA miec elementType='STATION' (ElementTypeV1.STATION).
+    """
+    violations = []
+    adapter_file = FRONTEND_SRC / "ui" / "sld" / "core" / "topologyAdapterV2.ts"
+
+    if not adapter_file.exists():
+        return violations
+
+    try:
+        content = adapter_file.read_text(encoding="utf-8")
+    except Exception:
+        return violations
+
+    # Szukaj sekcji tworzacej wezly stacji i sprawdz elementType
+    # Sekcja zaczyna sie od komentarza "--- 2. Create nodes for stations ---"
+    in_station_section = False
+    lines = content.split('\n')
+    for line_no, line in enumerate(lines, 1):
+        stripped = line.strip()
+
+        # Wykryj poczatek sekcji stacji (komentarz, nie loop)
+        if 'Create nodes for stations' in stripped:
+            in_station_section = True
+        if in_station_section and 'Create nodes for sources' in stripped:
+            in_station_section = False
+
+        if in_station_section and "elementType:" in stripped:
+            # elementType MUSI byc 'STATION', nie 'Bus'
+            if "'Bus'" in stripped or '"Bus"' in stripped:
+                violations.append(
+                    f"  Station elementType='Bus' (powinno byc 'STATION') w topologyAdapterV2.ts:{line_no}"
+                )
+
+    return violations
+
+
+# =========================================================================
+# GUARD 17: Generator elementType must be GENERATOR, not Source (RUN #3E)
+# =========================================================================
+
+def guard_generator_element_type() -> List[str]:
+    """
+    Sprawdz ze adapter NIE ustawia elementType='Source' dla generatorow.
+    Generatory MUSZA miec elementType='GENERATOR' (ElementTypeV1.GENERATOR).
+    """
+    violations = []
+    adapter_file = FRONTEND_SRC / "ui" / "sld" / "core" / "topologyAdapterV2.ts"
+
+    if not adapter_file.exists():
+        return violations
+
+    try:
+        content = adapter_file.read_text(encoding="utf-8")
+    except Exception:
+        return violations
+
+    # Szukaj sekcji tworzacej wezly generatorow i sprawdz elementType
+    in_generator_section = False
+    lines = content.split('\n')
+    for line_no, line in enumerate(lines, 1):
+        stripped = line.strip()
+
+        # Wykryj sekcje generatorow
+        if 'Create nodes for generators' in stripped or 'for (const gen of' in stripped:
+            in_generator_section = True
+        if in_generator_section and 'Create nodes for loads' in stripped:
+            in_generator_section = False
+
+        if in_generator_section and "elementType:" in stripped:
+            # elementType MUSI byc 'GENERATOR', nie 'Source'
+            if "'Source'" in stripped or '"Source"' in stripped:
+                violations.append(
+                    f"  Generator elementType='Source' (powinno byc 'GENERATOR') w topologyAdapterV2.ts:{line_no}"
+                )
+
+    return violations
+
+
+# =========================================================================
+# GUARD 18: No new UI elementId creation (identity_guard) (RUN #3E)
+# =========================================================================
+
+def guard_no_new_element_id_creation() -> List[str]:
+    """
+    Sprawdz ze nowe pliki nie tworza nowych schematow identyfikacji elementow.
+    Dozwolone: 'dev_' prefix (udokumentowany), 'edge_' prefix (SLD internal).
+    Zabronione: uuid/nanoid/randomUUID do tworzenia elementId.
+    """
+    violations = []
+
+    contract_dir = FRONTEND_SRC / "ui" / "sld" / "core"
+    if not contract_dir.exists():
+        return violations
+
+    ts_files = find_files(contract_dir, (".ts",))
+    forbidden_patterns = [
+        (r'\buuid\b', "uuid (fabricated elementId)"),
+        (r'\bnanoid\b', "nanoid (fabricated elementId)"),
+        (r'\brandomUUID\b', "randomUUID (fabricated elementId)"),
+        (r'\buuidv4\b', "uuidv4 (fabricated elementId)"),
+    ]
+
+    for f in ts_files:
+        rel = str(f.relative_to(FRONTEND_SRC))
+        if "__tests__" in rel or ".test." in rel:
+            continue
+
+        try:
+            content = f.read_text(encoding="utf-8")
+        except Exception:
+            continue
+
+        for pattern, label in forbidden_patterns:
+            matches = re.finditer(pattern, content, re.IGNORECASE)
+            for m in matches:
+                line_no = content[:m.start()].count('\n') + 1
+                # Skip comments
+                context_line = content.split('\n')[line_no - 1].strip()
+                if context_line.startswith('//') or context_line.startswith('*'):
+                    continue
+                violations.append(
+                    f"  Fabricated elementId: '{label}' w {rel}:{line_no}"
+                )
+
+    return violations
+
+
+# =========================================================================
+# GUARD 19: ReadinessGateError enforcement (RUN #3E)
+# =========================================================================
+
+def guard_readiness_gate_enforcement() -> List[str]:
+    """
+    Sprawdz ze ReadinessGateError jest zdefiniowany w OBIE strony (frontend + backend).
+    Gate functions MUSZA istniec: requireSldReady, requireShortCircuitReady,
+    requireLoadFlowReady, requireExportReady.
+    """
+    violations = []
+
+    # Frontend check
+    readiness_file_fe = FRONTEND_SRC / "ui" / "sld" / "core" / "readinessProfile.ts"
+    if readiness_file_fe.exists():
+        try:
+            content = readiness_file_fe.read_text(encoding="utf-8")
+        except Exception:
+            content = ""
+
+        required_fe = [
+            "class ReadinessGateError",
+            "function requireSldReady",
+            "function requireShortCircuitReady",
+            "function requireLoadFlowReady",
+            "function requireExportReady",
+        ]
+        for req in required_fe:
+            if req not in content:
+                violations.append(
+                    f"  BRAK '{req}' w readinessProfile.ts (frontend)"
+                )
+    else:
+        violations.append("  BRAK readinessProfile.ts — frontend gates missing")
+
+    # Backend check
+    readiness_file_be = BACKEND_SRC / "domain" / "readiness.py"
+    if readiness_file_be.exists():
+        try:
+            content = readiness_file_be.read_text(encoding="utf-8")
+        except Exception:
+            content = ""
+
+        required_be = [
+            "class ReadinessGateError",
+            "def require_sld_ready",
+            "def require_short_circuit_ready",
+            "def require_load_flow_ready",
+            "def require_export_ready",
+        ]
+        for req in required_be:
+            if req not in content:
+                violations.append(
+                    f"  BRAK '{req}' w readiness.py (backend)"
+                )
+    else:
+        violations.append("  BRAK readiness.py — backend gates missing")
+
+    return violations
+
+
+# =========================================================================
+# GUARD 20: ExportManifest spec v1.1 with readinessStatus (RUN #3E)
+# =========================================================================
+
+def guard_export_manifest_v11() -> List[str]:
+    """
+    Sprawdz ze ExportManifest ma specVersion 1.1 i pole readinessStatus.
+    Obie strony (frontend + backend) MUSZA byc zgodne.
+    """
+    violations = []
+
+    # Frontend
+    manifest_fe = FRONTEND_SRC / "ui" / "sld" / "core" / "exportManifest.ts"
+    if manifest_fe.exists():
+        try:
+            content = manifest_fe.read_text(encoding="utf-8")
+        except Exception:
+            content = ""
+
+        if "readinessStatus" not in content:
+            violations.append(
+                "  BRAK readinessStatus w exportManifest.ts (frontend)"
+            )
+        if "specVersion" not in content:
+            violations.append(
+                "  BRAK specVersion w exportManifest.ts (frontend)"
+            )
+        if "'1.1'" not in content and '"1.1"' not in content:
+            violations.append(
+                "  specVersion != '1.1' w exportManifest.ts (frontend)"
+            )
+    else:
+        violations.append("  BRAK exportManifest.ts (frontend)")
+
+    # Backend
+    manifest_be = BACKEND_SRC / "domain" / "export_manifest.py"
+    if manifest_be.exists():
+        try:
+            content = manifest_be.read_text(encoding="utf-8")
+        except Exception:
+            content = ""
+
+        if "readiness_status" not in content:
+            violations.append(
+                "  BRAK readiness_status w export_manifest.py (backend)"
+            )
+        if "spec_version" not in content:
+            violations.append(
+                "  BRAK spec_version w export_manifest.py (backend)"
+            )
+        if '"1.1"' not in content:
+            violations.append(
+                "  spec_version != '1.1' w export_manifest.py (backend)"
+            )
+    else:
+        violations.append("  BRAK export_manifest.py (backend)")
+
+    return violations
+
+
+# =========================================================================
+# GUARD 21: ResultJoin references domain elementId (RUN #3E)
+# =========================================================================
+
+def guard_result_join_domain_element_id() -> List[str]:
+    """
+    Sprawdz ze resultJoin.ts uzywa domain elementId, nie fabricowanych IDs.
+    ResultJoin NIE moze zawierac uuid/nanoid do tworzenia nowych identyfikatorow.
+    """
+    violations = []
+
+    result_join_files = [
+        FRONTEND_SRC / "ui" / "sld" / "core" / "resultJoin.ts",
+        BACKEND_SRC / "domain" / "result_join.py",
+    ]
+
+    for f in result_join_files:
+        if not f.exists():
+            continue
+        try:
+            content = f.read_text(encoding="utf-8")
+        except Exception:
+            continue
+
+        rel = f.name
+        forbidden = [
+            (r'\buuid\b', "uuid (fabricated ID)"),
+            (r'\bnanoid\b', "nanoid (fabricated ID)"),
+            (r'\brandomUUID\b', "randomUUID (fabricated ID)"),
+        ]
+
+        for pattern, label in forbidden:
+            matches = re.finditer(pattern, content, re.IGNORECASE)
+            for m in matches:
+                line_no = content[:m.start()].count('\n') + 1
+                context_line = content.split('\n')[line_no - 1].strip()
+                if context_line.startswith('//') or context_line.startswith('#') or context_line.startswith('*'):
+                    continue
+                violations.append(
+                    f"  ResultJoin fabricated ID: '{label}' w {rel}:{line_no}"
+                )
+
+    return violations
+
+
+# =========================================================================
+# GUARD 22: Golden network E2E tests exist (RUN #3E)
+# =========================================================================
+
+def guard_golden_network_e2e_exists() -> List[str]:
+    """
+    Sprawdz ze plik goldenNetworkE2E.test.ts istnieje
+    i zawiera 7 wymaganych topologii.
+    """
+    violations = []
+    golden_file = FRONTEND_SRC / "ui" / "sld" / "core" / "__tests__" / "goldenNetworkE2E.test.ts"
+
+    if not golden_file.exists():
+        violations.append(
+            "  BRAK goldenNetworkE2E.test.ts — brak referencyjnych testow E2E"
+        )
+        return violations
+
+    try:
+        content = golden_file.read_text(encoding="utf-8")
+    except Exception:
+        violations.append("  Nie mozna odczytac goldenNetworkE2E.test.ts")
+        return violations
+
+    required_networks = [
+        ("GN-E2E-01", "radial 10 stations"),
+        ("GN-E2E-02", "ring with NOP"),
+        ("GN-E2E-03", "branch station"),
+        ("GN-E2E-04", "sectional Type D"),
+        ("GN-E2E-05", "PV nn_side"),
+        ("GN-E2E-06", "BESS nn_side"),
+        ("GN-E2E-07", "PV+BESS block_transformer"),
+    ]
+
+    for code, desc in required_networks:
+        if code not in content:
+            violations.append(
+                f"  BRAK golden network {code} ({desc}) w goldenNetworkE2E.test.ts"
+            )
+
+    # Must have determinism tests
+    if "hash stability" not in content.lower() and "hash stable" not in content.lower():
+        violations.append(
+            "  BRAK testow hash stability w goldenNetworkE2E.test.ts"
+        )
+
+    if "permutation invariance" not in content.lower() and "permutation" not in content.lower():
+        violations.append(
+            "  BRAK testow permutation invariance w goldenNetworkE2E.test.ts"
+        )
+
+    return violations
+
+
+# =========================================================================
 # MAIN
 # =========================================================================
 
@@ -785,6 +1157,13 @@ def main() -> int:
         ("GUARD 13: Device catalog ref validation (RUN #3D)", guard_device_catalog_ref_present()),
         ("GUARD 14: Relay binding fix actions (RUN #3D)", guard_relay_binding_present()),
         ("GUARD 15: Zero fabrication in builder (RUN #3D)", guard_zero_fabrication()),
+        ("GUARD 16: Station elementType=STATION (RUN #3E)", guard_station_element_type()),
+        ("GUARD 17: Generator elementType=GENERATOR (RUN #3E)", guard_generator_element_type()),
+        ("GUARD 18: No new UI elementId creation (RUN #3E)", guard_no_new_element_id_creation()),
+        ("GUARD 19: ReadinessGateError enforcement (RUN #3E)", guard_readiness_gate_enforcement()),
+        ("GUARD 20: ExportManifest spec v1.1 + readinessStatus (RUN #3E)", guard_export_manifest_v11()),
+        ("GUARD 21: ResultJoin domain elementId (RUN #3E)", guard_result_join_domain_element_id()),
+        ("GUARD 22: Golden network E2E tests exist (RUN #3E)", guard_golden_network_e2e_exists()),
     ]
 
     total_violations = 0
