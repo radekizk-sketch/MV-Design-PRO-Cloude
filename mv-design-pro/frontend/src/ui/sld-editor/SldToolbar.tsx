@@ -23,6 +23,7 @@ import { CopyPasteCommand } from './commands/CopyPasteCommand';
 import { alignSymbols, distributeSymbols } from './utils/geometry';
 import type { AlignDirection, DistributeDirection } from './types';
 import { featureFlags } from '../config/featureFlags';
+import { useSldProjectModeStore, useIsProjectMode, useOverridesDirty } from '../sld/sldProjectModeStore';
 
 /**
  * Toolbar button component.
@@ -90,6 +91,15 @@ export const SldToolbar: React.FC = () => {
   const canCopy = hasSelection;
   const canPaste = sldStore.clipboard !== null && !isMutationBlocked;
   const canDuplicate = hasSelection && !isMutationBlocked;
+  // RUN #3H: Project mode overrides
+  const isProjectMode = useIsProjectMode();
+  const isProjectDirty = useOverridesDirty();
+  const projectLoading = useSldProjectModeStore((s) => s.loading);
+  const projectOverrides = useSldProjectModeStore((s) => s.overrides);
+  const saveOverrides = useSldProjectModeStore((s) => s.saveOverrides);
+  const loadOverrides = useSldProjectModeStore((s) => s.loadOverrides);
+  const resetProjectOverrides = useSldProjectModeStore((s) => s.resetOverrides);
+
   const canEditCadGeometry = featureFlags.sldCadEditingEnabled && sldStore.geometryMode !== 'AUTO' && !isMutationBlocked;
   const canEditBends = canEditCadGeometry && selectedConnectionId !== null;
   const canRemoveBend = canEditBends && selectedBendIndex !== null;
@@ -259,6 +269,23 @@ export const SldToolbar: React.FC = () => {
     sldStore.resetAllCadOverrides();
   }, [sldStore]);
 
+  // RUN #3H: Project mode override handlers
+  const handleProjectSave = useCallback(async () => {
+    // caseId derived from sldStore or external context — pass dummy for now
+    const caseId = 'default';
+    await saveOverrides(caseId);
+  }, [saveOverrides]);
+
+  const handleProjectLoad = useCallback(async () => {
+    const caseId = 'default';
+    await loadOverrides(caseId);
+  }, [loadOverrides]);
+
+  const handleProjectReset = useCallback(async () => {
+    const caseId = 'default';
+    await resetProjectOverrides(caseId);
+  }, [resetProjectOverrides]);
+
   return (
     <div className="flex items-center gap-2 px-4 py-2 bg-gray-50 border-b border-gray-300">
       {/* Selection count */}
@@ -405,6 +432,34 @@ export const SldToolbar: React.FC = () => {
               title="Wyczyść wszystkie nadpisania CAD"
               onClick={handleResetAll}
               disabled={!canResetAll}
+            />
+          </div>
+        </>
+      )}
+
+      {/* RUN #3H: Project mode overrides */}
+      {isProjectMode && (
+        <>
+          <ToolbarDivider />
+          <div className="flex items-center gap-1">
+            <span className="text-xs text-gray-500 mr-1">Nadpisania:</span>
+            <ToolbarButton
+              label="Zapisz"
+              title="Zapisz nadpisania geometrii"
+              onClick={handleProjectSave}
+              disabled={!isProjectDirty || projectLoading}
+            />
+            <ToolbarButton
+              label="Wczytaj"
+              title="Wczytaj nadpisania z serwera"
+              onClick={handleProjectLoad}
+              disabled={projectLoading}
+            />
+            <ToolbarButton
+              label="Resetuj"
+              title="Resetuj nadpisania do pustych"
+              onClick={handleProjectReset}
+              disabled={projectLoading || projectOverrides === null}
             />
           </div>
         </>

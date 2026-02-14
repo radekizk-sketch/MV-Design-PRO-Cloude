@@ -31,6 +31,7 @@ import { featureFlags } from '../config/featureFlags';
 import { useOverlayRuntime, OverlayLegend } from '../sld-overlay';
 import { ProjectModeToolbar } from '../sld/ProjectModeToolbar';
 import { useIsProjectMode } from '../sld/sldProjectModeStore';
+import { useSldDragCad } from './hooks/useSldDragCad';
 
 /**
  * SLD Editor props.
@@ -90,8 +91,9 @@ export const SldEditor: React.FC<SldEditorProps> = ({
   const currentSymbols = Array.from(sldStore.symbols.values());
   const overlayRuntime = useOverlayRuntime(currentSymbols);
 
-  // RUN #3H: Project mode
+  // RUN #3H: Project mode + CAD drag
   const isProjectMode = useIsProjectMode();
+  const cadDrag = useSldDragCad();
 
   // Combine mutation blocking with results mode
   const isEditBlocked = isMutationBlocked || isResultsMode;

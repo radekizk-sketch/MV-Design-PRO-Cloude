@@ -95,12 +95,24 @@ export interface SldProjectModeState {
   ) => void;
 
   /**
+   * Dodaj lub zamien override (wygodne API dla drag hook).
+   * Rownowazne applyDelta() ale z gotowym OverrideItemV1.
+   */
+  addOrReplaceOverride: (item: GeometryOverrideItemV1) => void;
+
+  /**
    * Usun override dla elementu (po elementId+scope).
    */
   removeOverride: (elementId: string, scope: OverrideScopeV1) => void;
 
   /** Waliduj overrides przeciwko layoutowi. */
   validate: (layout: LayoutResultV1) => void;
+
+  /**
+   * Waliduj overrides i sprawdz kolizje (pelna walidacja).
+   * Zwraca bledy walidacji (ustawia validationErrors w stanie).
+   */
+  validateOverrides: (layout: LayoutResultV1) => readonly OverrideValidationErrorV1[];
 }
 
 // =============================================================================
@@ -226,6 +238,30 @@ export const useSldProjectModeStore = create<SldProjectModeState>((set, get) => 
     set({ overrides: newOverrides, dirty: true });
   },
 
+  addOrReplaceOverride: (item) => {
+    const { overrides } = get();
+    const base = overrides ?? emptyOverrides('', '');
+
+    const existingIndex = base.items.findIndex(
+      (existing) => existing.elementId === item.elementId && existing.scope === item.scope,
+    );
+
+    let newItems: GeometryOverrideItemV1[];
+    if (existingIndex >= 0) {
+      newItems = [...base.items];
+      newItems[existingIndex] = item;
+    } else {
+      newItems = [...base.items, item];
+    }
+
+    const newOverrides = canonicalizeOverrides({
+      ...base,
+      items: newItems,
+    });
+
+    set({ overrides: newOverrides, dirty: true });
+  },
+
   removeOverride: (elementId, scope) => {
     const { overrides } = get();
     if (!overrides) return;
@@ -255,6 +291,21 @@ export const useSldProjectModeStore = create<SldProjectModeState>((set, get) => 
 
     const result = validateOverridesAgainstLayout(overrides, nodeIds, blockIds);
     set({ validationErrors: result.errors });
+  },
+
+  validateOverrides: (layout) => {
+    const { overrides } = get();
+    if (!overrides || overrides.items.length === 0) {
+      set({ validationErrors: [] });
+      return [];
+    }
+
+    const nodeIds = new Set(layout.nodePlacements.map((p) => p.nodeId));
+    const blockIds = new Set(layout.switchgearBlocks.map((b) => b.blockId));
+
+    const result = validateOverridesAgainstLayout(overrides, nodeIds, blockIds);
+    set({ validationErrors: result.errors });
+    return result.errors;
   },
 }));
 
