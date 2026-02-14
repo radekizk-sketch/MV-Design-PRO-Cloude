@@ -209,3 +209,25 @@ export type {
 export { buildExportManifest } from './exportManifest';
 
 export type { ExportManifestV1 } from './exportManifest';
+
+// SwitchgearRenderer — deterministic field/apparatus rendering (RUN #3G §3)
+export {
+  FIELD_COLUMN_PITCH,
+  DEVICE_SLOT_HEIGHT,
+  DEVICE_SYMBOL_WIDTH,
+  DEVICE_SYMBOL_HEIGHT,
+  BUS_BAR_HEIGHT,
+  OFF_PATH_OFFSET_X,
+  BUSBAR_Y,
+  renderSwitchgearBlock,
+  checkSymbolOverlap,
+  validateSymbolRegistry,
+  findElementById,
+  findDevicesInField,
+} from './switchgearRenderer';
+
+export type {
+  SwitchgearRenderElementV1,
+  SwitchgearRenderResultV1,
+  OverlapCheckResultV1,
+} from './switchgearRenderer';
