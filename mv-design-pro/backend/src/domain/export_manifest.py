@@ -46,6 +46,12 @@ class ExportManifestV1:
     content_hash: str = ""
     """SHA-256 of the canonical JSON representation (determinism seal)."""
 
+    overrides_hash: str | None = None
+    """Geometry overrides hash (null if no overrides). RUN #3H."""
+
+    overrides_version: str | None = None
+    """Geometry overrides version (null if no overrides). RUN #3H."""
+
 
 def build_export_manifest(
     *,
@@ -55,6 +61,8 @@ def build_export_manifest(
     element_ids: list[str] | tuple[str, ...],
     analysis_types: list[str] | tuple[str, ...],
     readiness_status: str = "UNKNOWN",
+    overrides_hash: str | None = None,
+    overrides_version: str | None = None,
 ) -> ExportManifestV1:
     """Build an ExportManifestV1 with computed content_hash.
 
@@ -78,6 +86,7 @@ def build_export_manifest(
             "analysis_types": list(sorted_types),
             "element_ids": list(sorted_ids),
             "layout_hash": layout_hash,
+            "overrides_hash": overrides_hash,
             "readiness_status": readiness_status,
             "run_hash": run_hash,
             "snapshot_hash": snapshot_hash,
@@ -94,6 +103,9 @@ def build_export_manifest(
         element_ids=sorted_ids,
         analysis_types=sorted_types,
         readiness_status=readiness_status,
+        spec_version="1.2",
         created_at=created_at,
         content_hash=content_hash,
+        overrides_hash=overrides_hash,
+        overrides_version=overrides_version,
     )

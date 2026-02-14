@@ -280,3 +280,18 @@ export type {
   EffectiveLayoutV1,
   CollisionCheckResultV1,
 } from './applyOverrides';
+
+// Overrides API Client (RUN #3H §3)
+export {
+  fetchSldOverrides,
+  saveSldOverrides,
+  validateSldOverrides,
+  resetSldOverrides,
+  mapResponseToOverrides,
+  mapValidateResponse,
+} from './overridesApi';
+
+export type {
+  OverridesApiResponse,
+  ValidateApiResponse,
+} from './overridesApi';
