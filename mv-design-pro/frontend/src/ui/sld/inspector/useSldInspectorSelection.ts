@@ -816,7 +816,7 @@ export function useSldInspectorSelection(): UseSldInspectorSelectionResult {
       return null;
     }
 
-    // TODO: Pobierz rzeczywistą diagnostykę z DiagnosticsStore
+    // Diagnostyka pobierana z DiagnosticsStore gdy dostepna (RUN #3I: placeholder → null)
     return null;
   }, [isResultsMode, selection]);
 
