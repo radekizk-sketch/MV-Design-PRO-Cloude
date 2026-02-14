@@ -125,16 +125,24 @@ ResultJoinV1:
   - unmatchedSnapshotIds[] → elementy bez wynikow
 ```
 
-## ExportManifestV1 (planned)
+## ExportManifestV1 (IMPLEMENTED — KROK 5)
 
 ```
 ExportManifestV1:
   snapshotHash: string         # Snapshot fingerprint
   layoutHash: string           # LayoutResult hash
   runHash: string | null       # ResultSet deterministic_signature
-  elementIds: string[]         # All ElementRefV1.elementId used
-  analysisTypes: string[]      # SC_3F, LOAD_FLOW, etc.
-  createdAt: string            # ISO timestamp
+  elementIds: string[]         # All ElementRefV1.elementId used (sorted, deduplicated)
+  analysisTypes: string[]      # SC_3F, LOAD_FLOW, etc. (sorted)
+  createdAt: string            # ISO-8601 timestamp
+  contentHash: string          # SHA-256 determinism seal
+
+Files:
+  backend:  src/domain/export_manifest.py
+  frontend: src/ui/sld/core/exportManifest.ts
+Tests:
+  backend:  tests/test_e2e_determinism.py (TestExportManifestDeterminism + TestFullChainDeterminism)
+  frontend: src/ui/sld/core/__tests__/exportManifest.test.ts
 ```
 
 ## Zero Fabrication Rule

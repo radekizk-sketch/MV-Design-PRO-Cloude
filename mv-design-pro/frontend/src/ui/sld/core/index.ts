@@ -172,3 +172,8 @@ export type {
   ResultJoinV1,
   ElementResultInput,
 } from './resultJoin';
+
+// ExportManifestV1 — deterministic export identity seal (KROK 5)
+export { buildExportManifest } from './exportManifest';
+
+export type { ExportManifestV1 } from './exportManifest';

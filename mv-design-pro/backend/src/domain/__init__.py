@@ -20,6 +20,7 @@ from .readiness import (
     ReadinessProfileV1,
     build_readiness_profile,
 )
+from .export_manifest import ExportManifestV1, build_export_manifest
 from .result_join import (
     InspectorFactV1,
     ResultJoinV1,
@@ -39,6 +40,7 @@ __all__ = [
     "ElementRefV1",
     "ElementScopeV1",
     "ElementTypeV1",
+    "ExportManifestV1",
     "Grounding",
     "AnalysisRun",
     "InspectorFactV1",
@@ -68,6 +70,7 @@ __all__ = [
     "UnitSystem",
     "ValidationIssue",
     "ValidationReport",
+    "build_export_manifest",
     "build_readiness_profile",
     "join_results",
 ]
