@@ -20,10 +20,20 @@ from .readiness import (
     ReadinessPriority,
     ReadinessProfileV1,
     build_readiness_profile,
+    require_devices_parametrized,
     require_export_ready,
+    require_fields_complete,
     require_load_flow_ready,
+    require_protection_bindings,
     require_short_circuit_ready,
     require_sld_ready,
+)
+from .field_device import (
+    AparatTypeV1,
+    DeviceTypeV1 as FieldDeviceTypeV1,
+    FieldRoleV1,
+    PoleTypeV1,
+    validate_generator_field_connection,
 )
 from .export_manifest import ExportManifestV1, build_export_manifest
 from .result_join import (
@@ -79,8 +89,17 @@ __all__ = [
     "build_export_manifest",
     "build_readiness_profile",
     "join_results",
+    "require_devices_parametrized",
     "require_export_ready",
+    "require_fields_complete",
     "require_load_flow_ready",
+    "require_protection_bindings",
     "require_short_circuit_ready",
     "require_sld_ready",
+    # Field/Device (RUN #3F)
+    "AparatTypeV1",
+    "FieldDeviceTypeV1",
+    "FieldRoleV1",
+    "PoleTypeV1",
+    "validate_generator_field_connection",
 ]

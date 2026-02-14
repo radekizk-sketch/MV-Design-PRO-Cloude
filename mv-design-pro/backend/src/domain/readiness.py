@@ -342,3 +342,56 @@ def require_export_ready(profile: ReadinessProfileV1) -> None:
     if not all_blockers:
         return
     raise ReadinessGateError("export_ready", all_blockers)
+
+
+# ---------------------------------------------------------------------------
+# Field/Device readiness gates (RUN #3F §3)
+# ---------------------------------------------------------------------------
+
+
+def require_fields_complete(profile: ReadinessProfileV1) -> None:
+    """Gate: All station fields must have required apparatus.
+
+    Blocks when any field.device_missing.* BLOCKER exists.
+    """
+    blockers = [
+        i for i in profile.issues
+        if i.priority == ReadinessPriority.BLOCKER
+        and i.code.startswith("field.device_missing.")
+    ]
+    if not blockers:
+        return
+    raise ReadinessGateError("fields_complete", blockers)
+
+
+def require_devices_parametrized(profile: ReadinessProfileV1) -> None:
+    """Gate: All critical apparatus must have parameters (CB rating, CT ratio, etc.).
+
+    Blocks when any device.*.missing BLOCKER exists.
+    """
+    blockers = [
+        i for i in profile.issues
+        if i.priority == ReadinessPriority.BLOCKER
+        and (
+            i.code.startswith("device.")
+            or i.code == "catalog.ref_missing"
+        )
+    ]
+    if not blockers:
+        return
+    raise ReadinessGateError("devices_parametrized", blockers)
+
+
+def require_protection_bindings(profile: ReadinessProfileV1) -> None:
+    """Gate: All relays must be bound to breakers (CB).
+
+    Blocks when protection.relay_binding_missing or protection.relay_cb_binding_missing.
+    """
+    blockers = [
+        i for i in profile.issues
+        if i.priority == ReadinessPriority.BLOCKER
+        and i.code.startswith("protection.")
+    ]
+    if not blockers:
+        return
+    raise ReadinessGateError("protection_bindings", blockers)

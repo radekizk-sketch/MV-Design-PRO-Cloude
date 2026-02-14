@@ -35,6 +35,14 @@ Guards dodane w RUN #3E:
 20. ExportManifest spec v1.1 with readinessStatus field
 21. ResultJoin references domain elementId (not fabricated)
 22. Golden network E2E tests exist (7 topologies)
+
+Guards dodane w RUN #3F:
+23. Polish taxonomy completeness (PoleTypeV1 + AparatTypeV1 in FE + BE)
+24. PV/BESS transformer enforcement (no direct connection without TR)
+25. Field/device readiness gates exist (3 gates: fields_complete, devices_parametrized, protection_bindings)
+26. Symbol registry completeness (DeviceType → SldSymbolType mapping)
+27. No decorative symbols in symbol registry (only IEC-compliant)
+28. Field device tests exist (FE: fieldDevicePolish.test.ts, BE: test_field_device.py)
 """
 
 import os
@@ -1137,6 +1145,357 @@ def guard_golden_network_e2e_exists() -> List[str]:
 
 
 # =========================================================================
+# GUARD 23: Polish taxonomy completeness (PoleTypeV1 + AparatTypeV1) (RUN #3F)
+# =========================================================================
+
+def guard_polish_taxonomy_completeness() -> List[str]:
+    """
+    Sprawdz ze PoleTypeV1 i AparatTypeV1 sa zdefiniowane w OBIE strony (FE + BE).
+    Polish taxonomy MUSI byc zsynchronizowana.
+    """
+    violations = []
+
+    # Frontend check
+    contracts_fe = FRONTEND_SRC / "ui" / "sld" / "core" / "fieldDeviceContracts.ts"
+    if contracts_fe.exists():
+        try:
+            content = contracts_fe.read_text(encoding="utf-8")
+        except Exception:
+            content = ""
+
+        required_pole_types = [
+            "POLE_LINIOWE_SN",
+            "POLE_TRANSFORMATOROWE_SN_NN",
+            "POLE_SPRZEGLOWE_SN",
+            "POLE_ZRODLA_PV_SN",
+            "POLE_ZRODLA_BESS_SN",
+            "POLE_LACZNIKA_SZYN_SN",
+            "POLE_GLOWNE_NN",
+            "POLE_ODPLYWOWE_NN",
+            "POLE_ZRODLA_PV_NN",
+            "POLE_ZRODLA_BESS_NN",
+        ]
+        for pt in required_pole_types:
+            if pt not in content:
+                violations.append(
+                    f"  BRAK PoleTypeV1.{pt} w fieldDeviceContracts.ts (frontend)"
+                )
+
+        required_aparat_types = [
+            "WYLACZNIK",
+            "ODLACZNIK",
+            "ROZLACZNIK",
+            "BEZPIECZNIK",
+            "UZIEMNIK",
+            "PRZEKLADNIK_PRADOWY",
+            "PRZEKLADNIK_NAPIECIOWY",
+            "ZABEZPIECZENIE",
+        ]
+        for at in required_aparat_types:
+            if at not in content:
+                violations.append(
+                    f"  BRAK AparatTypeV1.{at} w fieldDeviceContracts.ts (frontend)"
+                )
+    else:
+        violations.append("  BRAK fieldDeviceContracts.ts (frontend)")
+
+    # Backend check
+    field_device_be = BACKEND_SRC / "domain" / "field_device.py"
+    if field_device_be.exists():
+        try:
+            content = field_device_be.read_text(encoding="utf-8")
+        except Exception:
+            content = ""
+
+        if "class PoleTypeV1" not in content:
+            violations.append("  BRAK class PoleTypeV1 w field_device.py (backend)")
+        if "class AparatTypeV1" not in content:
+            violations.append("  BRAK class AparatTypeV1 w field_device.py (backend)")
+        if "POLE_TO_FIELD_ROLE" not in content:
+            violations.append("  BRAK POLE_TO_FIELD_ROLE w field_device.py (backend)")
+        if "APARAT_TO_DEVICE_TYPE" not in content:
+            violations.append("  BRAK APARAT_TO_DEVICE_TYPE w field_device.py (backend)")
+    else:
+        violations.append("  BRAK field_device.py (backend)")
+
+    return violations
+
+
+# =========================================================================
+# GUARD 24: PV/BESS transformer enforcement (RUN #3F)
+# =========================================================================
+
+def guard_pv_bess_transformer_enforcement() -> List[str]:
+    """
+    Sprawdz ze walidacja PV/BESS przez transformator istnieje.
+    Backend MUSI miec validate_generator_field_connection.
+    Frontend MUSI miec walidacje wariantow (nn_side, block_transformer).
+    """
+    violations = []
+
+    # Backend
+    field_device_be = BACKEND_SRC / "domain" / "field_device.py"
+    if field_device_be.exists():
+        try:
+            content = field_device_be.read_text(encoding="utf-8")
+        except Exception:
+            content = ""
+
+        if "def validate_generator_field_connection" not in content:
+            violations.append(
+                "  BRAK validate_generator_field_connection w field_device.py (backend)"
+            )
+        if "nn_side" not in content:
+            violations.append(
+                "  BRAK obslugi wariantu nn_side w field_device.py (backend)"
+            )
+        if "block_transformer" not in content:
+            violations.append(
+                "  BRAK obslugi wariantu block_transformer w field_device.py (backend)"
+            )
+    else:
+        violations.append("  BRAK field_device.py (backend) — PV/BESS validation missing")
+
+    # Frontend — fieldDeviceContracts must not allow direct PV/BESS without TR
+    contracts_fe = FRONTEND_SRC / "ui" / "sld" / "core" / "fieldDeviceContracts.ts"
+    if contracts_fe.exists():
+        try:
+            content = contracts_fe.read_text(encoding="utf-8")
+        except Exception:
+            content = ""
+
+        # PV and BESS fields must require TRANSFORMER or GENERATOR device
+        if "PV_SN" not in content:
+            violations.append("  BRAK roli PV_SN w fieldDeviceContracts.ts")
+        if "BESS_SN" not in content:
+            violations.append("  BRAK roli BESS_SN w fieldDeviceContracts.ts")
+        if "PV_NN" not in content:
+            violations.append("  BRAK roli PV_NN w fieldDeviceContracts.ts")
+        if "BESS_NN" not in content:
+            violations.append("  BRAK roli BESS_NN w fieldDeviceContracts.ts")
+
+    return violations
+
+
+# =========================================================================
+# GUARD 25: Field/device readiness gates (3 gates) (RUN #3F)
+# =========================================================================
+
+def guard_field_device_readiness_gates() -> List[str]:
+    """
+    Sprawdz ze 3 nowe readiness gates istnieja w OBIE strony:
+    - requireFieldsComplete / require_fields_complete
+    - requireDevicesParametrized / require_devices_parametrized
+    - requireProtectionBindings / require_protection_bindings
+    """
+    violations = []
+
+    # Frontend
+    readiness_fe = FRONTEND_SRC / "ui" / "sld" / "core" / "readinessProfile.ts"
+    if readiness_fe.exists():
+        try:
+            content = readiness_fe.read_text(encoding="utf-8")
+        except Exception:
+            content = ""
+
+        required_fe = [
+            "function requireFieldsComplete",
+            "function requireDevicesParametrized",
+            "function requireProtectionBindings",
+        ]
+        for req in required_fe:
+            if req not in content:
+                violations.append(f"  BRAK '{req}' w readinessProfile.ts (frontend)")
+    else:
+        violations.append("  BRAK readinessProfile.ts — field/device gates missing (frontend)")
+
+    # Backend
+    readiness_be = BACKEND_SRC / "domain" / "readiness.py"
+    if readiness_be.exists():
+        try:
+            content = readiness_be.read_text(encoding="utf-8")
+        except Exception:
+            content = ""
+
+        required_be = [
+            "def require_fields_complete",
+            "def require_devices_parametrized",
+            "def require_protection_bindings",
+        ]
+        for req in required_be:
+            if req not in content:
+                violations.append(f"  BRAK '{req}' w readiness.py (backend)")
+    else:
+        violations.append("  BRAK readiness.py — field/device gates missing (backend)")
+
+    return violations
+
+
+# =========================================================================
+# GUARD 26: Symbol registry completeness (RUN #3F)
+# =========================================================================
+
+def guard_symbol_registry_completeness() -> List[str]:
+    """
+    Sprawdz ze rejestr symboli (DEVICE_TO_SYMBOL) istnieje
+    i ze SldSymbolTypeV1 jest zdefiniowany.
+    """
+    violations = []
+    contracts_fe = FRONTEND_SRC / "ui" / "sld" / "core" / "fieldDeviceContracts.ts"
+
+    if not contracts_fe.exists():
+        violations.append("  BRAK fieldDeviceContracts.ts — symbol registry missing")
+        return violations
+
+    try:
+        content = contracts_fe.read_text(encoding="utf-8")
+    except Exception:
+        violations.append("  Nie mozna odczytac fieldDeviceContracts.ts")
+        return violations
+
+    if "SldSymbolTypeV1" not in content:
+        violations.append("  BRAK SldSymbolTypeV1 w fieldDeviceContracts.ts")
+
+    if "DEVICE_TO_SYMBOL" not in content:
+        violations.append("  BRAK DEVICE_TO_SYMBOL w fieldDeviceContracts.ts")
+
+    if "buildApparatusSymbolBinding" not in content:
+        violations.append("  BRAK buildApparatusSymbolBinding w fieldDeviceContracts.ts")
+
+    # Required IEC symbols (using SldSymbolTypeV1 naming convention: SYMBOL_*)
+    required_symbols = [
+        "SYMBOL_CB",
+        "SYMBOL_DS",
+        "SYMBOL_LOAD_SWITCH",
+        "SYMBOL_FUSE",
+        "SYMBOL_ES",
+        "SYMBOL_CT",
+        "SYMBOL_VT",
+        "SYMBOL_RELAY",
+    ]
+    for sym in required_symbols:
+        if sym not in content:
+            violations.append(f"  BRAK symbolu IEC '{sym}' w fieldDeviceContracts.ts")
+
+    return violations
+
+
+# =========================================================================
+# GUARD 27: No decorative symbols in symbol registry (RUN #3F)
+# =========================================================================
+
+def guard_no_decorative_symbols() -> List[str]:
+    """
+    Sprawdz brak dekoracyjnych symboli w rejestrze.
+    Zabronione: LABEL, ANNOTATION, DECORATION, ORNAMENT itp.
+    Kazdy symbol MUSI odpowiadac rzeczywistemu aparatowi IEC.
+    """
+    violations = []
+    contracts_fe = FRONTEND_SRC / "ui" / "sld" / "core" / "fieldDeviceContracts.ts"
+
+    if not contracts_fe.exists():
+        return violations
+
+    try:
+        content = contracts_fe.read_text(encoding="utf-8")
+    except Exception:
+        return violations
+
+    forbidden_symbols = [
+        (r"\bLABEL\b", "LABEL (decorative)"),
+        (r"\bANNOTATION\b", "ANNOTATION (decorative)"),
+        (r"\bDECORATION\b", "DECORATION (decorative)"),
+        (r"\bORNAMENT\b", "ORNAMENT (decorative)"),
+        (r"\bARROW\b", "ARROW (decorative)"),
+    ]
+
+    # Search only in SldSymbolTypeV1 definition area
+    in_symbol_type = False
+    lines = content.split('\n')
+    for line_no, line in enumerate(lines, 1):
+        stripped = line.strip()
+
+        if "SldSymbolTypeV1" in stripped and "=" in stripped:
+            in_symbol_type = True
+        if in_symbol_type and stripped.startswith("} as const"):
+            in_symbol_type = False
+
+        if in_symbol_type:
+            for pattern, label in forbidden_symbols:
+                if re.search(pattern, stripped):
+                    violations.append(
+                        f"  Dekoracyjny symbol: '{label}' w fieldDeviceContracts.ts:{line_no}"
+                    )
+
+    return violations
+
+
+# =========================================================================
+# GUARD 28: Field device tests exist (FE + BE) (RUN #3F)
+# =========================================================================
+
+def guard_field_device_tests_exist() -> List[str]:
+    """
+    Sprawdz ze testy field/device istnieja w OBIE strony:
+    - Frontend: fieldDevicePolish.test.ts
+    - Backend: test_field_device.py
+    """
+    violations = []
+
+    # Frontend
+    fe_test = FRONTEND_SRC / "ui" / "sld" / "core" / "__tests__" / "fieldDevicePolish.test.ts"
+    if not fe_test.exists():
+        violations.append(
+            "  BRAK fieldDevicePolish.test.ts — brak testow Polish taxonomy (frontend)"
+        )
+    else:
+        try:
+            content = fe_test.read_text(encoding="utf-8")
+        except Exception:
+            content = ""
+
+        required_test_sections = [
+            "PoleTypeV1",
+            "AparatTypeV1",
+            "DEVICE_TO_SYMBOL",
+            "buildWizardFieldStep",
+            "requireFieldsComplete",
+        ]
+        for section in required_test_sections:
+            if section not in content:
+                violations.append(
+                    f"  BRAK testow '{section}' w fieldDevicePolish.test.ts"
+                )
+
+    # Backend
+    be_test = REPO_ROOT / "backend" / "tests" / "test_field_device.py"
+    if not be_test.exists():
+        violations.append(
+            "  BRAK test_field_device.py — brak testow field/device (backend)"
+        )
+    else:
+        try:
+            content = be_test.read_text(encoding="utf-8")
+        except Exception:
+            content = ""
+
+        required_test_sections = [
+            "PoleTypeV1",
+            "AparatTypeV1",
+            "validate_generator_field_connection",
+            "require_fields_complete",
+            "require_protection_bindings",
+        ]
+        for section in required_test_sections:
+            if section not in content:
+                violations.append(
+                    f"  BRAK testow '{section}' w test_field_device.py"
+                )
+
+    return violations
+
+
+# =========================================================================
 # MAIN
 # =========================================================================
 
@@ -1164,6 +1523,12 @@ def main() -> int:
         ("GUARD 20: ExportManifest spec v1.1 + readinessStatus (RUN #3E)", guard_export_manifest_v11()),
         ("GUARD 21: ResultJoin domain elementId (RUN #3E)", guard_result_join_domain_element_id()),
         ("GUARD 22: Golden network E2E tests exist (RUN #3E)", guard_golden_network_e2e_exists()),
+        ("GUARD 23: Polish taxonomy completeness (RUN #3F)", guard_polish_taxonomy_completeness()),
+        ("GUARD 24: PV/BESS transformer enforcement (RUN #3F)", guard_pv_bess_transformer_enforcement()),
+        ("GUARD 25: Field/device readiness gates (RUN #3F)", guard_field_device_readiness_gates()),
+        ("GUARD 26: Symbol registry completeness (RUN #3F)", guard_symbol_registry_completeness()),
+        ("GUARD 27: No decorative symbols (RUN #3F)", guard_no_decorative_symbols()),
+        ("GUARD 28: Field device tests exist (RUN #3F)", guard_field_device_tests_exist()),
     ]
 
     total_violations = 0

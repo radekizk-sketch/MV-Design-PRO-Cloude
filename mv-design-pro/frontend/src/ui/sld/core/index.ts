@@ -102,7 +102,7 @@ export type {
   StationBlockBuildResult,
 } from './stationBlockBuilder';
 
-// Field & Device Modeling Contracts (RUN #3D)
+// Field & Device Modeling Contracts (RUN #3D + RUN #3F)
 export {
   FieldRoleV1,
   EmbeddingRoleV1,
@@ -115,6 +115,21 @@ export {
   DEVICE_REQUIREMENT_SETS,
   validateFieldDevices,
   validateStationBlock,
+  // Polish taxonomy (RUN #3F)
+  PoleTypeV1,
+  AparatTypeV1,
+  POLE_TO_FIELD_ROLE,
+  FIELD_ROLE_TO_POLE,
+  APARAT_TO_DEVICE_TYPE,
+  DEVICE_TYPE_TO_APARAT,
+  POLE_TYPE_LABELS_PL,
+  APARAT_TYPE_LABELS_PL,
+  // Symbol registry (RUN #3F)
+  SldSymbolTypeV1,
+  DEVICE_TO_SYMBOL,
+  buildApparatusSymbolBinding,
+  // Wizard field step (RUN #3F)
+  buildWizardFieldStep,
 } from './fieldDeviceContracts';
 
 export type {
@@ -132,6 +147,12 @@ export type {
   DeviceRequirementV1,
   DeviceRequirementSetV1,
   FieldDeviceFixActionV1,
+  // Symbol binding (RUN #3F)
+  ApparatusSymbolBindingV1,
+  // Wizard types (RUN #3F)
+  WizardFieldStepV1,
+  WizardFieldEntryV1,
+  WizardDeviceEntryV1,
 } from './fieldDeviceContracts';
 
 // ElementRefV1 — Unified Element Identity Contract (SYSTEM-WIDE)
@@ -157,6 +178,10 @@ export {
   requireShortCircuitReady,
   requireLoadFlowReady,
   requireExportReady,
+  // Field/Device gates (RUN #3F)
+  requireFieldsComplete,
+  requireDevicesParametrized,
+  requireProtectionBindings,
 } from './readinessProfile';
 
 export type {

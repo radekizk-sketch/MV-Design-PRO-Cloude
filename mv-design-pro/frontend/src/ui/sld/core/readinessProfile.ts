@@ -180,3 +180,49 @@ export function requireExportReady(profile: ReadinessProfileV1): void {
   if (allBlockers.length === 0) return;
   throw new ReadinessGateError('export_ready', allBlockers);
 }
+
+// =============================================================================
+// Field/Device readiness gates (RUN #3F §3)
+// =============================================================================
+
+/**
+ * Gate: All station fields must have required apparatus.
+ * Blocks when any field.device_missing.* BLOCKER exists.
+ * @throws ReadinessGateError
+ */
+export function requireFieldsComplete(profile: ReadinessProfileV1): void {
+  const blockers = profile.issues.filter(
+    i => i.priority === ReadinessPriority.BLOCKER &&
+      i.code.startsWith('field.device_missing.'),
+  );
+  if (blockers.length === 0) return;
+  throw new ReadinessGateError('fields_complete', blockers);
+}
+
+/**
+ * Gate: All critical apparatus must have parameters (CB rating, CT ratio, etc.).
+ * Blocks when any device.*.missing BLOCKER exists.
+ * @throws ReadinessGateError
+ */
+export function requireDevicesParametrized(profile: ReadinessProfileV1): void {
+  const blockers = profile.issues.filter(
+    i => i.priority === ReadinessPriority.BLOCKER &&
+      (i.code.startsWith('device.') || i.code === 'catalog.ref_missing'),
+  );
+  if (blockers.length === 0) return;
+  throw new ReadinessGateError('devices_parametrized', blockers);
+}
+
+/**
+ * Gate: All relays must be bound to breakers (CB).
+ * Blocks when protection.relay_binding_missing or protection.relay_cb_binding_missing.
+ * @throws ReadinessGateError
+ */
+export function requireProtectionBindings(profile: ReadinessProfileV1): void {
+  const blockers = profile.issues.filter(
+    i => i.priority === ReadinessPriority.BLOCKER &&
+      i.code.startsWith('protection.'),
+  );
+  if (blockers.length === 0) return;
+  throw new ReadinessGateError('protection_bindings', blockers);
+}
