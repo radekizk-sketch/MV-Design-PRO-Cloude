@@ -242,3 +242,41 @@ export type {
   PvBessConnectionInputV1,
   PvBessValidationResultV1,
 } from './pvBessValidation';
+
+// Geometry Overrides — project mode CAD contract (RUN #3H §2)
+export {
+  OVERRIDES_VERSION,
+  OverrideScopeV1,
+  OverrideOperationV1,
+  GEOMETRY_GRID_SNAP,
+  GeometryFixCodes,
+  emptyOverrides,
+  canonicalizeOverrides,
+  computeOverridesHash,
+  snapToGrid,
+  snapDeltaToGrid,
+  validateOverridesAgainstLayout,
+} from './geometryOverrides';
+
+export type {
+  ProjectGeometryOverridesV1,
+  GeometryOverrideItemV1,
+  GeometryOverridePayloadV1,
+  MoveDeltaPayloadV1,
+  ReorderFieldPayloadV1,
+  MoveLabelPayloadV1,
+  OverrideValidationErrorV1,
+  OverrideValidationResultV1,
+  GeometryFixCode,
+} from './geometryOverrides';
+
+// Apply Overrides — EffectiveLayout composition (RUN #3H §4)
+export {
+  applyOverrides,
+  checkEffectiveCollisions,
+} from './applyOverrides';
+
+export type {
+  EffectiveLayoutV1,
+  CollisionCheckResultV1,
+} from './applyOverrides';

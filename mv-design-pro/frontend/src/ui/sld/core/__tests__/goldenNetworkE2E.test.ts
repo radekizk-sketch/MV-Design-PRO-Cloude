@@ -380,7 +380,7 @@ describe('Golden Network E2E — full pipeline validity', () => {
       const { manifest } = runFullPipeline(input);
       expect(manifest.contentHash).toBeTruthy();
       expect(manifest.contentHash.length).toBe(64); // 8 * 8 hex chars from syncSha256
-      expect(manifest.specVersion).toBe('1.1');
+      expect(manifest.specVersion).toBe('1.2');
       expect(manifest.readinessStatus).toBe('READY');
     });
   }

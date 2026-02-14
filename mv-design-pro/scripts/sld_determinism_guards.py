@@ -1025,9 +1025,11 @@ def guard_export_manifest_v11() -> List[str]:
             violations.append(
                 "  BRAK specVersion w exportManifest.ts (frontend)"
             )
-        if "'1.1'" not in content and '"1.1"' not in content:
+        has_v11 = "'1.1'" in content or '"1.1"' in content
+        has_v12 = "'1.2'" in content or '"1.2"' in content
+        if not has_v11 and not has_v12:
             violations.append(
-                "  specVersion != '1.1' w exportManifest.ts (frontend)"
+                "  specVersion nie jest '1.1' ani '1.2' w exportManifest.ts (frontend)"
             )
     else:
         violations.append("  BRAK exportManifest.ts (frontend)")

@@ -30,6 +30,10 @@ export interface ExportManifestV1 {
   readonly createdAt: string;
   /** SHA-256 of the canonical JSON representation (determinism seal). */
   readonly contentHash: string;
+  /** Geometry overrides hash (null if no overrides). RUN #3H. */
+  readonly overridesHash: string | null;
+  /** Geometry overrides version (null if no overrides). RUN #3H. */
+  readonly overridesVersion: string | null;
 }
 
 // =============================================================================
@@ -49,17 +53,23 @@ export function buildExportManifest(params: {
   elementIds: readonly string[];
   analysisTypes: readonly string[];
   readinessStatus?: string;
+  overridesHash?: string | null;
+  overridesVersion?: string | null;
 }): ExportManifestV1 {
   const sortedIds = [...new Set(params.elementIds)].sort();
   const sortedTypes = [...new Set(params.analysisTypes)].sort();
   const readinessStatus = params.readinessStatus ?? 'UNKNOWN';
   const createdAt = new Date().toISOString();
 
+  const overridesHash = params.overridesHash ?? null;
+  const overridesVersion = params.overridesVersion ?? null;
+
   // Canonical JSON for hashing (deterministic key order)
   const canonical = JSON.stringify({
     analysis_types: sortedTypes,
     element_ids: sortedIds,
     layout_hash: params.layoutHash,
+    overrides_hash: overridesHash,
     readiness_status: readinessStatus,
     run_hash: params.runHash ?? null,
     snapshot_hash: params.snapshotHash,
@@ -75,9 +85,11 @@ export function buildExportManifest(params: {
     elementIds: sortedIds,
     analysisTypes: sortedTypes,
     readinessStatus,
-    specVersion: '1.1',
+    specVersion: '1.2',
     createdAt,
     contentHash,
+    overridesHash,
+    overridesVersion,
   };
 }
 
