@@ -281,6 +281,33 @@ export type {
   CollisionCheckResultV1,
 } from './applyOverrides';
 
+// SwitchgearConfig — Konfiguracja rozdzielnicy (RUN #3I §2)
+export {
+  SWITCHGEAR_CONFIG_VERSION,
+  ConfigIssueSeverity,
+  FixActionType,
+  SwitchgearConfigValidationCode,
+  REQUIRED_DEVICES,
+  PV_BESS_SN_ROLES,
+  canonicalizeConfig,
+  computeConfigHash,
+  emptyConfig,
+} from './switchgearConfig';
+
+export type {
+  SwitchgearConfigV1,
+  FieldConfigV1,
+  DeviceConfigV1,
+  CatalogBindingV1 as ConfigCatalogBindingV1,
+  ProtectionBindingV1 as ConfigProtectionBindingV1,
+  ConfigValidationIssueV1,
+  ConfigFixActionV1,
+  SwitchgearConfigValidationResultV1,
+} from './switchgearConfig';
+
+// SwitchgearConfig Validator — FE mirror (RUN #3I §2)
+export { validateSwitchgearConfig } from './validateSwitchgearConfig';
+
 // Overrides API Client (RUN #3H §3)
 export {
   fetchSldOverrides,

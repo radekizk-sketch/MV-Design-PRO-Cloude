@@ -45,6 +45,23 @@ from .field_device import (
     PoleTypeV1,
     validate_generator_field_connection,
 )
+from .switchgear_config import (
+    SWITCHGEAR_CONFIG_VERSION,
+    CatalogBindingV1,
+    ConfigFixActionV1,
+    ConfigIssueSeverity,
+    ConfigValidationIssueV1,
+    DeviceConfigV1,
+    FieldConfigV1,
+    FixActionType,
+    ProtectionBindingV1,
+    SwitchgearConfigV1,
+    SwitchgearConfigValidationCode,
+    SwitchgearConfigValidationResultV1,
+    canonicalize_config,
+    compute_config_hash,
+    validate_switchgear_config,
+)
 from .export_manifest import ExportManifestV1, build_export_manifest
 from .result_join import (
     InspectorFactV1,
@@ -121,4 +138,20 @@ __all__ = [
     "FieldRoleV1",
     "PoleTypeV1",
     "validate_generator_field_connection",
+    # SwitchgearConfig (RUN #3I)
+    "SWITCHGEAR_CONFIG_VERSION",
+    "CatalogBindingV1",
+    "ConfigFixActionV1",
+    "ConfigIssueSeverity",
+    "ConfigValidationIssueV1",
+    "DeviceConfigV1",
+    "FieldConfigV1",
+    "FixActionType",
+    "ProtectionBindingV1",
+    "SwitchgearConfigV1",
+    "SwitchgearConfigValidationCode",
+    "SwitchgearConfigValidationResultV1",
+    "canonicalize_config",
+    "compute_config_hash",
+    "validate_switchgear_config",
 ]
