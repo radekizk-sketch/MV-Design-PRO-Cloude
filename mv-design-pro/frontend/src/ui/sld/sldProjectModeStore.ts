@@ -165,7 +165,7 @@ export const useSldProjectModeStore = create<SldProjectModeState>((set, get) => 
     // RUN #3I N4: Domain validation before override save
     // Check if switchgear config has BLOCKER issues — block save if so
     try {
-      const { useSwitchgearStore } = await import('../../wizard/switchgear/useSwitchgearStore');
+      const { useSwitchgearStore } = await import('../wizard/switchgear/useSwitchgearStore');
       const switchgearState = useSwitchgearStore.getState();
       if (switchgearState.lastLoadedConfig) {
         const validationResult = validateSwitchgearConfig(switchgearState.lastLoadedConfig);
