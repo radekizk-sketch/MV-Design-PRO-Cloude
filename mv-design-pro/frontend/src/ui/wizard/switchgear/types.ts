@@ -177,3 +177,47 @@ export function parseFixActionNavigation(fix: FieldFixActionV1): FixActionNaviga
     focusElement: null,
   };
 }
+
+// ---------------------------------------------------------------------------
+// Geometry override FixAction — RUN #3I §I5
+// ---------------------------------------------------------------------------
+
+/**
+ * FixAction for geometry override issues.
+ * Navigates to SLD project mode instead of switchgear wizard.
+ */
+export interface GeometryOverrideFixActionV1 {
+  readonly code: string;
+  readonly messagePl: string;
+  readonly severity: 'BLOCKER' | 'WARNING' | 'INFO';
+  readonly elementId: string;
+  readonly actionType: 'OPEN_PROJECT_MODE' | 'REMOVE_OVERRIDE' | 'FIX_OVERRIDE';
+}
+
+/**
+ * Check if a fix action code is an override-related code.
+ * Override codes start with 'geometry.override_'.
+ * RUN #3I §I5.
+ */
+export function isOverrideFixAction(code: string): boolean {
+  return code.startsWith('geometry.override_');
+}
+
+/**
+ * Build a GeometryOverrideFixActionV1 from a readiness issue.
+ * Used by the inspector panel to render override-specific fix actions.
+ * RUN #3I §I5.
+ */
+export function buildOverrideFixAction(
+  elementId: string,
+  code: string,
+  message: string,
+): GeometryOverrideFixActionV1 {
+  return {
+    code,
+    messagePl: message,
+    severity: 'BLOCKER',
+    elementId,
+    actionType: 'OPEN_PROJECT_MODE',
+  };
+}

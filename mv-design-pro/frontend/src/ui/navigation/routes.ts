@@ -217,3 +217,35 @@ export function navigateToCompare(): void {
 export function navigateToSwitchgear(): void {
   navigateTo(ROUTES.SWITCHGEAR);
 }
+
+/**
+ * Navigate to SLD with project mode active (tryb projektowy).
+ * Used by FixAction navigation when geometry override issues exist.
+ * RUN #3I §I5.
+ */
+export function navigateToSldProjectMode(): void {
+  if (typeof window !== 'undefined') {
+    window.location.hash = '?projectMode=true';
+  }
+}
+
+/**
+ * Navigate to wizard at specific step (K1-K10).
+ * Used by FixAction navigation to jump to the exact wizard step.
+ * RUN #3I §I5.
+ */
+export function navigateToWizardStep(stepId: string): void {
+  if (typeof window !== 'undefined') {
+    window.location.hash = `#wizard/${stepId}`;
+  }
+}
+
+/**
+ * Parse project mode flag from URL hash.
+ * RUN #3I §I5.
+ */
+export function isProjectModeFromUrl(): boolean {
+  if (typeof window === 'undefined') return false;
+  const hash = window.location.hash;
+  return hash.includes('projectMode=true');
+}
