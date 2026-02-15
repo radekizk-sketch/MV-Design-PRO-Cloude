@@ -71,6 +71,14 @@ Guards dodane w RUN #3H DOMKNIECIE:
 46. Render artifacts script exists (sld_render_artifacts.ts)
 47. CI workflow has upload-artifact for render artifacts
 48. Drag overrides integration test exists (dragOverrides.integration.test.ts)
+
+Guards dodane w RUN #3I (DOMKNIECIE E2E):
+49. File persistence for overrides (SLD_OVERRIDES_DIR, clear_overrides_cache)
+50. Overrides readiness gate FE+BE (requireOverridesValid, overridesIssuesToReadiness)
+51. Toolbar Wczytaj (Load) button (handleLoad, lastSavedHash)
+52. Wizard E2E integration test (wizardOverridesE2e.test.ts)
+53. FixAction navigation → SLD project mode (isOverrideFixAction, navigateToSldProjectMode)
+54. No TODO/STUB in E2E code (zero stubs in overrides + wizard files)
 """
 
 import os
@@ -2314,6 +2322,181 @@ def guard_drag_overrides_test_exists() -> List[str]:
 
 
 # =========================================================================
+# GUARDS 49-54 — RUN #3I (DOMKNIECIE E2E)
+# =========================================================================
+
+
+def guard_file_persistence_exists() -> List[str]:
+    """
+    GUARD 49: Backend file persistence for overrides.
+    Checks that sld_overrides.py has SLD_OVERRIDES_DIR env var support,
+    clear_overrides_cache(), and file save/load logic.
+    """
+    violations = []
+
+    sld_overrides = BACKEND_SRC / "api" / "sld_overrides.py"
+    if not sld_overrides.exists():
+        violations.append("  BRAK sld_overrides.py")
+        return violations
+
+    content = sld_overrides.read_text(encoding="utf-8")
+    for kw in ["SLD_OVERRIDES_DIR", "clear_overrides_cache", "_storage_path", "_save_overrides"]:
+        if kw not in content:
+            violations.append(f"  sld_overrides.py brak '{kw}'")
+
+    # Test file must exist
+    test_file = REPO_ROOT / "backend" / "tests" / "test_sld_overrides_api.py"
+    if not test_file.exists():
+        violations.append("  BRAK test_sld_overrides_api.py")
+    else:
+        tc = test_file.read_text(encoding="utf-8")
+        if "TestFilePersistence" not in tc:
+            violations.append("  test_sld_overrides_api.py brak TestFilePersistence")
+
+    return violations
+
+
+def guard_overrides_readiness_gate_exists() -> List[str]:
+    """
+    GUARD 50: Overrides validation gate exists (FE + BE).
+    require_overrides_valid / requireOverridesValid gate blocks on
+    geometry.override_* BLOCKERs.
+    """
+    violations = []
+
+    # Backend
+    readiness_py = BACKEND_SRC / "domain" / "readiness.py"
+    if readiness_py.exists():
+        content = readiness_py.read_text(encoding="utf-8")
+        if "require_overrides_valid" not in content:
+            violations.append("  readiness.py brak require_overrides_valid")
+        if "overrides_issues_from_validation" not in content:
+            violations.append("  readiness.py brak overrides_issues_from_validation")
+    else:
+        violations.append("  BRAK readiness.py")
+
+    # Frontend
+    readiness_ts = FRONTEND_SRC / "ui" / "sld" / "core" / "readinessProfile.ts"
+    if readiness_ts.exists():
+        content = readiness_ts.read_text(encoding="utf-8")
+        if "requireOverridesValid" not in content:
+            violations.append("  readinessProfile.ts brak requireOverridesValid")
+        if "overridesIssuesToReadiness" not in content:
+            violations.append("  readinessProfile.ts brak overridesIssuesToReadiness")
+    else:
+        violations.append("  BRAK readinessProfile.ts")
+
+    return violations
+
+
+def guard_toolbar_load_button_exists() -> List[str]:
+    """
+    GUARD 51: ProjectModeToolbar has Wczytaj (Load) button.
+    """
+    violations = []
+
+    toolbar = FRONTEND_SRC / "ui" / "sld" / "ProjectModeToolbar.tsx"
+    if not toolbar.exists():
+        violations.append("  BRAK ProjectModeToolbar.tsx")
+        return violations
+
+    content = toolbar.read_text(encoding="utf-8")
+    for kw in ["handleLoad", "project-mode-load", "Wczytaj", "lastSavedHash"]:
+        if kw not in content:
+            violations.append(f"  ProjectModeToolbar.tsx brak '{kw}'")
+
+    return violations
+
+
+def guard_wizard_e2e_test_exists() -> List[str]:
+    """
+    GUARD 52: Wizard ↔ Overrides E2E integration test exists.
+    """
+    violations = []
+
+    test_file = FRONTEND_SRC / "ui" / "sld" / "core" / "__tests__" / "wizardOverridesE2e.test.ts"
+    if not test_file.exists():
+        violations.append("  BRAK wizardOverridesE2e.test.ts")
+        return violations
+
+    content = test_file.read_text(encoding="utf-8")
+    for kw in ["overrides layer is independent", "50× determinism", "FixAction navigation", "Full save"]:
+        if kw not in content:
+            violations.append(f"  wizardOverridesE2e.test.ts brak '{kw}'")
+
+    return violations
+
+
+def guard_fix_action_navigation_exists() -> List[str]:
+    """
+    GUARD 53: Override FixAction navigation to SLD project mode exists.
+    """
+    violations = []
+
+    # switchgear/types.ts must have isOverrideFixAction + buildOverrideFixAction
+    types_file = FRONTEND_SRC / "ui" / "wizard" / "switchgear" / "types.ts"
+    if types_file.exists():
+        content = types_file.read_text(encoding="utf-8")
+        for kw in ["isOverrideFixAction", "buildOverrideFixAction", "GeometryOverrideFixActionV1", "OPEN_PROJECT_MODE"]:
+            if kw not in content:
+                violations.append(f"  switchgear/types.ts brak '{kw}'")
+    else:
+        violations.append("  BRAK switchgear/types.ts")
+
+    # routes.ts must have navigateToSldProjectMode
+    routes_file = FRONTEND_SRC / "ui" / "navigation" / "routes.ts"
+    if routes_file.exists():
+        content = routes_file.read_text(encoding="utf-8")
+        if "navigateToSldProjectMode" not in content:
+            violations.append("  routes.ts brak navigateToSldProjectMode")
+        if "navigateToWizardStep" not in content:
+            violations.append("  routes.ts brak navigateToWizardStep")
+    else:
+        violations.append("  BRAK routes.ts")
+
+    return violations
+
+
+def guard_no_todo_stubs_in_e2e() -> List[str]:
+    """
+    GUARD 54: No TODO/FIXME/STUB in E2E test files and overrides code.
+    """
+    violations = []
+
+    # Check all overrides-related files for TODO stubs
+    files_to_check = [
+        FRONTEND_SRC / "ui" / "sld" / "core" / "overridesApi.ts",
+        FRONTEND_SRC / "ui" / "sld" / "core" / "geometryOverrides.ts",
+        FRONTEND_SRC / "ui" / "sld" / "core" / "applyOverrides.ts",
+        FRONTEND_SRC / "ui" / "sld" / "sldProjectModeStore.ts",
+        FRONTEND_SRC / "ui" / "sld" / "ProjectModeToolbar.tsx",
+        FRONTEND_SRC / "ui" / "sld" / "core" / "__tests__" / "wizardOverridesE2e.test.ts",
+        BACKEND_SRC / "api" / "sld_overrides.py",
+        BACKEND_SRC / "domain" / "geometry_overrides.py",
+    ]
+
+    stub_patterns = [
+        re.compile(r"\bTODO\b", re.IGNORECASE),
+        re.compile(r"\bFIXME\b", re.IGNORECASE),
+        re.compile(r"\bSTUB\b", re.IGNORECASE),
+        re.compile(r"\bHACK\b", re.IGNORECASE),
+    ]
+
+    for f in files_to_check:
+        if not f.exists():
+            continue
+        content = f.read_text(encoding="utf-8")
+        for pattern in stub_patterns:
+            matches = pattern.findall(content)
+            if matches:
+                violations.append(
+                    f"  {f.relative_to(REPO_ROOT)}: found {len(matches)}× {pattern.pattern}"
+                )
+
+    return violations
+
+
+# =========================================================================
 # MAIN
 # =========================================================================
 
@@ -2367,6 +2550,12 @@ def main() -> int:
         ("GUARD 46: Render artifacts script exists (RUN #3H DOMKNIECIE)", guard_render_artifacts_script_exists()),
         ("GUARD 47: CI upload-artifact for render artifacts (RUN #3H DOMKNIECIE)", guard_ci_upload_render_artifacts()),
         ("GUARD 48: Drag overrides integration test exists (RUN #3H DOMKNIECIE)", guard_drag_overrides_test_exists()),
+        ("GUARD 49: File persistence for overrides (RUN #3I)", guard_file_persistence_exists()),
+        ("GUARD 50: Overrides readiness gate FE+BE (RUN #3I)", guard_overrides_readiness_gate_exists()),
+        ("GUARD 51: Toolbar Wczytaj (Load) button (RUN #3I)", guard_toolbar_load_button_exists()),
+        ("GUARD 52: Wizard E2E integration test (RUN #3I)", guard_wizard_e2e_test_exists()),
+        ("GUARD 53: FixAction navigation → SLD project mode (RUN #3I)", guard_fix_action_navigation_exists()),
+        ("GUARD 54: No TODO/STUB in E2E code (RUN #3I)", guard_no_todo_stubs_in_e2e()),
     ]
 
     total_violations = 0
