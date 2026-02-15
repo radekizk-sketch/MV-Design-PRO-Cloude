@@ -1,12 +1,13 @@
 /**
- * Testy ProjectModeToolbar — RUN #3H §4.
+ * Testy ProjectModeToolbar — RUN #3H §4 + RUN #3I §I3.
  *
  * ZAKRES:
  * - Rendering przelacznika trybu (wlacz/wylacz)
  * - Wskaznik dirty (niezapisane zmiany)
- * - Przyciski zapisu/resetu
+ * - Przyciski zapisu/wczytania/resetu
  * - Wyswietlanie bledow walidacji
  * - Stan ladowania
+ * - Hash ostatniego zapisu
  * - 100% POLISH UI
  */
 
@@ -204,5 +205,64 @@ describe('ProjectModeToolbar', () => {
     render(<ProjectModeToolbar caseId="case-001" />);
     const saveBtn = screen.getByTestId('project-mode-save');
     expect(saveBtn.textContent).toContain('Ladowanie');
+  });
+
+  // =========================================================================
+  // RUN #3I §I3: Load button + lastSavedHash
+  // =========================================================================
+
+  it('should show load button when active', () => {
+    useSldProjectModeStore.setState({ projectModeActive: true });
+    render(<ProjectModeToolbar caseId="case-001" />);
+    const loadBtn = screen.getByTestId('project-mode-load');
+    expect(loadBtn).toBeDefined();
+    expect(loadBtn.textContent).toContain('Wczytaj');
+  });
+
+  it('should disable load button when no caseId', () => {
+    useSldProjectModeStore.setState({ projectModeActive: true });
+    render(<ProjectModeToolbar caseId={null} />);
+    const loadBtn = screen.getByTestId('project-mode-load');
+    expect((loadBtn as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  it('should disable load button when loading', () => {
+    useSldProjectModeStore.setState({ projectModeActive: true, loading: true });
+    render(<ProjectModeToolbar caseId="case-001" />);
+    const loadBtn = screen.getByTestId('project-mode-load');
+    expect((loadBtn as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  it('should enable load button when not loading and caseId present', () => {
+    useSldProjectModeStore.setState({ projectModeActive: true, loading: false });
+    render(<ProjectModeToolbar caseId="case-001" />);
+    const loadBtn = screen.getByTestId('project-mode-load');
+    expect((loadBtn as HTMLButtonElement).disabled).toBe(false);
+  });
+
+  it('should show lastSavedHash when available', () => {
+    useSldProjectModeStore.setState({
+      projectModeActive: true,
+      lastSavedHash: 'abcdef0123456789',
+    });
+    render(<ProjectModeToolbar caseId="case-001" />);
+    const hashEl = screen.getByTestId('project-mode-last-hash');
+    expect(hashEl).toBeDefined();
+    expect(hashEl.textContent).toContain('abcdef01');
+  });
+
+  it('should not show lastSavedHash when null', () => {
+    useSldProjectModeStore.setState({
+      projectModeActive: true,
+      lastSavedHash: null,
+    });
+    render(<ProjectModeToolbar caseId="case-001" />);
+    expect(screen.queryByTestId('project-mode-last-hash')).toBeNull();
+  });
+
+  it('should hide load button when project mode inactive', () => {
+    useSldProjectModeStore.setState({ projectModeActive: false });
+    render(<ProjectModeToolbar caseId="case-001" />);
+    expect(screen.queryByTestId('project-mode-load')).toBeNull();
   });
 });

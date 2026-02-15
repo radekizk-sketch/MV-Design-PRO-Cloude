@@ -40,6 +40,7 @@ const LABELS = {
   activate: 'Wlacz',
   deactivate: 'Wylacz',
   save: 'Zapisz',
+  load: 'Wczytaj',
   reset: 'Resetuj',
   validate: 'Waliduj',
   unsavedChanges: 'Niezapisane zmiany',
@@ -47,6 +48,7 @@ const LABELS = {
   loading: 'Ladowanie...',
   validationErrors: 'Bledy walidacji',
   noErrors: 'Brak bledow',
+  lastSavedHash: 'Ostatni hash',
 } as const;
 
 // =============================================================================
@@ -74,7 +76,10 @@ export const ProjectModeToolbar: React.FC<ProjectModeToolbarProps> = ({
   const error = useSldProjectModeStore((s) => s.error);
   const overrides = useSldProjectModeStore((s) => s.overrides);
 
+  const lastSavedHash = useSldProjectModeStore((s) => s.lastSavedHash);
+
   const setProjectMode = useSldProjectModeStore((s) => s.setProjectMode);
+  const loadOverrides = useSldProjectModeStore((s) => s.loadOverrides);
   const saveOverrides = useSldProjectModeStore((s) => s.saveOverrides);
   const resetOverrides = useSldProjectModeStore((s) => s.resetOverrides);
 
@@ -85,6 +90,11 @@ export const ProjectModeToolbar: React.FC<ProjectModeToolbarProps> = ({
   const handleToggle = useCallback(() => {
     setProjectMode(!isActive);
   }, [isActive, setProjectMode]);
+
+  const handleLoad = useCallback(async () => {
+    if (!caseId) return;
+    await loadOverrides(caseId);
+  }, [caseId, loadOverrides]);
 
   const handleSave = useCallback(async () => {
     if (!caseId) return;
@@ -100,6 +110,7 @@ export const ProjectModeToolbar: React.FC<ProjectModeToolbarProps> = ({
     setShowErrors((prev) => !prev);
   }, []);
 
+  const canLoad = !loading && caseId !== null;
   const canSave = isDirty && validationErrors.length === 0 && !loading && caseId !== null;
   const canReset = !loading && caseId !== null && overrides !== null;
   const itemCount = overrides?.items.length ?? 0;
@@ -152,8 +163,34 @@ export const ProjectModeToolbar: React.FC<ProjectModeToolbarProps> = ({
               Nadpisania: {itemCount}
             </span>
 
+            {/* Hash ostatniego zapisu */}
+            {lastSavedHash && (
+              <span
+                className="text-xs text-slate-400 font-mono"
+                data-testid="project-mode-last-hash"
+                title={lastSavedHash}
+              >
+                {LABELS.lastSavedHash}: {lastSavedHash.slice(0, 8)}
+              </span>
+            )}
+
             {/* Separator */}
             <div className="w-px h-6 bg-slate-300" />
+
+            {/* Przycisk wczytania */}
+            <button
+              type="button"
+              onClick={handleLoad}
+              disabled={!canLoad}
+              className={`px-3 py-1.5 text-xs font-medium rounded border transition-colors ${
+                canLoad
+                  ? 'bg-white text-slate-600 border-slate-300 hover:bg-slate-100'
+                  : 'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed'
+              }`}
+              data-testid="project-mode-load"
+            >
+              {LABELS.load}
+            </button>
 
             {/* Przycisk zapisu */}
             <button

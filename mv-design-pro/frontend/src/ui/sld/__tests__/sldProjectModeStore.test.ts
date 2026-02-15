@@ -1,11 +1,12 @@
 /**
- * TESTY MAGAZYNU TRYBU PROJEKTOWEGO SLD — RUN #3H §4.
+ * TESTY MAGAZYNU TRYBU PROJEKTOWEGO SLD — RUN #3H §4 + RUN #3I §I3.
  *
  * ZAKRES:
  * - setProjectMode (wlacz/wylacz + oczyszczanie stanu)
  * - applyDelta (dodaj/zaktualizuj override, snap-to-grid)
+ * - addOrReplaceOverride (dodaj/zamien gotowy item)
  * - removeOverride (usun per elementId+scope)
- * - validate (walidacja przeciwko layoutowi)
+ * - validate / validateOverrides (walidacja przeciwko layoutowi)
  * - loadOverrides / saveOverrides / resetOverrides (async API mock)
  * - Derived hooks (useIsProjectMode, useCurrentOverrides, etc.)
  * - 50× determinism (hash stabilnosc)
@@ -319,6 +320,152 @@ describe('sldProjectModeStore', () => {
       const items = useSldProjectModeStore.getState().overrides!.items;
       expect(items).toHaveLength(1);
       expect(items[0].scope).toBe(OverrideScopeV1.LABEL);
+    });
+  });
+
+  // ===========================================================================
+  // addOrReplaceOverride (RUN #3I §I3)
+  // ===========================================================================
+
+  describe('addOrReplaceOverride', () => {
+    it('should add a new override item', () => {
+      const store = useSldProjectModeStore.getState();
+      act(() => {
+        store.addOrReplaceOverride({
+          elementId: 'node-1',
+          scope: OverrideScopeV1.NODE,
+          operation: OverrideOperationV1.MOVE_DELTA,
+          payload: { dx: 40, dy: -20 },
+        });
+      });
+
+      const state = useSldProjectModeStore.getState();
+      expect(state.overrides).not.toBeNull();
+      expect(state.overrides!.items).toHaveLength(1);
+      expect(state.overrides!.items[0].elementId).toBe('node-1');
+      expect(state.dirty).toBe(true);
+    });
+
+    it('should replace existing item with same elementId+scope', () => {
+      const store = useSldProjectModeStore.getState();
+      act(() => {
+        store.addOrReplaceOverride({
+          elementId: 'node-1',
+          scope: OverrideScopeV1.NODE,
+          operation: OverrideOperationV1.MOVE_DELTA,
+          payload: { dx: 20, dy: 0 },
+        });
+      });
+      act(() => {
+        useSldProjectModeStore.getState().addOrReplaceOverride({
+          elementId: 'node-1',
+          scope: OverrideScopeV1.NODE,
+          operation: OverrideOperationV1.MOVE_DELTA,
+          payload: { dx: 60, dy: 40 },
+        });
+      });
+
+      const state = useSldProjectModeStore.getState();
+      expect(state.overrides!.items).toHaveLength(1);
+      expect((state.overrides!.items[0].payload as { dx: number }).dx).toBe(60);
+    });
+
+    it('should keep different scopes for same elementId', () => {
+      const store = useSldProjectModeStore.getState();
+      act(() => {
+        store.addOrReplaceOverride({
+          elementId: 'node-1',
+          scope: OverrideScopeV1.NODE,
+          operation: OverrideOperationV1.MOVE_DELTA,
+          payload: { dx: 20, dy: 0 },
+        });
+        store.addOrReplaceOverride({
+          elementId: 'node-1',
+          scope: OverrideScopeV1.LABEL,
+          operation: OverrideOperationV1.MOVE_LABEL,
+          payload: { anchorX: 100, anchorY: 50 },
+        });
+      });
+
+      expect(useSldProjectModeStore.getState().overrides!.items).toHaveLength(2);
+    });
+
+    it('should canonicalize items after add', () => {
+      const store = useSldProjectModeStore.getState();
+      act(() => {
+        store.addOrReplaceOverride({
+          elementId: 'z-node',
+          scope: OverrideScopeV1.NODE,
+          operation: OverrideOperationV1.MOVE_DELTA,
+          payload: { dx: 20, dy: 0 },
+        });
+        store.addOrReplaceOverride({
+          elementId: 'a-node',
+          scope: OverrideScopeV1.NODE,
+          operation: OverrideOperationV1.MOVE_DELTA,
+          payload: { dx: 40, dy: 0 },
+        });
+      });
+
+      const items = useSldProjectModeStore.getState().overrides!.items;
+      expect(items[0].elementId).toBe('a-node'); // sorted
+      expect(items[1].elementId).toBe('z-node');
+    });
+  });
+
+  // ===========================================================================
+  // validateOverrides (RUN #3I §I3)
+  // ===========================================================================
+
+  describe('validateOverrides', () => {
+    it('should return empty errors for null overrides', () => {
+      const store = useSldProjectModeStore.getState();
+      const layout = makeMinimalLayout();
+      let errors: readonly any[];
+      act(() => {
+        errors = store.validateOverrides(layout);
+      });
+      expect(errors!).toEqual([]);
+      expect(useSldProjectModeStore.getState().validationErrors).toEqual([]);
+    });
+
+    it('should return errors for unknown elements', () => {
+      const store = useSldProjectModeStore.getState();
+      act(() => {
+        store.applyDelta('unknown-node', OverrideScopeV1.NODE, OverrideOperationV1.MOVE_DELTA, {
+          dx: 20,
+          dy: 0,
+        });
+      });
+
+      const layout = makeMinimalLayout();
+      let errors: readonly any[];
+      act(() => {
+        errors = useSldProjectModeStore.getState().validateOverrides(layout);
+      });
+
+      expect(errors!.length).toBeGreaterThan(0);
+      expect(errors![0].code).toBe('geometry.override_invalid_element');
+      // Also stored in state
+      expect(useSldProjectModeStore.getState().validationErrors.length).toBeGreaterThan(0);
+    });
+
+    it('should return empty errors for valid overrides', () => {
+      const store = useSldProjectModeStore.getState();
+      act(() => {
+        store.applyDelta('node-1', OverrideScopeV1.NODE, OverrideOperationV1.MOVE_DELTA, {
+          dx: 20,
+          dy: 0,
+        });
+      });
+
+      const layout = makeMinimalLayout();
+      let errors: readonly any[];
+      act(() => {
+        errors = useSldProjectModeStore.getState().validateOverrides(layout);
+      });
+
+      expect(errors!).toEqual([]);
     });
   });
 
