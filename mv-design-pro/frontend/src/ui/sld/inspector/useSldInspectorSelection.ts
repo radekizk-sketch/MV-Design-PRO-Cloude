@@ -810,20 +810,34 @@ export function useSldInspectorSelection(): UseSldInspectorSelectionResult {
     );
   }, [isResultsMode, selection, busResults, branchResults, shortCircuitResults]);
 
-  // Mock diagnostyki (w rzeczywistości byłyby pobierane z diagnostics store)
+  // RUN #3H: Dane trybu projektowego (overrides + bledy walidacji)
+  const projectModeActive = useSldProjectModeStore((s) => s.projectModeActive);
+  const projectOverrides = useSldProjectModeStore((s) => s.overrides);
+  const projectValidationErrors = useSldProjectModeStore((s) => s.validationErrors);
+
+  // Diagnostyka walidacji (z bledow trybu projektowego)
   const diagnostics = useMemo<InspectorDiagnosticData | null>(() => {
     if (!isResultsMode || selection.type !== 'element') {
       return null;
     }
 
-    // Diagnostyka pobierana z DiagnosticsStore gdy dostepna (RUN #3I: placeholder → null)
-    return null;
-  }, [isResultsMode, selection]);
+    // Sprawdz bledy walidacji z trybu projektowego (overrides + config)
+    if (projectValidationErrors.length > 0) {
+      const elementErrors = projectValidationErrors.filter(
+        (e) => e.elementId === selection.elementId,
+      );
+      if (elementErrors.length > 0) {
+        return {
+          status: 'WYMAGA_KOREKTY',
+          reasons: elementErrors.map((e) => e.message),
+          source: 'analysis' as const,
+        };
+      }
+    }
 
-  // RUN #3H: Dane trybu projektowego (overrides + bledy walidacji)
-  const projectModeActive = useSldProjectModeStore((s) => s.projectModeActive);
-  const projectOverrides = useSldProjectModeStore((s) => s.overrides);
-  const projectValidationErrors = useSldProjectModeStore((s) => s.validationErrors);
+    // Brak bledow diagnostycznych dla tego elementu
+    return null;
+  }, [isResultsMode, selection, projectValidationErrors]);
 
   // PR-SLD-09: Dane zabezpieczeń dla elementu
   const protection = useMemo<ProtectionSummary | null>(() => {

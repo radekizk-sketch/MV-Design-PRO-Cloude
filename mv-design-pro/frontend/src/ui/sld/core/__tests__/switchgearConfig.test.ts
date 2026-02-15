@@ -2,7 +2,7 @@
  * Tests for SwitchgearConfigV1 — kontrakt TS konfiguracji rozdzielnicy.
  *
  * RUN #3I COMMIT 1:
- * - Deterministic hashing (FNV-1a, permutation invariant).
+ * - Deterministic hashing (SHA-256, permutation invariant).
  * - Canonical serialization (sorted keys, sorted items).
  * - Validation (stable PL codes, no heuristics).
  * - FE mirror matches BE codes.
@@ -206,10 +206,10 @@ describe('canonicalizeConfig', () => {
 // =============================================================================
 
 describe('computeConfigHash', () => {
-  it('returns 8-char hex string (FNV-1a)', () => {
+  it('returns 64-char hex string (SHA-256)', () => {
     const config = makeMinimalLineInConfig();
     const hash = computeConfigHash(config);
-    expect(hash).toMatch(/^[0-9a-f]{8}$/);
+    expect(hash).toMatch(/^[0-9a-f]{64}$/);
   });
 
   it('same config produces same hash 100x', () => {
@@ -380,7 +380,7 @@ describe('validateSwitchgearConfig', () => {
     expect(protIssues[0].deviceId).toBe('dev_relay');
   });
 
-  it('PV_BESS_TRANSFORMER_MISSING: PV_SN without transformer (WARNING)', () => {
+  it('PV_BESS_TRANSFORMER_MISSING: PV_SN without transformer (BLOCKER)', () => {
     const config: SwitchgearConfigV1 = {
       ...emptyConfig('s1'),
       fields: [
@@ -402,14 +402,21 @@ describe('validateSwitchgearConfig', () => {
     };
 
     const result = validateSwitchgearConfig(config);
-    // Should be valid (no blockers) but with WARNING
-    expect(result.valid).toBe(true);
+    // Should be invalid (BLOCKER — PV/BESS always requires transformer)
+    expect(result.valid).toBe(false);
 
     const pvIssues = result.issues.filter(
       i => i.code === SwitchgearConfigValidationCode.PV_BESS_TRANSFORMER_MISSING,
     );
     expect(pvIssues).toHaveLength(1);
-    expect(pvIssues[0].severity).toBe(ConfigIssueSeverity.WARNING);
+    expect(pvIssues[0].severity).toBe(ConfigIssueSeverity.BLOCKER);
+
+    // FixAction present
+    const pvFixes = result.fixActions.filter(
+      fa => fa.code === SwitchgearConfigValidationCode.PV_BESS_TRANSFORMER_MISSING,
+    );
+    expect(pvFixes).toHaveLength(1);
+    expect(pvFixes[0].action).toBe(FixActionType.NAVIGATE_TO_WIZARD_FIELD);
   });
 
   it('DEVICE_ORPHAN: device referencing non-existent field', () => {

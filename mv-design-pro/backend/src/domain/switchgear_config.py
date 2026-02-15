@@ -664,13 +664,24 @@ def validate_switchgear_config(
                 issues.append(
                     ConfigValidationIssueV1(
                         code=SwitchgearConfigValidationCode.PV_BESS_TRANSFORMER_MISSING,
-                        severity=ConfigIssueSeverity.WARNING,
+                        severity=ConfigIssueSeverity.BLOCKER,
                         message_pl=(
                             f"Pole {f.field_id} ({f.pole_type.value}): "
-                            f"generator PV/BESS wymaga transformatora "
-                            f"(SN/nN lub blokowego)"
+                            f"zrodlo PV/BESS wymaga transformatora — "
+                            f"brak transformatora w torze przylaczenia"
                         ),
                         element_id=f.field_id,
+                        field_id=f.field_id,
+                    )
+                )
+                fix_actions.append(
+                    ConfigFixActionV1(
+                        code=SwitchgearConfigValidationCode.PV_BESS_TRANSFORMER_MISSING,
+                        action=FixActionType.NAVIGATE_TO_WIZARD_FIELD,
+                        message_pl=(
+                            f"Dodaj transformator do pola {f.field_id}"
+                        ),
+                        station_id=config.station_id,
                         field_id=f.field_id,
                     )
                 )

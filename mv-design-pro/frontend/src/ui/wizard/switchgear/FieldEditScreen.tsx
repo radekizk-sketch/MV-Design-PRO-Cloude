@@ -19,7 +19,9 @@ import {
   POLE_TYPE_LABELS_PL,
   APARAT_TYPE_LABELS_PL,
   AparatTypeV1,
+  FieldRoleV1,
 } from '../../sld/core/fieldDeviceContracts';
+import { PV_BESS_SN_ROLES } from '../../sld/core/switchgearConfig';
 import type {
   DeviceEntryV1,
   DeviceBindingV1,
@@ -273,6 +275,33 @@ export function FieldEditScreen({ caseId = null }: FieldEditScreenProps): JSX.El
           </div>
         </div>
       </section>
+
+      {/* PV/BESS: Transformer required section */}
+      {PV_BESS_SN_ROLES.has(fieldData.fieldRole as FieldRoleV1) && (
+        <section className="switchgear-section switchgear-section--transformer" data-testid="section-transformer-required">
+          <h3 className="switchgear-section-title">Transformator (wymagany)</h3>
+          {fieldData.devices.some(
+            (d: DeviceEntryV1) => d.aparatType === AparatTypeV1.TRANSFORMATOR,
+          ) ? (
+            <p className="switchgear-all-ok">
+              Transformator przypisany do pola.
+            </p>
+          ) : (
+            <div className="switchgear-transformer-missing" data-testid="transformer-missing-warning">
+              <p className="switchgear-fix-action switchgear-fix--blocker">
+                Zrodlo PV/BESS wymaga transformatora — brak transformatora w torze przylaczenia.
+              </p>
+              <button
+                className="switchgear-btn switchgear-btn--primary"
+                onClick={() => handleAddDevice(AparatTypeV1.TRANSFORMATOR)}
+                data-testid="add-transformer-btn"
+              >
+                Dodaj transformator
+              </button>
+            </div>
+          )}
+        </section>
+      )}
 
       {/* Part 2: Devices */}
       <section className="switchgear-section" data-testid="section-devices">
