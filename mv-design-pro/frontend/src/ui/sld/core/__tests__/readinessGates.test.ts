@@ -1,5 +1,5 @@
 /**
- * readinessGates.test.ts — RUN #3E §3: Readiness gate tests.
+ * readinessGates.test.ts — RUN #3E §3 + RUN #3I §I4: Readiness gate tests.
  *
  * BINDING: gates MUST throw ReadinessGateError when blockers exist.
  */
@@ -12,6 +12,8 @@ import {
   requireShortCircuitReady,
   requireLoadFlowReady,
   requireExportReady,
+  requireOverridesValid,
+  overridesIssuesToReadiness,
 } from '../readinessProfile';
 import type { ReadinessProfileV1, ReadinessIssueV1 } from '../readinessProfile';
 
@@ -153,5 +155,103 @@ describe('requireExportReady', () => {
       expect(e).toBeInstanceOf(ReadinessGateError);
       expect((e as ReadinessGateError).blockers).toHaveLength(3);
     }
+  });
+});
+
+// =============================================================================
+// RUN #3I §I4: Overrides validation gate
+// =============================================================================
+
+describe('requireOverridesValid (RUN #3I §I4)', () => {
+  it('passes when no override issues', () => {
+    const profile = makeProfile({ issues: [] });
+    requireOverridesValid(profile); // should not throw
+  });
+
+  it('passes with non-override blockers', () => {
+    const profile = makeProfile({
+      issues: [makeIssue('topology.missing_bus', ReadinessAreaV1.TOPOLOGY)],
+    });
+    requireOverridesValid(profile); // should not throw
+  });
+
+  it('blocks on geometry.override_invalid_element', () => {
+    const profile = makeProfile({
+      issues: [
+        makeIssue('geometry.override_invalid_element', ReadinessAreaV1.STATIONS),
+      ],
+    });
+    try {
+      requireOverridesValid(profile);
+      expect.fail('Should have thrown');
+    } catch (e) {
+      expect(e).toBeInstanceOf(ReadinessGateError);
+      expect((e as ReadinessGateError).gate).toBe('overrides_valid');
+      expect((e as ReadinessGateError).blockers).toHaveLength(1);
+    }
+  });
+
+  it('blocks on geometry.override_causes_collision', () => {
+    const profile = makeProfile({
+      issues: [
+        makeIssue('geometry.override_causes_collision', ReadinessAreaV1.STATIONS),
+      ],
+    });
+    expect(() => requireOverridesValid(profile)).toThrow(ReadinessGateError);
+  });
+
+  it('ignores override warnings', () => {
+    const profile = makeProfile({
+      issues: [{
+        code: 'geometry.override_invalid_element',
+        area: ReadinessAreaV1.STATIONS,
+        priority: ReadinessPriority.WARNING,
+        messagePl: 'test',
+        elementId: null,
+        elementType: null,
+        fixHintPl: null,
+        wizardStep: null,
+      }],
+    });
+    requireOverridesValid(profile); // should not throw
+  });
+});
+
+describe('overridesIssuesToReadiness (RUN #3I §I4)', () => {
+  it('converts single error', () => {
+    const errors = [
+      { elementId: 'node-1', code: 'geometry.override_invalid_element', message: 'Nie istnieje' },
+    ];
+    const issues = overridesIssuesToReadiness(errors);
+    expect(issues).toHaveLength(1);
+    expect(issues[0].code).toBe('geometry.override_invalid_element');
+    expect(issues[0].area).toBe(ReadinessAreaV1.STATIONS);
+    expect(issues[0].priority).toBe(ReadinessPriority.BLOCKER);
+    expect(issues[0].elementId).toBe('node-1');
+    expect(issues[0].elementType).toBe('override');
+  });
+
+  it('converts multiple errors', () => {
+    const errors = [
+      { elementId: 'n1', code: 'geometry.override_invalid_element', message: 'm1' },
+      { elementId: 'n2', code: 'geometry.override_causes_collision', message: 'm2' },
+    ];
+    const issues = overridesIssuesToReadiness(errors);
+    expect(issues).toHaveLength(2);
+  });
+
+  it('returns empty for no errors', () => {
+    expect(overridesIssuesToReadiness([])).toEqual([]);
+  });
+
+  it('integrates with readiness profile and gate', () => {
+    const errors = [
+      { elementId: 'n1', code: 'geometry.override_invalid_element', message: 'Blad' },
+    ];
+    const readinessIssues = overridesIssuesToReadiness(errors);
+    const profile = makeProfile({
+      issues: readinessIssues,
+    });
+    expect(() => requireOverridesValid(profile)).toThrow(ReadinessGateError);
   });
 });

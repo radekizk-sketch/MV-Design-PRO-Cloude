@@ -242,3 +242,43 @@ export function requirePvBessTransformerRule(profile: ReadinessProfileV1): void 
   if (blockers.length === 0) return;
   throw new ReadinessGateError('pv_bess_transformer_rule', blockers);
 }
+
+// =============================================================================
+// Overrides validation gate (RUN #3I §I4)
+// =============================================================================
+
+/**
+ * Gate: Geometry overrides must be valid for SLD to render correctly.
+ * Blocks when any geometry.override_* BLOCKER exists.
+ * RUN #3I §I4.
+ * @throws ReadinessGateError
+ */
+export function requireOverridesValid(profile: ReadinessProfileV1): void {
+  const blockers = profile.issues.filter(
+    i => i.priority === ReadinessPriority.BLOCKER &&
+      i.code.startsWith('geometry.override_'),
+  );
+  if (blockers.length === 0) return;
+  throw new ReadinessGateError('overrides_valid', blockers);
+}
+
+/**
+ * Convert override validation errors to ReadinessIssueV1 format.
+ * Maps geometry override validation results into the readiness issue format
+ * for consistent gate integration.
+ * RUN #3I §I4.
+ */
+export function overridesIssuesToReadiness(
+  errors: readonly { elementId: string; code: string; message: string }[],
+): ReadinessIssueV1[] {
+  return errors.map(err => ({
+    code: err.code,
+    area: ReadinessAreaV1.STATIONS,
+    priority: ReadinessPriority.BLOCKER,
+    messagePl: err.message,
+    elementId: err.elementId,
+    elementType: 'override',
+    fixHintPl: 'Popraw lub usun nadpisanie w trybie projektowym',
+    wizardStep: null,
+  }));
+}

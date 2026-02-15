@@ -412,3 +412,51 @@ def require_pv_bess_transformer_rule(profile: ReadinessProfileV1) -> None:
     if not blockers:
         return
     raise ReadinessGateError("pv_bess_transformer_rule", blockers)
+
+
+# ---------------------------------------------------------------------------
+# Overrides validation gate (RUN #3I §I4)
+# ---------------------------------------------------------------------------
+
+
+def require_overrides_valid(profile: ReadinessProfileV1) -> None:
+    """Gate: Geometry overrides must be valid for SLD to render correctly.
+
+    Blocks when any geometry.override_* BLOCKER exists.
+    RUN #3I §I4.
+    """
+    blockers = [
+        i for i in profile.issues
+        if i.priority == ReadinessPriority.BLOCKER
+        and i.code.startswith("geometry.override_")
+    ]
+    if not blockers:
+        return
+    raise ReadinessGateError("overrides_valid", blockers)
+
+
+def overrides_issues_from_validation(
+    validation_errors: list[dict[str, str]],
+) -> list[ReadinessIssueV1]:
+    """Convert override validation errors to ReadinessIssueV1 list.
+
+    Maps geometry override validation errors (from validate_overrides)
+    into the ReadinessProfileV1 issue format for consistent gate integration.
+
+    RUN #3I §I4.
+    """
+    issues: list[ReadinessIssueV1] = []
+    for err in validation_errors:
+        issues.append(
+            ReadinessIssueV1(
+                code=err.get("code", "geometry.override_invalid_element"),
+                area=ReadinessAreaV1.STATIONS,
+                priority=ReadinessPriority.BLOCKER,
+                message_pl=err.get("message", "Nieprawidlowe nadpisanie geometrii"),
+                element_id=err.get("element_id"),
+                element_type="override",
+                fix_hint_pl="Popraw lub usun nadpisanie w trybie projektowym",
+                wizard_step=None,
+            )
+        )
+    return issues

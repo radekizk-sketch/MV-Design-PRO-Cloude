@@ -1,4 +1,4 @@
-"""Readiness Gate tests — RUN #3E §3.
+"""Readiness Gate tests — RUN #3E §3 + RUN #3I §I4.
 
 Tests that readiness gates block operations when BLOCKERs exist.
 BINDING: any failure blocks merge.
@@ -12,8 +12,10 @@ from domain.readiness import (
     ReadinessIssueV1,
     ReadinessPriority,
     build_readiness_profile,
+    overrides_issues_from_validation,
     require_export_ready,
     require_load_flow_ready,
+    require_overrides_valid,
     require_short_circuit_ready,
     require_sld_ready,
 )
@@ -203,3 +205,119 @@ class TestReadinessGateErrorMessage:
             require_sld_ready(profile)
         assert "sld_ready" in str(exc_info.value)
         assert "test.code" in str(exc_info.value)
+
+
+# =============================================================================
+# RUN #3I §I4: Overrides validation gate
+# =============================================================================
+
+
+class TestOverridesValidGate:
+    """require_overrides_valid blocks when geometry.override_* BLOCKERs exist."""
+
+    def test_passes_when_no_override_issues(self) -> None:
+        profile = build_readiness_profile(
+            snapshot_id="s1",
+            snapshot_fingerprint="fp1",
+            issues=[],
+        )
+        require_overrides_valid(profile)  # should not raise
+
+    def test_passes_with_non_override_blockers(self) -> None:
+        profile = build_readiness_profile(
+            snapshot_id="s1",
+            snapshot_fingerprint="fp1",
+            issues=[_make_issue("topology.missing_bus", ReadinessAreaV1.TOPOLOGY)],
+        )
+        require_overrides_valid(profile)  # should not raise
+
+    def test_blocks_on_override_invalid_element(self) -> None:
+        profile = build_readiness_profile(
+            snapshot_id="s1",
+            snapshot_fingerprint="fp1",
+            issues=[
+                _make_issue(
+                    "geometry.override_invalid_element",
+                    ReadinessAreaV1.STATIONS,
+                ),
+            ],
+        )
+        with pytest.raises(ReadinessGateError) as exc_info:
+            require_overrides_valid(profile)
+        assert exc_info.value.gate == "overrides_valid"
+        assert len(exc_info.value.blockers) == 1
+
+    def test_blocks_on_override_causes_collision(self) -> None:
+        profile = build_readiness_profile(
+            snapshot_id="s1",
+            snapshot_fingerprint="fp1",
+            issues=[
+                _make_issue(
+                    "geometry.override_causes_collision",
+                    ReadinessAreaV1.STATIONS,
+                ),
+            ],
+        )
+        with pytest.raises(ReadinessGateError):
+            require_overrides_valid(profile)
+
+    def test_ignores_override_warnings(self) -> None:
+        profile = build_readiness_profile(
+            snapshot_id="s1",
+            snapshot_fingerprint="fp1",
+            issues=[
+                _make_issue(
+                    "geometry.override_invalid_element",
+                    ReadinessAreaV1.STATIONS,
+                    ReadinessPriority.WARNING,
+                ),
+            ],
+        )
+        require_overrides_valid(profile)  # should not raise
+
+
+class TestOverridesIssuesToReadiness:
+    """overrides_issues_from_validation converts errors to ReadinessIssueV1."""
+
+    def test_converts_single_error(self) -> None:
+        errors = [
+            {
+                "element_id": "node-1",
+                "code": "geometry.override_invalid_element",
+                "message": "Element nie istnieje",
+            }
+        ]
+        issues = overrides_issues_from_validation(errors)
+        assert len(issues) == 1
+        assert issues[0].code == "geometry.override_invalid_element"
+        assert issues[0].area == ReadinessAreaV1.STATIONS
+        assert issues[0].priority == ReadinessPriority.BLOCKER
+        assert issues[0].element_id == "node-1"
+        assert issues[0].element_type == "override"
+
+    def test_converts_multiple_errors(self) -> None:
+        errors = [
+            {"element_id": "n1", "code": "geometry.override_invalid_element", "message": "m1"},
+            {"element_id": "n2", "code": "geometry.override_causes_collision", "message": "m2"},
+        ]
+        issues = overrides_issues_from_validation(errors)
+        assert len(issues) == 2
+
+    def test_empty_list(self) -> None:
+        issues = overrides_issues_from_validation([])
+        assert issues == []
+
+    def test_integration_with_readiness_profile(self) -> None:
+        """Override issues integrate into readiness profile and block gate."""
+        errors = [
+            {"element_id": "n1", "code": "geometry.override_invalid_element", "message": "m1"},
+        ]
+        override_issues = overrides_issues_from_validation(errors)
+        profile = build_readiness_profile(
+            snapshot_id="s1",
+            snapshot_fingerprint="fp1",
+            issues=override_issues,
+        )
+        with pytest.raises(ReadinessGateError) as exc_info:
+            require_overrides_valid(profile)
+        assert exc_info.value.gate == "overrides_valid"
