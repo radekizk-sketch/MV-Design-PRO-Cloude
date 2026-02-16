@@ -1,0 +1,367 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "insert_station_on_segment_sn_v1",
+  "title": "insert_station_on_segment_sn payload",
+  "description": "Canonical payload schema for inserting a station on an existing SN trunk segment. Dodatek C §4 + Dodatek D §1–§9.",
+  "type": "object",
+  "required": ["meta", "trunk_ref", "embedding_intent", "segment_target", "station_spec", "nn_block_spec"],
+  "additionalProperties": false,
+  "properties": {
+    "meta": { "$ref": "#/$defs/Meta" },
+    "trunk_ref": { "$ref": "#/$defs/TrunkRef" },
+    "embedding_intent": { "$ref": "#/$defs/EmbeddingIntent" },
+    "segment_target": { "$ref": "#/$defs/SegmentTarget" },
+    "station_spec": { "$ref": "#/$defs/StationSpec" },
+    "nn_block_spec": { "$ref": "#/$defs/NnBlockSpec" },
+    "catalog_bindings": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/CatalogBinding" },
+      "description": "Catalog entries bound to station elements."
+    },
+    "pozycja_widokowa": { "$ref": "#/$defs/ViewPosition" },
+    "expected_response_contract": { "$ref": "#/$defs/ExpectedResponseContract" }
+  },
+  "$defs": {
+    "Meta": {
+      "type": "object",
+      "required": ["snapshot_in", "idempotency_key", "schema_version"],
+      "additionalProperties": false,
+      "properties": {
+        "snapshot_in": {
+          "type": "string",
+          "description": "ID of the snapshot this operation applies to."
+        },
+        "idempotency_key": {
+          "type": "string",
+          "minLength": 16,
+          "maxLength": 64,
+          "description": "Deterministic key computed from domain-significant payload fields."
+        },
+        "ui": {
+          "type": "object",
+          "properties": {
+            "click_id": { "type": "string" },
+            "timestamp_utc": { "type": "string", "format": "date-time" }
+          },
+          "additionalProperties": false,
+          "description": "UI-only metadata, excluded from idempotency key computation."
+        },
+        "schema_version": {
+          "type": "string",
+          "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$",
+          "description": "Semantic version of this payload schema."
+        },
+        "numeric_stability": {
+          "type": "object",
+          "properties": {
+            "quantum": { "type": "number", "exclusiveMinimum": 0 },
+            "rounding_mode": { "type": "string", "enum": ["HALF_EVEN"] }
+          },
+          "additionalProperties": false
+        }
+      }
+    },
+    "TrunkRef": {
+      "type": "object",
+      "required": ["trunk_id"],
+      "additionalProperties": false,
+      "properties": {
+        "trunk_id": { "type": "string", "minLength": 1 },
+        "terminal_from_id": { "type": ["string", "null"] },
+        "terminal_to_id": { "type": ["string", "null"] },
+        "segment_order_index_expected": { "type": ["integer", "null"], "minimum": 0 }
+      }
+    },
+    "EmbeddingIntent": {
+      "type": "object",
+      "required": ["continuity", "branch_ports_allowed"],
+      "additionalProperties": false,
+      "properties": {
+        "continuity": {
+          "type": "string",
+          "enum": ["CIAGLOSC_IN_OUT", "ODNOGA"]
+        },
+        "branch_ports_allowed": { "type": "boolean" }
+      }
+    },
+    "InsertAt": {
+      "type": "object",
+      "required": ["mode"],
+      "oneOf": [
+        {
+          "properties": {
+            "mode": { "const": "RATIO" },
+            "value": { "type": "number", "minimum": 0, "maximum": 1 }
+          },
+          "required": ["mode", "value"]
+        },
+        {
+          "properties": {
+            "mode": { "const": "ODLEGLOSC_OD_POCZATKU_M" },
+            "value": { "type": "number", "minimum": 0 }
+          },
+          "required": ["mode", "value"]
+        },
+        {
+          "properties": {
+            "mode": { "const": "ANCHOR" },
+            "value": {
+              "type": "object",
+              "required": ["anchor_id", "offset_m"],
+              "properties": {
+                "anchor_id": { "type": "string", "minLength": 1 },
+                "offset_m": { "type": "number" }
+              },
+              "additionalProperties": false
+            }
+          },
+          "required": ["mode", "value"]
+        }
+      ]
+    },
+    "CutVariant": {
+      "type": "object",
+      "oneOf": [
+        {
+          "properties": {
+            "mode": { "const": "FRACTION" },
+            "fraction_0_1": { "type": "number", "minimum": 0, "maximum": 1 }
+          },
+          "required": ["mode", "fraction_0_1"]
+        },
+        {
+          "properties": {
+            "mode": { "const": "DISTANCE_M" },
+            "distance_m": { "type": "number", "minimum": 0 }
+          },
+          "required": ["mode", "distance_m"]
+        },
+        {
+          "properties": {
+            "mode": { "const": "WORLD_POINT" },
+            "world_point": {
+              "type": "object",
+              "required": ["x", "y", "unit"],
+              "properties": {
+                "x": { "type": "number" },
+                "y": { "type": "number" },
+                "unit": { "type": "string", "enum": ["PX", "M"] }
+              },
+              "additionalProperties": false
+            }
+          },
+          "required": ["mode", "world_point"]
+        }
+      ]
+    },
+    "CutResolutionPolicy": {
+      "type": "object",
+      "required": ["snap_to_existing_node_threshold_m", "if_within_threshold", "if_hits_port_exactly", "deterministic_tie_breaker"],
+      "additionalProperties": false,
+      "properties": {
+        "snap_to_existing_node_threshold_m": { "type": "number", "minimum": 0 },
+        "if_within_threshold": { "type": "string", "enum": ["SNAP_TO_NODE", "REJECT_WITH_ERROR"] },
+        "if_hits_port_exactly": { "type": "string", "enum": ["SNAP_TO_PORT", "SNAP_TO_NODE"] },
+        "deterministic_tie_breaker": { "type": "string", "enum": ["SORT_BY_ELEMENT_ID_THEN_PORT_ID"] }
+      }
+    },
+    "SegmentTarget": {
+      "type": "object",
+      "required": ["segment_id", "cut", "cut_resolution_policy"],
+      "additionalProperties": false,
+      "properties": {
+        "segment_id": { "type": "string", "minLength": 1 },
+        "insert_at": { "$ref": "#/$defs/InsertAt" },
+        "cut": { "$ref": "#/$defs/CutVariant" },
+        "segment_length": {
+          "type": "object",
+          "required": ["value", "unit"],
+          "properties": {
+            "value": { "type": ["number", "null"], "minimum": 0 },
+            "unit": { "type": "string", "const": "m" }
+          },
+          "additionalProperties": false
+        },
+        "cut_resolution_policy": { "$ref": "#/$defs/CutResolutionPolicy" }
+      }
+    },
+    "PortDeclaration": {
+      "type": "object",
+      "required": ["port_id", "role"],
+      "additionalProperties": false,
+      "properties": {
+        "port_id": { "type": "string" },
+        "role": {
+          "type": "string",
+          "enum": ["SN_IN", "SN_OUT", "SN_BRANCH_01", "SN_BRANCH_02", "SN_BRANCH_03", "NN_BUS", "NN_OUT_01", "NN_OUT_02", "NN_OUT_03", "NN_OUT_04"]
+        },
+        "required": { "type": "boolean" },
+        "field_binding": { "type": ["string", "null"] }
+      }
+    },
+    "PortPlan": {
+      "type": "object",
+      "required": ["ports_declared"],
+      "additionalProperties": false,
+      "properties": {
+        "ports_declared": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/PortDeclaration" },
+          "minItems": 2
+        }
+      }
+    },
+    "StationSpec": {
+      "type": "object",
+      "required": ["station_type", "port_plan"],
+      "additionalProperties": false,
+      "properties": {
+        "station_type": {
+          "type": "string",
+          "enum": ["A", "B", "C", "D"]
+        },
+        "station_name": { "type": ["string", "null"] },
+        "port_plan": { "$ref": "#/$defs/PortPlan" },
+        "sn_bus_sections": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 1,
+          "description": "Number of SN bus sections (station type D requires >= 2)."
+        },
+        "coupler_required": {
+          "type": "boolean",
+          "default": false,
+          "description": "Whether a bus coupler is required (station type D = true)."
+        }
+      }
+    },
+    "OutgoingField": {
+      "type": "object",
+      "required": ["field_id", "port_id", "device_id"],
+      "additionalProperties": false,
+      "properties": {
+        "field_id": { "type": "string" },
+        "port_id": { "type": "string" },
+        "device_id": { "type": "string" },
+        "creates_nn_segment": { "type": "boolean", "default": false },
+        "nn_segment_id": { "type": ["string", "null"] },
+        "nn_segment_length_placeholder": { "type": ["number", "null"], "minimum": 0 }
+      }
+    },
+    "NnBlockSpec": {
+      "type": "object",
+      "required": ["nn_bus", "nn_main", "nn_voltage_kv"],
+      "additionalProperties": false,
+      "properties": {
+        "nn_bus": {
+          "type": "object",
+          "required": ["bus_nn_id"],
+          "properties": {
+            "bus_nn_id": { "type": "string" }
+          },
+          "additionalProperties": false
+        },
+        "nn_main": {
+          "type": "object",
+          "required": ["main_field_id", "main_device_id"],
+          "properties": {
+            "main_field_id": { "type": "string" },
+            "main_device_id": { "type": "string" }
+          },
+          "additionalProperties": false
+        },
+        "outgoing": {
+          "type": "object",
+          "required": ["count_required_min", "outgoing_fields"],
+          "properties": {
+            "count_required_min": { "type": "integer", "minimum": 1 },
+            "outgoing_fields": {
+              "type": "array",
+              "items": { "$ref": "#/$defs/OutgoingField" },
+              "minItems": 1
+            }
+          },
+          "additionalProperties": false
+        },
+        "nn_voltage_kv": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "Nominal nN voltage in kV."
+        },
+        "odbiory_nn_moga_byc_puste": {
+          "type": "boolean",
+          "default": true,
+          "description": "nN loads may be empty but feeder objects must exist."
+        }
+      }
+    },
+    "CatalogBinding": {
+      "type": "object",
+      "required": ["element_role", "catalog_item_id", "catalog_item_version", "policy"],
+      "additionalProperties": false,
+      "properties": {
+        "element_role": {
+          "type": "string",
+          "description": "Role of the element receiving this catalog entry (e.g., 'transformer_sn_nn')."
+        },
+        "catalog_item_id": { "type": "string", "minLength": 1 },
+        "catalog_item_version": {
+          "oneOf": [
+            { "type": "string" },
+            { "type": "number" }
+          ]
+        },
+        "policy": {
+          "type": "object",
+          "required": ["store_ref_only", "store_materialized_params"],
+          "properties": {
+            "store_ref_only": { "type": "boolean" },
+            "store_materialized_params": { "type": "boolean" }
+          },
+          "additionalProperties": false
+        },
+        "materialized_params": {
+          "type": "object",
+          "description": "Materialized catalog parameters for solver (when policy.store_materialized_params=true).",
+          "properties": {
+            "u_k_percent": { "type": "number" },
+            "p0_kw": { "type": "number" },
+            "pk_kw": { "type": "number" },
+            "s_n_kva": { "type": "number" },
+            "r_ohm_per_km": { "type": "number" },
+            "x_ohm_per_km": { "type": "number" },
+            "i_max_a": { "type": "number" }
+          },
+          "additionalProperties": true
+        }
+      }
+    },
+    "ViewPosition": {
+      "type": "object",
+      "required": ["x", "y", "unit"],
+      "additionalProperties": false,
+      "properties": {
+        "x": { "type": "number" },
+        "y": { "type": "number" },
+        "unit": { "type": "string", "enum": ["PX", "M"] }
+      }
+    },
+    "ExpectedResponseContract": {
+      "type": "object",
+      "required": ["required_fields"],
+      "additionalProperties": false,
+      "properties": {
+        "required_fields": {
+          "type": "array",
+          "items": { "type": "string" },
+          "minItems": 1
+        },
+        "expected_domain_events": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Expected domain event types in order."
+        }
+      }
+    }
+  }
+}
