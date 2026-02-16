@@ -746,3 +746,186 @@ DOMAIN_EVENT_TYPES: list[str] = [
     "PARAMETERS_UPDATED",
 ]
 """Lista dozwolonych typów zdarzeń domenowych."""
+
+
+# ===========================================================================
+# 7. TERMINAL REF — kanoniczny byt „końca magistrali"
+# ===========================================================================
+
+
+class TerminalRef(_FrozenBase):
+    """Referecja terminala magistrali/odgałęzienia.
+
+    Opisuje jednoznacznie punkt końcowy magistrali lub odgałęzienia
+    wraz z jego statusem (dostępność do dalszej budowy).
+    """
+
+    element_id: str
+    """Identyfikator elementu (szyny), do którego terminal należy."""
+
+    port_id: str
+    """Identyfikator portu na elemencie."""
+
+    trunk_id: str | None = None
+    """Identyfikator magistrali (jeśli terminal należy do magistrali)."""
+
+    branch_id: str | None = None
+    """Identyfikator odgałęzienia (jeśli terminal należy do odgałęzienia)."""
+
+    status: Literal["OTWARTY", "ZAJETY", "ZAREZERWOWANY_DLA_RINGU"]
+    """Status terminala — dostępność do dalszej budowy."""
+
+
+# ===========================================================================
+# 8. LOGICAL VIEWS — widoki logiczne (pochodna Snapshot)
+# ===========================================================================
+
+
+class TrunkViewV1(_FrozenBase):
+    """Widok magistrali — pochodna topologii Snapshot."""
+
+    corridor_ref: str
+    """Identyfikator magistrali (korytarza)."""
+
+    corridor_type: str
+    """Typ magistrali (radial/ring/mixed)."""
+
+    segments: list[str]
+    """Uporządkowana lista identyfikatorów segmentów magistrali."""
+
+    no_point_ref: str | None = None
+    """Identyfikator punktu normalnie otwartego (NOP), jeśli istnieje."""
+
+    terminals: list[TerminalRef] = []
+    """Terminale magistrali (punkty końcowe dostępne do rozbudowy)."""
+
+
+class BranchViewV1(_FrozenBase):
+    """Widok odgałęzienia — pochodna topologii Snapshot."""
+
+    branch_id: str
+    """Identyfikator odgałęzienia."""
+
+    from_element_id: str
+    """Element źródłowy odgałęzienia."""
+
+    from_port_id: str
+    """Port źródłowy odgałęzienia."""
+
+    segments: list[str]
+    """Lista identyfikatorów segmentów odgałęzienia."""
+
+    terminals: list[TerminalRef] = []
+    """Terminale odgałęzienia (punkty końcowe)."""
+
+
+class SecondaryConnectorViewV1(_FrozenBase):
+    """Widok połączenia wtórnego (pierścień) — pochodna topologii Snapshot."""
+
+    connector_id: str
+    """Identyfikator połączenia wtórnego."""
+
+    from_element_id: str
+    """Element początkowy pierścienia."""
+
+    to_element_id: str
+    """Element końcowy pierścienia."""
+
+    segment_ref: str
+    """Identyfikator segmentu zamykającego pierścień."""
+
+
+class LogicalViewsV1(_FrozenBase):
+    """Pełne widoki logiczne — deterministyczna pochodna Snapshot.
+
+    Zawiera uporządkowaną strukturę magistral, odgałęzień,
+    połączeń wtórnych i terminali.
+    """
+
+    trunks: list[TrunkViewV1] = []
+    """Lista magistral z segmentami i terminalami."""
+
+    branches: list[BranchViewV1] = []
+    """Lista odgałęzień."""
+
+    secondary_connectors: list[SecondaryConnectorViewV1] = []
+    """Lista połączeń wtórnych (pierścienie)."""
+
+    terminals: list[TerminalRef] = []
+    """Wszystkie terminale dostępne w sieci (agregat)."""
+
+
+# ===========================================================================
+# 9. MATERIALIZED PARAMS — materializacja parametrów katalogowych
+# ===========================================================================
+
+
+class MaterializedLineParams(_FrozenBase):
+    """Zmaterializowane parametry linii/kabla z katalogu."""
+
+    catalog_item_id: str
+    """Identyfikator pozycji katalogowej."""
+
+    catalog_item_version: str | None = None
+    """Wersja pozycji katalogowej."""
+
+    r_ohm_per_km: float | None = None
+    """Rezystancja [Ω/km]."""
+
+    x_ohm_per_km: float | None = None
+    """Reaktancja [Ω/km]."""
+
+    i_max_a: float | None = None
+    """Prąd maksymalny [A]."""
+
+
+class MaterializedTransformerParams(_FrozenBase):
+    """Zmaterializowane parametry transformatora z katalogu."""
+
+    catalog_item_id: str
+    """Identyfikator pozycji katalogowej."""
+
+    catalog_item_version: str | None = None
+    """Wersja pozycji katalogowej."""
+
+    u_k_percent: float | None = None
+    """Napięcie zwarcia [%]."""
+
+    p0_kw: float | None = None
+    """Straty jałowe [kW]."""
+
+    pk_kw: float | None = None
+    """Straty obciążeniowe [kW]."""
+
+    s_n_kva: float | None = None
+    """Moc znamionowa [kVA]."""
+
+
+class MaterializedParams(_FrozenBase):
+    """Zmaterializowane parametry katalogowe w Snapshot.
+
+    Każde wiązanie katalogowe tworzy kopię parametrów
+    w momencie przypisania — aktualizacja katalogu
+    nie zmienia istniejących obliczeń.
+    """
+
+    lines_sn: dict[str, MaterializedLineParams] = {}
+    """Parametry linii SN: segment_id → parametry."""
+
+    transformers_sn_nn: dict[str, MaterializedTransformerParams] = {}
+    """Parametry transformatorów SN/nN: transformer_id → parametry."""
+
+
+# ===========================================================================
+# 10. LAYOUT INFO — informacja o układzie geometrycznym
+# ===========================================================================
+
+
+class LayoutInfo(_FrozenBase):
+    """Informacja o deterministycznym układzie geometrycznym SLD."""
+
+    layout_hash: str
+    """SHA-256 hash układu geometrycznego."""
+
+    layout_version: str = "1.0"
+    """Wersja algorytmu układu."""

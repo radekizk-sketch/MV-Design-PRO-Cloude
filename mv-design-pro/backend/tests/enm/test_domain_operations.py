@@ -59,11 +59,22 @@ def _add_grid_source(enm_dict: dict) -> dict:
 
 
 def _continue_trunk(enm_dict: dict, **extra_payload) -> dict:
-    """Wykonaj continue_trunk_segment_sn i zwróć result."""
+    """Wykonaj continue_trunk_segment_sn i zwróć result.
+
+    Podaje jawne parametry: segment z dlugosc_m=500 i rodzaj=KABEL.
+    Brak domyślnych wartości — zgodność z kanonem 'bez zgadywania'.
+    """
+    payload = {
+        "segment": {
+            "rodzaj": "KABEL",
+            "dlugosc_m": 500,
+        },
+    }
+    payload.update(extra_payload)
     return execute_domain_operation(
         enm_dict=enm_dict,
         op_name="continue_trunk_segment_sn",
-        payload=extra_payload,
+        payload=payload,
     )
 
 
@@ -265,6 +276,7 @@ class TestFullV1Sequence:
                 "segment_ref": first_seg,
                 "station_type": "B",
                 "insert_at": {"value": 0.5},
+                "station": {"sn_voltage_kv": 15.0, "nn_voltage_kv": 0.4},
                 "sn_fields": ["IN", "OUT"],
             },
         )
@@ -272,11 +284,20 @@ class TestFullV1Sequence:
         s4 = r4["snapshot"]
         assert _count(s4, "substations") > _count(s3, "substations")
 
-        # Step 5: start_branch_segment_sn
+        # Step 5: start_branch_segment_sn — jawny from_bus_ref
+        # Find the SN bus of the just-inserted station
+        stn_sn_buses = [
+            b for b in s4.get("buses", [])
+            if "sn_bus" in b.get("ref_id", "")
+        ]
+        branch_bus_ref = stn_sn_buses[0]["ref_id"] if stn_sn_buses else s4["buses"][-1]["ref_id"]
         r5 = execute_domain_operation(
             enm_dict=s4,
             op_name="start_branch_segment_sn",
-            payload={},
+            payload={
+                "from_bus_ref": branch_bus_ref,
+                "segment": {"rodzaj": "KABEL", "dlugosc_m": 200},
+            },
         )
         assert r5.get("snapshot") is not None, f"start_branch error: {r5.get('error')}"
         s5 = r5["snapshot"]
@@ -314,6 +335,7 @@ class TestInsertStationCreatesStructure:
                 "segment_ref": first_seg,
                 "station_type": "B",
                 "insert_at": {"value": 0.5},
+                "station": {"sn_voltage_kv": 15.0, "nn_voltage_kv": 0.4},
                 "sn_fields": ["IN", "OUT"],
             },
         )
@@ -361,6 +383,7 @@ class TestInsertStationReadinessBlockers:
                 "segment_ref": first_seg,
                 "station_type": "B",
                 "insert_at": {"value": 0.5},
+                "station": {"sn_voltage_kv": 15.0, "nn_voltage_kv": 0.4},
                 "sn_fields": ["IN", "OUT"],
             },
         )
@@ -415,6 +438,7 @@ class TestDeterministicIds100x:
             "segment_ref": first_seg,
             "station_type": "B",
             "insert_at": {"value": 0.5},
+            "station": {"sn_voltage_kv": 15.0, "nn_voltage_kv": 0.4},
             "sn_fields": ["IN", "OUT"],
         }
 
@@ -491,6 +515,7 @@ class TestPermutationInvarianceSNFields:
                         "segment_ref": first_seg,
                         "station_type": "B",
                         "insert_at": {"value": 0.5},
+                        "station": {"sn_voltage_kv": 15.0, "nn_voltage_kv": 0.4},
                         "sn_fields": list(perm),
                     },
                 )
@@ -527,6 +552,7 @@ class TestPVBESSTransformerGate:
                 "segment_ref": first_seg,
                 "station_type": "B",
                 "insert_at": {"value": 0.5},
+                "station": {"sn_voltage_kv": 15.0, "nn_voltage_kv": 0.4},
                 "sn_fields": ["IN", "OUT"],
             },
         )
@@ -613,11 +639,19 @@ class TestSetNormalOpenPoint:
         if corridors:
             seg_refs = corridors[0].get("ordered_segment_refs", [])
 
-        # Try to connect ring first
+        # Get first and last bus for ring connection
+        first_bus = buses[0].get("ref_id") if buses else None
+        last_bus = buses[-1].get("ref_id") if len(buses) > 1 else None
+
+        # Try to connect ring with explicit endpoints
         result_ring = execute_domain_operation(
             enm_dict=snapshot,
             op_name="connect_ring",
-            payload={},
+            payload={
+                "from_bus_ref": last_bus,
+                "to_bus_ref": first_bus,
+                "segment": {"rodzaj": "KABEL", "dlugosc_m": 200},
+            },
         )
 
         ring_snapshot = snapshot
@@ -782,6 +816,7 @@ class TestStationTypeBPassthrough:
                 "segment_ref": first_seg,
                 "station_type": "B",
                 "insert_at": {"value": 0.5},
+                "station": {"sn_voltage_kv": 15.0, "nn_voltage_kv": 0.4},
                 "sn_fields": ["IN", "OUT"],
             },
         )
@@ -856,6 +891,7 @@ class TestStationTypeCBranch:
                 "segment_ref": first_seg,
                 "station_type": "C",
                 "insert_at": {"value": 0.5},
+                "station": {"sn_voltage_kv": 15.0, "nn_voltage_kv": 0.4},
                 "sn_fields": ["IN", "OUT", "FEEDER"],
             },
         )
@@ -901,6 +937,7 @@ class TestStationTypeDSectional:
                 "segment_ref": first_seg,
                 "station_type": "D",
                 "insert_at": {"value": 0.5},
+                "station": {"sn_voltage_kv": 15.0, "nn_voltage_kv": 0.4},
                 "sn_fields": ["IN", "OUT", "COUPLER"],
             },
         )
@@ -949,6 +986,7 @@ class TestInsertStationOnNonexistentSegment:
                 "segment_ref": "nonexistent_segment_xyz",
                 "station_type": "B",
                 "insert_at": {"value": 0.5},
+                "station": {"sn_voltage_kv": 15.0, "nn_voltage_kv": 0.4},
                 "sn_fields": ["IN", "OUT"],
             },
         )
@@ -993,6 +1031,7 @@ class TestInsertAtRatioOutOfRange:
                 "segment_ref": first_seg,
                 "station_type": "B",
                 "insert_at": {"value": 1.5},  # > 1.0
+                "station": {"sn_voltage_kv": 15.0, "nn_voltage_kv": 0.4},
                 "sn_fields": ["IN", "OUT"],
             },
         )
@@ -1032,11 +1071,13 @@ class TestAliasResolution:
         assert r1.get("snapshot") is not None
         s1 = r1["snapshot"]
 
-        # Use the alias name
+        # Use the alias name with explicit segment params
         result = execute_domain_operation(
             enm_dict=s1,
             op_name="add_trunk_segment_sn",
-            payload={},
+            payload={
+                "segment": {"rodzaj": "KABEL", "dlugosc_m": 500},
+            },
         )
 
         # Should succeed (alias resolved to continue_trunk_segment_sn)
@@ -1074,6 +1115,7 @@ class TestDomainEventsOrder:
                 "segment_ref": first_seg,
                 "station_type": "B",
                 "insert_at": {"value": 0.5},
+                "station": {"sn_voltage_kv": 15.0, "nn_voltage_kv": 0.4},
                 "sn_fields": ["IN", "OUT"],
             },
         )
@@ -1128,10 +1170,19 @@ class TestConnectRing:
         """
         _, snapshot = _build_gpz_plus_segments(3)
 
+        # Jawne podanie szyn — brak auto-detekcji
+        buses = snapshot.get("buses", [])
+        first_bus = buses[0].get("ref_id")
+        last_bus = buses[-1].get("ref_id")
+
         result = execute_domain_operation(
             enm_dict=snapshot,
             op_name="connect_ring",
-            payload={},
+            payload={
+                "from_bus_ref": last_bus,
+                "to_bus_ref": first_bus,
+                "segment": {"rodzaj": "KABEL", "dlugosc_m": 200},
+            },
         )
 
         assert result.get("snapshot") is not None, f"Error: {result.get('error')}"
