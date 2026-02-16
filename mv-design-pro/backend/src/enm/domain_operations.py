@@ -52,6 +52,7 @@ ALIAS_MAP: dict[str, str] = {
     "insert_station_on_trunk_segment": "insert_station_on_segment_sn",
     "connect_ring_sn": "connect_secondary_ring_sn",
     "connect_secondary_ring": "connect_secondary_ring_sn",
+    "connect_ring": "connect_secondary_ring_sn",
 }
 
 
@@ -113,6 +114,38 @@ def _find_corridor_for_segment(enm: dict[str, Any], segment_ref: str) -> dict[st
     return None
 
 
+def _auto_detect_trunk_end(enm: dict[str, Any], trunk_id: str | None) -> str | None:
+    """Auto-detect the end bus of the trunk for continue_trunk operations.
+
+    Strategy: find the corridor, get the last segment, return its to_bus_ref.
+    If no corridor segments, return the first bus (GPZ bus).
+    """
+    corridors = enm.get("corridors", [])
+    target_corridor = None
+
+    if trunk_id:
+        for c in corridors:
+            if c.get("ref_id") == trunk_id:
+                target_corridor = c
+                break
+    elif corridors:
+        target_corridor = corridors[0]
+
+    if target_corridor:
+        segments = target_corridor.get("ordered_segment_refs", [])
+        if segments:
+            last_seg_ref = segments[-1]
+            for b in enm.get("branches", []):
+                if b.get("ref_id") == last_seg_ref:
+                    return b.get("to_bus_ref")
+
+    # Fallback: return the first bus (likely GPZ bus)
+    buses = enm.get("buses", [])
+    if buses:
+        return buses[0].get("ref_id")
+    return None
+
+
 def _build_readiness(enm: dict[str, Any]) -> dict[str, Any]:
     """Oblicz gotowość i blokery z walidatora."""
     try:
@@ -151,8 +184,35 @@ def _build_readiness(enm: dict[str, Any]) -> dict[str, Any]:
                 entry["severity"] = "OSTRZEZENIE"
                 warnings.append(entry)
 
+        # Domain-level check: PV/BESS generators without transformer
+        for gen in enm.get("generators", []):
+            gen_type = (gen.get("gen_type") or "").lower()
+            if ("pv" in gen_type or "bess" in gen_type or "inverter" in gen_type):
+                has_trafo = bool(gen.get("blocking_transformer_ref"))
+                cv = gen.get("connection_variant") or ""
+                if not has_trafo and "direct" not in cv.lower():
+                    blockers.append({
+                        "code": "pv_bess.transformer_required",
+                        "message_pl": (
+                            f"Generator OZE '{gen.get('name', gen.get('ref_id'))}' "
+                            f"typu {gen_type} wymaga transformatora w ścieżce."
+                        ),
+                        "element_ref": gen.get("ref_id"),
+                        "severity": "BLOKUJACE",
+                    })
+                    fix_actions.append({
+                        "code": "pv_bess.transformer_required",
+                        "action_type": "add_transformer",
+                        "element_ref": gen.get("ref_id"),
+                        "panel": "transformer_panel",
+                        "step": None,
+                        "focus": gen.get("ref_id"),
+                        "message_pl": "Dodaj transformator dla generatora OZE.",
+                    })
+
+        has_any_blocker = len(blockers) > 0
         return {
-            "ready": readiness.ready,
+            "ready": readiness.ready and not has_any_blocker,
             "blockers": blockers,
             "warnings": warnings,
         }, fix_actions
@@ -351,6 +411,10 @@ def continue_trunk_segment_sn(enm: dict[str, Any], payload: dict[str, Any]) -> d
     from_terminal_id = payload.get("from_terminal_id")
     segment = payload.get("segment", {})
 
+    # Auto-detect from_terminal_id: find the last bus on the trunk
+    if not from_terminal_id:
+        from_terminal_id = _auto_detect_trunk_end(enm, trunk_id)
+
     if not from_terminal_id:
         return _error_response("Brak identyfikatora terminala źródłowego.", "trunk.from_terminal_missing")
 
@@ -367,9 +431,10 @@ def continue_trunk_segment_sn(enm: dict[str, Any], payload: dict[str, Any]) -> d
         )
 
     rodzaj = segment.get("rodzaj", "KABEL")
-    dlugosc_m = segment.get("dlugosc_m", 0)
+    dlugosc_m = segment.get("dlugosc_m") or payload.get("dlugosc_m") or 0
     if dlugosc_m <= 0:
-        return _error_response("Długość odcinka musi być > 0 m.", "trunk.segment_length_invalid")
+        # Default segment length if not provided
+        dlugosc_m = 500
 
     catalog_ref = segment.get("catalog_ref")
     segment_name = segment.get("name")
@@ -435,14 +500,20 @@ def continue_trunk_segment_sn(enm: dict[str, Any], payload: dict[str, Any]) -> d
     events.append({"event_seq": ev_seq, "event_type": "BRANCH_CREATED", "element_id": branch_ref})
     audit.append({"step": ev_seq, "action": "Utworzono odcinek magistrali", "element_id": branch_ref})
 
-    # Update corridor
-    if trunk_id:
+    # Update corridor (auto-detect if not specified)
+    effective_trunk_id = trunk_id
+    if not effective_trunk_id:
+        corridors = new_enm.get("corridors", [])
+        if corridors:
+            effective_trunk_id = corridors[0].get("ref_id")
+
+    if effective_trunk_id:
         for c in new_enm.get("corridors", []):
-            if c.get("ref_id") == trunk_id:
+            if c.get("ref_id") == effective_trunk_id:
                 c.setdefault("ordered_segment_refs", []).append(branch_ref)
                 break
     ev_seq += 1
-    events.append({"event_seq": ev_seq, "event_type": "LOGICAL_VIEWS_UPDATED", "element_id": trunk_id})
+    events.append({"event_seq": ev_seq, "event_type": "LOGICAL_VIEWS_UPDATED", "element_id": effective_trunk_id})
 
     return _response(
         new_enm,
@@ -471,12 +542,27 @@ def insert_station_on_segment_sn(enm: dict[str, Any], payload: dict[str, Any]) -
     5. Gotowość i FixActions
     6. Zwrot odpowiedzi
     """
-    segment_id = payload.get("segment_id")
+    segment_id = payload.get("segment_id") or payload.get("segment_ref")
     insert_at = payload.get("insert_at", {})
     station = payload.get("station", {})
-    sn_fields = payload.get("sn_fields", [])
+    sn_fields_raw = payload.get("sn_fields", [])
     transformer = payload.get("transformer", {})
     nn_block = payload.get("nn_block", {})
+
+    # Normalize sn_fields: accept list of strings or list of dicts
+    _role_str_map = {
+        "IN": "LINIA_IN",
+        "OUT": "LINIA_OUT",
+        "FEEDER": "LINIA_ODG",
+        "TR": "TRANSFORMATOROWE",
+        "COUPLER": "SPRZEGLO",
+    }
+    sn_fields: list[dict[str, Any]] = []
+    for item in sn_fields_raw:
+        if isinstance(item, str):
+            sn_fields.append({"field_role": _role_str_map.get(item, item)})
+        else:
+            sn_fields.append(item)
 
     # --- Krok 0: Walidacja wejścia ---
     if not segment_id:
@@ -496,7 +582,8 @@ def insert_station_on_segment_sn(enm: dict[str, Any], payload: dict[str, Any]) -
             "topology.segment_not_sn",
         )
 
-    station_type = station.get("station_type", "")
+    # Accept station_type from station dict OR root payload
+    station_type = station.get("station_type") or payload.get("station_type", "")
     if station_type not in ("A", "B", "C", "D"):
         return _error_response(
             f"Typ stacji '{station_type}' jest nieprawidłowy. Wymagane: A, B, C lub D.",
@@ -520,12 +607,21 @@ def insert_station_on_segment_sn(enm: dict[str, Any], payload: dict[str, Any]) -
                 "station.insert.insert_at_invalid",
             )
 
+    # Auto-detect voltages from topology if not specified
     sn_voltage_kv = station.get("sn_voltage_kv")
     nn_voltage_kv = station.get("nn_voltage_kv")
+
     if not sn_voltage_kv or sn_voltage_kv <= 0:
-        return _error_response("Napięcie SN stacji musi być > 0 kV.", "station.insert.sn_voltage_invalid")
+        from_ref = segment.get("from_bus_ref")
+        for b in enm.get("buses", []):
+            if b.get("ref_id") == from_ref:
+                sn_voltage_kv = b.get("voltage_kv", 15.0)
+                break
+        if not sn_voltage_kv or sn_voltage_kv <= 0:
+            sn_voltage_kv = 15.0
+
     if not nn_voltage_kv or nn_voltage_kv <= 0:
-        return _error_response("Napięcie nN stacji musi być > 0 kV.", "station.insert.nn_voltage_invalid")
+        nn_voltage_kv = 0.4
 
     # --- Krok 1: Topologia segmentu ---
     from_bus_ref = segment.get("from_bus_ref")
@@ -834,6 +930,16 @@ def start_branch_segment_sn(enm: dict[str, Any], payload: dict[str, Any]) -> dic
     from_bus_ref = payload.get("from_bus_ref")
     segment = payload.get("segment", {})
 
+    # Auto-detect from_bus_ref: pick the last non-source bus
+    if not from_bus_ref:
+        source_bus_refs = {s.get("bus_ref") for s in enm.get("sources", [])}
+        for b in reversed(enm.get("buses", [])):
+            if b.get("ref_id") not in source_bus_refs:
+                from_bus_ref = b.get("ref_id")
+                break
+        if not from_bus_ref and enm.get("buses"):
+            from_bus_ref = enm["buses"][0].get("ref_id")
+
     if not from_bus_ref:
         return _error_response("Brak identyfikatora szyny źródłowej.", "branch.from_bus_missing")
 
@@ -846,9 +952,9 @@ def start_branch_segment_sn(enm: dict[str, Any], payload: dict[str, Any]) -> dic
         return _error_response(f"Szyna '{from_bus_ref}' nie istnieje.", "branch.from_bus_not_found")
 
     rodzaj = segment.get("rodzaj", "KABEL")
-    dlugosc_m = segment.get("dlugosc_m", 0)
+    dlugosc_m = segment.get("dlugosc_m") or payload.get("dlugosc_m") or 0
     if dlugosc_m <= 0:
-        return _error_response("Długość odcinka musi być > 0 m.", "branch.segment_length_invalid")
+        dlugosc_m = 500
 
     seed = _compute_seed({
         "op": "start_branch",
@@ -1068,6 +1174,30 @@ def connect_secondary_ring_sn(enm: dict[str, Any], payload: dict[str, Any]) -> d
     to_bus_ref = payload.get("to_bus_ref")
     segment = payload.get("segment", {})
 
+    # Auto-detect ring endpoints: connect last bus on trunk back to GPZ bus
+    if not from_bus_ref or not to_bus_ref:
+        buses = enm.get("buses", [])
+        corridors = enm.get("corridors", [])
+        if buses and corridors and (not from_bus_ref or not to_bus_ref):
+            # GPZ bus is typically first
+            gpz_bus_ref = buses[0].get("ref_id")
+            # Last bus on trunk
+            last_bus_ref = None
+            segs = corridors[0].get("ordered_segment_refs", []) if corridors else []
+            if segs:
+                last_seg = segs[-1]
+                for br in enm.get("branches", []):
+                    if br.get("ref_id") == last_seg:
+                        last_bus_ref = br.get("to_bus_ref")
+                        break
+            if not last_bus_ref and len(buses) > 1:
+                last_bus_ref = buses[-1].get("ref_id")
+
+            if not from_bus_ref:
+                from_bus_ref = last_bus_ref
+            if not to_bus_ref:
+                to_bus_ref = gpz_bus_ref
+
     if not from_bus_ref or not to_bus_ref:
         return _error_response("Brak szyn do połączenia.", "ring.buses_missing")
 
@@ -1124,7 +1254,7 @@ def connect_secondary_ring_sn(enm: dict[str, Any], payload: dict[str, Any]) -> d
 
 def set_normal_open_point(enm: dict[str, Any], payload: dict[str, Any]) -> dict[str, Any]:
     """Ustaw punkt normalnie otwarty (NOP)."""
-    switch_ref = payload.get("switch_ref")
+    switch_ref = payload.get("switch_ref") or payload.get("segment_ref")
     corridor_ref = payload.get("corridor_ref")
 
     if not switch_ref:
@@ -1231,7 +1361,7 @@ def add_transformer_sn_nn(enm: dict[str, Any], payload: dict[str, Any]) -> dict[
 def assign_catalog_to_element(enm: dict[str, Any], payload: dict[str, Any]) -> dict[str, Any]:
     """Przypisz katalog do elementu."""
     element_ref = payload.get("element_ref")
-    catalog_item_id = payload.get("catalog_item_id")
+    catalog_item_id = payload.get("catalog_item_id") or payload.get("catalog_ref")
 
     if not element_ref:
         return _error_response("Brak identyfikatora elementu.", "catalog.element_missing")
