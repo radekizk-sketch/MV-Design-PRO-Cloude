@@ -390,3 +390,148 @@ class TestLayoutHashPresent:
         assert layout_hash.startswith("sha256:"), (
             f"layout.layout_hash must start with 'sha256:', got '{layout_hash}'"
         )
+
+
+# ===========================================================================
+# 10. TestSecondaryConnectorDetection
+# ===========================================================================
+
+
+class TestCatalogMaterializationResolution:
+    """Po assign_catalog_to_element materialized_params zawiera parametry z katalogu."""
+
+    def test_catalog_params_resolved_in_materialized_params(self):
+        """After assigning catalog_ref to a cable, materialized_params should contain
+        actual catalog-resolved parameters (r_ohm_per_km, x_ohm_per_km, i_max_a).
+
+        Canon rule: materialized_params are frozen copies of catalog values,
+        not raw instance params. They enable auditing without catalog access.
+        """
+        _, snapshot = _build_gpz_plus_segments(2)
+
+        # Find first cable branch
+        cable_ref = None
+        for branch in snapshot.get("branches", []):
+            if branch.get("type") in ("cable", "line_overhead"):
+                cable_ref = branch["ref_id"]
+                break
+        assert cable_ref is not None, "Need at least one cable segment"
+
+        # Assign a known catalog type
+        catalog_id = "cable-base-xlpe-cu-1c-120"
+        result = execute_domain_operation(
+            enm_dict=snapshot,
+            op_name="assign_catalog_to_element",
+            payload={
+                "element_ref": cable_ref,
+                "catalog_item_id": catalog_id,
+            },
+        )
+
+        assert result.get("snapshot") is not None, (
+            f"Prerequisite failed: {result.get('error')}"
+        )
+
+        mat = result.get("materialized_params", {})
+        lines_sn = mat.get("lines_sn", {})
+        assert cable_ref in lines_sn, (
+            f"Cable {cable_ref} should appear in materialized_params.lines_sn "
+            f"after catalog assignment"
+        )
+
+        entry = lines_sn[cable_ref]
+        assert entry["catalog_item_id"] == catalog_id
+        # Catalog-resolved params should be numeric (not None)
+        assert entry["r_ohm_per_km"] is not None, (
+            "r_ohm_per_km should be resolved from catalog"
+        )
+        assert entry["x_ohm_per_km"] is not None, (
+            "x_ohm_per_km should be resolved from catalog"
+        )
+        assert entry["i_max_a"] is not None, (
+            "i_max_a should be resolved from catalog"
+        )
+        # Catalog values should be > 0
+        assert entry["r_ohm_per_km"] > 0, "r_ohm_per_km from catalog must be > 0"
+        assert entry["i_max_a"] > 0, "i_max_a from catalog must be > 0"
+
+
+# ===========================================================================
+# 11. TestSecondaryConnectorDetection
+# ===========================================================================
+
+
+class TestSecondaryConnectorDetection:
+    """Po connect_secondary_ring_sn logical_views zawiera secondary_connectors."""
+
+    def test_ring_closure_detected_as_secondary_connector(self):
+        """After ring closure, logical_views.secondary_connectors has >= 1 entry.
+
+        Canon rule: ring closure segments are classified as secondary_connectors
+        in logical_views, not as trunks or branches.
+        """
+        _, snapshot = _build_gpz_plus_segments(3)
+        buses = snapshot.get("buses", [])
+        assert len(buses) >= 2, "Need at least 2 buses for ring test"
+
+        result = execute_domain_operation(
+            enm_dict=snapshot,
+            op_name="connect_secondary_ring_sn",
+            payload={
+                "from_bus_ref": buses[-1]["ref_id"],
+                "to_bus_ref": buses[0]["ref_id"],
+                "segment": {"rodzaj": "KABEL", "dlugosc_m": 200},
+            },
+        )
+
+        assert result.get("snapshot") is not None, (
+            f"Prerequisite failed: {result.get('error')}"
+        )
+
+        lv = result.get("logical_views", {})
+        secondary = lv.get("secondary_connectors", [])
+        assert len(secondary) >= 1, (
+            "logical_views.secondary_connectors should have >= 1 entry "
+            "after ring closure"
+        )
+
+        # Verify structure of each secondary connector
+        for sc in secondary:
+            assert "connector_id" in sc, "Secondary connector must have connector_id"
+            assert "from_element_id" in sc, "Secondary connector must have from_element_id"
+            assert "to_element_id" in sc, "Secondary connector must have to_element_id"
+            assert "segment_ref" in sc, "Secondary connector must have segment_ref"
+
+    def test_secondary_connector_not_in_branches_or_trunks(self):
+        """Ring closure segment should NOT appear in logical_views branches or trunk segments."""
+        _, snapshot = _build_gpz_plus_segments(3)
+        buses = snapshot.get("buses", [])
+        assert len(buses) >= 2
+
+        result = execute_domain_operation(
+            enm_dict=snapshot,
+            op_name="connect_secondary_ring_sn",
+            payload={
+                "from_bus_ref": buses[-1]["ref_id"],
+                "to_bus_ref": buses[0]["ref_id"],
+                "segment": {"rodzaj": "KABEL", "dlugosc_m": 200},
+            },
+        )
+
+        assert result.get("snapshot") is not None
+
+        lv = result.get("logical_views", {})
+        secondary_ids = {sc["connector_id"] for sc in lv.get("secondary_connectors", [])}
+
+        # Check not in branch views
+        for bv in lv.get("branches", []):
+            assert bv["branch_id"] not in secondary_ids, (
+                f"Ring closure {bv['branch_id']} should not appear in branches"
+            )
+
+        # Check not in trunk segments
+        for trunk in lv.get("trunks", []):
+            for seg in trunk.get("segments", []):
+                assert seg not in secondary_ids, (
+                    f"Ring closure {seg} should not appear in trunk segments"
+                )

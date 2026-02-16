@@ -281,8 +281,19 @@ def _compute_logical_views(enm: dict[str, Any]) -> dict[str, Any]:
             "terminals": terminals,
         })
 
-    # Detect branches (segments NOT in any corridor, connected to corridor buses)
+    # Collect all corridor bus refs for ring detection (needed before branch classification)
+    corridor_bus_refs: set[str] = set()
+    for c in corridors:
+        for seg_ref in c.get("ordered_segment_refs", []):
+            seg = branch_idx.get(seg_ref)
+            if seg:
+                corridor_bus_refs.add(seg.get("from_bus_ref", ""))
+                corridor_bus_refs.add(seg.get("to_bus_ref", ""))
+    corridor_bus_refs.discard("")
+
+    # Classify non-corridor cable/line segments into branches vs secondary connectors
     branch_views = []
+    secondary_connectors = []
     for b in sorted(branches, key=lambda x: x.get("ref_id", "")):
         ref = b.get("ref_id", "")
         if ref in corridor_segment_refs:
@@ -290,26 +301,32 @@ def _compute_logical_views(enm: dict[str, Any]) -> dict[str, Any]:
         btype = b.get("type", "")
         if btype not in ("cable", "line_overhead"):
             continue
-        # This is a branch/lateral segment
         from_ref = b.get("from_bus_ref", "")
         to_ref = b.get("to_bus_ref", "")
-        branch_views.append({
-            "branch_id": ref,
-            "from_element_id": from_ref,
-            "from_port_id": "branch_start",
-            "segments": [ref],
-            "terminals": [{
-                "element_id": to_ref,
-                "port_id": "branch_end",
-                "trunk_id": None,
-                "branch_id": ref,
-                "status": _terminal_status(enm, to_ref, None),
-            }],
-        })
 
-    # Detect secondary connectors (ring closure segments)
-    secondary_connectors = []
-    # Ring closures: segments that create cycles (not in corridor but connect corridor buses)
+        # Ring closure: both ends connect to corridor buses → secondary connector
+        if from_ref in corridor_bus_refs and to_ref in corridor_bus_refs:
+            secondary_connectors.append({
+                "connector_id": ref,
+                "from_element_id": from_ref,
+                "to_element_id": to_ref,
+                "segment_ref": ref,
+            })
+        else:
+            # Lateral branch segment
+            branch_views.append({
+                "branch_id": ref,
+                "from_element_id": from_ref,
+                "from_port_id": "branch_start",
+                "segments": [ref],
+                "terminals": [{
+                    "element_id": to_ref,
+                    "port_id": "branch_end",
+                    "trunk_id": None,
+                    "branch_id": ref,
+                    "status": _terminal_status(enm, to_ref, None),
+                }],
+            })
 
     # Aggregate all terminals
     all_terminals = []
@@ -353,43 +370,95 @@ def _terminal_status(
     return "OTWARTY"
 
 
+def _get_catalog_safe():
+    """Załaduj katalog MV (bezpieczne — zwraca None przy braku)."""
+    try:
+        from network_model.catalog import get_default_mv_catalog
+        return get_default_mv_catalog()
+    except Exception:
+        return None
+
+
 def _compute_materialized_params(enm: dict[str, Any]) -> dict[str, Any]:
     """Oblicz zmaterializowane parametry katalogowe.
 
     Każdy segment z catalog_ref ma skopiowane parametry.
+    Jeśli dostępny jest katalog (CatalogRepository), parametry są
+    rozwiązywane z katalogu (precedence: catalog > instance).
     """
     lines_sn: dict[str, Any] = {}
     transformers_sn_nn: dict[str, Any] = {}
 
+    # Try loading catalog for actual parameter resolution
+    catalog = _get_catalog_safe()
+
     for b in enm.get("branches", []):
         btype = b.get("type", "")
-        if btype in ("cable", "line_overhead") and b.get("catalog_ref"):
-            lines_sn[b["ref_id"]] = {
-                "catalog_item_id": b["catalog_ref"],
-                "catalog_item_version": b.get("meta", {}).get(
-                    "catalog_item_version"
-                ),
-                "r_ohm_per_km": b.get("r_ohm_per_km"),
-                "x_ohm_per_km": b.get("x_ohm_per_km"),
-                "i_max_a": (b.get("rating") or {}).get("in_a")
-                if isinstance(b.get("rating"), dict)
-                else None,
-            }
+        if btype not in ("cable", "line_overhead"):
+            continue
+        catalog_ref = b.get("catalog_ref")
+        if not catalog_ref:
+            continue
+
+        r_ohm_per_km = b.get("r_ohm_per_km")
+        x_ohm_per_km = b.get("x_ohm_per_km")
+        i_max_a = (
+            (b.get("rating") or {}).get("in_a")
+            if isinstance(b.get("rating"), dict)
+            else None
+        )
+
+        # Resolve from catalog if available
+        if catalog:
+            is_cable = btype == "cable"
+            type_data = (
+                catalog.get_cable_type(catalog_ref) if is_cable
+                else catalog.get_line_type(catalog_ref)
+            )
+            if type_data:
+                r_ohm_per_km = type_data.r_ohm_per_km
+                x_ohm_per_km = type_data.x_ohm_per_km
+                i_max_a = type_data.rated_current_a
+
+        lines_sn[b["ref_id"]] = {
+            "catalog_item_id": catalog_ref,
+            "catalog_item_version": b.get("meta", {}).get(
+                "catalog_item_version"
+            ),
+            "r_ohm_per_km": r_ohm_per_km,
+            "x_ohm_per_km": x_ohm_per_km,
+            "i_max_a": i_max_a,
+        }
 
     for t in enm.get("transformers", []):
-        if t.get("catalog_ref"):
-            transformers_sn_nn[t["ref_id"]] = {
-                "catalog_item_id": t["catalog_ref"],
-                "catalog_item_version": t.get("meta", {}).get(
-                    "catalog_item_version"
-                ),
-                "u_k_percent": t.get("uk_percent"),
-                "p0_kw": t.get("p0_kw"),
-                "pk_kw": t.get("pk_kw"),
-                "s_n_kva": (t.get("sn_mva") or 0) * 1000
-                if t.get("sn_mva")
-                else None,
-            }
+        catalog_ref = t.get("catalog_ref")
+        if not catalog_ref:
+            continue
+
+        uk_percent = t.get("uk_percent")
+        p0_kw = t.get("p0_kw")
+        pk_kw = t.get("pk_kw")
+        s_n_kva = (t.get("sn_mva") or 0) * 1000 if t.get("sn_mva") else None
+
+        # Resolve from catalog if available
+        if catalog:
+            type_data = catalog.get_transformer_type(catalog_ref)
+            if type_data:
+                uk_percent = type_data.uk_percent
+                p0_kw = type_data.p0_kw
+                pk_kw = type_data.pk_kw
+                s_n_kva = type_data.rated_power_mva * 1000
+
+        transformers_sn_nn[t["ref_id"]] = {
+            "catalog_item_id": catalog_ref,
+            "catalog_item_version": t.get("meta", {}).get(
+                "catalog_item_version"
+            ),
+            "u_k_percent": uk_percent,
+            "p0_kw": p0_kw,
+            "pk_kw": pk_kw,
+            "s_n_kva": s_n_kva,
+        }
 
     return {
         "lines_sn": lines_sn,

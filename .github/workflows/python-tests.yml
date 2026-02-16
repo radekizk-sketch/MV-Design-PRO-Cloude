@@ -34,3 +34,9 @@ jobs:
       - name: Run pytest
         working-directory: mv-design-pro/backend
         run: poetry run pytest -q
+      - name: PCC Zero Guard
+        working-directory: mv-design-pro
+        run: python scripts/pcc_zero_guard.py
+      - name: Domain No-Guessing Guard
+        working-directory: mv-design-pro
+        run: python scripts/domain_no_guessing_guard.py
