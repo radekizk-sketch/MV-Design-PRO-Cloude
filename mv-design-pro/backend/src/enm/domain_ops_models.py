@@ -390,6 +390,300 @@ class NNBlockSpec(_FrozenBase):
     """Specyfikacje poszczególnych odpływów nN."""
 
 
+# ===========================================================================
+# 4b. SourceNN Models — modele źródeł w rozdzielni nN
+# ===========================================================================
+
+
+class NNSourceType:
+    """Typy źródeł w rozdzielni nN (stałe, nie enum — Pydantic-frozen)."""
+    PV_INVERTER = "PV_INVERTER"
+    BESS_INVERTER = "BESS_INVERTER"
+    GENSET = "GENSET"
+    UPS = "UPS"
+
+
+class NNSwitchSpec(_FrozenBase):
+    """Specyfikacja aparatu łączeniowego pola źródłowego nN."""
+
+    switch_kind: Literal["WYLACZNIK", "ROZLACZNIK", "BEZPIECZNIK"]
+    """Rodzaj aparatu łączeniowego (PL)."""
+
+    normal_state: Literal["OTWARTY", "ZAMKNIETY"]
+    """Stan normalny aparatu — jawnie, bez domyślnego."""
+
+    catalog_ref: str | None = None
+    """Referencja katalogowa aparatu (id+wersja) lub None => blocker."""
+
+    catalog_version: str | None = None
+    """Wersja pozycji katalogowej."""
+
+
+class NNSourceFieldSpec(_FrozenBase):
+    """Specyfikacja pola źródłowego nN.
+
+    Pole dedykowane źródłu w rozdzielni nN — zawiera aparat łączeniowy
+    i port przyłączeniowy źródła.
+    """
+
+    source_field_kind: Literal["PV", "BESS", "AGREGAT", "UPS"]
+    """Rodzaj pola źródłowego (PL)."""
+
+    switch_spec: NNSwitchSpec
+    """Specyfikacja aparatu łączeniowego pola."""
+
+    voltage_nn_kv: float
+    """Napięcie nN (kV) — jawnie, >0, bez domyślnego."""
+
+    field_name: str | None = None
+    """Opcjonalna nazwa pola."""
+
+    field_label: str | None = None
+    """Opcjonalne oznaczenie pola."""
+
+
+class PVInverterSpec(_FrozenBase):
+    """Specyfikacja falownika PV w rozdzielni nN.
+
+    Wszystkie parametry jawne — brak domyślnych wartości liczbowych.
+    """
+
+    catalog_item_id: str | None = None
+    """Identyfikator pozycji katalogowej falownika PV."""
+
+    catalog_item_version: str | None = None
+    """Wersja pozycji katalogowej."""
+
+    rated_power_ac_kw: float
+    """Moc znamionowa AC (kW) — >0, jawnie."""
+
+    max_power_kw: float
+    """Moc maksymalna (kW) — >= rated_power_ac_kw, jawnie."""
+
+    control_mode: Literal[
+        "STALY_COS_PHI",
+        "Q_OD_U",
+        "P_OD_U",
+        "WYLACZONE",
+    ]
+    """Tryb regulacji — jawnie, bez domyślnego."""
+
+    cos_phi: float | None = None
+    """Cos φ — wymagany przy trybie STALY_COS_PHI."""
+
+    generation_limit_pmax_kw: float | None = None
+    """Ograniczenie generacji Pmax (kW)."""
+
+    generation_limit_q_kvar: float | None = None
+    """Ograniczenie generacji Q (kvar)."""
+
+    disconnect_required: bool = True
+    """Wymóg aparatu odłączającego."""
+
+    measurement_point: Literal["UTWORZ_NOWY", "UZYJ_ISTNIEJACEGO", "BRAK"] | None = None
+    """Punkt pomiaru energii — jawnie."""
+
+    existing_measurement_ref: str | None = None
+    """Referencja do istniejącego punktu pomiaru (gdy UZYJ_ISTNIEJACEGO)."""
+
+    source_name: str | None = None
+    """Opcjonalna nazwa źródła."""
+
+    source_label: str | None = None
+    """Opcjonalne oznaczenie."""
+
+    work_profile_ref: str | None = None
+    """Opcjonalna referencja do profilu pracy."""
+
+
+class BESSInverterSpec(_FrozenBase):
+    """Specyfikacja falownika BESS w rozdzielni nN.
+
+    Obejmuje falownik + moduł magazynu energii.
+    """
+
+    inverter_catalog_id: str | None = None
+    """Identyfikator pozycji katalogowej falownika BESS."""
+
+    inverter_catalog_version: str | None = None
+    """Wersja pozycji katalogowej falownika."""
+
+    storage_catalog_id: str | None = None
+    """Identyfikator pozycji katalogowej modułu magazynu."""
+
+    storage_catalog_version: str | None = None
+    """Wersja pozycji katalogowej modułu magazynu."""
+
+    usable_capacity_kwh: float
+    """Pojemność użyteczna (kWh) — >0."""
+
+    charge_power_kw: float
+    """Moc ładowania (kW) — >0."""
+
+    discharge_power_kw: float
+    """Moc rozładowania (kW) — >0."""
+
+    operation_mode: Literal[
+        "TYLKO_GENERACJA",
+        "TYLKO_MAGAZYNOWANIE",
+        "DWUKIERUNKOWY",
+        "WYLACZONE",
+    ]
+    """Tryb pracy — jawnie, bez domyślnego."""
+
+    control_strategy: Literal[
+        "STALA_MOC",
+        "PROFIL",
+        "REGULACJA_NAPIECIA",
+        "REGULACJA_MOCY_BIERNEJ",
+    ]
+    """Strategia sterowania — jawnie, bez domyślnego."""
+
+    soc_min_percent: float
+    """Minimalny SOC (%) — jawnie."""
+
+    soc_max_percent: float
+    """Maksymalny SOC (%) — jawnie."""
+
+    source_name: str | None = None
+    """Opcjonalna nazwa źródła."""
+
+    source_label: str | None = None
+    """Opcjonalne oznaczenie."""
+
+    time_profile_ref: str | None = None
+    """Opcjonalna referencja do profilu czasowego."""
+
+
+class GensetSpec(_FrozenBase):
+    """Specyfikacja zespołu prądotwórczego (agregatu) w nN."""
+
+    catalog_item_id: str | None = None
+    """Identyfikator pozycji katalogowej agregatu."""
+
+    catalog_item_version: str | None = None
+    """Wersja pozycji katalogowej."""
+
+    rated_power_kw: float
+    """Moc znamionowa (kW) — >0."""
+
+    rated_voltage_kv: float
+    """Napięcie znamionowe (kV) — jawnie."""
+
+    power_factor: float
+    """Współczynnik mocy — jawnie."""
+
+    operation_mode: Literal[
+        "PRACA_CIAGLA",
+        "PRACA_AWARYJNA",
+        "PRACA_SZCZYTOWA",
+        "WYLACZONE",
+    ]
+    """Tryb pracy — jawnie."""
+
+    fuel_type: Literal["DIESEL", "GAZ", "BIOPALIWO", "INNY"] | None = None
+    """Rodzaj paliwa — opcjonalnie."""
+
+    source_name: str | None = None
+    source_label: str | None = None
+
+
+class UPSSpec(_FrozenBase):
+    """Specyfikacja zasilacza UPS w nN."""
+
+    catalog_item_id: str | None = None
+    """Identyfikator pozycji katalogowej UPS."""
+
+    catalog_item_version: str | None = None
+    """Wersja pozycji katalogowej."""
+
+    rated_power_kw: float
+    """Moc znamionowa (kW) — >0."""
+
+    backup_time_min: float
+    """Czas podtrzymania (min) — >0."""
+
+    operation_mode: Literal[
+        "ONLINE",
+        "LINE_INTERACTIVE",
+        "OFFLINE",
+        "WYLACZONE",
+    ]
+    """Tryb pracy — jawnie."""
+
+    battery_type: Literal["LI_ION", "VRLA", "NICD", "INNY"] | None = None
+    """Typ akumulatora — opcjonalnie."""
+
+    source_name: str | None = None
+    source_label: str | None = None
+
+
+class MaterializedSourceParams(_FrozenBase):
+    """Zmaterializowane parametry źródła nN z katalogu.
+
+    Stabilne pole w Snapshot — kopia parametrów z katalogu
+    w momencie przypięcia.
+    """
+
+    catalog_item_id: str
+    catalog_item_version: str
+    sn_mva: float | None = None
+    pmax_mw: float | None = None
+    un_kv: float | None = None
+    k_sc: float | None = None
+    cos_phi_min: float | None = None
+    cos_phi_max: float | None = None
+    e_kwh: float | None = None
+
+
+class SourceNN(_FrozenBase):
+    """Kanoniczny model źródła w rozdzielni nN.
+
+    Jedyna prawda o źródle w Snapshot — deterministyczne ID,
+    powiązania z polem i aparatem, zmaterializowane parametry.
+    """
+
+    element_id: str
+    """Deterministyczny identyfikator źródła."""
+
+    source_type: Literal["PV_INVERTER", "BESS_INVERTER", "GENSET", "UPS"]
+    """Typ źródła."""
+
+    field_id: str
+    """Identyfikator pola nN, do którego jest przypięte."""
+
+    switch_id: str
+    """Identyfikator aparatu odłączającego."""
+
+    bus_nn_ref: str
+    """Referencja do szyny nN."""
+
+    station_ref: str
+    """Referencja do stacji SN/nN."""
+
+    catalog_item_id: str | None = None
+    """Identyfikator pozycji katalogowej urządzenia."""
+
+    catalog_item_version: str | None = None
+    """Wersja pozycji katalogowej."""
+
+    materialized_params: MaterializedSourceParams | None = None
+    """Zmaterializowane parametry z katalogu."""
+
+    operation_mode: str
+    """Jawny tryb pracy."""
+
+    constraints: dict[str, Any] = {}
+    """Jawne ograniczenia (limit Pmax, Q, SOC, etc.)."""
+
+    readiness_codes: list[str] = []
+    """Wyliczane kody gotowości."""
+
+    name: str | None = None
+    label: str | None = None
+    in_service: bool = True
+
+
 class StationOptions(_FrozenBase):
     """Opcje tworzenia stacji SN/nN.
 
@@ -691,6 +985,110 @@ class UpdateElementParametersPayload(_FrozenBase):
 
 
 # ===========================================================================
+# 5b. nN Source Operation Payloads
+# ===========================================================================
+
+
+class AddNNSourceFieldPayload(_FrozenBase):
+    """Payload: add_nn_source_field — dodaje pole źródłowe nN."""
+
+    bus_nn_ref: str
+    """Referencja szyny nN, do której dodawane jest pole."""
+
+    station_ref: str
+    """Referencja stacji SN/nN."""
+
+    source_field: NNSourceFieldSpec
+    """Specyfikacja pola źródłowego."""
+
+
+class AddPVInverterNNPayload(_FrozenBase):
+    """Payload: add_pv_inverter_nn — dodaje falownik PV do rozdzielni nN."""
+
+    bus_nn_ref: str
+    """Referencja szyny nN."""
+
+    station_ref: str
+    """Referencja stacji SN/nN."""
+
+    placement: Literal["NEW_FIELD", "EXISTING_FIELD"]
+    """Sposób osadzenia: nowe pole lub istniejące."""
+
+    existing_field_ref: str | None = None
+    """Referencja istniejącego pola (gdy EXISTING_FIELD)."""
+
+    source_field: NNSourceFieldSpec | None = None
+    """Specyfikacja nowego pola (gdy NEW_FIELD)."""
+
+    pv_spec: PVInverterSpec
+    """Pełna specyfikacja falownika PV."""
+
+
+class AddBESSInverterNNPayload(_FrozenBase):
+    """Payload: add_bess_inverter_nn — dodaje falownik BESS do rozdzielni nN."""
+
+    bus_nn_ref: str
+    station_ref: str
+    placement: Literal["NEW_FIELD", "EXISTING_FIELD"]
+    existing_field_ref: str | None = None
+    source_field: NNSourceFieldSpec | None = None
+    bess_spec: BESSInverterSpec
+
+
+class AddGensetNNPayload(_FrozenBase):
+    """Payload: add_genset_nn — dodaje agregat do rozdzielni nN."""
+
+    bus_nn_ref: str
+    station_ref: str
+    placement: Literal["NEW_FIELD", "EXISTING_FIELD"]
+    existing_field_ref: str | None = None
+    source_field: NNSourceFieldSpec | None = None
+    genset_spec: GensetSpec
+
+
+class AddUPSNNPayload(_FrozenBase):
+    """Payload: add_ups_nn — dodaje UPS do rozdzielni nN."""
+
+    bus_nn_ref: str
+    station_ref: str
+    placement: Literal["NEW_FIELD", "EXISTING_FIELD"]
+    existing_field_ref: str | None = None
+    source_field: NNSourceFieldSpec | None = None
+    ups_spec: UPSSpec
+
+
+class AddNNLoadPayload(_FrozenBase):
+    """Payload: add_nn_load — dodaje odbiór do odpływu nN."""
+
+    feeder_ref: str
+    """Referencja odpływu nN."""
+
+    bus_nn_ref: str
+    """Referencja szyny nN."""
+
+    load_kind: Literal["SKUPIONY", "ROZPROSZONY"]
+    """Rodzaj odbioru (PL)."""
+
+    active_power_kw: float
+    """Moc czynna (kW) — >=0, jawnie."""
+
+    reactive_power_kvar: float | None = None
+    """Moc bierna (kvar) — jawnie."""
+
+    cos_phi: float | None = None
+    """Cos φ — jawnie, alternatywa dla mocy biernej."""
+
+    load_profile_ref: str | None = None
+    """Opcjonalna referencja do profilu obciążenia."""
+
+    connection_type: Literal["JEDNOFAZOWY", "TROJFAZOWY"]
+    """Sposób przyłączenia (PL) — bez domyślnego."""
+
+    load_name: str | None = None
+    load_label: str | None = None
+
+
+# ===========================================================================
 # 6. CANONICAL OPERATION NAMES — kanoniczne nazwy operacji
 # ===========================================================================
 
@@ -706,6 +1104,12 @@ CANONICAL_OPS: set[str] = {
     "add_transformer_sn_nn",
     "assign_catalog_to_element",
     "update_element_parameters",
+    "add_nn_source_field",
+    "add_pv_inverter_nn",
+    "add_bess_inverter_nn",
+    "add_genset_nn",
+    "add_ups_nn",
+    "add_nn_load",
 }
 """Zbiór kanonicznych nazw operacji domenowych."""
 
@@ -744,6 +1148,13 @@ DOMAIN_EVENT_TYPES: list[str] = [
     "TRANSFORMER_CREATED",
     "CATALOG_ASSIGNED",
     "PARAMETERS_UPDATED",
+    "NN_SOURCE_FIELD_CREATED",
+    "PV_INVERTER_CREATED",
+    "BESS_INVERTER_CREATED",
+    "GENSET_CREATED",
+    "UPS_CREATED",
+    "NN_LOAD_CREATED",
+    "NN_SOURCE_CATALOG_ASSIGNED",
 ]
 """Lista dozwolonych typów zdarzeń domenowych."""
 

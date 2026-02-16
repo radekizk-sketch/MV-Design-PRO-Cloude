@@ -189,22 +189,34 @@ export function buildContextMenuActions(
  * Get Polish delete label based on element type.
  */
 function getDeleteLabel(elementType: ElementType): string {
-  switch (elementType) {
-    case 'Bus':
-      return 'Usuń szynę...';
-    case 'LineBranch':
-      return 'Usuń linię...';
-    case 'TransformerBranch':
-      return 'Usuń transformator...';
-    case 'Switch':
-      return 'Usuń łącznik...';
-    case 'Source':
-      return 'Usuń źródło...';
-    case 'Load':
-      return 'Usuń odbiornik...';
-    default:
-      return 'Usuń element...';
-  }
+  const labels: Partial<Record<ElementType, string>> = {
+    Bus: 'Usuń szynę SN...',
+    LineBranch: 'Usuń linię...',
+    TransformerBranch: 'Usuń transformator...',
+    Switch: 'Usuń łącznik SN...',
+    Source: 'Usuń źródło SN...',
+    Load: 'Usuń odbiornik...',
+    Generator: 'Usuń generator...',
+    Measurement: 'Usuń przekładnik...',
+    ProtectionAssignment: 'Usuń zabezpieczenie...',
+    Station: 'Usuń stację...',
+    BaySN: 'Usuń pole SN...',
+    BusNN: 'Usuń szynę nN...',
+    FeederNN: 'Usuń odpływ nN...',
+    SourceFieldNN: 'Usuń pole źródłowe nN...',
+    PVInverter: 'Usuń falownik PV...',
+    BESSInverter: 'Usuń falownik BESS...',
+    EnergyStorage: 'Usuń magazyn energii...',
+    Genset: 'Usuń agregat...',
+    UPS: 'Usuń UPS...',
+    LoadNN: 'Usuń odbiór nN...',
+    SwitchNN: 'Usuń łącznik nN...',
+    ProtectionNN: 'Usuń zabezpieczenie nN...',
+    EnergyMeter: 'Usuń licznik...',
+    SurgeArresterNN: 'Usuń ogranicznik...',
+    SegmentNN: 'Usuń segment nN...',
+  };
+  return labels[elementType] ?? 'Usuń element...';
 }
 
 /**
@@ -307,14 +319,62 @@ export function getContextMenuHeader(
   elementType: ElementType,
   elementName: string
 ): string {
-  const typeLabels: Record<ElementType, string> = {
-    Bus: 'Szyna',
+  const typeLabels: Partial<Record<ElementType, string>> = {
+    Bus: 'Szyna SN',
     LineBranch: 'Linia',
     TransformerBranch: 'Transformator',
-    Switch: 'Łącznik',
-    Source: 'Źródło',
+    Switch: 'Łącznik SN',
+    Source: 'Źródło SN',
     Load: 'Odbiornik',
+    Generator: 'Generator',
+    Measurement: 'Przekładnik',
+    ProtectionAssignment: 'Zabezpieczenie',
+    Terminal: 'Terminal magistrali',
+    PortBranch: 'Port',
+    Station: 'Stacja',
+    BaySN: 'Pole SN',
+    Relay: 'Przekaźnik SN',
+    SecondaryLink: 'Połączenie wtórne',
+    NOP: 'Punkt normalnie otwarty',
+    BusNN: 'Szyna nN',
+    MainBreakerNN: 'Wyłącznik główny nN',
+    FeederNN: 'Odpływ nN',
+    SegmentNN: 'Segment nN',
+    LoadNN: 'Odbiór nN',
+    SwitchboardNN: 'Rozdzielnica nN',
+    SourceFieldNN: 'Pole źródłowe nN',
+    PVInverter: 'Falownik PV',
+    BESSInverter: 'Falownik BESS',
+    EnergyStorage: 'Magazyn energii',
+    Genset: 'Agregat',
+    UPS: 'UPS',
+    EnergyMeter: 'Licznik energii',
+    PowerQualityMeter: 'Pomiar jakości',
+    SurgeArresterNN: 'Ogranicznik przepięć nN',
+    Earthing: 'Uziemienie',
+    MeasurementNN: 'Przekładnik nN',
+    AuxBus: 'Szyna pomocnicza',
+    ConnectionPoint: 'Punkt przyłączenia',
+    SwitchNN: 'Łącznik nN',
+    ProtectionNN: 'Zabezpieczenie nN',
+    SourceController: 'Sterownik źródła',
+    InternalJunction: 'Punkt wspólny',
+    CableJointNN: 'Złącze kablowe nN',
+    FaultCurrentLimiter: 'Ogranicznik zwarciowy',
+    FilterCompensator: 'Filtr/kompensator',
+    TelecontrolDevice: 'Telemechanika',
+    BusSectionNN: 'Sekcja szyn nN',
+    BusCouplerNN: 'Sprzęgło szyn nN',
+    ReserveLink: 'Łącznik rezerwowy',
+    SourceDisconnect: 'Punkt odłączenia',
+    PowerLimit: 'Ograniczenie mocy',
+    WorkProfile: 'Profil pracy',
+    OperatingMode: 'Tryb pracy',
+    ConnectionConstraints: 'Warunki przyłączeniowe',
+    MeteringBlock: 'Układ pomiarowy',
+    SyncPoint: 'Punkt synchronizacji',
+    DescriptiveElement: 'Element opisowy',
   };
 
-  return `${typeLabels[elementType] || elementType}: ${elementName}`;
+  return `${typeLabels[elementType] ?? elementType}: ${elementName}`;
 }

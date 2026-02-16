@@ -25,7 +25,14 @@ export type CanonicalOpName =
   | 'set_normal_open_point'
   | 'add_transformer_sn_nn'
   | 'assign_catalog_to_element'
-  | 'update_element_parameters';
+  | 'update_element_parameters'
+  // Operacje nN / źródła
+  | 'add_nn_source_field'
+  | 'add_pv_inverter_nn'
+  | 'add_bess_inverter_nn'
+  | 'add_genset_nn'
+  | 'add_ups_nn'
+  | 'add_nn_load';
 
 export const ALIAS_MAP: Record<string, CanonicalOpName> = {
   add_trunk_segment_sn: 'continue_trunk_segment_sn',
@@ -174,7 +181,7 @@ export interface TransformerSpec {
 }
 
 // --- NN Block ---
-export type NNFeederRole = 'ODPLYW_NN' | 'ODPLYW_REZERWOWY' | 'ZRODLO_NN_PV' | 'ZRODLO_NN_BESS';
+export type NNFeederRole = 'ODPLYW_NN' | 'ODPLYW_REZERWOWY' | 'ZRODLO_NN_PV' | 'ZRODLO_NN_BESS' | 'ZRODLO_NN_AGREGAT' | 'ZRODLO_NN_UPS';
 
 export interface NNFeederSpec {
   feeder_role: NNFeederRole;
@@ -186,6 +193,189 @@ export interface NNBlockSpec {
   main_breaker_nn: true;
   outgoing_feeders_nn_count: number;
   outgoing_feeders_nn: NNFeederSpec[];
+}
+
+// --- SourceNN Types (FAZA 5: model danych źródeł nN) ---
+
+export type NNSourceType = 'PV_INVERTER' | 'BESS_INVERTER' | 'GENSET' | 'UPS';
+
+export type NNSwitchKind = 'WYLACZNIK' | 'ROZLACZNIK' | 'BEZPIECZNIK';
+export type NNSwitchState = 'OTWARTY' | 'ZAMKNIETY';
+
+export interface NNSwitchSpec {
+  switch_kind: NNSwitchKind;
+  normal_state: NNSwitchState;
+  catalog_ref: string | null;
+  catalog_version: string | null;
+}
+
+export type SourceFieldKind = 'PV' | 'BESS' | 'AGREGAT' | 'UPS';
+
+export interface NNSourceFieldSpec {
+  source_field_kind: SourceFieldKind;
+  switch_spec: NNSwitchSpec;
+  voltage_nn_kv: number;
+  field_name: string | null;
+  field_label: string | null;
+}
+
+export type PVControlMode = 'STALY_COS_PHI' | 'Q_OD_U' | 'P_OD_U' | 'WYLACZONE';
+export type PVMeasurementPoint = 'UTWORZ_NOWY' | 'UZYJ_ISTNIEJACEGO' | 'BRAK';
+
+export interface PVInverterSpec {
+  catalog_item_id: string | null;
+  catalog_item_version: string | null;
+  rated_power_ac_kw: number;
+  max_power_kw: number;
+  control_mode: PVControlMode;
+  cos_phi: number | null;
+  generation_limit_pmax_kw: number | null;
+  generation_limit_q_kvar: number | null;
+  disconnect_required: boolean;
+  measurement_point: PVMeasurementPoint | null;
+  existing_measurement_ref: string | null;
+  source_name: string | null;
+  source_label: string | null;
+  work_profile_ref: string | null;
+}
+
+export type BESSOperationMode = 'TYLKO_GENERACJA' | 'TYLKO_MAGAZYNOWANIE' | 'DWUKIERUNKOWY' | 'WYLACZONE';
+export type BESSControlStrategy = 'STALA_MOC' | 'PROFIL' | 'REGULACJA_NAPIECIA' | 'REGULACJA_MOCY_BIERNEJ';
+
+export interface BESSInverterSpec {
+  inverter_catalog_id: string | null;
+  inverter_catalog_version: string | null;
+  storage_catalog_id: string | null;
+  storage_catalog_version: string | null;
+  usable_capacity_kwh: number;
+  charge_power_kw: number;
+  discharge_power_kw: number;
+  operation_mode: BESSOperationMode;
+  control_strategy: BESSControlStrategy;
+  soc_min_percent: number;
+  soc_max_percent: number;
+  source_name: string | null;
+  source_label: string | null;
+  time_profile_ref: string | null;
+}
+
+export type GensetOperationMode = 'PRACA_CIAGLA' | 'PRACA_AWARYJNA' | 'PRACA_SZCZYTOWA' | 'WYLACZONE';
+
+export interface GensetSpec {
+  catalog_item_id: string | null;
+  catalog_item_version: string | null;
+  rated_power_kw: number;
+  rated_voltage_kv: number;
+  power_factor: number;
+  operation_mode: GensetOperationMode;
+  fuel_type: 'DIESEL' | 'GAZ' | 'BIOPALIWO' | 'INNY' | null;
+  source_name: string | null;
+  source_label: string | null;
+}
+
+export type UPSOperationMode = 'ONLINE' | 'LINE_INTERACTIVE' | 'OFFLINE' | 'WYLACZONE';
+
+export interface UPSSpec {
+  catalog_item_id: string | null;
+  catalog_item_version: string | null;
+  rated_power_kw: number;
+  backup_time_min: number;
+  operation_mode: UPSOperationMode;
+  battery_type: 'LI_ION' | 'VRLA' | 'NICD' | 'INNY' | null;
+  source_name: string | null;
+  source_label: string | null;
+}
+
+export interface MaterializedSourceParams {
+  catalog_item_id: string;
+  catalog_item_version: string;
+  sn_mva: number | null;
+  pmax_mw: number | null;
+  un_kv: number | null;
+  k_sc: number | null;
+  cos_phi_min: number | null;
+  cos_phi_max: number | null;
+  e_kwh: number | null;
+}
+
+export interface SourceNN {
+  element_id: string;
+  source_type: NNSourceType;
+  field_id: string;
+  switch_id: string;
+  bus_nn_ref: string;
+  station_ref: string;
+  catalog_item_id: string | null;
+  catalog_item_version: string | null;
+  materialized_params: MaterializedSourceParams | null;
+  operation_mode: string;
+  constraints: Record<string, unknown>;
+  readiness_codes: string[];
+  name: string | null;
+  label: string | null;
+  in_service: boolean;
+}
+
+// --- Operation Payloads for nN sources ---
+
+export type SourcePlacement = 'NEW_FIELD' | 'EXISTING_FIELD';
+
+export interface AddNNSourceFieldPayload {
+  bus_nn_ref: string;
+  station_ref: string;
+  source_field: NNSourceFieldSpec;
+}
+
+export interface AddPVInverterNNPayload {
+  bus_nn_ref: string;
+  station_ref: string;
+  placement: SourcePlacement;
+  existing_field_ref: string | null;
+  source_field: NNSourceFieldSpec | null;
+  pv_spec: PVInverterSpec;
+}
+
+export interface AddBESSInverterNNPayload {
+  bus_nn_ref: string;
+  station_ref: string;
+  placement: SourcePlacement;
+  existing_field_ref: string | null;
+  source_field: NNSourceFieldSpec | null;
+  bess_spec: BESSInverterSpec;
+}
+
+export interface AddGensetNNPayload {
+  bus_nn_ref: string;
+  station_ref: string;
+  placement: SourcePlacement;
+  existing_field_ref: string | null;
+  source_field: NNSourceFieldSpec | null;
+  genset_spec: GensetSpec;
+}
+
+export interface AddUPSNNPayload {
+  bus_nn_ref: string;
+  station_ref: string;
+  placement: SourcePlacement;
+  existing_field_ref: string | null;
+  source_field: NNSourceFieldSpec | null;
+  ups_spec: UPSSpec;
+}
+
+export type NNLoadKind = 'SKUPIONY' | 'ROZPROSZONY';
+export type NNConnectionType = 'JEDNOFAZOWY' | 'TROJFAZOWY';
+
+export interface AddNNLoadPayload {
+  feeder_ref: string;
+  bus_nn_ref: string;
+  load_kind: NNLoadKind;
+  active_power_kw: number;
+  reactive_power_kvar: number | null;
+  cos_phi: number | null;
+  load_profile_ref: string | null;
+  connection_type: NNConnectionType;
+  load_name: string | null;
+  load_label: string | null;
 }
 
 // --- Operation payloads ---

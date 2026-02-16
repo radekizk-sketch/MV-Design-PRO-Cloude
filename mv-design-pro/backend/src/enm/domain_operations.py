@@ -42,6 +42,12 @@ CANONICAL_OPS = frozenset({
     "add_transformer_sn_nn",
     "assign_catalog_to_element",
     "update_element_parameters",
+    "add_nn_source_field",
+    "add_pv_inverter_nn",
+    "add_bess_inverter_nn",
+    "add_genset_nn",
+    "add_ups_nn",
+    "add_nn_load",
 })
 
 ALIAS_MAP: dict[str, str] = {
