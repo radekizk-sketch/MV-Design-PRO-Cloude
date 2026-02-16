@@ -60,7 +60,7 @@ function createDefaultENM(): EnergyNetworkModel {
       created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
       revision: 0, hash_sha256: '', defaults: { frequency_hz: 50, unit_system: 'SI' },
     },
-    buses: [], branches: [], transformers: [], sources: [], loads: [], generators: [], substations: [], bays: [], junctions: [], corridors: [],
+    buses: [], branches: [], transformers: [], sources: [], loads: [], generators: [], substations: [], bays: [], junctions: [], corridors: [], measurements: [], protection_assignments: [],
   };
 }
 
