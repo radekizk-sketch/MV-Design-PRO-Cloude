@@ -43,7 +43,7 @@ export function resolveElementResults(
   elementId: string,
   busResults: BusResults | null,
   branchResults: BranchResults | null,
-  shortCircuitResults: ShortCircuitResults | null,
+  _shortCircuitResults: ShortCircuitResults | null,
 ): InspectorResultData | null {
   if (!elementId) return null;
 
@@ -103,7 +103,7 @@ export function resolveFieldDeviceResults(
   shortCircuitResults: ShortCircuitResults | null,
   branchResults: BranchResults | null,
 ): FieldDeviceResultDataV1 {
-  const base: FieldDeviceResultDataV1 = {
+  let result: FieldDeviceResultDataV1 = {
     elementId,
     elementType,
     ikss_ka: null,
@@ -119,8 +119,7 @@ export function resolveFieldDeviceResults(
     (r: ShortCircuitRow) => r.target_id === elementId,
   );
   if (scRow) {
-    base.ikss_ka = scRow.ikss_ka;
-    base.ip_ka = scRow.ip_ka;
+    result = { ...result, ikss_ka: scRow.ikss_ka, ip_ka: scRow.ip_ka };
   }
 
   // Branch/loading data
@@ -128,11 +127,10 @@ export function resolveFieldDeviceResults(
     (r: BranchResultRow) => r.branch_id === elementId,
   );
   if (branchRow) {
-    base.loading_pct = branchRow.loading_pct;
-    base.current_a = branchRow.i_a;
+    result = { ...result, loading_pct: branchRow.loading_pct, current_a: branchRow.i_a };
   }
 
-  return base;
+  return result;
 }
 
 // ---------------------------------------------------------------------------

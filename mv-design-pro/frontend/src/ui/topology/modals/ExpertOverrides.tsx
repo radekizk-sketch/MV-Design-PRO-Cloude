@@ -7,7 +7,7 @@
  * BINDING: PL labels, no codenames.
  */
 
-import React, { useCallback, useState } from 'react';
+import { useCallback, useState } from 'react';
 
 // ---------------------------------------------------------------------------
 // Types

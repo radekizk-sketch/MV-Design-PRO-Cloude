@@ -230,7 +230,7 @@ class TestFixActionOnBlockers:
             buses=[Bus(ref_id="b1", name="B1", voltage_kv=15)],
             sources=[Source(ref_id="s1", name="S1", bus_ref="b1", model="short_circuit_power")],
         ))
-        e008_issues = [i for i in result.issues if i.code == "E008"]
+        e008_issues = [i for i in result.issues if i.code == "sources.no_short_circuit_params"]
         assert len(e008_issues) == 1
         assert e008_issues[0].fix_action is not None
         assert e008_issues[0].fix_action.action_type == "OPEN_MODAL"

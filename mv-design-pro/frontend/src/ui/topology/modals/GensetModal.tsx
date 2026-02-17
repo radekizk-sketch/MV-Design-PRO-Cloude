@@ -5,7 +5,7 @@
  * FAZA 6 — Modale agregat (Y) i UPS (Z).
  */
 
-import React, { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { CatalogPicker, type CatalogEntry } from './CatalogPicker';
 
 // ---------------------------------------------------------------------------
@@ -103,7 +103,7 @@ const EMPTY_FORM: GensetFormData = {
 
 export function GensetModal({
   isOpen, mode, initialData, fieldOptions = [],
-  catalogEntries = [], switchCatalogEntries = [],
+  catalogEntries = [], switchCatalogEntries: _switchCatalogEntries = [],
   onSubmit, onCancel,
 }: GensetModalProps) {
   const [form, setForm] = useState<GensetFormData>({ ...EMPTY_FORM, ...initialData });

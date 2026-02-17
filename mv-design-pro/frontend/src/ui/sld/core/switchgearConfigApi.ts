@@ -12,11 +12,11 @@
 import type {
   SwitchgearConfigV1,
   SwitchgearConfigValidationResultV1,
-  ConfigValidationIssueV1,
-  ConfigFixActionV1,
+  FieldConfigV1,
+  DeviceConfigV1,
 } from './switchgearConfig';
 import {
-  SWITCHGEAR_CONFIG_VERSION,
+  SWITCHGEAR_CONFIG_VERSION as _SWITCHGEAR_CONFIG_VERSION,
   ConfigIssueSeverity,
   FixActionType,
 } from './switchgearConfig';
@@ -185,13 +185,13 @@ export function mapConfigResponse(response: ConfigApiResponse): SwitchgearConfig
       poleType: f['pole_type'] as string,
       fieldRole: f['field_role'] as string,
       busSectionId: (f['bus_section_id'] as string | null) ?? null,
-    })),
+    })) as FieldConfigV1[],
     devices: response.devices.map(d => ({
       deviceId: d['device_id'] as string,
       fieldId: d['field_id'] as string,
       deviceType: d['device_type'] as string,
       aparatType: d['aparat_type'] as string,
-    })),
+    })) as DeviceConfigV1[],
     catalogBindings: response.catalog_bindings.map(b => ({
       deviceId: b['device_id'] as string,
       catalogId: b['catalog_id'] as string,

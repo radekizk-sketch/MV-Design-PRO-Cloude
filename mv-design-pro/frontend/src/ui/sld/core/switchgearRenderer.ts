@@ -20,16 +20,11 @@
  */
 
 import type {
-  DeviceAnchorV1,
-  FieldV1,
-  DeviceV1,
-  BusSectionV1,
   StationBlockDetailV1,
 } from './fieldDeviceContracts';
 import {
   DevicePowerPathPositionV1,
   DeviceTypeV1,
-  FieldRoleV1,
   SldSymbolTypeV1,
   DEVICE_TO_SYMBOL,
 } from './fieldDeviceContracts';
@@ -301,7 +296,7 @@ export function validateSymbolRegistry(
   const invalidSymbols: string[] = [];
 
   for (const el of deviceElements) {
-    if (el.symbolType && !validSymbols.has(el.symbolType)) {
+    if (el.symbolType && !validSymbols.has(el.symbolType as SldSymbolTypeV1)) {
       invalidSymbols.push(`${el.elementId}: ${el.symbolType}`);
     }
   }

@@ -24,7 +24,7 @@ import type {
   OverrideValidationErrorV1,
 } from './core/geometryOverrides';
 import {
-  OVERRIDES_VERSION,
+  OVERRIDES_VERSION as _OVERRIDES_VERSION,
   OverrideScopeV1,
   OverrideOperationV1,
   emptyOverrides,

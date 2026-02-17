@@ -5,7 +5,7 @@
  * FAZA 6 — Modale agregat (Y) i UPS (Z).
  */
 
-import React, { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { CatalogPicker, type CatalogEntry } from './CatalogPicker';
 
 // ---------------------------------------------------------------------------
@@ -100,7 +100,7 @@ const EMPTY_FORM: UPSFormData = {
 
 export function UPSModal({
   isOpen, mode, initialData, fieldOptions = [],
-  catalogEntries = [], switchCatalogEntries = [],
+  catalogEntries = [], switchCatalogEntries: _switchCatalogEntries = [],
   onSubmit, onCancel,
 }: UPSModalProps) {
   const [form, setForm] = useState<UPSFormData>({ ...EMPTY_FORM, ...initialData });

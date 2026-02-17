@@ -55,12 +55,67 @@ const _warnedSymbols = new Set<string>();
  * Uses ETAP_SYMBOL_SIZES from sldEtapStyle.ts as source of truth.
  */
 export const SYMBOL_SIZES: Record<ElementType, { width: number; height: number }> = {
+  // Istniejące typy SN (A–L)
   Bus: ETAP_SYMBOL_SIZES.Bus,
   LineBranch: ETAP_SYMBOL_SIZES.LineBranch,
   TransformerBranch: ETAP_SYMBOL_SIZES.TransformerBranch,
   Switch: ETAP_SYMBOL_SIZES.Switch,
   Source: ETAP_SYMBOL_SIZES.Source,
   Load: ETAP_SYMBOL_SIZES.Load,
+  Generator: { width: 50, height: 50 },
+  Measurement: { width: 36, height: 36 },
+  ProtectionAssignment: { width: 36, height: 36 },
+  // Nowe typy infrastruktury SN
+  Terminal: { width: 20, height: 20 },
+  PortBranch: { width: 30, height: 30 },
+  Station: { width: 80, height: 60 },
+  BaySN: { width: 60, height: 48 },
+  Relay: { width: 36, height: 36 },
+  SecondaryLink: { width: 50, height: 30 },
+  NOP: { width: 36, height: 48 },
+  // Typy nN (M–O, R–AP)
+  BusNN: { width: 80, height: 16 },
+  MainBreakerNN: { width: 36, height: 48 },
+  FeederNN: { width: 36, height: 48 },
+  SegmentNN: { width: 50, height: 30 },
+  LoadNN: { width: 36, height: 44 },
+  SwitchboardNN: { width: 60, height: 48 },
+  SourceFieldNN: { width: 50, height: 48 },
+  // Źródła nN (V–Z)
+  PVInverter: { width: 50, height: 50 },
+  BESSInverter: { width: 50, height: 50 },
+  EnergyStorage: { width: 50, height: 50 },
+  Genset: { width: 50, height: 50 },
+  UPS: { width: 50, height: 50 },
+  // Pomiary i zabezpieczenia nN (AA–AE)
+  EnergyMeter: { width: 36, height: 36 },
+  PowerQualityMeter: { width: 36, height: 36 },
+  SurgeArresterNN: { width: 30, height: 44 },
+  Earthing: { width: 30, height: 40 },
+  MeasurementNN: { width: 36, height: 36 },
+  // Infrastruktura szyn nN (AF–AR)
+  AuxBus: { width: 60, height: 16 },
+  ConnectionPoint: { width: 24, height: 24 },
+  SwitchNN: { width: 36, height: 48 },
+  ProtectionNN: { width: 36, height: 36 },
+  SourceController: { width: 40, height: 40 },
+  InternalJunction: { width: 16, height: 16 },
+  CableJointNN: { width: 24, height: 24 },
+  FaultCurrentLimiter: { width: 36, height: 48 },
+  FilterCompensator: { width: 40, height: 44 },
+  TelecontrolDevice: { width: 36, height: 36 },
+  BusSectionNN: { width: 36, height: 48 },
+  BusCouplerNN: { width: 36, height: 48 },
+  ReserveLink: { width: 36, height: 48 },
+  // Parametry logiczne źródeł (AS–AZ)
+  SourceDisconnect: { width: 36, height: 48 },
+  PowerLimit: ETAP_SYMBOL_SIZES.default,
+  WorkProfile: ETAP_SYMBOL_SIZES.default,
+  OperatingMode: ETAP_SYMBOL_SIZES.default,
+  ConnectionConstraints: ETAP_SYMBOL_SIZES.default,
+  MeteringBlock: { width: 36, height: 36 },
+  SyncPoint: { width: 24, height: 24 },
+  DescriptiveElement: ETAP_SYMBOL_SIZES.default,
 };
 
 /**

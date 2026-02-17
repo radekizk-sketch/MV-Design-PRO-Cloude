@@ -92,8 +92,10 @@ export const SldEditor: React.FC<SldEditorProps> = ({
   const overlayRuntime = useOverlayRuntime(currentSymbols);
 
   // RUN #3H: Project mode + CAD drag
-  const isProjectMode = useIsProjectMode();
-  const cadDrag = useSldDragCad();
+  const _isProjectMode = useIsProjectMode();
+  void _isProjectMode;
+  const _cadDrag = useSldDragCad();
+  void _cadDrag;
 
   // Combine mutation blocking with results mode
   const isEditBlocked = isMutationBlocked || isResultsMode;

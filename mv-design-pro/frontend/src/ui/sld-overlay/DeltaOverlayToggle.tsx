@@ -37,7 +37,8 @@ export const DeltaOverlayToggle: React.FC<DeltaOverlayToggleProps> =
       toggleDeltaOverlay,
     } = useSldDeltaOverlayStore();
 
-    const isActive = activeComparisonId !== null && enabled;
+    const _isActive = activeComparisonId !== null && enabled;
+    void _isActive;
 
     const handleComparisonChange = useCallback(
       (e: React.ChangeEvent<HTMLSelectElement>) => {

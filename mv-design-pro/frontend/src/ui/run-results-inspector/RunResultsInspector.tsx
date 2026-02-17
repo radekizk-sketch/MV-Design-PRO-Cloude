@@ -15,7 +15,7 @@
  * - No project codenames
  */
 
-import React, { useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import type {
   OverlayBadgeV1,
   OverlayMetricV1,

@@ -17,16 +17,9 @@
 
 import type {
   EnergyNetworkModel,
-  Bus as ENMBus,
   Branch as ENMBranch,
-  Transformer as ENMTransformer,
-  Source as ENMSource,
-  Load as ENMLoad,
   Generator as ENMGenerator,
   Substation as ENMSubstation,
-  Bay as ENMBay,
-  Measurement as ENMMeasurement,
-  ProtectionAssignment as ENMProtectionAssignment,
 } from '../../../types/enm';
 import type { AnySldSymbol, BusSymbol, BranchSymbol, SwitchSymbol, SourceSymbol, LoadSymbol } from '../../sld-editor/types';
 

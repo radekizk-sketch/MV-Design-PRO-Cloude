@@ -9,9 +9,9 @@
  * BINDING: PL labels, no codenames.
  */
 
-import React, { useCallback, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { clsx } from 'clsx';
-import type { SpineNode, AdjacencyEntry, TopologyGraphSummary } from '../../types/enm';
+import type { TopologyGraphSummary } from '../../types/enm';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -31,7 +31,7 @@ interface SpineTreeNode {
   name: string;
   depth: number;
   is_source: boolean;
-  branches_to_next: string[];
+  children_refs: string[];
   laterals: LateralNode[];
   children: SpineTreeNode[];
 }
@@ -39,7 +39,7 @@ interface SpineTreeNode {
 interface LateralNode {
   ref_id: string;
   name: string;
-  connected_branches: string[];
+  connected_via: string[];
 }
 
 // ---------------------------------------------------------------------------
@@ -57,54 +57,66 @@ const SECTION_LABELS = {
 // ---------------------------------------------------------------------------
 
 function buildSpineTree(summary: TopologyGraphSummary): SpineTreeNode[] {
-  const { spine, laterals, adjacency } = summary;
+  const { spine, lateral_roots, adjacency } = summary;
   if (spine.length === 0) return [];
 
   // Build lookup maps
-  const spineSet = new Set(spine.map((s) => s.ref_id));
+  const spineSet = new Set(spine.map((s) => s.bus_ref));
   const lateralMap = new Map<string, LateralNode[]>();
 
-  // Map laterals to their nearest spine neighbor
-  for (const lat of laterals) {
-    // Find which spine node connects to this lateral
-    const adj = adjacency.find((a) => a.ref_id === lat);
-    if (!adj) continue;
+  // Map lateral_roots to their nearest spine neighbor via adjacency entries.
+  // Each AdjacencyEntry represents one edge: { bus_ref, neighbor_ref, via_ref, via_type }.
+  for (const lat of lateral_roots) {
+    // Find adjacency entries where this lateral connects to a spine node
+    const adjEntries = adjacency.filter(
+      (a) =>
+        (a.bus_ref === lat && spineSet.has(a.neighbor_ref)) ||
+        (a.neighbor_ref === lat && spineSet.has(a.bus_ref))
+    );
 
-    for (const neighbor of adj.neighbors) {
-      if (spineSet.has(neighbor)) {
-        if (!lateralMap.has(neighbor)) {
-          lateralMap.set(neighbor, []);
-        }
-        lateralMap.get(neighbor)!.push({
-          ref_id: lat,
-          name: lat,
-          connected_branches: adj.branch_refs,
-        });
-        break;
-      }
+    if (adjEntries.length === 0) continue;
+
+    // Determine which spine node this lateral connects to
+    const spineNeighbor =
+      adjEntries[0].bus_ref === lat
+        ? adjEntries[0].neighbor_ref
+        : adjEntries[0].bus_ref;
+
+    if (!lateralMap.has(spineNeighbor)) {
+      lateralMap.set(spineNeighbor, []);
     }
+    lateralMap.get(spineNeighbor)!.push({
+      ref_id: lat,
+      name: lat,
+      connected_via: adjEntries.map((a) => a.via_ref),
+    });
   }
 
   // Build spine chain sorted by depth
   const sorted = [...spine].sort((a, b) => a.depth - b.depth);
 
   return sorted.map((node) => ({
-    ref_id: node.ref_id,
-    name: node.ref_id,
+    ref_id: node.bus_ref,
+    name: node.bus_ref,
     depth: node.depth,
     is_source: node.is_source,
-    branches_to_next: node.branches_to_next,
-    laterals: lateralMap.get(node.ref_id) ?? [],
+    children_refs: node.children_refs,
+    laterals: lateralMap.get(node.bus_ref) ?? [],
     children: [],
   }));
 }
 
 function getIsolatedNodes(summary: TopologyGraphSummary): string[] {
-  const spineSet = new Set(summary.spine.map((s) => s.ref_id));
-  const lateralSet = new Set(summary.laterals);
-  const allNodes = summary.adjacency.map((a) => a.ref_id);
+  const spineSet = new Set(summary.spine.map((s) => s.bus_ref));
+  const lateralSet = new Set(summary.lateral_roots);
+  // Collect unique bus refs from adjacency edges
+  const allNodes = new Set<string>();
+  for (const a of summary.adjacency) {
+    allNodes.add(a.bus_ref);
+    allNodes.add(a.neighbor_ref);
+  }
 
-  return allNodes
+  return [...allNodes]
     .filter((n) => !spineSet.has(n) && !lateralSet.has(n))
     .sort();
 }
@@ -210,17 +222,17 @@ export function TopologyTreeView({
         )}
 
         {/* Laterals section */}
-        {summary.laterals.length > 0 && (
+        {summary.lateral_roots.length > 0 && (
           <>
             <SectionHeader
               label={SECTION_LABELS.laterals}
-              count={summary.laterals.length}
+              count={summary.lateral_roots.length}
               isExpanded={expandedSections.has('laterals')}
               onToggle={() => toggleSection('laterals')}
             />
             {expandedSections.has('laterals') && (
               <div className="ml-2" data-testid="topology-tree-laterals">
-                {[...summary.laterals].sort().map((lat) => (
+                {[...summary.lateral_roots].sort().map((lat) => (
                   <NodeItem
                     key={lat}
                     refId={lat}
@@ -310,7 +322,7 @@ function SpineNodeItem({
   node,
   isSelected,
   onSelect,
-  onBranchSelect,
+  onBranchSelect: _onBranchSelect,
 }: {
   node: SpineTreeNode;
   isSelected: boolean;
@@ -343,9 +355,9 @@ function SpineNodeItem({
         <span className="flex-1 truncate text-gray-800">{node.ref_id}</span>
 
         {/* Branch count indicator */}
-        {node.branches_to_next.length > 0 && (
+        {node.children_refs.length > 0 && (
           <span className="text-gray-400 text-[10px] ml-1">
-            {node.branches_to_next.length} gał.
+            {node.children_refs.length} gał.
           </span>
         )}
 

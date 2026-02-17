@@ -21,8 +21,6 @@
 
 import type {
   PowerFlowResultV1,
-  PowerFlowBusResult,
-  PowerFlowBranchResult,
   PowerFlowInterpretation,
   VoltageFinding,
   BranchLoadingFinding,

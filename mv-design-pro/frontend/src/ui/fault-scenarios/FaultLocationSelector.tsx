@@ -12,7 +12,7 @@
  * - All labels in Polish
  */
 
-import React, { useState, useCallback } from 'react';
+import { useState, useCallback } from 'react';
 import type { FaultLocation, LocationType } from './types';
 import { LOCATION_TYPE_LABELS } from './types';
 

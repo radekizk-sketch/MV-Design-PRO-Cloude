@@ -12,7 +12,7 @@
  */
 
 import { useResultsWorkspaceStore, useFilteredRuns, useFilteredBatches, useFilteredComparisons } from './store';
-import type { WorkspaceFilter, RunSummary, BatchSummary, ComparisonSummary, RunStatusValue, BatchStatusValue } from './types';
+import type { WorkspaceFilter, RunSummary, BatchSummary, ComparisonSummary } from './types';
 import {
   WORKSPACE_FILTER_LABELS,
   RUN_STATUS_LABELS,
@@ -25,7 +25,8 @@ import {
 const FILTERS: WorkspaceFilter[] = ['ALL', 'DONE', 'FAILED', 'SC_3F', 'SC_2F', 'SC_1F', 'LOAD_FLOW'];
 
 export function WorkspaceSidebar() {
-  const mode = useResultsWorkspaceStore((s) => s.mode);
+  const _mode = useResultsWorkspaceStore((s) => s.mode);
+  void _mode;
   const filter = useResultsWorkspaceStore((s) => s.filter);
   const setFilter = useResultsWorkspaceStore((s) => s.setFilter);
   const selectRun = useResultsWorkspaceStore((s) => s.selectRun);

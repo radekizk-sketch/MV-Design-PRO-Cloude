@@ -127,7 +127,7 @@ class TestBlockers:
         ))
         assert result.status == "FAIL"
         codes = [i.code for i in result.issues]
-        assert "E008" in codes
+        assert "sources.no_short_circuit_params" in codes
 
 
 class TestWarnings:

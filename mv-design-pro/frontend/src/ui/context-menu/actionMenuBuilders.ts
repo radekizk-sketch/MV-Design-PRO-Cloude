@@ -979,7 +979,7 @@ export function buildStudyCaseContextMenu(
 // ---------------------------------------------------------------------------
 
 export function buildAnalysisResultContextMenu(
-  mode: OperatingMode,
+  _mode: OperatingMode,
   resultType: 'SHORT_CIRCUIT' | 'POWER_FLOW' | 'TIME_SERIES' | undefined,
   handlers: Record<string, (() => void) | undefined> = {},
 ): ContextMenuAction[] {

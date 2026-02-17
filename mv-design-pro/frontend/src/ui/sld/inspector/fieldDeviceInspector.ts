@@ -20,7 +20,6 @@ import type {
   CatalogRefDetailV1,
 } from '../core/fieldDeviceContracts';
 import {
-  FieldRoleV1,
   DeviceTypeV1,
   DevicePowerPathPositionV1,
   DeviceElectricalRoleV1,
@@ -29,12 +28,8 @@ import {
   DEVICE_TYPE_TO_APARAT,
   APARAT_TYPE_LABELS_PL,
   DEVICE_TO_SYMBOL,
-  SldSymbolTypeV1,
 } from '../core/fieldDeviceContracts';
 
-import type {
-  SwitchgearRenderResultV1,
-} from '../core/switchgearRenderer';
 
 import type {
   InspectorPropertySection,
@@ -43,7 +38,6 @@ import type {
 
 import type {
   SwitchgearConfigValidationResultV1,
-  ConfigValidationIssueV1,
 } from '../core/switchgearConfig';
 import { ConfigIssueSeverity } from '../core/switchgearConfig';
 
