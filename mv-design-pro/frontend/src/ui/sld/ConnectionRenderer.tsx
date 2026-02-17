@@ -28,6 +28,7 @@ import {
   ETAP_LINE_LABEL,
   calculateLineLabelPosition,
 } from './sldEtapStyle';
+import { RING_DASH_ARRAY, RING_STROKE_WIDTH } from './IndustrialAesthetics';
 
 // =============================================================================
 // STALE STYLIZACJI — using ETAP tokens
@@ -94,7 +95,10 @@ export const ConnectionRenderer: React.FC<ConnectionRendererProps> = ({
   onMouseEnter,
   onMouseLeave,
 }) => {
-  const { id, path, connectionType } = connection;
+  const { id, path, connectionType, connectionStyle } = connection;
+
+  // Ring detection — kontrakt §1.7: ring = 2px przerywana
+  const isRing = connectionStyle === 'ring';
 
   // Hooks must be called before any early return (Rules of Hooks)
   // Punkty dla polyline
@@ -138,9 +142,15 @@ export const ConnectionRenderer: React.FC<ConnectionRendererProps> = ({
     ? CONNECTION_COLORS.default
     : CONNECTION_COLORS.deenergized;
 
-  const strokeWidth = selected
+  // Ring: stała grubość RING_STROKE_WIDTH, linia przerywana (kontrakt §1.7)
+  const strokeWidth = isRing
+    ? RING_STROKE_WIDTH
+    : selected
     ? CONNECTION_STROKE_WIDTH_SELECTED
     : CONNECTION_STROKE_WIDTH;
+
+  // Stroke-dasharray: pusta = ciągła, ustawiona = przerywana (ring)
+  const strokeDashArray = isRing ? RING_DASH_ARRAY : undefined;
 
   const opacity = energized ? 1 : 0.6;
 
@@ -171,6 +181,7 @@ export const ConnectionRenderer: React.FC<ConnectionRendererProps> = ({
       />
 
       {/* Widoczna linia polaczenia */}
+      {/* Ring: linia przerywana (kontrakt §1.7 — Industrial Aesthetics) */}
       <polyline
         points={points}
         fill="none"
@@ -178,8 +189,10 @@ export const ConnectionRenderer: React.FC<ConnectionRendererProps> = ({
         strokeWidth={strokeWidth}
         strokeLinecap="round"
         strokeLinejoin="round"
+        strokeDasharray={strokeDashArray}
         opacity={opacity}
         style={{ pointerEvents: 'none' }}
+        data-connection-ring={isRing}
       />
 
       {/* Etykieta na linii z halo/white-box */}

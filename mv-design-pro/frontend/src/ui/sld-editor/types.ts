@@ -403,4 +403,13 @@ export interface Connection {
 
   /** Connection type (for styling) */
   connectionType?: 'branch' | 'switch' | 'source' | 'load';
+
+  /**
+   * Styl wizualny połączenia — widokowy (nie domenowy).
+   * 'ring' = linia przerywana (połączenie ringowe w układzie pętlowym)
+   * 'default' = linia ciągła
+   *
+   * Industrial Aesthetics Contract §1.7: ring = 2px przerywana
+   */
+  connectionStyle?: 'ring' | 'default';
 }
