@@ -50,7 +50,9 @@ export interface ExportRequestV1 {
   readonly format: ExportFormatV1;
   /** Snapshot reference (ENM hash_sha256). */
   readonly snapshot_ref: string;
-  /** Analysis run ID (UUID) — null if exporting model only. */
+  /**
+   * Analysis run ID (UUID) — null if exporting model only.
+   */
   readonly run_id: string | null;
   /** Include full calculation trace in export. */
   readonly include_trace: boolean;
@@ -97,7 +99,9 @@ export const EXPORT_STATUS_LABELS_PL: Record<ExportStatusV1, string> = {
  * Export result — metadata for a completed (or failed) export.
  */
 export interface ExportResultV1 {
-  /** Unique export identifier (UUID). */
+  /**
+   * Unique export identifier (UUID).
+   */
   readonly export_id: string;
   /** Output format used. */
   readonly format: ExportFormatV1;
