@@ -31,8 +31,7 @@ function parseEnvBoolean(value: string | undefined, defaultValue: boolean): bool
  */
 function getViteEnv(key: string): string | undefined {
   try {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const env = (import.meta as any).env;
+    const env = (import.meta as any).env; // as any: import.meta.env is not typed in all build contexts
     return env?.[key];
   } catch {
     return undefined;

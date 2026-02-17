@@ -28,7 +28,7 @@ export const sampleProofData: InspectorView = {
       step_id: 'SC3F_STEP_001',
       title: 'Napięcie z współczynnikiem c',
       equation_id: 'EQ_SC3F_001',
-      formula_latex: '$$U = c \cdot U_n$$',
+      formula_latex: '$$U = c \\cdot U_n$$',
       standard_ref: 'IEC 60909-0:2016',
       input_values: [
         {
@@ -46,7 +46,7 @@ export const sampleProofData: InspectorView = {
           raw_value: 15,
         },
       ],
-      substitution_latex: '$$U = 1.100 \cdot 15.00 = 16.50\,\text{kV}$$',
+      substitution_latex: '$$U = 1.100 \\cdot 15.00 = 16.50\\,\\text{kV}$$',
       result: {
         symbol: 'U',
         value: '16.50',
@@ -66,7 +66,7 @@ export const sampleProofData: InspectorView = {
       step_id: 'VDROP_STEP_001',
       title: 'Rezystancja odcinka',
       equation_id: 'EQ_VDROP_001',
-      formula_latex: '$$R = r \cdot l$$',
+      formula_latex: '$$R = r \\cdot l$$',
       standard_ref: 'IEC 60909-0:2016',
       input_values: [
         {
@@ -84,7 +84,7 @@ export const sampleProofData: InspectorView = {
           raw_value: 2,
         },
       ],
-      substitution_latex: '$$R = 0.120 \cdot 2.00 = 0.240\,\Omega$$',
+      substitution_latex: '$$R = 0.120 \\cdot 2.00 = 0.240\\,\\Omega$$',
       result: {
         symbol: 'R',
         value: '0.240',
@@ -115,7 +115,7 @@ export const sampleProofData: InspectorView = {
           raw_value: 2.5,
         },
       ],
-      substitution_latex: '$$Q_{cmd} = 2.50\,\text{Mvar}$$',
+      substitution_latex: '$$Q_{cmd} = 2.50\\,\\text{Mvar}$$',
       result: {
         symbol: 'Q_{cmd}',
         value: '2.50',

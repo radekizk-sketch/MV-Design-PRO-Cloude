@@ -243,7 +243,7 @@ function getStrokeWidth(state: SymbolVisualState, elementType?: ElementType): nu
   const hierarchy = VISUAL_HIERARCHY[hierarchyLevel];
 
   // Base stroke from hierarchy
-  let baseStroke = hierarchy.strokeWidth;
+  const baseStroke = hierarchy.strokeWidth;
 
   // Highlight overrides (validation issues)
   if (highlighted && highlightSeverity) {

@@ -1249,7 +1249,7 @@ export function resolveLabelCollisions(
   const adjusted: LabelBoundingBox[] = [];
 
   for (const label of sortedLabels) {
-    let currentPos = { x: label.x, y: label.y };
+    const currentPos = { x: label.x, y: label.y };
     let hasCollision = true;
     let nudgeCount = 0;
 

@@ -163,14 +163,14 @@ function StepK2({ enm, onChange }: StepProps) {
     const srcRef = src?.ref_id ?? 'source_grid';
     const buses = [...enm.buses];
     const sources = [...enm.sources];
-    let bi = buses.findIndex((b) => b.ref_id === busRef);
+    const bi = buses.findIndex((b) => b.ref_id === busRef);
     if (bi < 0) {
       buses.push({ id: crypto.randomUUID(), ref_id: busRef, name: patch.busName ?? 'Szyna główna SN', tags: ['source'], meta: {}, voltage_kv: patch.voltage ?? 15, phase_system: '3ph' });
     } else {
       if (patch.busName !== undefined) buses[bi] = { ...buses[bi], name: patch.busName };
       if (patch.voltage !== undefined) buses[bi] = { ...buses[bi], voltage_kv: patch.voltage };
     }
-    let si = sources.findIndex((s) => s.ref_id === srcRef);
+    const si = sources.findIndex((s) => s.ref_id === srcRef);
     if (si < 0) {
       sources.push({ id: crypto.randomUUID(), ref_id: srcRef, name: 'Sieć zasilająca', tags: [], meta: {}, bus_ref: busRef, model: patch.model ?? 'short_circuit_power', sk3_mva: patch.sk3 ?? 250, rx_ratio: patch.rx ?? 0.1 });
     } else {

@@ -188,7 +188,6 @@ export function generateConnections(
       // standard routing will be used for its feeders (no crash, no empty paths)
       // This is a local fallback - other busbars are unaffected
       if (import.meta.env.DEV) {
-        // eslint-disable-next-line no-console
         console.debug(`[SLD] Auto-layout fallback for busbar ${busbar.id}`);
       }
     }

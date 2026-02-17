@@ -78,18 +78,19 @@ function EmptyState({ message }: { message: string }) {
 function ResultStatusBar() {
   const { runHeader } = useProtectionResultsStore();
 
-  if (!runHeader) return null;
-
-  const statusLabel = RESULT_STATUS_LABELS[runHeader.result_state] ?? runHeader.result_state;
-  const severity = RESULT_STATUS_SEVERITY[runHeader.result_state] ?? 'info';
-
   const formattedDate = useMemo(() => {
+    if (!runHeader) return '—';
     try {
       return new Date(runHeader.created_at).toLocaleString('pl-PL');
     } catch {
       return runHeader.created_at;
     }
-  }, [runHeader.created_at]);
+  }, [runHeader]);
+
+  if (!runHeader) return null;
+
+  const statusLabel = RESULT_STATUS_LABELS[runHeader.result_state] ?? runHeader.result_state;
+  const severity = RESULT_STATUS_SEVERITY[runHeader.result_state] ?? 'info';
 
   return (
     <div className="flex flex-wrap items-center justify-between gap-4 rounded border border-slate-200 bg-white p-3">

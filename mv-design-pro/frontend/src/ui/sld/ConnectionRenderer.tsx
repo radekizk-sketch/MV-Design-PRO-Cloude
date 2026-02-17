@@ -96,6 +96,36 @@ export const ConnectionRenderer: React.FC<ConnectionRendererProps> = ({
 }) => {
   const { id, path, connectionType } = connection;
 
+  // Hooks must be called before any early return (Rules of Hooks)
+  // Punkty dla polyline
+  const points = useMemo(
+    () => (path && path.length >= 2) ? pathToPoints(path) : '',
+    [path]
+  );
+
+  // Oblicz pozycje etykiety (deterministycznie)
+  const labelPosition = useMemo(() => {
+    if (!path || path.length < 2 || !showLabel || !label) return null;
+    return calculateLineLabelPosition(path, id);
+  }, [path, id, showLabel, label]);
+
+  // Handlery
+  const handleClick = useCallback(
+    (e: React.MouseEvent) => {
+      e.stopPropagation();
+      onClick?.(id, e);
+    },
+    [id, onClick]
+  );
+
+  const handleMouseEnter = useCallback(() => {
+    onMouseEnter?.(id);
+  }, [id, onMouseEnter]);
+
+  const handleMouseLeave = useCallback(() => {
+    onMouseLeave?.(id);
+  }, [id, onMouseLeave]);
+
   // Jesli sciezka jest pusta lub ma mniej niz 2 punkty, nie renderuj
   if (!path || path.length < 2) {
     return null;
@@ -114,35 +144,9 @@ export const ConnectionRenderer: React.FC<ConnectionRendererProps> = ({
 
   const opacity = energized ? 1 : 0.6;
 
-  // Punkty dla polyline
-  const points = useMemo(() => pathToPoints(path), [path]);
-
-  // Oblicz pozycje etykiety (deterministycznie)
-  const labelPosition = useMemo(() => {
-    if (!showLabel || !label) return null;
-    return calculateLineLabelPosition(path, id);
-  }, [path, id, showLabel, label]);
-
   // Szacowana szerokosc etykiety (7px na znak — przemyslowy standard)
   const estimatedLabelWidth = label ? Math.max(30, label.length * 7) : 0;
   const labelHeight = ETAP_TYPOGRAPHY.fontSize.medium;
-
-  // Handlery
-  const handleClick = useCallback(
-    (e: React.MouseEvent) => {
-      e.stopPropagation();
-      onClick?.(id, e);
-    },
-    [id, onClick]
-  );
-
-  const handleMouseEnter = useCallback(() => {
-    onMouseEnter?.(id);
-  }, [id, onMouseEnter]);
-
-  const handleMouseLeave = useCallback(() => {
-    onMouseLeave?.(id);
-  }, [id, onMouseLeave]);
 
   return (
     <g

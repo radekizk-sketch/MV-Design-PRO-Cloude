@@ -308,24 +308,15 @@ function EmptyState({ message }: { message: string }) {
 function ResultStatusBar() {
   const { runHeader, results, selectedRunId } = usePowerFlowResultsStore();
 
-  if (!runHeader) return null;
-
-  const statusLabel = RESULT_STATUS_LABELS[runHeader.result_status] ?? runHeader.result_status;
-  const severity = RESULT_STATUS_SEVERITY[runHeader.result_status] ?? 'info';
-  const convergedLabel = results?.converged
-    ? NormativeLabels.common.powerFlowLabels.converged
-    : results?.converged === false
-    ? NormativeLabels.common.powerFlowLabels.notConverged
-    : '—';
-  const iterationsLabel = results?.iterations_count ?? runHeader.iterations ?? '—';
-
+  // Hooks must precede early return (Rules of Hooks)
   const formattedDate = useMemo(() => {
+    if (!runHeader) return '—';
     try {
       return new Date(runHeader.created_at).toLocaleString('pl-PL');
     } catch {
       return runHeader.created_at;
     }
-  }, [runHeader.created_at]);
+  }, [runHeader]);
 
   // UI-10: Calculate quick verdict for export button highlighting
   const overallVerdict = useMemo((): CoordinationVerdict | null => {
@@ -341,6 +332,17 @@ function ResultStatusBar() {
     }
     return 'PASS';
   }, [results]);
+
+  if (!runHeader) return null;
+
+  const statusLabel = RESULT_STATUS_LABELS[runHeader.result_status] ?? runHeader.result_status;
+  const severity = RESULT_STATUS_SEVERITY[runHeader.result_status] ?? 'info';
+  const convergedLabel = results?.converged
+    ? NormativeLabels.common.powerFlowLabels.converged
+    : results?.converged === false
+    ? NormativeLabels.common.powerFlowLabels.notConverged
+    : '—';
+  const iterationsLabel = results?.iterations_count ?? runHeader.iterations ?? '—';
 
   return (
     <div className="flex flex-wrap items-center justify-between gap-4 rounded border border-slate-200 bg-white p-3">
@@ -687,18 +689,22 @@ function SummaryTab() {
     }
   }, [results, loadResults]);
 
+  // Hook must precede early return (Rules of Hooks)
+  // UI-05: Calculate network verdict (empty arrays when results not yet loaded)
+  const networkVerdict = useMemo(
+    () => calculateNetworkVerdict(
+      results?.bus_results ?? [],
+      results?.branch_results ?? []
+    ),
+    [results]
+  );
+
   if (isLoadingResults) return <LoadingSpinner />;
   if (!results) {
     return <EmptyState message={NormativeLabels.common.emptyStates.noResults} />;
   }
 
-  const { summary, converged, iterations_count, tolerance_used, base_mva, slack_bus_id, bus_results, branch_results } = results;
-
-  // UI-05: Calculate network verdict
-  const networkVerdict = useMemo(
-    () => calculateNetworkVerdict(bus_results, branch_results),
-    [bus_results, branch_results]
-  );
+  const { summary, converged, iterations_count, tolerance_used, base_mva, slack_bus_id } = results;
 
   return (
     <div className="space-y-4">

@@ -290,7 +290,7 @@ export function useAutoLayout(
       geoConfig,
       (config.direction === 'left-right') ? 'left-right' : 'top-down'
     );
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // intentional: geoConfig excluded — layout recalculates only on topology change
   }, [symbols, topologyHash]);
 
   // Build layout state from topological result
