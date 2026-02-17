@@ -118,17 +118,22 @@ describe('exportProject', () => {
 });
 
 describe('downloadProjectArchive', () => {
+  const originalCreateObjectURL = globalThis.URL.createObjectURL;
+  const originalRevokeObjectURL = globalThis.URL.revokeObjectURL;
+
   beforeEach(() => {
     mockFetch.mockReset();
-    // Mock DOM APIs
+    // Polyfill URL.createObjectURL/revokeObjectURL for jsdom
+    globalThis.URL.createObjectURL = vi.fn().mockReturnValue('blob:mock-url');
+    globalThis.URL.revokeObjectURL = vi.fn();
     vi.spyOn(document.body, 'appendChild').mockImplementation(() => document.body);
     vi.spyOn(document.body, 'removeChild').mockImplementation(() => document.body);
-    vi.spyOn(window.URL, 'createObjectURL').mockReturnValue('blob:mock-url');
-    vi.spyOn(window.URL, 'revokeObjectURL').mockImplementation(() => {});
   });
 
   afterEach(() => {
     vi.restoreAllMocks();
+    globalThis.URL.createObjectURL = originalCreateObjectURL;
+    globalThis.URL.revokeObjectURL = originalRevokeObjectURL;
   });
 
   it('should create download link with correct filename', async () => {
@@ -139,12 +144,13 @@ describe('downloadProjectArchive', () => {
     });
 
     let createdLink: HTMLAnchorElement | null = null;
+    const originalCreateElement = document.createElement.bind(document);
     vi.spyOn(document, 'createElement').mockImplementation((tag: string) => {
       if (tag === 'a') {
         createdLink = { click: vi.fn(), href: '', download: '' } as unknown as HTMLAnchorElement;
         return createdLink as unknown as HTMLElement;
       }
-      return document.createElement(tag);
+      return originalCreateElement(tag);
     });
 
     await downloadProjectArchive('12345678-abcd-efgh', 'Moj Projekt');
@@ -162,12 +168,13 @@ describe('downloadProjectArchive', () => {
     });
 
     let createdLink: HTMLAnchorElement | null = null;
+    const originalCreateElement = document.createElement.bind(document);
     vi.spyOn(document, 'createElement').mockImplementation((tag: string) => {
       if (tag === 'a') {
         createdLink = { click: vi.fn(), href: '', download: '' } as unknown as HTMLAnchorElement;
         return createdLink as unknown as HTMLElement;
       }
-      return document.createElement(tag);
+      return originalCreateElement(tag);
     });
 
     await downloadProjectArchive('12345678-abcd');
@@ -182,16 +189,17 @@ describe('downloadProjectArchive', () => {
       blob: () => Promise.resolve(mockBlob),
     });
 
+    const originalCreateElement = document.createElement.bind(document);
     vi.spyOn(document, 'createElement').mockImplementation((tag: string) => {
       if (tag === 'a') {
         return { click: vi.fn(), href: '', download: '' } as unknown as HTMLElement;
       }
-      return document.createElement(tag);
+      return originalCreateElement(tag);
     });
 
     await downloadProjectArchive('12345678-abcd');
 
-    expect(window.URL.revokeObjectURL).toHaveBeenCalledWith('blob:mock-url');
+    expect(globalThis.URL.revokeObjectURL).toHaveBeenCalledWith('blob:mock-url');
   });
 });
 
