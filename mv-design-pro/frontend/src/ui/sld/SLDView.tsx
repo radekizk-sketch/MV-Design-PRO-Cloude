@@ -53,6 +53,8 @@ import {
   type ExportScope,
 } from './export';
 import { useOverlayRuntime, OverlayLegend } from '../sld-overlay';
+import { SldTechLabelsLayer } from './SldTechLabelsLayer';
+import { useCanCalculate } from '../app-state';
 
 /**
  * Default canvas dimensions.
@@ -72,6 +74,7 @@ export const SLDView: React.FC<SLDViewProps> = ({
   height = DEFAULT_HEIGHT,
   initialZoom = 1.0,
   fitOnMount = true,
+  onCalculateClick,
 }) => {
   // Viewport state (pan/zoom)
   const [viewport, setViewport] = useState<ViewportState>(() => ({
@@ -82,6 +85,12 @@ export const SLDView: React.FC<SLDViewProps> = ({
   // Focus pulse state (for marker click visual feedback)
   // Cleared via CSS animationend event (no setTimeout for deterministic E2E)
   const [focusPulseElementId, setFocusPulseElementId] = useState<string | null>(null);
+
+  // BLOK 7 — etykiety techniczne (load%, NOP, napięcie)
+  const [techLabelsVisible, setTechLabelsVisible] = useState(false);
+
+  // BLOK 8 — przycisk uruchomienia obliczeń
+  const { allowed: canCalculate } = useCanCalculate();
 
   // Selection store integration
   const selectElement = useSelectionStore((state) => state.selectElement);
@@ -232,29 +241,55 @@ export const SLDView: React.FC<SLDViewProps> = ({
   }, [symbols, width, height]);
 
   /**
-   * Keyboard shortcut: F = fit to content (deterministic).
-   */
-  useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key !== 'f' && event.key !== 'F') return;
-      const target = event.target;
-      if (target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement || target instanceof HTMLSelectElement) {
-        return;
-      }
-      event.preventDefault();
-      handleFitToContent();
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [handleFitToContent]);
-
-  /**
-   * Handle reset view.
+   * Handle reset view (100%).
    */
   const handleResetView = useCallback(() => {
     setViewport({ ...DEFAULT_VIEWPORT, zoom: 1.0 });
   }, []);
+
+  /**
+   * Keyboard shortcuts (BLOK 10 — ekspert ergonomia):
+   * F       = dopasuj do schematu (fit to content)
+   * +/=     = powiększ
+   * -       = pomniejsz
+   * 0       = resetuj widok (100%)
+   */
+  useEffect(() => {
+    const isInputTarget = (target: EventTarget | null): boolean =>
+      target instanceof HTMLInputElement ||
+      target instanceof HTMLTextAreaElement ||
+      target instanceof HTMLSelectElement;
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (isInputTarget(event.target)) return;
+
+      switch (event.key) {
+        case 'f':
+        case 'F':
+          event.preventDefault();
+          handleFitToContent();
+          break;
+        case '+':
+        case '=':
+          event.preventDefault();
+          handleZoomIn();
+          break;
+        case '-':
+          event.preventDefault();
+          handleZoomOut();
+          break;
+        case '0':
+          event.preventDefault();
+          handleResetView();
+          break;
+        default:
+          break;
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [handleFitToContent, handleZoomIn, handleZoomOut, handleResetView]);
 
   /**
    * Handle mouse wheel (zoom).
@@ -752,6 +787,43 @@ export const SLDView: React.FC<SLDViewProps> = ({
             </button>
           )}
 
+          {/* BLOK 7: Etykiety techniczne toggle */}
+          <div className="w-px h-5 bg-slate-600 mx-1" />
+          <button
+            type="button"
+            onClick={() => setTechLabelsVisible((prev) => !prev)}
+            className={`px-3 py-1.5 text-xs font-medium rounded transition-colors ${
+              techLabelsVisible
+                ? 'bg-teal-600 text-white'
+                : 'text-slate-300 hover:text-slate-100 hover:bg-slate-700'
+            }`}
+            title={techLabelsVisible ? 'Ukryj etykiety techniczne' : 'Pokaż etykiety techniczne (load%, NOP, U)'}
+            data-testid="sld-tech-labels-toggle"
+          >
+            Etykiety
+          </button>
+
+          {/* BLOK 8: Uruchom obliczenia */}
+          {onCalculateClick && (
+            <>
+              <div className="w-px h-5 bg-slate-600 mx-1" />
+              <button
+                type="button"
+                onClick={onCalculateClick}
+                disabled={!canCalculate}
+                className={`px-3 py-1.5 text-xs font-semibold rounded transition-colors ${
+                  canCalculate
+                    ? 'bg-green-600 hover:bg-green-500 text-white'
+                    : 'bg-slate-600 text-slate-400 cursor-not-allowed'
+                }`}
+                title={canCalculate ? 'Uruchom obliczenia' : 'Brak aktywnego przypadku'}
+                data-testid="sld-calculate-btn"
+              >
+                ▶ Oblicz
+              </button>
+            </>
+          )}
+
           {/* Export button */}
           <div className="w-px h-5 bg-slate-600 mx-1" />
           <button
@@ -914,6 +986,15 @@ export const SLDView: React.FC<SLDViewProps> = ({
             onLabelClick={handleProtectionLabelClick}
           />
         )}
+
+        {/* BLOK 7: Etykiety techniczne — load%, NOP, napięcie */}
+        <SldTechLabelsLayer
+          symbols={symbols}
+          viewport={viewport}
+          width={width}
+          height={height}
+          visible={techLabelsVisible}
+        />
       </div>
 
       {/* Status bar — ETAP-grade professional */}
@@ -952,7 +1033,7 @@ export const SLDView: React.FC<SLDViewProps> = ({
             </span>
           )}
           <span className="text-slate-500">
-            Środkowy/prawy przycisk myszy: przesuwanie • Scroll: powiększanie • F: dopasuj
+            Prawy przycisk: przesuwanie • Scroll/+/−: zoom • F: dopasuj • 0: reset
           </span>
         </div>
       </div>

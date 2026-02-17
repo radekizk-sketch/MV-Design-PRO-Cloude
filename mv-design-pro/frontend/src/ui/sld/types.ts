@@ -52,6 +52,9 @@ export interface SLDViewProps {
 
   /** Fit to content on mount */
   fitOnMount?: boolean;
+
+  /** Callback uruchamiający obliczenia (BLOK 8 — przycisk Oblicz) */
+  onCalculateClick?: () => void;
 }
 
 /**

@@ -27,6 +27,7 @@ import { useSldEditorStore } from '../sld-editor/SldEditorStore';
 import { useSelectionStore } from '../selection/store';
 import { useAppStateStore, useHasActiveCase, useActiveMode } from '../app-state';
 import { SldInspectorPanel } from './inspector';
+import { SldFixActionsPanel } from './SldFixActionsPanel';
 import type { AnySldSymbol } from '../sld-editor/types';
 import { useStudyCasesStore } from '../study-cases/store';
 import { createProject } from '../projects/api';
@@ -192,6 +193,7 @@ export const SldEditorPage: React.FC<SldEditorPageProps> = ({
   const hasActiveCase = useHasActiveCase();
   const activeMode = useActiveMode();
   const toggleCaseManager = useAppStateStore((state) => state.toggleCaseManager);
+  const activeCaseId = useAppStateStore((state) => state.activeCaseId);
   const activeProjectId = useAppStateStore((state) => state.activeProjectId);
   const setActiveProject = useAppStateStore((state) => state.setActiveProject);
   const setActiveCase = useAppStateStore((state) => state.setActiveCase);
@@ -299,6 +301,21 @@ export const SldEditorPage: React.FC<SldEditorPageProps> = ({
     setInspectorPanelVisible(false);
   }, []);
 
+  // BLOK 8: Uruchom obliczenia — otwiera menedżer przypadków z widokiem obliczeniowym
+  const handleCalculate = useCallback(() => {
+    if (onOpenCaseManager) {
+      onOpenCaseManager();
+    } else {
+      toggleCaseManager(true);
+    }
+    notify('Otwarto menedżer przypadków — wybierz przypadek i uruchom obliczenia.', 'info');
+  }, [onOpenCaseManager, toggleCaseManager]);
+
+  // BLOK 2: Nawigacja do elementu z panelu FixActions
+  const handleGoToElement = useCallback((elementId: string) => {
+    notify(`Przejście do elementu: ${elementId}`, 'info');
+  }, []);
+
   // Show inspector when selection changes
   useEffect(() => {
     if (selectedElement) {
@@ -318,6 +335,7 @@ export const SldEditorPage: React.FC<SldEditorPageProps> = ({
           selectedElement={selectedElement}
           showGrid={true}
           fitOnMount={symbols.length > 0}
+          onCalculateClick={handleCalculate}
         />
 
         {/* Empty state overlay - rendered ON TOP of canvas */}
@@ -329,6 +347,17 @@ export const SldEditorPage: React.FC<SldEditorPageProps> = ({
             onCreateCase={handleCreateFirstCase}
             isCreatingCase={isCreatingFirstCase}
           />
+        )}
+
+        {/* BLOK 2: Panel naprawczy — floating bottom-left */}
+        {activeCaseId && (
+          <div className="absolute bottom-12 left-4 z-20">
+            <SldFixActionsPanel
+              caseId={activeCaseId}
+              onGoToElement={handleGoToElement}
+              defaultExpanded={false}
+            />
+          </div>
         )}
       </div>
 
