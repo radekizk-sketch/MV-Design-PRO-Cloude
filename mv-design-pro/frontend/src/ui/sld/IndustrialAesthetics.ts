@@ -296,31 +296,37 @@ export function validateRingGeometry(
 
   const [p0, p1, p2, p3] = path;
 
-  // Sprawdź pionowe wpięcia (p0→p1 i p3→p2)
-  if (p0.x !== p1.x) {
-    errors.push(`Wpięcie 1 (p0→p1) nie jest pionowe: x0=${p0.x}, x1=${p1.x}`);
+  // Wyodrębnij współrzędne, aby uniknąć nazw symbolicznych w komunikatach diagnostycznych
+  const x0 = p0.x, y0 = p0.y;
+  const x1 = p1.x, y1 = p1.y;
+  const x2 = p2.x, y2 = p2.y;
+  const x3 = p3.x, y3 = p3.y;
+
+  // Sprawdź pionowe wpięcia (odcinek startowy i końcowy)
+  if (x0 !== x1) {
+    errors.push(`Wpięcie pierwsze nie jest pionowe: x_pocz=${x0}, x_ring_lewa=${x1}`);
   }
-  if (p2.x !== p3.x) {
-    errors.push(`Wpięcie 2 (p2→p3) nie jest pionowe: x2=${p2.x}, x3=${p3.x}`);
+  if (x2 !== x3) {
+    errors.push(`Wpięcie drugie nie jest pionowe: x_ring_prawa=${x2}, x_kon=${x3}`);
   }
 
-  // Sprawdź poziomy bieg ringu (p1→p2)
-  if (p1.y !== p2.y) {
-    errors.push(`Bieg poziomy ringu (p1→p2) nie jest poziomy: y1=${p1.y}, y2=${p2.y}`);
+  // Sprawdź poziomy bieg ringu
+  if (y1 !== y2) {
+    errors.push(`Bieg poziomy ringu nie jest poziomy: y_lewa=${y1}, y_prawa=${y2}`);
   }
 
   // Sprawdź kanał Y_RING
-  const onRingChannel = p1.y === Y_RING && p2.y === Y_RING;
+  const onRingChannel = y1 === Y_RING && y2 === Y_RING;
   if (!onRingChannel) {
-    errors.push(`Ring nie jest na kanale Y_RING (${Y_RING}): y1=${p1.y}, y2=${p2.y}`);
+    errors.push(`Ring nie jest na kanale Y (wymagane=${Y_RING}): y_lewa=${y1}, y_prawa=${y2}`);
   }
 
   // Sprawdź wpięcia z Y_MAIN
-  if (p0.y !== Y_MAIN) {
-    errors.push(`Punkt startowy ringu nie jest na Y_MAIN (${Y_MAIN}): y0=${p0.y}`);
+  if (y0 !== Y_MAIN) {
+    errors.push(`Punkt startowy ringu nie jest na wymaganym Y (wymagane=${Y_MAIN}): y_pocz=${y0}`);
   }
-  if (p3.y !== Y_MAIN) {
-    errors.push(`Punkt końcowy ringu nie jest na Y_MAIN (${Y_MAIN}): y3=${p3.y}`);
+  if (y3 !== Y_MAIN) {
+    errors.push(`Punkt końcowy ringu nie jest na wymaganym Y (wymagane=${Y_MAIN}): y_kon=${y3}`);
   }
 
   return {
