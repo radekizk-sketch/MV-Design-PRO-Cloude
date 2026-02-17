@@ -1094,6 +1094,7 @@ class AddNNLoadPayload(_FrozenBase):
 
 
 CANONICAL_OPS: set[str] = {
+    # V1 — budowa SN
     "add_grid_source_sn",
     "continue_trunk_segment_sn",
     "insert_station_on_segment_sn",
@@ -1110,6 +1111,31 @@ CANONICAL_OPS: set[str] = {
     "add_genset_nn",
     "add_ups_nn",
     "add_nn_load",
+    # V2 — ochrona
+    "add_ct",
+    "add_vt",
+    "add_relay",
+    "update_relay_settings",
+    "link_relay_to_field",
+    "calculate_tcc_curve",
+    "validate_selectivity",
+    # V2 — Study Case
+    "create_study_case",
+    "set_case_switch_state",
+    "set_case_normal_state",
+    "set_case_source_mode",
+    "set_case_time_profile",
+    "run_short_circuit",
+    "run_power_flow",
+    "run_time_series_power_flow",
+    "compare_study_cases",
+    # V2 — nN
+    "add_nn_outgoing_field",
+    "set_source_operating_mode",
+    "set_dynamic_profile",
+    # V2 — uniwersalne
+    "rename_element",
+    "set_label",
 }
 """Zbiór kanonicznych nazw operacji domenowych."""
 
@@ -1155,6 +1181,19 @@ DOMAIN_EVENT_TYPES: list[str] = [
     "UPS_CREATED",
     "NN_LOAD_CREATED",
     "NN_SOURCE_CATALOG_ASSIGNED",
+    # V2 — Ochrona
+    "CT_CREATED",
+    "VT_CREATED",
+    "RELAY_CREATED",
+    "RELAY_SETTINGS_UPDATED",
+    "TCC_CURVE_COMPUTED",
+    "SELECTIVITY_VALIDATED",
+    # V2 — Study Case
+    "STUDY_CASE_CREATED",
+    "CASE_STATE_UPDATED",
+    "ANALYSIS_RUN_STARTED",
+    "ANALYSIS_RUN_COMPLETED",
+    "RESULTS_MAPPED",
 ]
 """Lista dozwolonych typów zdarzeń domenowych."""
 

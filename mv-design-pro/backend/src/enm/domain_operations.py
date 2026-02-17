@@ -1765,3 +1765,13 @@ def execute_domain_operation(
         )
 
     return _HANDLERS[canonical_name](enm_dict, payload)
+
+
+# ---------------------------------------------------------------------------
+# V2 Integration — ochrona, Study Case, źródła nN, operacje uniwersalne
+# ---------------------------------------------------------------------------
+
+from .domain_operations_v2 import ALL_V2_HANDLERS, V2_CANONICAL_OPS  # noqa: E402
+
+CANONICAL_OPS = CANONICAL_OPS | V2_CANONICAL_OPS
+_HANDLERS.update(ALL_V2_HANDLERS)
