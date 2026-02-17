@@ -41,3 +41,9 @@ jobs:
       - name: Domain No-Guessing Guard
         working-directory: mv-design-pro
         run: python scripts/domain_no_guessing_guard.py
+      - name: Canonical Operations Guard
+        working-directory: mv-design-pro
+        run: python scripts/canonical_ops_guard.py
+      - name: Readiness Codes Guard
+        working-directory: mv-design-pro
+        run: python scripts/readiness_codes_guard.py

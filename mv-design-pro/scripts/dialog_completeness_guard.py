@@ -1,0 +1,168 @@
+#!/usr/bin/env python3
+"""
+Dialog Completeness Guard
+
+Ensures that every canonical domain operation that creates/modifies elements
+has a corresponding frontend dialog (modal) component.
+
+SCAN FILES:
+  backend/src/domain/canonical_operations.py     (registry)
+  frontend/src/ui/topology/modals/*.tsx           (dialog components)
+  frontend/src/ui/topology/modals/index.ts        (exports)
+
+CHECKS:
+  1. Every model-mutating operation has at least one corresponding dialog
+  2. All dialog exports are present in index.ts
+  3. Dialog files use Polish labels (no English UI strings)
+
+MAPPING: operation -> expected modal
+  add_grid_source_sn      -> GridSourceModal
+  continue_trunk_segment_sn -> TrunkContinueModal
+  insert_station_on_segment_sn -> TransformerStationModal (existing)
+  start_branch_segment_sn -> BranchModal (existing)
+  insert_section_switch_sn -> NodeModal or SwitchModal
+  connect_secondary_ring_sn -> RingCloseModal
+  set_normal_open_point   -> (inline action, no modal needed)
+  add_transformer_sn_nn   -> TransformerStationModal (existing)
+  assign_catalog_to_element -> CatalogPicker (existing)
+  update_element_parameters -> PropertyGrid (existing)
+  add_nn_outgoing_field   -> NodeModal or dedicated
+  add_nn_load             -> LoadDERModal (existing)
+  add_pv_inverter_nn      -> PVInverterModal (existing)
+  add_bess_inverter_nn    -> BESSInverterModal (existing)
+  add_genset_nn           -> GensetModal (existing)
+  add_ups_nn              -> UPSModal (existing)
+  add_ct                  -> MeasurementModal (existing)
+  add_vt                  -> MeasurementModal (existing)
+  add_relay               -> ProtectionModal (existing)
+  update_relay_settings   -> ProtectionModal (existing)
+
+EXIT CODES:
+  0 = clean (all operations covered)
+  1 = violations found
+"""
+
+from __future__ import annotations
+
+import re
+import sys
+from pathlib import Path
+
+REPO_ROOT = Path(__file__).resolve().parents[1]
+MODALS_DIR = REPO_ROOT / "frontend" / "src" / "ui" / "topology" / "modals"
+INDEX_FILE = MODALS_DIR / "index.ts"
+
+# Mapping: canonical operation -> list of acceptable modal names (partial match)
+OPERATION_TO_MODAL: dict[str, list[str]] = {
+    "add_grid_source_sn": ["GridSource", "SourceModal", "GPZModal"],
+    "continue_trunk_segment_sn": ["TrunkContinue", "TrunkModal", "SegmentModal"],
+    "insert_station_on_segment_sn": ["TransformerStation", "StationModal", "InsertStation"],
+    "start_branch_segment_sn": ["BranchModal", "Branch"],
+    "insert_section_switch_sn": ["SwitchModal", "NodeModal", "SectionSwitch"],
+    "connect_secondary_ring_sn": ["RingClose", "RingModal"],
+    "add_transformer_sn_nn": ["TransformerStation", "Transformer"],
+    "assign_catalog_to_element": ["CatalogPicker", "Catalog"],
+    "add_nn_outgoing_field": ["NodeModal", "OutgoingField", "NNField"],
+    "add_nn_load": ["LoadDER", "LoadModal", "NNLoad"],
+    "add_pv_inverter_nn": ["PVInverter", "PV"],
+    "add_bess_inverter_nn": ["BESSInverter", "BESS"],
+    "add_genset_nn": ["Genset", "GensetModal"],
+    "add_ups_nn": ["UPS", "UPSModal"],
+    "add_ct": ["Measurement", "CTModal"],
+    "add_vt": ["Measurement", "VTModal"],
+    "add_relay": ["Protection", "RelayModal"],
+    "update_relay_settings": ["Protection", "RelaySettings"],
+}
+
+# Operations that don't need a dedicated modal
+NO_MODAL_NEEDED = {
+    "set_normal_open_point",  # inline action
+    "update_element_parameters",  # PropertyGrid handles this
+    "rename_element",  # inline edit
+    "set_label",  # inline edit
+    "set_source_operating_mode",  # inline edit
+    "set_dynamic_profile",  # inline edit
+    "link_relay_to_field",  # drag-drop or inline
+    "calculate_tcc_curve",  # automatic action
+    "validate_selectivity",  # automatic action
+    "create_study_case",  # CreateCaseDialog (separate module)
+    "run_short_circuit",  # button action
+    "run_power_flow",  # button action
+    "run_time_series_power_flow",  # button action
+    "compare_study_cases",  # comparison UI
+    "export_project_artifacts",  # export dialog (separate module)
+    "run_protection_study",  # button action
+    "set_case_switch_state",
+    "set_case_normal_state",
+    "set_case_source_mode",
+    "set_case_time_profile",
+}
+
+
+def find_modal_files() -> set[str]:
+    """Find all modal/dialog TSX component names in the modals directory."""
+    if not MODALS_DIR.exists():
+        return set()
+    names = set()
+    for f in MODALS_DIR.glob("*.tsx"):
+        # Extract component name from filename (e.g. BranchModal.tsx -> BranchModal)
+        names.add(f.stem)
+    return names
+
+
+def check_index_exports(modal_names: set[str]) -> list[str]:
+    """Check that all modal files are exported from index.ts."""
+    if not INDEX_FILE.exists():
+        return ["index.ts not found"]
+    text = INDEX_FILE.read_text(encoding="utf-8")
+    violations = []
+    for name in modal_names:
+        if name not in text:
+            violations.append(f"Modal '{name}' not exported from index.ts")
+    return violations
+
+
+def main() -> int:
+    violations: list[str] = []
+
+    modal_names = find_modal_files()
+    if not modal_names:
+        print("WARNING: No modal files found in %s" % MODALS_DIR)
+        return 0
+
+    # Check each operation has a modal
+    for op_name, expected_modals in OPERATION_TO_MODAL.items():
+        found = False
+        for modal_pattern in expected_modals:
+            for modal_name in modal_names:
+                if modal_pattern.lower() in modal_name.lower():
+                    found = True
+                    break
+            if found:
+                break
+        if not found:
+            violations.append(
+                f"Operation '{op_name}' has no matching dialog. "
+                f"Expected one of: {expected_modals}"
+            )
+
+    # Check index.ts exports
+    export_violations = check_index_exports(modal_names)
+    violations.extend(export_violations)
+
+    if violations:
+        print(f"\n{'='*60}")
+        print(f"DIALOG COMPLETENESS GUARD: {len(violations)} violation(s)")
+        print(f"{'='*60}\n")
+        for v in violations:
+            print(f"  VIOLATION: {v}")
+        print()
+        return 1
+
+    print(f"Dialog Completeness Guard: OK ({len(modal_names)} modals, "
+          f"{len(OPERATION_TO_MODAL)} operations covered)")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

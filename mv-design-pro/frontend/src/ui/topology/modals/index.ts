@@ -29,3 +29,12 @@ export type { PVInverterFormData } from './PVInverterModal';
 export type { BESSInverterFormData } from './BESSInverterModal';
 export type { GensetFormData } from './GensetModal';
 export type { UPSFormData } from './UPSModal';
+
+// Modale wizarda SN
+export { GridSourceModal } from './GridSourceModal';
+export { TrunkContinueModal } from './TrunkContinueModal';
+export { RingCloseModal } from './RingCloseModal';
+
+export type { GridSourceFormData } from './GridSourceModal';
+export type { TrunkContinueFormData, SegmentKind, GeometryMode, Direction } from './TrunkContinueModal';
+export type { RingCloseFormData, RingSegmentKind } from './RingCloseModal';

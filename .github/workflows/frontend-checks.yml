@@ -35,3 +35,9 @@ jobs:
       - name: Codenames guard
         working-directory: mv-design-pro
         run: python scripts/no_codenames_guard.py
+      - name: Dialog Completeness Guard
+        working-directory: mv-design-pro
+        run: python scripts/dialog_completeness_guard.py
+      - name: Local Truth Guard
+        working-directory: mv-design-pro
+        run: python scripts/local_truth_guard.py
