@@ -113,21 +113,21 @@ Tasks:
 | Regulation Q(U) Proofs | Reactive power regulation proof pack | DONE |
 | PR-27: SC ↔ Protection Bridge | Current source resolution (TEST_POINTS / SC_RESULT), FixActions | DONE |
 | PR-28: Coordination v1 | Selectivity margins (explicit pairs, numbers only) | DONE |
-| PR-29: Topology Links | Unified relay↔CB↔target_ref IDs (optional) | PLANNED |
+| PR-29: Topology Links | Unified relay↔CB↔target_ref IDs (optional) | DONE |
 | PR-30: Protection SLD Overlay Pro | Token-only overlay (t51, margins) | DONE |
 | PR-31: Protection Report Model | Export-ready data model (PDF/DOCX) | DONE |
 | PR-32: Governance & Determinism Guards | Solver diff-guard, schema guard, no-heuristics guard | DONE |
-| Frontend Test Coverage | Increase Vitest + Playwright coverage | PLANNED |
-| CI Pipeline Enhancement | Add frontend type-check and lint to CI | PLANNED |
+| Frontend Test Coverage | Increase Vitest + Playwright coverage | DONE |
+| CI Pipeline Enhancement | Add frontend type-check and lint to CI | DONE |
 
 ### 4.3 LOW Priority
 
 | Item | Description | Status |
 |------|-------------|--------|
 | XLSX Network Importer | Import from spreadsheet (ADR-009) | DONE |
-| Cloud Backup Integration | S3/GCS integration | PLANNED |
-| Incremental Archive Export | Delta export | PLANNED |
-| Archive Diff | Compare two project archives | PLANNED |
+| Cloud Backup Integration | S3/GCS integration | DONE |
+| Incremental Archive Export | Delta export | DONE |
+| Archive Diff | Compare two project archives | DONE |
 
 ---
 

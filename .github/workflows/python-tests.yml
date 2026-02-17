@@ -1,3 +1,4 @@
+# Frontend checks (type-check, lint, tests, codenames guard) are in frontend-checks.yml
 name: Python tests
 
 on:
