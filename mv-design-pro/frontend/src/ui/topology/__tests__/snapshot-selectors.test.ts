@@ -161,8 +161,8 @@ describe('selectTerminals', () => {
 
   it('should return all terminals from logical views', () => {
     const terminals: TerminalRef[] = [
-      { ref_id: 't-1', bus_ref: 'bus-1', status: 'OTWARTY' } as TerminalRef,
-      { ref_id: 't-2', bus_ref: 'bus-2', status: 'ZAMKNIETY' } as TerminalRef,
+      { element_id: 'el-1', port_id: 'p-1', trunk_id: null, branch_id: null, status: 'OTWARTY' },
+      { element_id: 'el-2', port_id: 'p-2', trunk_id: 'trunk-1', branch_id: 'br-1', status: 'ZAJETY' },
     ];
     const views = makeMockLogicalViews({ terminals } as Partial<LogicalViewsV1>);
     expect(selectTerminals(views)).toHaveLength(2);
@@ -176,9 +176,9 @@ describe('selectOpenTerminals', () => {
 
   it('should filter only terminals with OTWARTY status', () => {
     const terminals: TerminalRef[] = [
-      { ref_id: 't-1', bus_ref: 'bus-1', status: 'OTWARTY' } as TerminalRef,
-      { ref_id: 't-2', bus_ref: 'bus-2', status: 'ZAMKNIETY' } as TerminalRef,
-      { ref_id: 't-3', bus_ref: 'bus-3', status: 'OTWARTY' } as TerminalRef,
+      { element_id: 'el-1', port_id: 'p-1', trunk_id: null, branch_id: null, status: 'OTWARTY' },
+      { element_id: 'el-2', port_id: 'p-2', trunk_id: 'trunk-1', branch_id: 'br-1', status: 'ZAJETY' },
+      { element_id: 'el-3', port_id: 'p-3', trunk_id: null, branch_id: null, status: 'OTWARTY' },
     ];
     const views = makeMockLogicalViews({ terminals } as Partial<LogicalViewsV1>);
 
@@ -189,7 +189,7 @@ describe('selectOpenTerminals', () => {
 
   it('should return empty array when no terminals are open', () => {
     const terminals: TerminalRef[] = [
-      { ref_id: 't-1', bus_ref: 'bus-1', status: 'ZAMKNIETY' } as TerminalRef,
+      { element_id: 'el-1', port_id: 'p-1', trunk_id: 'trunk-1', branch_id: 'br-1', status: 'ZAJETY' },
     ];
     const views = makeMockLogicalViews({ terminals } as Partial<LogicalViewsV1>);
     expect(selectOpenTerminals(views)).toHaveLength(0);
