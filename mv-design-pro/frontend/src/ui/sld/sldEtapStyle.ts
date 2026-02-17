@@ -32,10 +32,10 @@
 // Industrial Aesthetics Contract §1.7 — grubości linii
 // Ref: IndustrialAesthetics.ts (BUSBAR_STROKE_WIDTH=3, BRANCH_STROKE_WIDTH=2, RING_STROKE_WIDTH=2)
 export const ETAP_STROKE = {
-  /** Busbar — dominant, heaviest line (szyny zbiorcze) — 3px per kontrakt §1.7 */
-  busbar: 3,
-  /** Feeder/branch — primary connections (linie zasilające) — 2px per kontrakt §1.7 */
-  feeder: 2,
+  /** Busbar — dominant, heaviest line (szyny zbiorcze) */
+  busbar: 5,
+  /** Feeder/branch — primary connections (linie zasilające) */
+  feeder: 2.5,
   /** Symbol outline — equipment symbols */
   symbol: 2,
   /** Auxiliary — secondary/measurement connections */
@@ -50,8 +50,8 @@ export const ETAP_STROKE = {
  * Stroke widths when element is selected.
  */
 export const ETAP_STROKE_SELECTED = {
-  busbar: 4,
-  feeder: 3,
+  busbar: 6,
+  feeder: 3.5,
   symbol: 3,
   aux: 2,
   leader: 1.5,
