@@ -28,6 +28,20 @@ from .power_flow_result import (
     PowerFlowResultV1,
     build_power_flow_result_v1,
 )
+from .protection_iec60255 import (
+    PROTECTION_IEC60255_SOLVER_VERSION,
+    IEC60255CurveType,
+    SelectivityVerdict,
+    RelaySettings,
+    CurveTripTimeResult,
+    I2tThermalResult,
+    SelectivityPairResult,
+    ProtectionCoordinationResult,
+    compute_curve_trip_time,
+    compute_i2t_thermal_energy,
+    check_selectivity_pair,
+    run_protection_coordination,
+)
 
 __all__ = [
     "C_MAX",
@@ -51,4 +65,16 @@ __all__ = [
     "PowerFlowSummary",
     "PowerFlowResultV1",
     "build_power_flow_result_v1",
+    "PROTECTION_IEC60255_SOLVER_VERSION",
+    "IEC60255CurveType",
+    "SelectivityVerdict",
+    "RelaySettings",
+    "CurveTripTimeResult",
+    "I2tThermalResult",
+    "SelectivityPairResult",
+    "ProtectionCoordinationResult",
+    "compute_curve_trip_time",
+    "compute_i2t_thermal_energy",
+    "check_selectivity_pair",
+    "run_protection_coordination",
 ]

@@ -70,6 +70,12 @@ from .result_join import (
     join_results,
 )
 from .sources import Source
+from .study_case_delta import (
+    DeltaOverlay,
+    DeltaOverlayToken,
+    FieldChange,
+    compute_delta,
+)
 from .substation import SubstationMetadata
 from .units import BaseQuantities, UnitSystem
 from .validation import ValidationIssue, ValidationReport
@@ -154,4 +160,9 @@ __all__ = [
     "canonicalize_config",
     "compute_config_hash",
     "validate_switchgear_config",
+    # Study Case Delta
+    "DeltaOverlay",
+    "DeltaOverlayToken",
+    "FieldChange",
+    "compute_delta",
 ]

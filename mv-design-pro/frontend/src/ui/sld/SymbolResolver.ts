@@ -16,7 +16,14 @@
  * - Load → fallback (brak symbolu w bibliotece ETAP)
  */
 
-import type { AnySldSymbol, BranchSymbol, SwitchSymbol } from '../sld-editor/types';
+import type {
+  AnySldSymbol,
+  BranchSymbol,
+  SwitchSymbol,
+  SourceSymbol,
+  GeneratorSymbol,
+  MeasurementSymbol,
+} from '../sld-editor/types';
 
 /**
  * Dedupe cache for console warnings.
@@ -50,6 +57,7 @@ export type EtapSymbolId =
   | 'ground'
   | 'ct'
   | 'vt'
+  | 'relay'
   // Tree-specific symbols (P9 Project Tree ETAP parity)
   | 'load'
   | 'project'
@@ -262,6 +270,15 @@ const SYMBOL_DEFINITIONS: Record<EtapSymbolId, Omit<ResolvedSymbol, 'symbolId'>>
     allowedRotations: [0, 90],
     defaultRotation: 0,
   },
+  relay: {
+    description: 'Przekaźnik zabezpieczeniowy / Protection Relay',
+    viewBox: '0 0 100 100',
+    ports: {
+      bottom: { x: 50, y: 100 },
+    },
+    allowedRotations: [0],
+    defaultRotation: 0,
+  },
   // Tree-specific symbols (P9 Project Tree ETAP parity)
   load: {
     description: 'Odbiornik / Load',
@@ -318,6 +335,43 @@ interface ExtendedBranchSymbol extends BranchSymbol {
 }
 
 /**
+ * Typ generatora dla rozróżnienia symbolu Source/Generator.
+ * Align: GeneratorKind z topologyInputReader.
+ */
+export type GeneratorSymbolType = 'PV' | 'WIND' | 'BESS' | 'SYNCHRONOUS';
+
+/**
+ * Interfejs dla Source z opcjonalnym rozróżnieniem typu generatora.
+ */
+interface ExtendedSourceSymbol extends SourceSymbol {
+  generatorType?: GeneratorSymbolType;
+}
+
+/**
+ * Interfejs dla Generator z rozróżnieniem typu generatora.
+ */
+interface ExtendedGeneratorSymbol extends GeneratorSymbol {
+  generatorType?: GeneratorSymbolType;
+}
+
+/**
+ * Interfejs dla Measurement z rozróżnieniem CT vs VT.
+ */
+interface ExtendedMeasurementSymbol extends MeasurementSymbol {
+  measurementType?: 'CT' | 'VT';
+}
+
+/**
+ * Mapowanie GeneratorSymbolType na EtapSymbolId.
+ */
+const GENERATOR_TYPE_TO_SYMBOL: Record<GeneratorSymbolType, EtapSymbolId> = {
+  PV: 'pv',
+  WIND: 'fw',
+  BESS: 'bess',
+  SYNCHRONOUS: 'generator',
+};
+
+/**
  * Rozwiąż symbol ETAP dla elementu SLD.
  *
  * BINDING CONTRACT:
@@ -369,16 +423,44 @@ export function resolveSymbol(symbol: AnySldSymbol): ResolvedSymbol | null {
       }
     }
 
-    case 'Source':
-      // Source → utility_feeder (domyślny fallback)
-      // UWAGA: Model nie rozróżnia PV/FW/BESS/generator
+    case 'Source': {
+      // Source z opcjonalnym rozróżnieniem PV/FW/BESS/generator
+      const sourceSymbol = symbol as ExtendedSourceSymbol;
+      if (sourceSymbol.generatorType) {
+        return getSymbolDefinition(GENERATOR_TYPE_TO_SYMBOL[sourceSymbol.generatorType]);
+      }
+      // Fallback → utility_feeder (zasilanie z sieci)
       return getSymbolDefinition('utility_feeder');
+    }
+
+    case 'Generator': {
+      // Generator z rozróżnieniem PV/Wind/BESS/Genset
+      const genSymbol = symbol as ExtendedGeneratorSymbol;
+      if (genSymbol.generatorType) {
+        return getSymbolDefinition(GENERATOR_TYPE_TO_SYMBOL[genSymbol.generatorType]);
+      }
+      // Fallback → generator (synchroniczny)
+      return getSymbolDefinition('generator');
+    }
+
+    case 'Measurement': {
+      // Measurement z rozróżnieniem CT vs VT
+      const measSymbol = symbol as ExtendedMeasurementSymbol;
+      if (measSymbol.measurementType === 'VT') {
+        return getSymbolDefinition('vt');
+      }
+      // Domyślnie CT (przekładnik prądowy)
+      return getSymbolDefinition('ct');
+    }
+
+    case 'ProtectionAssignment':
+    case 'Relay':
+      // Przekaźnik zabezpieczeniowy — pozycja nad CB (off-path)
+      return getSymbolDefinition('relay');
 
     case 'Load':
-      // Load nie ma symbolu w bibliotece ETAP
-      // Zwracamy null → fallback w rendererze (obecny trójkąt)
-      warnOnce('[SymbolResolver] Load nie ma symbolu ETAP - używam fallbacku');
-      return null;
+      // Load → symbol odbiornika
+      return getSymbolDefinition('load');
 
     default:
       warnOnce(`[SymbolResolver] Nieznany elementType: ${elementType}`);

@@ -612,6 +612,28 @@ const FolderSymbol: React.FC<Omit<EtapSymbolProps, 'symbolId'>> = ({
 );
 
 /**
+ * Relay / Przekaźnik zabezpieczeniowy
+ * IEC 60617 symbol: rectangle with function label, placed above breaker.
+ */
+const RelaySymbol: React.FC<Omit<EtapSymbolProps, 'symbolId'>> = ({
+  stroke = 'currentColor',
+  fill = 'none',
+  strokeWidth = 3,
+  opacity = 1,
+}) => (
+  <>
+    {/* Relay body */}
+    <rect x="25" y="20" width="50" height="40" fill={fill} stroke={stroke} strokeWidth={strokeWidth} opacity={opacity} />
+    {/* Function label */}
+    <text x="50" y="47" textAnchor="middle" fontSize="18" fontWeight="bold" fill={stroke} opacity={opacity}>
+      I&gt;
+    </text>
+    {/* Connection to CB below */}
+    <line x1="50" y1="60" x2="50" y2="100" stroke={stroke} strokeWidth={strokeWidth} opacity={opacity} />
+  </>
+);
+
+/**
  * Mapa komponentów symboli.
  */
 const SYMBOL_COMPONENTS: Record<EtapSymbolId, React.FC<Omit<EtapSymbolProps, 'symbolId'>>> = {
@@ -636,6 +658,7 @@ const SYMBOL_COMPONENTS: Record<EtapSymbolId, React.FC<Omit<EtapSymbolProps, 'sy
   catalog: CatalogSymbol,
   study_case: StudyCaseSymbol,
   results: ResultsSymbol,
+  relay: RelaySymbol,
   folder: FolderSymbol,
 };
 
@@ -781,6 +804,9 @@ export function renderSymbolToString(symbolId: EtapSymbolId): string | null {
       <rect x="25" y="50" width="12" height="30" fill="none" stroke="#000000" stroke-width="2"/>
       <rect x="45" y="30" width="12" height="50" fill="none" stroke="#000000" stroke-width="2"/>
       <rect x="65" y="45" width="12" height="35" fill="none" stroke="#000000" stroke-width="2"/>`,
+    relay: `<rect x="25" y="20" width="50" height="40" fill="none" stroke="#000000" stroke-width="3"/>
+      <text x="50" y="47" text-anchor="middle" font-size="18" font-weight="bold" fill="#000000">I&gt;</text>
+      <line x1="50" y1="60" x2="50" y2="100" stroke="#000000" stroke-width="3"/>`,
     folder: `<path d="M 10 25 L 10 20 L 35 20 L 45 30 L 90 30 L 90 25" fill="none" stroke="#000000" stroke-width="3" stroke-linejoin="round"/>
       <rect x="10" y="30" width="80" height="55" fill="none" stroke="#000000" stroke-width="3"/>`,
   };

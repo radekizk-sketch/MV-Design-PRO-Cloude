@@ -407,6 +407,7 @@ export function buildSourceFieldNNContextMenu(
     action('assign_switch_catalog', 'Przypisz katalog aparatu...', { enabled: edit, handler: handlers.onAssignSwitchCatalog }),
     action('edit_source_params', 'Edytuj parametry źródła...', { enabled: edit, handler: handlers.onEditSourceParams }),
     action('validate_transformer', 'Waliduj „transformator w torze" (raport)...', { handler: handlers.onValidateTransformer }),
+    action('change_kind', 'Zmień rodzaj pola źródłowego nN...', { enabled: edit, handler: handlers.onChangeKind }),
     sep('s3'),
     // --- Gotowość i wyniki (12-18) ---
     action('show_readiness', 'Pokaż gotowość pola...', { handler: handlers.onShowReadiness }),
@@ -703,7 +704,7 @@ export function buildSegmentSNContextMenu(
     action('show_whitebox', 'Pokaż White Box dla odcinka...', { enabled: result, handler: handlers.onShowWhitebox }),
     sep('s5'),
     // --- Historia i porównania (21-25) ---
-    action('show_history', 'Pokaż historię zmian (zdarzenia)...', { handler: handlers.onShowHistory }),
+    action('history', 'Pokaż historię zmian (zdarzenia)...', { handler: handlers.onShowHistory }),
     action('undo_snapshot', 'Cofnij do poprzedniego Snapshot...', { enabled: edit, handler: handlers.onUndoSnapshot }),
     action('compare_snapshots', 'Porównaj Snapshot...', { handler: handlers.onCompareSnapshots }),
     action('export_json', 'Eksportuj dane odcinka (JSON)...', { handler: handlers.onExportJSON }),

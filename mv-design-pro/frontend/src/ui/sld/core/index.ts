@@ -336,3 +336,39 @@ export type {
   OverridesApiResponse,
   ValidateApiResponse,
 } from './overridesApi';
+
+// TCC Chart — Time-Current Characteristic chart types and builder
+export {
+  DEFAULT_TCC_CHART_CONFIG,
+  buildTCCCurvePoints,
+  mapToLogScale,
+  mapFromLogScale,
+} from './tccChart';
+
+export type {
+  TCCCurveType,
+  TCCCurvePointV1,
+  TCCCurveDataV1,
+  TCCAxisConfigV1,
+  TCCChartConfigV1,
+  TCCFaultType,
+  TCCFaultMarkerV1,
+  SelectivityVerdict,
+  TCCSelectivityResultV1,
+  TCCCurveSettings,
+} from './tccChart';
+
+// Export Types — format, request, status, result contracts
+export {
+  EXPORT_FORMAT_VALUES,
+  EXPORT_FORMAT_LABELS_PL,
+  EXPORT_STATUS_VALUES,
+  EXPORT_STATUS_LABELS_PL,
+} from './exportTypes';
+
+export type {
+  ExportFormatV1,
+  ExportRequestV1,
+  ExportStatusV1,
+  ExportResultV1,
+} from './exportTypes';
