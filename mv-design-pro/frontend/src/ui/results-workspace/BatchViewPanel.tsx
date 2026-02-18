@@ -17,7 +17,8 @@ import { BATCH_STATUS_LABELS, BATCH_STATUS_STYLES, getAnalysisTypeLabel } from '
 
 export function BatchViewPanel() {
   const selectedBatch = useSelectedBatchDetail();
-  const selectComparison = useResultsWorkspaceStore((s) => s.selectComparison);
+  const _selectComparison = useResultsWorkspaceStore((s) => s.selectComparison);
+  void _selectComparison;
 
   if (!selectedBatch) {
     return (

@@ -344,13 +344,13 @@ export const EtapCalloutLayer: React.FC<EtapCalloutLayerProps> = ({
   selectedNodeId,
   visible = true,
 }) => {
-  if (!visible || results.length === 0) return null;
-
-  // Sort results for deterministic rendering
+  // Sort results for deterministic rendering (hook must precede early return)
   const sortedResults = useMemo(
     () => [...results].sort((a, b) => a.nodeId.localeCompare(b.nodeId)),
     [results]
   );
+
+  if (!visible || results.length === 0) return null;
 
   return (
     <g data-testid="sld-callout-layer">

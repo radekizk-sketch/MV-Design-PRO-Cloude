@@ -249,7 +249,7 @@ describe('SymbolResolver', () => {
       expect(resolved?.ports.bottom).toEqual({ x: 50, y: 100 });
     });
 
-    it('should return null for Load (no ETAP symbol)', () => {
+    it('should resolve Load to load symbol', () => {
       const loadSymbol: LoadSymbol = {
         id: 'load-1',
         elementId: 'elem-load-1',
@@ -262,8 +262,8 @@ describe('SymbolResolver', () => {
 
       const resolved = resolveSymbol(loadSymbol);
 
-      expect(resolved).toBeNull();
-      expect(warnMock).toHaveBeenCalledWith(expect.stringContaining('Load nie ma symbolu ETAP'));
+      expect(resolved).not.toBeNull();
+      expect(resolved!.symbolId).toBe('load');
     });
   });
 
@@ -283,7 +283,7 @@ describe('SymbolResolver', () => {
       expect(hasEtapSymbol(busSymbol)).toBe(true);
     });
 
-    it('should return false for Load', () => {
+    it('should return true for Load', () => {
       const loadSymbol: LoadSymbol = {
         id: 'load-1',
         elementId: 'elem-load-1',
@@ -294,7 +294,7 @@ describe('SymbolResolver', () => {
         connectedToNodeId: 'bus-1',
       };
 
-      expect(hasEtapSymbol(loadSymbol)).toBe(false);
+      expect(hasEtapSymbol(loadSymbol)).toBe(true);
     });
   });
 
@@ -331,10 +331,10 @@ describe('SymbolResolver', () => {
   });
 
   describe('getAllSymbolIds', () => {
-    it('should return all 21 ETAP symbol IDs', () => {
+    it('should return all 22 ETAP symbol IDs', () => {
       const ids = getAllSymbolIds();
 
-      expect(ids).toHaveLength(21);
+      expect(ids).toHaveLength(22);
       // Core SLD symbols (15)
       expect(ids).toContain('busbar');
       expect(ids).toContain('circuit_breaker');

@@ -373,7 +373,7 @@ describe('UnifiedSymbolRenderer - Fallback Handling', () => {
     consoleSpy.mockRestore();
   });
 
-  it('should not have data-etap-symbol attribute for Load fallback', () => {
+  it('should have data-etap-symbol attribute for Load', () => {
     const symbol = createLoadSymbol();
 
     render(
@@ -383,7 +383,7 @@ describe('UnifiedSymbolRenderer - Fallback Handling', () => {
     );
 
     const symbolElement = screen.getByTestId(`sld-symbol-${symbol.id}`);
-    expect(symbolElement).not.toHaveAttribute('data-etap-symbol');
+    expect(symbolElement).toHaveAttribute('data-etap-symbol', 'load');
   });
 });
 
@@ -514,11 +514,12 @@ describe('UnifiedSymbolRenderer - Port Consistency', () => {
     expect(resolved!.ports.bottom).toEqual({ x: 50, y: 100 });
   });
 
-  it('should return null for Load (no ETAP symbol)', () => {
+  it('should resolve Load to load symbol', () => {
     const symbol = createLoadSymbol();
     const resolved = resolveSymbol(symbol);
 
-    expect(resolved).toBeNull();
+    expect(resolved).not.toBeNull();
+    expect(resolved!.symbolId).toBe('load');
   });
 
   it('should transform ports correctly for rotation', () => {

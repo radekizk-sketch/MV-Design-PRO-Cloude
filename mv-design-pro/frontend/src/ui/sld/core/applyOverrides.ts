@@ -24,7 +24,6 @@ import type {
   ProjectGeometryOverridesV1,
   MoveDeltaPayloadV1,
   MoveLabelPayloadV1,
-  GeometryOverrideItemV1,
 } from './geometryOverrides';
 import {
   OverrideScopeV1,

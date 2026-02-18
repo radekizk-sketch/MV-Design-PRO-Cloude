@@ -497,6 +497,138 @@ export interface TopologyOpResult {
 }
 
 // ---------------------------------------------------------------------------
+// V1 Domain Operation Response (POST /enm/ops — canonical envelope)
+// ---------------------------------------------------------------------------
+
+export type TerminalStatus = 'OTWARTY' | 'ZAJETY' | 'ZAREZERWOWANY_DLA_RINGU';
+
+export interface TerminalRef {
+  element_id: string;
+  port_id: string;
+  trunk_id: string | null;
+  branch_id: string | null;
+  status: TerminalStatus;
+}
+
+export interface TrunkViewV1 {
+  corridor_ref: string;
+  corridor_type: string;
+  segments: string[];
+  no_point_ref: string | null;
+  terminals: TerminalRef[];
+}
+
+export interface BranchViewV1 {
+  branch_id: string;
+  from_element_id: string;
+  from_port_id: string;
+  segments: string[];
+  terminals: TerminalRef[];
+}
+
+export interface SecondaryConnectorViewV1 {
+  connector_id: string;
+  from_element_id: string;
+  to_element_id: string;
+  segment_ref: string;
+}
+
+export interface LogicalViewsV1 {
+  trunks: TrunkViewV1[];
+  branches: BranchViewV1[];
+  secondary_connectors: SecondaryConnectorViewV1[];
+  terminals: TerminalRef[];
+}
+
+export interface MaterializedLineParams {
+  catalog_item_id: string;
+  catalog_item_version: string | null;
+  r_ohm_per_km: number | null;
+  x_ohm_per_km: number | null;
+  i_max_a: number | null;
+}
+
+export interface MaterializedTransformerParams {
+  catalog_item_id: string;
+  catalog_item_version: string | null;
+  u_k_percent: number | null;
+  p0_kw: number | null;
+  pk_kw: number | null;
+  s_n_kva: number | null;
+}
+
+export interface MaterializedParams {
+  lines_sn: Record<string, MaterializedLineParams>;
+  transformers_sn_nn: Record<string, MaterializedTransformerParams>;
+}
+
+export interface LayoutInfo {
+  layout_hash: string;
+  layout_version: string;
+}
+
+export interface ReadinessInfo {
+  ready: boolean;
+  blockers: Array<{
+    code: string;
+    message_pl: string;
+    element_ref: string | null;
+    severity: string;
+  }>;
+  warnings: Array<{
+    code: string;
+    message_pl: string;
+    element_ref: string | null;
+    severity: string;
+  }>;
+}
+
+export interface FixAction {
+  code: string;
+  action_type: string;
+  element_ref: string | null;
+  panel: string | null;
+  step: string | null;
+  focus: string | null;
+  message_pl: string;
+}
+
+export interface SelectionHint {
+  element_id: string;
+  element_type: string;
+  zoom_to: boolean;
+}
+
+export interface ChangesInfo {
+  created_element_ids: string[];
+  updated_element_ids: string[];
+  deleted_element_ids: string[];
+}
+
+export interface DomainEvent {
+  event_seq: number;
+  event_type: string;
+  element_id: string;
+}
+
+/** V1 canonical response envelope from POST /enm/ops. */
+export interface DomainOpResponseV1 {
+  snapshot: EnergyNetworkModel | null;
+  logical_views: LogicalViewsV1;
+  readiness: ReadinessInfo;
+  fix_actions: FixAction[];
+  changes: ChangesInfo;
+  selection_hint: SelectionHint | null;
+  audit_trail: unknown[];
+  domain_events: DomainEvent[];
+  materialized_params: MaterializedParams;
+  layout: LayoutInfo;
+  /** Present only on error responses. */
+  error?: string;
+  error_code?: string;
+}
+
+// ---------------------------------------------------------------------------
 // Type guards
 // ---------------------------------------------------------------------------
 

@@ -17,7 +17,7 @@
  * - DETERMINIZM: ten sam input → identyczny output (bit-for-bit).
  */
 
-import type { VisualGraphV1, VisualNodeV1, VisualEdgeV1 } from './visualGraph';
+import type { VisualGraphV1, VisualNodeV1 } from './visualGraph';
 import { NodeTypeV1, EdgeTypeV1 } from './visualGraph';
 import {
   type LayoutResultV1,
@@ -163,9 +163,11 @@ function isSourceType(nodeType: string): boolean {
   );
 }
 
+/* istanbul ignore next — reserved for station-layout */
 function isTransformerType(nodeType: string): boolean {
   return nodeType === NodeTypeV1.TRANSFORMER_WN_SN || nodeType === NodeTypeV1.TRANSFORMER_SN_NN;
 }
+void isTransformerType;
 
 function isSwitchType(nodeType: string): boolean {
   return (
@@ -232,7 +234,6 @@ function phase1_place_trunk(
 
   // Warstwy kanoniczne
   const L0_SOURCE = 0;
-  const L1_WN_BUS = 1;
   const L2_TRANSFORMER = 2;
   const L3_SN_BUS = 3;
 
@@ -294,7 +295,6 @@ function phase1_place_trunk(
   }
 
   // Umieszczaj przelaczniki i inne elementy trunk
-  const trunkEdges = graph.edges.filter(e => e.edgeType === EdgeTypeV1.TRUNK);
   const switchNodes = graph.nodes
     .filter(n => isSwitchType(n.nodeType))
     .sort((a, b) => a.id.localeCompare(b.id));
@@ -338,7 +338,7 @@ function phase2_detect_and_reserve_blocks(
     .filter(n => isStationType(n.nodeType))
     .sort((a, b) => a.id.localeCompare(b.id));
 
-  const { gridStep, layerSpacing, blockMargin, defaultSymbolWidth, defaultSymbolHeight } = config;
+  const { gridStep, layerSpacing, blockMargin, defaultSymbolWidth } = config;
   const STATION_LAYER = 5;
 
   let blockSlotX = config.spineX;
@@ -480,7 +480,7 @@ function phase3_embed_switchgear_blocks(
     const bx = block.bounds.x;
     const by = block.bounds.y;
     const bw = block.bounds.width;
-    const bh = block.bounds.height;
+    void block.bounds.height;
 
     // Umieszczaj wewnetrzne elementy
     let internalY = by + config.blockMargin;
@@ -531,11 +531,6 @@ function phase4_place_branches_in_bands(
 ): void {
   const { gridStep, bandSpacing, defaultSymbolWidth, defaultSymbolHeight, layerSpacing } = config;
   const BRANCH_BASE_LAYER = 4;
-
-  // Zbierz branch edges
-  const branchEdges = graph.edges
-    .filter(e => e.edgeType === EdgeTypeV1.BRANCH)
-    .sort((a, b) => a.id.localeCompare(b.id));
 
   // Zbierz wezly junction i load ktore nie sa jeszcze umieszczone
   const unplacedNodes = graph.nodes
@@ -591,9 +586,6 @@ function phase5_route_edges_manhattan_with_channels(
   let secondaryLaneCounter = 0;
 
   for (const edge of sortedEdges) {
-    const fromNode = graph.nodes.find(n => n.id === edge.fromPortRef.nodeId);
-    const toNode = graph.nodes.find(n => n.id === edge.toPortRef.nodeId);
-
     const fromPlacement = state.placements.get(edge.fromPortRef.nodeId);
     const toPlacement = state.placements.get(edge.toPortRef.nodeId);
 

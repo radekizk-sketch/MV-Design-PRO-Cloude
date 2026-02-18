@@ -88,6 +88,13 @@ The detailed specification (18 chapters) is the authoritative source of truth fo
 - [ui/UI_ETAP_POWERFACTORY_PARITY.md](./ui/UI_ETAP_POWERFACTORY_PARITY.md) — UI Parity Matrix (CANONICAL)
 - [ui/SWITCHING_STATE_EXPLORER_CONTRACT.md](./ui/SWITCHING_STATE_EXPLORER_CONTRACT.md) — Switching State Explorer (CANONICAL)
 
+### Kreator i operacje SN+nN (BINDING)
+
+- [ui/KANON_KREATOR_SN_NN_NA_ZYWO.md](./ui/KANON_KREATOR_SN_NN_NA_ZYWO.md) — Kanon kreatora sieci SN+nN na zywo (BINDING)
+- [ui/MACIERZ_OKIEN_DIALOGOWYCH_I_AKCJI.md](./ui/MACIERZ_OKIEN_DIALOGOWYCH_I_AKCJI.md) — Macierz okien dialogowych i akcji (BINDING)
+- [ui/KONTRAKT_OPERACJI_ENM_OP.md](./ui/KONTRAKT_OPERACJI_ENM_OP.md) — Kontrakt operacji ENM (BINDING)
+- [ui/UI_UX_10_10_ABSOLUTE_CANONICAL.md](./ui/UI_UX_10_10_ABSOLUTE_CANONICAL.md) — UI/UX 10/10 absolutna specyfikacja (BINDING)
+
 ### UI Phase 2.x (PowerFactory++ Parity)
 
 - [ui/SLD_RENDER_LAYERS_CONTRACT.md](./ui/SLD_RENDER_LAYERS_CONTRACT.md) — SLD Render Layers: CAD vs SCADA (CANONICAL)
@@ -116,6 +123,34 @@ The detailed specification (18 chapters) is the authoritative source of truth fo
 - [proof_engine/PROOF_SCHEMAS.md](./proof_engine/PROOF_SCHEMAS.md) — Schematy JSON (BINDING)
 - [proof_engine/EQUATIONS_IEC60909_SC3F.md](./proof_engine/EQUATIONS_IEC60909_SC3F.md) — Rejestr rownan SC3F (BINDING)
 - [proof_engine/EQUATIONS_VDROP.md](./proof_engine/EQUATIONS_VDROP.md) — Rejestr rownan VDROP (BINDING)
+
+---
+
+## Domain Contracts (BINDING)
+
+- [domain/ENM_OP_CONTRACTS_CANONICAL_FULL.md](./domain/ENM_OP_CONTRACTS_CANONICAL_FULL.md) — Kanoniczne kontrakty operacji (BINDING)
+- [domain/KONTRAKTY_OPERACJI_I_SCHEMATY_JSON.md](./domain/KONTRAKTY_OPERACJI_I_SCHEMATY_JSON.md) — Kontrakty operacji i schematy JSON (BINDING)
+- [domain/READINESS_FIXACTIONS_CANONICAL_PL.md](./domain/READINESS_FIXACTIONS_CANONICAL_PL.md) — Slownik kodow gotowosci (BINDING)
+
+## Analysis Contracts (BINDING)
+
+- [analysis/URUCHAMIANIE_ANALIZ_I_GOTOWOSC.md](./analysis/URUCHAMIANIE_ANALIZ_I_GOTOWOSC.md) — Uruchamianie analiz i gotowosc (BINDING)
+- [analysis/OCHRONA_NADPRADOWA_SPEC.md](./analysis/OCHRONA_NADPRADOWA_SPEC.md) — Ochrona nadpradowa (BINDING)
+- [analysis/STUDY_CASE_SYSTEM_CANONICAL.md](./analysis/STUDY_CASE_SYSTEM_CANONICAL.md) — Study Case system kanoniczny
+
+## Study Cases & White Box (BINDING)
+
+- [study/WARIANTY_URUCHOMIENIA_POROWNANIA.md](./study/WARIANTY_URUCHOMIENIA_POROWNANIA.md) — Warianty, uruchomienia i porownania (BINDING)
+- [white_box/INSPEKTOR_SLADU_I_EKSPORT_DOWODOWY.md](./white_box/INSPEKTOR_SLADU_I_EKSPORT_DOWODOWY.md) — Inspektor sladu i eksport dowodowy (BINDING)
+
+## Export (BINDING)
+
+- [export/EXPORT_SYSTEM_CANONICAL.md](./export/EXPORT_SYSTEM_CANONICAL.md) — System eksportu kanoniczny (BINDING)
+- [export/PAKIET_PROJEKTU_DO_PODPISU.md](./export/PAKIET_PROJEKTU_DO_PODPISU.md) — Pakiet projektu do podpisu (BINDING)
+
+## Reference Networks (BINDING)
+
+- [tests/GOLDEN_NETWORKS_CANONICAL.md](./tests/GOLDEN_NETWORKS_CANONICAL.md) — Zlote sieci referencyjne (BINDING)
 
 ---
 

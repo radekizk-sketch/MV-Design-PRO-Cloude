@@ -14,32 +14,56 @@ import type { TopologyGraphSummary } from '../../../types/enm';
 // ---------------------------------------------------------------------------
 
 const MOCK_SUMMARY: TopologyGraphSummary = {
+  case_id: 'test-case-1',
+  enm_revision: 1,
+  bus_count: 4,
+  branch_count: 3,
+  transformer_count: 0,
+  source_count: 1,
+  load_count: 1,
+  generator_count: 0,
+  measurement_count: 0,
+  protection_count: 0,
   adjacency: [
-    { ref_id: 'bus_1', neighbors: ['bus_2', 'bus_3'], branch_refs: ['line_1', 'line_2'] },
-    { ref_id: 'bus_2', neighbors: ['bus_1', 'bus_4'], branch_refs: ['line_1', 'line_3'] },
-    { ref_id: 'bus_3', neighbors: ['bus_1'], branch_refs: ['line_2'] },
-    { ref_id: 'bus_4', neighbors: ['bus_2'], branch_refs: ['line_3'] },
+    { bus_ref: 'bus_1', neighbor_ref: 'bus_2', via_ref: 'line_1', via_type: 'line_overhead' },
+    { bus_ref: 'bus_1', neighbor_ref: 'bus_3', via_ref: 'line_2', via_type: 'line_overhead' },
+    { bus_ref: 'bus_2', neighbor_ref: 'bus_1', via_ref: 'line_1', via_type: 'line_overhead' },
+    { bus_ref: 'bus_2', neighbor_ref: 'bus_4', via_ref: 'line_3', via_type: 'line_overhead' },
+    { bus_ref: 'bus_3', neighbor_ref: 'bus_1', via_ref: 'line_2', via_type: 'line_overhead' },
+    { bus_ref: 'bus_4', neighbor_ref: 'bus_2', via_ref: 'line_3', via_type: 'line_overhead' },
   ],
   spine: [
-    { ref_id: 'bus_1', depth: 0, is_source: true, branches_to_next: ['line_1'] },
-    { ref_id: 'bus_2', depth: 1, is_source: false, branches_to_next: ['line_3'] },
-    { ref_id: 'bus_4', depth: 2, is_source: false, branches_to_next: [] },
+    { bus_ref: 'bus_1', depth: 0, is_source: true, children_refs: ['bus_2'] },
+    { bus_ref: 'bus_2', depth: 1, is_source: false, children_refs: ['bus_4'] },
+    { bus_ref: 'bus_4', depth: 2, is_source: false, children_refs: [] },
   ],
-  laterals: ['bus_3'],
+  lateral_roots: ['bus_3'],
   is_radial: true,
+  has_cycles: false,
 };
 
 const MOCK_SUMMARY_2: TopologyGraphSummary = {
+  case_id: 'test-case-2',
+  enm_revision: 1,
+  bus_count: 2,
+  branch_count: 1,
+  transformer_count: 0,
+  source_count: 1,
+  load_count: 0,
+  generator_count: 0,
+  measurement_count: 0,
+  protection_count: 0,
   adjacency: [
-    { ref_id: 'bus_a', neighbors: ['bus_b'], branch_refs: ['br_1'] },
-    { ref_id: 'bus_b', neighbors: ['bus_a'], branch_refs: ['br_1'] },
+    { bus_ref: 'bus_a', neighbor_ref: 'bus_b', via_ref: 'br_1', via_type: 'cable' },
+    { bus_ref: 'bus_b', neighbor_ref: 'bus_a', via_ref: 'br_1', via_type: 'cable' },
   ],
   spine: [
-    { ref_id: 'bus_a', depth: 0, is_source: true, branches_to_next: ['br_1'] },
-    { ref_id: 'bus_b', depth: 1, is_source: false, branches_to_next: [] },
+    { bus_ref: 'bus_a', depth: 0, is_source: true, children_refs: ['bus_b'] },
+    { bus_ref: 'bus_b', depth: 1, is_source: false, children_refs: [] },
   ],
-  laterals: [],
+  lateral_roots: [],
   is_radial: true,
+  has_cycles: false,
 };
 
 // ---------------------------------------------------------------------------
@@ -80,7 +104,7 @@ describe('TopologyStore', () => {
       useTopologyStore.setState({ summary: MOCK_SUMMARY });
       const spine = useTopologyStore.getState().summary?.spine ?? [];
       const sorted = [...spine].sort((a, b) => a.depth - b.depth);
-      expect(sorted.map((s) => s.ref_id)).toEqual(['bus_1', 'bus_2', 'bus_4']);
+      expect(sorted.map((s) => s.bus_ref)).toEqual(['bus_1', 'bus_2', 'bus_4']);
     });
 
     it('selectIsRadial should return true for radial network', () => {
@@ -90,10 +114,12 @@ describe('TopologyStore', () => {
 
     it('selectAdjacencyFor should find correct neighbors', () => {
       useTopologyStore.setState({ summary: MOCK_SUMMARY });
-      const adj = MOCK_SUMMARY.adjacency.find((a) => a.ref_id === 'bus_2');
-      expect(adj).toBeDefined();
-      expect(adj!.neighbors).toEqual(['bus_1', 'bus_4']);
-      expect(adj!.branch_refs).toEqual(['line_1', 'line_3']);
+      const adjEntries = MOCK_SUMMARY.adjacency.filter((a) => a.bus_ref === 'bus_2');
+      expect(adjEntries.length).toBeGreaterThan(0);
+      const neighborRefs = adjEntries.map((a) => a.neighbor_ref);
+      expect(neighborRefs).toEqual(expect.arrayContaining(['bus_1', 'bus_4']));
+      const viaRefs = adjEntries.map((a) => a.via_ref);
+      expect(viaRefs).toEqual(expect.arrayContaining(['line_1', 'line_3']));
     });
   });
 
@@ -109,8 +135,8 @@ describe('TopologyStore', () => {
       expect(depths).toEqual([0, 1, 2]);
     });
 
-    it('laterals should be deterministically sortable', () => {
-      const laterals = [...MOCK_SUMMARY.laterals].sort();
+    it('lateral_roots should be deterministically sortable', () => {
+      const laterals = [...MOCK_SUMMARY.lateral_roots].sort();
       expect(laterals).toEqual(['bus_3']);
     });
   });

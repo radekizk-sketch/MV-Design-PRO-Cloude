@@ -24,10 +24,16 @@ from .models import (
     Bay,
     Junction,
     Corridor,
+    Measurement,
+    MeasurementRating,
+    ProtectionAssignment,
+    ProtectionSetting,
+    ParameterOverride,
 )
 from .hash import compute_enm_hash
 from .mapping import map_enm_to_network_graph
 from .validator import ENMValidator, ValidationResult, ValidationIssue, AnalysisAvailability
+from .fix_actions import FixAction
 
 __all__ = [
     "EnergyNetworkModel",
@@ -53,10 +59,16 @@ __all__ = [
     "Bay",
     "Junction",
     "Corridor",
+    "Measurement",
+    "MeasurementRating",
+    "ProtectionAssignment",
+    "ProtectionSetting",
+    "ParameterOverride",
     "compute_enm_hash",
     "map_enm_to_network_graph",
     "ENMValidator",
     "ValidationResult",
     "ValidationIssue",
     "AnalysisAvailability",
+    "FixAction",
 ]

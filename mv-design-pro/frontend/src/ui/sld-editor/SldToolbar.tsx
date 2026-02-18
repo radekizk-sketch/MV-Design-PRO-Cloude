@@ -99,6 +99,7 @@ export const SldToolbar: React.FC = () => {
   const saveOverrides = useSldProjectModeStore((s) => s.saveOverrides);
   const loadOverrides = useSldProjectModeStore((s) => s.loadOverrides);
   const resetProjectOverrides = useSldProjectModeStore((s) => s.resetOverrides);
+  const projectError = useSldProjectModeStore((s) => s.error);
 
   const canEditCadGeometry = featureFlags.sldCadEditingEnabled && sldStore.geometryMode !== 'AUTO' && !isMutationBlocked;
   const canEditBends = canEditCadGeometry && selectedConnectionId !== null;
@@ -463,9 +464,9 @@ export const SldToolbar: React.FC = () => {
             />
           </div>
           {/* RUN #3I N4: Blocker message from domain validation */}
-          {useSldProjectModeStore((s) => s.error) && (
-            <div className="text-xs text-red-600 font-medium ml-2 max-w-sm truncate" title={useSldProjectModeStore.getState().error ?? undefined}>
-              {useSldProjectModeStore((s) => s.error)}
+          {projectError && (
+            <div className="text-xs text-red-600 font-medium ml-2 max-w-sm truncate" title={projectError}>
+              {projectError}
             </div>
           )}
         </>

@@ -137,12 +137,67 @@ export interface InspectorResultData {
  * BINDING: Bez anglicyzmów.
  */
 export const ELEMENT_TYPE_LABELS_PL: Record<ElementType, string> = {
+  // Istniejące typy SN (A–L)
   Bus: 'Szyna',
   LineBranch: 'Linia',
   TransformerBranch: 'Transformator',
   Switch: 'Łącznik',
   Source: 'Źródło',
   Load: 'Odbiornik',
+  Generator: 'Generator',
+  Measurement: 'Pomiar',
+  ProtectionAssignment: 'Zabezpieczenie',
+  // Nowe typy infrastruktury SN
+  Terminal: 'Terminal',
+  PortBranch: 'Port',
+  Station: 'Stacja',
+  BaySN: 'Pole SN',
+  Relay: 'Przekaźnik',
+  SecondaryLink: 'Połączenie wtórne',
+  NOP: 'Punkt normalnie otwarty',
+  // Typy nN (M–O, R–AP)
+  BusNN: 'Szyna nN',
+  MainBreakerNN: 'Wyłącznik główny nN',
+  FeederNN: 'Odpływ nN',
+  SegmentNN: 'Segment nN',
+  LoadNN: 'Odbiór nN',
+  SwitchboardNN: 'Rozdzielnica nN',
+  SourceFieldNN: 'Pole źródłowe nN',
+  // Źródła nN (V–Z)
+  PVInverter: 'Falownik PV',
+  BESSInverter: 'Falownik BESS',
+  EnergyStorage: 'Magazyn energii',
+  Genset: 'Agregat prądotwórczy',
+  UPS: 'UPS',
+  // Pomiary i zabezpieczenia nN (AA–AE)
+  EnergyMeter: 'Licznik energii',
+  PowerQualityMeter: 'Miernik jakości',
+  SurgeArresterNN: 'Ogranicznik przepięć',
+  Earthing: 'Uziemienie',
+  MeasurementNN: 'Pomiar nN',
+  // Infrastruktura szyn nN (AF–AR)
+  AuxBus: 'Szyna pomocnicza',
+  ConnectionPoint: 'Punkt przyłączenia',
+  SwitchNN: 'Łącznik nN',
+  ProtectionNN: 'Zabezpieczenie nN',
+  SourceController: 'Sterownik źródła',
+  InternalJunction: 'Węzeł wewnętrzny',
+  CableJointNN: 'Złącze kablowe',
+  FaultCurrentLimiter: 'Ogr. prądu zwarciowego',
+  FilterCompensator: 'Filtr/kompensator',
+  TelecontrolDevice: 'Urządzenie telesterowania',
+  BusSectionNN: 'Sekcja szyn nN',
+  BusCouplerNN: 'Sprzęgło szyn nN',
+  ReserveLink: 'Łącznik rezerwowy',
+  // Parametry logiczne źródeł (AS–AZ)
+  SourceDisconnect: 'Odłącznik źródła',
+  PowerLimit: 'Ograniczenie mocy',
+  WorkProfile: 'Profil pracy',
+  OperatingMode: 'Tryb pracy',
+  ConnectionConstraints: 'Warunki przyłączenia',
+  MeteringBlock: 'Układ pomiarowy',
+  SyncPoint: 'Punkt synchronizacji',
+  DescriptiveElement: 'Element opisowy',
 };
 
 /**

@@ -14,9 +14,9 @@ const steps: StepView[] = [
     step_id: 'SC3F_STEP_001',
     title: 'Napięcie z współczynnikiem c',
     equation_id: 'EQ_SC3F_001',
-    formula_latex: '$$U = c \cdot U_n$$',
+    formula_latex: '$$U = c \\cdot U_n$$',
     input_values: [],
-    substitution_latex: '$$U = 1.1 \cdot 15$$',
+    substitution_latex: '$$U = 1.1 \\cdot 15$$',
     result: {
       symbol: 'U',
       value: '16.5',
@@ -35,9 +35,9 @@ const steps: StepView[] = [
     step_id: 'VDROP_STEP_001',
     title: 'Rezystancja odcinka',
     equation_id: 'EQ_VDROP_001',
-    formula_latex: '$$R = r \cdot l$$',
+    formula_latex: '$$R = r \\cdot l$$',
     input_values: [],
-    substitution_latex: '$$R = 0.12 \cdot 2$$',
+    substitution_latex: '$$R = 0.12 \\cdot 2$$',
     result: {
       symbol: 'R',
       value: '0.24',

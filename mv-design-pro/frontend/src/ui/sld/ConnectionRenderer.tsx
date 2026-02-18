@@ -28,6 +28,7 @@ import {
   ETAP_LINE_LABEL,
   calculateLineLabelPosition,
 } from './sldEtapStyle';
+import { RING_DASH_ARRAY, RING_STROKE_WIDTH } from './IndustrialAesthetics';
 
 // =============================================================================
 // STALE STYLIZACJI — using ETAP tokens
@@ -94,38 +95,23 @@ export const ConnectionRenderer: React.FC<ConnectionRendererProps> = ({
   onMouseEnter,
   onMouseLeave,
 }) => {
-  const { id, path, connectionType } = connection;
+  const { id, path, connectionType, connectionStyle } = connection;
 
-  // Jesli sciezka jest pusta lub ma mniej niz 2 punkty, nie renderuj
-  if (!path || path.length < 2) {
-    return null;
-  }
+  // Ring detection — kontrakt §1.7: ring = 2px przerywana
+  const isRing = connectionStyle === 'ring';
 
-  // Styl linii
-  const strokeColor = selected
-    ? CONNECTION_COLORS.selected
-    : energized
-    ? CONNECTION_COLORS.default
-    : CONNECTION_COLORS.deenergized;
-
-  const strokeWidth = selected
-    ? CONNECTION_STROKE_WIDTH_SELECTED
-    : CONNECTION_STROKE_WIDTH;
-
-  const opacity = energized ? 1 : 0.6;
-
+  // Hooks must be called before any early return (Rules of Hooks)
   // Punkty dla polyline
-  const points = useMemo(() => pathToPoints(path), [path]);
+  const points = useMemo(
+    () => (path && path.length >= 2) ? pathToPoints(path) : '',
+    [path]
+  );
 
   // Oblicz pozycje etykiety (deterministycznie)
   const labelPosition = useMemo(() => {
-    if (!showLabel || !label) return null;
+    if (!path || path.length < 2 || !showLabel || !label) return null;
     return calculateLineLabelPosition(path, id);
   }, [path, id, showLabel, label]);
-
-  // Szacowana szerokosc etykiety (7px na znak — przemyslowy standard)
-  const estimatedLabelWidth = label ? Math.max(30, label.length * 7) : 0;
-  const labelHeight = ETAP_TYPOGRAPHY.fontSize.medium;
 
   // Handlery
   const handleClick = useCallback(
@@ -143,6 +129,34 @@ export const ConnectionRenderer: React.FC<ConnectionRendererProps> = ({
   const handleMouseLeave = useCallback(() => {
     onMouseLeave?.(id);
   }, [id, onMouseLeave]);
+
+  // Jesli sciezka jest pusta lub ma mniej niz 2 punkty, nie renderuj
+  if (!path || path.length < 2) {
+    return null;
+  }
+
+  // Styl linii
+  const strokeColor = selected
+    ? CONNECTION_COLORS.selected
+    : energized
+    ? CONNECTION_COLORS.default
+    : CONNECTION_COLORS.deenergized;
+
+  // Ring: stała grubość RING_STROKE_WIDTH, linia przerywana (kontrakt §1.7)
+  const strokeWidth = isRing
+    ? RING_STROKE_WIDTH
+    : selected
+    ? CONNECTION_STROKE_WIDTH_SELECTED
+    : CONNECTION_STROKE_WIDTH;
+
+  // Stroke-dasharray: pusta = ciągła, ustawiona = przerywana (ring)
+  const strokeDashArray = isRing ? RING_DASH_ARRAY : undefined;
+
+  const opacity = energized ? 1 : 0.6;
+
+  // Szacowana szerokosc etykiety (7px na znak — przemyslowy standard)
+  const estimatedLabelWidth = label ? Math.max(30, label.length * 7) : 0;
+  const labelHeight = ETAP_TYPOGRAPHY.fontSize.medium;
 
   return (
     <g
@@ -167,6 +181,7 @@ export const ConnectionRenderer: React.FC<ConnectionRendererProps> = ({
       />
 
       {/* Widoczna linia polaczenia */}
+      {/* Ring: linia przerywana (kontrakt §1.7 — Industrial Aesthetics) */}
       <polyline
         points={points}
         fill="none"
@@ -174,8 +189,10 @@ export const ConnectionRenderer: React.FC<ConnectionRendererProps> = ({
         strokeWidth={strokeWidth}
         strokeLinecap="round"
         strokeLinejoin="round"
+        strokeDasharray={strokeDashArray}
         opacity={opacity}
         style={{ pointerEvents: 'none' }}
+        data-connection-ring={isRing}
       />
 
       {/* Etykieta na linii z halo/white-box */}

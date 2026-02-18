@@ -11,7 +11,7 @@
  * BINDING: PL labels, no codenames.
  */
 
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { CatalogPicker, type CatalogEntry } from './CatalogPicker';
 import { CatalogPreview, type CatalogPreviewSection } from './CatalogPreview';
 import { ExpertOverrides, type OverrideEntry } from './ExpertOverrides';

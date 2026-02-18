@@ -141,8 +141,7 @@ export const SldSnapshotExportDialog: React.FC<SldSnapshotExportDialogProps> = (
         }));
       }
     }
-    // Only run when dialog opens
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // Only run when dialog opens — intentional mount-only dep array
   }, [isOpen]);
 
   // Update layer option — switches to CUSTOM if manual change

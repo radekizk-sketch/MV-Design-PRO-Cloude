@@ -1548,7 +1548,6 @@ function applyInternalConnections(
 
     // Jeśli któryś koniec nie został zmapowany, pomiń (diagnostyka)
     if (!newFromElementId || !newToElementId) {
-      // eslint-disable-next-line no-console
       console.debug(
         `[PR-SLD-03b] Pominięto połączenie wewnętrzne: brak mapowania dla ` +
         `from=${conn.fromOriginalElementId} lub to=${conn.toOriginalElementId}`
@@ -1559,7 +1558,6 @@ function applyInternalConnections(
     // Znajdź symbol docelowy (element łączący: branch, switch, source, load)
     const targetSymbol = newElementToSymbol.get(newToElementId);
     if (!targetSymbol) {
-      // eslint-disable-next-line no-console
       console.debug(
         `[PR-SLD-03b] Pominięto połączenie wewnętrzne: nie znaleziono symbolu ` +
         `dla elementId=${newToElementId}`

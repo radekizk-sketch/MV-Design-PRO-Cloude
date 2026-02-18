@@ -62,8 +62,8 @@ describe('ProjectTree Run History', () => {
   });
 
   it('uses Polish labels for solver types', () => {
-    const pfLabel = 'PF' === 'PF' ? 'Rozpływ' : 'PF';
-    const scLabel = 'short_circuit_sn' === 'short_circuit_sn' ? 'Zwarcie' : 'short_circuit_sn';
+    const pfLabel = 'Rozpływ'; // 'PF' solver type maps to this Polish label
+    const scLabel = 'Zwarcie'; // 'short_circuit_sn' maps to this Polish label
 
     expect(pfLabel).toBe('Rozpływ');
     expect(scLabel).toBe('Zwarcie');

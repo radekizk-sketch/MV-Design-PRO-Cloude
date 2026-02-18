@@ -211,7 +211,6 @@ export function MathRenderer({
       className={containerClassName}
       data-testid="math-rendered"
       data-latex={latex}
-      // eslint-disable-next-line react/no-danger
       dangerouslySetInnerHTML={{ __html: result.html }}
     />
   );

@@ -29,6 +29,8 @@
  * Canonical stroke widths for ETAP visual hierarchy.
  * Busbar must visually dominate; feeders clearly subordinate.
  */
+// Industrial Aesthetics Contract §1.7 — grubości linii
+// Ref: IndustrialAesthetics.ts (BUSBAR_STROKE_WIDTH=3, BRANCH_STROKE_WIDTH=2, RING_STROKE_WIDTH=2)
 export const ETAP_STROKE = {
   /** Busbar — dominant, heaviest line (szyny zbiorcze) */
   busbar: 5,
@@ -683,8 +685,8 @@ export const ETAP_GEOMETRY = {
     height: 8,
     /** Padding on each side for bay connections (px) */
     sidePadding: 40,
-    /** Per-bay width increment (px) — busbar expands by this for each bay */
-    bayWidthIncrement: 100,
+    /** Per-bay width increment (px) — per kontrakt §1.3: GRID_SPACING_MAIN = 280 */
+    bayWidthIncrement: 280,
   },
 
   /** Sectioned busbar configuration (ETAP-grade) */
@@ -705,14 +707,17 @@ export const ETAP_GEOMETRY = {
 
   /** Bay (pola SN) spacing and layout */
   bay: {
-    /** Horizontal spacing between bay center lines (px) */
-    spacing: 100,
+    /**
+     * Horizontal spacing between station center lines (px).
+     * Per Industrial Aesthetics Contract §1.3: GRID_SPACING_MAIN = 14*GRID_BASE = 280
+     */
+    spacing: 280,
     /** Minimum horizontal spacing (px) */
-    minSpacing: 80,
-    /** Vertical offset from SN busbar to first bay element (px) */
+    minSpacing: 280,
+    /** Vertical offset from SN busbar to first bay element (px) — OFFSET_POLE = 3*GRID_BASE = 60 */
     verticalOffset: 60,
     /** Vertical spacing between bay elements (switch → line/load) (px) */
-    elementSpacing: 80,
+    elementSpacing: 60,
   },
 
   // ---------------------------------------------------------------------------
@@ -1249,7 +1254,7 @@ export function resolveLabelCollisions(
   const adjusted: LabelBoundingBox[] = [];
 
   for (const label of sortedLabels) {
-    let currentPos = { x: label.x, y: label.y };
+    const currentPos = { x: label.x, y: label.y };
     let hasCollision = true;
     let nudgeCount = 0;
 

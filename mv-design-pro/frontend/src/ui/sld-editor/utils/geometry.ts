@@ -96,7 +96,7 @@ export function alignSymbols(
 
   sorted.forEach((symbol) => {
     const box = getSymbolBoundingBox(symbol);
-    let newPosition = { ...symbol.position };
+    const newPosition = { ...symbol.position };
 
     switch (direction) {
       case 'left':

@@ -156,7 +156,7 @@ export function mapResponseToOverrides(
       elementId: item.element_id,
       scope: item.scope as OverrideScopeV1,
       operation: item.operation as OverrideOperationV1,
-      payload: item.payload as GeometryOverrideItemV1['payload'],
+      payload: item.payload as unknown as GeometryOverrideItemV1['payload'],
     })),
   };
 }

@@ -705,7 +705,7 @@ describe('Determinism Suite — stress test', () => {
     } as BusSymbol);
 
     // 100 feederow, kazdy z 5 elementami = 500+ wezlow
-    let prevId = 'bus_main';
+    const prevId = 'bus_main';
     for (let f = 1; f <= 100; f++) {
       const feedBusId = `bus_f${f}`;
       symbols.push({

@@ -19,10 +19,7 @@ import {
   type VisualNodeV1,
   type VisualEdgeV1,
   type VisualPortV1,
-  type VisualNodeAttributesV1,
-  type VisualEdgeAttributesV1,
   type VisualGraphMetaV1,
-  type PortRefV1,
   NodeTypeV1,
   EdgeTypeV1,
   PortRoleV1,
@@ -32,17 +29,11 @@ import {
 
 import type {
   TopologyInputV1,
-  ConnectionNodeV1,
   TopologyBranchV1,
-  TopologyDeviceV1,
   TopologyStationV1,
-  TopologyGeneratorV1,
-  TopologySourceV1,
-  TopologyLoadV1,
-  TopologyProtectionV1,
   TopologyFixAction,
 } from './topologyInputReader';
-import { BranchKind, DeviceKind, GeneratorKind, StationKind } from './topologyInputReader';
+import { BranchKind, GeneratorKind, StationKind } from './topologyInputReader';
 
 import {
   buildStationBlocks,
@@ -151,19 +142,18 @@ function classifyGeneratorType(kind: GeneratorKind): NodeTypeV1 {
   }
 }
 
-/**
- * Klasyfikuje NodeType urzadzenia (switch/CB/DS/fuse).
- */
-function classifyDeviceType(kind: DeviceKind): NodeTypeV1 | null {
-  switch (kind) {
-    case DeviceKind.CB: return NodeTypeV1.SWITCH_BREAKER;
-    case DeviceKind.DS: return NodeTypeV1.SWITCH_DISCONNECTOR;
-    case DeviceKind.LOAD_SWITCH: return NodeTypeV1.SWITCH_LOAD_SWITCH;
-    case DeviceKind.FUSE: return NodeTypeV1.SWITCH_FUSE;
-    // CT, VT, ES, RELAY nie generuja wlasnych wezlow VisualGraph
-    default: return null;
-  }
-}
+// NOTE: classifyDeviceType is not currently used by the adapter but is kept
+// for future device-node expansion (when individual switch nodes are needed).
+// function classifyDeviceType(kind: DeviceKind): NodeTypeV1 | null {
+//   switch (kind) {
+//     case DeviceKind.CB: return NodeTypeV1.SWITCH_BREAKER;
+//     case DeviceKind.DS: return NodeTypeV1.SWITCH_DISCONNECTOR;
+//     case DeviceKind.LOAD_SWITCH: return NodeTypeV1.SWITCH_LOAD_SWITCH;
+//     case DeviceKind.FUSE: return NodeTypeV1.SWITCH_FUSE;
+//     // CT, VT, ES, RELAY nie generuja wlasnych wezlow VisualGraph
+//     default: return null;
+//   }
+// }
 
 // =============================================================================
 // PORT GENERATION (reused from V1 contract)
@@ -837,7 +827,7 @@ function resolvePortId(nodeType: NodeTypeV1, role: PortRoleV1): string {
  * Wybiera portId na wezle FROM (zrodlowym) dla krawedzi branch.
  * Semantyka: rola portu zalezy od typu krawedzi, nie od pozycji geometrycznej.
  */
-function selectSourcePort(branch: TopologyBranchV1, edgeType: EdgeTypeV1, fromNodeType: NodeTypeV1): string {
+function selectSourcePort(_branch: TopologyBranchV1, edgeType: EdgeTypeV1, fromNodeType: NodeTypeV1): string {
   if (edgeType === EdgeTypeV1.TRANSFORMER_LINK) {
     return resolvePortId(fromNodeType, PortRoleV1.IN);
   }
@@ -847,7 +837,7 @@ function selectSourcePort(branch: TopologyBranchV1, edgeType: EdgeTypeV1, fromNo
 /**
  * Wybiera portId na wezle TO (docelowym) dla krawedzi branch.
  */
-function selectTargetPort(branch: TopologyBranchV1, edgeType: EdgeTypeV1, toNodeType: NodeTypeV1): string {
+function selectTargetPort(_branch: TopologyBranchV1, edgeType: EdgeTypeV1, toNodeType: NodeTypeV1): string {
   if (edgeType === EdgeTypeV1.TRANSFORMER_LINK) {
     return resolvePortId(toNodeType, PortRoleV1.IN);
   }

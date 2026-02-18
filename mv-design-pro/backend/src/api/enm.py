@@ -633,3 +633,74 @@ async def wizard_can_proceed(
         to_step=result.to_step,
         blocking_issues=result.blocking_issues,
     ).model_dump(mode="json")
+
+
+# ---------------------------------------------------------------------------
+# Domain Operations (canonical V1 — semantic network building ops)
+# ---------------------------------------------------------------------------
+
+
+class DomainOpPayloadModel(BaseModel):
+    """Payload operacji domenowej."""
+    name: str = Field(..., description="Kanoniczna nazwa operacji")
+    idempotency_key: str = Field("", description="Klucz idempotencji")
+    payload: dict[str, Any] = Field(default_factory=dict)
+
+
+class DomainOpEnvelopeModel(BaseModel):
+    """Wspólny envelope wywołania operacji domenowej."""
+    project_id: str = ""
+    snapshot_base_hash: str = ""
+    operation: DomainOpPayloadModel
+
+
+@router.post("/{case_id}/enm/domain-ops")
+async def domain_ops(case_id: str, req: DomainOpEnvelopeModel) -> dict[str, Any]:
+    """Kanoniczny endpoint operacji domenowych V1.
+
+    Wspólny kontrakt dla wszystkich operacji budowy sieci SN:
+    add_grid_source_sn, continue_trunk_segment_sn,
+    insert_station_on_segment_sn, start_branch_segment_sn,
+    insert_section_switch_sn, connect_secondary_ring_sn,
+    set_normal_open_point, add_transformer_sn_nn,
+    assign_catalog_to_element, update_element_parameters.
+
+    Aliasy (stare nazwy) są tłumaczone automatycznie na nazwy kanoniczne.
+    Odpowiedź zawiera: snapshot, readiness, fix_actions, changes,
+    selection_hint, audit_trail, domain_events.
+    """
+    from enm.domain_operations import execute_domain_operation
+
+    enm = _get_enm(case_id)
+    enm_dict = enm.model_dump(mode="json")
+
+    # Walidacja snapshot_base_hash (optimistic concurrency)
+    current_hash = enm.header.hash_sha256
+    if req.snapshot_base_hash and req.snapshot_base_hash != current_hash:
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                f"Konflikt wersji: oczekiwany hash '{req.snapshot_base_hash}', "
+                f"aktualny '{current_hash}'. Odśwież snapshot i spróbuj ponownie."
+            ),
+        )
+
+    result = execute_domain_operation(
+        enm_dict=enm_dict,
+        op_name=req.operation.name,
+        payload=req.operation.payload,
+    )
+
+    # Persist if operation succeeded (snapshot present and valid)
+    if result.get("snapshot") and not result.get("error"):
+        try:
+            new_enm = EnergyNetworkModel.model_validate(result["snapshot"])
+            saved = _set_enm(case_id, new_enm)
+            result["snapshot"] = saved.model_dump(mode="json")
+        except Exception as e:
+            raise HTTPException(
+                status_code=500,
+                detail=f"Błąd zapisu snapshot: {e}",
+            )
+
+    return result

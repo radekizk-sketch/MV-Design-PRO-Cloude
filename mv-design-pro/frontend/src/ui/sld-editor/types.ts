@@ -121,6 +121,30 @@ export interface LoadSymbol extends SldSymbol {
 }
 
 /**
+ * Generator symbol (PV, BESS, Wind, Genset).
+ */
+export interface GeneratorSymbol extends SldSymbol {
+  elementType: 'Generator';
+  connectedToNodeId: string;
+}
+
+/**
+ * Measurement symbol (CT / VT).
+ */
+export interface MeasurementSymbol extends SldSymbol {
+  elementType: 'Measurement';
+  connectedToNodeId: string;
+}
+
+/**
+ * Protection / Relay symbol.
+ */
+export interface ProtectionSymbol extends SldSymbol {
+  elementType: 'ProtectionAssignment' | 'Relay';
+  connectedToNodeId: string;
+}
+
+/**
  * Union of all symbol types.
  */
 export type AnySldSymbol =
@@ -128,7 +152,10 @@ export type AnySldSymbol =
   | BranchSymbol
   | SwitchSymbol
   | SourceSymbol
-  | LoadSymbol;
+  | LoadSymbol
+  | GeneratorSymbol
+  | MeasurementSymbol
+  | ProtectionSymbol;
 
 /**
  * Selection mode.
@@ -376,4 +403,13 @@ export interface Connection {
 
   /** Connection type (for styling) */
   connectionType?: 'branch' | 'switch' | 'source' | 'load';
+
+  /**
+   * Styl wizualny połączenia — widokowy (nie domenowy).
+   * 'ring' = linia przerywana (połączenie ringowe w układzie pętlowym)
+   * 'default' = linia ciągła
+   *
+   * Industrial Aesthetics Contract §1.7: ring = 2px przerywana
+   */
+  connectionStyle?: 'ring' | 'default';
 }

@@ -92,6 +92,7 @@ class ENMElement(BaseModel):
 class ENMDefaults(BaseModel):
     frequency_hz: float = 50.0
     unit_system: Literal["SI"] = "SI"
+    sn_nominal_kv: float | None = None
 
 
 class ENMHeader(BaseModel):

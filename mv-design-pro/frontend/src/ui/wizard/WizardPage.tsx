@@ -60,7 +60,7 @@ function createDefaultENM(): EnergyNetworkModel {
       created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
       revision: 0, hash_sha256: '', defaults: { frequency_hz: 50, unit_system: 'SI' },
     },
-    buses: [], branches: [], transformers: [], sources: [], loads: [], generators: [], substations: [], bays: [], junctions: [], corridors: [],
+    buses: [], branches: [], transformers: [], sources: [], loads: [], generators: [], substations: [], bays: [], junctions: [], corridors: [], measurements: [], protection_assignments: [],
   };
 }
 
@@ -163,14 +163,14 @@ function StepK2({ enm, onChange }: StepProps) {
     const srcRef = src?.ref_id ?? 'source_grid';
     const buses = [...enm.buses];
     const sources = [...enm.sources];
-    let bi = buses.findIndex((b) => b.ref_id === busRef);
+    const bi = buses.findIndex((b) => b.ref_id === busRef);
     if (bi < 0) {
       buses.push({ id: crypto.randomUUID(), ref_id: busRef, name: patch.busName ?? 'Szyna główna SN', tags: ['source'], meta: {}, voltage_kv: patch.voltage ?? 15, phase_system: '3ph' });
     } else {
       if (patch.busName !== undefined) buses[bi] = { ...buses[bi], name: patch.busName };
       if (patch.voltage !== undefined) buses[bi] = { ...buses[bi], voltage_kv: patch.voltage };
     }
-    let si = sources.findIndex((s) => s.ref_id === srcRef);
+    const si = sources.findIndex((s) => s.ref_id === srcRef);
     if (si < 0) {
       sources.push({ id: crypto.randomUUID(), ref_id: srcRef, name: 'Sieć zasilająca', tags: [], meta: {}, bus_ref: busRef, model: patch.model ?? 'short_circuit_power', sk3_mva: patch.sk3 ?? 250, rx_ratio: patch.rx ?? 0.1 });
     } else {
@@ -338,7 +338,7 @@ function StepK8({ validation, onGoToStep }: { validation: ValidationResult | nul
             {validation.issues.map((i, idx) => (
               <tr key={idx} style={{ borderBottom: '1px solid #e5e7eb' }}>
                 <td style={{ padding: '8px', fontFamily: 'monospace' }}>{i.code}</td>
-                <td style={{ padding: '8px' }}><span style={{ padding: '2px 8px', borderRadius: '4px', fontSize: '11px', fontWeight: 600, background: i.severity === 'BLOCKER' ? '#fef2f2' : i.severity === 'IMPORTANT' ? '#fef3c7' : '#f0f9ff', color: i.severity === 'BLOCKER' ? '#ef4444' : i.severity === 'IMPORTANT' ? '#d97706' : '#3b82f6' }}>{i.severity}</span></td>
+                <td style={{ padding: '8px' }}><span style={{ padding: '2px 8px', borderRadius: '4px', fontSize: '11px', fontWeight: 600, background: i.severity === 'BLOCKER' ? '#fef2f2' : i.severity === 'WARNING' ? '#fef3c7' : '#f0f9ff', color: i.severity === 'BLOCKER' ? '#ef4444' : i.severity === 'WARNING' ? '#d97706' : '#3b82f6' }}>{i.severity}</span></td>
                 <td style={{ padding: '8px' }}>{i.message_pl}</td>
                 <td style={{ padding: '8px' }}>{i.wizard_step_hint && sm[i.wizard_step_hint] !== undefined && <button onClick={() => onGoToStep(sm[i.wizard_step_hint])} style={{ padding: '2px 8px', border: '1px solid #d1d5db', borderRadius: '4px', background: '#fff', cursor: 'pointer', fontSize: '12px' }}>{i.wizard_step_hint}</button>}</td>
               </tr>

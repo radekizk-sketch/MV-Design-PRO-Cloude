@@ -20,7 +20,7 @@
 
 import React, { useMemo } from 'react';
 import type { OverlayLegendEntry, OverlayPayloadV1 } from './overlayTypes';
-import { COLOR_TOKEN_MAP, VISUAL_STATE_STYLE } from './overlayTypes';
+import { VISUAL_STATE_STYLE } from './overlayTypes';
 
 /**
  * Single legend row — renders one legend entry.

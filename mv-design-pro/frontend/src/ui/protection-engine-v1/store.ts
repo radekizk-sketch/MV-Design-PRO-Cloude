@@ -17,7 +17,6 @@ import type {
   ProtectionResultSetV1,
   ExecuteProtectionResponse,
   ValidationResponse,
-  IECCurveType,
 } from './types';
 
 // =============================================================================

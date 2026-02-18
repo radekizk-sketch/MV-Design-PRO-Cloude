@@ -18,7 +18,14 @@ from .switch import Switch, SwitchType, SwitchState
 from .station import Station, StationType
 from .graph import NetworkGraph
 from .inverter import InverterSource
+from .generator import GeneratorType, GeneratorSN, GeneratorNN, ControlMode
 from .snapshot import NetworkSnapshot, SnapshotMeta, create_network_snapshot
+from .canonical_hash import (
+    canonical_json,
+    canonical_json_from_dict,
+    snapshot_hash,
+    verify_hash,
+)
 from .action_apply import apply_action_to_snapshot
 from .action_envelope import (
     ActionEnvelope,
@@ -53,6 +60,11 @@ __all__ = [
     "NetworkGraph",
     # Sources
     "InverterSource",
+    # OZE Generators
+    "GeneratorType",
+    "GeneratorSN",
+    "GeneratorNN",
+    "ControlMode",
     # Snapshots (immutable state)
     "NetworkSnapshot",
     "SnapshotMeta",
@@ -67,6 +79,11 @@ __all__ = [
     "EntityId",
     "validate_action_envelope",
     "apply_action_to_snapshot",
+    # Canonical hashing
+    "canonical_json",
+    "canonical_json_from_dict",
+    "snapshot_hash",
+    "verify_hash",
     # Admittance matrix
     "AdmittanceMatrixBuilder",
 ]

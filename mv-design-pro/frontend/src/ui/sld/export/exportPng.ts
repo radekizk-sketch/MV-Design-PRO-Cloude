@@ -130,8 +130,8 @@ export async function exportPng(
 
     // Determine export dimensions
     const canvasRect = canvasElement.getBoundingClientRect();
-    let exportWidth = canvasRect.width;
-    let exportHeight = canvasRect.height;
+    const exportWidth = canvasRect.width;
+    const exportHeight = canvasRect.height;
 
     // For 'fit' scope, we would need to recalculate viewport
     // But this is handled by the orchestrator passing the correct viewport state

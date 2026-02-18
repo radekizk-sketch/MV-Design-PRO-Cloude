@@ -230,16 +230,16 @@ export function SldInspectorPanel({ className = '', onClose }: SldInspectorPanel
   const { selection, sections, mode, isResultsMode, closeInspector } = useSldInspectorSelection();
   const { isCompareMode } = useSldCompareSelection();
 
-  // PR-SLD-08: Jeśli tryb porównania (2 elementy), renderuj panel porównania
-  if (isCompareMode) {
-    return <SldInspectorComparePanel className={className} onClose={onClose} />;
-  }
-
-  // Obsługa zamknięcia
+  // Obsługa zamknięcia (hook must precede early return)
   const handleClose = useCallback(() => {
     closeInspector();
     onClose?.();
   }, [closeInspector, onClose]);
+
+  // PR-SLD-08: Jeśli tryb porównania (2 elementy), renderuj panel porównania
+  if (isCompareMode) {
+    return <SldInspectorComparePanel className={className} onClose={onClose} />;
+  }
 
   // Tytuł panelu
   const getTitle = (): string => {

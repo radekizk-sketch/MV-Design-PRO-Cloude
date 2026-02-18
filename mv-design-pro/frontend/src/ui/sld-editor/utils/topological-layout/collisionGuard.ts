@@ -253,16 +253,17 @@ export function resolveSymbolCollisions(
       }
 
       const moverPos = resolved.get(mover)!;
-      const anchor = mover === pair.symbolA ? posB : posA;
 
       // Y-ONLY COLLISION RESOLUTION (SLD_AUTOLAYOUT_AUDIT_I_NAPRAWA.md)
       // Shift ONLY in Y axis to preserve slot column alignment (X positions).
       // Always prefer downward shift (positive Y) for MV SLD top-down layout.
-      const dy = moverPos.y - anchor.y;
-      const shiftY = pair.overlapY * (dy >= 0 ? 1 : 1); // always downward
+      // MIN_CLEARANCE_Y ensures post-grid-snap position always clears the overlap.
+      const MIN_CLEARANCE_Y = config.gridSize;
+      const shiftY = pair.overlapY + MIN_CLEARANCE_Y; // always downward
 
       const newX = moverPos.x; // X NEVER changes during collision resolution
-      const newY = Math.round((moverPos.y + shiftY) / config.gridSize) * config.gridSize;
+      // Math.ceil guarantees forward progress even for small overlapY values
+      const newY = Math.ceil((moverPos.y + shiftY) / config.gridSize) * config.gridSize;
 
       if (newY !== moverPos.y) {
         resolved.set(mover, { x: newX, y: newY });

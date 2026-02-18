@@ -12,7 +12,7 @@
  * BINDING: PL labels, no codenames.
  */
 
-import React, { useCallback, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { useTopologyStore } from './store';
 import { TopologyTreeView } from './TopologyTreeView';
 import {
@@ -216,7 +216,7 @@ export function TopologyPanel({
           {lastOpIssues.map((issue, i) => (
             <div key={i}>
               <span className="font-medium">[{issue.severity}]</span>{' '}
-              {issue.message}
+              {issue.message_pl}
             </div>
           ))}
         </div>

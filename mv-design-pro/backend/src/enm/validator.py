@@ -228,7 +228,7 @@ class ENMValidator:
             has_ik = source.ik3_ka is not None and source.ik3_ka > 0
             if not (has_sk or has_rx or has_ik):
                 issues.append(ValidationIssue(
-                    code="E008",
+                    code="sources.no_short_circuit_params",
                     severity="BLOCKER",
                     message_pl=(
                         f"Źródło '{source.ref_id}' nie ma parametrów zwarciowych "

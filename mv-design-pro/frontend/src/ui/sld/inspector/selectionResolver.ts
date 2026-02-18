@@ -115,6 +115,8 @@ export const ENM_ELEMENT_TYPE_LABELS_PL: Record<SelectionRef['element_type'], st
   bay: 'Pole',
   junction: 'Węzeł T',
   corridor: 'Magistrala',
+  measurement: 'Pomiar',
+  protection_assignment: 'Przypisanie zabezpieczenia',
 };
 
 // =============================================================================

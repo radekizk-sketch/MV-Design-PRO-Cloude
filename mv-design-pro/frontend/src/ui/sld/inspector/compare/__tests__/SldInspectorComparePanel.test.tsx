@@ -72,7 +72,6 @@ const mockSwitchSymbol2 = {
 // MOCK STORES
 // =============================================================================
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const mockSymbolsMap = new Map<string, any>();
 mockSymbolsMap.set(mockBusSymbol1.id, mockBusSymbol1);
 mockSymbolsMap.set(mockBusSymbol2.id, mockBusSymbol2);
