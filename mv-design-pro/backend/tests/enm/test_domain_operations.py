@@ -23,9 +23,9 @@ from enm.domain_operations import execute_domain_operation
 
 
 def _empty_enm() -> dict:
-    """Pusty ENM do testów."""
+    """Pusty ENM do testów z jawnymi domyślnymi ustawieniami projektu."""
     enm = EnergyNetworkModel(
-        header=ENMHeader(name="test", defaults=ENMDefaults()),
+        header=ENMHeader(name="test", defaults=ENMDefaults(sn_nominal_kv=15.0)),
     )
     return enm.model_dump(mode="json")
 

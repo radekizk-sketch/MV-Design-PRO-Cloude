@@ -566,15 +566,18 @@ def _error_response(message: str, code: str = "UNKNOWN") -> dict[str, Any]:
 # ---------------------------------------------------------------------------
 
 
-DEFAULT_SN_KV: float = 15.0
-"""Domyślne napięcie znamionowe sieci SN (kV) — standardowe polskie SN."""
-
-
 def add_grid_source_sn(enm: dict[str, Any], payload: dict[str, Any]) -> dict[str, Any]:
     """Dodaj źródło zasilania (GPZ) — pierwszy krok budowy sieci SN."""
     voltage_kv = payload.get("voltage_kv")
     if voltage_kv is None or voltage_kv <= 0:
-        voltage_kv = DEFAULT_SN_KV
+        # Pobierz napięcie z jawnych ustawień projektu (ENM defaults)
+        voltage_kv = enm.get("header", {}).get("defaults", {}).get("sn_nominal_kv")
+    if voltage_kv is None or voltage_kv <= 0:
+        return _error_response(
+            "Brak napięcia znamionowego SN: podaj voltage_kv w payloadzie lub ustaw "
+            "defaults.sn_nominal_kv w nagłówku ENM.",
+            "source.missing_voltage",
+        )
 
     # Check no existing source
     if enm.get("sources"):
