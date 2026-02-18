@@ -13,6 +13,7 @@ import type {
   TopologyOpIssue,
 } from '../../types/enm';
 import { executeTopologyOp, fetchTopologySummary } from './api';
+import { useSnapshotStore } from './snapshotStore';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -96,6 +97,8 @@ export const useTopologyStore = create<TopologyState>((set) => ({
         // Reload summary after successful operation
         const summary = await fetchTopologySummary(caseId);
         set({ summary });
+        // Sync snapshotStore — single source of truth for SLD/Tree
+        useSnapshotStore.getState().refreshFromBackend(caseId).catch(() => {});
       }
 
       return { success: result.success, issues: result.issues };

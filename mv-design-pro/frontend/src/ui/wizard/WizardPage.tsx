@@ -25,6 +25,7 @@ import type { WizardState } from './wizardStateMachine';
 import { WizardSldPreview } from './WizardSldPreview';
 import { useWizardStore } from './useWizardStore';
 import type { WizardIssueApi } from './useWizardStore';
+import { useSnapshotStore } from '../topology/snapshotStore';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -506,6 +507,7 @@ export function WizardPage() {
 
   // Wizard store (Zustand) — syncs with backend step controller
   const wizardStore = useWizardStore();
+  const refreshSnapshot = useSnapshotStore((s) => s.refreshFromBackend);
 
   // Wizard state machine — deterministic, recomputed on every ENM change
   const wizardState = useMemo<WizardState>(() => computeWizardState(enm), [enm]);
@@ -528,7 +530,7 @@ export function WizardPage() {
   // Validate after load / save
   useEffect(() => { validateENM(caseId).then(setValidation).catch(() => {}); }, [caseId, enm.header.revision]);
 
-  // Autosave with debounce + model-updated event
+  // Autosave with debounce + model-updated event + snapshot sync
   const handleChange = useCallback((newEnm: EnergyNetworkModel) => {
     setEnm(newEnm);
     if (timerRef.current) clearTimeout(timerRef.current);
@@ -538,13 +540,15 @@ export function WizardPage() {
         setEnm(saved);
         setSaveStatus('saved');
         validateENM(caseId).then(setValidation).catch(() => {});
-        // Emit model-updated for Tree/SLD reactivity
+        // Sync snapshotStore — single source of truth for SLD/Tree
+        refreshSnapshot(caseId).catch(() => {});
+        // Emit model-updated for legacy Tree/SLD reactivity
         window.dispatchEvent(new CustomEvent('model-updated', {
           detail: { revision: saved.header.revision, source: 'wizard' },
         }));
       }).catch(() => setSaveStatus('error'));
     }, AUTOSAVE_DEBOUNCE_MS);
-  }, [caseId]);
+  }, [caseId, refreshSnapshot]);
 
   // Deep-link update
   useEffect(() => {

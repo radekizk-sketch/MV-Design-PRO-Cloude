@@ -69,6 +69,8 @@ export interface SnapshotState {
     opName: string,
     payload: Record<string, unknown>,
   ) => Promise<DomainOpResponseV1 | null>;
+  /** Refresh snapshot from backend without mutation (calls refresh_snapshot op). */
+  refreshFromBackend: (caseId: string) => Promise<DomainOpResponseV1 | null>;
   setSnapshot: (response: DomainOpResponseV1) => void;
   clearError: () => void;
   reset: () => void;
@@ -172,6 +174,39 @@ export const useSnapshotStore = create<SnapshotState>((set) => ({
         selectionHint: response.selection_hint,
         lastChanges: response.changes,
         lastEvents: response.domain_events,
+        loading: false,
+        error: null,
+        errorCode: null,
+      });
+
+      return response;
+    } catch (err) {
+      const errorMsg = err instanceof Error ? err.message : String(err);
+      set({ loading: false, error: errorMsg, errorCode: 'NETWORK_ERROR' });
+      return null;
+    }
+  },
+
+  refreshFromBackend: async (caseId: string) => {
+    set({ loading: true, error: null, errorCode: null });
+    try {
+      const response = await executeDomainOp(caseId, 'refresh_snapshot', {});
+
+      if (response.error) {
+        set({ loading: false, error: response.error, errorCode: response.error_code ?? null });
+        return response;
+      }
+
+      set({
+        snapshot: response.snapshot,
+        logicalViews: response.logical_views,
+        readiness: response.readiness,
+        fixActions: response.fix_actions,
+        materializedParams: response.materialized_params,
+        layout: response.layout,
+        selectionHint: null,
+        lastChanges: null,
+        lastEvents: [],
         loading: false,
         error: null,
         errorCode: null,
