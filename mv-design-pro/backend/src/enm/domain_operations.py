@@ -1785,7 +1785,13 @@ def execute_domain_operation(
             "dispatcher.unknown_operation",
         )
 
-    return _HANDLERS[canonical_name](enm_dict, payload)
+    try:
+        return _HANDLERS[canonical_name](enm_dict, payload)
+    except Exception as exc:
+        return _error_response(
+            f"Nieobsłużony wyjątek w operacji '{canonical_name}': {exc}",
+            "dispatcher.unhandled_exception",
+        )
 
 
 # ---------------------------------------------------------------------------
