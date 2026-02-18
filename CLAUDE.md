@@ -2,90 +2,207 @@
 
 ## Project Overview
 
-MV-DESIGN-PRO is a professional Medium Voltage (MV) network design and analysis system for the power industry. It provides tools for network modeling, short circuit calculations (IEC 60909), power flow analysis, and protection coordination with full OZE (renewable energy) integration.
+MV-DESIGN-PRO is a professional Medium Voltage (MV) network design and analysis system for the power industry. It provides tools for network modeling, short circuit calculations (IEC 60909), power flow analysis (Newton-Raphson, Gauss-Seidel, Fast Decoupled), protection coordination, and proof generation with full OZE (renewable energy) integration.
 
 The system is architecturally aligned with **DIgSILENT PowerFactory** principles:
-- One explicit Network Model per project
+- One explicit Network Model per project (singleton)
 - Multiple Study Cases (calculation scenarios)
 - WHITE BOX calculations (all intermediate values auditable)
 - No fictional entities in solvers
-- Strict layer separation (Solver vs Analysis vs Presentation)
+- Strict layer separation (Solver vs Analysis vs Application vs Presentation)
 
 ## Technology Stack
 
 ### Backend (Python 3.11+)
 - **Framework**: FastAPI
 - **Package Manager**: Poetry
-- **Dependencies**: numpy, scipy, networkx, pydantic, pandas
-- **Databases**: PostgreSQL, MongoDB, Redis
+- **Core Dependencies**: numpy, scipy, networkx, pydantic, pandas
+- **Databases**: PostgreSQL (asyncpg/psycopg), MongoDB (motor), Redis
 - **Task Queue**: Celery
-- **Testing**: pytest, pytest-asyncio
-- **Linting**: black, ruff, mypy
+- **HTTP Client**: httpx
+- **Export**: reportlab (PDF), python-docx (DOCX)
+- **Testing**: pytest, pytest-asyncio, pytest-cov
+- **Linting/Formatting**: black (line-length 100), ruff (E, F, W, I, N, UP, B, C4), mypy (strict)
 
-### Frontend (TypeScript/React)
-- **Framework**: React 18 with TypeScript
-- **Build Tool**: Vite
+### Frontend (TypeScript 5 / React 18)
+- **Build Tool**: Vite 5
 - **State Management**: Zustand
 - **Data Fetching**: @tanstack/react-query
 - **Forms**: react-hook-form with zod validation
-- **Styling**: Tailwind CSS
+- **Styling**: Tailwind CSS, tailwind-merge, clsx
 - **Math Rendering**: KaTeX
-- **Testing**: Vitest, Playwright (e2e)
+- **Charts**: Recharts
+- **PDF Export**: html2canvas + jspdf
+- **Routing**: react-router-dom
+- **Testing**: Vitest (unit), @testing-library/react (components), Playwright (e2e)
+- **Node.js**: >=18.0.0 (CI uses Node 20)
 
 ## Project Structure
 
 ```
-MV-Design-PRO-Cloude/
-├── .github/workflows/         # CI/CD pipelines
-├── docs/                      # Root-level documentation index
-│   └── ui/                    # UI contract documents
-├── mv-design-pro/             # Main application
+MV-Design-PRO/
+├── .github/workflows/            # CI/CD pipelines (4 workflows)
+│   ├── python-tests.yml          # Backend tests + Python guards
+│   ├── frontend-checks.yml       # Frontend tests, lint, type-check + guards
+│   ├── sld-determinism.yml       # SLD contract tests + render artifacts
+│   └── docs-guard.yml            # Documentation integrity checks
+├── docs/                         # Root-level documentation index
+│   ├── INDEX.md                  # UI documentation index
+│   ├── ui/                       # UI contracts (root-level)
+│   ├── sld/                      # SLD layout contracts
+│   └── system/                   # System-level docs
+├── mv-design-pro/                # Main application
+│   ├── SYSTEM_SPEC.md            # Executive overview + navigation hub (BINDING)
+│   ├── AGENTS.md                 # Agent governance rules (BINDING)
+│   ├── ARCHITECTURE.md           # Technical architecture reference (BINDING)
+│   ├── PLANS.md                  # Operational status & next steps (LIVING)
+│   ├── docker-compose.yml        # 6 services: backend, frontend, postgres, mongodb, redis, celery
 │   ├── backend/
+│   │   ├── pyproject.toml        # Poetry configuration
+│   │   ├── Dockerfile
 │   │   ├── src/
-│   │   │   ├── analysis/      # Interpretation layer (no physics)
-│   │   │   ├── api/           # FastAPI endpoints
-│   │   │   ├── application/   # Application layer (Wizard, SLD)
-│   │   │   ├── compliance/    # Normative compliance checks
-│   │   │   ├── domain/        # Domain models
-│   │   │   ├── infrastructure/# Persistence, external services
-│   │   │   ├── network_model/ # Core network model
-│   │   │   │   ├── core/      # Bus, Branch, Switch, Source, Load
-│   │   │   │   ├── catalog/   # Type library
-│   │   │   │   ├── solvers/   # Physics calculations
-│   │   │   │   ├── validation/# NetworkValidator
-│   │   │   │   └── whitebox/  # Calculation trace utilities
-│   │   │   ├── solvers/       # Top-level solver wrappers
-│   │   │   └── whitebox/      # White-box trace utilities
-│   │   └── tests/             # Backend tests
+│   │   │   ├── api/              # FastAPI endpoints (15+ modules)
+│   │   │   ├── analysis/         # Interpretation layer (NO physics)
+│   │   │   │   ├── boundary/     # Boundary identification
+│   │   │   │   ├── coverage_score/
+│   │   │   │   ├── energy_validation/
+│   │   │   │   ├── lf_sensitivity/
+│   │   │   │   ├── normative/
+│   │   │   │   ├── power_flow/
+│   │   │   │   ├── power_flow_interpretation/
+│   │   │   │   ├── protection_curves_it/
+│   │   │   │   ├── protection_insight/
+│   │   │   │   ├── recommendations/
+│   │   │   │   ├── reporting/    # PDF report generation
+│   │   │   │   ├── scenario_comparison/
+│   │   │   │   ├── sensitivity/
+│   │   │   │   └── voltage_profile/
+│   │   │   ├── application/      # Application layer (NO physics)
+│   │   │   │   ├── active_case/  # Active case management
+│   │   │   │   ├── analyses/     # Analysis execution services
+│   │   │   │   ├── analysis_dispatch/
+│   │   │   │   ├── analysis_run/
+│   │   │   │   ├── designer/     # Designer/Wizard engine
+│   │   │   │   ├── equipment_proof/
+│   │   │   │   ├── network_model/# Single model management
+│   │   │   │   ├── network_wizard/
+│   │   │   │   ├── project_archive/
+│   │   │   │   ├── reference_patterns/
+│   │   │   │   ├── sld/          # SLD layout, overlay, integration
+│   │   │   │   ├── study_case/
+│   │   │   │   ├── wizard_actions/
+│   │   │   │   └── wizard_runtime/
+│   │   │   ├── compliance/       # IEC normative compliance checks
+│   │   │   ├── diagnostics/      # Diagnostic utilities
+│   │   │   ├── domain/           # Domain models (mutation allowed HERE ONLY)
+│   │   │   ├── enm/              # Energy Network Model (API, topology, validator)
+│   │   │   ├── infrastructure/   # Persistence (repositories), external services
+│   │   │   ├── network_model/    # Core network model
+│   │   │   │   ├── core/         # Bus, Branch, Switch, Source, Load, Graph, Snapshot, Station
+│   │   │   │   ├── catalog/      # Type library (immutable types, resolver, governance)
+│   │   │   │   ├── solvers/      # Physics calculations (WHITE BOX)
+│   │   │   │   │   ├── short_circuit_iec60909.py
+│   │   │   │   │   ├── power_flow_newton.py
+│   │   │   │   │   ├── power_flow_gauss_seidel.py
+│   │   │   │   │   ├── power_flow_fast_decoupled.py
+│   │   │   │   │   └── fault_scenario_executor.py
+│   │   │   │   ├── validation/   # NetworkValidator, rules, constraints
+│   │   │   │   └── whitebox/     # Calculation trace utilities
+│   │   │   ├── protection/       # Protection domain (NOT a solver)
+│   │   │   ├── solver_input/     # Solver input preparation, contracts, eligibility
+│   │   │   ├── solvers/          # Solver wrapper/dispatcher layer
+│   │   │   └── whitebox/         # Top-level trace, proof, equation registry, LaTeX
+│   │   ├── tests/                # Backend tests (~241 files, 1600+ tests)
+│   │   │   ├── conftest.py
+│   │   │   ├── analysis/         # Analysis layer tests
+│   │   │   ├── api/              # API endpoint tests
+│   │   │   ├── application/      # Application layer tests
+│   │   │   ├── ci/               # CI guard validation tests
+│   │   │   ├── domain/           # Domain model tests
+│   │   │   ├── e2e/              # End-to-end workflow tests
+│   │   │   ├── enm/              # ENM model tests
+│   │   │   ├── golden/           # Golden network fixtures
+│   │   │   ├── infrastructure/   # Persistence tests
+│   │   │   ├── network_model/    # Network model & catalog tests
+│   │   │   ├── proof_engine/     # Proof engine tests
+│   │   │   ├── reference_networks/ # Reference network builders
+│   │   │   └── utils/            # Test utilities (determinism helpers)
+│   │   └── schemas/              # JSON schemas (resultset_v1_schema.json)
 │   ├── frontend/
+│   │   ├── package.json
+│   │   ├── tsconfig.json         # Strict mode, ES2020, noUnusedLocals/Parameters
+│   │   ├── vite.config.ts        # Vitest config embedded (jsdom, globals)
+│   │   ├── tailwind.config.js
 │   │   ├── src/
-│   │   │   ├── ui/            # React components
-│   │   │   │   ├── sld/       # Single Line Diagram
-│   │   │   │   ├── proof/     # Proof Inspector
-│   │   │   │   ├── results/   # Results browser
-│   │   │   │   ├── inspector/ # Element inspector
-│   │   │   │   └── ...        # Other UI modules
-│   │   │   ├── designer/      # Designer module
-│   │   │   └── proof-inspector/
-│   │   └── e2e/               # Playwright e2e tests
-│   ├── scripts/               # CI/CD and utility scripts
-│   └── docs/                  # Detailed documentation
-│       ├── proof_engine/      # Proof Pack specifications
-│       ├── adr/               # Architecture Decision Records
-│       └── ui/                # UI contracts
+│   │   │   ├── App.tsx           # Root React component
+│   │   │   ├── main.tsx          # Entry point
+│   │   │   ├── designer/         # Designer/Wizard page
+│   │   │   ├── engine/           # Algorithm engines
+│   │   │   │   └── sld-layout/   # SLD auto-layout engine (7-phase pipeline)
+│   │   │   ├── proof-inspector/  # Proof inspector UI module
+│   │   │   ├── types/            # Shared TypeScript type definitions
+│   │   │   ├── test/             # Test infrastructure (setup.ts)
+│   │   │   └── ui/               # React components (by feature)
+│   │   │       ├── sld/          # Single Line Diagram (primary)
+│   │   │       │   ├── core/     # VisualGraph, TopologyAdapter, LayoutPipeline, StationBlockBuilder
+│   │   │       │   ├── etap_symbols/
+│   │   │       │   ├── export/
+│   │   │       │   ├── inspector/
+│   │   │       │   ├── layout/
+│   │   │       │   └── symbols/
+│   │   │       ├── sld-editor/   # SLD editing (CAD geometry, drag, routing)
+│   │   │       ├── sld-overlay/  # Result overlays on SLD
+│   │   │       ├── wizard/       # Network wizard (switchgear config)
+│   │   │       ├── study-cases/  # Study case manager
+│   │   │       ├── results-browser/    # Results hierarchy browser
+│   │   │       ├── results-inspector/  # Result details inspector
+│   │   │       ├── results-workspace/  # Results view container
+│   │   │       ├── proof/              # Proof pack display
+│   │   │       ├── protection/         # Protection library browser
+│   │   │       ├── protection-coordination/ # TCC charts, protection curves
+│   │   │       ├── protection-diagnostics/
+│   │   │       ├── property-grid/      # Element property editor
+│   │   │       ├── catalog/            # Type library browser
+│   │   │       ├── topology/           # Topology tree
+│   │   │       ├── power-flow-results/ # Load flow results
+│   │   │       ├── context-menu/       # Context menu actions
+│   │   │       ├── app-state/          # Global Zustand store
+│   │   │       ├── history/            # Undo/redo
+│   │   │       ├── selection/          # Element selection
+│   │   │       ├── mode-gate/          # Expert mode gating
+│   │   │       ├── contracts/          # API contract definitions
+│   │   │       └── ...                 # 40+ UI feature modules
+│   │   └── e2e/                  # Playwright end-to-end tests
+│   ├── scripts/                  # CI/CD guard scripts (28 scripts)
+│   └── docs/                     # Detailed documentation (150+ files)
+│       ├── spec/                 # DETAILED SPECIFICATION (18 chapters - SOURCE OF TRUTH)
+│       ├── ui/                   # UI contracts (35+ canonical contracts)
+│       ├── proof_engine/         # Proof Pack specifications
+│       ├── analysis/             # Analysis specifications
+│       ├── adr/                  # Architecture Decision Records (15+)
+│       ├── sld/                  # SLD specifications
+│       ├── protection/           # Protection specifications
+│       ├── domain/               # Domain model specs
+│       ├── export/               # Export specifications
+│       ├── audit/                # Audit reports, historical exec plans
+│       └── tests/                # Test specifications (golden networks)
 ```
 
-## Canonical Documents (BINDING)
+## Document Hierarchy (BINDING)
 
-These documents define authoritative rules - always consult before making changes:
+Authority order (highest first):
 
-| Document | Purpose |
-|----------|---------|
-| `mv-design-pro/SYSTEM_SPEC.md` | **Canonical architecture spec** - single source of truth |
-| `mv-design-pro/AGENTS.md` | Governance rules for all agents (human & AI) |
-| `mv-design-pro/ARCHITECTURE.md` | Detailed design reference |
-| `mv-design-pro/PLANS.md` | Current execution plan (living document) |
-| `docs/INDEX.md` | UI contracts index |
+| Priority | Document | Purpose |
+|----------|----------|---------|
+| 1 | `mv-design-pro/docs/spec/` (18 chapters) | **Detailed specification** - SOURCE OF TRUTH |
+| 2 | `mv-design-pro/docs/spec/AUDIT_SPEC_VS_CODE.md` | Spec-vs-code gap analysis + decision matrix |
+| 3 | `mv-design-pro/SYSTEM_SPEC.md` | Executive overview + navigation hub |
+| 4 | `mv-design-pro/ARCHITECTURE.md` | Technical architecture reference |
+| 5 | `mv-design-pro/AGENTS.md` | Agent governance rules |
+| 6 | `mv-design-pro/PLANS.md` | Operational status & next steps (LIVING) |
+| 7 | `docs/INDEX.md` | UI contracts index |
+
+In case of conflict: `docs/spec/` wins. Always consult before making architectural changes.
 
 ## Architecture Layer Boundaries (CRITICAL)
 
@@ -107,7 +224,8 @@ These documents define authoritative rules - always consult before making change
 ┌─────────────────────────────────────────────────────────────┐
 │                      DOMAIN LAYER                            │
 │  - NetworkModel (Bus, Branch, Switch, Source, Load)          │
-│  - Catalog (Type Library)                                    │
+│  - ENM (Energy Network Model)                                │
+│  - Catalog (Type Library - immutable)                        │
 │  - Case (Study Cases)                                        │
 │  Model mutation allowed HERE ONLY                            │
 └─────────────────────────────────────────────────────────────┘
@@ -116,14 +234,19 @@ These documents define authoritative rules - always consult before making change
 │                      SOLVER LAYER                            │
 │  - IEC 60909 Short Circuit                                   │
 │  - Newton-Raphson Power Flow                                 │
+│  - Gauss-Seidel Power Flow                                   │
+│  - Fast Decoupled Power Flow                                 │
+│  - Fault Scenario Executor                                   │
 │  PHYSICS HERE ONLY, WHITE BOX REQUIRED                       │
 └─────────────────────────────────────────────────────────────┘
                               │
 ┌─────────────────────────────────────────────────────────────┐
 │                     ANALYSIS LAYER                           │
-│  - Protection Analysis                                       │
-│  - Thermal/Voltage Analysis                                  │
-│  - Boundary Identification (PCC)                             │
+│  - Protection Analysis / Insight / Curves                    │
+│  - Voltage Profile / Sensitivity                             │
+│  - Boundary Identification                                   │
+│  - Coverage Score / Normative Compliance                     │
+│  - Scenario Comparison / Recommendations                     │
 │  INTERPRETATION ONLY, NO physics                             │
 └─────────────────────────────────────────────────────────────┘
 ```
@@ -131,37 +254,44 @@ These documents define authoritative rules - always consult before making change
 ## Core Rules (IMMUTABLE)
 
 ### 1. NOT-A-SOLVER Rule
-These components **CANNOT** contain physics calculations:
-- Protection, Frontend, Reporting, Wizard, SLD, Validation
-
-Only dedicated solvers compute physics:
-- `network_model.solvers.short_circuit_iec60909`
-- `network_model.solvers.power_flow_newton`
+Only dedicated solvers in `network_model/solvers/` compute physics. These components **CANNOT** contain physics calculations:
+- Protection, Frontend, Reporting, Wizard, SLD, Validation, Proof Engine, Analysis
 
 ### 2. WHITE BOX Rule
 All solvers **MUST**:
 - Expose all calculation steps
-- Provide intermediate values (Y-bus matrix, Z-thevenin, etc.)
+- Provide intermediate values (Y-bus matrix, Z-thevenin, Jacobian, etc.)
 - Allow numerical audit
 - Document assumptions
 
-**Forbidden**: Black-box solvers, hidden corrections, undocumented simplifications
+**Forbidden**: Black-box solvers, hidden corrections, undocumented simplifications.
 
 ### 3. Single Model Rule
-- **ONE NetworkModel** per project
-- Wizard and SLD edit **THE SAME** model
-- No duplicate data stores
+- **ONE NetworkModel** per project (singleton)
+- Wizard and SLD edit **THE SAME** model instance
+- No shadow models, no duplicate data stores
 
 ### 4. Case Immutability Rule
 - Case **CANNOT mutate** NetworkModel
-- Case stores **ONLY** calculation parameters
+- Case stores **ONLY** calculation parameters (configuration)
 - Multiple Cases reference one Model (read-only view)
+- Model change invalidates ALL case results
 
-### 5. PCC Prohibition Rule
-- **PCC is NOT in NetworkModel** (it's a business concept, not physics)
-- PCC belongs in the interpretation/analysis layer only
+### 5. BoundaryNode Prohibition Rule
+- **BoundaryNode is NOT in NetworkModel** (it's interpretation, not physics)
+- BoundaryNode belongs ONLY in the Analysis/Interpretation layer (BoundaryIdentifier)
 
-### 6. No Codenames in UI
+### 6. Frozen Result API Rule
+- ShortCircuitResult and PowerFlowResult APIs are **FROZEN**
+- Changes require major version bump
+- Proof Engine reads results READ-ONLY
+
+### 7. Determinism Rule
+- Same input **MUST** produce identical output
+- Solver results, proof documents, exports must be deterministic
+- SHA-256 fingerprints must be stable
+
+### 8. No Codenames in UI
 Project codenames (P7, P11, P14, P17, P20, etc.) must **NEVER** appear in:
 - UI-visible strings
 - Exports
@@ -181,8 +311,11 @@ poetry install --with dev
 # Run tests
 poetry run pytest -q
 
-# Run specific test
+# Run specific test file
 poetry run pytest tests/test_short_circuit_iec60909.py -v
+
+# Run specific test directory
+poetry run pytest tests/proof_engine/ -v
 
 # Run linting
 poetry run black src tests
@@ -198,15 +331,17 @@ poetry run uvicorn src.api.main:app --reload --port 8000
 cd mv-design-pro/frontend
 
 # Install dependencies
-npm install
+npm ci            # preferred (deterministic)
+npm install       # alternative
 
-# Run development server
-npm run dev
+# Run tests (--no-file-parallelism is required)
+npm test
+# Equivalent: vitest run --no-file-parallelism
 
-# Run tests
-npm run test
+# Run tests in watch mode
+npm run test:watch
 
-# Run e2e tests
+# Run e2e tests (Playwright)
 npm run test:e2e
 
 # Type checking
@@ -215,18 +350,21 @@ npm run type-check
 # Linting
 npm run lint
 
-# Build
+# Build (runs tsc then vite build)
 npm run build
+
+# Development server (port 5173, proxies /api to backend)
+npm run dev
 
 # No-codenames guard check
 npm run guard:codenames
 ```
 
-### Docker
+### Docker (6 services)
 ```bash
 cd mv-design-pro
 
-# Start all services
+# Start all services (backend:18000, frontend:3000, postgres:5432, mongodb:27017, redis:6379, celery)
 docker-compose up -d
 
 # View logs
@@ -236,79 +374,118 @@ docker-compose logs -f backend
 docker-compose down
 ```
 
+### Guard Scripts
+```bash
+cd mv-design-pro
+
+# Key guards (all run in CI)
+python scripts/pcc_zero_guard.py              # Prevent PCC in NetworkModel
+python scripts/domain_no_guessing_guard.py    # Domain model validation
+python scripts/canonical_ops_guard.py         # Canonical operations check
+python scripts/readiness_codes_guard.py       # Readiness gate validation
+python scripts/no_codenames_guard.py          # Block codenames in UI
+python scripts/dialog_completeness_guard.py   # Dialog contract completeness
+python scripts/local_truth_guard.py           # Local vs remote consistency
+python scripts/sld_determinism_guards.py      # SLD rendering determinism
+python scripts/arch_guard.py                  # Architecture layer boundaries
+python scripts/docs_guard.py                  # Documentation integrity
+python scripts/solver_boundary_guard.py       # Solver layer isolation
+python scripts/trace_determinism_guard.py     # Trace output determinism
+```
+
+## CI/CD Pipelines
+
+All 4 workflows run on push and pull_request:
+
+| Workflow | File | What It Does |
+|----------|------|-------------|
+| Python tests | `python-tests.yml` | pytest + pcc_zero + domain_no_guessing + canonical_ops + readiness_codes guards |
+| Frontend checks | `frontend-checks.yml` | type-check + lint + vitest + codenames + dialog_completeness + local_truth guards |
+| SLD Determinism | `sld-determinism.yml` | Python SLD guards + 18 Vitest contract tests + render artifacts |
+| Docs Guard | `docs-guard.yml` | Documentation integrity check (broken links, PCC terms) |
+
 ## Code Style & Conventions
 
 ### Python
 - Line length: 100 characters
-- Formatter: black
-- Linter: ruff (rules: E, F, W, I, N, UP, B, C4)
-- Type hints required (mypy strict mode)
+- Formatter: black (`target-version = ['py311']`)
+- Linter: ruff (rules: E, F, W, I, N, UP, B, C4; ignores: E501)
+- Type hints required: mypy strict mode with pydantic plugin
+- asyncio mode: auto (pytest-asyncio)
 - Use frozen dataclasses for immutable result types
 
 ### TypeScript
-- Strict mode enabled
-- Use explicit typing
-- ESLint with React hooks plugin
+- Strict mode enabled (`noUnusedLocals`, `noUnusedParameters`, `noFallthroughCasesInSwitch`)
+- Target: ES2020, module: ESNext, JSX: react-jsx
+- ESLint with React hooks + React refresh plugins
 - Prefer zustand for state management
+- Tests exclude pattern in tsconfig: `src/**/__tests__/**/*`
 
 ### Terminology
 | Term | Definition | PowerFactory Equivalent |
 |------|------------|------------------------|
 | Bus | Electrical node (single potential) | Terminal |
-| Branch | Physical connection with impedance | Line/Cable/Trafo |
-| Switch | Switching apparatus (no impedance) | Switch/Breaker |
+| Line | Overhead line (explicit branch) | Line |
+| Cable | Underground cable (explicit branch) | Cable |
+| Transformer2W | Two-winding transformer | Transformer |
+| Switch/Breaker | Switching device (no impedance) | Switch/Breaker |
+| Source | External Grid / Generator / Inverter | External Grid |
+| Load | Electrical load | Load |
 | Station | Logical container (no physics) | Substation folder |
 | Case | Calculation scenario | Study Case |
-| Catalog | Type library | Type Library |
+| Catalog | Type library (immutable) | Type Library |
 
-**Forbidden Terms in Core Model**: PCC, Connection Point, Virtual Node, Aggregated Element
+**Forbidden Terms in Core Model**: PCC, Connection Point, Virtual Node, Aggregated Element, BoundaryNode
 
 ## Testing Guidelines
 
-### Backend Tests
+### Backend Tests (~241 files, 1600+ tests)
 - Located in `mv-design-pro/backend/tests/`
 - Use pytest with asyncio mode auto
 - Mark integration tests with `@pytest.mark.integration`
-- Key test files:
-  - `test_short_circuit_iec60909.py` - Short circuit solver
+- Key test areas:
+  - `test_short_circuit_iec60909.py` - IEC 60909 SC solver
   - `test_power_flow_v2.py` - Power flow solver
-  - `test_result_api_contract.py` - Frozen Result API
-  - `test_protection_analysis.py` - Protection layer
+  - `tests/proof_engine/` - All proof pack generation (SC3F, VDROP, Equipment, Protection, Earthing, Losses, LF Voltage)
+  - `tests/enm/` - ENM model, topology, validation, golden network
+  - `tests/e2e/` - Determinism workflows, export stability
+  - `tests/api/` - API endpoint contract tests
+  - `tests/golden/` - Golden network fixtures
+  - `tests/ci/` - CI guard validation tests
 
-### Frontend Tests
-- Unit tests with Vitest in `src/ui/**/__tests__/`
+### Frontend Tests (~138 files)
+- Unit tests with Vitest in `src/**/__tests__/`
 - E2E tests with Playwright in `e2e/`
 - Component tests use @testing-library/react
+- Tests run with `--no-file-parallelism` (required for determinism)
+- Test environment: jsdom with globals enabled
+- Critical contract tests (run in SLD Determinism CI):
+  - `sld/core/__tests__/visualGraph.test.ts`
+  - `sld/core/__tests__/determinism.test.ts`
+  - `sld/core/__tests__/layoutPipeline.test.ts`
+  - `sld/core/__tests__/topologyAdapterV2.test.ts`
+  - `sld/core/__tests__/switchgearConfig.test.ts`
+  - `sld/core/__tests__/switchgearConfig.hashParity.test.ts`
 
-## Git Workflow
-
-### Branch Naming
-- `main` - stable, tested
-- `develop` - integration
-- `feature/*` - new features
-- `refactor/*` - architectural changes
-- `fix/*` - bug fixes
-- `claude/*` - AI assistant branches
-
-### PR Requirements
-- Small, focused changes
-- Reference to ExecPlan step (if applicable)
-- Verification of compliance checklist
-- WHITE BOX tests included for solver changes
-
-### CI Pipeline
-- GitHub Actions workflow: `.github/workflows/python-tests.yml`
-- Runs pytest on push and PR
-- Uses Python 3.11, Poetry for dependency management
-
-## Proof Engine (P11)
+## Proof Engine
 
 The Proof Engine generates mathematical proofs from solver results:
 
 ### Key Concepts
-- **TraceArtifact**: Immutable calculation trace
+- **TraceArtifact**: Immutable calculation trace from solvers
 - **ProofDocument**: Formal mathematical proof
-- **ProofStep**: Formula → Data → Substitution → Result → Unit verification
+- **ProofStep**: Formula -> Data -> Substitution -> Result -> Unit verification
+- **EquationRegistry**: Canonical equation definitions (LaTeX)
+
+### Proof Pack Types
+- SC3F (3-phase short circuit)
+- VDROP (voltage drop)
+- Equipment (thermal/dynamic withstand)
+- Power Flow (load flow)
+- Losses/Energy
+- Protection (overcurrent)
+- Earthing (ground fault)
+- LF Voltage (load flow voltage)
 
 ### Invariants
 - Solver untouched - Proof Engine does NOT modify solvers
@@ -326,23 +503,26 @@ The Proof Engine generates mathematical proofs from solver results:
 ## Common Tasks
 
 ### Adding a New Element Type
-1. Check SYSTEM_SPEC.md for allowed element types
+1. Check `docs/spec/` and `SYSTEM_SPEC.md` for allowed element types
 2. Add to `network_model/core/`
-3. Update NetworkValidator
-4. Add SLD symbol mapping
-5. Write tests
+3. Update ENM model if applicable (`src/enm/`)
+4. Update NetworkValidator
+5. Add SLD symbol mapping
+6. Write tests
 
 ### Modifying Solver Output
 1. **STOP** - Result APIs are FROZEN
 2. Check if change requires version bump
 3. Ensure WHITE BOX trace is maintained
 4. Update ProofDocument mapping if needed
+5. Verify determinism (SHA-256 fingerprints)
 
 ### Adding UI Feature
-1. Review UI contracts in `docs/ui/`
+1. Review UI contracts in `mv-design-pro/docs/ui/`
 2. Follow layer boundaries (no physics in UI)
 3. Use Polish labels, no project codenames
 4. Add tests (Vitest for unit, Playwright for e2e)
+5. Run `npm run guard:codenames` to verify
 
 ### Working with Study Cases
 - Cases store config only, not model data
@@ -350,9 +530,22 @@ The Proof Engine generates mathematical proofs from solver results:
 - Clone creates new case with NONE status (no results copied)
 - Only ONE case active at a time
 
+### Running All Guards Locally
+```bash
+cd mv-design-pro
+python scripts/pcc_zero_guard.py
+python scripts/no_codenames_guard.py
+python scripts/domain_no_guessing_guard.py
+python scripts/canonical_ops_guard.py
+python scripts/readiness_codes_guard.py
+python scripts/sld_determinism_guards.py
+python scripts/arch_guard.py
+python scripts/docs_guard.py
+```
+
 ## Important Warnings
 
-1. **NEVER** add PCC/boundary concepts to NetworkModel
+1. **NEVER** add PCC/BoundaryNode concepts to NetworkModel
 2. **NEVER** add physics calculations to non-solver components
 3. **NEVER** modify frozen Result APIs without version bump
 4. **NEVER** create shadow/duplicate data models
@@ -360,6 +553,8 @@ The Proof Engine generates mathematical proofs from solver results:
 6. **NEVER** use project codenames (P11, P14, etc.) in UI strings
 7. **ALWAYS** maintain WHITE BOX traceability in solvers
 8. **ALWAYS** preserve deterministic behavior (same input = same output)
+9. **ALWAYS** consult `docs/spec/` before architectural changes
+10. **ALWAYS** run relevant guards before pushing changes
 
 ## Escalation
 
@@ -369,13 +564,35 @@ If any rule conflict is detected:
 3. Request architectural review
 4. Do not proceed until resolved
 
+## Git Workflow
+
+### Branch Naming
+- `main` - stable, tested
+- `develop` - integration
+- `feature/*` - new features
+- `refactor/*` - architectural changes
+- `fix/*` - bug fixes
+- `claude/*` - AI assistant branches
+
+### PR Requirements
+- Small, focused changes
+- Reference to ExecPlan step (if applicable)
+- Verification of compliance checklist
+- WHITE BOX tests included for solver changes
+- All 4 CI workflows must pass
+
 ## Quick Reference
 
 | Action | Command |
 |--------|---------|
 | Run backend tests | `cd mv-design-pro/backend && poetry run pytest -q` |
 | Run frontend tests | `cd mv-design-pro/frontend && npm test` |
-| Check codenames | `cd mv-design-pro/frontend && npm run guard:codenames` |
-| Start dev servers | `cd mv-design-pro && docker-compose up -d` |
 | Type check frontend | `cd mv-design-pro/frontend && npm run type-check` |
+| Lint frontend | `cd mv-design-pro/frontend && npm run lint` |
 | Lint Python | `cd mv-design-pro/backend && poetry run ruff check src` |
+| Format Python | `cd mv-design-pro/backend && poetry run black src tests` |
+| Check codenames | `cd mv-design-pro && python scripts/no_codenames_guard.py` |
+| Check PCC guard | `cd mv-design-pro && python scripts/pcc_zero_guard.py` |
+| Check docs guard | `cd mv-design-pro && python scripts/docs_guard.py` |
+| Start dev servers | `cd mv-design-pro && docker-compose up -d` |
+| Build frontend | `cd mv-design-pro/frontend && npm run build` |
