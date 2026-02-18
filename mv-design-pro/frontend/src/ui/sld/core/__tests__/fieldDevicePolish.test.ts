@@ -318,7 +318,7 @@ describe('Wizard Field Step Builder', () => {
       makeField('f_tr', 'st1', FieldRoleV1.TRANSFORMER_SN_NN),
     ],
     devices: [],
-    ports: { trunkInPort: 'p1', trunkOutPort: null, branchPort: null },
+    ports: { trunkInPort: 'portA', trunkOutPort: null, branchPort: null },
     couplerFieldId: null,
     deviceAnchors: [],
     fixActions: [
