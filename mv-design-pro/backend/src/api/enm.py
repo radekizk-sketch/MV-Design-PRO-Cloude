@@ -698,9 +698,8 @@ async def domain_ops(case_id: str, req: DomainOpEnvelopeModel) -> dict[str, Any]
             saved = _set_enm(case_id, new_enm)
             result["snapshot"] = saved.model_dump(mode="json")
         except Exception as e:
-            raise HTTPException(
-                status_code=500,
-                detail=f"Błąd zapisu snapshot: {e}",
-            )
+            result["error"] = f"Błąd zapisu snapshot: {e}"
+            result["error_code"] = "api.snapshot_validation_failed"
+            result["snapshot"] = None
 
     return result
