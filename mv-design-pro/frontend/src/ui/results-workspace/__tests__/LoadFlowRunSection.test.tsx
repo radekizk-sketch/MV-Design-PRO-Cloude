@@ -234,11 +234,7 @@ describe('LoadFlowRunSection', () => {
     const { container } = render(<LoadFlowRunSection runId="run-lf-1" />);
     const html = container.innerHTML;
 
-    expect(html).not.toContain('P11');
-    expect(html).not.toContain('P14');
-    expect(html).not.toContain('P17');
-    expect(html).not.toContain('P20');
-    expect(html).not.toContain('P22');
+    expect(html).not.toMatch(/\bP\d{1,3}\b/);
     expect(html).not.toContain('PR-');
   });
 

@@ -209,7 +209,7 @@ describe('ResultsWorkspacePage', () => {
     expect(screen.getByText('Test error message')).toBeTruthy();
   });
 
-  it('does not contain codenames (P11, P14, etc.)', () => {
+  it('nie zawiera nazw kodowych projektu', () => {
     useAppStateStore.setState({ activeCaseId: 'case-123' });
     useResultsWorkspaceStore.setState({
       studyCaseId: 'case-123',
@@ -232,11 +232,7 @@ describe('ResultsWorkspacePage', () => {
     const html = container.innerHTML;
 
     // Verify no project codenames appear in rendered HTML
-    expect(html).not.toContain('P11');
-    expect(html).not.toContain('P14');
-    expect(html).not.toContain('P17');
-    expect(html).not.toContain('P20');
-    expect(html).not.toContain('PR-22');
+    expect(html).not.toMatch(/\bP\d{1,3}\b/);
   });
 
   it('shows Polish labels for mode buttons', () => {

@@ -34,8 +34,8 @@ const WIZARD_STEPS: WizardStep[] = [
   { id: 'K10', number: 10, title: 'Uruchom analizy', description: 'Zwarcia 3F, rozplyw mocy' },
 ];
 
-// Codenames that must NEVER appear in UI labels
-const FORBIDDEN_CODENAMES = ['P7', 'P11', 'P14', 'P17', 'P20', 'P23', 'P30'];
+// Wzorzec nazw kodowych, które nigdy nie mogą pojawiać się w etykietach UI
+const ZAKAZANE_WZORCE_NAZW_KODOWYCH = /\bP\d{1,3}\b/;
 
 
 describe('Wizard: step structure', () => {
@@ -67,10 +67,8 @@ describe('Wizard: step structure', () => {
 
   it('no project codenames in titles or descriptions', () => {
     for (const step of WIZARD_STEPS) {
-      for (const code of FORBIDDEN_CODENAMES) {
-        expect(step.title).not.toContain(code);
-        expect(step.description).not.toContain(code);
-      }
+      expect(step.title).not.toMatch(ZAKAZANE_WZORCE_NAZW_KODOWYCH);
+      expect(step.description).not.toMatch(ZAKAZANE_WZORCE_NAZW_KODOWYCH);
     }
   });
 

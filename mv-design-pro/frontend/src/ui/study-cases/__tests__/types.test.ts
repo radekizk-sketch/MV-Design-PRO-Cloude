@@ -160,11 +160,9 @@ describe('CONFIG_FIELD_LABELS', () => {
   });
 
   it('should not contain project codenames', () => {
-    const codenames = ['P7', 'P10', 'P11', 'P14', 'P17', 'P20'];
+    const WZORZEC_NAZW_KODOWYCH = /\bP\d{1,3}\b/;
     for (const label of Object.values(CONFIG_FIELD_LABELS)) {
-      for (const codename of codenames) {
-        expect(label).not.toContain(codename);
-      }
+      expect(label).not.toMatch(WZORZEC_NAZW_KODOWYCH);
     }
   });
 });
