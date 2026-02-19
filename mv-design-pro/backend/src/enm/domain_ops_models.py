@@ -253,6 +253,34 @@ class DomainOpResponse(_FrozenBase):
 
 
 # ===========================================================================
+# 2b. CatalogBindingPayload — kanoniczne wiązanie katalogowe w payloadach
+# ===========================================================================
+
+
+class CatalogBindingPayload(_FrozenBase):
+    """Canonical catalog binding in domain operation payloads.
+
+    Links an element to a specific catalog item version
+    with materialization control.
+    """
+
+    catalog_namespace: str
+    """Namespace katalogu (np. KABEL_SN, TRAFO_SN_NN, APARAT_SN)."""
+
+    catalog_item_id: str
+    """Identyfikator pozycji katalogowej."""
+
+    catalog_item_version: str
+    """Wersja pozycji katalogowej (obowiązkowa)."""
+
+    materialize: bool = True
+    """Czy zmaterializować parametry do Snapshot."""
+
+    snapshot_mapping_version: str = "1.0"
+    """Wersja mapowania materializacji."""
+
+
+# ===========================================================================
 # 3. InsertAt — kanoniczny model pozycji wstawienia
 # ===========================================================================
 
@@ -1148,6 +1176,13 @@ ALIAS_MAP: dict[str, str] = {
     "insert_station_on_trunk_segment": "insert_station_on_segment_sn",
     "connect_ring_sn": "connect_secondary_ring_sn",
     "connect_secondary_ring": "connect_secondary_ring_sn",
+    # Phase 2 — prompt-canonical aliases
+    "add_nn_feeder": "add_nn_outgoing_field",
+    "add_nn_source_pv": "add_pv_inverter_nn",
+    "add_nn_source_bess": "add_bess_inverter_nn",
+    "attach_protection_to_cb": "add_relay",
+    "update_protection_settings": "update_relay_settings",
+    "add_load_to_feeder_nn": "add_nn_load",
 }
 """Mapa aliasów operacji — mapowanie alternatywnych nazw na kanoniczne."""
 

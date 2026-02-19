@@ -4,16 +4,24 @@ from dataclasses import dataclass, field
 from typing import Iterable
 
 from .types import (
+    BESSInverterType,
     CableType,
+    CTType,
     ConverterKind,
     ConverterType,
     InverterType,
+    LVApparatusType,
+    LVCableType,
     LineType,
+    LoadType,
+    MVApparatusType,
+    PVInverterType,
     ProtectionCurve,
     ProtectionDeviceType,
     ProtectionSettingTemplate,
     SwitchEquipmentType,
     TransformerType,
+    VTType,
 )
 
 
@@ -34,6 +42,15 @@ class CatalogRepository:
     protection_device_types: dict[str, ProtectionDeviceType] = field(default_factory=dict)
     protection_curves: dict[str, ProtectionCurve] = field(default_factory=dict)
     protection_setting_templates: dict[str, ProtectionSettingTemplate] = field(default_factory=dict)
+    # Phase 1 — extended catalog namespaces
+    lv_cable_types: dict[str, LVCableType] = field(default_factory=dict)
+    load_types: dict[str, LoadType] = field(default_factory=dict)
+    mv_apparatus_types: dict[str, MVApparatusType] = field(default_factory=dict)
+    lv_apparatus_types: dict[str, LVApparatusType] = field(default_factory=dict)
+    ct_types: dict[str, CTType] = field(default_factory=dict)
+    vt_types: dict[str, VTType] = field(default_factory=dict)
+    pv_inverter_types: dict[str, PVInverterType] = field(default_factory=dict)
+    bess_inverter_types: dict[str, BESSInverterType] = field(default_factory=dict)
 
     @classmethod
     def from_records(
@@ -48,6 +65,14 @@ class CatalogRepository:
         protection_device_types: Iterable[dict] | None = None,
         protection_curves: Iterable[dict] | None = None,
         protection_setting_templates: Iterable[dict] | None = None,
+        lv_cable_types: Iterable[dict] | None = None,
+        load_types: Iterable[dict] | None = None,
+        mv_apparatus_types: Iterable[dict] | None = None,
+        lv_apparatus_types: Iterable[dict] | None = None,
+        ct_types: Iterable[dict] | None = None,
+        vt_types: Iterable[dict] | None = None,
+        pv_inverter_types: Iterable[dict] | None = None,
+        bess_inverter_types: Iterable[dict] | None = None,
     ) -> "CatalogRepository":
         def _build_line_type(record: dict) -> LineType:
             data = {"id": record.get("id"), "name": record.get("name")}
@@ -94,6 +119,46 @@ class CatalogRepository:
             data.update(record.get("params") or {})
             return ProtectionSettingTemplate.from_dict(data)
 
+        def _build_lv_cable_type(record: dict) -> LVCableType:
+            data = {"id": record.get("id"), "name": record.get("name")}
+            data.update(record.get("params") or {})
+            return LVCableType.from_dict(data)
+
+        def _build_load_type(record: dict) -> LoadType:
+            data = {"id": record.get("id"), "name": record.get("name")}
+            data.update(record.get("params") or {})
+            return LoadType.from_dict(data)
+
+        def _build_mv_apparatus_type(record: dict) -> MVApparatusType:
+            data = {"id": record.get("id"), "name": record.get("name")}
+            data.update(record.get("params") or {})
+            return MVApparatusType.from_dict(data)
+
+        def _build_lv_apparatus_type(record: dict) -> LVApparatusType:
+            data = {"id": record.get("id"), "name": record.get("name")}
+            data.update(record.get("params") or {})
+            return LVApparatusType.from_dict(data)
+
+        def _build_ct_type(record: dict) -> CTType:
+            data = {"id": record.get("id"), "name": record.get("name")}
+            data.update(record.get("params") or {})
+            return CTType.from_dict(data)
+
+        def _build_vt_type(record: dict) -> VTType:
+            data = {"id": record.get("id"), "name": record.get("name")}
+            data.update(record.get("params") or {})
+            return VTType.from_dict(data)
+
+        def _build_pv_inverter_type(record: dict) -> PVInverterType:
+            data = {"id": record.get("id"), "name": record.get("name")}
+            data.update(record.get("params") or {})
+            return PVInverterType.from_dict(data)
+
+        def _build_bess_inverter_type(record: dict) -> BESSInverterType:
+            data = {"id": record.get("id"), "name": record.get("name")}
+            data.update(record.get("params") or {})
+            return BESSInverterType.from_dict(data)
+
         switch_records = list(switch_equipment_types or [])
         converter_records = list(converter_types or [])
         inverter_records = list(inverter_types or [])
@@ -130,6 +195,38 @@ class CatalogRepository:
                 for item in map(
                     _build_protection_setting_template, protection_setting_template_records
                 )
+            },
+            lv_cable_types={
+                str(item.id): item
+                for item in map(_build_lv_cable_type, list(lv_cable_types or []))
+            },
+            load_types={
+                str(item.id): item
+                for item in map(_build_load_type, list(load_types or []))
+            },
+            mv_apparatus_types={
+                str(item.id): item
+                for item in map(_build_mv_apparatus_type, list(mv_apparatus_types or []))
+            },
+            lv_apparatus_types={
+                str(item.id): item
+                for item in map(_build_lv_apparatus_type, list(lv_apparatus_types or []))
+            },
+            ct_types={
+                str(item.id): item
+                for item in map(_build_ct_type, list(ct_types or []))
+            },
+            vt_types={
+                str(item.id): item
+                for item in map(_build_vt_type, list(vt_types or []))
+            },
+            pv_inverter_types={
+                str(item.id): item
+                for item in map(_build_pv_inverter_type, list(pv_inverter_types or []))
+            },
+            bess_inverter_types={
+                str(item.id): item
+                for item in map(_build_bess_inverter_type, list(bess_inverter_types or []))
             },
         )
 
@@ -189,6 +286,56 @@ class CatalogRepository:
 
     def get_protection_setting_template(self, type_id: str) -> ProtectionSettingTemplate | None:
         return self.protection_setting_templates.get(str(type_id))
+
+    # --- Phase 1: Extended namespace accessors ---
+
+    def list_lv_cable_types(self) -> list[LVCableType]:
+        return self._sorted(self.lv_cable_types.values())
+
+    def get_lv_cable_type(self, type_id: str) -> LVCableType | None:
+        return self.lv_cable_types.get(str(type_id))
+
+    def list_load_types(self) -> list[LoadType]:
+        return self._sorted(self.load_types.values())
+
+    def get_load_type(self, type_id: str) -> LoadType | None:
+        return self.load_types.get(str(type_id))
+
+    def list_mv_apparatus_types(self) -> list[MVApparatusType]:
+        return self._sorted(self.mv_apparatus_types.values())
+
+    def get_mv_apparatus_type(self, type_id: str) -> MVApparatusType | None:
+        return self.mv_apparatus_types.get(str(type_id))
+
+    def list_lv_apparatus_types(self) -> list[LVApparatusType]:
+        return self._sorted(self.lv_apparatus_types.values())
+
+    def get_lv_apparatus_type(self, type_id: str) -> LVApparatusType | None:
+        return self.lv_apparatus_types.get(str(type_id))
+
+    def list_ct_types(self) -> list[CTType]:
+        return self._sorted(self.ct_types.values())
+
+    def get_ct_type(self, type_id: str) -> CTType | None:
+        return self.ct_types.get(str(type_id))
+
+    def list_vt_types(self) -> list[VTType]:
+        return self._sorted(self.vt_types.values())
+
+    def get_vt_type(self, type_id: str) -> VTType | None:
+        return self.vt_types.get(str(type_id))
+
+    def list_pv_inverter_types(self) -> list[PVInverterType]:
+        return self._sorted(self.pv_inverter_types.values())
+
+    def get_pv_inverter_type(self, type_id: str) -> PVInverterType | None:
+        return self.pv_inverter_types.get(str(type_id))
+
+    def list_bess_inverter_types(self) -> list[BESSInverterType]:
+        return self._sorted(self.bess_inverter_types.values())
+
+    def get_bess_inverter_type(self, type_id: str) -> BESSInverterType | None:
+        return self.bess_inverter_types.get(str(type_id))
 
     @staticmethod
     def _sorted(values: Iterable) -> list:
