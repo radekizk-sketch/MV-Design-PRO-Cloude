@@ -699,6 +699,7 @@ export function buildSegmentSNContextMenu(
     // --- Gotowość i wyniki (16-20) ---
     action('show_readiness', 'Pokaż gotowość odcinka...', { handler: handlers.onShowReadiness }),
     action('fix_issues', 'Napraw braki odcinka...', { handler: handlers.onFixIssues }),
+    action('run_sc_analysis', 'Uruchom analizę zwarciową w tym punkcie...', { enabled: result || edit, handler: handlers.onRunScAnalysis }),
     action('show_results', 'Pokaż wyniki (z ostatniej analizy)...', { enabled: result, handler: handlers.onShowResults }),
     action('show_comparison', 'Pokaż porównanie wyników...', { enabled: result, handler: handlers.onShowComparison }),
     action('show_whitebox', 'Pokaż White Box dla odcinka...', { enabled: result, handler: handlers.onShowWhitebox }),
