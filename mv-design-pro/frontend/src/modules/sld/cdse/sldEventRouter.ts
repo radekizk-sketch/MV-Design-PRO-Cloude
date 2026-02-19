@@ -10,7 +10,7 @@
  * - No heuristics in routing logic
  */
 
-import type { CdseContextType, CdseResolvedContext, LogicalViewsProjection } from './contextResolver';
+import type { CdseResolvedContext, LogicalViewsProjection } from './contextResolver';
 import { resolveContext } from './contextResolver';
 import type { ModalDispatchTarget } from './modalDispatcher';
 import { dispatchModal } from './modalDispatcher';
