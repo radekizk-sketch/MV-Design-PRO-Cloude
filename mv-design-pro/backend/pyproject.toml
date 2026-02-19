@@ -10,6 +10,7 @@ packages = [
     {include = "analysis", from = "src"},
     {include = "compliance", from = "src"},
     {include = "domain", from = "src"},
+    {include = "enm", from = "src"},
     {include = "infrastructure", from = "src"},
     {include = "network_model", from = "src"},
     {include = "solvers", from = "src"},

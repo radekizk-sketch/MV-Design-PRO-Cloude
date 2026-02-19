@@ -23,6 +23,7 @@ import { create } from 'zustand';
 import type { EnergyNetworkModel } from '../../types/enm';
 import { computeWizardState } from './wizardStateMachine';
 import type { WizardState, StepIssue } from './wizardStateMachine';
+import { useSnapshotStore } from '../topology/snapshotStore';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -252,6 +253,9 @@ export const useWizardStore = create<WizardStoreState>()((set, get) => ({
           transitionBlockers: [],
           isApplying: false,
         });
+        // Sync snapshotStore after successful wizard step
+        const cId = caseId;
+        useSnapshotStore.getState().refreshFromBackend(cId).catch(() => {});
         emitModelUpdated(resp.revision);
       } else {
         // Combine pre and post issues for display

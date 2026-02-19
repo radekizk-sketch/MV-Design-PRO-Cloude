@@ -48,6 +48,7 @@ CANONICAL_OPS = frozenset({
     "add_genset_nn",
     "add_ups_nn",
     "add_nn_load",
+    "refresh_snapshot",
 })
 
 ALIAS_MAP: dict[str, str] = {
@@ -1733,6 +1734,21 @@ def update_element_parameters(enm: dict[str, Any], payload: dict[str, Any]) -> d
 
 
 # ---------------------------------------------------------------------------
+# refresh_snapshot — odczyt bez modyfikacji
+# ---------------------------------------------------------------------------
+
+
+def refresh_snapshot(enm: dict[str, Any], payload: dict[str, Any]) -> dict[str, Any]:
+    """Zwróć pełną kopertę odpowiedzi bez modyfikacji modelu.
+
+    Używane przez frontend po operacjach Wizard (PUT /enm) lub Topology
+    w celu synchronizacji snapshotStore z bieżącym stanem ENM.
+    Operacja nie mutuje ENM — zwraca readiness, logical_views, fix_actions.
+    """
+    return _response(enm)
+
+
+# ---------------------------------------------------------------------------
 # Dispatcher
 # ---------------------------------------------------------------------------
 
@@ -1747,6 +1763,7 @@ _HANDLERS: dict[str, Any] = {
     "add_transformer_sn_nn": add_transformer_sn_nn,
     "assign_catalog_to_element": assign_catalog_to_element,
     "update_element_parameters": update_element_parameters,
+    "refresh_snapshot": refresh_snapshot,
 }
 
 
@@ -1768,7 +1785,13 @@ def execute_domain_operation(
             "dispatcher.unknown_operation",
         )
 
-    return _HANDLERS[canonical_name](enm_dict, payload)
+    try:
+        return _HANDLERS[canonical_name](enm_dict, payload)
+    except Exception as exc:
+        return _error_response(
+            f"Nieobsłużony wyjątek w operacji '{canonical_name}': {exc}",
+            "dispatcher.unhandled_exception",
+        )
 
 
 # ---------------------------------------------------------------------------
