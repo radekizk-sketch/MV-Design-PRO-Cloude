@@ -2,6 +2,8 @@
  * Context Menu module exports.
  */
 export { ContextMenu } from './ContextMenu';
+export { EngineeringContextMenu } from './EngineeringContextMenu';
+export type { EngineeringContextMenuState, EngineeringContextMenuProps } from './EngineeringContextMenu';
 export {
   buildContextMenuActions,
   buildBusContextMenu,
