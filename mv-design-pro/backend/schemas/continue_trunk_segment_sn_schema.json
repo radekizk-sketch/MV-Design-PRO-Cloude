@@ -4,6 +4,7 @@
   "title": "ContinueTrunkSegmentSN",
   "description": "Payload for continue_trunk_segment_sn domain operation.",
   "type": "object",
+  "additionalProperties": false,
   "properties": {
     "meta": {
       "type": "object",

@@ -4,6 +4,7 @@
   "title": "InsertStationOnSegmentSN",
   "description": "Payload for insert_station_on_segment_sn — supports Variant 2 (full) and Variant 2.1 (engineering).",
   "type": "object",
+  "additionalProperties": false,
   "properties": {
     "meta": {
       "type": "object",

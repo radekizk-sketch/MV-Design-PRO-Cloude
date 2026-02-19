@@ -4,6 +4,7 @@
   "title": "AddLoadToFeederNN",
   "description": "Payload for add_load_to_feeder_nn (alias: add_nn_load) domain operation.",
   "type": "object",
+  "additionalProperties": false,
   "properties": {
     "meta": {
       "type": "object",

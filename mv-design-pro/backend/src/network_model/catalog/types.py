@@ -1367,12 +1367,13 @@ MATERIALIZATION_CONTRACTS: Dict[str, MaterializationContract] = {
     CatalogNamespace.KABEL_SN.value: MaterializationContract(
         namespace=CatalogNamespace.KABEL_SN.value,
         solver_fields=(
-            "r_ohm_per_km", "x_ohm_per_km", "i_max_a", "c_nf_per_km", "u_n_kv",
+            "r_ohm_per_km", "x_ohm_per_km", "rated_current_a", "c_nf_per_km",
+            "voltage_rating_kv",
         ),
         ui_fields=(
             ("r_ohm_per_km", "R [Ω/km] @20°C", "Ω/km"),
             ("x_ohm_per_km", "X [Ω/km]", "Ω/km"),
-            ("i_max_a", "Imax [A]", "A"),
+            ("rated_current_a", "Imax [A]", "A"),
             ("voltage_rating_kv", "U [kV]", "kV"),
             ("cross_section_mm2", "Przekrój", "mm²"),
         ),
@@ -1478,20 +1479,20 @@ MATERIALIZATION_CONTRACTS: Dict[str, MaterializationContract] = {
     ),
     CatalogNamespace.ZABEZPIECZENIE.value: MaterializationContract(
         namespace=CatalogNamespace.ZABEZPIECZENIE.value,
-        solver_fields=("relay_family_pl", "functions"),
+        solver_fields=("name_pl", "vendor", "series"),
         ui_fields=(
-            ("relay_family_pl", "Rodzina", ""),
-            ("functions", "Funkcje", ""),
+            ("name_pl", "Nazwa", ""),
+            ("vendor", "Producent", ""),
+            ("series", "Seria", ""),
         ),
     ),
     CatalogNamespace.NASTAWY_ZABEZPIECZEN.value: MaterializationContract(
         namespace=CatalogNamespace.NASTAWY_ZABEZPIECZEN.value,
-        solver_fields=("curve_pl", "i_pickup_a", "t_multiplier_s", "i_inst_a"),
+        solver_fields=("name_pl", "device_type_ref", "curve_ref"),
         ui_fields=(
-            ("curve_pl", "Krzywa", ""),
-            ("i_pickup_a", "Irozr [A]", "A"),
-            ("t_multiplier_s", "TMS", "s"),
-            ("i_inst_a", "Iinst [A]", "A"),
+            ("name_pl", "Szablon", ""),
+            ("device_type_ref", "Typ urządzenia", ""),
+            ("curve_ref", "Krzywa", ""),
         ),
     ),
 }

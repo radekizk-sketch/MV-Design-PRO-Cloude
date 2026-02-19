@@ -4,6 +4,7 @@
   "title": "AttachProtectionToCB",
   "description": "Payload for attach_protection_to_cb (alias: add_relay) domain operation.",
   "type": "object",
+  "additionalProperties": false,
   "properties": {
     "meta": {
       "type": "object",

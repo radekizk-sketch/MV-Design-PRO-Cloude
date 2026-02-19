@@ -4,6 +4,7 @@
   "title": "DomainOpResponse",
   "description": "Canonical response contract for ALL domain operations.",
   "type": "object",
+  "additionalProperties": false,
   "properties": {
     "snapshot": {
       "type": "object",
