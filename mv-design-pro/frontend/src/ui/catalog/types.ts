@@ -121,11 +121,145 @@ export interface ProtectionDeviceType extends CatalogType {
   rated_current_a?: number;
 }
 
+// =============================================================================
+// Phase 1 — Extended catalog namespaces
+// =============================================================================
+
+/**
+ * LV Cable Type (KABEL_NN).
+ * Source: backend LVCableType dataclass.
+ */
+export interface LVCableType extends CatalogType {
+  u_n_kv: number;
+  r_ohm_per_km: number;
+  x_ohm_per_km: number;
+  i_max_a: number;
+  conductor_material?: string;
+  insulation_type?: string;
+  cross_section_mm2: number;
+  number_of_cores: number;
+}
+
+/**
+ * Load Type (OBCIAZENIE).
+ * Source: backend LoadType dataclass.
+ */
+export interface LoadCatalogType extends CatalogType {
+  model: string;
+  p_kw: number;
+  q_kvar?: number;
+  cos_phi?: number;
+  cos_phi_mode: string;
+  profile_id?: string;
+}
+
+/**
+ * MV Apparatus Type (APARAT_SN).
+ * Source: backend MVApparatusType dataclass.
+ */
+export interface MVApparatusType extends CatalogType {
+  device_kind: string;
+  u_n_kv: number;
+  i_n_a: number;
+  breaking_capacity_ka?: number;
+  making_capacity_ka?: number;
+}
+
+/**
+ * LV Apparatus Type (APARAT_NN).
+ * Source: backend LVApparatusType dataclass.
+ */
+export interface LVApparatusType extends CatalogType {
+  device_kind: string;
+  u_n_kv: number;
+  i_n_a: number;
+  breaking_capacity_ka?: number;
+}
+
+/**
+ * CT Type (Przekładnik prądowy).
+ * Source: backend CTType dataclass.
+ */
+export interface CTCatalogType extends CatalogType {
+  ratio_primary_a: number;
+  ratio_secondary_a: number;
+  accuracy_class?: string;
+  burden_va?: number;
+}
+
+/**
+ * VT Type (Przekładnik napięciowy).
+ * Source: backend VTType dataclass.
+ */
+export interface VTCatalogType extends CatalogType {
+  ratio_primary_v: number;
+  ratio_secondary_v: number;
+  accuracy_class?: string;
+}
+
+/**
+ * PV Inverter Type (ZRODLO_NN_PV).
+ * Source: backend PVInverterType dataclass.
+ */
+export interface PVInverterCatalogType extends CatalogType {
+  s_n_kva: number;
+  p_max_kw: number;
+  cos_phi_min?: number;
+  cos_phi_max?: number;
+  control_mode?: string;
+  grid_code?: string;
+}
+
+/**
+ * BESS Inverter Type (ZRODLO_NN_BESS).
+ * Source: backend BESSInverterType dataclass.
+ */
+export interface BESSInverterCatalogType extends CatalogType {
+  p_charge_kw: number;
+  p_discharge_kw: number;
+  e_kwh: number;
+  s_n_kva?: number;
+}
+
+/**
+ * Catalog Binding — links element to catalog item with version.
+ * Source: backend CatalogBinding / CatalogBindingPayload.
+ */
+export interface CatalogBinding {
+  catalog_namespace: CatalogNamespace;
+  catalog_item_id: string;
+  catalog_item_version: string;
+  materialize?: boolean;
+  snapshot_mapping_version?: string;
+}
+
+/**
+ * Canonical catalog namespace identifiers.
+ */
+export type CatalogNamespace =
+  | 'KABEL_SN'
+  | 'LINIA_SN'
+  | 'TRAFO_SN_NN'
+  | 'APARAT_SN'
+  | 'APARAT_NN'
+  | 'KABEL_NN'
+  | 'CT'
+  | 'VT'
+  | 'OBCIAZENIE'
+  | 'ZRODLO_NN_PV'
+  | 'ZRODLO_NN_BESS'
+  | 'ZABEZPIECZENIE'
+  | 'NASTAWY_ZABEZPIECZEN'
+  | 'CONVERTER'
+  | 'INVERTER';
+
 /**
  * Union of all catalog type categories.
  */
 export type TypeCategory = 'LINE' | 'CABLE' | 'TRANSFORMER' | 'SWITCH_EQUIPMENT'
-  | 'CONVERTER' | 'MEASUREMENT_TRANSFORMER' | 'PROTECTION_DEVICE';
+  | 'CONVERTER' | 'MEASUREMENT_TRANSFORMER' | 'PROTECTION_DEVICE'
+  | 'LV_CABLE' | 'LOAD' | 'MV_APPARATUS' | 'LV_APPARATUS'
+  | 'CT' | 'VT' | 'PV_INVERTER' | 'BESS_INVERTER';
 
 /**
  * Type reference in element (points to catalog).

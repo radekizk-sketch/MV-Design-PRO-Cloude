@@ -21,13 +21,25 @@ from .resolver import (
     resolve_transformer_params,
 )
 from .types import (
+    BESSInverterType,
+    CTType,
     CableType,
+    CatalogBinding,
+    CatalogNamespace,
     ConverterKind,
     ConverterType,
     InverterType,
+    LVApparatusType,
+    LVCableType,
     LineType,
+    LoadType,
+    MATERIALIZATION_CONTRACTS,
+    MVApparatusType,
+    MaterializationContract,
+    PVInverterType,
     SwitchEquipmentType,
     TransformerType,
+    VTType,
 )
 
 __all__ = [
@@ -38,8 +50,23 @@ __all__ = [
     "ConverterKind",
     "ConverterType",
     "InverterType",
+    # Phase 1 — extended namespaces
+    "LVCableType",
+    "LoadType",
+    "MVApparatusType",
+    "LVApparatusType",
+    "CTType",
+    "VTType",
+    "PVInverterType",
+    "BESSInverterType",
+    "CatalogNamespace",
+    "CatalogBinding",
+    "MaterializationContract",
+    "MATERIALIZATION_CONTRACTS",
+    # Repository
     "CatalogRepository",
     "get_default_mv_catalog",
+    # Resolver
     "ParameterSource",
     "ResolvedLineParams",
     "ResolvedThermalParams",

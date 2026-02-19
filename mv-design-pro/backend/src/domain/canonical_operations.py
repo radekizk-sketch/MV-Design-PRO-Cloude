@@ -392,6 +392,13 @@ ALIAS_MAP: dict[str, str] = {
     "add_nn_source_field": "add_nn_outgoing_field",  # if semantically same
     "update_nn_bus_sections": "update_element_parameters",
     "update_nn_coupler_state": "update_element_parameters",
+    # Prompt-canonical aliases (Faza 2 alignment)
+    "add_nn_feeder": "add_nn_outgoing_field",
+    "add_nn_source_pv": "add_pv_inverter_nn",
+    "add_nn_source_bess": "add_bess_inverter_nn",
+    "attach_protection_to_cb": "add_relay",
+    "update_protection_settings": "update_relay_settings",
+    "add_load_to_feeder_nn": "add_nn_load",
 }
 
 
@@ -682,6 +689,101 @@ READINESS_CODES: dict[str, ReadinessCodeSpec] = {
         message_pl="Analiza zablokowana przez niezaspokojone wymagania gotowości",
         fix_action_id=None,
         fix_navigation={"panel": "readiness"},
+    ),
+    # Phase 8 — Extended validation codes for catalog materialization
+    "catalog.binding_version_missing": ReadinessCodeSpec(
+        code="catalog.binding_version_missing",
+        area=ReadinessArea.CATALOGS,
+        priority=1,
+        level=ReadinessLevel.BLOCKER,
+        message_pl="Brak wersji katalogu w wiązaniu elementu obliczeniowego",
+        fix_action_id="fix_catalog_version",
+        fix_navigation={"panel": "inspector", "tab": "katalog", "modal": "MODAL_ZMIEN_TYP_Z_KATALOGU"},
+    ),
+    "catalog.binding_missing": ReadinessCodeSpec(
+        code="catalog.binding_missing",
+        area=ReadinessArea.CATALOGS,
+        priority=2,
+        level=ReadinessLevel.BLOCKER,
+        message_pl="Element obliczeniowy nie ma przypisanego katalogu",
+        fix_action_id="fix_catalog_binding",
+        fix_navigation={"panel": "inspector", "tab": "katalog", "modal": "MODAL_ZMIEN_TYP_Z_KATALOGU"},
+    ),
+    "catalog.materialization_failed": ReadinessCodeSpec(
+        code="catalog.materialization_failed",
+        area=ReadinessArea.CATALOGS,
+        priority=2,
+        level=ReadinessLevel.BLOCKER,
+        message_pl="Materializacja parametrów z katalogu nie powiodła się",
+        fix_action_id="fix_catalog_rematerialize",
+        fix_navigation={"panel": "inspector", "tab": "katalog"},
+    ),
+    # OZE — PV/BESS transformer rule
+    "oze.pv_no_transformer": ReadinessCodeSpec(
+        code="oze.pv_no_transformer",
+        area=ReadinessArea.GENERATORS,
+        priority=1,
+        level=ReadinessLevel.BLOCKER,
+        message_pl="Źródło PV nie ma transformatora w ścieżce zasilania (zakaz przyłączenia do SN bez transformatora)",
+        fix_action_id="fix_pv_transformer",
+        fix_navigation={"panel": "inspector", "tab": "transformator", "modal": "MODAL_WSTAW_STACJE_SN_NN_WARIANT_2"},
+    ),
+    "oze.bess_no_transformer": ReadinessCodeSpec(
+        code="oze.bess_no_transformer",
+        area=ReadinessArea.GENERATORS,
+        priority=1,
+        level=ReadinessLevel.BLOCKER,
+        message_pl="Źródło BESS nie ma transformatora w ścieżce zasilania (zakaz przyłączenia do SN bez transformatora)",
+        fix_action_id="fix_bess_transformer",
+        fix_navigation={"panel": "inspector", "tab": "transformator", "modal": "MODAL_WSTAW_STACJE_SN_NN_WARIANT_2"},
+    ),
+    # Apparatus (aparaty łączeniowe)
+    "apparatus.sn_catalog_missing": ReadinessCodeSpec(
+        code="apparatus.sn_catalog_missing",
+        area=ReadinessArea.STATIONS,
+        priority=3,
+        level=ReadinessLevel.BLOCKER,
+        message_pl="Aparat SN nie ma przypisanego katalogu",
+        fix_action_id="fix_apparatus_sn_catalog",
+        fix_navigation={"panel": "inspector", "tab": "katalog", "modal": "MODAL_ZMIEN_TYP_Z_KATALOGU"},
+    ),
+    "apparatus.nn_catalog_missing": ReadinessCodeSpec(
+        code="apparatus.nn_catalog_missing",
+        area=ReadinessArea.STATIONS,
+        priority=3,
+        level=ReadinessLevel.BLOCKER,
+        message_pl="Aparat nN nie ma przypisanego katalogu",
+        fix_action_id="fix_apparatus_nn_catalog",
+        fix_navigation={"panel": "inspector", "tab": "katalog", "modal": "MODAL_ZMIEN_TYP_Z_KATALOGU"},
+    ),
+    # Load
+    "load.catalog_missing": ReadinessCodeSpec(
+        code="load.catalog_missing",
+        area=ReadinessArea.CATALOGS,
+        priority=3,
+        level=ReadinessLevel.WARNING,
+        message_pl="Obciążenie nie ma przypisanego katalogu",
+        fix_action_id="fix_load_catalog",
+        fix_navigation={"panel": "inspector", "tab": "katalog", "modal": "MODAL_ZMIEN_TYP_Z_KATALOGU"},
+    ),
+    "load.power_zero": ReadinessCodeSpec(
+        code="load.power_zero",
+        area=ReadinessArea.CATALOGS,
+        priority=3,
+        level=ReadinessLevel.WARNING,
+        message_pl="Moc czynna obciążenia wynosi 0 kW",
+        fix_action_id="fix_load_power",
+        fix_navigation={"panel": "inspector", "tab": "parametry", "focus": "p_kw"},
+    ),
+    # LV cable
+    "nn.cable_catalog_missing": ReadinessCodeSpec(
+        code="nn.cable_catalog_missing",
+        area=ReadinessArea.CATALOGS,
+        priority=3,
+        level=ReadinessLevel.WARNING,
+        message_pl="Kabel nN nie ma przypisanego katalogu",
+        fix_action_id="fix_nn_cable_catalog",
+        fix_navigation={"panel": "inspector", "tab": "katalog", "modal": "MODAL_ZMIEN_TYP_Z_KATALOGU"},
     ),
 }
 

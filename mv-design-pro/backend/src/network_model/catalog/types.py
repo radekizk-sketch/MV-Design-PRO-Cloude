@@ -25,8 +25,102 @@ Usage:
 
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, Tuple
 from uuid import uuid4
+
+
+# =============================================================================
+# CATALOG NAMESPACE ENUM — kanoniczne nazwy przestrzeni nazw katalogu
+# =============================================================================
+
+
+class CatalogNamespace(Enum):
+    """Canonical catalog namespace identifiers.
+
+    Each namespace corresponds to a distinct type category in the catalog.
+    Binding: This enum is the SINGLE SOURCE OF TRUTH for namespace names.
+    """
+
+    KABEL_SN = "KABEL_SN"
+    LINIA_SN = "LINIA_SN"
+    TRAFO_SN_NN = "TRAFO_SN_NN"
+    APARAT_SN = "APARAT_SN"
+    APARAT_NN = "APARAT_NN"
+    KABEL_NN = "KABEL_NN"
+    CT = "CT"
+    VT = "VT"
+    OBCIAZENIE = "OBCIAZENIE"
+    ZRODLO_NN_PV = "ZRODLO_NN_PV"
+    ZRODLO_NN_BESS = "ZRODLO_NN_BESS"
+    ZABEZPIECZENIE = "ZABEZPIECZENIE"
+    NASTAWY_ZABEZPIECZEN = "NASTAWY_ZABEZPIECZEN"
+    CONVERTER = "CONVERTER"
+    INVERTER = "INVERTER"
+
+
+# =============================================================================
+# CATALOG BINDING — canonical binding contract
+# =============================================================================
+
+
+@dataclass(frozen=True)
+class CatalogBinding:
+    """Canonical catalog binding — links element to catalog item.
+
+    Used in every domain operation that creates or assigns catalog types.
+    """
+
+    catalog_namespace: str
+    catalog_item_id: str
+    catalog_item_version: str
+    materialize: bool = True
+    snapshot_mapping_version: str = "1.0"
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "catalog_namespace": self.catalog_namespace,
+            "catalog_item_id": self.catalog_item_id,
+            "catalog_item_version": self.catalog_item_version,
+            "materialize": self.materialize,
+            "snapshot_mapping_version": self.snapshot_mapping_version,
+        }
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "CatalogBinding":
+        return cls(
+            catalog_namespace=str(data.get("catalog_namespace", "")),
+            catalog_item_id=str(data.get("catalog_item_id", "")),
+            catalog_item_version=str(data.get("catalog_item_version", "")),
+            materialize=bool(data.get("materialize", True)),
+            snapshot_mapping_version=str(data.get("snapshot_mapping_version", "1.0")),
+        )
+
+
+# =============================================================================
+# MATERIALIZATION CONTRACT — what gets copied to Snapshot
+# =============================================================================
+
+
+@dataclass(frozen=True)
+class MaterializationContract:
+    """Describes which fields from a catalog item get materialized into Snapshot.
+
+    solver_fields: tuple of field names copied for solver use
+    ui_fields: tuple of (field_name, display_label_pl, unit) for UI preview
+    """
+
+    namespace: str
+    solver_fields: Tuple[str, ...]
+    ui_fields: Tuple[Tuple[str, str, str], ...]
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "namespace": self.namespace,
+            "solver_fields": list(self.solver_fields),
+            "ui_fields": [
+                {"field": f, "label_pl": lbl, "unit": u} for f, lbl, u in self.ui_fields
+            ],
+        }
 
 
 @dataclass(frozen=True)
@@ -797,3 +891,608 @@ class ProtectionSettingTemplate:
             curve_ref=data.get("curve_ref"),
             setting_fields=data.get("setting_fields") or [],
         )
+
+
+# =============================================================================
+# LV CABLE TYPE (KABEL_NN) — kable niskiego napięcia
+# =============================================================================
+
+
+@dataclass(frozen=True)
+class LVCableType:
+    """Immutable LV cable type definition (0.4 kV).
+
+    Attributes:
+        id: Unique identifier.
+        name: Type name (e.g., "YAKY 4x120 mm²").
+        manufacturer: Manufacturer name (optional).
+        u_n_kv: Rated voltage [kV] (typically 0.4 or 0.69).
+        r_ohm_per_km: Resistance per km at 20°C [Ω/km].
+        x_ohm_per_km: Reactance per km [Ω/km].
+        i_max_a: Maximum continuous current [A].
+        conductor_material: Conductor material ("AL" or "CU").
+        insulation_type: Insulation type (e.g., "PVC", "XLPE").
+        cross_section_mm2: Conductor cross-section [mm²].
+        number_of_cores: Number of cores (3, 4, or 5).
+    """
+
+    id: str
+    name: str
+    u_n_kv: float
+    r_ohm_per_km: float
+    x_ohm_per_km: float
+    i_max_a: float = 0.0
+    manufacturer: Optional[str] = None
+    conductor_material: Optional[str] = None
+    insulation_type: Optional[str] = None
+    cross_section_mm2: float = 0.0
+    number_of_cores: int = 4
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "id": self.id,
+            "name": self.name,
+            "u_n_kv": self.u_n_kv,
+            "r_ohm_per_km": self.r_ohm_per_km,
+            "x_ohm_per_km": self.x_ohm_per_km,
+            "i_max_a": self.i_max_a,
+            "manufacturer": self.manufacturer,
+            "conductor_material": self.conductor_material,
+            "insulation_type": self.insulation_type,
+            "cross_section_mm2": self.cross_section_mm2,
+            "number_of_cores": self.number_of_cores,
+        }
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "LVCableType":
+        return cls(
+            id=str(data.get("id", str(uuid4()))),
+            name=str(data.get("name", "")),
+            u_n_kv=float(data.get("u_n_kv", 0.4)),
+            r_ohm_per_km=float(data.get("r_ohm_per_km", 0.0)),
+            x_ohm_per_km=float(data.get("x_ohm_per_km", 0.0)),
+            i_max_a=float(data.get("i_max_a", 0.0)),
+            manufacturer=data.get("manufacturer"),
+            conductor_material=data.get("conductor_material"),
+            insulation_type=data.get("insulation_type"),
+            cross_section_mm2=float(data.get("cross_section_mm2", 0.0)),
+            number_of_cores=int(data.get("number_of_cores", 4)),
+        )
+
+
+# =============================================================================
+# LOAD TYPE (OBCIAZENIE) — typy obciążeń
+# =============================================================================
+
+
+@dataclass(frozen=True)
+class LoadType:
+    """Immutable load type definition for catalog.
+
+    Attributes:
+        id: Unique identifier.
+        name: Type name (e.g., "Obciążenie mieszkaniowe 15 kW").
+        model: Load model ("PQ").
+        p_kw: Active power [kW].
+        q_kvar: Reactive power [kvar] (optional, computed from cos_phi if absent).
+        cos_phi: Power factor (optional).
+        cos_phi_mode: Power factor mode ("IND", "POJ", "BRAK").
+        profile_id: Reference to load profile (optional).
+        manufacturer: Manufacturer/source (optional).
+    """
+
+    id: str
+    name: str
+    model: str = "PQ"
+    p_kw: float = 0.0
+    q_kvar: Optional[float] = None
+    cos_phi: Optional[float] = None
+    cos_phi_mode: str = "IND"
+    profile_id: Optional[str] = None
+    manufacturer: Optional[str] = None
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "id": self.id,
+            "name": self.name,
+            "model": self.model,
+            "p_kw": self.p_kw,
+            "q_kvar": self.q_kvar,
+            "cos_phi": self.cos_phi,
+            "cos_phi_mode": self.cos_phi_mode,
+            "profile_id": self.profile_id,
+            "manufacturer": self.manufacturer,
+        }
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "LoadType":
+        return cls(
+            id=str(data.get("id", str(uuid4()))),
+            name=str(data.get("name", "")),
+            model=str(data.get("model", "PQ")),
+            p_kw=float(data.get("p_kw", 0.0)),
+            q_kvar=(
+                float(data["q_kvar"]) if data.get("q_kvar") is not None else None
+            ),
+            cos_phi=(
+                float(data["cos_phi"]) if data.get("cos_phi") is not None else None
+            ),
+            cos_phi_mode=str(data.get("cos_phi_mode", "IND")),
+            profile_id=data.get("profile_id"),
+            manufacturer=data.get("manufacturer"),
+        )
+
+
+# =============================================================================
+# MV APPARATUS TYPE (APARAT_SN) — aparaty łączeniowe SN
+# =============================================================================
+
+
+@dataclass(frozen=True)
+class MVApparatusType:
+    """Immutable MV switchgear apparatus type (APARAT_SN).
+
+    Attributes:
+        id: Unique identifier.
+        name: Type name.
+        device_kind: Device kind (WYLACZNIK, ROZLACZNIK, LACZNIK_SEKCYJNY).
+        u_n_kv: Rated voltage [kV].
+        i_n_a: Rated current [A].
+        breaking_capacity_ka: Breaking capacity [kA] (optional).
+        making_capacity_ka: Making capacity [kA] (optional).
+        manufacturer: Manufacturer (optional).
+    """
+
+    id: str
+    name: str
+    device_kind: str = "WYLACZNIK"
+    u_n_kv: float = 0.0
+    i_n_a: float = 0.0
+    breaking_capacity_ka: Optional[float] = None
+    making_capacity_ka: Optional[float] = None
+    manufacturer: Optional[str] = None
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "id": self.id,
+            "name": self.name,
+            "device_kind": self.device_kind,
+            "u_n_kv": self.u_n_kv,
+            "i_n_a": self.i_n_a,
+            "breaking_capacity_ka": self.breaking_capacity_ka,
+            "making_capacity_ka": self.making_capacity_ka,
+            "manufacturer": self.manufacturer,
+        }
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "MVApparatusType":
+        return cls(
+            id=str(data.get("id", str(uuid4()))),
+            name=str(data.get("name", "")),
+            device_kind=str(data.get("device_kind", "WYLACZNIK")),
+            u_n_kv=float(data.get("u_n_kv", 0.0)),
+            i_n_a=float(data.get("i_n_a", 0.0)),
+            breaking_capacity_ka=(
+                float(data["breaking_capacity_ka"])
+                if data.get("breaking_capacity_ka") is not None
+                else None
+            ),
+            making_capacity_ka=(
+                float(data["making_capacity_ka"])
+                if data.get("making_capacity_ka") is not None
+                else None
+            ),
+            manufacturer=data.get("manufacturer"),
+        )
+
+
+# =============================================================================
+# LV APPARATUS TYPE (APARAT_NN) — aparaty łączeniowe nN
+# =============================================================================
+
+
+@dataclass(frozen=True)
+class LVApparatusType:
+    """Immutable LV switchgear apparatus type (APARAT_NN).
+
+    Attributes:
+        id: Unique identifier.
+        name: Type name.
+        device_kind: Device kind (WYLACZNIK_GLOWNY, WYLACZNIK_ODPLYWOWY,
+                     ROZLACZNIK_BEZPIECZNIKOWY).
+        u_n_kv: Rated voltage [kV] (typically 0.4).
+        i_n_a: Rated current [A].
+        breaking_capacity_ka: Breaking capacity [kA] (optional).
+        manufacturer: Manufacturer (optional).
+    """
+
+    id: str
+    name: str
+    device_kind: str = "WYLACZNIK_GLOWNY"
+    u_n_kv: float = 0.4
+    i_n_a: float = 0.0
+    breaking_capacity_ka: Optional[float] = None
+    manufacturer: Optional[str] = None
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "id": self.id,
+            "name": self.name,
+            "device_kind": self.device_kind,
+            "u_n_kv": self.u_n_kv,
+            "i_n_a": self.i_n_a,
+            "breaking_capacity_ka": self.breaking_capacity_ka,
+            "manufacturer": self.manufacturer,
+        }
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "LVApparatusType":
+        return cls(
+            id=str(data.get("id", str(uuid4()))),
+            name=str(data.get("name", "")),
+            device_kind=str(data.get("device_kind", "WYLACZNIK_GLOWNY")),
+            u_n_kv=float(data.get("u_n_kv", 0.4)),
+            i_n_a=float(data.get("i_n_a", 0.0)),
+            breaking_capacity_ka=(
+                float(data["breaking_capacity_ka"])
+                if data.get("breaking_capacity_ka") is not None
+                else None
+            ),
+            manufacturer=data.get("manufacturer"),
+        )
+
+
+# =============================================================================
+# CT TYPE (Przekładnik prądowy)
+# =============================================================================
+
+
+@dataclass(frozen=True)
+class CTType:
+    """Immutable current transformer type.
+
+    Attributes:
+        id: Unique identifier.
+        name: Type name.
+        ratio_primary_a: Primary current [A].
+        ratio_secondary_a: Secondary current [A] (1 or 5).
+        accuracy_class: Accuracy class (e.g., "5P20").
+        burden_va: Rated burden [VA] (optional).
+        manufacturer: Manufacturer (optional).
+    """
+
+    id: str
+    name: str
+    ratio_primary_a: float
+    ratio_secondary_a: float = 5.0
+    accuracy_class: Optional[str] = None
+    burden_va: Optional[float] = None
+    manufacturer: Optional[str] = None
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "id": self.id,
+            "name": self.name,
+            "ratio_primary_a": self.ratio_primary_a,
+            "ratio_secondary_a": self.ratio_secondary_a,
+            "accuracy_class": self.accuracy_class,
+            "burden_va": self.burden_va,
+            "manufacturer": self.manufacturer,
+        }
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "CTType":
+        return cls(
+            id=str(data.get("id", str(uuid4()))),
+            name=str(data.get("name", "")),
+            ratio_primary_a=float(data.get("ratio_primary_a", 0.0)),
+            ratio_secondary_a=float(data.get("ratio_secondary_a", 5.0)),
+            accuracy_class=data.get("accuracy_class"),
+            burden_va=(
+                float(data["burden_va"]) if data.get("burden_va") is not None else None
+            ),
+            manufacturer=data.get("manufacturer"),
+        )
+
+
+# =============================================================================
+# VT TYPE (Przekładnik napięciowy)
+# =============================================================================
+
+
+@dataclass(frozen=True)
+class VTType:
+    """Immutable voltage transformer type.
+
+    Attributes:
+        id: Unique identifier.
+        name: Type name.
+        ratio_primary_v: Primary voltage [V].
+        ratio_secondary_v: Secondary voltage [V] (typically 100).
+        accuracy_class: Accuracy class (e.g., "0.5").
+        manufacturer: Manufacturer (optional).
+    """
+
+    id: str
+    name: str
+    ratio_primary_v: float
+    ratio_secondary_v: float = 100.0
+    accuracy_class: Optional[str] = None
+    manufacturer: Optional[str] = None
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "id": self.id,
+            "name": self.name,
+            "ratio_primary_v": self.ratio_primary_v,
+            "ratio_secondary_v": self.ratio_secondary_v,
+            "accuracy_class": self.accuracy_class,
+            "manufacturer": self.manufacturer,
+        }
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "VTType":
+        return cls(
+            id=str(data.get("id", str(uuid4()))),
+            name=str(data.get("name", "")),
+            ratio_primary_v=float(data.get("ratio_primary_v", 0.0)),
+            ratio_secondary_v=float(data.get("ratio_secondary_v", 100.0)),
+            accuracy_class=data.get("accuracy_class"),
+            manufacturer=data.get("manufacturer"),
+        )
+
+
+# =============================================================================
+# PV INVERTER TYPE (ZRODLO_NN_PV) — falownik PV dedykowany nN
+# =============================================================================
+
+
+@dataclass(frozen=True)
+class PVInverterType:
+    """Immutable PV inverter catalog type for LV connection.
+
+    Attributes:
+        id: Unique identifier.
+        name: Type name.
+        s_n_kva: Rated apparent power [kVA].
+        p_max_kw: Maximum active power [kW].
+        cos_phi_min: Minimum power factor (optional).
+        cos_phi_max: Maximum power factor (optional).
+        control_mode: Default control mode (optional).
+        grid_code: Grid code reference (optional).
+        manufacturer: Manufacturer (optional).
+    """
+
+    id: str
+    name: str
+    s_n_kva: float
+    p_max_kw: float
+    cos_phi_min: Optional[float] = None
+    cos_phi_max: Optional[float] = None
+    control_mode: Optional[str] = None
+    grid_code: Optional[str] = None
+    manufacturer: Optional[str] = None
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "id": self.id,
+            "name": self.name,
+            "s_n_kva": self.s_n_kva,
+            "p_max_kw": self.p_max_kw,
+            "cos_phi_min": self.cos_phi_min,
+            "cos_phi_max": self.cos_phi_max,
+            "control_mode": self.control_mode,
+            "grid_code": self.grid_code,
+            "manufacturer": self.manufacturer,
+        }
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "PVInverterType":
+        return cls(
+            id=str(data.get("id", str(uuid4()))),
+            name=str(data.get("name", "")),
+            s_n_kva=float(data.get("s_n_kva", 0.0)),
+            p_max_kw=float(data.get("p_max_kw", 0.0)),
+            cos_phi_min=(
+                float(data["cos_phi_min"]) if data.get("cos_phi_min") is not None else None
+            ),
+            cos_phi_max=(
+                float(data["cos_phi_max"]) if data.get("cos_phi_max") is not None else None
+            ),
+            control_mode=data.get("control_mode"),
+            grid_code=data.get("grid_code"),
+            manufacturer=data.get("manufacturer"),
+        )
+
+
+# =============================================================================
+# BESS INVERTER TYPE (ZRODLO_NN_BESS) — falownik BESS dedykowany nN
+# =============================================================================
+
+
+@dataclass(frozen=True)
+class BESSInverterType:
+    """Immutable BESS inverter catalog type for LV connection.
+
+    Attributes:
+        id: Unique identifier.
+        name: Type name.
+        p_charge_kw: Charge power [kW].
+        p_discharge_kw: Discharge power [kW].
+        e_kwh: Nameplate energy capacity [kWh].
+        s_n_kva: Rated apparent power [kVA] (optional).
+        manufacturer: Manufacturer (optional).
+    """
+
+    id: str
+    name: str
+    p_charge_kw: float
+    p_discharge_kw: float
+    e_kwh: float
+    s_n_kva: Optional[float] = None
+    manufacturer: Optional[str] = None
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "id": self.id,
+            "name": self.name,
+            "p_charge_kw": self.p_charge_kw,
+            "p_discharge_kw": self.p_discharge_kw,
+            "e_kwh": self.e_kwh,
+            "s_n_kva": self.s_n_kva,
+            "manufacturer": self.manufacturer,
+        }
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "BESSInverterType":
+        return cls(
+            id=str(data.get("id", str(uuid4()))),
+            name=str(data.get("name", "")),
+            p_charge_kw=float(data.get("p_charge_kw", 0.0)),
+            p_discharge_kw=float(data.get("p_discharge_kw", 0.0)),
+            e_kwh=float(data.get("e_kwh", 0.0)),
+            s_n_kva=(
+                float(data["s_n_kva"]) if data.get("s_n_kva") is not None else None
+            ),
+            manufacturer=data.get("manufacturer"),
+        )
+
+
+# =============================================================================
+# MATERIALIZATION CONTRACTS — canonical mappings per namespace
+# =============================================================================
+
+
+MATERIALIZATION_CONTRACTS: Dict[str, MaterializationContract] = {
+    CatalogNamespace.KABEL_SN.value: MaterializationContract(
+        namespace=CatalogNamespace.KABEL_SN.value,
+        solver_fields=(
+            "r_ohm_per_km", "x_ohm_per_km", "rated_current_a", "c_nf_per_km",
+            "voltage_rating_kv",
+        ),
+        ui_fields=(
+            ("r_ohm_per_km", "R [Ω/km] @20°C", "Ω/km"),
+            ("x_ohm_per_km", "X [Ω/km]", "Ω/km"),
+            ("rated_current_a", "Imax [A]", "A"),
+            ("voltage_rating_kv", "U [kV]", "kV"),
+            ("cross_section_mm2", "Przekrój", "mm²"),
+        ),
+    ),
+    CatalogNamespace.LINIA_SN.value: MaterializationContract(
+        namespace=CatalogNamespace.LINIA_SN.value,
+        solver_fields=(
+            "r_ohm_per_km", "x_ohm_per_km", "b_us_per_km", "rated_current_a",
+        ),
+        ui_fields=(
+            ("r_ohm_per_km", "R [Ω/km] @20°C", "Ω/km"),
+            ("x_ohm_per_km", "X [Ω/km]", "Ω/km"),
+            ("b_us_per_km", "B [μS/km]", "μS/km"),
+            ("rated_current_a", "In [A]", "A"),
+        ),
+    ),
+    CatalogNamespace.TRAFO_SN_NN.value: MaterializationContract(
+        namespace=CatalogNamespace.TRAFO_SN_NN.value,
+        solver_fields=(
+            "rated_power_mva", "voltage_hv_kv", "voltage_lv_kv",
+            "uk_percent", "p0_kw", "pk_kw", "vector_group",
+        ),
+        ui_fields=(
+            ("rated_power_mva", "Sn [MVA]", "MVA"),
+            ("uk_percent", "uk%", "%"),
+            ("p0_kw", "P0 [kW]", "kW"),
+            ("pk_kw", "Pk [kW]", "kW"),
+            ("vector_group", "Grupa połączeń", ""),
+        ),
+    ),
+    CatalogNamespace.APARAT_SN.value: MaterializationContract(
+        namespace=CatalogNamespace.APARAT_SN.value,
+        solver_fields=("u_n_kv", "i_n_a"),
+        ui_fields=(
+            ("u_n_kv", "Un [kV]", "kV"),
+            ("i_n_a", "In [A]", "A"),
+            ("breaking_capacity_ka", "Ik [kA]", "kA"),
+        ),
+    ),
+    CatalogNamespace.APARAT_NN.value: MaterializationContract(
+        namespace=CatalogNamespace.APARAT_NN.value,
+        solver_fields=("u_n_kv", "i_n_a"),
+        ui_fields=(
+            ("u_n_kv", "Un [kV]", "kV"),
+            ("i_n_a", "In [A]", "A"),
+        ),
+    ),
+    CatalogNamespace.KABEL_NN.value: MaterializationContract(
+        namespace=CatalogNamespace.KABEL_NN.value,
+        solver_fields=("r_ohm_per_km", "x_ohm_per_km", "i_max_a", "u_n_kv"),
+        ui_fields=(
+            ("r_ohm_per_km", "R [Ω/km]", "Ω/km"),
+            ("x_ohm_per_km", "X [Ω/km]", "Ω/km"),
+            ("i_max_a", "Imax [A]", "A"),
+            ("cross_section_mm2", "Przekrój", "mm²"),
+        ),
+    ),
+    CatalogNamespace.CT.value: MaterializationContract(
+        namespace=CatalogNamespace.CT.value,
+        solver_fields=("ratio_primary_a", "ratio_secondary_a", "accuracy_class"),
+        ui_fields=(
+            ("ratio_primary_a", "I1 [A]", "A"),
+            ("ratio_secondary_a", "I2 [A]", "A"),
+            ("accuracy_class", "Klasa", ""),
+        ),
+    ),
+    CatalogNamespace.VT.value: MaterializationContract(
+        namespace=CatalogNamespace.VT.value,
+        solver_fields=("ratio_primary_v", "ratio_secondary_v"),
+        ui_fields=(
+            ("ratio_primary_v", "U1 [V]", "V"),
+            ("ratio_secondary_v", "U2 [V]", "V"),
+            ("accuracy_class", "Klasa", ""),
+        ),
+    ),
+    CatalogNamespace.OBCIAZENIE.value: MaterializationContract(
+        namespace=CatalogNamespace.OBCIAZENIE.value,
+        solver_fields=("p_kw", "q_kvar", "model"),
+        ui_fields=(
+            ("p_kw", "P [kW]", "kW"),
+            ("q_kvar", "Q [kvar]", "kvar"),
+            ("cos_phi", "cos φ", ""),
+        ),
+    ),
+    CatalogNamespace.ZRODLO_NN_PV.value: MaterializationContract(
+        namespace=CatalogNamespace.ZRODLO_NN_PV.value,
+        solver_fields=("s_n_kva", "p_max_kw"),
+        ui_fields=(
+            ("s_n_kva", "Sn [kVA]", "kVA"),
+            ("p_max_kw", "Pmax [kW]", "kW"),
+            ("cos_phi_min", "cos φ min", ""),
+            ("cos_phi_max", "cos φ max", ""),
+        ),
+    ),
+    CatalogNamespace.ZRODLO_NN_BESS.value: MaterializationContract(
+        namespace=CatalogNamespace.ZRODLO_NN_BESS.value,
+        solver_fields=("p_charge_kw", "p_discharge_kw", "e_kwh", "s_n_kva"),
+        ui_fields=(
+            ("p_charge_kw", "Pład [kW]", "kW"),
+            ("p_discharge_kw", "Prozł [kW]", "kW"),
+            ("e_kwh", "E [kWh]", "kWh"),
+        ),
+    ),
+    CatalogNamespace.ZABEZPIECZENIE.value: MaterializationContract(
+        namespace=CatalogNamespace.ZABEZPIECZENIE.value,
+        solver_fields=("name_pl", "vendor", "series"),
+        ui_fields=(
+            ("name_pl", "Nazwa", ""),
+            ("vendor", "Producent", ""),
+            ("series", "Seria", ""),
+        ),
+    ),
+    CatalogNamespace.NASTAWY_ZABEZPIECZEN.value: MaterializationContract(
+        namespace=CatalogNamespace.NASTAWY_ZABEZPIECZEN.value,
+        solver_fields=("name_pl", "device_type_ref", "curve_ref"),
+        ui_fields=(
+            ("name_pl", "Szablon", ""),
+            ("device_type_ref", "Typ urządzenia", ""),
+            ("curve_ref", "Krzywa", ""),
+        ),
+    ),
+}

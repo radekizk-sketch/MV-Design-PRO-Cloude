@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "catalog_binding_v1",
+  "title": "CatalogBinding",
+  "description": "Canonical catalog binding — links element to catalog item with version and materialization flag.",
+  "type": "object",
+  "properties": {
+    "catalog_namespace": {
+      "type": "string",
+      "enum": [
+        "KABEL_SN", "LINIA_SN", "TRAFO_SN_NN", "APARAT_SN", "APARAT_NN",
+        "KABEL_NN", "CT", "VT", "OBCIAZENIE", "ZRODLO_NN_PV", "ZRODLO_NN_BESS",
+        "ZABEZPIECZENIE", "NASTAWY_ZABEZPIECZEN", "CONVERTER", "INVERTER"
+      ]
+    },
+    "catalog_item_id": { "type": "string", "minLength": 1 },
+    "catalog_item_version": { "type": "string", "minLength": 1 },
+    "materialize": { "type": "boolean", "default": true },
+    "snapshot_mapping_version": { "type": "string", "default": "1.0" }
+  },
+  "required": ["catalog_namespace", "catalog_item_id", "catalog_item_version"],
+  "additionalProperties": false
+}

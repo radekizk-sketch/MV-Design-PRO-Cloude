@@ -93,9 +93,75 @@ export interface OverlayPayloadV1 {
 }
 
 /**
+ * Analysis overlay type identifiers.
+ * Used by backend to tag overlay payloads with their source analysis.
+ */
+export type OverlayAnalysisType =
+  | 'SC_3F'
+  | 'SC_1F'
+  | 'LOAD_FLOW'
+  | 'PROTECTION_COVERAGE'
+  | 'VOLTAGE_PROFILE'
+  | 'OVERLOAD'
+  | 'VARIANT_DELTA';
+
+/**
+ * Power flow overlay numeric badges (pre-computed by backend).
+ * NO physics in frontend — all values are backend-provided.
+ */
+export interface PowerFlowOverlayBadges {
+  /** Active power [kW] */
+  p_kw: number | null;
+  /** Reactive power [kvar] */
+  q_kvar: number | null;
+  /** Current [A] */
+  i_a: number | null;
+  /** Loading [%] */
+  loading_percent: number | null;
+  /** Voltage [pu] */
+  v_pu: number | null;
+}
+
+/**
+ * Short circuit overlay numeric badges.
+ */
+export interface ShortCircuitOverlayBadges {
+  /** Initial symmetrical SC current [kA] */
+  ik_3f_ka: number | null;
+  /** Peak SC current [kA] */
+  ip_ka: number | null;
+  /** Thermal SC current [kA] */
+  ith_ka: number | null;
+}
+
+/**
+ * Protection coverage overlay badges.
+ */
+export interface ProtectionCoverageOverlayBadges {
+  /** Whether the element is protected by a relay */
+  is_protected: boolean;
+  /** Relay name (Polish) or null if unprotected */
+  relay_name_pl: string | null;
+  /** Sensitivity ratio (Ik_min / I_pickup) */
+  sensitivity_ratio: number | null;
+  /** Coordination verdict */
+  coordination_verdict: 'OK' | 'NA_GRANICY' | 'NIE_OK' | null;
+}
+
+/**
+ * Variant delta overlay badges for A/B comparison.
+ */
+export interface VariantDeltaOverlayBadges {
+  /** Delta token: ADDED, REMOVED, MODIFIED, UNCHANGED */
+  delta_token: 'ADDED' | 'REMOVED' | 'MODIFIED' | 'UNCHANGED';
+  /** Change description (Polish) */
+  change_description_pl: string | null;
+}
+
+/**
  * Color token → CSS class mapping.
  * Deterministic, no physics, no heuristics.
- * Includes delta overlay tokens (PR-21).
+ * Includes delta overlay tokens (PR-21) and industrial overlay tokens.
  */
 export const COLOR_TOKEN_MAP: Readonly<Record<string, string>> = {
   ok: 'sld-overlay-ok',
@@ -106,6 +172,19 @@ export const COLOR_TOKEN_MAP: Readonly<Record<string, string>> = {
   delta_none: 'sld-overlay-ok',
   delta_change: 'sld-overlay-warning',
   delta_inactive: 'sld-overlay-inactive',
+  // Protection coverage tokens
+  protected: 'sld-overlay-ok',
+  unprotected: 'sld-overlay-critical',
+  marginal: 'sld-overlay-warning',
+  // Variant comparison tokens
+  variant_added: 'sld-overlay-variant-added',
+  variant_removed: 'sld-overlay-variant-removed',
+  variant_modified: 'sld-overlay-variant-modified',
+  variant_unchanged: 'sld-overlay-inactive',
+  // Overload tokens
+  overload_none: 'sld-overlay-ok',
+  overload_warning: 'sld-overlay-warning',
+  overload_critical: 'sld-overlay-critical',
 } as const;
 
 /**

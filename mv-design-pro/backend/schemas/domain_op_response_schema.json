@@ -1,0 +1,115 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "domain_op_response_v1",
+  "title": "DomainOpResponse",
+  "description": "Canonical response contract for ALL domain operations.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "snapshot": {
+      "type": "object",
+      "description": "Full ENM snapshot after operation (immutable)."
+    },
+    "logical_views": {
+      "type": "object",
+      "description": "Deterministic projections (trunks, branches, secondary connectors).",
+      "default": {}
+    },
+    "readiness": {
+      "type": "object",
+      "properties": {
+        "ready": { "type": "boolean" },
+        "blockers": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "code": { "type": "string" },
+              "severity": { "type": "string", "const": "BLOKUJACE" },
+              "message_pl": { "type": "string" },
+              "element_ref": { "type": ["string", "null"] }
+            },
+            "required": ["code", "message_pl"]
+          }
+        },
+        "warnings": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "code": { "type": "string" },
+              "severity": { "type": "string", "const": "OSTRZEZENIE" },
+              "message_pl": { "type": "string" },
+              "element_ref": { "type": ["string", "null"] }
+            },
+            "required": ["code", "message_pl"]
+          }
+        }
+      },
+      "required": ["ready", "blockers", "warnings"]
+    },
+    "fix_actions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "code": { "type": "string" },
+          "action_type": {
+            "type": "string",
+            "enum": ["OPEN_MODAL", "NAVIGATE_TO_ELEMENT", "SELECT_CATALOG", "ADD_MISSING_DEVICE"]
+          },
+          "element_ref": { "type": ["string", "null"] },
+          "panel": { "type": ["string", "null"] },
+          "step": { "type": ["string", "null"] },
+          "focus": { "type": ["string", "null"] },
+          "message_pl": { "type": "string" }
+        },
+        "required": ["code", "action_type"]
+      }
+    },
+    "changes": {
+      "type": "object",
+      "properties": {
+        "created_element_ids": { "type": "array", "items": { "type": "string" } },
+        "updated_element_ids": { "type": "array", "items": { "type": "string" } },
+        "deleted_element_ids": { "type": "array", "items": { "type": "string" } }
+      },
+      "required": ["created_element_ids", "updated_element_ids", "deleted_element_ids"]
+    },
+    "selection_hint": {
+      "type": ["object", "null"],
+      "properties": {
+        "element_id": { "type": ["string", "null"] },
+        "element_type": { "type": ["string", "null"] },
+        "zoom_to": { "type": "boolean", "default": true }
+      }
+    },
+    "audit_trail": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "step": { "type": "integer" },
+          "action": { "type": "string" },
+          "element_id": { "type": ["string", "null"] },
+          "detail": { "type": "string" }
+        },
+        "required": ["step", "action"]
+      }
+    },
+    "domain_events": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "event_seq": { "type": "integer" },
+          "event_type": { "type": "string" },
+          "element_id": { "type": ["string", "null"] },
+          "detail": { "type": "string" }
+        },
+        "required": ["event_seq", "event_type"]
+      }
+    }
+  },
+  "required": ["snapshot", "readiness", "changes"]
+}
