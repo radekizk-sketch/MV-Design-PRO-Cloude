@@ -78,6 +78,7 @@ def _continue_trunk(enm_dict: dict, dlugosc_m: int = 320) -> dict:
             "segment": {
                 "rodzaj": "KABEL",
                 "dlugosc_m": dlugosc_m,
+                "catalog_ref": "YAKXS_3x120",
             },
         },
     )
@@ -205,6 +206,7 @@ def _run_full_v1_sequence() -> tuple[list[dict], dict]:
             "insert_at": {"value": 0.5},
             "station": {"sn_voltage_kv": 15.0, "nn_voltage_kv": 0.4},
             "sn_fields": ["IN", "OUT"],
+            "transformer": {"create": True, "transformer_catalog_ref": "ONAN_630"},
         },
     )
     _assert_step_ok(r3, "Krok 3: insert_station_on_segment_sn (B)")
@@ -238,7 +240,7 @@ def _run_full_v1_sequence() -> tuple[list[dict], dict]:
         op_name="start_branch_segment_sn",
         payload={
             "from_bus_ref": branch_from_bus_ref,
-            "segment": {"rodzaj": "KABEL", "dlugosc_m": 210},
+            "segment": {"rodzaj": "KABEL", "dlugosc_m": 210, "catalog_ref": "YAKXS_3x120"},
         },
     )
     _assert_step_ok(r5, "Krok 5: start_branch_segment_sn")
@@ -264,6 +266,7 @@ def _run_full_v1_sequence() -> tuple[list[dict], dict]:
             "insert_at": {"value": 0.5},
             "station": {"sn_voltage_kv": 15.0, "nn_voltage_kv": 0.4},
             "sn_fields": ["IN", "OUT", "FEEDER"],
+            "transformer": {"create": True, "transformer_catalog_ref": "ONAN_630"},
         },
     )
     _assert_step_ok(r6, "Krok 6: insert_station_on_segment_sn (C)")
@@ -283,7 +286,7 @@ def _run_full_v1_sequence() -> tuple[list[dict], dict]:
         payload={
             "from_bus_ref": last_bus_ref,
             "to_bus_ref": first_bus_ref,
-            "segment": {"rodzaj": "KABEL", "dlugosc_m": 140},
+            "segment": {"rodzaj": "KABEL", "dlugosc_m": 140, "catalog_ref": "YAKXS_3x120"},
         },
     )
     _assert_step_ok(r7, "Krok 7: connect_secondary_ring_sn")

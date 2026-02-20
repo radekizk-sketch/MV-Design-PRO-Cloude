@@ -775,11 +775,29 @@ class ProjectArchiveService:
             # Zapisz do bazy danych
             project_id = self._restore_project(archive, new_project_name)
 
+            # Bramka katalogowa po imporcie — sprawdz elementy bez catalog_ref
+            elements_no_catalog = _find_elements_without_catalog(archive)
+            catalog_mapping_needed = len(elements_no_catalog) > 0
+
+            if catalog_mapping_needed:
+                warnings.append(
+                    f"Import wymaga mapowania katalogowego: "
+                    f"{len(elements_no_catalog)} element(ów) bez katalogu"
+                )
+
+            final_status = (
+                ArchiveImportStatus.CATALOG_MAPPING_REQUIRED
+                if catalog_mapping_needed
+                else ArchiveImportStatus.SUCCESS
+            )
+
             return ArchiveImportResult(
-                status=ArchiveImportStatus.SUCCESS,
+                status=final_status,
                 project_id=str(project_id),
                 warnings=warnings,
                 migrated_from_version=migrated_from,
+                elements_without_catalog=elements_no_catalog,
+                catalog_mapping_required=catalog_mapping_needed,
             )
 
         except ArchiveError as e:
@@ -1336,3 +1354,50 @@ class ProjectArchiveService:
             return {"valid": False, "error": f"Błąd parsowania JSON: {e}"}
         except zipfile.BadZipFile:
             return {"valid": False, "error": "Nieprawidłowy format archiwum ZIP"}
+
+
+def _find_elements_without_catalog(archive: ProjectArchive) -> list[str]:
+    """Znajdz elementy techniczne bez referencji katalogowej.
+
+    Sprawdza branches (segmenty SN) z network_model.branches
+    oraz szuka transformatorow w snapshotach.
+    Zwraca liste ref_id elementow bez catalog_ref.
+    """
+    elements_no_catalog: list[str] = []
+    seen: set[str] = set()
+
+    # Typy branchow wymagajace katalogu
+    catalog_required_branch_types = {"cable", "line_overhead"}
+
+    # Sprawdz branches z modelu sieci
+    for branch in archive.network_model.branches:
+        branch_type = branch.get("type", "")
+        ref_id = branch.get("ref_id", branch.get("id", ""))
+        if branch_type in catalog_required_branch_types and ref_id not in seen:
+            if not branch.get("catalog_ref"):
+                elements_no_catalog.append(ref_id)
+                seen.add(ref_id)
+
+    # Sprawdz snapshoty (dla transformatorow i dodatkowych branchow)
+    for snapshot in archive.network_model.snapshots:
+        graph = snapshot.get("graph", {}) if isinstance(snapshot, dict) else {}
+        if not graph:
+            continue
+
+        for branch in graph.get("branches", []):
+            branch_type = branch.get("type", "")
+            ref_id = branch.get("ref_id", "")
+            if branch_type in catalog_required_branch_types and ref_id not in seen:
+                if not branch.get("catalog_ref"):
+                    elements_no_catalog.append(ref_id)
+                    seen.add(ref_id)
+
+        for device in graph.get("devices", []):
+            device_type = device.get("device_type", "")
+            ref_id = device.get("ref_id", "")
+            if device_type == "transformer" and ref_id not in seen:
+                if not device.get("catalog_ref"):
+                    elements_no_catalog.append(ref_id)
+                    seen.add(ref_id)
+
+    return elements_no_catalog

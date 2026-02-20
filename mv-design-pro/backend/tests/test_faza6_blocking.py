@@ -61,7 +61,7 @@ def _minimal_network() -> dict:
     result = execute_domain_operation(
         enm_dict=enm,
         op_name="continue_trunk_segment_sn",
-        payload={"segment": {"rodzaj": "KABEL", "dlugosc_m": 500}},
+        payload={"segment": {"rodzaj": "KABEL", "dlugosc_m": 500, "catalog_ref": "YAKXS_3x120"}},
     )
     assert result.get("snapshot") is not None
     return result["snapshot"]
@@ -92,7 +92,7 @@ class TestAllOperationsReturnSnapshot:
 
     def test_continue_trunk_returns_snapshot(self) -> None:
         enm = _enm_with_source()
-        result = execute_domain_operation(enm, "continue_trunk_segment_sn", {"segment": {"rodzaj": "KABEL", "dlugosc_m": 500}})
+        result = execute_domain_operation(enm, "continue_trunk_segment_sn", {"segment": {"rodzaj": "KABEL", "dlugosc_m": 500, "catalog_ref": "YAKXS_3x120"}})
         assert result.get("snapshot") is not None
         assert "readiness" in result
 
@@ -139,7 +139,7 @@ class TestSnapshotChangesAfterOperation:
     def test_continue_trunk_changes_snapshot(self) -> None:
         enm = _enm_with_source()
         fp_before = _snapshot_fingerprint(enm)
-        result = execute_domain_operation(enm, "continue_trunk_segment_sn", {"segment": {"rodzaj": "KABEL", "dlugosc_m": 500}})
+        result = execute_domain_operation(enm, "continue_trunk_segment_sn", {"segment": {"rodzaj": "KABEL", "dlugosc_m": 500, "catalog_ref": "YAKXS_3x120"}})
         fp_after = _snapshot_fingerprint(result["snapshot"])
         assert fp_before != fp_after, "Fingerprint musi się zmienić po dodaniu odcinka"
 
@@ -349,7 +349,7 @@ class TestFullDesignPath:
         """Krok 2: Dodaj odcinek SN."""
         enm = _enm_with_source()
         result = execute_domain_operation(enm, "continue_trunk_segment_sn", {
-            "segment": {"rodzaj": "KABEL", "dlugosc_m": 500},
+            "segment": {"rodzaj": "KABEL", "dlugosc_m": 500, "catalog_ref": "YAKXS_3x120"},
         })
         assert result.get("snapshot") is not None
         snapshot = result["snapshot"]
@@ -360,7 +360,7 @@ class TestFullDesignPath:
         enm = _enm_with_source()
         # Dodaj odcinek, potem wstaw stację
         r1 = execute_domain_operation(enm, "continue_trunk_segment_sn", {
-            "segment": {"rodzaj": "KABEL", "dlugosc_m": 500},
+            "segment": {"rodzaj": "KABEL", "dlugosc_m": 500, "catalog_ref": "YAKXS_3x120"},
         })
         if r1.get("snapshot") is None:
             pytest.skip("Brak snapshot po dodaniu odcinka")
