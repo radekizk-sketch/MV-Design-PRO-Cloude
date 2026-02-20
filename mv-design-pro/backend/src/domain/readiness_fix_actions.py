@@ -1,0 +1,297 @@
+"""
+Readiness FixAction Resolver — maps readiness codes to FixAction suggestions.
+
+Every BLOCKER readiness code MUST have a FixAction leading to a repair path.
+WARNING/INFO codes MAY have FixActions.
+
+This module is the SINGLE SOURCE OF TRUTH for code→FixAction mapping.
+It bridges ReadinessIssueV1 (domain) with FixAction (ENM) without coupling.
+
+INVARIANTS:
+- Deterministic: same code + element → same FixAction
+- No physics
+- No model mutation
+- All modal_type values MUST correspond to frontend ModalRegistry entries
+"""
+
+from __future__ import annotations
+
+from enm.fix_actions import FixAction
+
+
+# ---------------------------------------------------------------------------
+# Code → FixAction factory mapping
+# ---------------------------------------------------------------------------
+
+def resolve_fix_action(
+    code: str,
+    element_id: str | None = None,
+    element_type: str | None = None,
+) -> FixAction | None:
+    """Resolve a FixAction for a given readiness code.
+
+    Returns None if no FixAction is defined for the code.
+    """
+    factory = _FIX_ACTION_MAP.get(code)
+    if factory is None:
+        # Try prefix match for parametric codes (e.g., field.device_missing.cb)
+        for prefix, pfx_factory in _PREFIX_FIX_ACTION_MAP.items():
+            if code.startswith(prefix):
+                return pfx_factory(element_id, element_type)
+        return None
+    return factory(element_id, element_type)
+
+
+# ---------------------------------------------------------------------------
+# Generator validation codes
+# ---------------------------------------------------------------------------
+
+def _fix_catalog_ref_missing(
+    element_id: str | None, _et: str | None,
+) -> FixAction:
+    return FixAction(
+        action_type="SELECT_CATALOG",
+        element_ref=element_id,
+        modal_type="CatalogPicker",
+        payload_hint={"required": "catalog_ref"},
+    )
+
+
+def _fix_generator_connection_variant(
+    element_id: str | None, _et: str | None,
+) -> FixAction:
+    return FixAction(
+        action_type="OPEN_MODAL",
+        element_ref=element_id,
+        modal_type="GeneratorModal",
+        payload_hint={"required": "connection_variant"},
+    )
+
+
+def _fix_generator_station_ref(
+    element_id: str | None, _et: str | None,
+) -> FixAction:
+    return FixAction(
+        action_type="OPEN_MODAL",
+        element_ref=element_id,
+        modal_type="GeneratorModal",
+        payload_hint={"required": "station_ref"},
+    )
+
+
+def _fix_generator_block_transformer(
+    element_id: str | None, _et: str | None,
+) -> FixAction:
+    return FixAction(
+        action_type="OPEN_MODAL",
+        element_ref=element_id,
+        modal_type="TransformerModal",
+        payload_hint={"required": "blocking_transformer_ref"},
+    )
+
+
+# ---------------------------------------------------------------------------
+# Station field validation codes
+# ---------------------------------------------------------------------------
+
+def _fix_station_nn_without_transformer(
+    element_id: str | None, _et: str | None,
+) -> FixAction:
+    return FixAction(
+        action_type="ADD_MISSING_DEVICE",
+        element_ref=element_id,
+        modal_type="TransformerModal",
+        payload_hint={"required": "transformer_field"},
+    )
+
+
+def _fix_field_device_missing(
+    element_id: str | None, _et: str | None,
+) -> FixAction:
+    return FixAction(
+        action_type="ADD_MISSING_DEVICE",
+        element_ref=element_id,
+        modal_type="FieldDeviceModal",
+        payload_hint={"required": "apparatus"},
+    )
+
+
+def _fix_protection_binding_missing(
+    element_id: str | None, _et: str | None,
+) -> FixAction:
+    return FixAction(
+        action_type="OPEN_MODAL",
+        element_ref=element_id,
+        modal_type="ProtectionBindingModal",
+        payload_hint={"required": "relay_to_cb_binding"},
+    )
+
+
+# ---------------------------------------------------------------------------
+# Topology validation codes (W005-W008)
+# ---------------------------------------------------------------------------
+
+def _fix_topology_ref_invalid(
+    element_id: str | None, _et: str | None,
+) -> FixAction:
+    return FixAction(
+        action_type="NAVIGATE_TO_ELEMENT",
+        element_ref=element_id,
+        payload_hint={"action": "inspect_and_fix_references"},
+    )
+
+
+def _fix_graph_island(
+    element_id: str | None, _et: str | None,
+) -> FixAction:
+    return FixAction(
+        action_type="NAVIGATE_TO_ELEMENT",
+        element_ref=element_id,
+        payload_hint={"action": "connect_island_to_source"},
+    )
+
+
+# ---------------------------------------------------------------------------
+# Load flow validation codes
+# ---------------------------------------------------------------------------
+
+def _fix_lf_convergence(
+    element_id: str | None, _et: str | None,
+) -> FixAction:
+    return FixAction(
+        action_type="OPEN_MODAL",
+        element_ref=element_id,
+        modal_type="StudyCaseSettings",
+        payload_hint={"required": "convergence_settings"},
+    )
+
+
+def _fix_lf_damping(
+    element_id: str | None, _et: str | None,
+) -> FixAction:
+    return FixAction(
+        action_type="OPEN_MODAL",
+        element_ref=element_id,
+        modal_type="StudyCaseSettings",
+        payload_hint={"required": "solver_damping"},
+    )
+
+
+# ---------------------------------------------------------------------------
+# Mapping tables
+# ---------------------------------------------------------------------------
+
+_FIX_ACTION_MAP: dict[
+    str,
+    type[object] | object,  # Callable[[str | None, str | None], FixAction]
+] = {
+    # Generator validation
+    "catalog.ref_missing": _fix_catalog_ref_missing,
+    "generator.connection_variant_missing": _fix_generator_connection_variant,
+    "generator.station_ref_missing": _fix_generator_station_ref,
+    "generator.station_ref_invalid": _fix_generator_station_ref,
+    "generator.block_transformer_missing": _fix_generator_block_transformer,
+    "generator.block_transformer_invalid": _fix_generator_block_transformer,
+    "generator.connection_variant_invalid": _fix_generator_connection_variant,
+    # Station field validation
+    "station.nn_without_transformer": _fix_station_nn_without_transformer,
+    "protection.binding_missing": _fix_protection_binding_missing,
+    # Station field — generator variants
+    "generator.nn_variant_requires_station_transformer": _fix_station_nn_without_transformer,
+    "generator.block_variant_requires_block_transformer": _fix_generator_block_transformer,
+    "generator.block_transformer_catalog_missing": _fix_catalog_ref_missing,
+    # Topology warnings
+    "E003": _fix_graph_island,
+    "W005": _fix_topology_ref_invalid,
+    "W006": _fix_topology_ref_invalid,
+    "W007": _fix_topology_ref_invalid,
+    "W008": _fix_topology_ref_invalid,
+    # Load flow
+    "LF_CONVERGENCE_TOLERANCE_INVALID": _fix_lf_convergence,
+    "LF_CONVERGENCE_ITER_LIMIT_INVALID": _fix_lf_convergence,
+    "LF_SOLVER_DAMPING_INVALID": _fix_lf_damping,
+}
+
+_PREFIX_FIX_ACTION_MAP: dict[
+    str,
+    type[object] | object,  # Callable[[str | None, str | None], FixAction]
+] = {
+    "field.device_missing.": _fix_field_device_missing,
+}
+
+
+# ---------------------------------------------------------------------------
+# Completeness check (for CI guard)
+# ---------------------------------------------------------------------------
+
+# All BLOCKER readiness codes that MUST have a FixAction
+KNOWN_BLOCKER_CODES: frozenset[str] = frozenset({
+    # ENMValidator (already have FixAction in ValidationIssue)
+    "E001", "E002", "E003", "E004", "E005", "E006", "E007",
+    "sources.no_short_circuit_params", "E009", "E010",
+    # Generator validation
+    "catalog.ref_missing",
+    "generator.connection_variant_missing",
+    "generator.station_ref_missing",
+    "generator.station_ref_invalid",
+    "generator.block_transformer_missing",
+    "generator.block_transformer_invalid",
+    "generator.connection_variant_invalid",
+    # Station field validation
+    "station.nn_without_transformer",
+    "protection.binding_missing",
+    "generator.nn_variant_requires_station_transformer",
+    "generator.block_variant_requires_block_transformer",
+    "generator.block_transformer_catalog_missing",
+    # Eligibility (already have FixAction in eligibility_service)
+    "ELIG_SC3_MISSING_SOURCE",
+    "ELIG_SC3_MISSING_BUSES",
+    "ELIG_SC3_MISSING_CATALOG_REF",
+    "ELIG_SC3_MISSING_IMPEDANCE",
+    "ELIG_SC3_SOURCE_NO_SC_PARAMS",
+    "ELIG_SC1_MISSING_Z0",
+    "ELIG_LF_NO_LOADS_OR_GENERATORS",
+    "ELIG_LF_BUS_NO_VOLTAGE",
+    # Load flow
+    "LF_SLACK_SINGLE_MISSING_SPEC",
+    "LF_SLACK_SINGLE_EMPTY_NODE_ID",
+    "LF_SLACK_DISTRIBUTED_MISSING_SPEC",
+    "LF_SLACK_DISTRIBUTED_EMPTY",
+    "LF_CUSTOM_INITIAL_EMPTY",
+})
+
+# Codes prefixes for device_missing (parametric)
+KNOWN_BLOCKER_PREFIXES: frozenset[str] = frozenset({
+    "field.device_missing.",
+})
+
+
+def check_blocker_fix_action_coverage() -> list[str]:
+    """Check that all known BLOCKER codes have FixActions.
+
+    Returns list of codes WITHOUT FixAction (should be empty for CI pass).
+    """
+    missing: list[str] = []
+    for code in sorted(KNOWN_BLOCKER_CODES):
+        result = resolve_fix_action(code, element_id="test")
+        if result is None:
+            # Check if ENMValidator already provides it (E001-E010, W001-W004)
+            # Those have FixAction in ValidationIssue directly — skip them
+            enm_validator_codes = {
+                "E001", "E002", "E004", "E005", "E006", "E007",
+                "sources.no_short_circuit_params", "E009", "E010",
+            }
+            eligibility_codes = {
+                "ELIG_SC3_MISSING_SOURCE", "ELIG_SC3_MISSING_BUSES",
+                "ELIG_SC3_MISSING_CATALOG_REF", "ELIG_SC3_MISSING_IMPEDANCE",
+                "ELIG_SC3_SOURCE_NO_SC_PARAMS", "ELIG_SC1_MISSING_Z0",
+                "ELIG_LF_NO_LOADS_OR_GENERATORS", "ELIG_LF_BUS_NO_VOLTAGE",
+            }
+            lf_with_fix = {
+                "LF_SLACK_SINGLE_MISSING_SPEC", "LF_SLACK_SINGLE_EMPTY_NODE_ID",
+                "LF_SLACK_DISTRIBUTED_MISSING_SPEC", "LF_SLACK_DISTRIBUTED_EMPTY",
+                "LF_CUSTOM_INITIAL_EMPTY",
+            }
+            if code not in enm_validator_codes | eligibility_codes | lf_with_fix:
+                missing.append(code)
+    return missing

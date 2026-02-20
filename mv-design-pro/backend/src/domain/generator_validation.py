@@ -24,6 +24,7 @@ from domain.readiness import (
     ReadinessIssueV1,
     ReadinessPriority,
 )
+from enm.fix_actions import FixAction
 
 # Generator types that REQUIRE connection_variant
 _OZE_GEN_TYPES = frozenset({"pv_inverter", "wind_inverter", "bess"})

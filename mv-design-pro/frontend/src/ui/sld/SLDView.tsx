@@ -60,8 +60,8 @@ import { useOperationalModeStore } from './operationalModeStore';
 import { EngineeringContextMenu } from '../context-menu/EngineeringContextMenu';
 import type { EngineeringContextMenuState } from '../context-menu/EngineeringContextMenu';
 import { useLabelModeStore } from './labelModeStore';
-import { getModalByOp } from '../topology/modals/modalRegistry';
 import { notify } from '../notifications/store';
+import { useModalController, ModalOverlay } from './ModalController';
 
 /**
  * Default canvas dimensions.
@@ -96,27 +96,139 @@ const CONTEXT_MENU_OP_MAP: Record<string, string> = {
   edit_load_power: 'update_element_parameters',
   edit_transformer_ratio: 'update_element_parameters',
   edit_parameters: 'update_element_parameters',
-  // Catalog
+  edit_tap: 'update_element_parameters',
+  edit_vector_group: 'update_element_parameters',
+  edit_power: 'update_element_parameters',
+  edit_reactive: 'update_element_parameters',
+  edit_kind: 'update_element_parameters',
+  edit_connection: 'update_element_parameters',
+  edit_control: 'update_element_parameters',
+  edit_limits: 'update_element_parameters',
+  edit_disconnect: 'update_element_parameters',
+  edit_measurement: 'update_element_parameters',
+  edit_capacity: 'update_element_parameters',
+  edit_soc: 'update_element_parameters',
+  edit_mode: 'update_element_parameters',
+  edit_strategy: 'update_element_parameters',
+  edit_pf: 'update_element_parameters',
+  edit_fuel: 'update_element_parameters',
+  edit_backup_time: 'update_element_parameters',
+  edit_battery: 'update_element_parameters',
+  edit_switch: 'update_element_parameters',
+  edit_rating: 'update_element_parameters',
+  edit_purpose: 'update_element_parameters',
+  edit_accuracy: 'update_element_parameters',
+  edit_ratio: 'update_element_parameters',
+  edit_settings: 'update_element_parameters',
+  edit_curve: 'update_element_parameters',
+  edit_type: 'update_element_parameters',
+  edit_name: 'update_element_parameters',
+  edit_description: 'update_element_parameters',
+  edit_label: 'update_element_parameters',
+  edit_source_params: 'update_element_parameters',
+  edit_segment_length: 'update_element_parameters',
+  edit_cycles: 'update_element_parameters',
+  edit_chemistry: 'update_element_parameters',
+  rename: 'update_element_parameters',
+  set_normal_state: 'update_element_parameters',
+  set_operating_mode: 'update_element_parameters',
+  set_time_profile: 'update_element_parameters',
+  set_profile: 'update_element_parameters',
+  set_source_mode: 'update_element_parameters',
+  change_role: 'update_element_parameters',
+  change_kind: 'update_element_parameters',
+  // Catalog operations
   assign_catalog: 'assign_catalog_to_element',
-  // Topology operations
+  assign_tr_catalog: 'assign_catalog_to_element',
+  assign_bus_catalog: 'assign_catalog_to_element',
+  assign_default_catalog: 'assign_catalog_to_element',
+  assign_inverter_catalog: 'assign_catalog_to_element',
+  assign_storage_catalog: 'assign_catalog_to_element',
+  assign_switch_catalog: 'assign_catalog_to_element',
+  assign_cable_catalog: 'assign_catalog_to_element',
+  assign_next_catalog: 'assign_catalog_to_element',
+  clear_catalog: 'assign_catalog_to_element',
+  // Topology operations — SN
   add_line: 'start_branch_segment_sn',
   add_cable: 'start_branch_segment_sn',
   add_branch: 'start_branch_segment_sn',
   add_station: 'insert_station_on_segment_sn',
+  insert_station_a: 'insert_station_on_segment_sn',
+  insert_station_b: 'insert_station_on_segment_sn',
+  insert_station_c: 'insert_station_on_segment_sn',
+  insert_station_d: 'insert_station_on_segment_sn',
   add_section_switch: 'insert_section_switch_sn',
+  insert_section_switch: 'insert_section_switch_sn',
+  insert_disconnector: 'insert_section_switch_sn',
+  insert_earthing: 'insert_section_switch_sn',
   connect_ring: 'connect_secondary_ring_sn',
   set_nop: 'set_normal_open_point',
-  // Element addition
+  set_as_nop: 'set_normal_open_point',
+  clear_nop: 'set_normal_open_point',
+  move_nop: 'set_normal_open_point',
+  set_nop_candidate: 'set_normal_open_point',
+  // Element addition — SN
+  add_source: 'add_grid_source_sn',
+  add_transformer: 'add_transformer_sn_nn',
+  add_breaker: 'add_sn_bay',
+  add_disconnector: 'add_sn_bay',
+  add_earth_switch: 'add_sn_bay',
+  add_sn_field_in: 'add_sn_bay',
+  add_sn_field_out: 'add_sn_bay',
+  add_sn_field_branch: 'add_sn_bay',
+  add_sn_field_tr: 'add_sn_bay',
+  add_sn_bus_section: 'add_sn_bay',
+  add_sn_coupler: 'add_sn_bay',
+  // Measurement — CT/VT
+  add_ct: 'add_measurement',
+  add_vt: 'add_measurement',
+  assign_ct: 'add_measurement',
+  assign_vt: 'add_measurement',
+  // Protection
   add_relay: 'add_relay',
   add_protection: 'add_relay',
+  edit_relay_settings: 'add_relay',
+  // Element addition — nN
   add_nn_load: 'add_nn_load',
   add_load: 'add_nn_load',
   add_pv: 'add_pv_inverter_nn',
   add_bess: 'add_bess_inverter_nn',
+  add_bess_energy: 'add_bess_inverter_nn',
+  add_genset: 'add_genset_nn',
+  add_ups: 'add_ups_nn',
   add_nn_outgoing_field: 'add_nn_outgoing_field',
+  add_feeder: 'add_nn_outgoing_field',
+  add_nn_feeder: 'add_nn_outgoing_field',
+  add_nn_bus: 'add_nn_outgoing_field',
+  add_nn_main: 'add_nn_outgoing_field',
+  add_nn_bus_section: 'add_nn_outgoing_field',
+  add_nn_coupler: 'add_nn_outgoing_field',
+  add_source_field: 'add_nn_outgoing_field',
+  add_source_field_nn: 'add_nn_outgoing_field',
+  add_bus_section: 'add_nn_outgoing_field',
+  add_bus_coupler: 'add_nn_outgoing_field',
+  add_segment: 'add_nn_segment',
+  add_fuse: 'add_sn_bay',
+  add_energy_meter: 'add_measurement',
+  add_quality_meter: 'add_measurement',
+  add_surge_arrester: 'add_measurement',
   // Calculations
   run_power_flow: 'run_power_flow',
   run_short_circuit: 'run_short_circuit',
+  run_sc_analysis: 'run_short_circuit',
+  run_sc_3f: 'run_short_circuit',
+  run_sc_2f: 'run_short_circuit',
+  run_sc_1f: 'run_short_circuit',
+  run_sc_2f_rf: 'run_short_circuit',
+  run_time_series: 'run_power_flow',
+  // StudyCase operations
+  set_switch_states: 'update_element_parameters',
+  set_normal_states: 'update_element_parameters',
+  set_source_modes: 'update_element_parameters',
+  set_analysis_settings: 'update_element_parameters',
+  clone_case: 'update_element_parameters',
+  // Validation / readiness
+  validate_transformer: 'update_element_parameters',
 };
 
 /**
@@ -129,8 +241,44 @@ const NAVIGATION_ACTIONS = new Set([
   'show_tree',
   'show_diagram',
   'show_on_diagram',
+  'show_topology',
+  'show_secondary_links',
+  'show_coordination',
+  'show_summary',
+  'show_per_element',
+  'show_overlay',
+  'show_ik',
+  'show_ip',
+  'show_ith',
+  'show_idyn',
+  'show_voltages',
+  'show_currents',
+  'show_powers',
+  'show_losses',
+  'show_comparison',
+  'show_delta_overlay',
   'export_data',
+  'export_json',
+  'export_report',
+  'export_pdf',
+  'export_docx',
+  'export_results',
+  'export_whitebox',
   'history',
+  'fix_issues',
+  'check_ring',
+  'check_nop',
+  'check_selectivity',
+  'check_collisions',
+  'calc_tcc',
+  'validate_selectivity',
+  'compare_cases',
+  'compare_with',
+  'compare_snapshots',
+  'add_trunk_segment',
+  'reserve_ring',
+  'release_ring',
+  'start_secondary_link',
 ]);
 
 /**
@@ -139,10 +287,15 @@ const NAVIGATION_ACTIONS = new Set([
 const TOGGLE_ACTIONS = new Set([
   'toggle_switch',
   'toggle_service',
+  'toggle_enabled',
   'delete',
   'delete_element',
   'disconnect',
   'disconnect_element',
+  'edit_geometry',
+  'snap_to_grid',
+  'reset_geometry',
+  'undo_snapshot',
 ]);
 
 /**
@@ -231,6 +384,9 @@ export const SLDView: React.FC<SLDViewProps> = ({
 
   // PR-16: Overlay Runtime Engine
   const overlayRuntime = useOverlayRuntime(symbols);
+
+  // Modal controller for context menu → modal dispatch
+  const modalController = useModalController();
 
   // Export dialog state
   const [exportDialogOpen, setExportDialogOpen] = useState(false);
@@ -606,25 +762,20 @@ export const SLDView: React.FC<SLDViewProps> = ({
       // Close menu immediately
       setContextMenuState(CONTEXT_MENU_CLOSED);
 
-      // 1. Check for canonical domain operation
+      // 1. Check for canonical domain operation → open modal via ModalController
       const canonicalOp = CONTEXT_MENU_OP_MAP[operationId];
       if (canonicalOp) {
-        const modalEntry = getModalByOp(canonicalOp);
-        if (modalEntry) {
-          // Select the element for context
-          selectElement({ id: elementId, type: elementType, name: elementId });
-          notify(`${modalEntry.labelPl} — ${elementType} (${elementId})`, 'info');
-          console.debug(
-            `[SLDView] Dispatch: ${operationId} → ${canonicalOp} → ${modalEntry.componentName}`,
-          );
-        } else {
-          console.debug(`[SLDView] Operacja kanonyczna bez modala: ${canonicalOp}`);
-          notify(`Operacja: ${canonicalOp}`, 'info');
-        }
+        // Select element for context
+        selectElement({ id: elementId, type: elementType, name: elementId });
+        // Dispatch to modal controller — opens the appropriate modal
+        modalController.dispatch(canonicalOp, elementId, elementType);
+        console.debug(
+          `[SLDView] Dispatch: ${operationId} → ${canonicalOp}`,
+        );
         return;
       }
 
-      // 2. Navigation/info actions — select + notify
+      // 2. Navigation/info actions — select + notify + navigate
       if (NAVIGATION_ACTIONS.has(operationId)) {
         selectElement({ id: elementId, type: elementType, name: elementId });
         const labels: Record<string, string> = {
@@ -634,33 +785,79 @@ export const SLDView: React.FC<SLDViewProps> = ({
           show_tree: 'Zaznaczono w drzewie projektu',
           show_diagram: 'Wycentrowano na schemacie',
           show_on_diagram: 'Wycentrowano na schemacie',
+          show_topology: 'Informacje topologiczne',
+          show_secondary_links: 'Połączenia wtórne',
+          show_coordination: 'Koordynacja zabezpieczeń',
+          show_summary: 'Podsumowanie wyników',
+          show_per_element: 'Wyniki po elementach',
+          show_overlay: 'Nakładka wyników na SLD',
+          show_ik: 'Prądy zwarciowe Ik″',
+          show_ip: 'Prądy udarowe ip',
+          show_ith: 'Prądy cieplne Ith',
+          show_idyn: 'Prądy dynamiczne Idyn',
+          show_voltages: 'Napięcia węzłowe',
+          show_currents: 'Prądy gałęziowe',
+          show_powers: 'Moce gałęziowe',
+          show_losses: 'Straty mocy',
+          show_comparison: 'Porównanie wyników',
+          show_delta_overlay: 'Nakładka delta',
           export_data: 'Eksport danych elementu',
+          export_json: 'Eksport JSON',
+          export_report: 'Eksport raportu',
+          export_pdf: 'Eksport PDF',
+          export_docx: 'Eksport DOCX',
+          export_results: 'Eksport wyników',
+          export_whitebox: 'Eksport White Box',
           history: 'Historia zdarzeń elementu',
+          fix_issues: 'Otwieranie działań naprawczych',
+          check_ring: 'Sprawdzanie możliwości ring',
+          check_nop: 'Sprawdzanie możliwości NOP',
+          check_selectivity: 'Sprawdzanie selektywności',
+          check_collisions: 'Sprawdzanie kolizji',
+          calc_tcc: 'Obliczanie krzywych TCC',
+          validate_selectivity: 'Walidacja selektywności',
+          compare_cases: 'Porównanie Study Case',
+          compare_with: 'Porównanie wyników',
+          compare_snapshots: 'Porównanie Snapshot',
+          add_trunk_segment: 'Dodawanie odcinka magistrali',
+          reserve_ring: 'Rezerwacja do ring',
+          release_ring: 'Zwolnienie rezerwacji ring',
+          start_secondary_link: 'Rozpoczęcie łączenia wtórnego',
         };
         notify(labels[operationId] ?? operationId, 'info');
+
+        // Center on element for navigation actions
+        if (operationId === 'show_diagram' || operationId === 'show_on_diagram') {
+          centerSldOnElement(elementId);
+        }
         return;
       }
 
-      // 3. Toggle actions — direct state change
+      // 3. Toggle actions — direct state change + notify
       if (TOGGLE_ACTIONS.has(operationId)) {
         selectElement({ id: elementId, type: elementType, name: elementId });
         const labels: Record<string, string> = {
           toggle_switch: 'Przełączono stan łącznika',
           toggle_service: 'Zmieniono stan eksploatacji',
+          toggle_enabled: 'Zmieniono stan aktywności',
           delete: 'Usunięcie elementu wymaga potwierdzenia',
           delete_element: 'Usunięcie elementu wymaga potwierdzenia',
           disconnect: 'Odłączenie elementu',
           disconnect_element: 'Odłączenie elementu',
+          edit_geometry: 'Edycja geometrii widoku',
+          snap_to_grid: 'Wyrównano do siatki',
+          reset_geometry: 'Zresetowano geometrię widoku',
+          undo_snapshot: 'Cofnięto do poprzedniego Snapshot',
         };
         notify(labels[operationId] ?? operationId, 'info');
         return;
       }
 
-      // 4. Unknown operation — log warning
+      // 4. Unknown operation — log warning + generic notification
       console.warn(`[SLDView] Nieznana operacja kontekstowa: ${operationId}`);
       notify(`Operacja: ${operationId}`, 'info');
     },
-    [selectElement],
+    [selectElement, modalController, centerSldOnElement],
   );
 
   /**
@@ -1275,6 +1472,12 @@ export const SLDView: React.FC<SLDViewProps> = ({
         mode={isResultsMode ? 'RESULT_VIEW' : isProtectionMode ? 'RESULT_VIEW' : 'MODEL_EDIT'}
         onClose={handleContextMenuClose}
         onOperation={handleContextMenuOperation}
+      />
+
+      {/* Modal overlay — opened by context menu dispatch */}
+      <ModalOverlay
+        state={modalController.state}
+        onClose={modalController.close}
       />
     </div>
   );

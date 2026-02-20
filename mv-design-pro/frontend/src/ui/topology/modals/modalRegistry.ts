@@ -27,6 +27,14 @@ export const MODAL_IDS = {
   MODAL_ZMIEN_PARAMETRY: 'MODAL_ZMIEN_PARAMETRY',
   MODAL_URUCHOM_ROZPLYW: 'MODAL_URUCHOM_ROZPLYW',
   MODAL_URUCHOM_ZWARCIE: 'MODAL_URUCHOM_ZWARCIE',
+  // Phase 7: Complete modal coverage — SN+nN+OZE+protection
+  MODAL_DODAJ_AGREGAT_NN: 'MODAL_DODAJ_AGREGAT_NN',
+  MODAL_DODAJ_UPS_NN: 'MODAL_DODAJ_UPS_NN',
+  MODAL_DODAJ_ZRODLO_SN: 'MODAL_DODAJ_ZRODLO_SN',
+  MODAL_DODAJ_PRZEKLADNIK: 'MODAL_DODAJ_PRZEKLADNIK',
+  MODAL_DODAJ_TRANSFORMATOR: 'MODAL_DODAJ_TRANSFORMATOR',
+  MODAL_DODAJ_POLE_SN: 'MODAL_DODAJ_POLE_SN',
+  MODAL_DODAJ_SEGMENT_NN: 'MODAL_DODAJ_SEGMENT_NN',
 } as const;
 
 export type ModalId = (typeof MODAL_IDS)[keyof typeof MODAL_IDS];
@@ -156,6 +164,56 @@ export const MODAL_REGISTRY: ModalRegistryEntry[] = [
     canonicalOp: 'run_short_circuit',
     componentName: 'RunButton',
     labelPl: 'Uruchom obliczenia zwarciowe',
+    implemented: true,
+  },
+  // Phase 7: Complete modal coverage — SN+nN+OZE+protection
+  {
+    modalId: MODAL_IDS.MODAL_DODAJ_AGREGAT_NN,
+    canonicalOp: 'add_genset_nn',
+    componentName: 'GensetModal',
+    labelPl: 'Dodaj agregat (nN)',
+    implemented: true,
+  },
+  {
+    modalId: MODAL_IDS.MODAL_DODAJ_UPS_NN,
+    canonicalOp: 'add_ups_nn',
+    componentName: 'UPSModal',
+    labelPl: 'Dodaj UPS (nN)',
+    implemented: true,
+  },
+  {
+    modalId: MODAL_IDS.MODAL_DODAJ_ZRODLO_SN,
+    canonicalOp: 'add_grid_source_sn',
+    componentName: 'GridSourceModal',
+    labelPl: 'Dodaj źródło SN (GPZ)',
+    implemented: true,
+  },
+  {
+    modalId: MODAL_IDS.MODAL_DODAJ_PRZEKLADNIK,
+    canonicalOp: 'add_measurement',
+    componentName: 'MeasurementModal',
+    labelPl: 'Dodaj przekładnik (CT/VT)',
+    implemented: true,
+  },
+  {
+    modalId: MODAL_IDS.MODAL_DODAJ_TRANSFORMATOR,
+    canonicalOp: 'add_transformer_sn_nn',
+    componentName: 'TransformerStationModal',
+    labelPl: 'Dodaj transformator SN/nN',
+    implemented: true,
+  },
+  {
+    modalId: MODAL_IDS.MODAL_DODAJ_POLE_SN,
+    canonicalOp: 'add_sn_bay',
+    componentName: 'NodeModal',
+    labelPl: 'Dodaj pole SN',
+    implemented: true,
+  },
+  {
+    modalId: MODAL_IDS.MODAL_DODAJ_SEGMENT_NN,
+    canonicalOp: 'add_nn_segment',
+    componentName: 'BranchModal',
+    labelPl: 'Dodaj segment nN',
     implemented: true,
   },
 ];
