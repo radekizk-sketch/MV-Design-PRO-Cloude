@@ -45,7 +45,7 @@ def _build_gpz_plus_segments(n_segments=2):
         result = execute_domain_operation(
             enm_dict=snapshot,
             op_name="continue_trunk_segment_sn",
-            payload={"segment": {"rodzaj": "KABEL", "dlugosc_m": 500}},
+            payload={"segment": {"rodzaj": "KABEL", "dlugosc_m": 500, "catalog_ref": "YAKXS_3x120"}},
         )
         snapshot = result["snapshot"]
     return result, snapshot
@@ -145,7 +145,7 @@ class TestNoAutoDetectBranchSource:
             op_name="start_branch_segment_sn",
             payload={
                 # NO from_bus_ref
-                "segment": {"rodzaj": "KABEL", "dlugosc_m": 300},
+                "segment": {"rodzaj": "KABEL", "dlugosc_m": 300, "catalog_ref": "YAKXS_3x120"},
             },
         )
 
@@ -228,7 +228,7 @@ class TestNoAutoDetectRingEndpoints:
             payload={
                 # NO from_bus_ref
                 "to_bus_ref": buses[-1]["ref_id"],
-                "segment": {"rodzaj": "KABEL", "dlugosc_m": 200},
+                "segment": {"rodzaj": "KABEL", "dlugosc_m": 200, "catalog_ref": "YAKXS_3x120"},
             },
         )
 
@@ -480,7 +480,7 @@ class TestSecondaryConnectorDetection:
             payload={
                 "from_bus_ref": buses[-1]["ref_id"],
                 "to_bus_ref": buses[0]["ref_id"],
-                "segment": {"rodzaj": "KABEL", "dlugosc_m": 200},
+                "segment": {"rodzaj": "KABEL", "dlugosc_m": 200, "catalog_ref": "YAKXS_3x120"},
             },
         )
 
@@ -514,7 +514,7 @@ class TestSecondaryConnectorDetection:
             payload={
                 "from_bus_ref": buses[-1]["ref_id"],
                 "to_bus_ref": buses[0]["ref_id"],
-                "segment": {"rodzaj": "KABEL", "dlugosc_m": 200},
+                "segment": {"rodzaj": "KABEL", "dlugosc_m": 200, "catalog_ref": "YAKXS_3x120"},
             },
         )
 

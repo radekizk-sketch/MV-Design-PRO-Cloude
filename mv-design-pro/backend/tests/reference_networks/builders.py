@@ -66,7 +66,7 @@ def build_gn01_sn_promieniowa() -> dict[str, Any]:
     # Steps 2-4: Add 3 trunk segments (auto-detect trunk end)
     for i, length in enumerate([250, 180, 320], 1):
         result = execute_domain_operation(enm, "continue_trunk_segment_sn", {
-            "segment": {"rodzaj": "KABEL", "dlugosc_m": length, "name": f"Odcinek {i}"},
+            "segment": {"rodzaj": "KABEL", "dlugosc_m": length, "name": f"Odcinek {i}", "catalog_ref": "YAKXS_3x120"},
         })
         assert result.get("error") is None, f"continue_trunk #{i} failed: {result.get('error')}"
         enm = result["snapshot"]
@@ -92,7 +92,7 @@ def build_gn01_sn_promieniowa() -> dict[str, Any]:
                 {"field_role": "LINIA_OUT"},
                 {"field_role": "TRANSFORMATOROWE"},
             ],
-            "transformer": {"create": True},
+            "transformer": {"create": True, "transformer_catalog_ref": "ONAN_630"},
             "nn_block": {"outgoing_feeders_nn_count": 2},
         })
         assert result.get("error") is None, f"insert_station failed: {result.get('error')}"
@@ -134,7 +134,7 @@ def build_gn02_sn_odgalezienie() -> dict[str, Any]:
     # Steps 2-3: Continue trunk 2 times
     for i, length in enumerate([200, 300], 1):
         result = execute_domain_operation(enm, "continue_trunk_segment_sn", {
-            "segment": {"rodzaj": "KABEL", "dlugosc_m": length},
+            "segment": {"rodzaj": "KABEL", "dlugosc_m": length, "catalog_ref": "YAKXS_3x120"},
         })
         assert result.get("error") is None, f"continue_trunk #{i} failed: {result.get('error')}"
         enm = result["snapshot"]
@@ -160,7 +160,7 @@ def build_gn02_sn_odgalezienie() -> dict[str, Any]:
                 {"field_role": "LINIA_ODG"},
                 {"field_role": "TRANSFORMATOROWE"},
             ],
-            "transformer": {"create": True},
+            "transformer": {"create": True, "transformer_catalog_ref": "ONAN_630"},
             "nn_block": {"outgoing_feeders_nn_count": 2},
         })
         assert result.get("error") is None, f"insert_station failed: {result.get('error')}"
@@ -171,7 +171,7 @@ def build_gn02_sn_odgalezienie() -> dict[str, Any]:
     if len(sn_buses) >= 3:
         result = execute_domain_operation(enm, "start_branch_segment_sn", {
             "from_bus_ref": sn_buses[-1]["ref_id"],
-            "segment": {"rodzaj": "KABEL", "dlugosc_m": 150},
+            "segment": {"rodzaj": "KABEL", "dlugosc_m": 150, "catalog_ref": "YAKXS_3x120"},
         })
         assert result.get("error") is None, f"start_branch failed: {result.get('error')}"
         enm = result["snapshot"]
@@ -210,7 +210,7 @@ def build_gn03_sn_pierscien() -> dict[str, Any]:
     # Steps 2-4: Continue trunk 3 times
     for i, length in enumerate([200, 250, 300], 1):
         result = execute_domain_operation(enm, "continue_trunk_segment_sn", {
-            "segment": {"rodzaj": "KABEL", "dlugosc_m": length},
+            "segment": {"rodzaj": "KABEL", "dlugosc_m": length, "catalog_ref": "YAKXS_3x120"},
         })
         assert result.get("error") is None, f"continue_trunk #{i} failed: {result.get('error')}"
         enm = result["snapshot"]
@@ -234,7 +234,7 @@ def build_gn03_sn_pierscien() -> dict[str, Any]:
         result = execute_domain_operation(enm, "connect_secondary_ring_sn", {
             "from_bus_ref": sn_buses[0]["ref_id"],
             "to_bus_ref": sn_buses[-1]["ref_id"],
-            "segment": {"rodzaj": "KABEL", "dlugosc_m": 400},
+            "segment": {"rodzaj": "KABEL", "dlugosc_m": 400, "catalog_ref": "YAKXS_3x120"},
         })
         assert result.get("error") is None, f"connect_ring failed: {result.get('error')}"
         enm = result["snapshot"]
@@ -288,7 +288,7 @@ def build_gn04_sn_nn_oze() -> dict[str, Any]:
 
     # Step 2: Continue trunk
     result = execute_domain_operation(enm, "continue_trunk_segment_sn", {
-        "segment": {"rodzaj": "KABEL", "dlugosc_m": 600},
+        "segment": {"rodzaj": "KABEL", "dlugosc_m": 600, "catalog_ref": "YAKXS_3x120"},
     })
     assert result.get("error") is None, f"continue_trunk failed: {result.get('error')}"
     enm = result["snapshot"]
@@ -313,7 +313,7 @@ def build_gn04_sn_nn_oze() -> dict[str, Any]:
             {"field_role": "LINIA_OUT"},
             {"field_role": "TRANSFORMATOROWE"},
         ],
-        "transformer": {"create": True},
+        "transformer": {"create": True, "transformer_catalog_ref": "ONAN_630"},
         "nn_block": {"outgoing_feeders_nn_count": 2},
     })
     assert result.get("error") is None, f"insert_station failed: {result.get('error')}"

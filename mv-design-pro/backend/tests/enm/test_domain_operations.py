@@ -343,6 +343,7 @@ class TestInsertStationCreatesStructure:
                 "insert_at": {"value": 0.5},
                 "station": {"sn_voltage_kv": 15.0, "nn_voltage_kv": 0.4},
                 "sn_fields": ["IN", "OUT"],
+                "transformer": {"create": True, "transformer_catalog_ref": "ONAN_630"},
             },
         )
 
@@ -373,11 +374,9 @@ class TestInsertStationCreatesStructure:
 
 class TestInsertStationReadinessBlockers:
     def test_insert_station_readiness_blockers(self):
-        """Insert station without catalog refs.
+        """Insert station without transformer catalog refs.
 
-        Assert: readiness has blockers for line.catalog_ref_missing and
-                transformer.catalog_ref_missing.
-        Assert: fix_actions point to correct elements.
+        Assert: catalog gate rejects with catalog.ref_required error.
         """
         _, snapshot = _build_gpz_plus_segments(2)
         first_seg = _get_first_segment_ref(snapshot)
@@ -391,38 +390,13 @@ class TestInsertStationReadinessBlockers:
                 "insert_at": {"value": 0.5},
                 "station": {"sn_voltage_kv": 15.0, "nn_voltage_kv": 0.4},
                 "sn_fields": ["IN", "OUT"],
+                # No transformer_catalog_ref — catalog gate should block
             },
         )
 
-        assert result.get("snapshot") is not None
-
-        readiness = result.get("readiness", {})
-        blockers = readiness.get("blockers", [])
-        fix_actions = result.get("fix_actions", [])
-
-        # Expect blockers for missing catalog refs (lines and/or transformers)
-        blocker_codes = [b.get("code", "") for b in blockers]
-        blocker_messages = " ".join(b.get("message_pl", "") for b in blockers)
-
-        has_line_catalog_blocker = (
-            "line.catalog_ref_missing" in blocker_codes
-            or "E009" in blocker_codes
-            or "catalog_ref" in blocker_messages.lower()
-        )
-        has_trafo_catalog_blocker = (
-            "transformer.catalog_ref_missing" in blocker_codes
-            or "E009" in blocker_codes
-            or "transformator" in blocker_messages.lower()
-        )
-
-        assert has_line_catalog_blocker or has_trafo_catalog_blocker, (
-            f"Expected catalog_ref blockers, got: {blocker_codes}"
-        )
-
-        # fix_actions should point to specific elements
-        if fix_actions:
-            action_refs = [fa.get("element_ref") for fa in fix_actions if fa.get("element_ref")]
-            assert len(action_refs) > 0, "fix_actions should reference specific elements"
+        # Catalog gate rejects the operation before station creation
+        assert result.get("error") is not None
+        assert result.get("error_code") == "catalog.ref_required"
 
 
 # ===========================================================================
@@ -446,6 +420,7 @@ class TestDeterministicIds100x:
             "insert_at": {"value": 0.5},
             "station": {"sn_voltage_kv": 15.0, "nn_voltage_kv": 0.4},
             "sn_fields": ["IN", "OUT"],
+            "transformer": {"create": True, "transformer_catalog_ref": "ONAN_630"},
         }
 
         # Collect results from 100 runs
@@ -523,6 +498,7 @@ class TestPermutationInvarianceSNFields:
                         "insert_at": {"value": 0.5},
                         "station": {"sn_voltage_kv": 15.0, "nn_voltage_kv": 0.4},
                         "sn_fields": list(perm),
+                        "transformer": {"create": True, "transformer_catalog_ref": "ONAN_630"},
                     },
                 )
                 assert result.get("snapshot") is not None, f"Error: {result.get('error')}"
@@ -560,9 +536,10 @@ class TestPVBESSTransformerGate:
                 "insert_at": {"value": 0.5},
                 "station": {"sn_voltage_kv": 15.0, "nn_voltage_kv": 0.4},
                 "sn_fields": ["IN", "OUT"],
+                "transformer": {"create": True, "transformer_catalog_ref": "ONAN_630"},
             },
         )
-        assert result_station.get("snapshot") is not None
+        assert result_station.get("snapshot") is not None, f"Error: {result_station.get('error')}"
         s = result_station["snapshot"]
 
         # Find a bus in the station (nn bus if present, otherwise sn bus)
@@ -656,7 +633,7 @@ class TestSetNormalOpenPoint:
             payload={
                 "from_bus_ref": last_bus,
                 "to_bus_ref": first_bus,
-                "segment": {"rodzaj": "KABEL", "dlugosc_m": 200},
+                "segment": {"rodzaj": "KABEL", "dlugosc_m": 200, "catalog_ref": "YAKXS_3x120"},
             },
         )
 
@@ -824,6 +801,7 @@ class TestStationTypeBPassthrough:
                 "insert_at": {"value": 0.5},
                 "station": {"sn_voltage_kv": 15.0, "nn_voltage_kv": 0.4},
                 "sn_fields": ["IN", "OUT"],
+                "transformer": {"create": True, "transformer_catalog_ref": "ONAN_630"},
             },
         )
 
@@ -899,6 +877,7 @@ class TestStationTypeCBranch:
                 "insert_at": {"value": 0.5},
                 "station": {"sn_voltage_kv": 15.0, "nn_voltage_kv": 0.4},
                 "sn_fields": ["IN", "OUT", "FEEDER"],
+                "transformer": {"create": True, "transformer_catalog_ref": "ONAN_630"},
             },
         )
 
@@ -945,6 +924,7 @@ class TestStationTypeDSectional:
                 "insert_at": {"value": 0.5},
                 "station": {"sn_voltage_kv": 15.0, "nn_voltage_kv": 0.4},
                 "sn_fields": ["IN", "OUT", "COUPLER"],
+                "transformer": {"create": True, "transformer_catalog_ref": "ONAN_630"},
             },
         )
 
@@ -1082,7 +1062,7 @@ class TestAliasResolution:
             enm_dict=s1,
             op_name="add_trunk_segment_sn",
             payload={
-                "segment": {"rodzaj": "KABEL", "dlugosc_m": 500},
+                "segment": {"rodzaj": "KABEL", "dlugosc_m": 500, "catalog_ref": "YAKXS_3x120"},
             },
         )
 
@@ -1123,6 +1103,7 @@ class TestDomainEventsOrder:
                 "insert_at": {"value": 0.5},
                 "station": {"sn_voltage_kv": 15.0, "nn_voltage_kv": 0.4},
                 "sn_fields": ["IN", "OUT"],
+                "transformer": {"create": True, "transformer_catalog_ref": "ONAN_630"},
             },
         )
 
@@ -1187,7 +1168,7 @@ class TestConnectRing:
             payload={
                 "from_bus_ref": last_bus,
                 "to_bus_ref": first_bus,
-                "segment": {"rodzaj": "KABEL", "dlugosc_m": 200},
+                "segment": {"rodzaj": "KABEL", "dlugosc_m": 200, "catalog_ref": "YAKXS_3x120"},
             },
         )
 
