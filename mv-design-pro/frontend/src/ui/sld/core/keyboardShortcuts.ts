@@ -57,6 +57,13 @@ export const KEYBOARD_SHORTCUTS: readonly KeyboardShortcutDef[] = [
   { keys: 'F2', description_pl: 'Zmień nazwę elementu', category: 'EDYCJA_MODELU', action_id: 'rename', required_mode: 'MODEL_EDIT' },
   { keys: 'Space', description_pl: 'Przełącz stan łącznika (otwórz/zamknij)', category: 'EDYCJA_MODELU', action_id: 'toggle_switch', required_mode: 'MODEL_EDIT' },
 
+  // --- Konteksty K1-K5: Budowa sieci SN ---
+  { keys: 'S', description_pl: 'Dodaj odcinek magistrali (od terminala)', category: 'EDYCJA_MODELU', action_id: 'add_trunk_segment', required_mode: 'MODEL_EDIT' },
+  { keys: 'T', description_pl: 'Wstaw stację SN/nN (domyślnie A)', category: 'EDYCJA_MODELU', action_id: 'insert_station_a', required_mode: 'MODEL_EDIT' },
+  { keys: 'B', description_pl: 'Dodaj odgałęzienie', category: 'EDYCJA_MODELU', action_id: 'add_branch', required_mode: 'MODEL_EDIT' },
+  { keys: 'R', description_pl: 'Wejdź w tryb łączenia końców (rezerwa/pierścień)', category: 'EDYCJA_MODELU', action_id: 'start_connect_ends', required_mode: 'MODEL_EDIT' },
+  { keys: 'N', description_pl: 'Ustaw NOP (punkt normalnie otwarty)', category: 'EDYCJA_MODELU', action_id: 'set_nop', required_mode: 'MODEL_EDIT' },
+
   // --- Dodawanie źródeł nN ---
   { keys: 'Ctrl+Shift+P', description_pl: 'Dodaj falownik PV...', category: 'EDYCJA_MODELU', action_id: 'add_pv_inverter', required_mode: 'MODEL_EDIT' },
   { keys: 'Ctrl+Shift+B', description_pl: 'Dodaj falownik BESS...', category: 'EDYCJA_MODELU', action_id: 'add_bess_inverter', required_mode: 'MODEL_EDIT' },

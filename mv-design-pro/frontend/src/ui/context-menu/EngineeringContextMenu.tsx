@@ -6,11 +6,13 @@
  *
  * Pipeline:
  *   rightClick → resolveElementType → selectBuilder → filterByMode → render
+ *   → [catalogGate] → CatalogPicker (jeśli wymagany) → onOperation
  *
  * INVARIANTS:
  * - Zero logiki biznesowej — tylko routing
  * - Operacje nielegalne UKRYTE (nie zablokowane)
  * - Każda operacja mapowana na canonical operation (backend)
+ * - Bramka katalogowa: NIGDY nie wysyłaj operacji bez catalog_binding
  * - 100% Polish labels
  * - Deterministic action ordering
  */
@@ -18,6 +20,8 @@
 import { useCallback, useMemo } from 'react';
 import { ContextMenu } from './ContextMenu';
 import type { ContextMenuAction, ElementType, OperatingMode, SwitchState } from '../types';
+import { checkCatalogGate } from './catalogGate';
+import type { CatalogNamespace } from './catalogGate';
 import {
   buildSourceSNContextMenu,
   buildBusSNContextMenu,
@@ -62,11 +66,27 @@ export interface EngineeringContextMenuState {
   resultType?: 'SHORT_CIRCUIT' | 'POWER_FLOW' | 'TIME_SERIES';
 }
 
+/**
+ * Callback wywoływany gdy operacja wymaga wyboru z katalogu.
+ * Komponent nadrzędny MUSI otworzyć CatalogPicker i po wyborze
+ * wywołać onOperation z catalog_binding w payload.
+ */
+export interface CatalogGateRequest {
+  operationId: string;
+  elementId: string;
+  elementType: ElementType;
+  namespace: CatalogNamespace;
+  label: string;
+}
+
 export interface EngineeringContextMenuProps {
   state: EngineeringContextMenuState;
   mode: OperatingMode;
   onClose: () => void;
+  /** Wywołany TYLKO jeśli operacja NIE wymaga katalogu lub katalog już wybrany */
   onOperation: (operationId: string, elementId: string, elementType: ElementType) => void;
+  /** Wywołany gdy operacja WYMAGA katalogu — komponent nadrzędny otwiera CatalogPicker */
+  onCatalogRequired?: (request: CatalogGateRequest) => void;
 }
 
 // =============================================================================
@@ -128,21 +148,38 @@ const SWITCH_BUILDERS: Partial<
  *
  * Automatycznie dobiera builder per elementType.
  * Generuje handlery które wywołują onOperation z operationId.
+ * BRAMKA KATALOGOWA: jeśli operacja wymaga katalogu, wywołuje onCatalogRequired
+ * zamiast onOperation — komponent nadrzędny MUSI otworzyć CatalogPicker.
  */
 export function EngineeringContextMenu({
   state,
   mode,
   onClose,
   onOperation,
+  onCatalogRequired,
 }: EngineeringContextMenuProps) {
   const { isOpen, x, y, elementId, elementType, elementName, switchState } = state;
 
-  // Generuj handlery (każda akcja → onOperation callback)
+  // Generuj handlery z bramką katalogową
   const makeHandler = useCallback(
     (operationId: string) => () => {
-      onOperation(operationId, elementId, elementType);
+      // Sprawdź bramkę katalogową PRZED wysłaniem operacji
+      const gate = checkCatalogGate(operationId);
+      if (gate.required && gate.namespace && gate.label && onCatalogRequired) {
+        // Operacja wymaga katalogu — deleguj do CatalogPicker
+        onCatalogRequired({
+          operationId,
+          elementId,
+          elementType,
+          namespace: gate.namespace,
+          label: gate.label,
+        });
+      } else {
+        // Operacja nie wymaga katalogu — wykonaj bezpośrednio
+        onOperation(operationId, elementId, elementType);
+      }
     },
-    [onOperation, elementId, elementType],
+    [onOperation, onCatalogRequired, elementId, elementType],
   );
 
   // Zbuduj proxy handlerów (Proxy-based to cover all possible handler keys)

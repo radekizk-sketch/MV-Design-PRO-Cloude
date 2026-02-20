@@ -3,7 +3,21 @@
  */
 export { ContextMenu } from './ContextMenu';
 export { EngineeringContextMenu } from './EngineeringContextMenu';
-export type { EngineeringContextMenuState, EngineeringContextMenuProps } from './EngineeringContextMenu';
+export type {
+  EngineeringContextMenuState,
+  EngineeringContextMenuProps,
+  CatalogGateRequest,
+} from './EngineeringContextMenu';
+
+// Catalog Gate (bramka katalogowa UI)
+export {
+  requiresCatalog,
+  catalogNamespace,
+  catalogNamespaceLabel,
+  resolveCanonicalOperation,
+  checkCatalogGate,
+} from './catalogGate';
+export type { CatalogNamespace, CatalogGateResult } from './catalogGate';
 export {
   buildContextMenuActions,
   buildBusContextMenu,
