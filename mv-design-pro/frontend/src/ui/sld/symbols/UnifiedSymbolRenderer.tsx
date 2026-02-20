@@ -590,6 +590,8 @@ export const UnifiedSymbolRenderer: React.FC<UnifiedSymbolRendererProps> = ({
   // Build data-testid attributes
   const testIdAttrs: Record<string, string> = {
     'data-testid': `sld-symbol-${symbol.id}`,
+    'data-element-id': symbol.elementId ?? symbol.id,
+    'data-element-name': elementName,
     'data-element-type': elementType,
     'data-hierarchy-level': hierarchyLevel,
   };

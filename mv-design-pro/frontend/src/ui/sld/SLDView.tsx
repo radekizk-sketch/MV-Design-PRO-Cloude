@@ -54,12 +54,14 @@ import {
 } from './export';
 import { useOverlayRuntime, OverlayLegend } from '../sld-overlay';
 import { SldTechLabelsLayer } from './SldTechLabelsLayer';
-import { useCanCalculate } from '../app-state';
+import { useCanCalculate, useAppStateStore } from '../app-state';
 import { resolveClickAction } from './SldModeInteractionHandler';
 import { useOperationalModeStore } from './operationalModeStore';
 import { EngineeringContextMenu } from '../context-menu/EngineeringContextMenu';
 import type { EngineeringContextMenuState } from '../context-menu/EngineeringContextMenu';
 import { useLabelModeStore } from './labelModeStore';
+import { getModalByOp } from '../topology/modals/modalRegistry';
+import { notify } from '../notifications/store';
 
 /**
  * Default canvas dimensions.
@@ -78,6 +80,70 @@ const CONTEXT_MENU_CLOSED: EngineeringContextMenuState = {
   elementType: 'Bus',
   elementName: '',
 };
+
+/**
+ * Context menu action ID → canonical operation mapping.
+ * Bridges context menu builder proxy IDs to modalRegistry canonical operations.
+ */
+const CONTEXT_MENU_OP_MAP: Record<string, string> = {
+  // Properties / parameter editing
+  properties: 'update_element_parameters',
+  edit_sk3: 'update_element_parameters',
+  edit_voltage: 'update_element_parameters',
+  edit_rx: 'update_element_parameters',
+  edit_impedance: 'update_element_parameters',
+  edit_length: 'update_element_parameters',
+  edit_load_power: 'update_element_parameters',
+  edit_transformer_ratio: 'update_element_parameters',
+  edit_parameters: 'update_element_parameters',
+  // Catalog
+  assign_catalog: 'assign_catalog_to_element',
+  // Topology operations
+  add_line: 'start_branch_segment_sn',
+  add_cable: 'start_branch_segment_sn',
+  add_branch: 'start_branch_segment_sn',
+  add_station: 'insert_station_on_segment_sn',
+  add_section_switch: 'insert_section_switch_sn',
+  connect_ring: 'connect_secondary_ring_sn',
+  set_nop: 'set_normal_open_point',
+  // Element addition
+  add_relay: 'add_relay',
+  add_protection: 'add_relay',
+  add_nn_load: 'add_nn_load',
+  add_load: 'add_nn_load',
+  add_pv: 'add_pv_inverter_nn',
+  add_bess: 'add_bess_inverter_nn',
+  add_nn_outgoing_field: 'add_nn_outgoing_field',
+  // Calculations
+  run_power_flow: 'run_power_flow',
+  run_short_circuit: 'run_short_circuit',
+};
+
+/**
+ * Navigation/info action IDs — these don't map to domain operations.
+ */
+const NAVIGATION_ACTIONS = new Set([
+  'show_results',
+  'show_whitebox',
+  'show_readiness',
+  'show_tree',
+  'show_diagram',
+  'show_on_diagram',
+  'export_data',
+  'history',
+]);
+
+/**
+ * Direct toggle actions — handled in-place without modals.
+ */
+const TOGGLE_ACTIONS = new Set([
+  'toggle_switch',
+  'toggle_service',
+  'delete',
+  'delete_element',
+  'disconnect',
+  'disconnect_element',
+]);
 
 /**
  * Main SLD View component.
@@ -119,6 +185,10 @@ export const SLDView: React.FC<SLDViewProps> = ({
 
   // Operational mode store integration (mode-aware click handling)
   const operationalMode = useOperationalModeStore((state) => state.mode);
+
+  // App state for export metadata (project/case names)
+  const activeProjectName = useAppStateStore((state) => state.activeProjectName);
+  const activeCaseName = useAppStateStore((state) => state.activeCaseName);
 
   // BLOK 8 — przycisk uruchomienia obliczeń
   const { allowed: canCalculate } = useCanCalculate();
@@ -533,13 +603,64 @@ export const SLDView: React.FC<SLDViewProps> = ({
    */
   const handleContextMenuOperation = useCallback(
     (operationId: string, elementId: string, elementType: ElementType) => {
-      // TODO: Route operation to CDSE pipeline / canonical operation dispatcher
-      console.debug(
-        `[SLDView] Operacja kontekstowa: ${operationId} na ${elementType} (${elementId})`,
-      );
+      // Close menu immediately
       setContextMenuState(CONTEXT_MENU_CLOSED);
+
+      // 1. Check for canonical domain operation
+      const canonicalOp = CONTEXT_MENU_OP_MAP[operationId];
+      if (canonicalOp) {
+        const modalEntry = getModalByOp(canonicalOp);
+        if (modalEntry) {
+          // Select the element for context
+          selectElement({ id: elementId, type: elementType, name: elementId });
+          notify(`${modalEntry.labelPl} — ${elementType} (${elementId})`, 'info');
+          console.debug(
+            `[SLDView] Dispatch: ${operationId} → ${canonicalOp} → ${modalEntry.componentName}`,
+          );
+        } else {
+          console.debug(`[SLDView] Operacja kanonyczna bez modala: ${canonicalOp}`);
+          notify(`Operacja: ${canonicalOp}`, 'info');
+        }
+        return;
+      }
+
+      // 2. Navigation/info actions — select + notify
+      if (NAVIGATION_ACTIONS.has(operationId)) {
+        selectElement({ id: elementId, type: elementType, name: elementId });
+        const labels: Record<string, string> = {
+          show_results: 'Przejście do wyników',
+          show_whitebox: 'Otwarcie śladu obliczeń WhiteBox',
+          show_readiness: 'Gotowość elementu',
+          show_tree: 'Zaznaczono w drzewie projektu',
+          show_diagram: 'Wycentrowano na schemacie',
+          show_on_diagram: 'Wycentrowano na schemacie',
+          export_data: 'Eksport danych elementu',
+          history: 'Historia zdarzeń elementu',
+        };
+        notify(labels[operationId] ?? operationId, 'info');
+        return;
+      }
+
+      // 3. Toggle actions — direct state change
+      if (TOGGLE_ACTIONS.has(operationId)) {
+        selectElement({ id: elementId, type: elementType, name: elementId });
+        const labels: Record<string, string> = {
+          toggle_switch: 'Przełączono stan łącznika',
+          toggle_service: 'Zmieniono stan eksploatacji',
+          delete: 'Usunięcie elementu wymaga potwierdzenia',
+          delete_element: 'Usunięcie elementu wymaga potwierdzenia',
+          disconnect: 'Odłączenie elementu',
+          disconnect_element: 'Odłączenie elementu',
+        };
+        notify(labels[operationId] ?? operationId, 'info');
+        return;
+      }
+
+      // 4. Unknown operation — log warning
+      console.warn(`[SLDView] Nieznana operacja kontekstowa: ${operationId}`);
+      notify(`Operacja: ${operationId}`, 'info');
     },
-    [],
+    [selectElement],
   );
 
   /**
@@ -580,8 +701,8 @@ export const SLDView: React.FC<SLDViewProps> = ({
 
       try {
         const metadata = {
-          projectName: 'demo-project', // TODO: Get from context
-          caseName: 'demo-case', // TODO: Get from context
+          projectName: activeProjectName ?? 'projekt',
+          caseName: activeCaseName ?? 'przypadek',
           runId: sldOverlay?.run_id,
           zoomPercent: Math.round(viewport.zoom * 100),
           timestamp: new Date().toISOString(),
@@ -612,7 +733,7 @@ export const SLDView: React.FC<SLDViewProps> = ({
         setIsExporting(false);
       }
     },
-    [symbols, viewport, width, height, sldOverlay]
+    [symbols, viewport, width, height, sldOverlay, activeProjectName, activeCaseName]
   );
 
   /**
@@ -628,13 +749,13 @@ export const SLDView: React.FC<SLDViewProps> = ({
    */
   const exportMetadata = useMemo(
     () => ({
-      projectName: 'demo-project', // TODO: Get from context
-      caseName: 'demo-case', // TODO: Get from context
+      projectName: activeProjectName ?? 'projekt',
+      caseName: activeCaseName ?? 'przypadek',
       runId: sldOverlay?.run_id,
       zoomPercent: Math.round(viewport.zoom * 100),
       timestamp: new Date().toISOString(),
     }),
-    [viewport.zoom, sldOverlay]
+    [viewport.zoom, sldOverlay, activeProjectName, activeCaseName]
   );
 
   // Zoom percentage for display

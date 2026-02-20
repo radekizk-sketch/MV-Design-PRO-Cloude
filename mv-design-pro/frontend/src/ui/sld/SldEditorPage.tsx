@@ -33,8 +33,11 @@ import { useStudyCasesStore } from '../study-cases/store';
 import { createProject } from '../projects/api';
 import { notify } from '../notifications/store';
 import { ReadinessLivePanel, DataGapPanel } from '../engineering-readiness';
+import { useReadinessLiveStore } from '../engineering-readiness';
 import { EngineeringInspector } from '../property-grid';
 import { SldResultsAccess } from './SldResultsAccess';
+import type { ElementResultsSummary } from './SldResultsAccess';
+import { useResultsInspectorStore } from '../results-inspector/store';
 import { OperationalModeToolbar } from './OperationalModeToolbar';
 import { LabelModeToolbar } from './LabelModeToolbar';
 
@@ -207,12 +210,98 @@ export const SldEditorPage: React.FC<SldEditorPageProps> = ({
   // Selection state
   const selectedElement = useSelectionStore((state) => state.selectedElements[0] ?? null);
 
+  // Selection store actions for navigation
+  const selectElement = useSelectionStore((state) => state.selectElement);
+  const centerSldOnElement = useSelectionStore((state) => state.centerSldOnElement);
+
+  // Readiness live store — real data from API
+  const readinessIssues = useReadinessLiveStore((state) => state.issues);
+  const readinessStatus = useReadinessLiveStore((state) => state.status);
+  const readinessLoading = useReadinessLiveStore((state) => state.loading);
+  const readinessCollapsedGroups = useReadinessLiveStore((state) => state.collapsedGroups);
+  const readinessToggleGroup = useReadinessLiveStore((state) => state.toggleGroup);
+  const readinessRefresh = useReadinessLiveStore((state) => state.refresh);
+
+  // Results inspector store — for SldResultsAccess
+  const busResults = useResultsInspectorStore((state) => state.busResults);
+  const branchResults = useResultsInspectorStore((state) => state.branchResults);
+  const shortCircuitResults = useResultsInspectorStore((state) => state.shortCircuitResults);
+
+  // Study cases — for hasCases wiring
+  const studyCasesCount = useStudyCasesStore((state) => state.cases.length);
+
   // Inspector panel state
   const [inspectorPanelVisible, setInspectorPanelVisible] = useState(true);
   const [isCreatingFirstCase, setIsCreatingFirstCase] = useState(false);
 
   // UX 10/10: Results mode flag — true when RESULT_VIEW mode and results available
   const isResultsMode = activeMode === 'RESULT_VIEW';
+
+  // Resolve element data from SLD editor store for EngineeringInspector
+  const selectedSymbol = useSldEditorStore((state) =>
+    selectedElement ? state.symbols.get(selectedElement.id) ?? null : null,
+  );
+
+  const elementData = useMemo<Record<string, unknown>>(() => {
+    if (!selectedSymbol) return {};
+    const data: Record<string, unknown> = {};
+    // Extract all known fields from the symbol
+    for (const [key, value] of Object.entries(selectedSymbol)) {
+      if (key !== 'id' && key !== 'position' && value !== undefined) {
+        data[key] = value;
+      }
+    }
+    return data;
+  }, [selectedSymbol]);
+
+  // Resolve results summary for SldResultsAccess
+  const resultsSummary = useMemo<ElementResultsSummary | null>(() => {
+    if (!selectedElement || !isResultsMode) return null;
+    const elId = selectedElement.id;
+    const elType = selectedElement.type;
+
+    // Look up bus results (BusResults.rows: BusResultRow[])
+    if (busResults?.rows) {
+      const busRow = busResults.rows.find((b) => b.bus_id === elId);
+      if (busRow) {
+        return {
+          elementId: elId,
+          elementType: elType,
+          elementName: selectedElement.name ?? elId,
+          hasLoadFlowResults: true,
+          hasScResults: !!shortCircuitResults,
+          voltageKv: busRow.u_kv ?? undefined,
+          voltagePu: busRow.u_pu ?? undefined,
+        };
+      }
+    }
+
+    // Look up branch results (BranchResults.rows: BranchResultRow[])
+    if (branchResults?.rows) {
+      const brRow = branchResults.rows.find((b) => b.branch_id === elId);
+      if (brRow) {
+        return {
+          elementId: elId,
+          elementType: elType,
+          elementName: selectedElement.name ?? elId,
+          hasLoadFlowResults: true,
+          hasScResults: !!shortCircuitResults,
+          loadingPct: brRow.loading_pct ?? undefined,
+          pKw: brRow.p_mw != null ? brRow.p_mw * 1000 : undefined,
+          qKvar: brRow.q_mvar != null ? brRow.q_mvar * 1000 : undefined,
+        };
+      }
+    }
+
+    // Minimal summary when no results available
+    return {
+      elementId: elId,
+      elementType: elType,
+      elementName: selectedElement.name ?? elId,
+      hasLoadFlowResults: false,
+      hasScResults: false,
+    };
+  }, [selectedElement, isResultsMode, busResults, branchResults, shortCircuitResults]);
 
   const withTimeout = useCallback(async <T,>(promise: Promise<T>, timeoutMs = 15000): Promise<T> => {
     return await Promise.race([
@@ -238,6 +327,13 @@ export const SldEditorPage: React.FC<SldEditorPageProps> = ({
       setSymbols(DEMO_SYMBOLS);
     }
   }, [useDemo, storeSymbols.length, setSymbols]);
+
+  // Refresh readiness data when active case changes
+  useEffect(() => {
+    if (activeCaseId) {
+      readinessRefresh(activeCaseId);
+    }
+  }, [activeCaseId, readinessRefresh]);
 
   // Determine empty state
   const emptyState: SldEmptyState | null = useMemo(() => {
@@ -321,26 +417,35 @@ export const SldEditorPage: React.FC<SldEditorPageProps> = ({
 
   // BLOK 2: Nawigacja do elementu z panelu FixActions
   const handleGoToElement = useCallback((elementId: string) => {
-    notify(`Przejście do elementu: ${elementId}`, 'info');
-  }, []);
+    selectElement({ id: elementId, type: 'Bus', name: elementId });
+    centerSldOnElement(elementId);
+  }, [selectElement, centerSldOnElement]);
 
   // UX 10/10: ReadinessLivePanel callbacks
   const handleReadinessNavigate = useCallback((elementRef: string) => {
-    notify(`Nawigacja do elementu: ${elementRef}`, 'info');
-  }, []);
+    selectElement({ id: elementRef, type: 'Bus', name: elementRef });
+    centerSldOnElement(elementRef);
+  }, [selectElement, centerSldOnElement]);
 
-  const handleReadinessFixAction = useCallback((_fixAction: unknown, _elementRef: string | null) => {
+  const handleReadinessFixAction = useCallback((_fixAction: unknown, elementRef: string | null) => {
+    if (elementRef) {
+      selectElement({ id: elementRef, type: 'Bus', name: elementRef });
+      centerSldOnElement(elementRef);
+    }
     notify('Akcja naprawcza uruchomiona.', 'info');
-  }, []);
+  }, [selectElement, centerSldOnElement]);
 
   // UX 10/10: DataGapPanel callbacks
   const handleDataGapNavigate = useCallback((elementId: string) => {
-    notify(`Nawigacja do braku danych: ${elementId}`, 'info');
-  }, []);
+    selectElement({ id: elementId, type: 'Bus', name: elementId });
+    centerSldOnElement(elementId);
+  }, [selectElement, centerSldOnElement]);
 
   const handleDataGapQuickFix = useCallback((elementId: string, fixAction: string) => {
+    selectElement({ id: elementId, type: 'Bus', name: elementId });
+    centerSldOnElement(elementId);
     notify(`Szybka naprawa: ${fixAction} dla ${elementId}`, 'info');
-  }, []);
+  }, [selectElement, centerSldOnElement]);
 
   // Show inspector when selection changes
   useEffect(() => {
@@ -368,7 +473,7 @@ export const SldEditorPage: React.FC<SldEditorPageProps> = ({
         {emptyState && (
           <SldEmptyOverlay
             state={emptyState}
-            hasCases={false}  // TODO: Pass actual case count when available
+            hasCases={studyCasesCount > 0}
             onSelectCase={handleEmptyAction}
             onCreateCase={handleCreateFirstCase}
             isCreatingCase={isCreatingFirstCase}
@@ -393,9 +498,11 @@ export const SldEditorPage: React.FC<SldEditorPageProps> = ({
             data-testid="sld-readiness-stack"
           >
             <ReadinessLivePanel
-              issues={[]}
-              status="OK"
-              loading={false}
+              issues={readinessIssues}
+              status={readinessStatus}
+              loading={readinessLoading}
+              collapsedGroups={readinessCollapsedGroups}
+              onToggleGroup={readinessToggleGroup}
               onNavigateToElement={handleReadinessNavigate}
               onFixAction={handleReadinessFixAction}
             />
@@ -430,7 +537,23 @@ export const SldEditorPage: React.FC<SldEditorPageProps> = ({
           <EngineeringInspector
             elementId={selectedElement.id}
             elementType={selectedElement.type}
-            elementData={{}}
+            elementData={elementData}
+            onFieldChange={(field, value) => {
+              notify(`Zmieniono pole: ${field}`, 'info');
+              console.debug('[SldEditorPage] Field change:', field, value);
+            }}
+            onChangeCatalogType={() => {
+              notify('Otwarcie katalogu typów...', 'info');
+            }}
+            onRefreshFromCatalog={() => {
+              notify('Odświeżanie z katalogu...', 'info');
+            }}
+            onNavigateToResults={() => {
+              notify('Przejście do wyników elementu...', 'info');
+            }}
+            onEditProtection={() => {
+              notify('Edycja zabezpieczeń elementu...', 'info');
+            }}
           />
         </div>
       )}
@@ -440,7 +563,19 @@ export const SldEditorPage: React.FC<SldEditorPageProps> = ({
         <div data-testid="sld-results-access-wrapper" className="flex-shrink-0">
           <SldResultsAccess
             selectedElementId={selectedElement.id}
-            resultsSummary={null}
+            resultsSummary={resultsSummary}
+            onShowWhiteBox={(elId) => {
+              notify(`Otwarcie śladu WhiteBox dla: ${elId}`, 'info');
+            }}
+            onShowFullResults={(elId) => {
+              notify(`Pełne wyniki dla: ${elId}`, 'info');
+            }}
+            onExportResults={(elId, format) => {
+              notify(`Eksport wyników (${format}) dla: ${elId}`, 'info');
+            }}
+            onShowProtectionCoverage={(elId) => {
+              notify(`Pokrycie zabezpieczeniowe: ${elId}`, 'info');
+            }}
           />
         </div>
       )}
