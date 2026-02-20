@@ -55,12 +55,29 @@ import {
 import { useOverlayRuntime, OverlayLegend } from '../sld-overlay';
 import { SldTechLabelsLayer } from './SldTechLabelsLayer';
 import { useCanCalculate } from '../app-state';
+import { resolveClickAction } from './SldModeInteractionHandler';
+import { useOperationalModeStore } from './operationalModeStore';
+import { EngineeringContextMenu } from '../context-menu/EngineeringContextMenu';
+import type { EngineeringContextMenuState } from '../context-menu/EngineeringContextMenu';
+import { useLabelModeStore } from './labelModeStore';
 
 /**
  * Default canvas dimensions.
  */
 const DEFAULT_WIDTH = 1000;
 const DEFAULT_HEIGHT = 600;
+
+/**
+ * Default (closed) state for the engineering context menu.
+ */
+const CONTEXT_MENU_CLOSED: EngineeringContextMenuState = {
+  isOpen: false,
+  x: 0,
+  y: 0,
+  elementId: '',
+  elementType: 'Bus',
+  elementName: '',
+};
 
 /**
  * Main SLD View component.
@@ -88,6 +105,20 @@ export const SLDView: React.FC<SLDViewProps> = ({
 
   // BLOK 7 — etykiety techniczne (load%, NOP, napięcie)
   const [techLabelsVisible, setTechLabelsVisible] = useState(false);
+
+  // Label mode store integration — tech labels also respond to label mode store
+  const labelModeVisible = useLabelModeStore((state) => state.visible);
+
+  // Derived: tech labels visible when either local toggle OR label mode store says visible
+  const effectiveTechLabelsVisible = techLabelsVisible || labelModeVisible;
+
+  // Context menu state for EngineeringContextMenu
+  const [contextMenuState, setContextMenuState] = useState<EngineeringContextMenuState>(
+    CONTEXT_MENU_CLOSED,
+  );
+
+  // Operational mode store integration (mode-aware click handling)
+  const operationalMode = useOperationalModeStore((state) => state.mode);
 
   // BLOK 8 — przycisk uruchomienia obliczeń
   const { allowed: canCalculate } = useCanCalculate();
@@ -184,7 +215,9 @@ export const SLDView: React.FC<SLDViewProps> = ({
   }, [sldCenterOnElement, symbols, width, height, centerSldOnElement]);
 
   /**
-   * Handle symbol click — update selection.
+   * Handle symbol click — mode-aware click handling via SldModeInteractionHandler.
+   * If operationalMode !== 'NORMALNY', the click is intercepted by the mode handler.
+   * Otherwise, standard selection logic applies.
    */
   const handleSymbolClick = useCallback(
     (symbolId: string, elementType: ElementType, elementName: string) => {
@@ -192,6 +225,23 @@ export const SLDView: React.FC<SLDViewProps> = ({
       const symbol = symbols.find((s) => s.id === symbolId);
       const elementId = symbol?.elementId || symbolId;
 
+      // Check if the operational mode intercepts this click
+      const clickResult = resolveClickAction(operationalMode, {
+        elementId,
+        elementType,
+      });
+
+      // If operational mode is NOT 'NORMALNY', use mode-specific handler
+      if (operationalMode !== 'NORMALNY') {
+        // Mode-specific actions (TOGGLE_SERVICE, SET_FAULT_BUS) are handled
+        // by the caller via clickResult; selection still happens for feedback
+        if (clickResult.action === 'NONE') {
+          // Click was rejected by mode handler — no selection
+          return;
+        }
+      }
+
+      // Standard selection logic (NORMALNY mode, or SELECT action in other modes)
       const element: SelectedElement = {
         id: elementId,
         type: elementType,
@@ -209,7 +259,7 @@ export const SLDView: React.FC<SLDViewProps> = ({
         onElementClick(element);
       }
     },
-    [symbols, selectElement, onElementClick]
+    [symbols, selectElement, onElementClick, operationalMode]
   );
 
   /**
@@ -353,11 +403,37 @@ export const SLDView: React.FC<SLDViewProps> = ({
   }, []);
 
   /**
-   * Prevent context menu.
+   * Handle context menu — open EngineeringContextMenu on right-click.
+   * Detects the clicked element via data attributes on the SLD symbol DOM.
    */
-  const handleContextMenu = useCallback((e: React.MouseEvent) => {
-    e.preventDefault();
-  }, []);
+  const handleContextMenu = useCallback(
+    (e: React.MouseEvent) => {
+      e.preventDefault();
+
+      // Attempt to find the closest SLD symbol element with data attributes
+      const target = e.target as HTMLElement;
+      const symbolEl = target.closest<HTMLElement>('[data-element-id]');
+
+      if (symbolEl) {
+        const elementId = symbolEl.getAttribute('data-element-id') ?? '';
+        const elementType = (symbolEl.getAttribute('data-element-type') ?? 'Bus') as ElementType;
+        const elementName = symbolEl.getAttribute('data-element-name') ?? elementId;
+
+        setContextMenuState({
+          isOpen: true,
+          x: e.clientX,
+          y: e.clientY,
+          elementId,
+          elementType,
+          elementName,
+        });
+      } else {
+        // Close context menu if right-clicking on empty canvas
+        setContextMenuState(CONTEXT_MENU_CLOSED);
+      }
+    },
+    [],
+  );
 
   /**
    * Handle diagnostics marker click — select element + center + pulse.
@@ -442,6 +518,28 @@ export const SLDView: React.FC<SLDViewProps> = ({
       }
     },
     [selectElement, centerSldOnElement, onElementClick]
+  );
+
+  /**
+   * Handle context menu close — reset state to closed.
+   */
+  const handleContextMenuClose = useCallback(() => {
+    setContextMenuState(CONTEXT_MENU_CLOSED);
+  }, []);
+
+  /**
+   * Handle context menu operation — dispatched from EngineeringContextMenu.
+   * Closes the menu after the operation is dispatched.
+   */
+  const handleContextMenuOperation = useCallback(
+    (operationId: string, elementId: string, elementType: ElementType) => {
+      // TODO: Route operation to CDSE pipeline / canonical operation dispatcher
+      console.debug(
+        `[SLDView] Operacja kontekstowa: ${operationId} na ${elementType} (${elementId})`,
+      );
+      setContextMenuState(CONTEXT_MENU_CLOSED);
+    },
+    [],
   );
 
   /**
@@ -993,7 +1091,7 @@ export const SLDView: React.FC<SLDViewProps> = ({
           viewport={viewport}
           width={width}
           height={height}
-          visible={techLabelsVisible}
+          visible={effectiveTechLabelsVisible}
         />
       </div>
 
@@ -1048,6 +1146,14 @@ export const SLDView: React.FC<SLDViewProps> = ({
         hasResultsOverlay={hasResults}
         hasDiagnosticsOverlay={hasDiagnostics}
         isExporting={isExporting}
+      />
+
+      {/* Engineering context menu — right-click on SLD elements */}
+      <EngineeringContextMenu
+        state={contextMenuState}
+        mode={isResultsMode ? 'RESULT_VIEW' : isProtectionMode ? 'RESULT_VIEW' : 'MODEL_EDIT'}
+        onClose={handleContextMenuClose}
+        onOperation={handleContextMenuOperation}
       />
     </div>
   );

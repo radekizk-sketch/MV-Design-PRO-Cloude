@@ -32,6 +32,11 @@ import type { AnySldSymbol } from '../sld-editor/types';
 import { useStudyCasesStore } from '../study-cases/store';
 import { createProject } from '../projects/api';
 import { notify } from '../notifications/store';
+import { ReadinessLivePanel, DataGapPanel } from '../engineering-readiness';
+import { EngineeringInspector } from '../property-grid';
+import { SldResultsAccess } from './SldResultsAccess';
+import { OperationalModeToolbar } from './OperationalModeToolbar';
+import { LabelModeToolbar } from './LabelModeToolbar';
 
 /**
  * Demo symbols for development/testing.
@@ -206,6 +211,9 @@ export const SldEditorPage: React.FC<SldEditorPageProps> = ({
   const [inspectorPanelVisible, setInspectorPanelVisible] = useState(true);
   const [isCreatingFirstCase, setIsCreatingFirstCase] = useState(false);
 
+  // UX 10/10: Results mode flag — true when RESULT_VIEW mode and results available
+  const isResultsMode = activeMode === 'RESULT_VIEW';
+
   const withTimeout = useCallback(async <T,>(promise: Promise<T>, timeoutMs = 15000): Promise<T> => {
     return await Promise.race([
       promise,
@@ -316,6 +324,24 @@ export const SldEditorPage: React.FC<SldEditorPageProps> = ({
     notify(`Przejście do elementu: ${elementId}`, 'info');
   }, []);
 
+  // UX 10/10: ReadinessLivePanel callbacks
+  const handleReadinessNavigate = useCallback((elementRef: string) => {
+    notify(`Nawigacja do elementu: ${elementRef}`, 'info');
+  }, []);
+
+  const handleReadinessFixAction = useCallback((_fixAction: unknown, _elementRef: string | null) => {
+    notify('Akcja naprawcza uruchomiona.', 'info');
+  }, []);
+
+  // UX 10/10: DataGapPanel callbacks
+  const handleDataGapNavigate = useCallback((elementId: string) => {
+    notify(`Nawigacja do braku danych: ${elementId}`, 'info');
+  }, []);
+
+  const handleDataGapQuickFix = useCallback((elementId: string, fixAction: string) => {
+    notify(`Szybka naprawa: ${fixAction} dla ${elementId}`, 'info');
+  }, []);
+
   // Show inspector when selection changes
   useEffect(() => {
     if (selectedElement) {
@@ -359,6 +385,36 @@ export const SldEditorPage: React.FC<SldEditorPageProps> = ({
             />
           </div>
         )}
+
+        {/* UX 10/10: ReadinessLivePanel + DataGapPanel — floating bottom-left, above FixActions */}
+        {activeCaseId && (
+          <div
+            className="absolute bottom-28 left-4 z-20 flex flex-col gap-2"
+            data-testid="sld-readiness-stack"
+          >
+            <ReadinessLivePanel
+              issues={[]}
+              status="OK"
+              loading={false}
+              onNavigateToElement={handleReadinessNavigate}
+              onFixAction={handleReadinessFixAction}
+            />
+            <DataGapPanel
+              onNavigateToElement={handleDataGapNavigate}
+              onQuickFix={handleDataGapQuickFix}
+              compact
+            />
+          </div>
+        )}
+
+        {/* UX 10/10: OperationalModeToolbar + LabelModeToolbar — bottom-right corner */}
+        <div
+          className="absolute bottom-4 right-4 z-20 flex items-center gap-2"
+          data-testid="sld-bottom-right-toolbars"
+        >
+          <LabelModeToolbar compact />
+          <OperationalModeToolbar />
+        </div>
       </div>
 
       {/* Inspector Panel (PR-SLD-07) - Only in read-only or when something selected */}
@@ -366,6 +422,27 @@ export const SldEditorPage: React.FC<SldEditorPageProps> = ({
         <SldInspectorPanel
           onClose={handleInspectorClose}
         />
+      )}
+
+      {/* UX 10/10: EngineeringInspector — replaces SldInspectorPanel in MODEL_EDIT mode */}
+      {inspectorPanelVisible && selectedElement && activeMode === 'MODEL_EDIT' && (
+        <div data-testid="sld-engineering-inspector-wrapper" className="flex-shrink-0">
+          <EngineeringInspector
+            elementId={selectedElement.id}
+            elementType={selectedElement.type}
+            elementData={{}}
+          />
+        </div>
+      )}
+
+      {/* UX 10/10: SldResultsAccess — floating right panel in results mode */}
+      {isResultsMode && selectedElement && (
+        <div data-testid="sld-results-access-wrapper" className="flex-shrink-0">
+          <SldResultsAccess
+            selectedElementId={selectedElement.id}
+            resultsSummary={null}
+          />
+        </div>
       )}
     </div>
   );

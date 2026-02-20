@@ -152,3 +152,62 @@ export type {
   EtapCalloutProps,
   EtapCalloutLayerProps,
 } from './EtapCallout';
+
+// UX 10/10: Operational mode store (NORMALNY/AWARYJNY/ZWARCIE)
+export {
+  useOperationalModeStore,
+  useOperationalMode,
+  useIsFaultMode,
+  useIsEmergencyMode,
+} from './operationalModeStore';
+export type {
+  OperationalMode,
+  FaultType,
+  ScOverlayField,
+} from './operationalModeStore';
+
+// UX 10/10: Operational mode toolbar
+export { OperationalModeToolbar } from './OperationalModeToolbar';
+
+// UX 10/10: SLD Mode Interaction Handler
+export {
+  resolveClickAction,
+  executeClickAction,
+  isElementOutOfService,
+  getElementModeOverlay,
+} from './SldModeInteractionHandler';
+export type {
+  SldClickContext,
+  SldClickResult,
+  EmergencyToggleResult,
+  ModeOverlayStyle,
+} from './SldModeInteractionHandler';
+
+// UX 10/10: SLD Results Access panel
+export { SldResultsAccess } from './SldResultsAccess';
+export type { SldResultsAccessProps } from './SldResultsAccess';
+
+// UX 10/10: Label layer utilities
+export {
+  buildLabelsForSymbol,
+  buildMinimalLabels,
+  buildTechnicalLabels,
+  buildAnalyticalLabels,
+} from './sldLabelLayer';
+export type {
+  LabelMode,
+  LabelLine,
+  ElementLabel,
+  BranchResultData,
+  BusResultData,
+  ProtectionSettingData,
+} from './sldLabelLayer';
+
+// UX 10/10: Label mode store
+export {
+  useLabelModeStore,
+  useLabelMode,
+} from './labelModeStore';
+
+// UX 10/10: Label mode toolbar
+export { LabelModeToolbar } from './LabelModeToolbar';
