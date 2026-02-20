@@ -84,6 +84,7 @@ class ArchiveImportStatus(str, Enum):
     SUCCESS = "SUCCESS"
     PARTIAL = "PARTIAL"  # Częściowy import (np. starsza wersja)
     FAILED = "FAILED"
+    CATALOG_MAPPING_REQUIRED = "CATALOG_MAPPING_REQUIRED"  # Import OK, ale wymagane mapowanie katalogowe
 
 
 # ============================================================================
@@ -583,3 +584,6 @@ class ArchiveImportResult:
     warnings: list[str] = field(default_factory=list)
     errors: list[str] = field(default_factory=list)
     migrated_from_version: str | None = None
+    # Bramka katalogowa po imporcie — lista elementow bez catalog_ref
+    elements_without_catalog: list[str] = field(default_factory=list)
+    catalog_mapping_required: bool = False

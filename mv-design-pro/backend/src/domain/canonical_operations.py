@@ -700,6 +700,19 @@ READINESS_CODES: dict[str, ReadinessCodeSpec] = {
         fix_action_id="fix_catalog_select",
         fix_navigation={"panel": "inspector", "tab": "katalog", "modal": "CatalogPicker"},
     ),
+    # Import — mandatory catalog mapping
+    "import.catalog_mapping_required": ReadinessCodeSpec(
+        code="import.catalog_mapping_required",
+        area=ReadinessArea.CATALOGS,
+        priority=1,
+        level=ReadinessLevel.BLOCKER,
+        message_pl=(
+            "Import wymaga mapowania katalogowego: elementy bez przypisanego katalogu "
+            "muszą zostać zmapowane przed dalszą edycją"
+        ),
+        fix_action_id="fix_import_catalog_mapping",
+        fix_navigation={"panel": "catalog_mapper", "modal": "IMPORT_CATALOG_MAPPING"},
+    ),
     # Phase 8 — Extended validation codes for catalog materialization
     "catalog.binding_version_missing": ReadinessCodeSpec(
         code="catalog.binding_version_missing",

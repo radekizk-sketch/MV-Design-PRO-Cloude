@@ -38,11 +38,14 @@ class ExportResponse(BaseModel):
 class ImportResponse(BaseModel):
     """Odpowiedź importu."""
 
-    status: str  # SUCCESS, PARTIAL, FAILED
+    status: str  # SUCCESS, PARTIAL, FAILED, CATALOG_MAPPING_REQUIRED
     project_id: str | None
     warnings: list[str]
     errors: list[str]
     migrated_from_version: str | None
+    # Bramka katalogowa po imporcie
+    elements_without_catalog: list[str] = []
+    catalog_mapping_required: bool = False
 
 
 class ArchiveSummary(BaseModel):
@@ -160,6 +163,8 @@ async def import_project(
         warnings=result.warnings,
         errors=result.errors,
         migrated_from_version=result.migrated_from_version,
+        elements_without_catalog=result.elements_without_catalog,
+        catalog_mapping_required=result.catalog_mapping_required,
     )
 
 
