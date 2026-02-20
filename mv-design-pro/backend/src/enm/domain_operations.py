@@ -723,6 +723,17 @@ def continue_trunk_segment_sn(enm: dict[str, Any], payload: dict[str, Any]) -> d
         )
 
     catalog_ref = segment.get("catalog_ref")
+    # Bramka katalogowa (ENM) — segment SN WYMAGA catalog_ref
+    catalog_binding = segment.get("catalog_binding") or payload.get("catalog_binding")
+    if not catalog_ref and not catalog_binding:
+        return _error_response(
+            "Odcinek SN wymaga powiązania z katalogiem. "
+            "Podaj catalog_ref lub catalog_binding w payload segmentu.",
+            "catalog.ref_required",
+        )
+    # Wyciagnij catalog_ref z catalog_binding jesli nie podano bezposrednio
+    if not catalog_ref and catalog_binding:
+        catalog_ref = catalog_binding.get("item_id") if isinstance(catalog_binding, dict) else None
     segment_name = segment.get("name")
 
     seed = _compute_seed({
@@ -1109,16 +1120,29 @@ def insert_station_on_segment_sn(enm: dict[str, Any], payload: dict[str, Any]) -
     # --- Create Transformer ---
     if transformer.get("create", True):
         tr_catalog = transformer.get("transformer_catalog_ref")
+        tr_catalog_binding = transformer.get("catalog_binding") or payload.get("catalog_binding")
+        # Bramka katalogowa (ENM) — transformator WYMAGA catalog_ref
+        if not tr_catalog and not tr_catalog_binding:
+            return _error_response(
+                "Transformator SN/nN wymaga powiązania z katalogiem. "
+                "Podaj transformer_catalog_ref lub catalog_binding w payload transformatora.",
+                "catalog.ref_required",
+            )
+        if not tr_catalog and tr_catalog_binding:
+            tr_catalog = (
+                tr_catalog_binding.get("item_id")
+                if isinstance(tr_catalog_binding, dict) else None
+            )
         tr_data = {
             "device_type": "transformer",
             "ref_id": tr_id,
             "name": f"Transformator SN/nN",
             "hv_bus_ref": sn_bus_id,
             "lv_bus_ref": nn_bus_id,
-            "sn_mva": 0.001,  # Placeholder — wymaga katalogu
+            "sn_mva": 0.001,  # Wartosc inicjalna — materializacja z katalogu
             "uhv_kv": sn_voltage_kv,
             "ulv_kv": nn_voltage_kv,
-            "uk_percent": 0.01,  # Placeholder — wymaga katalogu
+            "uk_percent": 0.01,  # Wartosc inicjalna — materializacja z katalogu
             "pk_kw": 0.0,
         }
         if tr_catalog:
@@ -1255,6 +1279,21 @@ def start_branch_segment_sn(enm: dict[str, Any], payload: dict[str, Any]) -> dic
             "branch.dlugosc_missing",
         )
 
+    # Bramka katalogowa (ENM) — segment odgalezienia WYMAGA catalog_ref
+    branch_catalog_ref = segment.get("catalog_ref")
+    branch_catalog_binding = segment.get("catalog_binding") or payload.get("catalog_binding")
+    if not branch_catalog_ref and not branch_catalog_binding:
+        return _error_response(
+            "Odcinek odgałęzienia SN wymaga powiązania z katalogiem. "
+            "Podaj catalog_ref lub catalog_binding w payload segmentu.",
+            "catalog.ref_required",
+        )
+    if not branch_catalog_ref and branch_catalog_binding:
+        branch_catalog_ref = (
+            branch_catalog_binding.get("item_id")
+            if isinstance(branch_catalog_binding, dict) else None
+        )
+
     seed = _compute_seed({
         "op": "start_branch",
         "from": from_bus_ref,
@@ -1288,7 +1327,7 @@ def start_branch_segment_sn(enm: dict[str, Any], payload: dict[str, Any]) -> dic
     events.append({"event_seq": ev_seq, "event_type": "BUS_CREATED", "element_id": new_bus_ref})
 
     branch_type = "cable" if rodzaj == "KABEL" else "line_overhead"
-    result = create_branch(new_enm, {
+    branch_data: dict[str, Any] = {
         "ref_id": branch_ref,
         "name": f"Odgałęzienie",
         "type": branch_type,
@@ -1298,8 +1337,10 @@ def start_branch_segment_sn(enm: dict[str, Any], payload: dict[str, Any]) -> dic
         "r_ohm_per_km": 0.0,
         "x_ohm_per_km": 0.0,
         "status": "closed",
-        "catalog_ref": segment.get("catalog_ref"),
-    })
+    }
+    if branch_catalog_ref:
+        branch_data["catalog_ref"] = branch_catalog_ref
+    result = create_branch(new_enm, branch_data)
     if not result.success:
         return _error_response("Nie udało się utworzyć odgałęzienia.", "branch.creation_failed")
     new_enm = result.enm
@@ -1521,9 +1562,24 @@ def connect_secondary_ring_sn(enm: dict[str, Any], payload: dict[str, Any]) -> d
             "Podaj jawną wartość > 0.",
             "ring.dlugosc_missing",
         )
-    branch_type = "cable" if rodzaj == "KABEL" else "line_overhead"
 
-    result = create_branch(new_enm, {
+    # Bramka katalogowa (ENM) — segment pierscienia WYMAGA catalog_ref
+    ring_catalog_ref = segment.get("catalog_ref")
+    ring_catalog_binding = segment.get("catalog_binding") or payload.get("catalog_binding")
+    if not ring_catalog_ref and not ring_catalog_binding:
+        return _error_response(
+            "Segment zamknięcia pierścienia wymaga powiązania z katalogiem. "
+            "Podaj catalog_ref lub catalog_binding w payload segmentu.",
+            "catalog.ref_required",
+        )
+    if not ring_catalog_ref and ring_catalog_binding:
+        ring_catalog_ref = (
+            ring_catalog_binding.get("item_id")
+            if isinstance(ring_catalog_binding, dict) else None
+        )
+
+    branch_type = "cable" if rodzaj == "KABEL" else "line_overhead"
+    ring_data: dict[str, Any] = {
         "ref_id": ring_ref,
         "name": payload.get("ring_name") or "Zamknięcie pierścienia",
         "type": branch_type,
@@ -1533,8 +1589,10 @@ def connect_secondary_ring_sn(enm: dict[str, Any], payload: dict[str, Any]) -> d
         "r_ohm_per_km": 0.0,
         "x_ohm_per_km": 0.0,
         "status": "closed",
-        "catalog_ref": segment.get("catalog_ref"),
-    })
+    }
+    if ring_catalog_ref:
+        ring_data["catalog_ref"] = ring_catalog_ref
+    result = create_branch(new_enm, ring_data)
     if not result.success:
         return _error_response("Nie udało się zamknąć pierścienia.", "ring.creation_failed")
     new_enm = result.enm
@@ -1614,6 +1672,21 @@ def add_transformer_sn_nn(enm: dict[str, Any], payload: dict[str, Any]) -> dict[
     if not hv_bus_ref or not lv_bus_ref:
         return _error_response("Brak szyn HV/LV.", "transformer.buses_missing")
 
+    # Bramka katalogowa (ENM) — transformator WYMAGA catalog_ref
+    standalone_catalog = payload.get("transformer_catalog_ref")
+    standalone_binding = payload.get("catalog_binding")
+    if not standalone_catalog and not standalone_binding:
+        return _error_response(
+            "Transformator SN/nN wymaga powiązania z katalogiem. "
+            "Podaj transformer_catalog_ref lub catalog_binding w payload.",
+            "catalog.ref_required",
+        )
+    if not standalone_catalog and standalone_binding:
+        standalone_catalog = (
+            standalone_binding.get("item_id")
+            if isinstance(standalone_binding, dict) else None
+        )
+
     seed = _compute_seed({"op": "add_transformer", "hv": hv_bus_ref, "lv": lv_bus_ref})
     tr_ref = f"tr/{seed}/transformer"
 
@@ -1643,8 +1716,8 @@ def add_transformer_sn_nn(enm: dict[str, Any], payload: dict[str, Any]) -> dict[
         "uk_percent": payload.get("uk_percent") or 0.0,
         "pk_kw": payload.get("pk_kw") or 0.0,
     }
-    if payload.get("transformer_catalog_ref"):
-        tr_data["catalog_ref"] = payload["transformer_catalog_ref"]
+    if standalone_catalog:
+        tr_data["catalog_ref"] = standalone_catalog
     if payload.get("station_ref"):
         for sub in new_enm.get("substations", []):
             if sub.get("ref_id") == payload["station_ref"]:

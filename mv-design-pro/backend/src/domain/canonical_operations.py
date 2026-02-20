@@ -690,6 +690,16 @@ READINESS_CODES: dict[str, ReadinessCodeSpec] = {
         fix_action_id=None,
         fix_navigation={"panel": "readiness"},
     ),
+    # Catalog gate — input validation (NOT readiness, blocks operation execution)
+    "catalog.ref_required": ReadinessCodeSpec(
+        code="catalog.ref_required",
+        area=ReadinessArea.CATALOGS,
+        priority=1,
+        level=ReadinessLevel.BLOCKER,
+        message_pl="Segment lub transformator wymaga referencji katalogowej przed utworzeniem",
+        fix_action_id="fix_catalog_select",
+        fix_navigation={"panel": "inspector", "tab": "katalog", "modal": "CatalogPicker"},
+    ),
     # Phase 8 — Extended validation codes for catalog materialization
     "catalog.binding_version_missing": ReadinessCodeSpec(
         code="catalog.binding_version_missing",
