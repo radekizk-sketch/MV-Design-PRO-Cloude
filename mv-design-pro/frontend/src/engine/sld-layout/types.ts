@@ -291,6 +291,57 @@ export const DEFAULT_LAYOUT_CONFIG: LayoutConfig = {
   sourceOffsetAboveBusbar: 40,
 };
 
+/**
+ * Konfiguracja layoutu — estetyka przemysłowa DIgSILENT/ABB.
+ *
+ * Wartości zsynchronizowane z IndustrialAesthetics.ts:
+ * - gridSize = GRID_BASE (20)
+ * - bayGap = GRID_SPACING_MAIN (280) — równy rozstaw stacji
+ * - elementGapY = OFFSET_POLE (60) — wyrównanie pól stacji
+ * - bandGap = MIN_VERTICAL_GAP (80) — kanały Y (4*GRID_BASE)
+ * - busbarHeight = 10 — grubsza szyna przemysłowa
+ *
+ * Użycie: computeLayout({ ..., config: INDUSTRIAL_LAYOUT_CONFIG })
+ */
+export const INDUSTRIAL_LAYOUT_CONFIG: LayoutConfig = {
+  // Grid — GRID_BASE = 20
+  gridSize: 20,
+
+  // Busbar — grubsza szyna, szersze baye
+  busbarMinWidth: 560,      // 28 * GRID_BASE — więcej miejsca na etykiety
+  busbarExtendPerBay: 280,  // GRID_SPACING_MAIN — bay = stacja
+  busbarHeight: 10,         // grubsza szyna (przemysłowa estetyka)
+
+  // Bay spacing — synchronizacja z IndustrialAesthetics
+  bayGap: 280,              // GRID_SPACING_MAIN — równy rozstaw stacji
+  elementGapY: 60,          // OFFSET_POLE — wyrównanie pól stacji
+  elementGapX: 40,          // 2 * GRID_BASE
+
+  // Band spacing — kanały Y
+  bandGap: 80,              // MIN_VERTICAL_GAP = 4 * GRID_BASE
+  bandHeaderHeight: 40,     // 2 * GRID_BASE — większy nagłówek
+
+  // Labels — więcej miejsca na polskie etykiety
+  labelOffsetX: 80,         // 4 * GRID_BASE
+  labelOffsetY: -20,        // -1 * GRID_BASE
+  labelMaxWidth: 200,       // 10 * GRID_BASE — dłuższe polskie nazwy
+
+  // Canvas
+  canvasPadding: 80,        // 4 * GRID_BASE (= X_START * 2)
+
+  // Symbol sizes — większe symbole
+  symbolDefaultWidth: 60,   // 3 * GRID_BASE
+  symbolDefaultHeight: 40,  // 2 * GRID_BASE
+
+  // Transformers — synchronizacja z kanałami Y
+  transformerOffsetFromWN: 80,  // MIN_VERTICAL_GAP
+  transformerOffsetToSN: 60,    // OFFSET_POLE
+
+  // Source
+  sourceHeight: 60,             // OFFSET_POLE
+  sourceOffsetAboveBusbar: 40,  // 2 * GRID_BASE
+};
+
 // =============================================================================
 // LAYOUT INPUT — DANE WEJŚCIOWE
 // =============================================================================

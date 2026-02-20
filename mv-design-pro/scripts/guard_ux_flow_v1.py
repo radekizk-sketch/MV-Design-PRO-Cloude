@@ -48,6 +48,20 @@ def main() -> int:
     if not test_file.exists():
         errors.append(f"BRAK: Testy operacji domenowych nie istnieją: {test_file}")
 
+    # 2b. Check E2E analysis pipeline test exists
+    e2e_analysis = root / "backend" / "tests" / "e2e" / "test_v1_analysis_pipeline.py"
+    if not e2e_analysis.exists():
+        errors.append(f"BRAK: Test E2E pipeline analizy V1 nie istnieje: {e2e_analysis}")
+
+    # 2c. Check ENM → NetworkGraph mapping exists
+    mapping_file = root / "backend" / "src" / "enm" / "mapping.py"
+    if not mapping_file.exists():
+        errors.append(f"BRAK: Moduł mapowania ENM→NetworkGraph nie istnieje: {mapping_file}")
+    else:
+        content = mapping_file.read_text(encoding="utf-8")
+        if "map_enm_to_network_graph" not in content:
+            errors.append("BRAK: Funkcja map_enm_to_network_graph nie znaleziona w mapping.py")
+
     # 3. Check no local truth in wizard (frontend store should use snapshot)
     frontend_src = root / "frontend" / "src"
     if frontend_src.exists():
