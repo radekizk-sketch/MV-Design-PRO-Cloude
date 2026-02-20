@@ -61,13 +61,15 @@ def _add_grid_source(enm_dict: dict) -> dict:
 def _continue_trunk(enm_dict: dict, **extra_payload) -> dict:
     """Wykonaj continue_trunk_segment_sn i zwróć result.
 
-    Podaje jawne parametry: segment z dlugosc_m=500 i rodzaj=KABEL.
+    Podaje jawne parametry: segment z dlugosc_m=500, rodzaj=KABEL, catalog_ref.
     Brak domyślnych wartości — zgodność z kanonem 'bez zgadywania'.
+    Bramka katalogowa wymaga catalog_ref lub catalog_binding.
     """
     payload = {
         "segment": {
             "rodzaj": "KABEL",
             "dlugosc_m": 500,
+            "catalog_ref": "YAKXS_3x120",
         },
     }
     payload.update(extra_payload)
@@ -267,7 +269,7 @@ class TestFullV1Sequence:
         assert _count(s3, "buses") > _count(s2, "buses")
         assert _count(s3, "branches") > _count(s2, "branches")
 
-        # Step 4: insert_station_on_segment_sn (type B)
+        # Step 4: insert_station_on_segment_sn (type B) — z bramka katalogowa
         first_seg = _get_first_segment_ref(s3)
         r4 = execute_domain_operation(
             enm_dict=s3,
@@ -278,6 +280,10 @@ class TestFullV1Sequence:
                 "insert_at": {"value": 0.5},
                 "station": {"sn_voltage_kv": 15.0, "nn_voltage_kv": 0.4},
                 "sn_fields": ["IN", "OUT"],
+                "transformer": {
+                    "create": True,
+                    "transformer_catalog_ref": "ONAN_630",
+                },
             },
         )
         assert r4.get("snapshot") is not None, f"insert_station error: {r4.get('error')}"
@@ -296,7 +302,7 @@ class TestFullV1Sequence:
             op_name="start_branch_segment_sn",
             payload={
                 "from_bus_ref": branch_bus_ref,
-                "segment": {"rodzaj": "KABEL", "dlugosc_m": 200},
+                "segment": {"rodzaj": "KABEL", "dlugosc_m": 200, "catalog_ref": "YAKXS_3x120"},
             },
         )
         assert r5.get("snapshot") is not None, f"start_branch error: {r5.get('error')}"
