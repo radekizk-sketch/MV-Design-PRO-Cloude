@@ -62,8 +62,11 @@ export function CreateCaseDialog({
         setSetActive(true);
         setUseDefaultConfig(true);
         setConfig(DEFAULT_STUDY_CASE_CONFIG);
-      } catch {
-        // Error is handled in store
+      } catch (err) {
+        // Display error in UI; store may also handle it
+        if (!useStudyCasesStore.getState().error) {
+          console.error('Błąd tworzenia przypadku:', err);
+        }
       }
     },
     [

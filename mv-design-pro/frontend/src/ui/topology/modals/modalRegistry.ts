@@ -79,7 +79,7 @@ export const MODAL_REGISTRY: ModalRegistryEntry[] = [
     canonicalOp: 'insert_section_switch_sn',
     componentName: 'SectionSwitchModal',
     labelPl: 'Wstaw łącznik sekcyjny',
-    implemented: false,
+    implemented: true,
   },
   {
     modalId: MODAL_IDS.MODAL_POLACZ_RING_WTORNY,
@@ -93,7 +93,7 @@ export const MODAL_REGISTRY: ModalRegistryEntry[] = [
     canonicalOp: 'set_normal_open_point',
     componentName: 'NOPModal',
     labelPl: 'Ustaw punkt normalnie otwarty (NOP)',
-    implemented: false,
+    implemented: true,
   },
   {
     modalId: MODAL_IDS.MODAL_DODAJ_ODPLYW_NN,

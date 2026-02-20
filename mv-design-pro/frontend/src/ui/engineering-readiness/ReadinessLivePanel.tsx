@@ -1,0 +1,397 @@
+/**
+ * Readiness Live Panel — §3 UX 10/10
+ *
+ * Stały panel pokazujący braki danych w czasie rzeczywistym.
+ * Automatyczna synchronizacja ze Snapshot + readiness backend.
+ *
+ * WYMAGANIA:
+ * - Grupowanie: Magistrala / Stacje / Zabezpieczenia / Źródła
+ * - Każdy wpis: przycisk „Przejdź" (centerOnElement + highlight + openModal)
+ * - Automatyczne znikanie po naprawie (diff-based re-render)
+ * - 100% synchronizacja z backend readiness codes
+ *
+ * INVARIANTS:
+ * - Read-only — brak mutacji modelu
+ * - Deterministyczne sortowanie (severity DESC, group ASC, code ASC)
+ * - Wszystkie etykiety 100% PL
+ */
+
+import React, { useMemo, useCallback } from 'react';
+import { clsx } from 'clsx';
+import type { ReadinessIssue, ReadinessSeverity, FixAction } from '../types';
+
+// =============================================================================
+// Group definitions
+// =============================================================================
+
+export type ReadinessGroup = 'MAGISTRALA' | 'STACJE' | 'ZABEZPIECZENIA' | 'ZRODLA';
+
+const GROUP_LABELS: Record<ReadinessGroup, string> = {
+  MAGISTRALA: 'Magistrala',
+  STACJE: 'Stacje',
+  ZABEZPIECZENIA: 'Zabezpieczenia',
+  ZRODLA: 'Źródła',
+};
+
+const GROUP_ICONS: Record<ReadinessGroup, string> = {
+  MAGISTRALA: '━',
+  STACJE: '▣',
+  ZABEZPIECZENIA: '⚡',
+  ZRODLA: '⬡',
+};
+
+const GROUP_COLORS: Record<ReadinessGroup, string> = {
+  MAGISTRALA: 'border-l-blue-500',
+  STACJE: 'border-l-violet-500',
+  ZABEZPIECZENIA: 'border-l-amber-500',
+  ZRODLA: 'border-l-green-500',
+};
+
+const SEVERITY_DOT: Record<ReadinessSeverity, string> = {
+  BLOCKER: 'bg-red-500',
+  IMPORTANT: 'bg-amber-400',
+  INFO: 'bg-blue-400',
+};
+
+// =============================================================================
+// Classifier — deterministic issue-to-group mapping
+// =============================================================================
+
+/**
+ * Classifies a readiness issue into a group based on its code prefix.
+ * Deterministic: same code → same group.
+ */
+export function classifyIssueGroup(issue: ReadinessIssue): ReadinessGroup {
+  const code = issue.code.toLowerCase();
+
+  // Protection-related codes
+  if (
+    code.startsWith('protection.') ||
+    code.startsWith('relay.') ||
+    code.startsWith('ct.') ||
+    code.startsWith('vt.') ||
+    code.includes('selectivity') ||
+    code.includes('coordination')
+  ) {
+    return 'ZABEZPIECZENIA';
+  }
+
+  // Source-related codes
+  if (
+    code.startsWith('source.') ||
+    code.startsWith('nn.source') ||
+    code.startsWith('pv.') ||
+    code.startsWith('bess.') ||
+    code.startsWith('genset.') ||
+    code.startsWith('ups.') ||
+    code.startsWith('inverter.') ||
+    code.includes('source')
+  ) {
+    return 'ZRODLA';
+  }
+
+  // Station-related codes
+  if (
+    code.startsWith('station.') ||
+    code.startsWith('transformer.') ||
+    code.startsWith('bay.') ||
+    code.startsWith('bus_nn.') ||
+    code.startsWith('feeder.') ||
+    code.startsWith('nn.') ||
+    code.includes('station')
+  ) {
+    return 'STACJE';
+  }
+
+  // Default: trunk/magistrala (cables, lines, buses, topology)
+  return 'MAGISTRALA';
+}
+
+// =============================================================================
+// Grouped Issue Type
+// =============================================================================
+
+interface GroupedIssues {
+  group: ReadinessGroup;
+  issues: ReadinessIssue[];
+  blockerCount: number;
+  warningCount: number;
+  infoCount: number;
+}
+
+// =============================================================================
+// Props
+// =============================================================================
+
+export interface ReadinessLivePanelProps {
+  /** Issues from readiness store */
+  issues: ReadinessIssue[];
+  /** Overall status */
+  status: 'OK' | 'WARN' | 'FAIL';
+  /** Loading state */
+  loading: boolean;
+  /** Navigate to element (centerOnElement + highlight) */
+  onNavigateToElement: (elementRef: string) => void;
+  /** Execute fix action (openModal with context) */
+  onFixAction: (fixAction: FixAction, elementRef: string | null) => void;
+  /** Collapsed groups (controlled externally for persistence) */
+  collapsedGroups?: ReadinessGroup[];
+  /** Toggle group collapsed state */
+  onToggleGroup?: (group: ReadinessGroup) => void;
+}
+
+// =============================================================================
+// Component
+// =============================================================================
+
+export const ReadinessLivePanel: React.FC<ReadinessLivePanelProps> = ({
+  issues,
+  status,
+  loading,
+  onNavigateToElement,
+  onFixAction,
+  collapsedGroups = [],
+  onToggleGroup,
+}) => {
+  // Group and sort issues deterministically
+  const grouped = useMemo((): GroupedIssues[] => {
+    const groupMap = new Map<ReadinessGroup, ReadinessIssue[]>();
+
+    // Initialize all groups (deterministic order)
+    const groupOrder: ReadinessGroup[] = ['MAGISTRALA', 'STACJE', 'ZABEZPIECZENIA', 'ZRODLA'];
+    for (const g of groupOrder) {
+      groupMap.set(g, []);
+    }
+
+    // Classify each issue
+    for (const issue of issues) {
+      const group = classifyIssueGroup(issue);
+      groupMap.get(group)!.push(issue);
+    }
+
+    // Sort within groups: severity DESC (BLOCKER first), then code ASC
+    const severityOrder: Record<ReadinessSeverity, number> = {
+      BLOCKER: 0,
+      IMPORTANT: 1,
+      INFO: 2,
+    };
+
+    const result: GroupedIssues[] = [];
+    for (const group of groupOrder) {
+      const groupIssues = groupMap.get(group)!;
+      groupIssues.sort((a, b) => {
+        const sevDiff = severityOrder[a.severity] - severityOrder[b.severity];
+        if (sevDiff !== 0) return sevDiff;
+        return a.code.localeCompare(b.code);
+      });
+
+      if (groupIssues.length > 0) {
+        result.push({
+          group,
+          issues: groupIssues,
+          blockerCount: groupIssues.filter((i) => i.severity === 'BLOCKER').length,
+          warningCount: groupIssues.filter((i) => i.severity === 'IMPORTANT').length,
+          infoCount: groupIssues.filter((i) => i.severity === 'INFO').length,
+        });
+      }
+    }
+
+    return result;
+  }, [issues]);
+
+  const totalBlockers = useMemo(
+    () => issues.filter((i) => i.severity === 'BLOCKER').length,
+    [issues],
+  );
+
+  const handleNavigate = useCallback(
+    (issue: ReadinessIssue) => {
+      const ref = issue.element_ref ?? issue.element_refs[0];
+      if (ref) {
+        onNavigateToElement(ref);
+      }
+    },
+    [onNavigateToElement],
+  );
+
+  const handleFix = useCallback(
+    (issue: ReadinessIssue) => {
+      if (issue.fix_action) {
+        const ref = issue.element_ref ?? issue.element_refs[0] ?? null;
+        onFixAction(issue.fix_action, ref);
+      }
+    },
+    [onFixAction],
+  );
+
+  // Empty state
+  if (!loading && issues.length === 0) {
+    return (
+      <div
+        className="flex flex-col items-center justify-center p-6 text-center"
+        data-testid="readiness-live-panel-empty"
+      >
+        <div className="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center mb-2">
+          <span className="text-green-600 text-lg">✓</span>
+        </div>
+        <span className="text-sm text-green-700 font-medium">
+          Model kompletny
+        </span>
+        <span className="text-xs text-gray-500 mt-1">
+          Brak brakujących danych
+        </span>
+      </div>
+    );
+  }
+
+  return (
+    <div
+      className="flex flex-col h-full bg-white"
+      data-testid="readiness-live-panel"
+    >
+      {/* Compact header */}
+      <div className="px-3 py-2 border-b border-gray-200 bg-gray-50 flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <span className="text-xs font-semibold text-gray-700 uppercase tracking-wide">
+            Braki danych
+          </span>
+          {loading && (
+            <span className="text-xs text-gray-400 animate-pulse">
+              Aktualizacja...
+            </span>
+          )}
+        </div>
+        <div className="flex items-center gap-1">
+          {totalBlockers > 0 && (
+            <span className="px-1.5 py-0.5 text-xs font-bold bg-red-600 text-white rounded">
+              {totalBlockers}
+            </span>
+          )}
+          <span
+            className={clsx(
+              'px-1.5 py-0.5 text-xs font-medium rounded',
+              status === 'OK' && 'bg-green-100 text-green-700',
+              status === 'WARN' && 'bg-amber-100 text-amber-700',
+              status === 'FAIL' && 'bg-red-100 text-red-700',
+            )}
+          >
+            {issues.length}
+          </span>
+        </div>
+      </div>
+
+      {/* Grouped issues */}
+      <div className="flex-1 overflow-y-auto">
+        {grouped.map((g) => {
+          const isCollapsed = collapsedGroups.includes(g.group);
+          return (
+            <div
+              key={g.group}
+              className="border-b border-gray-100"
+              data-testid={`readiness-group-${g.group}`}
+            >
+              {/* Group header */}
+              <button
+                onClick={() => onToggleGroup?.(g.group)}
+                className={clsx(
+                  'w-full flex items-center justify-between px-3 py-2',
+                  'bg-gray-50 hover:bg-gray-100 transition-colors text-left',
+                  'border-l-4',
+                  GROUP_COLORS[g.group],
+                )}
+              >
+                <div className="flex items-center gap-2">
+                  <span className="text-xs">{GROUP_ICONS[g.group]}</span>
+                  <span className="text-xs font-semibold text-gray-700">
+                    {GROUP_LABELS[g.group]}
+                  </span>
+                </div>
+                <div className="flex items-center gap-1">
+                  {g.blockerCount > 0 && (
+                    <span className="w-5 h-5 flex items-center justify-center text-xs font-bold bg-red-100 text-red-700 rounded-full">
+                      {g.blockerCount}
+                    </span>
+                  )}
+                  {g.warningCount > 0 && (
+                    <span className="w-5 h-5 flex items-center justify-center text-xs bg-amber-100 text-amber-700 rounded-full">
+                      {g.warningCount}
+                    </span>
+                  )}
+                  {g.infoCount > 0 && (
+                    <span className="w-5 h-5 flex items-center justify-center text-xs bg-blue-100 text-blue-700 rounded-full">
+                      {g.infoCount}
+                    </span>
+                  )}
+                  <span className="text-xs text-gray-400 ml-1">
+                    {isCollapsed ? '▸' : '▾'}
+                  </span>
+                </div>
+              </button>
+
+              {/* Group items */}
+              {!isCollapsed && (
+                <div className="py-1">
+                  {g.issues.map((issue) => {
+                    const elementRef =
+                      issue.element_ref ?? issue.element_refs[0] ?? null;
+                    return (
+                      <div
+                        key={`${issue.code}-${elementRef ?? 'no-ref'}`}
+                        className="flex items-start gap-2 px-3 py-1.5 hover:bg-gray-50 transition-colors"
+                        data-testid={`readiness-live-issue-${issue.code}`}
+                      >
+                        {/* Severity dot */}
+                        <span
+                          className={clsx(
+                            'w-2 h-2 rounded-full mt-1.5 flex-shrink-0',
+                            SEVERITY_DOT[issue.severity],
+                          )}
+                        />
+                        {/* Content */}
+                        <div className="flex-1 min-w-0">
+                          <div className="text-xs text-gray-800 leading-tight">
+                            {issue.message_pl}
+                          </div>
+                          {elementRef && (
+                            <div className="text-xs text-gray-400 font-mono truncate mt-0.5">
+                              {elementRef}
+                            </div>
+                          )}
+                        </div>
+                        {/* Actions */}
+                        <div className="flex gap-1 flex-shrink-0">
+                          {elementRef && (
+                            <button
+                              onClick={() => handleNavigate(issue)}
+                              className="px-2 py-0.5 text-xs text-blue-600 hover:bg-blue-50 rounded transition-colors"
+                              title="Przejdź do elementu"
+                              data-testid={`live-navigate-${issue.code}`}
+                            >
+                              Przejdź
+                            </button>
+                          )}
+                          {issue.fix_action && (
+                            <button
+                              onClick={() => handleFix(issue)}
+                              className="px-2 py-0.5 text-xs text-green-600 hover:bg-green-50 rounded transition-colors"
+                              title="Napraw brak"
+                              data-testid={`live-fix-${issue.code}`}
+                            >
+                              Napraw
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+};
+
+export default ReadinessLivePanel;

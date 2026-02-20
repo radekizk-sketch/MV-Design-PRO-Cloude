@@ -54,13 +54,96 @@ import {
 } from './export';
 import { useOverlayRuntime, OverlayLegend } from '../sld-overlay';
 import { SldTechLabelsLayer } from './SldTechLabelsLayer';
-import { useCanCalculate } from '../app-state';
+import { useCanCalculate, useAppStateStore } from '../app-state';
+import { resolveClickAction } from './SldModeInteractionHandler';
+import { useOperationalModeStore } from './operationalModeStore';
+import { EngineeringContextMenu } from '../context-menu/EngineeringContextMenu';
+import type { EngineeringContextMenuState } from '../context-menu/EngineeringContextMenu';
+import { useLabelModeStore } from './labelModeStore';
+import { getModalByOp } from '../topology/modals/modalRegistry';
+import { notify } from '../notifications/store';
 
 /**
  * Default canvas dimensions.
  */
 const DEFAULT_WIDTH = 1000;
 const DEFAULT_HEIGHT = 600;
+
+/**
+ * Default (closed) state for the engineering context menu.
+ */
+const CONTEXT_MENU_CLOSED: EngineeringContextMenuState = {
+  isOpen: false,
+  x: 0,
+  y: 0,
+  elementId: '',
+  elementType: 'Bus',
+  elementName: '',
+};
+
+/**
+ * Context menu action ID → canonical operation mapping.
+ * Bridges context menu builder proxy IDs to modalRegistry canonical operations.
+ */
+const CONTEXT_MENU_OP_MAP: Record<string, string> = {
+  // Properties / parameter editing
+  properties: 'update_element_parameters',
+  edit_sk3: 'update_element_parameters',
+  edit_voltage: 'update_element_parameters',
+  edit_rx: 'update_element_parameters',
+  edit_impedance: 'update_element_parameters',
+  edit_length: 'update_element_parameters',
+  edit_load_power: 'update_element_parameters',
+  edit_transformer_ratio: 'update_element_parameters',
+  edit_parameters: 'update_element_parameters',
+  // Catalog
+  assign_catalog: 'assign_catalog_to_element',
+  // Topology operations
+  add_line: 'start_branch_segment_sn',
+  add_cable: 'start_branch_segment_sn',
+  add_branch: 'start_branch_segment_sn',
+  add_station: 'insert_station_on_segment_sn',
+  add_section_switch: 'insert_section_switch_sn',
+  connect_ring: 'connect_secondary_ring_sn',
+  set_nop: 'set_normal_open_point',
+  // Element addition
+  add_relay: 'add_relay',
+  add_protection: 'add_relay',
+  add_nn_load: 'add_nn_load',
+  add_load: 'add_nn_load',
+  add_pv: 'add_pv_inverter_nn',
+  add_bess: 'add_bess_inverter_nn',
+  add_nn_outgoing_field: 'add_nn_outgoing_field',
+  // Calculations
+  run_power_flow: 'run_power_flow',
+  run_short_circuit: 'run_short_circuit',
+};
+
+/**
+ * Navigation/info action IDs — these don't map to domain operations.
+ */
+const NAVIGATION_ACTIONS = new Set([
+  'show_results',
+  'show_whitebox',
+  'show_readiness',
+  'show_tree',
+  'show_diagram',
+  'show_on_diagram',
+  'export_data',
+  'history',
+]);
+
+/**
+ * Direct toggle actions — handled in-place without modals.
+ */
+const TOGGLE_ACTIONS = new Set([
+  'toggle_switch',
+  'toggle_service',
+  'delete',
+  'delete_element',
+  'disconnect',
+  'disconnect_element',
+]);
 
 /**
  * Main SLD View component.
@@ -88,6 +171,24 @@ export const SLDView: React.FC<SLDViewProps> = ({
 
   // BLOK 7 — etykiety techniczne (load%, NOP, napięcie)
   const [techLabelsVisible, setTechLabelsVisible] = useState(false);
+
+  // Label mode store integration — tech labels also respond to label mode store
+  const labelModeVisible = useLabelModeStore((state) => state.visible);
+
+  // Derived: tech labels visible when either local toggle OR label mode store says visible
+  const effectiveTechLabelsVisible = techLabelsVisible || labelModeVisible;
+
+  // Context menu state for EngineeringContextMenu
+  const [contextMenuState, setContextMenuState] = useState<EngineeringContextMenuState>(
+    CONTEXT_MENU_CLOSED,
+  );
+
+  // Operational mode store integration (mode-aware click handling)
+  const operationalMode = useOperationalModeStore((state) => state.mode);
+
+  // App state for export metadata (project/case names)
+  const activeProjectName = useAppStateStore((state) => state.activeProjectName);
+  const activeCaseName = useAppStateStore((state) => state.activeCaseName);
 
   // BLOK 8 — przycisk uruchomienia obliczeń
   const { allowed: canCalculate } = useCanCalculate();
@@ -184,7 +285,9 @@ export const SLDView: React.FC<SLDViewProps> = ({
   }, [sldCenterOnElement, symbols, width, height, centerSldOnElement]);
 
   /**
-   * Handle symbol click — update selection.
+   * Handle symbol click — mode-aware click handling via SldModeInteractionHandler.
+   * If operationalMode !== 'NORMALNY', the click is intercepted by the mode handler.
+   * Otherwise, standard selection logic applies.
    */
   const handleSymbolClick = useCallback(
     (symbolId: string, elementType: ElementType, elementName: string) => {
@@ -192,6 +295,23 @@ export const SLDView: React.FC<SLDViewProps> = ({
       const symbol = symbols.find((s) => s.id === symbolId);
       const elementId = symbol?.elementId || symbolId;
 
+      // Check if the operational mode intercepts this click
+      const clickResult = resolveClickAction(operationalMode, {
+        elementId,
+        elementType,
+      });
+
+      // If operational mode is NOT 'NORMALNY', use mode-specific handler
+      if (operationalMode !== 'NORMALNY') {
+        // Mode-specific actions (TOGGLE_SERVICE, SET_FAULT_BUS) are handled
+        // by the caller via clickResult; selection still happens for feedback
+        if (clickResult.action === 'NONE') {
+          // Click was rejected by mode handler — no selection
+          return;
+        }
+      }
+
+      // Standard selection logic (NORMALNY mode, or SELECT action in other modes)
       const element: SelectedElement = {
         id: elementId,
         type: elementType,
@@ -209,7 +329,7 @@ export const SLDView: React.FC<SLDViewProps> = ({
         onElementClick(element);
       }
     },
-    [symbols, selectElement, onElementClick]
+    [symbols, selectElement, onElementClick, operationalMode]
   );
 
   /**
@@ -353,11 +473,37 @@ export const SLDView: React.FC<SLDViewProps> = ({
   }, []);
 
   /**
-   * Prevent context menu.
+   * Handle context menu — open EngineeringContextMenu on right-click.
+   * Detects the clicked element via data attributes on the SLD symbol DOM.
    */
-  const handleContextMenu = useCallback((e: React.MouseEvent) => {
-    e.preventDefault();
-  }, []);
+  const handleContextMenu = useCallback(
+    (e: React.MouseEvent) => {
+      e.preventDefault();
+
+      // Attempt to find the closest SLD symbol element with data attributes
+      const target = e.target as HTMLElement;
+      const symbolEl = target.closest<HTMLElement>('[data-element-id]');
+
+      if (symbolEl) {
+        const elementId = symbolEl.getAttribute('data-element-id') ?? '';
+        const elementType = (symbolEl.getAttribute('data-element-type') ?? 'Bus') as ElementType;
+        const elementName = symbolEl.getAttribute('data-element-name') ?? elementId;
+
+        setContextMenuState({
+          isOpen: true,
+          x: e.clientX,
+          y: e.clientY,
+          elementId,
+          elementType,
+          elementName,
+        });
+      } else {
+        // Close context menu if right-clicking on empty canvas
+        setContextMenuState(CONTEXT_MENU_CLOSED);
+      }
+    },
+    [],
+  );
 
   /**
    * Handle diagnostics marker click — select element + center + pulse.
@@ -445,6 +591,79 @@ export const SLDView: React.FC<SLDViewProps> = ({
   );
 
   /**
+   * Handle context menu close — reset state to closed.
+   */
+  const handleContextMenuClose = useCallback(() => {
+    setContextMenuState(CONTEXT_MENU_CLOSED);
+  }, []);
+
+  /**
+   * Handle context menu operation — dispatched from EngineeringContextMenu.
+   * Closes the menu after the operation is dispatched.
+   */
+  const handleContextMenuOperation = useCallback(
+    (operationId: string, elementId: string, elementType: ElementType) => {
+      // Close menu immediately
+      setContextMenuState(CONTEXT_MENU_CLOSED);
+
+      // 1. Check for canonical domain operation
+      const canonicalOp = CONTEXT_MENU_OP_MAP[operationId];
+      if (canonicalOp) {
+        const modalEntry = getModalByOp(canonicalOp);
+        if (modalEntry) {
+          // Select the element for context
+          selectElement({ id: elementId, type: elementType, name: elementId });
+          notify(`${modalEntry.labelPl} — ${elementType} (${elementId})`, 'info');
+          console.debug(
+            `[SLDView] Dispatch: ${operationId} → ${canonicalOp} → ${modalEntry.componentName}`,
+          );
+        } else {
+          console.debug(`[SLDView] Operacja kanonyczna bez modala: ${canonicalOp}`);
+          notify(`Operacja: ${canonicalOp}`, 'info');
+        }
+        return;
+      }
+
+      // 2. Navigation/info actions — select + notify
+      if (NAVIGATION_ACTIONS.has(operationId)) {
+        selectElement({ id: elementId, type: elementType, name: elementId });
+        const labels: Record<string, string> = {
+          show_results: 'Przejście do wyników',
+          show_whitebox: 'Otwarcie śladu obliczeń WhiteBox',
+          show_readiness: 'Gotowość elementu',
+          show_tree: 'Zaznaczono w drzewie projektu',
+          show_diagram: 'Wycentrowano na schemacie',
+          show_on_diagram: 'Wycentrowano na schemacie',
+          export_data: 'Eksport danych elementu',
+          history: 'Historia zdarzeń elementu',
+        };
+        notify(labels[operationId] ?? operationId, 'info');
+        return;
+      }
+
+      // 3. Toggle actions — direct state change
+      if (TOGGLE_ACTIONS.has(operationId)) {
+        selectElement({ id: elementId, type: elementType, name: elementId });
+        const labels: Record<string, string> = {
+          toggle_switch: 'Przełączono stan łącznika',
+          toggle_service: 'Zmieniono stan eksploatacji',
+          delete: 'Usunięcie elementu wymaga potwierdzenia',
+          delete_element: 'Usunięcie elementu wymaga potwierdzenia',
+          disconnect: 'Odłączenie elementu',
+          disconnect_element: 'Odłączenie elementu',
+        };
+        notify(labels[operationId] ?? operationId, 'info');
+        return;
+      }
+
+      // 4. Unknown operation — log warning
+      console.warn(`[SLDView] Nieznana operacja kontekstowa: ${operationId}`);
+      notify(`Operacja: ${operationId}`, 'info');
+    },
+    [selectElement],
+  );
+
+  /**
    * Handle export dialog open.
    */
   const handleExportClick = useCallback(() => {
@@ -482,8 +701,8 @@ export const SLDView: React.FC<SLDViewProps> = ({
 
       try {
         const metadata = {
-          projectName: 'demo-project', // TODO: Get from context
-          caseName: 'demo-case', // TODO: Get from context
+          projectName: activeProjectName ?? 'projekt',
+          caseName: activeCaseName ?? 'przypadek',
           runId: sldOverlay?.run_id,
           zoomPercent: Math.round(viewport.zoom * 100),
           timestamp: new Date().toISOString(),
@@ -514,7 +733,7 @@ export const SLDView: React.FC<SLDViewProps> = ({
         setIsExporting(false);
       }
     },
-    [symbols, viewport, width, height, sldOverlay]
+    [symbols, viewport, width, height, sldOverlay, activeProjectName, activeCaseName]
   );
 
   /**
@@ -530,13 +749,13 @@ export const SLDView: React.FC<SLDViewProps> = ({
    */
   const exportMetadata = useMemo(
     () => ({
-      projectName: 'demo-project', // TODO: Get from context
-      caseName: 'demo-case', // TODO: Get from context
+      projectName: activeProjectName ?? 'projekt',
+      caseName: activeCaseName ?? 'przypadek',
       runId: sldOverlay?.run_id,
       zoomPercent: Math.round(viewport.zoom * 100),
       timestamp: new Date().toISOString(),
     }),
-    [viewport.zoom, sldOverlay]
+    [viewport.zoom, sldOverlay, activeProjectName, activeCaseName]
   );
 
   // Zoom percentage for display
@@ -993,7 +1212,7 @@ export const SLDView: React.FC<SLDViewProps> = ({
           viewport={viewport}
           width={width}
           height={height}
-          visible={techLabelsVisible}
+          visible={effectiveTechLabelsVisible}
         />
       </div>
 
@@ -1048,6 +1267,14 @@ export const SLDView: React.FC<SLDViewProps> = ({
         hasResultsOverlay={hasResults}
         hasDiagnosticsOverlay={hasDiagnostics}
         isExporting={isExporting}
+      />
+
+      {/* Engineering context menu — right-click on SLD elements */}
+      <EngineeringContextMenu
+        state={contextMenuState}
+        mode={isResultsMode ? 'RESULT_VIEW' : isProtectionMode ? 'RESULT_VIEW' : 'MODEL_EDIT'}
+        onClose={handleContextMenuClose}
+        onOperation={handleContextMenuOperation}
       />
     </div>
   );

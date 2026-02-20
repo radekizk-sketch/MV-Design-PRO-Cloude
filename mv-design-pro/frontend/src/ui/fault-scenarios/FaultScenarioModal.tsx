@@ -114,7 +114,9 @@ export function FaultScenarioModal() {
         };
         await createScenario(studyCaseId, createData);
       }
-    } catch { /* Error handled in store */ }
+    } catch (err) {
+      setValidationError(err instanceof Error ? err.message : 'Wystąpił błąd podczas zapisu scenariusza');
+    }
   }, [name, faultType, elementRef, locationType, alpha, faultMode, rOhm, xOhm, editingScenarioId, studyCaseId, createScenario, updateScenario]);
 
   if (!isModalOpen) return null;
