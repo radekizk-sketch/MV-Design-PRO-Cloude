@@ -44,4 +44,54 @@
   [data-testid^="tree-node-container-"]:has(span:where(:empty, [class*="text-gray-400"]):last-child) {
     /* This selector is a placeholder - actual implementation depends on DOM structure */
   }
+
+  /* =========================================================================
+   * Canonical SLD — ETAP/IEC Typography
+   * ========================================================================= */
+
+  .sld-node-label {
+    font-family: 'JetBrains Mono', 'Fira Code', monospace;
+    font-size: 11px;
+    fill: #374151;
+    font-weight: 600;
+  }
+
+  .sld-segment-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    fill: #1D4ED8;
+    font-weight: 500;
+  }
+
+  .sld-segment-params {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    fill: #6B7280;
+  }
+
+  .sld-apparatus-label {
+    font-family: 'Inter', system-ui, sans-serif;
+    font-size: 10px;
+    fill: #374151;
+  }
+
+  .sld-apparatus-params {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    fill: #6B7280;
+  }
+
+  .sld-station-title {
+    font-family: 'Inter', system-ui, sans-serif;
+    font-size: 11px;
+    fill: #111827;
+    font-weight: 700;
+  }
+
+  .sld-iec-designation {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    fill: #DC2626;
+    font-weight: 600;
+  }
 }

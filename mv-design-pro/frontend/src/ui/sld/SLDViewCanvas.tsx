@@ -38,6 +38,10 @@ import { ConnectionsLayer } from './ConnectionRenderer';
 import { generateConnections } from '../sld-editor/utils/connectionRouting';
 import { useAutoLayout } from '../sld-editor/hooks/useAutoLayout';
 import { UnifiedSymbolRenderer, type SymbolVisualState, type SymbolInteractionHandlers } from './symbols';
+import { TrunkSpineRenderer } from './TrunkSpineRenderer';
+import { BranchRenderer } from './BranchRenderer';
+import { StationFieldRenderer } from './StationFieldRenderer';
+import { JunctionDotLayer } from './JunctionDotLayer';
 import { ETAP_GRID, ETAP_TYPOGRAPHY, ETAP_CANVAS } from './sldEtapStyle';
 
 /**
@@ -177,6 +181,7 @@ export const SLDViewCanvas: React.FC<SLDViewCanvasProps> = ({
   showGrid,
   width,
   height,
+  canonicalAnnotations,
 }) => {
   // AUTO-LAYOUT (N-02): Automatyczne rozmieszczenie przy kazdej zmianie topologii
   // DETERMINISM: Ten sam model -> ten sam uklad
@@ -263,6 +268,31 @@ export const SLDViewCanvas: React.FC<SLDViewCanvasProps> = ({
             energized={energizationState.energizedElements.get(symbol.id) ?? true}
           />
         ))}
+
+        {/* Canonical SLD layers (Phase 7) — pointerEvents: none to avoid blocking interaction */}
+        {canonicalAnnotations && (
+          <>
+            <g className="sld-trunk-spines" style={{ pointerEvents: 'none' }}>
+              <TrunkSpineRenderer
+                nodes={canonicalAnnotations.trunkNodes}
+                segments={canonicalAnnotations.trunkSegments}
+              />
+            </g>
+            <g className="sld-branch-points" style={{ pointerEvents: 'none' }}>
+              {canonicalAnnotations.branchPoints.map((bp) => (
+                <BranchRenderer key={bp.branchId} branch={bp} />
+              ))}
+            </g>
+            <g className="sld-station-fields" style={{ pointerEvents: 'none' }}>
+              {canonicalAnnotations.stationChains.map((sc) => (
+                <StationFieldRenderer key={sc.stationId} chain={sc} />
+              ))}
+            </g>
+            <g className="sld-junction-dots" style={{ pointerEvents: 'none' }}>
+              <JunctionDotLayer annotations={canonicalAnnotations} />
+            </g>
+          </>
+        )}
       </g>
 
       {/* Empty state — ETAP typography */}

@@ -37,8 +37,8 @@ import { findVoltageBandForSymbol, getTransformersBetweenBands } from './phase1-
 /** Gap between terminal elements along sub-busbar (horizontal spread) */
 export const SUBBUS_TERMINAL_SPREAD_GAP_X = 80;
 
-/** Step size for deterministic push-away collision resolution */
-export const PUSH_AWAY_STEP_X = 40;
+/** Step size for deterministic push-away collision resolution — Y-ONLY */
+export const PUSH_AWAY_STEP_Y = 60;
 
 /** Maximum iterations for collision resolution */
 export const COLLISION_MAX_ITERATIONS = 20;
@@ -599,6 +599,9 @@ function propagateBayX(
 
 /**
  * Oblicz pozycje X dla bayów wzdłuż busbara.
+ *
+ * E1: Rowne odleglosci — bayGap jest staly (snap to grid)
+ * E3: Brak przypadkowych dlugosci — staly krok niezalezny od busbar width
  */
 function calculateBayXPositions(
   bayCount: number,
@@ -609,12 +612,15 @@ function calculateBayXPositions(
   if (bayCount === 1) return [busbarGeometry.p0.x + busbarGeometry.width / 2];
 
   const positions: number[] = [];
-  const usableWidth = busbarGeometry.width - 2 * config.canvasPadding;
-  const spacing = usableWidth / (bayCount - 1);
-  const startX = busbarGeometry.p0.x + config.canvasPadding;
+  // E1: Staly rozstaw bayow = bayGap (nie proporcjonalny do szyny)
+  const spacing = config.bayGap;
+  const totalWidth = (bayCount - 1) * spacing;
+  const centerX = busbarGeometry.p0.x + busbarGeometry.width / 2;
+  const startX = centerX - totalWidth / 2;
 
   for (let i = 0; i < bayCount; i++) {
-    positions.push(startX + i * spacing);
+    // E3: Snap to grid
+    positions.push(Math.round((startX + i * spacing) / config.gridSize) * config.gridSize);
   }
 
   return positions;
@@ -884,18 +890,20 @@ function applyUserOverrides(
 /**
  * Rozwiąż kolizje między elementami.
  *
- * ALGORYTM DETERMINISTYCZNY (Phase4 Aesthetics):
+ * ALGORYTM DETERMINISTYCZNY — ESTETYKA PRZEMYSLOWA:
  * 1. Sortuj elementy po (y, x, id) dla stabilności
- * 2. Dla każdej kolizji — push-away w osi X (stały krok)
+ * 2. Dla każdej kolizji — push-away WYLACZNIE w osi Y (stały krok)
  * 3. Limit iteracji z COLLISION_MAX_ITERATIONS
  * 4. Tiebreak po id (string sort)
+ *
+ * ZAKAZ: przesuwania w osi X — magistrala i rozstawy stacji sa stale (E1)
  *
  * @returns Liczba rozwiązanych kolizji
  */
 function resolveCollisions(
   positions: Map<string, ElementPosition>,
   symbolById: Map<string, LayoutSymbol>,
-  config: LayoutConfig
+  _config: LayoutConfig
 ): number {
   let resolved = 0;
 
@@ -936,29 +944,10 @@ function resolveCollisions(
       const symbol = symbolById.get(toMove.symbolId);
       if (symbol?.elementType === 'Bus') continue;
 
-      // Calculate push direction: push right if toMove is right of stable, else push left
-      // Then push down as fallback
-      const dx = toMove.position.x - stable.position.x;
-      const pushDirection = dx >= 0 ? 1 : -1;
-
-      // Try horizontal push first
-      const newX = toMove.position.x + pushDirection * PUSH_AWAY_STEP_X;
-      const testBounds: Rectangle = {
-        x: newX - toMove.size.width / 2,
-        y: toMove.bounds.y,
-        width: toMove.bounds.width,
-        height: toMove.bounds.height,
-      };
-
-      // Check if horizontal push resolves collision
-      if (!rectanglesOverlap(stable.bounds, testBounds)) {
-        toMove.position.x = newX;
-        toMove.bounds.x = newX - toMove.size.width / 2;
-      } else {
-        // Fallback: push down
-        toMove.position.y += config.elementGapY;
-        toMove.bounds.y += config.elementGapY;
-      }
+      // Y-ONLY push-away: NIGDY nie przesuwaj w osi X (E1: stale rozstawy)
+      // Przesun element w dol o staly krok PUSH_AWAY_STEP_Y
+      toMove.position.y = stable.bounds.y + stable.bounds.height + PUSH_AWAY_STEP_Y;
+      toMove.bounds.y = toMove.position.y - toMove.size.height / 2;
 
       resolved++;
     }

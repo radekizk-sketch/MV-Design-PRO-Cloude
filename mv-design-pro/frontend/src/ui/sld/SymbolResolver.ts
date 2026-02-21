@@ -58,7 +58,12 @@ export type EtapSymbolId =
   | 'ct'
   | 'vt'
   | 'relay'
-  // Tree-specific symbols (P9 Project Tree ETAP parity)
+  // Canonical SLD symbols (IEC 60617/61082)
+  | 'overcurrent_relay'
+  | 'directional_relay'
+  | 'earthing_switch'
+  | 'load_arrow'
+  // Tree-specific symbols
   | 'load'
   | 'project'
   | 'catalog'
@@ -279,7 +284,47 @@ const SYMBOL_DEFINITIONS: Record<EtapSymbolId, Omit<ResolvedSymbol, 'symbolId'>>
     allowedRotations: [0],
     defaultRotation: 0,
   },
-  // Tree-specific symbols (P9 Project Tree ETAP parity)
+  // Canonical SLD symbols (IEC 60617/61082)
+  overcurrent_relay: {
+    description: 'Zabezpieczenie nadpradowe / Overcurrent Relay (51)',
+    viewBox: '0 0 100 100',
+    ports: {
+      left: { x: 10, y: 50 },
+      right: { x: 90, y: 50 },
+    },
+    allowedRotations: [0, 90],
+    defaultRotation: 0,
+  },
+  directional_relay: {
+    description: 'Zabezpieczenie kierunkowe / Directional Relay (67)',
+    viewBox: '0 0 100 100',
+    ports: {
+      left: { x: 10, y: 50 },
+      right: { x: 90, y: 50 },
+    },
+    allowedRotations: [0, 90],
+    defaultRotation: 0,
+  },
+  earthing_switch: {
+    description: 'Uziemnik / Earthing Switch',
+    viewBox: '0 0 100 100',
+    ports: {
+      left: { x: 10, y: 50 },
+      right: { x: 90, y: 50 },
+    },
+    allowedRotations: [0, 90],
+    defaultRotation: 0,
+  },
+  load_arrow: {
+    description: 'Strzalka odbioru / Load Arrow',
+    viewBox: '0 0 100 100',
+    ports: {
+      top: { x: 50, y: 10 },
+    },
+    allowedRotations: [0],
+    defaultRotation: 0,
+  },
+  // Tree-specific symbols
   load: {
     description: 'Odbiornik / Load',
     viewBox: '0 0 100 100',

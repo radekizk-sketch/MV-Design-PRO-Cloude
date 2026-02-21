@@ -274,6 +274,131 @@ export interface LayoutResultV1 {
   readonly bounds: RectangleV1;
   /** Deterministyczny hash (world geometry only) */
   readonly hash: string;
+  /** Canonical SLD annotations (Phase 7, nullable for backwards compatibility) */
+  readonly canonicalAnnotations: CanonicalAnnotationsV1 | null;
+}
+
+// =============================================================================
+// CANONICAL SLD ANNOTATIONS (Phase 7)
+// =============================================================================
+
+/**
+ * Annotacja węzła na torze głównym.
+ * Numerowany punkt rozgałęzienia z parametrami elektrycznymi.
+ */
+export interface TrunkNodeAnnotationV1 {
+  readonly nodeId: string;
+  readonly trunkId: string;
+  readonly kmFromGPZ: number;
+  readonly voltageKV: number;
+  readonly ikss3p: number;
+  readonly deltaU_percent: number;
+  readonly position: PointV1;
+  readonly branchStationId: string | null;
+}
+
+/**
+ * Annotacja odcinka toru głównego z parametrami impedancyjnymi.
+ */
+export interface TrunkSegmentAnnotationV1 {
+  readonly segmentId: string;
+  readonly designation: string;
+  readonly cableType: string;
+  readonly isOverhead: boolean;
+  readonly lengthKm: number;
+  readonly resistance_ohm: number;
+  readonly reactance_ohm: number;
+  readonly capacitance_uF_per_km: number | null;
+  readonly ampacity_A: number;
+  readonly current_A: number;
+  readonly power_MW: number;
+}
+
+/**
+ * Punkt odgałęzienia na torze głównym z aparaturą.
+ */
+export interface BranchPointV1 {
+  readonly branchId: string;
+  readonly trunkNodeId: string;
+  readonly physicalLocation: 'ZK' | 'SO';
+  readonly physicalLocationId: string;
+  readonly branchApparatus: {
+    readonly designation: string;
+    readonly type: 'disconnector';
+    readonly ratedCurrent_A: number;
+    readonly ratedVoltage_kV: number;
+  };
+  readonly branchLine: {
+    readonly designation: string;
+    readonly cableType: string;
+    readonly lengthKm: number;
+    readonly resistance_ohm: number;
+    readonly reactance_ohm: number;
+    readonly ampacity_A: number;
+    readonly isOverhead: boolean;
+  };
+  readonly targetStationId: string;
+  readonly position: PointV1;
+}
+
+/**
+ * Łańcuch aparatów stacyjnych (QS -> Q -> CT -> T -> BUS NN -> feeders).
+ */
+export interface StationApparatusChainV1 {
+  readonly stationId: string;
+  readonly stationType: 'TYPE_A' | 'TYPE_B' | 'TYPE_C' | 'TYPE_D';
+  readonly hasOZE: boolean;
+  readonly ozeType: 'PV' | 'BESS' | 'WIND' | null;
+  readonly apparatus: readonly StationApparatusItemV1[];
+  readonly nnBusbar: {
+    readonly voltageKV: number;
+    readonly feeders: readonly NNFeederV1[];
+  };
+  readonly protection: readonly ProtectionRelayV1[];
+}
+
+/**
+ * Pojedynczy aparat w łańcuchu stacyjnym.
+ */
+export interface StationApparatusItemV1 {
+  readonly designation: string;
+  readonly symbolType: string;
+  readonly label: string;
+  readonly parameters: Record<string, string | number>;
+  readonly position: PointV1;
+}
+
+/**
+ * Feeder na szynie NN.
+ */
+export interface NNFeederV1 {
+  readonly designation: string;
+  readonly type: 'load' | 'generator_pv' | 'generator_bess';
+  readonly power_kW: number;
+  readonly cosPhi: number | null;
+  readonly additionalParams: Record<string, string | number>;
+}
+
+/**
+ * Przekaźnik zabezpieczeniowy w łańcuchu stacyjnym.
+ */
+export interface ProtectionRelayV1 {
+  readonly designation: string;
+  readonly ansiCode: string;
+  readonly function: string;
+  readonly setting_Ir_A: number;
+  readonly setting_t_s: number;
+}
+
+/**
+ * Kontener adnotacji kanonicznego SLD (Phase 7 output).
+ * Immutable, sorted, deterministic.
+ */
+export interface CanonicalAnnotationsV1 {
+  readonly trunkNodes: readonly TrunkNodeAnnotationV1[];
+  readonly trunkSegments: readonly TrunkSegmentAnnotationV1[];
+  readonly branchPoints: readonly BranchPointV1[];
+  readonly stationChains: readonly StationApparatusChainV1[];
 }
 
 // =============================================================================
@@ -294,6 +419,7 @@ export function canonicalizeLayoutResult(result: LayoutResultV1): LayoutResultV1
     validationErrors: [...result.validationErrors].sort((a, b) => (a.nodeId ?? '').localeCompare(b.nodeId ?? '')),
     bounds: result.bounds,
     hash: result.hash,
+    canonicalAnnotations: result.canonicalAnnotations,
   };
 }
 

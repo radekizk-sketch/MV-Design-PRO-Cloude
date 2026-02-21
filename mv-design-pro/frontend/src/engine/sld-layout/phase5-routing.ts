@@ -407,11 +407,13 @@ function placeLabels(
 /**
  * Znajdź najlepszą pozycję dla etykiety.
  *
- * PHASE5 AESTHETICS:
- * - Heurystyka kolejności: right → left → top → bottom
+ * ESTETYKA PRZEMYSLOWA — LABEL PLACEMENT:
+ * - Kolejnosc deterministyczna: right → left → top → bottom
  * - Unikaj kolizji label-symbol (twarde)
  * - Clamp dystansu do LABEL_MAX_DISTANCE_PX
  * - Deterministic tiebreak (sort kandydatów po placement order + id)
+ * - Jesli konflikt: etykieta schodzi na drugi poziom (stack) w osi Y
+ *   w ramach kanalu, NIGDY losowo
  */
 function findBestLabelPosition(
   symbol: LayoutSymbol,
@@ -449,31 +451,37 @@ function findBestLabelPosition(
     }
   }
 
-  // Fallback: try with smaller multiplier to stay within distance limit
-  for (const placement of placements) {
-    // Try multiplier 1.0 first, then 1.5 (clamped to max distance)
-    for (const multiplier of [1.0, 1.5]) {
-      const labelPos = calculateLabelPosition(elementPos, placement, config, multiplier);
-      const labelBounds = estimateLabelBounds(symbol.elementName, labelPos);
+  // Y-stack fallback: try stacking label below in Y-axis (deterministic)
+  // Grid step = 14px (label height), try up to 3 stack levels
+  const LABEL_STACK_STEP_Y = 16;
+  for (let stackLevel = 1; stackLevel <= 3; stackLevel++) {
+    for (const placement of placements) {
+      const labelPos = calculateLabelPosition(elementPos, placement, config);
+      const stackedPos = {
+        ...labelPos,
+        position: {
+          x: labelPos.position.x,
+          y: labelPos.position.y + stackLevel * LABEL_STACK_STEP_Y,
+        },
+      };
+      const labelBounds = estimateLabelBounds(symbol.elementName, stackedPos);
 
-      // Check distance constraint
       const distance = Math.sqrt(
-        Math.pow(labelPos.position.x - elementPos.position.x, 2) +
-          Math.pow(labelPos.position.y - elementPos.position.y, 2)
+        Math.pow(stackedPos.position.x - elementPos.position.x, 2) +
+          Math.pow(stackedPos.position.y - elementPos.position.y, 2)
       );
 
       if (distance > LABEL_MAX_DISTANCE_PX) continue;
 
-      // Check collision (soft for fallback)
       const hasCollision = occupiedAreas.some((area) => rectanglesOverlap(labelBounds, area));
 
       if (!hasCollision) {
         return {
           symbolId: symbol.id,
-          position: labelPos.position,
-          anchor: labelPos.anchor,
+          position: stackedPos.position,
+          anchor: stackedPos.anchor,
           placement,
-          offset: labelPos.offset,
+          offset: { x: labelPos.offset.x, y: labelPos.offset.y + stackLevel * LABEL_STACK_STEP_Y },
           adjusted: true,
         };
       }
