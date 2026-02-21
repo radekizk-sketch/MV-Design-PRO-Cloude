@@ -278,10 +278,6 @@ describe('E3 — all coordinates snap to GRID_BASE', () => {
       }
       const alignment = validateGridAlignment(posMap);
       expect(alignment.allAligned).toBe(true);
-      if (!alignment.allAligned) {
-        // eslint-disable-next-line no-console
-        console.error('Grid violations:', alignment.violations);
-      }
     });
 
     it(`${name}: all edge routing points on GRID_BASE`, () => {
@@ -369,10 +365,6 @@ describe('Orthogonal routing — 100% orthogonal', () => {
 
       const orthoResult = validateOrthogonalRouting(segments);
       expect(orthoResult.allOrthogonal).toBe(true);
-      if (!orthoResult.allOrthogonal) {
-        // eslint-disable-next-line no-console
-        console.error('Orthogonal violations:', orthoResult.violations);
-      }
     });
   }
 });
@@ -482,10 +474,6 @@ describe('Zero symbol overlaps — golden networks', () => {
       const result = runLayout(buildFn());
       const overlaps = detectOverlaps(result.nodePlacements);
       expect(overlaps.length).toBe(0);
-      if (overlaps.length > 0) {
-        // eslint-disable-next-line no-console
-        console.error('Overlapping symbols:', overlaps);
-      }
     });
   }
 });

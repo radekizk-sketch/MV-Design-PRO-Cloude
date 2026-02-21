@@ -612,6 +612,93 @@ const FolderSymbol: React.FC<Omit<EtapSymbolProps, 'symbolId'>> = ({
 );
 
 /**
+ * Overcurrent Relay / Zabezpieczenie nadpradowe
+ * IEC 60617 symbol: rectangle with ANSI code, inline on feeder.
+ */
+const OvercurrentRelaySymbol: React.FC<Omit<EtapSymbolProps, 'symbolId'>> = ({
+  stroke = 'currentColor',
+  fill = 'none',
+  strokeWidth = 3,
+  opacity = 1,
+}) => (
+  <>
+    <line x1="10" y1="50" x2="35" y2="50" stroke={stroke} strokeWidth={strokeWidth} opacity={opacity} />
+    <rect x="35" y="35" width="30" height="30" fill={fill} stroke={stroke} strokeWidth={strokeWidth} rx={2} opacity={opacity} />
+    <text x="50" y="55" textAnchor="middle" fontSize="12" fill={stroke} opacity={opacity}>
+      51
+    </text>
+    <line x1="65" y1="50" x2="90" y2="50" stroke={stroke} strokeWidth={strokeWidth} opacity={opacity} />
+  </>
+);
+
+/**
+ * Directional Relay / Zabezpieczenie kierunkowe
+ * IEC 60617 symbol: rectangle with ANSI code 67, inline.
+ */
+const DirectionalRelaySymbol: React.FC<Omit<EtapSymbolProps, 'symbolId'>> = ({
+  stroke = 'currentColor',
+  fill = 'none',
+  strokeWidth = 3,
+  opacity = 1,
+}) => (
+  <>
+    <line x1="10" y1="50" x2="35" y2="50" stroke={stroke} strokeWidth={strokeWidth} opacity={opacity} />
+    <rect x="35" y="35" width="30" height="30" fill={fill} stroke={stroke} strokeWidth={strokeWidth} rx={2} opacity={opacity} />
+    <text x="50" y="55" textAnchor="middle" fontSize="12" fill={stroke} opacity={opacity}>
+      67
+    </text>
+    <line x1="65" y1="50" x2="90" y2="50" stroke={stroke} strokeWidth={strokeWidth} opacity={opacity} />
+    {/* Direction arrow */}
+    <polygon points="72,46 78,50 72,54" fill={stroke} opacity={opacity} />
+  </>
+);
+
+/**
+ * Earthing Switch / Uziemnik
+ * IEC 60617 symbol: X with ground symbol below.
+ */
+const EarthingSwitchSymbol: React.FC<Omit<EtapSymbolProps, 'symbolId'>> = ({
+  stroke = 'currentColor',
+  strokeWidth = 3,
+  opacity = 1,
+}) => (
+  <>
+    <line x1="10" y1="50" x2="40" y2="50" stroke={stroke} strokeWidth={strokeWidth} opacity={opacity} />
+    <line x1="40" y1="35" x2="60" y2="65" stroke={stroke} strokeWidth={strokeWidth} opacity={opacity} />
+    <line x1="40" y1="65" x2="60" y2="35" stroke={stroke} strokeWidth={strokeWidth} opacity={opacity} />
+    <line x1="60" y1="50" x2="90" y2="50" stroke={stroke} strokeWidth={strokeWidth} opacity={opacity} />
+    {/* Ground symbol */}
+    <line x1="50" y1="65" x2="50" y2="75" stroke={stroke} strokeWidth={strokeWidth} opacity={opacity} />
+    <line x1="42" y1="75" x2="58" y2="75" stroke={stroke} strokeWidth={strokeWidth} opacity={opacity} />
+    <line x1="44" y1="80" x2="56" y2="80" stroke={stroke} strokeWidth={1.5} opacity={opacity} />
+    <line x1="47" y1="85" x2="53" y2="85" stroke={stroke} strokeWidth={1} opacity={opacity} />
+  </>
+);
+
+/**
+ * Load Arrow / Strzalka odbioru
+ * Downward-pointing filled triangle for load termination.
+ */
+const LoadArrowSymbol: React.FC<Omit<EtapSymbolProps, 'symbolId'>> = ({
+  stroke = 'currentColor',
+  fill = 'none',
+  strokeWidth = 3,
+  opacity = 1,
+}) => (
+  <>
+    <line x1="50" y1="10" x2="50" y2="45" stroke={stroke} strokeWidth={strokeWidth} opacity={opacity} />
+    <polygon
+      points="35,45 65,45 50,75"
+      fill={fill}
+      stroke={stroke}
+      strokeWidth={strokeWidth}
+      strokeLinejoin="round"
+      opacity={opacity}
+    />
+  </>
+);
+
+/**
  * Relay / Przekaźnik zabezpieczeniowy
  * IEC 60617 symbol: rectangle with function label, placed above breaker.
  */
@@ -652,6 +739,11 @@ const SYMBOL_COMPONENTS: Record<EtapSymbolId, React.FC<Omit<EtapSymbolProps, 'sy
   ground: GroundSymbol,
   ct: CtSymbol,
   vt: VtSymbol,
+  // Canonical SLD symbols (IEC 60617/61082)
+  overcurrent_relay: OvercurrentRelaySymbol,
+  directional_relay: DirectionalRelaySymbol,
+  earthing_switch: EarthingSwitchSymbol,
+  load_arrow: LoadArrowSymbol,
   // Tree-specific symbols
   load: LoadSymbol,
   project: ProjectSymbol,
@@ -809,6 +901,25 @@ export function renderSymbolToString(symbolId: EtapSymbolId): string | null {
       <line x1="50" y1="60" x2="50" y2="100" stroke="#000000" stroke-width="3"/>`,
     folder: `<path d="M 10 25 L 10 20 L 35 20 L 45 30 L 90 30 L 90 25" fill="none" stroke="#000000" stroke-width="3" stroke-linejoin="round"/>
       <rect x="10" y="30" width="80" height="55" fill="none" stroke="#000000" stroke-width="3"/>`,
+    overcurrent_relay: `<line x1="10" y1="50" x2="35" y2="50" stroke="#000000" stroke-width="3"/>
+      <rect x="35" y="35" width="30" height="30" fill="none" stroke="#000000" stroke-width="3" rx="2"/>
+      <text x="50" y="55" text-anchor="middle" font-size="12" fill="#000000">51</text>
+      <line x1="65" y1="50" x2="90" y2="50" stroke="#000000" stroke-width="3"/>`,
+    directional_relay: `<line x1="10" y1="50" x2="35" y2="50" stroke="#000000" stroke-width="3"/>
+      <rect x="35" y="35" width="30" height="30" fill="none" stroke="#000000" stroke-width="3" rx="2"/>
+      <text x="50" y="55" text-anchor="middle" font-size="12" fill="#000000">67</text>
+      <line x1="65" y1="50" x2="90" y2="50" stroke="#000000" stroke-width="3"/>
+      <polygon points="72,46 78,50 72,54" fill="#000000"/>`,
+    earthing_switch: `<line x1="10" y1="50" x2="40" y2="50" stroke="#000000" stroke-width="3"/>
+      <line x1="40" y1="35" x2="60" y2="65" stroke="#000000" stroke-width="3"/>
+      <line x1="40" y1="65" x2="60" y2="35" stroke="#000000" stroke-width="3"/>
+      <line x1="60" y1="50" x2="90" y2="50" stroke="#000000" stroke-width="3"/>
+      <line x1="50" y1="65" x2="50" y2="75" stroke="#000000" stroke-width="3"/>
+      <line x1="42" y1="75" x2="58" y2="75" stroke="#000000" stroke-width="3"/>
+      <line x1="44" y1="80" x2="56" y2="80" stroke="#000000" stroke-width="1.5"/>
+      <line x1="47" y1="85" x2="53" y2="85" stroke="#000000" stroke-width="1"/>`,
+    load_arrow: `<line x1="50" y1="10" x2="50" y2="45" stroke="#000000" stroke-width="3"/>
+      <polygon points="35,45 65,45 50,75" fill="none" stroke="#000000" stroke-width="3" stroke-linejoin="round"/>`,
   };
 
   return svgContent[symbolId] || null;

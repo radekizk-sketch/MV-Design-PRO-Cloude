@@ -11,6 +11,7 @@
 
 import type { ElementType, SelectedElement } from '../types';
 import type { AnySldSymbol, Position } from '../sld-editor/types';
+import type { CanonicalAnnotationsV1 } from './core/layoutResult';
 import { ETAP_GEOMETRY } from './sldEtapStyle';
 
 /**
@@ -81,6 +82,9 @@ export interface SLDViewCanvasProps {
 
   /** Canvas height */
   height: number;
+
+  /** Canonical SLD annotations (Phase 7 output, optional) */
+  canonicalAnnotations?: CanonicalAnnotationsV1 | null;
 }
 
 /**

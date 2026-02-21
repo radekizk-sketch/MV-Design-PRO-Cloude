@@ -536,6 +536,50 @@ export function deterministicBranchSide(elementId: string): 1 | -1 {
  * Weryfikacja niezmienników kontraktu (używana w testach).
  * Zwraca true jeśli wszystkie niezmienniki są spełnione.
  */
+// =============================================================================
+// § 1.9 STYL KANONICZNY SLD — ETAP/IEC
+// =============================================================================
+
+/** Grubość toru głównego magistrali [px]. Dominujący — najgrubszy element. */
+export const TRUNK_STROKE_WIDTH = 5 as const;
+
+/** Grubość linii odgałęzienia (kabel/napowietrzna) [px]. */
+export const BRANCH_LINE_STROKE_WIDTH = 2.5 as const;
+
+/** Grubość linii wewnątrz stacji (łańcuch aparatów) [px]. */
+export const STATION_INTERNAL_STROKE = 2 as const;
+
+/** Promień kropki połączeniowej IEC 61082 [px]. */
+export const JUNCTION_DOT_RADIUS = 4 as const;
+
+/** Wzór kreskowania linii napowietrznej (SVG stroke-dasharray). */
+export const OVERHEAD_DASH_ARRAY = '12 6' as const;
+
+/** Kabel = linia ciągła (brak dash). */
+export const CABLE_DASH_ARRAY = 'none' as const;
+
+/** Offset etykiety węzła po lewej stronie toru [px]. */
+export const NODE_LABEL_OFFSET_X = -20 as const;
+
+/** Szerokość symbolu aparatu odgałęźnego [px]. */
+export const BRANCH_APPARATUS_WIDTH = 40 as const;
+
+/** Offset pola stacyjnego od toru głównego [px]. */
+export const STATION_FIELD_OFFSET_X = 60 as const;
+
+/** Krok pionowy w łańcuchu aparatów stacyjnych [px]. */
+export const APPARATUS_CHAIN_STEP_Y = 40 as const;
+
+/** Szerokość szyny zbiorczej NN [px]. */
+export const NN_BUSBAR_WIDTH = 120 as const;
+
+/** Rozmiar strzałki kierunku mocy [px]. */
+export const POWER_ARROW_SIZE = 8 as const;
+
+// =============================================================================
+// STAŁA WERYFIKACYJNA (dla testów)
+// =============================================================================
+
 export function verifyAestheticContract(): { valid: boolean; errors: string[] } {
   const errors: string[] = [];
 

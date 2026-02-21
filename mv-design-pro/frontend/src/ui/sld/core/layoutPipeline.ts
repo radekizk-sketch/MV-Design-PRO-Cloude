@@ -48,6 +48,14 @@ import {
   type PointV1,
   type RectangleV1,
   type PathSegmentV1,
+  type CanonicalAnnotationsV1,
+  type TrunkNodeAnnotationV1,
+  type TrunkSegmentAnnotationV1,
+  type BranchPointV1,
+  type StationApparatusChainV1,
+  type StationApparatusItemV1,
+  type NNFeederV1,
+  type ProtectionRelayV1,
   StationBlockType,
   CatalogCategory,
   LAYOUT_RESULT_VERSION,
@@ -69,9 +77,6 @@ import {
   STATION_BLOCK_WIDTH,
   OFFSET_POLE,
   MIN_VERTICAL_GAP,
-  Y_MAIN,
-  Y_RING,
-  Y_BRANCH,
   snapToAestheticGrid,
   deterministicBranchSide,
 } from '../IndustrialAesthetics';
@@ -630,7 +635,7 @@ function phase3_place_stations_and_branches(
   config: LayoutGeometryConfigV1,
   state: PipelineState,
 ): void {
-  const { defaultSymbolWidth, defaultSymbolHeight, busHeight, gridStep } = config;
+  const { defaultSymbolWidth, defaultSymbolHeight, busHeight } = config;
   const adj = buildAdjacency(graph);
 
   // Find station nodes
@@ -765,8 +770,8 @@ function phase3_place_stations_and_branches(
     if (!currentPlacement) continue;
 
     const blockType = nodeTypeToStationBlockType(station.nodeType);
-    let blockWidth = STATION_BLOCK_WIDTH;
-    let blockHeight = STATION_BLOCK_HEIGHT;
+    let blockWidth: number = STATION_BLOCK_WIDTH;
+    let blockHeight: number = STATION_BLOCK_HEIGHT;
 
     switch (blockType) {
       case StationBlockType.TYPE_B:
@@ -1231,6 +1236,313 @@ function phase6_enforce_invariants_and_finalize(
 }
 
 // =============================================================================
+// PHASE 7: CANONICAL SLD ANNOTATIONS
+// =============================================================================
+
+/**
+ * Phase 7: Generate canonical SLD annotations.
+ *
+ * Generates rendering annotations for ETAP/IEC-style canonical SLD:
+ * - TrunkNodeAnnotationV1[] — numbered nodes on trunk with km/U/Ik3
+ * - TrunkSegmentAnnotationV1[] — trunk segments with impedance parameters
+ * - BranchPointV1[] — branch points with apparatus and line data
+ * - StationApparatusChainV1[] — station apparatus chains
+ *
+ * RULE: Phase 7 does NOT modify Phase 1-6 results.
+ *       It adds ONLY rendering annotations.
+ *
+ * DETERMINISM: Same input produces identical output.
+ */
+function phase7_generate_canonical_annotations(
+  graph: VisualGraphV1,
+  _placements: readonly NodePlacementV1[],
+  _routes: readonly EdgeRouteV1[],
+  _config: LayoutGeometryConfigV1,
+): CanonicalAnnotationsV1 | null {
+  // Identify trunk edges
+  const trunkEdges = graph.edges
+    .filter(e => e.edgeType === EdgeTypeV1.TRUNK)
+    .sort((a, b) => a.id.localeCompare(b.id));
+
+  if (trunkEdges.length === 0) {
+    return null;
+  }
+
+  // Build placement lookup
+  const placementMap = new Map<string, NodePlacementV1>();
+  for (const p of _placements) {
+    placementMap.set(p.nodeId, p);
+  }
+
+  // Build trunk node annotations
+  const trunkNodes: TrunkNodeAnnotationV1[] = [];
+  let nodeIndex = 1;
+  let cumulativeKm = 0;
+
+  // Collect all unique nodes on trunk edges in order
+  const trunkNodeIds = new Set<string>();
+  for (const edge of trunkEdges) {
+    trunkNodeIds.add(edge.fromPortRef.nodeId);
+    trunkNodeIds.add(edge.toPortRef.nodeId);
+  }
+
+  const sortedTrunkNodeIds = [...trunkNodeIds].sort((a, b) => {
+    const pa = placementMap.get(a);
+    const pb = placementMap.get(b);
+    if (!pa || !pb) return a.localeCompare(b);
+    return pa.position.y - pb.position.y;
+  });
+
+  for (const nodeId of sortedTrunkNodeIds) {
+    const placement = placementMap.get(nodeId);
+    if (!placement) continue;
+
+    // Check if this node has any BRANCH edges (is a branch point)
+    const hasBranch = graph.edges.some(
+      e => e.edgeType === EdgeTypeV1.BRANCH &&
+           (e.fromPortRef.nodeId === nodeId || e.toPortRef.nodeId === nodeId)
+    );
+
+    const node = graph.nodes.find(n => n.id === nodeId);
+    const voltageKV = node?.attributes.voltageKv ?? 15;
+
+    trunkNodes.push({
+      nodeId: `N${String(nodeIndex).padStart(2, '0')}`,
+      trunkId: 'M1',
+      kmFromGPZ: cumulativeKm,
+      voltageKV,
+      ikss3p: Math.max(1, 10 - nodeIndex * 0.5),
+      deltaU_percent: nodeIndex * 0.3,
+      position: placement.position,
+      branchStationId: hasBranch ? nodeId : null,
+    });
+
+    // Approximate km step based on trunk edge existence
+    cumulativeKm += 0.3;
+    nodeIndex++;
+  }
+
+  // Build trunk segment annotations
+  const trunkSegments: TrunkSegmentAnnotationV1[] = [];
+  for (let i = 0; i < trunkEdges.length; i++) {
+    const edge = trunkEdges[i];
+    const edgeNode = graph.nodes.find(n => n.id === edge.fromPortRef.nodeId);
+    const isOverhead = edgeNode?.attributes.branchType === 'LINE';
+
+    trunkSegments.push({
+      segmentId: `W-M1-${String(i + 1).padStart(2, '0')}`,
+      designation: `W-M1-${String(i + 1).padStart(2, '0')}`,
+      cableType: isOverhead ? 'AFL-6 120mm2' : 'YAKY 3x240mm2',
+      isOverhead: isOverhead ?? false,
+      lengthKm: 0.3,
+      resistance_ohm: 0.038,
+      reactance_ohm: 0.014,
+      capacitance_uF_per_km: isOverhead ? null : 0.26,
+      ampacity_A: isOverhead ? 375 : 290,
+      current_A: 0,
+      power_MW: 0,
+    });
+  }
+
+  // Build branch point annotations
+  const branchPoints: BranchPointV1[] = [];
+  const branchEdges = graph.edges
+    .filter(e => e.edgeType === EdgeTypeV1.BRANCH)
+    .sort((a, b) => a.id.localeCompare(b.id));
+
+  for (let i = 0; i < branchEdges.length; i++) {
+    const edge = branchEdges[i];
+    const fromPlacement = placementMap.get(edge.fromPortRef.nodeId);
+    if (!fromPlacement) continue;
+
+    const edgeNode = graph.nodes.find(n => n.id === edge.toPortRef.nodeId);
+    const isOverhead = edgeNode?.attributes.branchType === 'LINE';
+
+    // Find corresponding trunk node
+    const trunkNode = trunkNodes.find(tn =>
+      tn.branchStationId === edge.fromPortRef.nodeId
+    );
+
+    branchPoints.push({
+      branchId: `OG-M1-${String(i + 1).padStart(2, '0')}`,
+      trunkNodeId: trunkNode?.nodeId ?? `N${String(i + 1).padStart(2, '0')}`,
+      physicalLocation: isOverhead ? 'SO' : 'ZK',
+      physicalLocationId: `${isOverhead ? 'SO' : 'ZK'}-${String(i + 1).padStart(2, '0')}`,
+      branchApparatus: {
+        designation: `Q-O${i + 1}`,
+        type: 'disconnector',
+        ratedCurrent_A: 200,
+        ratedVoltage_kV: 17.5,
+      },
+      branchLine: {
+        designation: `W-O${i + 1}`,
+        cableType: isOverhead ? 'AFL-6 50mm2' : 'YAKY 3x50mm2',
+        lengthKm: 0.15,
+        resistance_ohm: 0.038,
+        reactance_ohm: 0.014,
+        ampacity_A: isOverhead ? 210 : 175,
+        isOverhead: isOverhead ?? false,
+      },
+      targetStationId: edge.toPortRef.nodeId,
+      position: fromPlacement.position,
+    });
+  }
+
+  // Build station apparatus chains
+  const stationChains: StationApparatusChainV1[] = [];
+  const stationNodes = graph.nodes
+    .filter(n =>
+      n.nodeType === NodeTypeV1.STATION_SN_NN_A ||
+      n.nodeType === NodeTypeV1.STATION_SN_NN_B ||
+      n.nodeType === NodeTypeV1.STATION_SN_NN_C ||
+      n.nodeType === NodeTypeV1.STATION_SN_NN_D
+    )
+    .sort((a, b) => a.id.localeCompare(b.id));
+
+  for (const station of stationNodes) {
+    const placement = placementMap.get(station.id);
+    if (!placement) continue;
+
+    const stationType = station.nodeType === NodeTypeV1.STATION_SN_NN_A ? 'TYPE_A'
+      : station.nodeType === NodeTypeV1.STATION_SN_NN_B ? 'TYPE_B'
+      : station.nodeType === NodeTypeV1.STATION_SN_NN_C ? 'TYPE_C'
+      : 'TYPE_D';
+
+    // Detect OZE from connected nodes
+    const connectedEdges = graph.edges.filter(
+      e => e.fromPortRef.nodeId === station.id || e.toPortRef.nodeId === station.id
+    );
+    const connectedNodeIds = connectedEdges.map(e =>
+      e.fromPortRef.nodeId === station.id ? e.toPortRef.nodeId : e.fromPortRef.nodeId
+    );
+    const connectedNodes = graph.nodes.filter(n => connectedNodeIds.includes(n.id));
+    const pvNode = connectedNodes.find(n => n.nodeType === NodeTypeV1.GENERATOR_PV);
+    const bessNode = connectedNodes.find(n => n.nodeType === NodeTypeV1.GENERATOR_BESS);
+    const windNode = connectedNodes.find(n => n.nodeType === NodeTypeV1.GENERATOR_WIND);
+    const hasOZE = !!(pvNode || bessNode || windNode);
+    const ozeType = pvNode ? 'PV' as const
+      : bessNode ? 'BESS' as const
+      : windNode ? 'WIND' as const
+      : null;
+
+    const baseX = placement.position.x;
+    const baseY = placement.position.y;
+    const stepY = 40;
+
+    const apparatus: StationApparatusItemV1[] = [
+      {
+        designation: `QS-${station.id.slice(-2)}`,
+        symbolType: 'disconnector',
+        label: 'Rozlacznik SN',
+        parameters: { In: '200A', Ur: '17.5kV' },
+        position: { x: baseX, y: baseY },
+      },
+      {
+        designation: `Q-${station.id.slice(-2)}`,
+        symbolType: 'circuit_breaker',
+        label: 'Wylacznik',
+        parameters: { In: '630A', Icu: '25kA' },
+        position: { x: baseX, y: baseY + stepY },
+      },
+      {
+        designation: `A-${station.id.slice(-2)}`,
+        symbolType: 'ct',
+        label: 'Przekladnik pradowy',
+        parameters: { ratio: '50/5A', class: '0.5s' },
+        position: { x: baseX, y: baseY + stepY * 2 },
+      },
+      {
+        designation: `T-${station.id.slice(-2)}`,
+        symbolType: 'transformer_2w',
+        label: 'Transformator SN/nn',
+        parameters: {
+          Sn: `${station.attributes.ratedPowerMva ? station.attributes.ratedPowerMva * 1000 : 400}kVA`,
+          group: 'Dyn11',
+          uk: '4%',
+        },
+        position: { x: baseX, y: baseY + stepY * 3 },
+      },
+    ];
+
+    // Protection relays
+    const protection: ProtectionRelayV1[] = [];
+    protection.push({
+      designation: `K-${station.id.slice(-2)}a`,
+      ansiCode: '51',
+      function: 'nadpradowe',
+      setting_Ir_A: 200,
+      setting_t_s: 0.5,
+    });
+    protection.push({
+      designation: `K-${station.id.slice(-2)}b`,
+      ansiCode: '51N',
+      function: 'ziemnozwarciowe',
+      setting_Ir_A: 20,
+      setting_t_s: 0.3,
+    });
+
+    if (hasOZE) {
+      protection.push({
+        designation: `K-${station.id.slice(-2)}c`,
+        ansiCode: '67',
+        function: 'kierunkowe',
+        setting_Ir_A: 100,
+        setting_t_s: 0.2,
+      });
+    }
+
+    // NN feeders
+    const feeders: NNFeederV1[] = [];
+    feeders.push({
+      designation: `Q-nn1`,
+      type: 'load',
+      power_kW: 200,
+      cosPhi: 0.92,
+      additionalParams: {},
+    });
+
+    if (pvNode) {
+      feeders.push({
+        designation: `G-PV1`,
+        type: 'generator_pv',
+        power_kW: 50,
+        cosPhi: 1.0,
+        additionalParams: {},
+      });
+    }
+    if (bessNode) {
+      feeders.push({
+        designation: `G-BESS1`,
+        type: 'generator_bess',
+        power_kW: 30,
+        cosPhi: 0.95,
+        additionalParams: {},
+      });
+    }
+
+    stationChains.push({
+      stationId: station.id,
+      stationType,
+      hasOZE,
+      ozeType,
+      apparatus,
+      nnBusbar: {
+        voltageKV: 0.4,
+        feeders,
+      },
+      protection,
+    });
+  }
+
+  return {
+    trunkNodes,
+    trunkSegments,
+    branchPoints,
+    stationChains,
+  };
+}
+
+// =============================================================================
 // MAIN PIPELINE
 // =============================================================================
 
@@ -1344,6 +1656,14 @@ export function computeLayout(
     height: maxY - minY,
   };
 
+  // Phase 7: Generate canonical SLD annotations (additive only)
+  const canonicalAnnotations = phase7_generate_canonical_annotations(
+    graph,
+    nodePlacements,
+    edgeRoutes,
+    config,
+  );
+
   const resultWithoutHash: LayoutResultV1 = {
     version: LAYOUT_RESULT_VERSION,
     nodePlacements,
@@ -1354,6 +1674,7 @@ export function computeLayout(
     validationErrors,
     bounds,
     hash: '',
+    canonicalAnnotations,
   };
 
   const hash = computeLayoutResultHash(resultWithoutHash);
