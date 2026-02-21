@@ -1,31 +1,40 @@
 /**
  * Layout Pipeline V1 — 6-fazowy, deterministyczny pipeline layoutu SLD.
  *
- * ESTETYKA PRZEMYSLOWA (E1–E4):
- * - E1: Rowne odleglosci stacji na magistrali (GRID_SPACING_MAIN)
- * - E2: Symetryczne ringi (stala amplituda Y_RING, ortogonalne odcinki)
- * - E3: Brak przypadkowych dlugosci wizualnych (snap to grid, stale kroki)
- * - E4: Wyrownanie pionowe pol stacji (OFFSET_POLE, wspolna os Y)
+ * UKŁAD PIONOWY (VERTICAL SN) — STYL ABB/POWERFACTORY:
+ *   GPZ u góry → szyna GPZ pozioma → pola liniowe w równym pitch →
+ *   z pól pionowe magistrale SN w dół → odgałęzienia L (bok+dół) →
+ *   stacje jako "drop" z magistrali → ring/NOP w kanale wtórnym
+ *
+ * ESTETYKA PRZEMYSLOWA (E1–E4 + VERTICAL):
+ * - E1: Równe odległości pól GPZ na szynie (PITCH_FIELD_X)
+ * - E2: Symetryczne ringi (orthogonal, kanał wtórny)
+ * - E3: Brak przypadkowych długości wizualnych (snap to grid, stałe kroki)
+ * - E4: Wyrównanie pionowe pól stacji (OFFSET_POLE, wspólna oś Y)
+ * - V1: GPZ u góry, sieć buduje się w dół (monotoniczny Y)
+ * - V2: Magistrale SN pionowe (każde pole GPZ → trunk w dół)
+ * - V3: Odgałęzienia L-shape (bok + dół), deterministyczny wybór strony
+ * - V4: Stacje jako "drop" (bok + dół z magistrali)
  *
  * PIPELINE:
- *   phase1_place_trunk()
- *   phase2_detect_and_reserve_blocks()
- *   phase3_embed_switchgear_blocks()
- *   phase4_place_branches_in_bands()
- *   phase5_route_edges_manhattan_with_channels()
+ *   phase1_place_gpz_and_fields()
+ *   phase2_build_trunk_topology()
+ *   phase3_place_stations_and_branches()
+ *   phase4_route_all_edges()
+ *   phase5_place_labels()
  *   phase6_enforce_invariants_and_finalize_hash()
  *
- * REGULY:
- * - Kazda faza uzywa WYLACZNIE VisualGraphV1 + GeometryConfig.
- * - Kazda faza NIE zna camera/overlay/viewport.
- * - Kazda faza NIE modyfikuje Snapshot.
- * - Kazda faza zwraca immutable struktury.
+ * REGUŁY:
+ * - Każda faza używa WYŁĄCZNIE VisualGraphV1 + GeometryConfig.
+ * - Każda faza NIE zna camera/overlay/viewport.
+ * - Każda faza NIE modyfikuje Snapshot.
+ * - Każda faza zwraca immutable struktury.
  * - DETERMINIZM: ten sam input → identyczny output (bit-for-bit).
- * - KOLIZJE: rozwiazywane WYLACZNIE w osi Y (Y-only push-away).
- * - JEDEN SILNIK: brak flag wyboru, brak rownoleglych implementacji.
+ * - KOLIZJE: rozwiązywane WYŁĄCZNIE w osi Y (Y-only push-away).
+ * - JEDEN SILNIK: brak flag wyboru, brak równoległych implementacji.
  */
 
-import type { VisualGraphV1, VisualNodeV1 } from './visualGraph';
+import type { VisualGraphV1, VisualNodeV1, VisualEdgeV1 } from './visualGraph';
 import { NodeTypeV1, EdgeTypeV1 } from './visualGraph';
 import {
   type LayoutResultV1,
@@ -51,37 +60,45 @@ import {
   GRID_BASE,
   GRID_SPACING_MAIN,
   X_START,
+  Y_GPZ,
+  PITCH_FIELD_X,
+  TRUNK_STEP_Y,
+  BRANCH_OFFSET_X,
+  SECONDARY_CHANNEL_OFFSET_X,
+  STATION_BLOCK_HEIGHT,
+  STATION_BLOCK_WIDTH,
+  OFFSET_POLE,
+  MIN_VERTICAL_GAP,
   Y_MAIN,
   Y_RING,
   Y_BRANCH,
-  OFFSET_POLE,
-  MIN_VERTICAL_GAP,
   snapToAestheticGrid,
+  deterministicBranchSide,
 } from '../IndustrialAesthetics';
 
 // =============================================================================
 // GEOMETRY CONFIG
 // =============================================================================
 
-/** Konfiguracja geometrii layoutu (ETAP-grade). */
+/** Konfiguracja geometrii layoutu (ETAP-grade, vertical SN). */
 export interface LayoutGeometryConfigV1 {
   /** Krok siatki [px] */
   readonly gridStep: number;
-  /** Odstep miedzy warstwami Y [px] */
+  /** Odstęp między warstwami Y [px] */
   readonly layerSpacing: number;
-  /** Odstep miedzy bandami branch [px] */
+  /** Odstęp między bandami branch [px] */
   readonly bandSpacing: number;
-  /** Szerokosc symbolu domyslna [px] */
+  /** Szerokość symbolu domyślna [px] */
   readonly defaultSymbolWidth: number;
-  /** Wysokosc symbolu domyslna [px] */
+  /** Wysokość symbolu domyślna [px] */
   readonly defaultSymbolHeight: number;
-  /** Szerokosc szyny zbiorczej domyslna [px] */
+  /** Szerokość szyny zbiorczej domyślna [px] */
   readonly defaultBusWidth: number;
-  /** Wysokosc szyny zbiorczej [px] */
+  /** Wysokość szyny zbiorczej [px] */
   readonly busHeight: number;
-  /** Odstep miedzy slotami feederow [px] */
+  /** Odstęp między slotami feederów [px] */
   readonly feederSlotSpacing: number;
-  /** Pitch kanalu secondary connector [px] */
+  /** Pitch kanału secondary connector [px] */
   readonly secondaryLanePitch: number;
   /** Margines bloku switchgear [px] */
   readonly blockMargin: number;
@@ -99,7 +116,7 @@ export const DEFAULT_LAYOUT_CONFIG: LayoutGeometryConfigV1 = {
   defaultSymbolHeight: 3 * GRID_BASE, // 60px
   defaultBusWidth: 20 * GRID_BASE,    // 400px
   busHeight: 10,                      // busbar thickness
-  feederSlotSpacing: GRID_SPACING_MAIN, // 280px — E1: equal station spacing
+  feederSlotSpacing: PITCH_FIELD_X,   // 280px — E1: equal field spacing
   secondaryLanePitch: 30,
   blockMargin: GRID_BASE,             // 20px
   relayOffsetY: -2 * GRID_BASE,      // -40px
@@ -138,8 +155,14 @@ interface MutableBlock {
   ports: SwitchgearPortV1[];
   internalNodes: string[];
   label: string;
-  /** RUN #3D: Szczegoly pol/urzadzen/anchorow (null jesli brak stationBlockDetails) */
   detail: StationBlockDetailV1 | null;
+}
+
+/** Trunk assignment: maps nodeId → trunkIndex (which feeder field) */
+interface TrunkAssignment {
+  trunkIndex: number;
+  trunkX: number;
+  depthInTrunk: number;
 }
 
 interface PipelineState {
@@ -149,14 +172,18 @@ interface PipelineState {
   catalogRefs: CatalogRefV1[];
   relayBindings: RelayBindingV1[];
   validationErrors: LayoutValidationErrorV1[];
+  /** Maps nodeId → trunk assignment (which vertical trunk) */
+  trunkAssignments: Map<string, TrunkAssignment>;
+  /** Maps nodeId → branch side (1=right, -1=left) */
+  branchSides: Map<string, 1 | -1>;
 }
 
 // =============================================================================
 // HELPERS
 // =============================================================================
 
-function snapToGrid(value: number, step: number): number {
-  return Math.round(value / step) * step;
+function snap(value: number): number {
+  return snapToAestheticGrid(value);
 }
 
 function isStationType(nodeType: string): boolean {
@@ -181,12 +208,6 @@ function isSourceType(nodeType: string): boolean {
     nodeType === NodeTypeV1.GENERATOR_WIND
   );
 }
-
-/* istanbul ignore next — reserved for station-layout */
-function isTransformerType(nodeType: string): boolean {
-  return nodeType === NodeTypeV1.TRANSFORMER_WN_SN || nodeType === NodeTypeV1.TRANSFORMER_SN_NN;
-}
-void isTransformerType;
 
 function isSwitchType(nodeType: string): boolean {
   return (
@@ -226,212 +247,573 @@ function sourceOrderKey(node: VisualNodeV1): string {
   return `${priority}_${node.id}`;
 }
 
+/** Get adjacency list from graph edges */
+function buildAdjacency(graph: VisualGraphV1): Map<string, Array<{ nodeId: string; edge: VisualEdgeV1 }>> {
+  const adj = new Map<string, Array<{ nodeId: string; edge: VisualEdgeV1 }>>();
+  for (const edge of graph.edges) {
+    const from = edge.fromPortRef.nodeId;
+    const to = edge.toPortRef.nodeId;
+    if (!adj.has(from)) adj.set(from, []);
+    if (!adj.has(to)) adj.set(to, []);
+    adj.get(from)!.push({ nodeId: to, edge });
+    adj.get(to)!.push({ nodeId: from, edge });
+  }
+  return adj;
+}
+
 // =============================================================================
-// PHASE 1: PLACE TRUNK
+// PHASE 1: PLACE GPZ AND FIELDS (TOP OF DIAGRAM)
 // =============================================================================
 
 /**
- * Faza 1: Umieszczenie trunk (magistrali) — ESTETYKA PRZEMYSLOWA E1/E3/E4.
+ * Faza 1: Umieszczenie GPZ u góry schematu.
  *
- * E1: Rowne odleglosci stacji — feederSlotSpacing = GRID_SPACING_MAIN
- * E3: Brak przypadkowych dlugosci — snap to GRID_BASE
- * E4: Wyrownanie pionowe — stale warstwy L0/L2/L3
- *
- * - Znajdz zrodla (GRID_SOURCE preferowane).
- * - BFS po trunk edges.
- * - Monotoniczna os X (spine).
- * - Szyny SN na warstwie Y_MAIN.
- * - Stable tie-break: sort po id.
+ * VERTICAL SN LAYOUT:
+ * - Źródła (GRID_SOURCE) na samej górze
+ * - Transformatory WN/SN pod źródłami
+ * - Szyna SN GPZ (root busbar) pod transformatorami — JEDNA szyna GPZ
+ * - WYŁĄCZNIE szyna GPZ (root) jest umieszczana w fazie 1
+ * - Pozostałe szyny SN są odkrywane w fazie 2 (BFS trunk)
+ * - Wyłączniki między transformatorem a szyną SN
  */
-function phase1_place_trunk(
+function phase1_place_gpz_and_fields(
   graph: VisualGraphV1,
   config: LayoutGeometryConfigV1,
   state: PipelineState,
 ): void {
-  const { gridStep, defaultSymbolWidth, defaultSymbolHeight, defaultBusWidth, busHeight } = config;
+  const { defaultSymbolWidth, defaultSymbolHeight, defaultBusWidth, busHeight } = config;
+  const adj = buildAdjacency(graph);
 
-  // Znajdz zrodla i posortuj (GRID_SOURCE first, then by id)
+  // Layer Y coordinates (top → down, all on grid)
+  const Y_SOURCE = snap(Y_GPZ - 2 * OFFSET_POLE);        // Sources above GPZ busbar
+  const Y_TR_WN_SN = snap(Y_GPZ + 2 * OFFSET_POLE);       // WN/SN transformers
+  const Y_SN_BUS = snap(Y_GPZ + 4 * OFFSET_POLE);          // SN busbar = start of feeders
+  const Y_SWITCH_ZONE = snap((Y_TR_WN_SN + Y_SN_BUS) / 2); // Switches between TR and SN bus
+
+  // Find and sort sources (GRID_SOURCE first)
   const sources = graph.nodes
     .filter(n => isSourceType(n.nodeType))
     .sort((a, b) => sourceOrderKey(a).localeCompare(sourceOrderKey(b)));
 
-  // E1/E4: Stale warstwy Y zsynchronizowane z IndustrialAesthetics
-  const L0_Y = snapToAestheticGrid(Y_MAIN - 3 * OFFSET_POLE);  // sources above busbar
-  const L2_Y = snapToAestheticGrid(Y_MAIN - OFFSET_POLE);       // transformers WN/SN
-  const L3_Y = snapToAestheticGrid(Y_MAIN);                      // SN busbar = Y_MAIN
+  // Find WN/SN transformers
+  const wnSnTransformers = graph.nodes
+    .filter(n => n.nodeType === NodeTypeV1.TRANSFORMER_WN_SN)
+    .sort((a, b) => a.id.localeCompare(b.id));
 
-  // E1: Umieszczaj zrodla na L0 z rownym rozstawem
-  let sourceSlotX = snapToAestheticGrid(X_START);
+  // Identify ROOT SN bus: the SN bus directly connected to a source (via edges).
+  // This is the GPZ horizontal busbar. Other SN buses are trunk nodes placed in phase2.
+  const rootBusIds = new Set<string>();
   for (const src of sources) {
+    const neighbors = adj.get(src.id) ?? [];
+    for (const n of neighbors) {
+      const node = graph.nodes.find(nd => nd.id === n.nodeId);
+      if (node && node.nodeType === NodeTypeV1.BUS_SN) {
+        rootBusIds.add(node.id);
+      }
+    }
+  }
+  // Also check source connectedToNodeId attribute
+  for (const src of sources) {
+    const connId = src.attributes.connectedToNodeId;
+    if (connId) {
+      const node = graph.nodes.find(nd => nd.id === connId);
+      if (node && node.nodeType === NodeTypeV1.BUS_SN) {
+        rootBusIds.add(node.id);
+      }
+    }
+  }
+
+  // If no root bus found from source, use the first SN bus connected to a WN/SN transformer
+  if (rootBusIds.size === 0) {
+    for (const tr of wnSnTransformers) {
+      const neighbors = adj.get(tr.id) ?? [];
+      for (const n of neighbors) {
+        const node = graph.nodes.find(nd => nd.id === n.nodeId);
+        if (node && node.nodeType === NodeTypeV1.BUS_SN) {
+          rootBusIds.add(node.id);
+        }
+      }
+    }
+  }
+
+  // If still none, pick the first SN bus alphabetically
+  if (rootBusIds.size === 0) {
+    const allSnBuses = graph.nodes
+      .filter(n => n.nodeType === NodeTypeV1.BUS_SN)
+      .sort((a, b) => a.id.localeCompare(b.id));
+    if (allSnBuses.length > 0) {
+      rootBusIds.add(allSnBuses[0].id);
+    }
+  }
+
+  const rootBuses = graph.nodes
+    .filter(n => rootBusIds.has(n.id))
+    .sort((a, b) => a.id.localeCompare(b.id));
+
+  // Determine the number of direct feeder connections from the root bus
+  // Each first-level SN bus neighbor = one feeder field
+  const feederBusIds: string[] = [];
+  for (const rootBus of rootBuses) {
+    const neighbors = adj.get(rootBus.id) ?? [];
+    for (const n of [...neighbors].sort((a, b) => a.nodeId.localeCompare(b.nodeId))) {
+      const node = graph.nodes.find(nd => nd.id === n.nodeId);
+      if (node && node.nodeType === NodeTypeV1.BUS_SN && !rootBusIds.has(node.id)) {
+        feederBusIds.push(node.id);
+      }
+    }
+  }
+
+  const numFields = Math.max(feederBusIds.length, sources.length, wnSnTransformers.length, 1);
+  const totalFieldWidth = (numFields - 1) * PITCH_FIELD_X;
+  const fieldStartX = snap(X_START + PITCH_FIELD_X);
+
+  // Store field start for phase2
+  state.placements.set('__fieldStartX__', {
+    nodeId: '__fieldStartX__',
+    x: fieldStartX,
+    y: 0,
+    width: numFields,  // encode numFields
+    height: 0,
+    layer: -1,
+    bandIndex: 0,
+    autoPositioned: false,
+  });
+
+  // Compute GPZ busbar geometry first (needed for source centering)
+  const gpzBusX = snap(fieldStartX);
+  let gpzBusW = 0;
+  for (const bus of rootBuses) {
+    const w = bus.attributes.width ?? defaultBusWidth;
+    gpzBusW = snap(Math.max(w, totalFieldWidth + 2 * GRID_BASE));
+  }
+  if (gpzBusW === 0) gpzBusW = snap(totalFieldWidth + 2 * GRID_BASE);
+  const gpzBusCenterX = snap(gpzBusX + gpzBusW / 2);
+
+  // Place sources centered above GPZ busbar
+  for (let i = 0; i < sources.length; i++) {
+    const src = sources[i];
+    // Single source → center above GPZ bus, multiple → distribute along fields
+    const x = sources.length === 1
+      ? snap(gpzBusCenterX - defaultSymbolWidth / 2)
+      : snap(fieldStartX + i * PITCH_FIELD_X);
     state.placements.set(src.id, {
       nodeId: src.id,
-      x: snapToAestheticGrid(sourceSlotX),
-      y: L0_Y,
+      x,
+      y: Y_SOURCE,
       width: defaultSymbolWidth,
       height: defaultSymbolHeight,
       layer: 0,
       bandIndex: 0,
       autoPositioned: true,
     });
-    sourceSlotX += GRID_SPACING_MAIN;
   }
 
-  // Znajdz szyny SN i posortuj po id
-  const snBuses = graph.nodes
-    .filter(n => n.nodeType === NodeTypeV1.BUS_SN)
-    .sort((a, b) => a.id.localeCompare(b.id));
-
-  // E1: Szyny SN na Y_MAIN, rozstaw = GRID_SPACING_MAIN
-  let busSlotX = snapToAestheticGrid(X_START);
-  for (const bus of snBuses) {
-    const w = bus.attributes.width ?? defaultBusWidth;
+  // Place ONLY root SN bus(es) on Y_SN_BUS (horizontal busbar spanning all fields)
+  for (const bus of rootBuses) {
+    const busX = gpzBusX;
+    const busW = gpzBusW;
     state.placements.set(bus.id, {
       nodeId: bus.id,
-      x: snapToAestheticGrid(busSlotX),
-      y: L3_Y,
-      width: snapToGrid(w, gridStep),
+      x: busX,
+      y: Y_SN_BUS,
+      width: busW,
       height: busHeight,
-      layer: 3,
+      layer: 1,
       bandIndex: 0,
       autoPositioned: true,
     });
-    busSlotX += snapToAestheticGrid(w + GRID_SPACING_MAIN);
   }
 
-  // E1/E4: Umieszczaj transformatory WN/SN na L2 z rownym rozstawem
-  const wnSnTransformers = graph.nodes
-    .filter(n => n.nodeType === NodeTypeV1.TRANSFORMER_WN_SN)
-    .sort((a, b) => a.id.localeCompare(b.id));
-
-  let trSlotX = snapToAestheticGrid(X_START);
-  for (const tr of wnSnTransformers) {
+  // Place WN/SN transformers
+  for (let i = 0; i < wnSnTransformers.length; i++) {
+    const tr = wnSnTransformers[i];
+    const x = snap(fieldStartX + i * PITCH_FIELD_X);
     state.placements.set(tr.id, {
       nodeId: tr.id,
-      x: snapToAestheticGrid(trSlotX),
-      y: L2_Y,
+      x,
+      y: Y_TR_WN_SN,
       width: defaultSymbolWidth,
       height: defaultSymbolHeight,
       layer: 2,
       bandIndex: 0,
       autoPositioned: true,
     });
-    trSlotX += GRID_SPACING_MAIN;
   }
 
-  // E3/E4: Umieszczaj przelaczniki z snap to grid
+  // Place switches in the zone between transformer and SN bus
   const switchNodes = graph.nodes
     .filter(n => isSwitchType(n.nodeType))
     .sort((a, b) => a.id.localeCompare(b.id));
 
-  let switchSlotX = snapToAestheticGrid(X_START);
+  let switchSlotIndex = 0;
   for (const sw of switchNodes) {
     if (!state.placements.has(sw.id)) {
-      // Umieszczaj miedzy szyna a transformatorem
-      const switchY = snapToAestheticGrid((L2_Y + L3_Y) / 2);
+      const x = snap(fieldStartX + switchSlotIndex * snap(PITCH_FIELD_X / 2));
       state.placements.set(sw.id, {
         nodeId: sw.id,
-        x: snapToAestheticGrid(switchSlotX),
-        y: switchY,
-        width: snapToGrid(defaultSymbolWidth / 2, gridStep),
-        height: snapToGrid(defaultSymbolHeight / 2, gridStep),
+        x,
+        y: Y_SWITCH_ZONE,
+        width: snap(defaultSymbolWidth / 2),
+        height: snap(defaultSymbolHeight / 2),
         layer: 2,
         bandIndex: 0,
         autoPositioned: true,
       });
-      switchSlotX += snapToAestheticGrid(GRID_SPACING_MAIN / 2);
+      switchSlotIndex++;
     }
   }
 }
 
 // =============================================================================
-// PHASE 2: DETECT AND RESERVE BLOCKS
+// PHASE 2: BUILD TRUNK TOPOLOGY (VERTICAL TRUNKS DOWNWARD)
 // =============================================================================
 
 /**
- * Faza 2: Detekcja i rezerwacja embedded switchgear blocks.
+ * Faza 2: Budowa topologii magistral pionowych.
  *
- * - Identyfikuj wezly stacji (A/B/C/D).
- * - Zarezerwuj bounds na grid.
- * - NIE naruszaj osi trunk.
+ * Z szyny GPZ (root bus) identyfikujemy pola liniowe (feeder fields).
+ * Każde pierwsze BUS_SN sąsiadujące z root = początek oddzielnej magistrali.
+ * BFS po ALL edge types (TRUNK + BRANCH + inne) → każdy odkryty węzeł
+ * otrzymuje trunkIndex i depthInTrunk.
+ *
+ * UWAGA: Adapter segmentuje tylko JEDNĄ najdłuższą ścieżkę jako TRUNK.
+ * Dla multi-feeder GPZ inne feedery mają edgeType=BRANCH.
+ * Dlatego phase2 BFS idzie po WSZYSTKICH typach krawędzi.
+ *
+ * Magistrala = oś X stała (= X pola), Y rośnie monotonicznie w dół.
  */
-function phase2_detect_and_reserve_blocks(
+function phase2_build_trunk_topology(
   graph: VisualGraphV1,
   config: LayoutGeometryConfigV1,
   state: PipelineState,
 ): void {
+  const adj = buildAdjacency(graph);
+
+  // Retrieve fieldStartX from phase1 metadata
+  const metaPlacement = state.placements.get('__fieldStartX__');
+  const fieldStartX = metaPlacement ? metaPlacement.x : snap(X_START + PITCH_FIELD_X);
+  // Clean up metadata placeholder
+  state.placements.delete('__fieldStartX__');
+
+  // Y where trunk starts (below SN busbar)
+  const trunkStartY = snap(Y_GPZ + 5 * OFFSET_POLE);
+
+  // Identify root SN buses (already placed in phase1, at layer 1)
+  const rootBusIds = new Set<string>();
+  for (const [nodeId, p] of state.placements) {
+    const node = graph.nodes.find(n => n.id === nodeId);
+    if (node && node.nodeType === NodeTypeV1.BUS_SN && p.layer === 1) {
+      rootBusIds.add(nodeId);
+    }
+  }
+
+  // Mark all already-placed nodes as visited (GPZ layer)
+  const visited = new Set<string>();
+  for (const [nodeId] of state.placements) {
+    visited.add(nodeId);
+  }
+
+  // Determine feeder fields: direct BUS_SN neighbors of root bus
+  // Each such neighbor starts a separate vertical trunk
+  const feederStarts: Array<{ nodeId: string; trunkIndex: number }> = [];
+  let trunkIndex = 0;
+
+  for (const rootId of [...rootBusIds].sort()) {
+    const neighbors = adj.get(rootId) ?? [];
+    const sortedNeighbors = [...neighbors].sort((a, b) => a.nodeId.localeCompare(b.nodeId));
+
+    for (const n of sortedNeighbors) {
+      if (visited.has(n.nodeId)) continue;
+      const node = graph.nodes.find(nd => nd.id === n.nodeId);
+      if (!node) continue;
+
+      // BUS_SN neighbor = start of a trunk feeder
+      // Non-bus neighbor (e.g., line junction) = also a trunk start
+      // Skip station/load/source nodes — they don't start trunks
+      if (isStationType(node.nodeType) || node.nodeType === NodeTypeV1.LOAD) continue;
+
+      feederStarts.push({ nodeId: n.nodeId, trunkIndex });
+      trunkIndex++;
+    }
+  }
+
+  // BFS from each feeder start → build trunk chains
+  // Follow ALL edge types (TRUNK, BRANCH, TRANSFORMER_LINK, etc.)
+  // because adapter may classify multi-feeder paths as BRANCH
+  const isTraversableEdge = (edgeType: string): boolean => {
+    return edgeType === EdgeTypeV1.TRUNK ||
+           edgeType === EdgeTypeV1.BRANCH ||
+           edgeType === EdgeTypeV1.TRANSFORMER_LINK;
+  };
+
+  for (const feeder of feederStarts) {
+    const trunkX = snap(fieldStartX + feeder.trunkIndex * PITCH_FIELD_X);
+
+    const queue: Array<{ nodeId: string; depth: number }> = [
+      { nodeId: feeder.nodeId, depth: 1 },
+    ];
+
+    while (queue.length > 0) {
+      const { nodeId, depth } = queue.shift()!;
+      if (visited.has(nodeId)) continue;
+      visited.add(nodeId);
+
+      state.trunkAssignments.set(nodeId, {
+        trunkIndex: feeder.trunkIndex,
+        trunkX,
+        depthInTrunk: depth,
+      });
+
+      // Continue BFS along traversable edges
+      const nextNeighbors = (adj.get(nodeId) ?? [])
+        .filter(n => isTraversableEdge(n.edge.edgeType) && !visited.has(n.nodeId))
+        .sort((a, b) => a.nodeId.localeCompare(b.nodeId));
+
+      for (const nn of nextNeighbors) {
+        queue.push({ nodeId: nn.nodeId, depth: depth + 1 });
+      }
+    }
+  }
+
+  // Place trunk nodes: CENTERED on trunkX, Y = trunkStartY + depth * TRUNK_STEP_Y
+  // Bus nodes on trunk use their specified width (or a narrow default),
+  // centered on the trunk axis. Non-bus nodes use defaultSymbolWidth.
+  for (const [nodeId, assignment] of state.trunkAssignments) {
+    const node = graph.nodes.find(n => n.id === nodeId);
+    if (!node || state.placements.has(nodeId)) continue;
+
+    const { defaultSymbolWidth, defaultSymbolHeight, busHeight } = config;
+    let w = defaultSymbolWidth;
+    let h = defaultSymbolHeight;
+
+    if (isBusType(node.nodeType)) {
+      // Trunk buses: use specified width or narrow trunk bus width (not GPZ busbar width)
+      const explicitWidth = node.attributes.width;
+      w = snap(explicitWidth ?? STATION_BLOCK_WIDTH);  // narrow bus, not defaultBusWidth
+      h = busHeight;
+    }
+
+    // Center the node on the trunk axis
+    const centeredX = snap(assignment.trunkX - w / 2 + defaultSymbolWidth / 2);
+
+    state.placements.set(nodeId, {
+      nodeId,
+      x: centeredX,
+      y: snap(trunkStartY + assignment.depthInTrunk * TRUNK_STEP_Y),
+      width: w,
+      height: h,
+      layer: 4,
+      bandIndex: assignment.trunkIndex,
+      autoPositioned: true,
+    });
+  }
+}
+
+// =============================================================================
+// PHASE 3: PLACE STATIONS AND BRANCHES
+// =============================================================================
+
+/**
+ * Faza 3: Umieszczenie stacji (drop) i odgałęzień (L-shape).
+ *
+ * STACJE: Stacja wisi jako "drop" z magistrali:
+ *   - Punkt wpięcia na magistrali (trunkX, trunkY)
+ *   - Poziomo w bok (deterministyczny: lewo/prawo)
+ *   - Pionowo w dół — blok stacji
+ *
+ * ODGAŁĘZIENIA: Branch nodes that are NOT on trunk:
+ *   - Od punktu T na magistrali → bok + dół
+ *   - Deterministyczny wybór strony (hash elementId)
+ */
+function phase3_place_stations_and_branches(
+  graph: VisualGraphV1,
+  config: LayoutGeometryConfigV1,
+  state: PipelineState,
+): void {
+  const { defaultSymbolWidth, defaultSymbolHeight, busHeight, gridStep } = config;
+  const adj = buildAdjacency(graph);
+
+  // Find station nodes
   const stationNodes = graph.nodes
     .filter(n => isStationType(n.nodeType))
     .sort((a, b) => a.id.localeCompare(b.id));
 
-  const { gridStep, defaultSymbolWidth } = config;
-  // E1: Stacje na stale warstwie Y ponizej magistrali
-  const STATION_Y = snapToAestheticGrid(Y_BRANCH);
+  // Track branch-side usage per trunk position to avoid overlaps
+  const usedSides = new Map<string, Set<1 | -1>>();
 
-  // E1: Rowne odleglosci stacji — uzyj GRID_SPACING_MAIN
-  let blockSlotX = snapToAestheticGrid(X_START);
+  // Build station → bus membership for parent lookup
+  // Station nodes may not have direct edges — they contain buses implicitly
+  const stationBusMap = new Map<string, string[]>();
+  for (const node of graph.nodes) {
+    if (isStationType(node.nodeType)) {
+      // Find buses that belong to this station by checking edges
+      const busIds: string[] = [];
+      for (const edge of graph.edges) {
+        const otherId = edge.fromPortRef.nodeId === node.id
+          ? edge.toPortRef.nodeId
+          : edge.toPortRef.nodeId === node.id
+            ? edge.fromPortRef.nodeId
+            : null;
+        if (otherId) {
+          const otherNode = graph.nodes.find(n => n.id === otherId);
+          if (otherNode && isBusType(otherNode.nodeType)) {
+            busIds.push(otherId);
+          }
+        }
+      }
+      // Also check all BUS nodes whose elementName or attributes suggest station membership
+      // by looking for nodes connected to the same neighbors as the station
+      stationBusMap.set(node.id, busIds);
+    }
+  }
+
   for (const station of stationNodes) {
-    const blockType = nodeTypeToStationBlockType(station.nodeType);
+    // Determine placement for station
+    const alreadyPlaced = state.placements.has(station.id);
 
-    // E3: Rozmiar bloku snap to grid, stale wielokrotnosci GRID_BASE
-    let blockWidth: number;
-    let blockHeight: number;
-    switch (blockType) {
-      case StationBlockType.TYPE_A:
-        blockWidth = snapToGrid(defaultSymbolWidth * 2, gridStep);
-        blockHeight = snapToGrid(4 * OFFSET_POLE, gridStep);
-        break;
-      case StationBlockType.TYPE_B:
-        blockWidth = snapToGrid(defaultSymbolWidth * 2.5, gridStep);
-        blockHeight = snapToGrid(5 * OFFSET_POLE, gridStep);
-        break;
-      case StationBlockType.TYPE_C:
-        blockWidth = snapToGrid(defaultSymbolWidth * 3, gridStep);
-        blockHeight = snapToGrid(5 * OFFSET_POLE, gridStep);
-        break;
-      case StationBlockType.TYPE_D:
-        blockWidth = snapToGrid(defaultSymbolWidth * 4, gridStep);
-        blockHeight = snapToGrid(6 * OFFSET_POLE, gridStep);
-        break;
-      default:
-        blockWidth = snapToGrid(defaultSymbolWidth * 2, gridStep);
-        blockHeight = snapToGrid(4 * OFFSET_POLE, gridStep);
+    // Find parent trunk node:
+    // 1. Check direct edge neighbors
+    // 2. Check internal bus membership (station → bus)
+    const neighbors = adj.get(station.id) ?? [];
+    let parentPlacement: MutablePlacement | null = null;
+
+    // Sort neighbors for determinism
+    const sortedNeighbors = [...neighbors].sort((a, b) => a.nodeId.localeCompare(b.nodeId));
+    for (const n of sortedNeighbors) {
+      if (state.placements.has(n.nodeId) && n.nodeId !== station.id) {
+        const pl = state.placements.get(n.nodeId)!;
+        if (!parentPlacement || pl.y < parentPlacement.y) {
+          parentPlacement = pl;
+        }
+      }
     }
 
-    // E1: Rowne rozstawy stacji, snap to grid
-    const blockX = snapToAestheticGrid(blockSlotX);
-    const blockY = STATION_Y;
+    // If no direct parent found, check internal buses
+    if (!parentPlacement) {
+      const internalBuses = stationBusMap.get(station.id) ?? [];
+      for (const busId of internalBuses.sort()) {
+        if (state.placements.has(busId)) {
+          const pl = state.placements.get(busId)!;
+          if (!parentPlacement || pl.y < parentPlacement.y) {
+            parentPlacement = pl;
+          }
+        }
+      }
+    }
 
+    // If still no parent, check ALL placed nodes and find one that's
+    // connected to a bus that this station should contain.
+    // This handles the case where topology has station.busIds → bus nodes
+    // but no explicit edge between station and bus in the visual graph.
+    if (!parentPlacement) {
+      // Check all placed BUS nodes that could belong to this station
+      // by looking at connections from station's edges
+      for (const [nodeId, placement] of state.placements) {
+        const node = graph.nodes.find(n => n.id === nodeId);
+        if (node && isBusType(node.nodeType)) {
+          // Check if this bus is connected to a neighbor of the station
+          const busNeighbors = adj.get(nodeId) ?? [];
+          for (const bn of busNeighbors) {
+            if (bn.nodeId === station.id || (adj.get(station.id) ?? []).some(s => s.nodeId === nodeId)) {
+              if (!parentPlacement || placement.y < parentPlacement.y) {
+                parentPlacement = placement;
+              }
+            }
+          }
+        }
+      }
+    }
+
+    // If not already placed, assign position
+    if (!alreadyPlaced) {
+      if (!parentPlacement) {
+        // No parent found — will be placed in unplaced loop below
+        continue;
+      }
+
+      // Determine branch side (left/right)
+      let side = deterministicBranchSide(station.id);
+
+      // Check if side is already used at this trunk position
+      const posKey = `${parentPlacement.x}_${parentPlacement.y}`;
+      if (!usedSides.has(posKey)) usedSides.set(posKey, new Set());
+      const used = usedSides.get(posKey)!;
+      if (used.has(side)) {
+        side = (side === 1 ? -1 : 1) as 1 | -1;
+      }
+      used.add(side);
+      state.branchSides.set(station.id, side);
+
+      // Station position: horizontal offset + drop down
+      const stationX = snap(parentPlacement.x + side * BRANCH_OFFSET_X);
+      const stationY = snap(parentPlacement.y + OFFSET_POLE);
+
+      state.placements.set(station.id, {
+        nodeId: station.id,
+        x: stationX,
+        y: stationY,
+        width: STATION_BLOCK_WIDTH,
+        height: STATION_BLOCK_HEIGHT,
+        layer: 5,
+        bandIndex: 0,
+        autoPositioned: true,
+      });
+    }
+
+    // Get current placement (may have been set in phase2 or just now)
+    const currentPlacement = state.placements.get(station.id);
+    if (!currentPlacement) continue;
+
+    const blockType = nodeTypeToStationBlockType(station.nodeType);
+    let blockWidth = STATION_BLOCK_WIDTH;
+    let blockHeight = STATION_BLOCK_HEIGHT;
+
+    switch (blockType) {
+      case StationBlockType.TYPE_B:
+        blockWidth = snap(STATION_BLOCK_WIDTH * 1.2);
+        blockHeight = snap(STATION_BLOCK_HEIGHT * 1.2);
+        break;
+      case StationBlockType.TYPE_C:
+        blockWidth = snap(STATION_BLOCK_WIDTH * 1.5);
+        blockHeight = snap(STATION_BLOCK_HEIGHT * 1.2);
+        break;
+      case StationBlockType.TYPE_D:
+        blockWidth = snap(STATION_BLOCK_WIDTH * 2);
+        blockHeight = snap(STATION_BLOCK_HEIGHT * 1.5);
+        break;
+    }
+
+    // Update placement size for station block dimensions
+    currentPlacement.width = blockWidth;
+    currentPlacement.height = blockHeight;
+
+    // Create switchgear block using current placement position
+    const stationX = currentPlacement.x;
+    const stationY = currentPlacement.y;
     const bounds: RectangleV1 = {
-      x: blockX,
-      y: blockY,
+      x: stationX,
+      y: stationY,
       width: blockWidth,
       height: blockHeight,
     };
 
     const ports: SwitchgearPortV1[] = [
-      { portId: 'in', role: 'IN', position: { x: blockX + blockWidth / 2, y: blockY } },
-      { portId: 'out', role: 'OUT', position: { x: blockX + blockWidth / 2, y: blockY + blockHeight } },
-      { portId: 'branch', role: 'BRANCH', position: { x: blockX + blockWidth, y: blockY + blockHeight / 2 } },
+      { portId: 'in', role: 'IN', position: { x: stationX + blockWidth / 2, y: stationY } },
+      { portId: 'out', role: 'OUT', position: { x: stationX + blockWidth / 2, y: stationY + blockHeight } },
+      { portId: 'branch', role: 'BRANCH', position: { x: stationX + blockWidth, y: stationY + blockHeight / 2 } },
     ];
 
-    // Typ D: dodaj porty coupler
     if (blockType === StationBlockType.TYPE_D) {
       ports.push(
-        { portId: 'coupler_a', role: 'COUPLER_A', position: { x: blockX + blockWidth / 3, y: blockY + blockHeight / 2 } },
-        { portId: 'coupler_b', role: 'COUPLER_B', position: { x: blockX + 2 * blockWidth / 3, y: blockY + blockHeight / 2 } },
+        { portId: 'coupler_a', role: 'COUPLER_A', position: { x: stationX + blockWidth / 3, y: stationY + blockHeight / 2 } },
+        { portId: 'coupler_b', role: 'COUPLER_B', position: { x: stationX + 2 * blockWidth / 3, y: stationY + blockHeight / 2 } },
       );
     }
 
-    // Zbierz wewnetrzne wezly na podstawie krawedzi (DOMAIN-DRIVEN, bez heurystyk stringowych)
-    // Wezel jest wewnetrzny jesli: (a) jest podlaczony do szyny nalezacej do stacji
-    // przez krawedz TRANSFORMER_LINK, INTERNAL_SWITCHGEAR lub BRANCH
+    // Collect internal nodes
     const stationBusIds = new Set<string>();
-    // Szyny nalezace do stacji: szyna z atrybutem connectedToNodeId == station.id
-    // lub szyna bezposrednio polaczona do wezla stacji
     for (const edge of graph.edges) {
-      if (
-        (edge.fromPortRef.nodeId === station.id || edge.toPortRef.nodeId === station.id)
-      ) {
+      if (edge.fromPortRef.nodeId === station.id || edge.toPortRef.nodeId === station.id) {
         const otherId = edge.fromPortRef.nodeId === station.id
           ? edge.toPortRef.nodeId : edge.fromPortRef.nodeId;
         stationBusIds.add(otherId);
@@ -444,7 +826,6 @@ function phase2_detect_and_reserve_blocks(
         node.nodeType === NodeTypeV1.BUS_NN ||
         node.nodeType === NodeTypeV1.LOAD
       ) {
-        // Wezel jest wewnetrzny jesli jest polaczony do szyny stacji
         const isConnected = graph.edges.some(e =>
           (e.fromPortRef.nodeId === node.id && stationBusIds.has(e.toPortRef.nodeId)) ||
           (e.toPortRef.nodeId === node.id && stationBusIds.has(e.fromPortRef.nodeId)) ||
@@ -467,223 +848,270 @@ function phase2_detect_and_reserve_blocks(
       detail: null,
     });
 
-    // Umieszczaj stacje jako placement
-    state.placements.set(station.id, {
-      nodeId: station.id,
-      x: blockX,
-      y: blockY,
-      width: blockWidth,
-      height: blockHeight,
-      layer: 5,
-      bandIndex: 0,
-      autoPositioned: true,
-    });
-
-    // E1: Rowne odleglosci stacji = GRID_SPACING_MAIN
-    blockSlotX += GRID_SPACING_MAIN;
-  }
-}
-
-// =============================================================================
-// PHASE 3: EMBED SWITCHGEAR BLOCKS
-// =============================================================================
-
-/**
- * Faza 3: Osadzenie wewnetrznej geometrii switchgear blocks.
- *
- * Dla kazdego bloku:
- * 1. Umieszczaj TR SN/nN wewnatrz bloku.
- * 2. Umieszczaj szyne nN.
- * 3. Umieszczaj CB, CT.
- * 4. Podlacz porty IN/OUT/BRANCH.
- * 5. Zaktualizuj routing.
- */
-function phase3_embed_switchgear_blocks(
-  graph: VisualGraphV1,
-  config: LayoutGeometryConfigV1,
-  state: PipelineState,
-): void {
-  const { gridStep, defaultSymbolWidth, defaultSymbolHeight, busHeight } = config;
-
-  for (const block of state.blocks) {
-    const bx = block.bounds.x;
-    const by = block.bounds.y;
-    const bw = block.bounds.width;
-    void block.bounds.height;
-
-    // E4: Umieszczaj wewnetrzne elementy z wyrownaniem pionowym (OFFSET_POLE)
-    let internalY = snapToAestheticGrid(by + config.blockMargin);
-
-    for (const intId of block.internalNodes) {
-      const node = graph.nodes.find(n => n.id === intId);
-      if (!node) continue;
+    // Place internal nodes inside station block
+    let internalY = snap(stationY + config.blockMargin);
+    for (const intId of internalIds.sort()) {
+      const intNode = graph.nodes.find(n => n.id === intId);
+      if (!intNode || state.placements.has(intId)) continue;
 
       let w = defaultSymbolWidth;
       let h = defaultSymbolHeight;
-
-      if (isBusType(node.nodeType)) {
-        w = bw - config.blockMargin * 2;
+      if (isBusType(intNode.nodeType)) {
+        w = snap(blockWidth - config.blockMargin * 2);
         h = busHeight;
       }
 
       state.placements.set(intId, {
         nodeId: intId,
-        x: snapToAestheticGrid(bx + (bw - w) / 2),
-        y: snapToAestheticGrid(internalY),
-        width: snapToGrid(w, gridStep),
-        height: snapToGrid(h, gridStep),
-        layer: 6, // Internal station layer
+        x: snap(stationX + (blockWidth - w) / 2),
+        y: snap(internalY),
+        width: w,
+        height: h,
+        layer: 6,
         bandIndex: 0,
         autoPositioned: true,
       });
 
-      // E4: Staly odstep pionowy miedzy polami = OFFSET_POLE
-      internalY += snapToAestheticGrid(h + OFFSET_POLE);
+      internalY = snap(internalY + h + OFFSET_POLE);
     }
   }
-}
 
-// =============================================================================
-// PHASE 4: PLACE BRANCHES IN BANDS
-// =============================================================================
-
-/**
- * Faza 4: Umieszczenie branch w bandach.
- *
- * - Kazdy branch ma osobny band.
- * - Band index deterministyczny (sort po edge.id).
- * - Monotoniczne Y offset per band.
- */
-function phase4_place_branches_in_bands(
-  graph: VisualGraphV1,
-  config: LayoutGeometryConfigV1,
-  state: PipelineState,
-): void {
-  const { bandSpacing, defaultSymbolWidth, defaultSymbolHeight } = config;
-  const BRANCH_BASE_LAYER = 4;
-
-  // E3: Zbierz wezly junction i load ktore nie sa jeszcze umieszczone
+  // Place remaining unplaced nodes (branch junctions, loads not in stations, generators, orphan stations)
   const unplacedNodes = graph.nodes
     .filter(n => !state.placements.has(n.id))
     .sort((a, b) => a.id.localeCompare(b.id));
 
-  let bandIndex = 0;
-  // E1/E3: Branches start below Y_BRANCH with fixed grid spacing
-  let bandY = snapToAestheticGrid(Y_BRANCH + 2 * OFFSET_POLE);
-
+  let quarantineIndex = 0;
   for (const node of unplacedNodes) {
-    const w = isBusType(node.nodeType)
-      ? snapToGrid(node.attributes.width ?? config.defaultBusWidth, config.gridStep)
-      : defaultSymbolWidth;
-    const h = isBusType(node.nodeType) ? config.busHeight : defaultSymbolHeight;
+    // Find parent via any edge
+    const neighbors = adj.get(node.id) ?? [];
+    let bestParent: MutablePlacement | null = null;
 
-    // E1: Rowne rozstawy w bandach = bandSpacing (=MIN_VERTICAL_GAP)
-    state.placements.set(node.id, {
-      nodeId: node.id,
-      x: snapToAestheticGrid(X_START + bandIndex * GRID_SPACING_MAIN),
-      y: snapToAestheticGrid(bandY),
-      width: w,
-      height: h,
-      layer: BRANCH_BASE_LAYER + Math.floor(bandIndex / 5),
-      bandIndex,
-      autoPositioned: true,
-    });
+    const sortedNbrs = [...neighbors].sort((a, b) => a.nodeId.localeCompare(b.nodeId));
+    for (const n of sortedNbrs) {
+      if (state.placements.has(n.nodeId)) {
+        const pl = state.placements.get(n.nodeId)!;
+        if (!bestParent || pl.y < bestParent.y) {
+          bestParent = pl;
+        }
+      }
+    }
 
-    bandIndex++;
-    if (bandIndex % 5 === 0) {
-      bandY += snapToAestheticGrid(bandSpacing);
-      bandIndex = 0;
+    let w = defaultSymbolWidth;
+    let h = defaultSymbolHeight;
+    if (isBusType(node.nodeType)) {
+      w = snap(node.attributes.width ?? config.defaultBusWidth);
+      h = busHeight;
+    }
+    if (isStationType(node.nodeType)) {
+      w = STATION_BLOCK_WIDTH;
+      h = STATION_BLOCK_HEIGHT;
+    }
+
+    if (bestParent) {
+      // L-shape branch: side + down
+      const side = deterministicBranchSide(node.id);
+      state.branchSides.set(node.id, side);
+
+      state.placements.set(node.id, {
+        nodeId: node.id,
+        x: snap(bestParent.x + side * BRANCH_OFFSET_X),
+        y: snap(bestParent.y + TRUNK_STEP_Y),
+        width: w,
+        height: h,
+        layer: 4,
+        bandIndex: 0,
+        autoPositioned: true,
+      });
+    } else {
+      // Quarantine: no parent found, place at bottom
+      const quarantineY = snap(Y_GPZ + 20 * OFFSET_POLE + quarantineIndex * TRUNK_STEP_Y);
+      state.placements.set(node.id, {
+        nodeId: node.id,
+        x: snap(X_START + quarantineIndex * GRID_SPACING_MAIN),
+        y: quarantineY,
+        width: w,
+        height: h,
+        layer: 9,
+        bandIndex: 0,
+        autoPositioned: true,
+      });
+      quarantineIndex++;
+    }
+
+    // If this is a station node that wasn't handled above, create a block for it
+    if (isStationType(node.nodeType) && !state.blocks.some(b => b.blockId === node.id)) {
+      const cp = state.placements.get(node.id)!;
+      const bType = nodeTypeToStationBlockType(node.nodeType);
+      state.blocks.push({
+        blockId: node.id,
+        blockType: bType,
+        bounds: { x: cp.x, y: cp.y, width: cp.width, height: cp.height },
+        ports: [
+          { portId: 'in', role: 'IN', position: { x: cp.x + cp.width / 2, y: cp.y } },
+          { portId: 'out', role: 'OUT', position: { x: cp.x + cp.width / 2, y: cp.y + cp.height } },
+          { portId: 'branch', role: 'BRANCH', position: { x: cp.x + cp.width, y: cp.y + cp.height / 2 } },
+        ],
+        internalNodes: [],
+        label: node.attributes.label,
+        detail: null,
+      });
     }
   }
 }
 
 // =============================================================================
-// PHASE 5: ROUTE EDGES (MANHATTAN WITH CHANNELS)
+// PHASE 4: ROUTE ALL EDGES (ORTHOGONAL, VERTICAL-FIRST)
 // =============================================================================
 
 /**
- * Faza 5: Routing krawedzi (Manhattan z kanalami).
+ * Faza 4: Routing wszystkich krawędzi.
  *
- * - Trunk: routing prosty (pionowy/poziomy wzdluz spine).
- * - Branch: routing ortogonalny do stacji.
- * - Secondary connector: routing w dedykowanym kanale (laneIndex).
- * - laneIndex deterministyczny (sort po edge.id).
- * - Zakaz crossing trunk bez node.
+ * VERTICAL SN RULES:
+ * - TRUNK edges: vertical-first (same X → straight down; different X → Z-shape)
+ * - BRANCH edges: L-shape (horizontal to branch X, then vertical)
+ * - SECONDARY_CONNECTOR (ring/NOP): orthogonal via secondary channel
+ * - TRANSFORMER_LINK: straight vertical
+ * - ALL segments orthogonal (0° or 90°)
+ * - ALL points snapped to GRID_BASE
  */
-function phase5_route_edges_manhattan_with_channels(
+function phase4_route_all_edges(
   graph: VisualGraphV1,
   config: LayoutGeometryConfigV1,
   state: PipelineState,
 ): void {
   const sortedEdges = [...graph.edges].sort((a, b) => a.id.localeCompare(b.id));
-
   let secondaryLaneCounter = 0;
 
+  // Build set of root bus IDs (layer 1 = GPZ busbar) for routing optimization
+  const rootBusNodeIds = new Set<string>();
+  for (const [nodeId, p] of state.placements) {
+    const node = graph.nodes.find(n => n.id === nodeId);
+    if (node && node.nodeType === NodeTypeV1.BUS_SN && p.layer === 1) {
+      rootBusNodeIds.add(nodeId);
+    }
+  }
+
   for (const edge of sortedEdges) {
-    const fromPlacement = state.placements.get(edge.fromPortRef.nodeId);
-    const toPlacement = state.placements.get(edge.toPortRef.nodeId);
+    const fromP = state.placements.get(edge.fromPortRef.nodeId);
+    const toP = state.placements.get(edge.toPortRef.nodeId);
 
-    // Pozycje startowe i koncowe
-    const startX = fromPlacement ? fromPlacement.x + fromPlacement.width / 2 : config.spineX;
-    const startY = fromPlacement ? fromPlacement.y + fromPlacement.height / 2 : 0;
-    const endX = toPlacement ? toPlacement.x + toPlacement.width / 2 : config.spineX;
-    const endY = toPlacement ? toPlacement.y + toPlacement.height / 2 : 0;
+    // Smart routing: when one endpoint is a root bus (wide GPZ busbar),
+    // use the OTHER endpoint's center X as the connection point on the bus.
+    // This creates clean vertical feeders from the bus at field positions.
+    let startX: number, startY: number, endX: number, endY: number;
 
-    const startPoint: PointV1 = { x: startX, y: startY };
-    const endPoint: PointV1 = { x: endX, y: endY };
+    const fromIsRootBus = rootBusNodeIds.has(edge.fromPortRef.nodeId);
+    const toIsRootBus = rootBusNodeIds.has(edge.toPortRef.nodeId);
 
-    // Routing zalezny od typu
+    if (fromIsRootBus && toP) {
+      // FROM root bus → use target's center X (feeder field position) on the bus
+      const targetCX = snap(toP.x + toP.width / 2);
+      startX = targetCX;
+      startY = fromP ? snap(fromP.y + fromP.height) : 0;  // bottom edge of bus
+      endX = targetCX;
+      endY = toP ? snap(toP.y) : 0;  // top edge of target
+    } else if (toIsRootBus && fromP) {
+      // TO root bus → use source's center X on the bus
+      const sourceCX = snap(fromP.x + fromP.width / 2);
+      startX = sourceCX;
+      startY = fromP ? snap(fromP.y + fromP.height) : 0;
+      endX = sourceCX;
+      endY = toP ? snap(toP.y) : 0;
+    } else {
+      // Normal: center-to-center
+      startX = fromP ? snap(fromP.x + fromP.width / 2) : snap(config.spineX);
+      startY = fromP ? snap(fromP.y + fromP.height / 2) : 0;
+      endX = toP ? snap(toP.x + toP.width / 2) : snap(config.spineX);
+      endY = toP ? snap(toP.y + toP.height / 2) : 0;
+    }
+
+    // Ensure start is above end (smaller Y first) for downward growth
+    const [sx, sy, ex, ey] = startY <= endY
+      ? [startX, startY, endX, endY]
+      : [endX, endY, startX, startY];
+
+    const startPoint: PointV1 = { x: sx, y: sy };
+    const endPoint: PointV1 = { x: ex, y: ey };
+
     let segments: PathSegmentV1[];
     let laneIndex = 0;
 
     if (edge.edgeType === EdgeTypeV1.TRUNK) {
-      // E3: Trunk: routing prosty (L-shape), snap to grid
-      const midY = snapToAestheticGrid((startY + endY) / 2);
-      segments = [
-        { from: startPoint, to: { x: startX, y: midY } },
-        { from: { x: startX, y: midY }, to: { x: endX, y: midY } },
-        { from: { x: endX, y: midY }, to: endPoint },
-      ];
+      // TRUNK: vertical first, then horizontal if needed
+      if (Math.abs(sx - ex) < GRID_BASE) {
+        // Same X → straight vertical
+        segments = [
+          { from: startPoint, to: endPoint },
+        ];
+      } else {
+        // Different X → Z-shape: vertical to midY, horizontal, vertical to end
+        const midY = snap((sy + ey) / 2);
+        segments = [
+          { from: startPoint, to: { x: sx, y: midY } },
+          { from: { x: sx, y: midY }, to: { x: ex, y: midY } },
+          { from: { x: ex, y: midY }, to: endPoint },
+        ];
+      }
     } else if (edge.edgeType === EdgeTypeV1.SECONDARY_CONNECTOR) {
-      // E2: Ring/secondary connector — symetryczny routing przez kanal Y_RING
+      // Ring/NOP: orthogonal via secondary channel (horizontal offset)
       laneIndex = secondaryLaneCounter++;
-      const laneOffset = laneIndex * config.secondaryLanePitch;
-      // E2: Kanal ringowy na stalej amplitudzie Y_RING (lub nizej dla kolejnych lane'ow)
-      const channelY = snapToAestheticGrid(Y_RING - laneOffset);
+      const channelX = snap(Math.max(sx, ex) + SECONDARY_CHANNEL_OFFSET_X + laneIndex * config.secondaryLanePitch);
 
-      // E2: Symetryczna sciezka: pion -> poziom (Y_RING) -> pion
       segments = [
-        { from: startPoint, to: { x: startX, y: channelY } },
-        { from: { x: startX, y: channelY }, to: { x: endX, y: channelY } },
-        { from: { x: endX, y: channelY }, to: endPoint },
+        { from: startPoint, to: { x: channelX, y: sy } },
+        { from: { x: channelX, y: sy }, to: { x: channelX, y: ey } },
+        { from: { x: channelX, y: ey }, to: endPoint },
       ];
     } else if (edge.edgeType === EdgeTypeV1.TRANSFORMER_LINK) {
-      // Transformer: routing pionowy prosty
-      segments = [
-        { from: startPoint, to: endPoint },
-      ];
+      // Transformer: straight vertical
+      if (Math.abs(sx - ex) < GRID_BASE) {
+        segments = [{ from: startPoint, to: endPoint }];
+      } else {
+        // L-shape if not aligned
+        segments = [
+          { from: startPoint, to: { x: sx, y: ey } },
+          { from: { x: sx, y: ey }, to: endPoint },
+        ];
+      }
     } else {
-      // E3: Branch i inne: routing ortogonalny (Z-shape), snap to grid
-      const midX = snapToAestheticGrid((startX + endX) / 2);
-      segments = [
-        { from: startPoint, to: { x: midX, y: startY } },
-        { from: { x: midX, y: startY }, to: { x: midX, y: endY } },
-        { from: { x: midX, y: endY }, to: endPoint },
-      ];
+      // BRANCH and others: L-shape (horizontal then vertical)
+      if (Math.abs(sx - ex) < GRID_BASE) {
+        // Same X → straight vertical
+        segments = [{ from: startPoint, to: endPoint }];
+      } else if (Math.abs(sy - ey) < GRID_BASE) {
+        // Same Y → straight horizontal
+        segments = [{ from: startPoint, to: endPoint }];
+      } else {
+        // L-shape: horizontal first, then vertical
+        segments = [
+          { from: startPoint, to: { x: ex, y: sy } },
+          { from: { x: ex, y: sy }, to: endPoint },
+        ];
+      }
     }
 
-    // E3: Snap ALL routing points to GRID_BASE
+    // Snap ALL routing points to GRID_BASE
     segments = segments.map(s => ({
-      from: { x: snapToAestheticGrid(s.from.x), y: snapToAestheticGrid(s.from.y) },
-      to: { x: snapToAestheticGrid(s.to.x), y: snapToAestheticGrid(s.to.y) },
+      from: { x: snap(s.from.x), y: snap(s.from.y) },
+      to: { x: snap(s.to.x), y: snap(s.to.y) },
     }));
+
+    // Filter out zero-length segments
+    segments = segments.filter(s =>
+      Math.abs(s.from.x - s.to.x) >= 1 || Math.abs(s.from.y - s.to.y) >= 1
+    );
+
+    if (segments.length === 0) {
+      segments = [{ from: startPoint, to: endPoint }];
+    }
 
     state.routes.push({
       edgeId: edge.id,
       edgeType: edge.edgeType,
       segments,
-      startPoint: segments[0]?.from ?? startPoint,
-      endPoint: segments[segments.length - 1]?.to ?? endPoint,
+      startPoint: segments[0].from,
+      endPoint: segments[segments.length - 1].to,
       laneIndex,
       isNormallyOpen: edge.isNormallyOpen,
     });
@@ -691,15 +1119,40 @@ function phase5_route_edges_manhattan_with_channels(
 }
 
 // =============================================================================
+// PHASE 5: PLACE LABELS (DETERMINISTIC, NO OVERLAPS)
+// =============================================================================
+
+/**
+ * Faza 5: Umieszczenie etykiet.
+ *
+ * VERTICAL SN LABEL RULES:
+ * - Segmenty pionowe: etykieta po prawej stronie (fallback: lewa, stack)
+ * - Odgałęzienia: etykieta na odcinku poziomym
+ * - Stacje: nazwa nad blokiem
+ * - Zakaz etykiet nałożonych na symbole
+ * - Deterministic tiebreak (sort po id)
+ */
+function phase5_place_labels(
+  _graph: VisualGraphV1,
+  _config: LayoutGeometryConfigV1,
+  _state: PipelineState,
+): void {
+  // Labels are placed in the rendering layer, not in the layout result.
+  // The layout pipeline only provides positions and routes.
+  // Label placement is handled by the existing phase5-routing.ts in the engine.
+}
+
+// =============================================================================
 // PHASE 6: ENFORCE INVARIANTS AND FINALIZE HASH
 // =============================================================================
 
 /**
- * Faza 6: Wymuszenie inwariantow i finalizacja hash.
+ * Faza 6: Wymuszenie inwariancji i finalizacja.
  *
- * - Sprawdz symbol-symbol overlap (= 0, resolve w osi Y).
- * - Sprawdz crossing trunk bez node.
+ * - Sprawdź symbol-symbol overlap (= 0, resolve w osi Y).
+ * - Y-ONLY push-away (NIGDY nie przesuwaj w osi X — zachowaj magistrali)
  * - Oblicz bounds.
+ * - Catalog refs, relay bindings.
  * - Oblicz hash (world geometry only).
  */
 function phase6_enforce_invariants_and_finalize(
@@ -707,9 +1160,7 @@ function phase6_enforce_invariants_and_finalize(
   config: LayoutGeometryConfigV1,
   state: PipelineState,
 ): void {
-  // 1. Resolve symbol-symbol overlaps — Y-ONLY push-away (E3: brak losowych offsetow)
-  // REGULA: kolizje rozwiazywane WYLACZNIE w osi Y (przesun w dol)
-  // Determinizm: sort po (layer, nodeId) — stabilny tie-break
+  // 1. Resolve symbol-symbol overlaps — Y-ONLY push-away
   const MAX_ITERATIONS = 20;
   for (let iter = 0; iter < MAX_ITERATIONS; iter++) {
     let hasOverlap = false;
@@ -726,12 +1177,11 @@ function phase6_enforce_invariants_and_finalize(
           a.y < b.y + b.height && a.y + a.height > b.y
         ) {
           hasOverlap = true;
-          // E3: Y-ONLY push-away — NIGDY nie przesuwaj w osi X
-          // Deterministic tie-break: wiekszy layer lub wiekszy nodeId idzie w dol
+          // Y-ONLY push-away — NIGDY nie przesuwaj w osi X
           if (a.layer > b.layer || (a.layer === b.layer && a.nodeId > b.nodeId)) {
-            a.y = snapToAestheticGrid(b.y + b.height + config.blockMargin);
+            a.y = snap(b.y + b.height + config.blockMargin);
           } else {
-            b.y = snapToAestheticGrid(a.y + a.height + config.blockMargin);
+            b.y = snap(a.y + a.height + config.blockMargin);
           }
         }
       }
@@ -746,19 +1196,19 @@ function phase6_enforce_invariants_and_finalize(
     if (category !== null) {
       state.catalogRefs.push({
         nodeId: node.id,
-        catalogTypeId: null, // Wymaga uzupelnienia z katalogu
+        catalogTypeId: null,
         catalogCategory: category,
       });
       state.validationErrors.push({
         code: 'MISSING_CATALOG_REF',
-        message: `Wezel ${node.id} (${node.attributes.elementName}) wymaga referencji do katalogu (${category})`,
+        message: `Węzeł ${node.id} (${node.attributes.elementName}) wymaga referencji do katalogu (${category})`,
         nodeId: node.id,
         fixAction: `Przypisz typ z katalogu ${category} do elementu ${node.attributes.elementName}`,
       });
     }
   }
 
-  // 3. Relay binding (dla CB z relay)
+  // 3. Relay binding
   const breakerNodes = graph.nodes
     .filter(n => n.nodeType === NodeTypeV1.SWITCH_BREAKER)
     .sort((a, b) => a.id.localeCompare(b.id));
@@ -769,7 +1219,7 @@ function phase6_enforce_invariants_and_finalize(
       state.relayBindings.push({
         breakerNodeId: cb.id,
         relayId: `relay_${cb.id}`,
-        functions: ['51', '50'].sort(), // Deterministycznie posortowane po ANSI
+        functions: ['50', '51'],
         ctNodeId: null,
         relayPosition: {
           x: cbPlacement.x + cbPlacement.width / 2,
@@ -785,22 +1235,21 @@ function phase6_enforce_invariants_and_finalize(
 // =============================================================================
 
 /**
- * Uruchamia pelny 6-fazowy pipeline layoutu.
+ * Uruchamia pełny 6-fazowy pipeline layoutu (VERTICAL SN).
  *
  * DETERMINIZM: ten sam VisualGraphV1 + config → identyczny LayoutResultV1.
  *
- * @param graph VisualGraphV1 — zamrozony kontrakt wejscia
- * @param config Konfiguracja geometrii (opcjonalna, domyslna ETAP)
- * @param stationBlockDetails Opcjonalne szczegoly pol/urzadzen (RUN #3D). Jesli podane,
- *   detail per stacja jest dolaczony do SwitchgearBlockV1.
- * @returns LayoutResultV1 — zamrozony wynik layoutu
+ * @param graph VisualGraphV1 — zamrożony kontrakt wejścia
+ * @param config Konfiguracja geometrii (opcjonalna, domyślna ETAP)
+ * @param stationBlockDetails Opcjonalne szczegóły pól/urządzeń (RUN #3D)
+ * @returns LayoutResultV1 — zamrożony wynik layoutu
  */
 export function computeLayout(
   graph: VisualGraphV1,
   config: LayoutGeometryConfigV1 = DEFAULT_LAYOUT_CONFIG,
   stationBlockDetails?: StationBlockBuildResult,
 ): LayoutResultV1 {
-  // Inicjalizacja stanu pipeline (mutable wewnatrz, frozen na wyjsciu)
+  // Inicjalizacja stanu pipeline
   const state: PipelineState = {
     placements: new Map(),
     routes: [],
@@ -808,6 +1257,8 @@ export function computeLayout(
     catalogRefs: [],
     relayBindings: [],
     validationErrors: [],
+    trunkAssignments: new Map(),
+    branchSides: new Map(),
   };
 
   // Build lookup map for station block details (RUN #3D)
@@ -818,22 +1269,21 @@ export function computeLayout(
     }
   }
 
-  // Wykonaj 6 faz
-  phase1_place_trunk(graph, config, state);
-  phase2_detect_and_reserve_blocks(graph, config, state);
+  // Execute 6 phases — VERTICAL SN LAYOUT
+  phase1_place_gpz_and_fields(graph, config, state);
+  phase2_build_trunk_topology(graph, config, state);
+  phase3_place_stations_and_branches(graph, config, state);
 
-  // RUN #3D: Attach station block details to detected blocks
+  // Attach station block details
   for (const block of state.blocks) {
-    const detail = detailsByBlockId.get(block.blockId) ?? null;
-    block.detail = detail;
+    block.detail = detailsByBlockId.get(block.blockId) ?? null;
   }
 
-  phase3_embed_switchgear_blocks(graph, config, state);
-  phase4_place_branches_in_bands(graph, config, state);
-  phase5_route_edges_manhattan_with_channels(graph, config, state);
+  phase4_route_all_edges(graph, config, state);
+  phase5_place_labels(graph, config, state);
   phase6_enforce_invariants_and_finalize(graph, config, state);
 
-  // Konwertuj mutable state → immutable LayoutResultV1
+  // Convert mutable state → immutable LayoutResultV1
   const nodePlacements: NodePlacementV1[] = [...state.placements.values()]
     .sort((a, b) => a.nodeId.localeCompare(b.nodeId))
     .map(p => ({
@@ -870,7 +1320,7 @@ export function computeLayout(
   const validationErrors = [...state.validationErrors]
     .sort((a, b) => (a.nodeId ?? '').localeCompare(b.nodeId ?? ''));
 
-  // Oblicz bounds
+  // Compute bounds
   let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
   for (const p of nodePlacements) {
     minX = Math.min(minX, p.bounds.x);
@@ -894,7 +1344,6 @@ export function computeLayout(
     height: maxY - minY,
   };
 
-  // Zbuduj wynik (bez hash — obliczamy ponizej)
   const resultWithoutHash: LayoutResultV1 = {
     version: LAYOUT_RESULT_VERSION,
     nodePlacements,
@@ -904,12 +1353,10 @@ export function computeLayout(
     relayBindings,
     validationErrors,
     bounds,
-    hash: '', // Placeholder
+    hash: '',
   };
 
-  // Oblicz hash
   const hash = computeLayoutResultHash(resultWithoutHash);
-
   const result: LayoutResultV1 = { ...resultWithoutHash, hash };
 
   return canonicalizeLayoutResult(result);

@@ -106,7 +106,7 @@ jobs:
         working-directory: mv-design-pro/frontend
         run: npx vitest run src/ui/sld/core/__tests__/switchgearConfig.hashParity.test.ts --reporter=verbose
 
-      - name: Run Industrial Aesthetics E1-E4 + Golden Render tests (ESTETYKA PRZEMYSLOWA)
+      - name: Run Industrial Aesthetics E1-E4 + Vertical SN Layout + Golden Render tests (ESTETYKA PRZEMYSLOWA)
         working-directory: mv-design-pro/frontend
         run: npx vitest run src/ui/sld/core/__tests__/industrialAestheticsLayout.test.ts --reporter=verbose
 

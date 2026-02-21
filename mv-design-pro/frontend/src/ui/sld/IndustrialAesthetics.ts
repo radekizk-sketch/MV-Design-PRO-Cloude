@@ -392,6 +392,143 @@ export function ringPath(
 }
 
 // =============================================================================
+// § 4 UKŁAD PIONOWY (VERTICAL SN LAYOUT) — GPZ U GÓRY, SIEĆ W DÓŁ
+// =============================================================================
+
+/**
+ * Y szyny GPZ (górna krawedź schematu) [px].
+ * GPZ ZAWSZE u góry — styl ABB/PowerFactory.
+ */
+export const Y_GPZ = 60 as const;  // 3 * GRID_BASE
+
+/**
+ * Pitch pól liniowych GPZ (odstęp X) [px].
+ * Pola liniowe GPZ rozmieszczone równomiernie wzdłuż szyny.
+ *
+ * PITCH_FIELD_X = GRID_SPACING_MAIN = 280 px
+ */
+export const PITCH_FIELD_X = GRID_SPACING_MAIN;
+
+/**
+ * Krok pionowy magistrali (odcinek trunk w dół) [px].
+ * Stały krok wizualny — długość realna jest etykietą.
+ *
+ * TRUNK_STEP_Y = 5 * GRID_BASE = 100 px
+ */
+export const TRUNK_STEP_Y = 100 as const;  // 5 * GRID_BASE
+
+/**
+ * Odstęp boczny odgałęzienia od magistrali [px].
+ * Odgałęzienia biegną bokiem od punktu T na magistrali.
+ *
+ * BRANCH_OFFSET_X = 7 * GRID_BASE = 140 px
+ */
+export const BRANCH_OFFSET_X = 140 as const;  // 7 * GRID_BASE
+
+/**
+ * Szerokość kanału wtórnego (ring/NOP) [px].
+ * Kanał wtórny biegnie równolegle do magistrali, ale przesunięty w X.
+ *
+ * SECONDARY_CHANNEL_OFFSET_X = 4 * GRID_BASE = 80 px
+ */
+export const SECONDARY_CHANNEL_OFFSET_X = 80 as const;  // 4 * GRID_BASE
+
+/**
+ * Wysokość bloku stacji (drop z magistrali) [px].
+ * Stacja wisi pod magistralą jako blok.
+ *
+ * STATION_BLOCK_HEIGHT = 8 * GRID_BASE = 160 px
+ */
+export const STATION_BLOCK_HEIGHT = 160 as const;  // 8 * GRID_BASE
+
+/**
+ * Szerokość bloku stacji [px].
+ * STATION_BLOCK_WIDTH = 6 * GRID_BASE = 120 px
+ */
+export const STATION_BLOCK_WIDTH = 120 as const;  // 6 * GRID_BASE
+
+// =============================================================================
+// § 4.1 WALIDACJA UKŁADU PIONOWEGO
+// =============================================================================
+
+/**
+ * Wynik walidacji monotonii Y (sieć rośnie w dół).
+ */
+export interface DownwardGrowthResult {
+  /** Czy wszystkie magistrale rosną w dół (monotoniczny Y) */
+  allDownward: boolean;
+  /** Naruszenia (segment, gdzie Y maleje) */
+  violations: Array<{ edgeId: string; fromY: number; toY: number }>;
+}
+
+/**
+ * Waliduj czy wszystkie magistrale rosną w dół (monotoniczny Y).
+ *
+ * @param trunkSegments — segmenty magistral [{edgeId, fromY, toY}]
+ * @returns wynik walidacji
+ */
+export function validateDownwardGrowth(
+  trunkSegments: Array<{ edgeId: string; fromY: number; toY: number }>
+): DownwardGrowthResult {
+  const violations: DownwardGrowthResult['violations'] = [];
+  for (const seg of trunkSegments) {
+    // Vertical trunk: toY should be >= fromY (growing downward)
+    // Allow horizontal segments (fromY === toY)
+    if (seg.toY < seg.fromY) {
+      violations.push(seg);
+    }
+  }
+  return { allDownward: violations.length === 0, violations };
+}
+
+/**
+ * Wynik walidacji ortogonalności routingu.
+ */
+export interface OrthogonalResult {
+  /** Czy wszystkie segmenty są ortogonalne (0° lub 90°) */
+  allOrthogonal: boolean;
+  /** Naruszenia (skosy, łuki) */
+  violations: Array<{ edgeId: string; fromX: number; fromY: number; toX: number; toY: number }>;
+}
+
+/**
+ * Waliduj ortogonalność routingu (0° lub 90° only).
+ *
+ * @param segments — segmenty [{edgeId, fromX, fromY, toX, toY}]
+ * @returns wynik walidacji
+ */
+export function validateOrthogonalRouting(
+  segments: Array<{ edgeId: string; fromX: number; fromY: number; toX: number; toY: number }>
+): OrthogonalResult {
+  const violations: OrthogonalResult['violations'] = [];
+  for (const seg of segments) {
+    const isH = Math.abs(seg.fromY - seg.toY) < 1;
+    const isV = Math.abs(seg.fromX - seg.toX) < 1;
+    if (!isH && !isV) {
+      violations.push(seg);
+    }
+  }
+  return { allOrthogonal: violations.length === 0, violations };
+}
+
+/**
+ * Deterministyczny wybór strony odgałęzienia (lewo/prawo).
+ *
+ * Na podstawie hash elementId: parzyste → prawo, nieparzyste → lewo.
+ * Remis: stabilny — ten sam elementId ZAWSZE daje tę samą stronę.
+ *
+ * @param elementId — ID elementu odgałęzienia
+ * @returns 1 = prawo (+X), -1 = lewo (-X)
+ */
+export function deterministicBranchSide(elementId: string): 1 | -1 {
+  let hash = 0;
+  for (let i = 0; i < elementId.length; i++) {
+    hash = ((hash << 5) - hash + elementId.charCodeAt(i)) | 0;
+  }
+  return (hash & 1) === 0 ? 1 : -1;
+}
+
+// =============================================================================
 // STAŁA WERYFIKACYJNA (dla testów)
 // =============================================================================
 
@@ -423,6 +560,17 @@ export function verifyAestheticContract(): { valid: boolean; errors: string[] } 
     errors.push(`OFFSET_POLE musi wynosić 3*GRID_BASE = ${3 * GRID_BASE}, jest: ${OFFSET_POLE}`);
   }
 
+  // § 4: Vertical layout invariants
+  if (TRUNK_STEP_Y !== 5 * GRID_BASE) {
+    errors.push(`TRUNK_STEP_Y musi wynosić 5*GRID_BASE = ${5 * GRID_BASE}, jest: ${TRUNK_STEP_Y}`);
+  }
+  if (BRANCH_OFFSET_X !== 7 * GRID_BASE) {
+    errors.push(`BRANCH_OFFSET_X musi wynosić 7*GRID_BASE = ${7 * GRID_BASE}, jest: ${BRANCH_OFFSET_X}`);
+  }
+  if (PITCH_FIELD_X !== GRID_SPACING_MAIN) {
+    errors.push(`PITCH_FIELD_X musi wynosić GRID_SPACING_MAIN = ${GRID_SPACING_MAIN}, jest: ${PITCH_FIELD_X}`);
+  }
+
   // Wszystkie stałe muszą być wielokrotnościami GRID_BASE
   const toCheck: Array<[string, number]> = [
     ['Y_MAIN', Y_MAIN],
@@ -432,6 +580,13 @@ export function verifyAestheticContract(): { valid: boolean; errors: string[] } 
     ['X_START', X_START],
     ['OFFSET_POLE', OFFSET_POLE],
     ['MIN_VERTICAL_GAP', MIN_VERTICAL_GAP],
+    ['Y_GPZ', Y_GPZ],
+    ['PITCH_FIELD_X', PITCH_FIELD_X],
+    ['TRUNK_STEP_Y', TRUNK_STEP_Y],
+    ['BRANCH_OFFSET_X', BRANCH_OFFSET_X],
+    ['SECONDARY_CHANNEL_OFFSET_X', SECONDARY_CHANNEL_OFFSET_X],
+    ['STATION_BLOCK_HEIGHT', STATION_BLOCK_HEIGHT],
+    ['STATION_BLOCK_WIDTH', STATION_BLOCK_WIDTH],
   ];
 
   for (const [name, value] of toCheck) {

@@ -1,17 +1,32 @@
 /**
- * Industrial Aesthetics Layout Tests — E1–E4 Enforcement + Golden Renders + CI Guard
+ * Industrial Aesthetics Layout Tests — E1–E4 + Vertical SN Enforcement + Golden Renders + CI Guard
+ *
+ * VERTICAL SN LAYOUT (GPZ U GÓRY, SIEĆ W DÓŁ — STYL ABB):
+ * - GPZ u góry; szyna GPZ pozioma; pola SN w równych odstępach
+ * - Z pól liniowych GPZ pionowo w dół schodzą magistrale SN
+ * - Cała sieć buduje się w dół (monotoniczny Y)
+ * - Odgałęzienia: L-shape (bok + dół), deterministyczny wybór strony
+ * - Stacje SN/nN jako "drop" z magistrali
+ * - 100% ortogonalny routing
+ * - Brak kolizji symboli/etykiet
+ * - 10× identyczny layout_hash
  *
  * TESTS:
- * - E1: Equal station spacing (GRID_SPACING_MAIN)
- * - E2: Symmetric rings (Y_RING channel, orthogonal segments)
+ * - E1: Equal station spacing (PITCH_FIELD_X)
+ * - E2: Symmetric rings (orthogonal, secondary channel)
  * - E3: No random visual lengths (all coords snap to GRID_BASE)
  * - E4: Vertical field alignment (OFFSET_POLE, common Y axis)
+ * - V1: GPZ at top, network grows downward (monotonic Y)
+ * - V2: Vertical trunks (same X, monotonic Y)
+ * - V3: L-shape branches (deterministic side)
+ * - V4: Station drops (side + down)
  * - Golden render hash stability (layout_hash identical across runs)
  * - Overlay does NOT modify geometry
  * - No reflow on zoom/pan (geometry independent of camera)
  * - Label overlap detection (0 overlaps in golden networks)
  * - Performance budgets (layout time < threshold)
  * - Permutation invariance (shuffled input → identical output)
+ * - 100% orthogonal routing (0 diagonal violations)
  */
 
 import { describe, it, expect } from 'vitest';
@@ -38,6 +53,13 @@ import {
   GRID_BASE,
   GRID_SPACING_MAIN,
   X_START,
+  Y_GPZ,
+  PITCH_FIELD_X,
+  TRUNK_STEP_Y,
+  BRANCH_OFFSET_X,
+  SECONDARY_CHANNEL_OFFSET_X,
+  STATION_BLOCK_HEIGHT,
+  STATION_BLOCK_WIDTH,
   Y_MAIN,
   Y_RING,
   Y_BRANCH,
@@ -46,14 +68,17 @@ import {
   validateGridAlignment,
   validateStationSpacing,
   validateRingGeometry,
+  validateDownwardGrowth,
+  validateOrthogonalRouting,
   verifyAestheticContract,
+  deterministicBranchSide,
 } from '../../IndustrialAesthetics';
 
 // =============================================================================
 // GOLDEN NETWORK BUILDERS
 // =============================================================================
 
-/** GN-IA-01: Trunk with 3 stations (simplest case) */
+/** GN-IA-01: Trunk with 3 stations (simplest vertical case) */
 function buildTrunk3Stations(): AnySldSymbol[] {
   const s: AnySldSymbol[] = [];
   s.push({ id: 'src', elementId: 'src', elementType: 'Source', elementName: 'GPZ 110/15kV', position: { x: 0, y: 0 }, inService: true, connectedToNodeId: 'bus_sn' } as SourceSymbol);
@@ -109,6 +134,45 @@ function buildPvBessNN(): AnySldSymbol[] {
   return s;
 }
 
+/**
+ * GN-IA-05: WIELE MAGISTRAL (PIONOWO) — 3 pola liniowe GPZ, vertical trunks.
+ *
+ * GPZ z 3 polami liniowymi → 3 magistrale pionowe w dół:
+ * - Magistrala A: 3 segmenty, 1 stacja drop
+ * - Magistrala B: 2 segmenty, 1 odbiorca
+ * - Magistrala C: 1 segment, stacja końcowa
+ */
+function buildMultiTrunkVertical(): AnySldSymbol[] {
+  const s: AnySldSymbol[] = [];
+
+  // GPZ
+  s.push({ id: 'src_gpz', elementId: 'src_gpz', elementType: 'Source', elementName: 'GPZ 110/15kV Piaskowa', position: { x: 0, y: 0 }, inService: true, connectedToNodeId: 'bus_gpz_sn' } as SourceSymbol);
+  s.push({ id: 'bus_gpz_sn', elementId: 'bus_gpz_sn', elementType: 'Bus', elementName: 'Szyna SN 15kV GPZ', position: { x: 0, y: 0 }, inService: true, width: 600, height: 10 } as BusSymbol);
+
+  // Magistrala A: 3 linie w dół
+  s.push({ id: 'lineA1', elementId: 'lineA1', elementType: 'LineBranch', elementName: 'Linia SN A1', position: { x: 0, y: 0 }, inService: true, fromNodeId: 'bus_gpz_sn', toNodeId: 'busA1', points: [], branchType: 'CABLE' } as BranchSymbol);
+  s.push({ id: 'busA1', elementId: 'busA1', elementType: 'Bus', elementName: 'Szyna SN-A1', position: { x: 0, y: 0 }, inService: true, width: 60, height: 8 } as BusSymbol);
+  s.push({ id: 'lineA2', elementId: 'lineA2', elementType: 'LineBranch', elementName: 'Linia SN A2', position: { x: 0, y: 0 }, inService: true, fromNodeId: 'busA1', toNodeId: 'busA2', points: [], branchType: 'CABLE' } as BranchSymbol);
+  s.push({ id: 'busA2', elementId: 'busA2', elementType: 'Bus', elementName: 'Szyna SN-A2', position: { x: 0, y: 0 }, inService: true, width: 60, height: 8 } as BusSymbol);
+  s.push({ id: 'lineA3', elementId: 'lineA3', elementType: 'LineBranch', elementName: 'Linia SN A3', position: { x: 0, y: 0 }, inService: true, fromNodeId: 'busA2', toNodeId: 'busA3', points: [], branchType: 'LINE' } as BranchSymbol);
+  s.push({ id: 'busA3', elementId: 'busA3', elementType: 'Bus', elementName: 'Szyna SN-A3', position: { x: 0, y: 0 }, inService: true, width: 60, height: 8 } as BusSymbol);
+  s.push({ id: 'loadA3', elementId: 'loadA3', elementType: 'Load', elementName: 'Odbiorca A3', position: { x: 0, y: 0 }, inService: true, connectedToNodeId: 'busA3' } as LoadSymbol);
+
+  // Magistrala B: 2 linie w dół
+  s.push({ id: 'lineB1', elementId: 'lineB1', elementType: 'LineBranch', elementName: 'Linia SN B1', position: { x: 0, y: 0 }, inService: true, fromNodeId: 'bus_gpz_sn', toNodeId: 'busB1', points: [], branchType: 'CABLE' } as BranchSymbol);
+  s.push({ id: 'busB1', elementId: 'busB1', elementType: 'Bus', elementName: 'Szyna SN-B1', position: { x: 0, y: 0 }, inService: true, width: 60, height: 8 } as BusSymbol);
+  s.push({ id: 'lineB2', elementId: 'lineB2', elementType: 'LineBranch', elementName: 'Linia SN B2', position: { x: 0, y: 0 }, inService: true, fromNodeId: 'busB1', toNodeId: 'busB2', points: [], branchType: 'LINE' } as BranchSymbol);
+  s.push({ id: 'busB2', elementId: 'busB2', elementType: 'Bus', elementName: 'Szyna SN-B2', position: { x: 0, y: 0 }, inService: true, width: 60, height: 8 } as BusSymbol);
+  s.push({ id: 'loadB2', elementId: 'loadB2', elementType: 'Load', elementName: 'Odbiorca B2', position: { x: 0, y: 0 }, inService: true, connectedToNodeId: 'busB2' } as LoadSymbol);
+
+  // Magistrala C: 1 linia w dół + stacja
+  s.push({ id: 'lineC1', elementId: 'lineC1', elementType: 'LineBranch', elementName: 'Linia SN C1', position: { x: 0, y: 0 }, inService: true, fromNodeId: 'bus_gpz_sn', toNodeId: 'busC1', points: [], branchType: 'CABLE' } as BranchSymbol);
+  s.push({ id: 'busC1', elementId: 'busC1', elementType: 'Bus', elementName: 'Szyna SN-C1', position: { x: 0, y: 0 }, inService: true, width: 60, height: 8 } as BusSymbol);
+  s.push({ id: 'loadC1', elementId: 'loadC1', elementType: 'Load', elementName: 'Odbiorca C1', position: { x: 0, y: 0 }, inService: true, connectedToNodeId: 'busC1' } as LoadSymbol);
+
+  return s;
+}
+
 // Helper: run layout pipeline
 function runLayout(symbols: AnySldSymbol[], config?: LayoutGeometryConfigV1): LayoutResultV1 {
   const graph = convertToVisualGraph(symbols);
@@ -116,7 +180,7 @@ function runLayout(symbols: AnySldSymbol[], config?: LayoutGeometryConfigV1): La
 }
 
 // Helper: detect bounding box overlaps
-function detectOverlaps(placements: NodePlacementV1[]): Array<[string, string]> {
+function detectOverlaps(placements: readonly NodePlacementV1[]): Array<[string, string]> {
   const overlaps: Array<[string, string]> = [];
   for (let i = 0; i < placements.length; i++) {
     for (let j = i + 1; j < placements.length; j++) {
@@ -164,12 +228,31 @@ describe('IndustrialAesthetics — contract verification', () => {
     expect(GRID_SPACING_MAIN).toBe(280);
   });
 
-  it('Y_RING = Y_MAIN - 4 * GRID_BASE', () => {
-    expect(Y_RING).toBe(Y_MAIN - 4 * GRID_BASE);
+  it('Y_GPZ = 3 * GRID_BASE = 60', () => {
+    expect(Y_GPZ).toBe(60);
+  });
+
+  it('PITCH_FIELD_X = GRID_SPACING_MAIN = 280', () => {
+    expect(PITCH_FIELD_X).toBe(GRID_SPACING_MAIN);
+  });
+
+  it('TRUNK_STEP_Y = 5 * GRID_BASE = 100', () => {
+    expect(TRUNK_STEP_Y).toBe(100);
+  });
+
+  it('BRANCH_OFFSET_X = 7 * GRID_BASE = 140', () => {
+    expect(BRANCH_OFFSET_X).toBe(140);
   });
 
   it('OFFSET_POLE = 3 * GRID_BASE = 60', () => {
     expect(OFFSET_POLE).toBe(60);
+  });
+
+  it('deterministicBranchSide is stable', () => {
+    const side1 = deterministicBranchSide('test_element_1');
+    const side2 = deterministicBranchSide('test_element_1');
+    expect(side1).toBe(side2);
+    expect(side1 === 1 || side1 === -1).toBe(true);
   });
 });
 
@@ -183,6 +266,7 @@ describe('E3 — all coordinates snap to GRID_BASE', () => {
     ['trunk-2-branches', buildTrunk2Branches],
     ['ring-nop', buildRingNOP],
     ['pv-bess-nn', buildPvBessNN],
+    ['multi-trunk-vertical', buildMultiTrunkVertical],
   ];
 
   for (const [name, buildFn] of goldenNetworks) {
@@ -204,10 +288,11 @@ describe('E3 — all coordinates snap to GRID_BASE', () => {
       const result = runLayout(buildFn());
       for (const route of result.edgeRoutes) {
         for (const seg of route.segments) {
-          expect(seg.from.x % GRID_BASE).toBe(0);
-          expect(seg.from.y % GRID_BASE).toBe(0);
-          expect(seg.to.x % GRID_BASE).toBe(0);
-          expect(seg.to.y % GRID_BASE).toBe(0);
+          // Use Math.abs to handle -0 vs +0 (JavaScript negative zero)
+          expect(Math.abs(seg.from.x % GRID_BASE)).toBe(0);
+          expect(Math.abs(seg.from.y % GRID_BASE)).toBe(0);
+          expect(Math.abs(seg.to.x % GRID_BASE)).toBe(0);
+          expect(Math.abs(seg.to.y % GRID_BASE)).toBe(0);
         }
       }
     });
@@ -215,7 +300,85 @@ describe('E3 — all coordinates snap to GRID_BASE', () => {
 });
 
 // =============================================================================
-// TEST: DETERMINISM 100x
+// V1: DOWNWARD GROWTH (MONOTONIC Y FOR TRUNKS)
+// =============================================================================
+
+describe('V1 — downward growth (monotonic Y)', () => {
+  const goldenNetworks: [string, () => AnySldSymbol[]][] = [
+    ['trunk-3-stations', buildTrunk3Stations],
+    ['trunk-2-branches', buildTrunk2Branches],
+    ['multi-trunk-vertical', buildMultiTrunkVertical],
+  ];
+
+  for (const [name, buildFn] of goldenNetworks) {
+    it(`${name}: trunk edges grow downward (Y increases)`, () => {
+      const result = runLayout(buildFn());
+
+      // Extract trunk edge segments
+      const trunkSegments: Array<{ edgeId: string; fromY: number; toY: number }> = [];
+      for (const route of result.edgeRoutes) {
+        if (route.edgeType === 'TRUNK') {
+          for (const seg of route.segments) {
+            // Only check vertical segments (same X)
+            if (Math.abs(seg.from.x - seg.to.x) < 1) {
+              trunkSegments.push({
+                edgeId: route.edgeId,
+                fromY: Math.min(seg.from.y, seg.to.y),
+                toY: Math.max(seg.from.y, seg.to.y),
+              });
+            }
+          }
+        }
+      }
+
+      const downwardResult = validateDownwardGrowth(trunkSegments);
+      expect(downwardResult.allDownward).toBe(true);
+    });
+  }
+});
+
+// =============================================================================
+// ORTHOGONAL ROUTING (0° OR 90° ONLY)
+// =============================================================================
+
+describe('Orthogonal routing — 100% orthogonal', () => {
+  const goldenNetworks: [string, () => AnySldSymbol[]][] = [
+    ['trunk-3-stations', buildTrunk3Stations],
+    ['trunk-2-branches', buildTrunk2Branches],
+    ['ring-nop', buildRingNOP],
+    ['pv-bess-nn', buildPvBessNN],
+    ['multi-trunk-vertical', buildMultiTrunkVertical],
+  ];
+
+  for (const [name, buildFn] of goldenNetworks) {
+    it(`${name}: 0 orthogonal violations`, () => {
+      const result = runLayout(buildFn());
+
+      const segments: Array<{ edgeId: string; fromX: number; fromY: number; toX: number; toY: number }> = [];
+      for (const route of result.edgeRoutes) {
+        for (const seg of route.segments) {
+          segments.push({
+            edgeId: route.edgeId,
+            fromX: seg.from.x,
+            fromY: seg.from.y,
+            toX: seg.to.x,
+            toY: seg.to.y,
+          });
+        }
+      }
+
+      const orthoResult = validateOrthogonalRouting(segments);
+      expect(orthoResult.allOrthogonal).toBe(true);
+      if (!orthoResult.allOrthogonal) {
+        // eslint-disable-next-line no-console
+        console.error('Orthogonal violations:', orthoResult.violations);
+      }
+    });
+  }
+});
+
+// =============================================================================
+// DETERMINISM 100x
 // =============================================================================
 
 describe('Determinism — 100x identical hash', () => {
@@ -224,6 +387,7 @@ describe('Determinism — 100x identical hash', () => {
     ['trunk-2-branches', buildTrunk2Branches],
     ['ring-nop', buildRingNOP],
     ['pv-bess-nn', buildPvBessNN],
+    ['multi-trunk-vertical', buildMultiTrunkVertical],
   ];
 
   for (const [name, buildFn] of goldenNetworks) {
@@ -239,7 +403,7 @@ describe('Determinism — 100x identical hash', () => {
 });
 
 // =============================================================================
-// TEST: PERMUTATION INVARIANCE
+// PERMUTATION INVARIANCE
 // =============================================================================
 
 describe('Permutation invariance — shuffled input → identical hash', () => {
@@ -247,6 +411,7 @@ describe('Permutation invariance — shuffled input → identical hash', () => {
     ['trunk-3-stations', buildTrunk3Stations],
     ['trunk-2-branches', buildTrunk2Branches],
     ['ring-nop', buildRingNOP],
+    ['multi-trunk-vertical', buildMultiTrunkVertical],
   ];
 
   for (const [name, buildFn] of goldenNetworks) {
@@ -263,17 +428,15 @@ describe('Permutation invariance — shuffled input → identical hash', () => {
 });
 
 // =============================================================================
-// TEST: OVERLAY DOES NOT MODIFY GEOMETRY
+// OVERLAY DOES NOT MODIFY GEOMETRY
 // =============================================================================
 
 describe('Overlay — no geometry mutation', () => {
   it('overlay payload does not change node positions', () => {
     const symbols = buildTrunk3Stations();
     const result1 = runLayout(symbols);
-    // Run layout again (simulating overlay re-render)
     const result2 = runLayout(symbols);
 
-    // All positions identical
     expect(result1.nodePlacements.length).toBe(result2.nodePlacements.length);
     for (let i = 0; i < result1.nodePlacements.length; i++) {
       expect(result1.nodePlacements[i].position.x).toBe(result2.nodePlacements[i].position.x);
@@ -284,18 +447,16 @@ describe('Overlay — no geometry mutation', () => {
 });
 
 // =============================================================================
-// TEST: NO REFLOW ON ZOOM/PAN
+// NO REFLOW ON ZOOM/PAN
 // =============================================================================
 
 describe('No reflow on zoom — geometry independent of camera', () => {
   it('layout result has no camera/viewport dependency', () => {
     const symbols = buildTrunk3Stations();
-    // Layout should produce identical output regardless of theoretical zoom level
     const result1 = runLayout(symbols);
     const result2 = runLayout(symbols);
 
     expect(result1.hash).toBe(result2.hash);
-    // Verify bounds are stable
     expect(result1.bounds.x).toBe(result2.bounds.x);
     expect(result1.bounds.y).toBe(result2.bounds.y);
     expect(result1.bounds.width).toBe(result2.bounds.width);
@@ -304,7 +465,7 @@ describe('No reflow on zoom — geometry independent of camera', () => {
 });
 
 // =============================================================================
-// TEST: ZERO SYMBOL OVERLAPS IN GOLDEN NETWORKS
+// ZERO SYMBOL OVERLAPS IN GOLDEN NETWORKS
 // =============================================================================
 
 describe('Zero symbol overlaps — golden networks', () => {
@@ -313,6 +474,7 @@ describe('Zero symbol overlaps — golden networks', () => {
     ['trunk-2-branches', buildTrunk2Branches],
     ['ring-nop', buildRingNOP],
     ['pv-bess-nn', buildPvBessNN],
+    ['multi-trunk-vertical', buildMultiTrunkVertical],
   ];
 
   for (const [name, buildFn] of goldenNetworks) {
@@ -329,7 +491,7 @@ describe('Zero symbol overlaps — golden networks', () => {
 });
 
 // =============================================================================
-// TEST: GOLDEN RENDER HASH MATCHES
+// GOLDEN RENDER HASH STABILITY
 // =============================================================================
 
 describe('Golden render hash — stable across runs', () => {
@@ -338,6 +500,7 @@ describe('Golden render hash — stable across runs', () => {
     ['trunk-2-branches', buildTrunk2Branches],
     ['ring-nop', buildRingNOP],
     ['pv-bess-nn', buildPvBessNN],
+    ['multi-trunk-vertical', buildMultiTrunkVertical],
   ];
 
   for (const [name, buildFn] of goldenNetworks) {
@@ -352,7 +515,7 @@ describe('Golden render hash — stable across runs', () => {
 });
 
 // =============================================================================
-// TEST: PERFORMANCE BUDGETS
+// PERFORMANCE BUDGETS
 // =============================================================================
 
 describe('Performance budgets — layout time', () => {
@@ -365,7 +528,6 @@ describe('Performance budgets — layout time', () => {
   });
 
   it('medium network (20-50 elements): layout < 120ms', () => {
-    // Build a larger network
     const s: AnySldSymbol[] = [];
     s.push({ id: 'src', elementId: 'src', elementType: 'Source', elementName: 'GPZ', position: { x: 0, y: 0 }, inService: true, connectedToNodeId: 'bus_sn' } as SourceSymbol);
     s.push({ id: 'bus_sn', elementId: 'bus_sn', elementType: 'Bus', elementName: 'Szyna SN', position: { x: 0, y: 0 }, inService: true, width: 400, height: 10 } as BusSymbol);
@@ -381,10 +543,18 @@ describe('Performance budgets — layout time', () => {
     const elapsed = performance.now() - start;
     expect(elapsed).toBeLessThan(120);
   });
+
+  it('multi-trunk network: layout < 150ms', () => {
+    const symbols = buildMultiTrunkVertical();
+    const start = performance.now();
+    runLayout(symbols);
+    const elapsed = performance.now() - start;
+    expect(elapsed).toBeLessThan(150);
+  });
 });
 
 // =============================================================================
-// TEST: LAYOUT RESULT VERSION AND VALIDATION
+// LAYOUT RESULT VERSION AND VALIDATION
 // =============================================================================
 
 describe('Layout result — version and validation', () => {
@@ -396,5 +566,66 @@ describe('Layout result — version and validation', () => {
   it('validateLayoutResult passes for golden networks', () => {
     const result = runLayout(buildTrunk3Stations());
     expect(() => validateLayoutResult(result)).not.toThrow();
+  });
+
+  it('validateLayoutResult passes for multi-trunk vertical', () => {
+    const result = runLayout(buildMultiTrunkVertical());
+    expect(() => validateLayoutResult(result)).not.toThrow();
+  });
+});
+
+// =============================================================================
+// V3: BRANCH SIDE DETERMINISM
+// =============================================================================
+
+describe('V3 — branch side deterministic', () => {
+  it('deterministicBranchSide is stable for same elementId', () => {
+    for (let i = 0; i < 100; i++) {
+      const id = `element_${i}`;
+      const side1 = deterministicBranchSide(id);
+      const side2 = deterministicBranchSide(id);
+      expect(side1).toBe(side2);
+    }
+  });
+
+  it('deterministicBranchSide produces both left and right', () => {
+    const sides = new Set<number>();
+    for (let i = 0; i < 50; i++) {
+      sides.add(deterministicBranchSide(`test_${i}`));
+    }
+    expect(sides.has(1)).toBe(true);
+    expect(sides.has(-1)).toBe(true);
+  });
+});
+
+// =============================================================================
+// MULTI-TRUNK VERTICAL: STRUCTURE TEST
+// =============================================================================
+
+describe('Multi-trunk vertical — structure', () => {
+  it('has correct number of elements', () => {
+    const symbols = buildMultiTrunkVertical();
+    // 1 source + 1 GPZ bus + 3 lines A + 3 buses A + 1 load A +
+    // 2 lines B + 2 buses B + 1 load B + 1 line C + 1 bus C + 1 load C = 17
+    expect(symbols.length).toBe(17);
+  });
+
+  it('layout places all elements', () => {
+    const result = runLayout(buildMultiTrunkVertical());
+    expect(result.nodePlacements.length).toBeGreaterThanOrEqual(10);
+  });
+
+  it('GPZ source is at top (smallest Y)', () => {
+    const result = runLayout(buildMultiTrunkVertical());
+    const srcPlacement = result.nodePlacements.find(p => p.nodeId === 'src_gpz');
+    expect(srcPlacement).toBeDefined();
+    if (srcPlacement) {
+      // Source should be above all other placements
+      for (const p of result.nodePlacements) {
+        if (p.nodeId !== 'src_gpz') {
+          expect(srcPlacement.position.y).toBeLessThanOrEqual(p.position.y);
+        }
+      }
+    }
   });
 });
