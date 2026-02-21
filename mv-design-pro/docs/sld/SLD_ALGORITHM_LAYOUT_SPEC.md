@@ -221,12 +221,63 @@ Dla typowej sieci SN (V < 1000, d < 10): **< 10ms**.
 
 ---
 
-## 8. Powiazane pliki
+## 8. Estetyka Przemyslowa (E1-E4)
+
+### 8.1 E1: Rowne odleglosci stacji na magistrali
+
+- Odleglosc centrum-centrum = `GRID_SPACING_MAIN` = 280px (14 * GRID_BASE)
+- Pozycja i-tej stacji: `X_i = X_START + i * GRID_SPACING_MAIN`
+- Odchylenia WYLACZNIE jesli wymusza topologia (np. wstawka stacji w segmencie)
+
+### 8.2 E2: Symetryczne ringi
+
+- Kanal ringowy na stalej amplitudzie `Y_RING` = Y_MAIN - 4*GRID_BASE
+- Sciezka: `(X_i, Y_MAIN) → (X_i, Y_RING) → (X_j, Y_RING) → (X_j, Y_MAIN)`
+- Ring NIE "faluje" — deterministyczna geometria
+- Kolejne lane'y (multi-ring): `Y_RING - laneIndex * secondaryLanePitch`
+
+### 8.3 E3: Brak przypadkowych dlugosci wizualnych
+
+- Wszystkie wspolrzedne: `x % GRID_BASE === 0 && y % GRID_BASE === 0`
+- Dlugosci rzeczywiste (m/km) NIE wplywaja na dlugosc wizualna odcinka
+- Dlugosc wizualna = f(typ polaczenia, krok siatki, minimalne odstepy)
+- `snapToAestheticGrid()` na kazdym punkcie wyjsciowym
+
+### 8.4 E4: Wyrownanie pionowe pol stacji
+
+- Pola wyrownane do wspolnej osi Y w ramach bloku stacji
+- Odstep miedzy polami: `OFFSET_POLE` = 60px (3 * GRID_BASE)
+- Aparat i przekaznik zawsze w tych samych pozycjach wzglednych
+- CT w torze, VT boczny (kanon symboli)
+
+### 8.5 Kolizje — Y-only push-away
+
+- Rozwiazywanie kolizji WYLACZNIE w osi Y (przesun w dol)
+- ZAKAZ przesuwania w osi X (magistrala i rozstawy stacji sa stale)
+- Deterministic tie-break: wiekszy layer lub wiekszy nodeId idzie w dol
+- Max iteracji: 20
+
+---
+
+## 9. Budzety wydajnosci
+
+| Siec | Limit czasu layout |
+|------|--------------------|
+| Mala (< 20 elementow) | < 50ms |
+| Srednia (20-50 elementow) | < 120ms |
+| Duza (50+ elementow) | < 250ms |
+
+---
+
+## 10. Powiazane pliki
 
 | Plik | Rola |
 |------|------|
 | `frontend/src/ui/sld/core/topologyAdapterV2.ts` | Implementacja segmentacji |
 | `frontend/src/ui/sld/core/topologyInputReader.ts` | Kontrakt wejsciowy |
 | `frontend/src/ui/sld/core/visualGraph.ts` | Kontrakt wyjsciowy (VisualGraphV1) |
+| `frontend/src/ui/sld/core/layoutPipeline.ts` | Kanoniczny silnik layoutu (6 faz) |
+| `frontend/src/ui/sld/IndustrialAesthetics.ts` | Stale i walidatory estetyki |
 | `frontend/src/ui/sld/core/__tests__/topologyAdapterV2.test.ts` | Testy 7 golden networks |
-| `scripts/sld_determinism_guards.py` | Guards 8-10 |
+| `frontend/src/ui/sld/core/__tests__/industrialAestheticsLayout.test.ts` | Testy E1-E4 + golden renders |
+| `scripts/sld_determinism_guards.py` | Guards 8-10, 62-64 |

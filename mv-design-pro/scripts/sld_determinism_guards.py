@@ -2672,6 +2672,109 @@ def guard_inspector_no_null_placeholder() -> List[str]:
 
 
 # =========================================================================
+# GUARDS 62-64: ESTETYKA PRZEMYSLOWA (Industrial Aesthetics)
+# =========================================================================
+
+def guard_industrial_aesthetics_module_exists() -> List[str]:
+    """GUARD 62: IndustrialAesthetics.ts module exists with E1-E4 constants."""
+    violations: List[str] = []
+
+    ia_file = FRONTEND_SRC / "ui" / "sld" / "IndustrialAesthetics.ts"
+    if not ia_file.exists():
+        violations.append("IndustrialAesthetics.ts does not exist")
+        return violations
+
+    content = ia_file.read_text(encoding="utf-8")
+
+    required_exports = [
+        "GRID_BASE",
+        "GRID_SPACING_MAIN",
+        "X_START",
+        "Y_MAIN",
+        "Y_RING",
+        "Y_BRANCH",
+        "OFFSET_POLE",
+        "snapToAestheticGrid",
+        "validateGridAlignment",
+        "validateStationSpacing",
+        "validateRingGeometry",
+    ]
+
+    for exp in required_exports:
+        if exp not in content:
+            violations.append(
+                f"IndustrialAesthetics.ts missing export: {exp}"
+            )
+
+    return violations
+
+
+def guard_industrial_aesthetics_tests_exist() -> List[str]:
+    """GUARD 63: Industrial aesthetics layout tests exist."""
+    violations: List[str] = []
+
+    test_file = (
+        FRONTEND_SRC
+        / "ui"
+        / "sld"
+        / "core"
+        / "__tests__"
+        / "industrialAestheticsLayout.test.ts"
+    )
+    if not test_file.exists():
+        violations.append(
+            "industrialAestheticsLayout.test.ts does not exist"
+        )
+        return violations
+
+    content = test_file.read_text(encoding="utf-8")
+
+    required_tests = [
+        "E3 — all coordinates snap to GRID_BASE",
+        "Determinism — 100x identical hash",
+        "Permutation invariance",
+        "Overlay — no geometry mutation",
+        "No reflow on zoom",
+        "Zero symbol overlaps",
+        "Golden render hash",
+        "Performance budgets",
+    ]
+
+    for test_name in required_tests:
+        if test_name not in content:
+            violations.append(
+                f"Test missing in industrialAestheticsLayout.test.ts: {test_name}"
+            )
+
+    return violations
+
+
+def guard_y_only_collision_resolution() -> List[str]:
+    """GUARD 64: Collision resolution is Y-only (no X push-away)."""
+    violations: List[str] = []
+
+    # Check canonical pipeline
+    pipeline_file = FRONTEND_SRC / "ui" / "sld" / "core" / "layoutPipeline.ts"
+    if pipeline_file.exists():
+        content = pipeline_file.read_text(encoding="utf-8")
+        if "PUSH_AWAY_STEP_X" in content:
+            violations.append(
+                "layoutPipeline.ts contains PUSH_AWAY_STEP_X — must use Y-only collision"
+            )
+
+    # Check engine pipeline
+    phase4_file = FRONTEND_SRC / "engine" / "sld-layout" / "phase4-coordinates.ts"
+    if phase4_file.exists():
+        content = phase4_file.read_text(encoding="utf-8")
+        if "PUSH_AWAY_STEP_X" in content:
+            violations.append(
+                "phase4-coordinates.ts contains PUSH_AWAY_STEP_X — must use Y-only collision"
+            )
+
+    return violations
+
+
+# =========================================================================
 # MAIN
 # =========================================================================
 
@@ -2738,6 +2841,9 @@ def main() -> int:
         ("GUARD 59: Wizard saves actual config (RUN #3I N3)", guard_wizard_store_saves_actual_config()),
         ("GUARD 60: Overrides domain validation (RUN #3I N4)", guard_overrides_domain_validation()),
         ("GUARD 61: Inspector no null placeholder (RUN #3I N5)", guard_inspector_no_null_placeholder()),
+        ("GUARD 62: IndustrialAesthetics module exists (ESTETYKA PRZEMYSLOWA)", guard_industrial_aesthetics_module_exists()),
+        ("GUARD 63: Industrial aesthetics layout tests exist (ESTETYKA PRZEMYSLOWA)", guard_industrial_aesthetics_tests_exist()),
+        ("GUARD 64: Y-only collision resolution — no X push-away (ESTETYKA PRZEMYSLOWA)", guard_y_only_collision_resolution()),
     ]
 
     total_violations = 0

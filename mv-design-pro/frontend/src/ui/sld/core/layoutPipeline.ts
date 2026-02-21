@@ -1,6 +1,12 @@
 /**
  * Layout Pipeline V1 — 6-fazowy, deterministyczny pipeline layoutu SLD.
  *
+ * ESTETYKA PRZEMYSLOWA (E1–E4):
+ * - E1: Rowne odleglosci stacji na magistrali (GRID_SPACING_MAIN)
+ * - E2: Symetryczne ringi (stala amplituda Y_RING, ortogonalne odcinki)
+ * - E3: Brak przypadkowych dlugosci wizualnych (snap to grid, stale kroki)
+ * - E4: Wyrownanie pionowe pol stacji (OFFSET_POLE, wspolna os Y)
+ *
  * PIPELINE:
  *   phase1_place_trunk()
  *   phase2_detect_and_reserve_blocks()
@@ -15,6 +21,8 @@
  * - Kazda faza NIE modyfikuje Snapshot.
  * - Kazda faza zwraca immutable struktury.
  * - DETERMINIZM: ten sam input → identyczny output (bit-for-bit).
+ * - KOLIZJE: rozwiazywane WYLACZNIE w osi Y (Y-only push-away).
+ * - JEDEN SILNIK: brak flag wyboru, brak rownoleglych implementacji.
  */
 
 import type { VisualGraphV1, VisualNodeV1 } from './visualGraph';
@@ -39,6 +47,17 @@ import {
 } from './layoutResult';
 import type { StationBlockDetailV1 } from './fieldDeviceContracts';
 import type { StationBlockBuildResult } from './stationBlockBuilder';
+import {
+  GRID_BASE,
+  GRID_SPACING_MAIN,
+  X_START,
+  Y_MAIN,
+  Y_RING,
+  Y_BRANCH,
+  OFFSET_POLE,
+  MIN_VERTICAL_GAP,
+  snapToAestheticGrid,
+} from '../IndustrialAesthetics';
 
 // =============================================================================
 // GEOMETRY CONFIG
@@ -73,18 +92,18 @@ export interface LayoutGeometryConfigV1 {
 }
 
 export const DEFAULT_LAYOUT_CONFIG: LayoutGeometryConfigV1 = {
-  gridStep: 20,
-  layerSpacing: 120,
-  bandSpacing: 80,
-  defaultSymbolWidth: 60,
-  defaultSymbolHeight: 60,
-  defaultBusWidth: 400,
-  busHeight: 10,
-  feederSlotSpacing: 80,
+  gridStep: GRID_BASE,
+  layerSpacing: 6 * GRID_BASE,       // 120px — layer Y spacing
+  bandSpacing: MIN_VERTICAL_GAP,      // 80px — branch band gap
+  defaultSymbolWidth: 3 * GRID_BASE,  // 60px
+  defaultSymbolHeight: 3 * GRID_BASE, // 60px
+  defaultBusWidth: 20 * GRID_BASE,    // 400px
+  busHeight: 10,                      // busbar thickness
+  feederSlotSpacing: GRID_SPACING_MAIN, // 280px — E1: equal station spacing
   secondaryLanePitch: 30,
-  blockMargin: 20,
-  relayOffsetY: -40,
-  spineX: 500,
+  blockMargin: GRID_BASE,             // 20px
+  relayOffsetY: -2 * GRID_BASE,      // -40px
+  spineX: X_START + 2 * GRID_SPACING_MAIN, // centered at ~600px
 } as const;
 
 // =============================================================================
@@ -212,12 +231,16 @@ function sourceOrderKey(node: VisualNodeV1): string {
 // =============================================================================
 
 /**
- * Faza 1: Umieszczenie trunk (magistrali).
+ * Faza 1: Umieszczenie trunk (magistrali) — ESTETYKA PRZEMYSLOWA E1/E3/E4.
+ *
+ * E1: Rowne odleglosci stacji — feederSlotSpacing = GRID_SPACING_MAIN
+ * E3: Brak przypadkowych dlugosci — snap to GRID_BASE
+ * E4: Wyrownanie pionowe — stale warstwy L0/L2/L3
  *
  * - Znajdz zrodla (GRID_SOURCE preferowane).
  * - BFS po trunk edges.
  * - Monotoniczna os X (spine).
- * - Szyny SN na warstwie L3 (trunk bus layer).
+ * - Szyny SN na warstwie Y_MAIN.
  * - Stable tie-break: sort po id.
  */
 function phase1_place_trunk(
@@ -225,32 +248,32 @@ function phase1_place_trunk(
   config: LayoutGeometryConfigV1,
   state: PipelineState,
 ): void {
-  const { gridStep, layerSpacing, spineX, defaultSymbolWidth, defaultSymbolHeight, defaultBusWidth, busHeight } = config;
+  const { gridStep, defaultSymbolWidth, defaultSymbolHeight, defaultBusWidth, busHeight } = config;
 
   // Znajdz zrodla i posortuj (GRID_SOURCE first, then by id)
   const sources = graph.nodes
     .filter(n => isSourceType(n.nodeType))
     .sort((a, b) => sourceOrderKey(a).localeCompare(sourceOrderKey(b)));
 
-  // Warstwy kanoniczne
-  const L0_SOURCE = 0;
-  const L2_TRANSFORMER = 2;
-  const L3_SN_BUS = 3;
+  // E1/E4: Stale warstwy Y zsynchronizowane z IndustrialAesthetics
+  const L0_Y = snapToAestheticGrid(Y_MAIN - 3 * OFFSET_POLE);  // sources above busbar
+  const L2_Y = snapToAestheticGrid(Y_MAIN - OFFSET_POLE);       // transformers WN/SN
+  const L3_Y = snapToAestheticGrid(Y_MAIN);                      // SN busbar = Y_MAIN
 
-  // Umieszczaj zrodla na L0
-  let sourceSlotX = spineX;
+  // E1: Umieszczaj zrodla na L0 z rownym rozstawem
+  let sourceSlotX = snapToAestheticGrid(X_START);
   for (const src of sources) {
     state.placements.set(src.id, {
       nodeId: src.id,
-      x: snapToGrid(sourceSlotX, gridStep),
-      y: snapToGrid(L0_SOURCE * layerSpacing, gridStep),
+      x: snapToAestheticGrid(sourceSlotX),
+      y: L0_Y,
       width: defaultSymbolWidth,
       height: defaultSymbolHeight,
-      layer: L0_SOURCE,
+      layer: 0,
       bandIndex: 0,
       autoPositioned: true,
     });
-    sourceSlotX += config.feederSlotSpacing;
+    sourceSlotX += GRID_SPACING_MAIN;
   }
 
   // Znajdz szyny SN i posortuj po id
@@ -258,62 +281,64 @@ function phase1_place_trunk(
     .filter(n => n.nodeType === NodeTypeV1.BUS_SN)
     .sort((a, b) => a.id.localeCompare(b.id));
 
-  let busSlotX = spineX - defaultBusWidth / 2;
+  // E1: Szyny SN na Y_MAIN, rozstaw = GRID_SPACING_MAIN
+  let busSlotX = snapToAestheticGrid(X_START);
   for (const bus of snBuses) {
     const w = bus.attributes.width ?? defaultBusWidth;
     state.placements.set(bus.id, {
       nodeId: bus.id,
-      x: snapToGrid(busSlotX, gridStep),
-      y: snapToGrid(L3_SN_BUS * layerSpacing, gridStep),
-      width: w,
+      x: snapToAestheticGrid(busSlotX),
+      y: L3_Y,
+      width: snapToGrid(w, gridStep),
       height: busHeight,
-      layer: L3_SN_BUS,
+      layer: 3,
       bandIndex: 0,
       autoPositioned: true,
     });
-    busSlotX += w + config.feederSlotSpacing;
+    busSlotX += snapToAestheticGrid(w + GRID_SPACING_MAIN);
   }
 
-  // Umieszczaj transformatory WN/SN na L2
+  // E1/E4: Umieszczaj transformatory WN/SN na L2 z rownym rozstawem
   const wnSnTransformers = graph.nodes
     .filter(n => n.nodeType === NodeTypeV1.TRANSFORMER_WN_SN)
     .sort((a, b) => a.id.localeCompare(b.id));
 
-  let trSlotX = spineX;
+  let trSlotX = snapToAestheticGrid(X_START);
   for (const tr of wnSnTransformers) {
     state.placements.set(tr.id, {
       nodeId: tr.id,
-      x: snapToGrid(trSlotX, gridStep),
-      y: snapToGrid(L2_TRANSFORMER * layerSpacing, gridStep),
+      x: snapToAestheticGrid(trSlotX),
+      y: L2_Y,
       width: defaultSymbolWidth,
       height: defaultSymbolHeight,
-      layer: L2_TRANSFORMER,
+      layer: 2,
       bandIndex: 0,
       autoPositioned: true,
     });
-    trSlotX += config.feederSlotSpacing;
+    trSlotX += GRID_SPACING_MAIN;
   }
 
-  // Umieszczaj przelaczniki i inne elementy trunk
+  // E3/E4: Umieszczaj przelaczniki z snap to grid
   const switchNodes = graph.nodes
     .filter(n => isSwitchType(n.nodeType))
     .sort((a, b) => a.id.localeCompare(b.id));
 
-  let switchSlotX = spineX;
+  let switchSlotX = snapToAestheticGrid(X_START);
   for (const sw of switchNodes) {
     if (!state.placements.has(sw.id)) {
       // Umieszczaj miedzy szyna a transformatorem
+      const switchY = snapToAestheticGrid((L2_Y + L3_Y) / 2);
       state.placements.set(sw.id, {
         nodeId: sw.id,
-        x: snapToGrid(switchSlotX, gridStep),
-        y: snapToGrid((L2_TRANSFORMER + L3_SN_BUS) / 2 * layerSpacing, gridStep),
-        width: defaultSymbolWidth / 2,
-        height: defaultSymbolHeight / 2,
-        layer: L2_TRANSFORMER,
+        x: snapToAestheticGrid(switchSlotX),
+        y: switchY,
+        width: snapToGrid(defaultSymbolWidth / 2, gridStep),
+        height: snapToGrid(defaultSymbolHeight / 2, gridStep),
+        layer: 2,
         bandIndex: 0,
         autoPositioned: true,
       });
-      switchSlotX += config.feederSlotSpacing / 2;
+      switchSlotX += snapToAestheticGrid(GRID_SPACING_MAIN / 2);
     }
   }
 }
@@ -338,40 +363,43 @@ function phase2_detect_and_reserve_blocks(
     .filter(n => isStationType(n.nodeType))
     .sort((a, b) => a.id.localeCompare(b.id));
 
-  const { gridStep, layerSpacing, blockMargin, defaultSymbolWidth } = config;
-  const STATION_LAYER = 5;
+  const { gridStep, defaultSymbolWidth } = config;
+  // E1: Stacje na stale warstwie Y ponizej magistrali
+  const STATION_Y = snapToAestheticGrid(Y_BRANCH);
 
-  let blockSlotX = config.spineX;
+  // E1: Rowne odleglosci stacji — uzyj GRID_SPACING_MAIN
+  let blockSlotX = snapToAestheticGrid(X_START);
   for (const station of stationNodes) {
     const blockType = nodeTypeToStationBlockType(station.nodeType);
 
-    // Rozmiar bloku zalezy od typu
+    // E3: Rozmiar bloku snap to grid, stale wielokrotnosci GRID_BASE
     let blockWidth: number;
     let blockHeight: number;
     switch (blockType) {
       case StationBlockType.TYPE_A:
-        blockWidth = defaultSymbolWidth * 2;
-        blockHeight = layerSpacing * 2;
+        blockWidth = snapToGrid(defaultSymbolWidth * 2, gridStep);
+        blockHeight = snapToGrid(4 * OFFSET_POLE, gridStep);
         break;
       case StationBlockType.TYPE_B:
-        blockWidth = defaultSymbolWidth * 2.5;
-        blockHeight = layerSpacing * 2.5;
+        blockWidth = snapToGrid(defaultSymbolWidth * 2.5, gridStep);
+        blockHeight = snapToGrid(5 * OFFSET_POLE, gridStep);
         break;
       case StationBlockType.TYPE_C:
-        blockWidth = defaultSymbolWidth * 3;
-        blockHeight = layerSpacing * 2.5;
+        blockWidth = snapToGrid(defaultSymbolWidth * 3, gridStep);
+        blockHeight = snapToGrid(5 * OFFSET_POLE, gridStep);
         break;
       case StationBlockType.TYPE_D:
-        blockWidth = defaultSymbolWidth * 4;
-        blockHeight = layerSpacing * 3;
+        blockWidth = snapToGrid(defaultSymbolWidth * 4, gridStep);
+        blockHeight = snapToGrid(6 * OFFSET_POLE, gridStep);
         break;
       default:
-        blockWidth = defaultSymbolWidth * 2;
-        blockHeight = layerSpacing * 2;
+        blockWidth = snapToGrid(defaultSymbolWidth * 2, gridStep);
+        blockHeight = snapToGrid(4 * OFFSET_POLE, gridStep);
     }
 
-    const blockX = snapToGrid(blockSlotX, gridStep);
-    const blockY = snapToGrid(STATION_LAYER * layerSpacing, gridStep);
+    // E1: Rowne rozstawy stacji, snap to grid
+    const blockX = snapToAestheticGrid(blockSlotX);
+    const blockY = STATION_Y;
 
     const bounds: RectangleV1 = {
       x: blockX,
@@ -446,12 +474,13 @@ function phase2_detect_and_reserve_blocks(
       y: blockY,
       width: blockWidth,
       height: blockHeight,
-      layer: STATION_LAYER,
+      layer: 5,
       bandIndex: 0,
       autoPositioned: true,
     });
 
-    blockSlotX += blockWidth + blockMargin * 2;
+    // E1: Rowne odleglosci stacji = GRID_SPACING_MAIN
+    blockSlotX += GRID_SPACING_MAIN;
   }
 }
 
@@ -482,8 +511,8 @@ function phase3_embed_switchgear_blocks(
     const bw = block.bounds.width;
     void block.bounds.height;
 
-    // Umieszczaj wewnetrzne elementy
-    let internalY = by + config.blockMargin;
+    // E4: Umieszczaj wewnetrzne elementy z wyrownaniem pionowym (OFFSET_POLE)
+    let internalY = snapToAestheticGrid(by + config.blockMargin);
 
     for (const intId of block.internalNodes) {
       const node = graph.nodes.find(n => n.id === intId);
@@ -499,16 +528,17 @@ function phase3_embed_switchgear_blocks(
 
       state.placements.set(intId, {
         nodeId: intId,
-        x: snapToGrid(bx + (bw - w) / 2, gridStep),
-        y: snapToGrid(internalY, gridStep),
-        width: w,
-        height: h,
+        x: snapToAestheticGrid(bx + (bw - w) / 2),
+        y: snapToAestheticGrid(internalY),
+        width: snapToGrid(w, gridStep),
+        height: snapToGrid(h, gridStep),
         layer: 6, // Internal station layer
         bandIndex: 0,
         autoPositioned: true,
       });
 
-      internalY += h + config.blockMargin;
+      // E4: Staly odstep pionowy miedzy polami = OFFSET_POLE
+      internalY += snapToAestheticGrid(h + OFFSET_POLE);
     }
   }
 }
@@ -529,25 +559,29 @@ function phase4_place_branches_in_bands(
   config: LayoutGeometryConfigV1,
   state: PipelineState,
 ): void {
-  const { gridStep, bandSpacing, defaultSymbolWidth, defaultSymbolHeight, layerSpacing } = config;
+  const { bandSpacing, defaultSymbolWidth, defaultSymbolHeight } = config;
   const BRANCH_BASE_LAYER = 4;
 
-  // Zbierz wezly junction i load ktore nie sa jeszcze umieszczone
+  // E3: Zbierz wezly junction i load ktore nie sa jeszcze umieszczone
   const unplacedNodes = graph.nodes
     .filter(n => !state.placements.has(n.id))
     .sort((a, b) => a.id.localeCompare(b.id));
 
   let bandIndex = 0;
-  let bandY = BRANCH_BASE_LAYER * layerSpacing;
+  // E1/E3: Branches start below Y_BRANCH with fixed grid spacing
+  let bandY = snapToAestheticGrid(Y_BRANCH + 2 * OFFSET_POLE);
 
   for (const node of unplacedNodes) {
-    const w = isBusType(node.nodeType) ? (node.attributes.width ?? config.defaultBusWidth) : defaultSymbolWidth;
+    const w = isBusType(node.nodeType)
+      ? snapToGrid(node.attributes.width ?? config.defaultBusWidth, config.gridStep)
+      : defaultSymbolWidth;
     const h = isBusType(node.nodeType) ? config.busHeight : defaultSymbolHeight;
 
+    // E1: Rowne rozstawy w bandach = bandSpacing (=MIN_VERTICAL_GAP)
     state.placements.set(node.id, {
       nodeId: node.id,
-      x: snapToGrid(config.spineX + bandIndex * bandSpacing, gridStep),
-      y: snapToGrid(bandY, gridStep),
+      x: snapToAestheticGrid(X_START + bandIndex * GRID_SPACING_MAIN),
+      y: snapToAestheticGrid(bandY),
       width: w,
       height: h,
       layer: BRANCH_BASE_LAYER + Math.floor(bandIndex / 5),
@@ -557,7 +591,7 @@ function phase4_place_branches_in_bands(
 
     bandIndex++;
     if (bandIndex % 5 === 0) {
-      bandY += layerSpacing;
+      bandY += snapToAestheticGrid(bandSpacing);
       bandIndex = 0;
     }
   }
@@ -603,19 +637,21 @@ function phase5_route_edges_manhattan_with_channels(
     let laneIndex = 0;
 
     if (edge.edgeType === EdgeTypeV1.TRUNK) {
-      // Trunk: routing prosty (L-shape)
-      const midY = (startY + endY) / 2;
+      // E3: Trunk: routing prosty (L-shape), snap to grid
+      const midY = snapToAestheticGrid((startY + endY) / 2);
       segments = [
         { from: startPoint, to: { x: startX, y: midY } },
         { from: { x: startX, y: midY }, to: { x: endX, y: midY } },
         { from: { x: endX, y: midY }, to: endPoint },
       ];
     } else if (edge.edgeType === EdgeTypeV1.SECONDARY_CONNECTOR) {
-      // Secondary: routing w dedykowanym kanale
+      // E2: Ring/secondary connector — symetryczny routing przez kanal Y_RING
       laneIndex = secondaryLaneCounter++;
       const laneOffset = laneIndex * config.secondaryLanePitch;
-      const channelY = Math.min(startY, endY) - 60 - laneOffset;
+      // E2: Kanal ringowy na stalej amplitudzie Y_RING (lub nizej dla kolejnych lane'ow)
+      const channelY = snapToAestheticGrid(Y_RING - laneOffset);
 
+      // E2: Symetryczna sciezka: pion -> poziom (Y_RING) -> pion
       segments = [
         { from: startPoint, to: { x: startX, y: channelY } },
         { from: { x: startX, y: channelY }, to: { x: endX, y: channelY } },
@@ -627,8 +663,8 @@ function phase5_route_edges_manhattan_with_channels(
         { from: startPoint, to: endPoint },
       ];
     } else {
-      // Branch i inne: routing ortogonalny (Z-shape)
-      const midX = (startX + endX) / 2;
+      // E3: Branch i inne: routing ortogonalny (Z-shape), snap to grid
+      const midX = snapToAestheticGrid((startX + endX) / 2);
       segments = [
         { from: startPoint, to: { x: midX, y: startY } },
         { from: { x: midX, y: startY }, to: { x: midX, y: endY } },
@@ -636,10 +672,10 @@ function phase5_route_edges_manhattan_with_channels(
       ];
     }
 
-    // Snap to grid
+    // E3: Snap ALL routing points to GRID_BASE
     segments = segments.map(s => ({
-      from: { x: snapToGrid(s.from.x, config.gridStep), y: snapToGrid(s.from.y, config.gridStep) },
-      to: { x: snapToGrid(s.to.x, config.gridStep), y: snapToGrid(s.to.y, config.gridStep) },
+      from: { x: snapToAestheticGrid(s.from.x), y: snapToAestheticGrid(s.from.y) },
+      to: { x: snapToAestheticGrid(s.to.x), y: snapToAestheticGrid(s.to.y) },
     }));
 
     state.routes.push({
@@ -671,7 +707,9 @@ function phase6_enforce_invariants_and_finalize(
   config: LayoutGeometryConfigV1,
   state: PipelineState,
 ): void {
-  // 1. Resolve symbol-symbol overlaps (Y-axis only, max 20 iteracji)
+  // 1. Resolve symbol-symbol overlaps — Y-ONLY push-away (E3: brak losowych offsetow)
+  // REGULA: kolizje rozwiazywane WYLACZNIE w osi Y (przesun w dol)
+  // Determinizm: sort po (layer, nodeId) — stabilny tie-break
   const MAX_ITERATIONS = 20;
   for (let iter = 0; iter < MAX_ITERATIONS; iter++) {
     let hasOverlap = false;
@@ -688,11 +726,12 @@ function phase6_enforce_invariants_and_finalize(
           a.y < b.y + b.height && a.y + a.height > b.y
         ) {
           hasOverlap = true;
-          // Przesuñ element z wieksza warstawa w dol
+          // E3: Y-ONLY push-away — NIGDY nie przesuwaj w osi X
+          // Deterministic tie-break: wiekszy layer lub wiekszy nodeId idzie w dol
           if (a.layer > b.layer || (a.layer === b.layer && a.nodeId > b.nodeId)) {
-            a.y = snapToGrid(b.y + b.height + config.blockMargin, config.gridStep);
+            a.y = snapToAestheticGrid(b.y + b.height + config.blockMargin);
           } else {
-            b.y = snapToGrid(a.y + a.height + config.blockMargin, config.gridStep);
+            b.y = snapToAestheticGrid(a.y + a.height + config.blockMargin);
           }
         }
       }
