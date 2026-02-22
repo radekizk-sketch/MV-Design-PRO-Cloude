@@ -1,19 +1,19 @@
 /**
- * Status Bar — PowerFactory/ETAP Style Bottom Bar
+ * Pasek stanu — PowerFactory/ETAP Style Bottom Bar
  *
  * CANONICAL ALIGNMENT:
- * - powerfactory_ui_parity.md § B: Status bar zawsze widoczny
+ * - powerfactory_ui_parity.md § B: Pasek stanu zawsze widoczny
  * - wizard_screens.md § 1.4: Informacje kontekstowe
  *
  * ALWAYS VISIBLE bar showing:
- * - Operating mode (Edycja / Przypadek / Wyniki)
- * - Active project name
- * - Active case name
- * - Active snapshot ID (abbreviated)
- * - Validation status (if available)
+ * - Tryb pracy (Edycja / Konfiguracja / Wyniki)
+ * - Aktywny projekt
+ * - Aktywny przypadek + stan wyników
+ * - Status walidacji
+ * - Statystyki sieci
  *
  * INVARIANTS:
- * - StatusBar ZAWSZE renderowany, niezależnie od stanu aplikacji
+ * - Pasek stanu ZAWSZE renderowany, niezależnie od stanu aplikacji
  * - Brak danych = wyświetl "—" lub komunikat informacyjny
  * - 100% Polish UI
  */
@@ -33,28 +33,25 @@ import {
 import type { OperatingMode, ResultStatus } from '../types';
 
 // =============================================================================
-// Status Styling
+// Status Styling — Industrial Grade
 // =============================================================================
 
-const MODE_STYLES: Record<OperatingMode, { bg: string; text: string }> = {
-  MODEL_EDIT: {
-    bg: 'bg-blue-600',
-    text: 'text-white',
-  },
-  CASE_CONFIG: {
-    bg: 'bg-purple-600',
-    text: 'text-white',
-  },
-  RESULT_VIEW: {
-    bg: 'bg-green-600',
-    text: 'text-white',
-  },
+const MODE_STYLES: Record<OperatingMode, string> = {
+  MODEL_EDIT: 'bg-ind-600 text-white',
+  CASE_CONFIG: 'bg-purple-600 text-white',
+  RESULT_VIEW: 'bg-status-ok text-white',
 };
 
-const RESULT_STATUS_STYLES: Record<ResultStatus, { dot: string; text: string }> = {
-  NONE: { dot: 'bg-gray-400', text: 'text-gray-500' },
-  FRESH: { dot: 'bg-green-500', text: 'text-green-600' },
-  OUTDATED: { dot: 'bg-amber-500', text: 'text-amber-600' },
+const RESULT_DOT_STYLES: Record<ResultStatus, string> = {
+  NONE: 'ind-dot-none',
+  FRESH: 'ind-dot-ok',
+  OUTDATED: 'ind-dot-warn',
+};
+
+const RESULT_TEXT_STYLES: Record<ResultStatus, string> = {
+  NONE: 'text-chrome-400',
+  FRESH: 'text-emerald-400',
+  OUTDATED: 'text-amber-400',
 };
 
 // =============================================================================
@@ -62,32 +59,13 @@ const RESULT_STATUS_STYLES: Record<ResultStatus, { dot: string; text: string }> 
 // =============================================================================
 
 interface StatusBarProps {
-  /**
-   * Optional validation status (e.g., from NetworkValidator).
-   */
   validationStatus?: 'valid' | 'warnings' | 'errors' | null;
-
-  /**
-   * Number of validation warnings (if any).
-   */
   validationWarnings?: number;
-
-  /**
-   * Number of validation errors (if any).
-   */
   validationErrors?: number;
-
-  /**
-   * Network statistics (optional).
-   */
   networkStats?: {
     nodeCount?: number;
     branchCount?: number;
   };
-
-  /**
-   * Additional CSS classes.
-   */
   className?: string;
 }
 
@@ -113,9 +91,6 @@ export function StatusBar({
   const resultStatusLabel = useResultStatusLabel();
   const resultStatus = useAppStateStore((state) => state.activeCaseResultStatus);
 
-  const modeStyle = MODE_STYLES[activeMode];
-  const resultStyle = RESULT_STATUS_STYLES[resultStatus];
-
   // Abbreviate snapshot ID for display
   const snapshotDisplay = snapshotId
     ? snapshotId.length > 8
@@ -125,44 +100,42 @@ export function StatusBar({
 
   // Determine background color based on state
   const bgStyle = !projectId
-    ? 'bg-amber-900 border-amber-700'  // No project - warning state
+    ? 'bg-amber-900 border-amber-700'  // Brak projektu
     : !caseId
-      ? 'bg-blue-900 border-blue-700'   // No case - info state
-      : 'bg-gray-800 border-gray-700';  // Normal state
+      ? 'bg-ind-900 border-ind-700'     // Brak przypadku
+      : 'bg-chrome-800 border-chrome-700'; // Stan normalny
 
   return (
     <div
       data-testid="status-bar"
       className={clsx(
         'flex items-center justify-between h-7 px-4',
-        'text-white text-xs',
+        'text-white text-[11px]',
         'border-t',
         'select-none',
         bgStyle,
         className
       )}
     >
-      {/* Left Section: Mode Indicator */}
-      <div className="flex items-center gap-4">
-        {/* Mode Badge */}
+      {/* Lewa sekcja: Tryb + Projekt + Przypadek */}
+      <div className="flex items-center gap-3">
+        {/* Wskaźnik trybu */}
         <div
           data-testid="status-bar-mode"
           data-mode={activeMode}
           className={clsx(
-            'flex items-center px-2 py-0.5 rounded text-xs font-medium',
-            modeStyle.bg,
-            modeStyle.text
+            'flex items-center px-2 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider',
+            MODE_STYLES[activeMode]
           )}
         >
           <span>{modeLabel}</span>
         </div>
 
-        {/* Separator */}
-        <span className="text-gray-600">|</span>
+        <span className="text-chrome-600">|</span>
 
-        {/* Project */}
-        <div className="flex items-center gap-2" data-testid="status-bar-project">
-          <span className="text-gray-400">Projekt:</span>
+        {/* Projekt */}
+        <div className="flex items-center gap-1.5" data-testid="status-bar-project">
+          <span className="text-chrome-400">Projekt:</span>
           {projectId ? (
             <span className="text-white font-medium">
               {projectName || projectId.substring(0, 8)}
@@ -172,62 +145,57 @@ export function StatusBar({
           )}
         </div>
 
-        {/* Separator */}
-        <span className="text-gray-600">|</span>
+        <span className="text-chrome-600">|</span>
 
-        {/* Case */}
-        <div className="flex items-center gap-2" data-testid="status-bar-case">
-          <span className="text-gray-400">Przypadek:</span>
+        {/* Przypadek */}
+        <div className="flex items-center gap-1.5" data-testid="status-bar-case">
+          <span className="text-chrome-400">Przypadek:</span>
           {caseId ? (
             <>
               <span className="text-white font-medium">{caseName || 'Bez nazwy'}</span>
-              {/* Result Status Dot */}
-              <span
-                className={clsx('w-2 h-2 rounded-full', resultStyle.dot)}
-                title={resultStatusLabel}
-              />
+              <span className={RESULT_DOT_STYLES[resultStatus]} title={resultStatusLabel} />
             </>
           ) : (
-            <span className="text-gray-500 italic">Nie wybrano</span>
+            <span className="text-chrome-500 italic">Nie wybrano</span>
           )}
         </div>
 
-        {/* Analysis Type (if in results mode) */}
+        {/* Typ analizy (tylko w trybie wyników) */}
         {activeMode === 'RESULT_VIEW' && analysisTypeLabel && (
           <>
-            <span className="text-gray-600">|</span>
-            <div className="flex items-center gap-2" data-testid="status-bar-analysis">
-              <span className="text-gray-400">Analiza:</span>
+            <span className="text-chrome-600">|</span>
+            <div className="flex items-center gap-1.5" data-testid="status-bar-analysis">
+              <span className="text-chrome-400">Analiza:</span>
               <span className="text-white">{analysisTypeLabel}</span>
             </div>
           </>
         )}
       </div>
 
-      {/* Right Section: Snapshot & Validation */}
-      <div className="flex items-center gap-4">
+      {/* Prawa sekcja: Snapshot + Walidacja + Stan wyników */}
+      <div className="flex items-center gap-3">
         {/* Snapshot */}
         {snapshotDisplay && (
-          <div className="flex items-center gap-2" data-testid="status-bar-snapshot">
-            <span className="text-gray-400">Snapshot:</span>
-            <span className="text-gray-300 font-mono text-xs">{snapshotDisplay}</span>
+          <div className="flex items-center gap-1.5" data-testid="status-bar-snapshot">
+            <span className="text-chrome-400">Snapshot:</span>
+            <span className="text-chrome-300 font-mono text-[10px]">{snapshotDisplay}</span>
           </div>
         )}
 
-        {/* Validation Status */}
+        {/* Status walidacji */}
         {validationStatus && (
           <>
-            <span className="text-gray-600">|</span>
-            <div className="flex items-center gap-2" data-testid="status-bar-validation">
+            <span className="text-chrome-600">|</span>
+            <div className="flex items-center gap-1.5" data-testid="status-bar-validation">
               {validationStatus === 'valid' && (
                 <>
-                  <span className="w-2 h-2 rounded-full bg-green-500" />
-                  <span className="text-green-400">Model prawidłowy</span>
+                  <span className="ind-dot-ok" />
+                  <span className="text-emerald-400">Model prawidłowy</span>
                 </>
               )}
               {validationStatus === 'warnings' && (
                 <>
-                  <span className="w-2 h-2 rounded-full bg-amber-500" />
+                  <span className="ind-dot-warn" />
                   <span className="text-amber-400">
                     {validationWarnings} {validationWarnings === 1 ? 'ostrzeżenie' : 'ostrzeżeń'}
                   </span>
@@ -235,7 +203,7 @@ export function StatusBar({
               )}
               {validationStatus === 'errors' && (
                 <>
-                  <span className="w-2 h-2 rounded-full bg-red-500" />
+                  <span className="ind-dot-error" />
                   <span className="text-red-400">
                     {validationErrors} {validationErrors === 1 ? 'błąd' : 'błędów'}
                   </span>
@@ -245,12 +213,12 @@ export function StatusBar({
           </>
         )}
 
-        {/* Result Status (if case active) */}
+        {/* Stan wyników */}
         {caseId && (
           <>
-            <span className="text-gray-600">|</span>
+            <span className="text-chrome-600">|</span>
             <div
-              className={clsx('flex items-center gap-1.5', resultStyle.text)}
+              className={clsx('flex items-center gap-1.5', RESULT_TEXT_STYLES[resultStatus])}
               data-testid="status-bar-result-status"
             >
               <span>{resultStatusLabel}</span>
@@ -258,16 +226,16 @@ export function StatusBar({
           </>
         )}
 
-        {/* Network Statistics */}
+        {/* Statystyki sieci */}
         {networkStats && (networkStats.nodeCount !== undefined || networkStats.branchCount !== undefined) && (
           <>
-            <span className="text-gray-600">|</span>
-            <div className="flex items-center gap-3 text-gray-300" data-testid="status-bar-network-stats">
+            <span className="text-chrome-600">|</span>
+            <div className="flex items-center gap-3 text-chrome-300" data-testid="status-bar-network-stats">
               {networkStats.nodeCount !== undefined && (
-                <span>Wezly: <span className="font-medium text-white">{networkStats.nodeCount}</span></span>
+                <span>Węzły: <span className="font-medium text-white">{networkStats.nodeCount}</span></span>
               )}
               {networkStats.branchCount !== undefined && (
-                <span>Galezie: <span className="font-medium text-white">{networkStats.branchCount}</span></span>
+                <span>Gałęzie: <span className="font-medium text-white">{networkStats.branchCount}</span></span>
               )}
             </div>
           </>
