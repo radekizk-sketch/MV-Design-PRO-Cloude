@@ -40,7 +40,19 @@ import {
   APPARATUS_CHAIN_STEP_Y,
   NN_BUSBAR_WIDTH,
   POWER_ARROW_SIZE,
+  STATION_BOUNDING_BOX_PADDING,
+  TRUNK_SPINE_MIN_LENGTH,
+  ANNOTATION_FONT_SIZE_NODE,
+  ANNOTATION_FONT_SIZE_SEGMENT,
+  ANNOTATION_FONT_SIZE_PARAMS,
+  CABLE_DASH_ARRAY,
+  BRANCH_APPARATUS_WIDTH,
+  STATION_FIELD_OFFSET_X,
+  NODE_LABEL_OFFSET_X,
 } from '../../IndustrialAesthetics';
+import { CANONICAL_SLD_STYLES, ETAP_VOLTAGE_COLORS, VISUAL_HIERARCHY } from '../../sldEtapStyle';
+import { getAllSymbolIds, getSymbolDefinition } from '../../SymbolResolver';
+import type { EtapSymbolId } from '../../SymbolResolver';
 
 // =============================================================================
 // GOLDEN NETWORK BUILDERS
@@ -442,6 +454,184 @@ describe('Canonical SLD — ETAP/IEC Style', () => {
       const hashWithAnnotations = result.hash;
       expect(hashWithAnnotations).toBeTruthy();
       expect(hashWithAnnotations.length).toBeGreaterThan(0);
+    });
+  });
+
+  // ===========================================================================
+  // BLOK A — New Constants Contract Tests
+  // ===========================================================================
+
+  describe('BLOK A — Industrial Aesthetic Constants', () => {
+    it('STATION_BOUNDING_BOX_PADDING is 16px', () => {
+      expect(STATION_BOUNDING_BOX_PADDING).toBe(16);
+    });
+
+    it('TRUNK_SPINE_MIN_LENGTH is 200px (10 * GRID_BASE)', () => {
+      expect(TRUNK_SPINE_MIN_LENGTH).toBe(200);
+    });
+
+    it('ANNOTATION_FONT_SIZE_NODE is 11px', () => {
+      expect(ANNOTATION_FONT_SIZE_NODE).toBe(11);
+    });
+
+    it('ANNOTATION_FONT_SIZE_SEGMENT is 10px', () => {
+      expect(ANNOTATION_FONT_SIZE_SEGMENT).toBe(10);
+    });
+
+    it('ANNOTATION_FONT_SIZE_PARAMS is 9px', () => {
+      expect(ANNOTATION_FONT_SIZE_PARAMS).toBe(9);
+    });
+
+    it('CABLE_DASH_ARRAY is "none" (solid line)', () => {
+      expect(CABLE_DASH_ARRAY).toBe('none');
+    });
+
+    it('BRANCH_APPARATUS_WIDTH is 40px', () => {
+      expect(BRANCH_APPARATUS_WIDTH).toBe(40);
+    });
+
+    it('STATION_FIELD_OFFSET_X is 60px', () => {
+      expect(STATION_FIELD_OFFSET_X).toBe(60);
+    });
+
+    it('NODE_LABEL_OFFSET_X is -20px (left of trunk)', () => {
+      expect(NODE_LABEL_OFFSET_X).toBe(-20);
+    });
+
+    it('font size hierarchy: node > segment > params', () => {
+      expect(ANNOTATION_FONT_SIZE_NODE).toBeGreaterThan(ANNOTATION_FONT_SIZE_SEGMENT);
+      expect(ANNOTATION_FONT_SIZE_SEGMENT).toBeGreaterThan(ANNOTATION_FONT_SIZE_PARAMS);
+    });
+  });
+
+  // ===========================================================================
+  // CANONICAL_SLD_STYLES Contract Tests
+  // ===========================================================================
+
+  describe('CANONICAL_SLD_STYLES — Token Integrity', () => {
+    it('trunkSpine strokeWidth is 5', () => {
+      expect(CANONICAL_SLD_STYLES.trunkSpine.strokeWidth).toBe(5);
+    });
+
+    it('branchLine strokeWidth is 2.5', () => {
+      expect(CANONICAL_SLD_STYLES.branchLine.strokeWidth).toBe(2.5);
+    });
+
+    it('stationInternal strokeWidth is 2', () => {
+      expect(CANONICAL_SLD_STYLES.stationInternal.strokeWidth).toBe(2);
+    });
+
+    it('junctionDot radius is 4', () => {
+      expect(CANONICAL_SLD_STYLES.junctionDot.radius).toBe(4);
+    });
+
+    it('powerArrow size is 8', () => {
+      expect(CANONICAL_SLD_STYLES.powerArrow.size).toBe(8);
+    });
+
+    it('nodeLabel fontSize is 11', () => {
+      expect(CANONICAL_SLD_STYLES.nodeLabel.fontSize).toBe(11);
+    });
+
+    it('segmentLabel fontSize is 10', () => {
+      expect(CANONICAL_SLD_STYLES.segmentLabel.fontSize).toBe(10);
+    });
+
+    it('segmentParams fontSize is 9', () => {
+      expect(CANONICAL_SLD_STYLES.segmentParams.fontSize).toBe(9);
+    });
+
+    it('stationTitle fontSize is 12 (largest)', () => {
+      expect(CANONICAL_SLD_STYLES.stationTitle.fontSize).toBe(12);
+    });
+
+    it('iecDesignation fontSize is 8 (smallest)', () => {
+      expect(CANONICAL_SLD_STYLES.iecDesignation.fontSize).toBe(8);
+    });
+
+    it('nodeLabel uses monospace font', () => {
+      expect(CANONICAL_SLD_STYLES.nodeLabel.fontFamily).toContain('JetBrains Mono');
+    });
+
+    it('stationTitle uses sans-serif font', () => {
+      expect(CANONICAL_SLD_STYLES.stationTitle.fontFamily).toContain('Inter');
+    });
+
+    it('overhead dash is "12 6"', () => {
+      expect(CANONICAL_SLD_STYLES.branchLine.overheadDash).toBe('12 6');
+    });
+
+    it('cable dash is "none"', () => {
+      expect(CANONICAL_SLD_STYLES.branchLine.cableDash).toBe('none');
+    });
+
+    it('trunkSpine color is ETAP SN blue', () => {
+      expect(CANONICAL_SLD_STYLES.trunkSpine.color).toBe(ETAP_VOLTAGE_COLORS.SN);
+    });
+  });
+
+  // ===========================================================================
+  // BLOK B — Symbol Registry Completeness
+  // ===========================================================================
+
+  describe('BLOK B — Symbol Registry', () => {
+    const allIds = getAllSymbolIds();
+
+    it('registry has at least 28 symbols (15 base + 4 canonical + 6 industrial + tree)', () => {
+      expect(allIds.length).toBeGreaterThanOrEqual(28);
+    });
+
+    const expectedIndustrialSymbols: EtapSymbolId[] = [
+      'fuse', 'surge_arrester', 'capacitor', 'reactor', 'inverter', 'metering_cubicle',
+    ];
+
+    for (const sym of expectedIndustrialSymbols) {
+      it(`symbol "${sym}" is registered in SymbolResolver`, () => {
+        expect(allIds).toContain(sym);
+      });
+
+      it(`symbol "${sym}" has valid ports definition`, () => {
+        const def = getSymbolDefinition(sym);
+        expect(def.viewBox).toBe('0 0 100 100');
+        expect(def.ports).toBeDefined();
+      });
+    }
+
+    it('all symbols have viewBox "0 0 100 100"', () => {
+      for (const id of allIds) {
+        const def = getSymbolDefinition(id);
+        expect(def.viewBox).toBe('0 0 100 100');
+      }
+    });
+
+    it('every symbol has at least one allowed rotation', () => {
+      for (const id of allIds) {
+        const def = getSymbolDefinition(id);
+        expect(def.allowedRotations.length).toBeGreaterThanOrEqual(1);
+      }
+    });
+  });
+
+  // ===========================================================================
+  // Visual Hierarchy Extended
+  // ===========================================================================
+
+  describe('Visual Hierarchy — Extended', () => {
+    it('VISUAL_HIERARCHY has structure > topology > detail levels', () => {
+      expect(VISUAL_HIERARCHY.structure.strokeWidth).toBeGreaterThan(VISUAL_HIERARCHY.topology.strokeWidth);
+      expect(VISUAL_HIERARCHY.topology.strokeWidth).toBeGreaterThan(VISUAL_HIERARCHY.detail.strokeWidth);
+    });
+
+    it('VISUAL_HIERARCHY font sizes follow hierarchy', () => {
+      expect(VISUAL_HIERARCHY.structure.labelFontSize).toBeGreaterThan(VISUAL_HIERARCHY.topology.labelFontSize);
+      expect(VISUAL_HIERARCHY.topology.labelFontSize).toBeGreaterThan(VISUAL_HIERARCHY.detail.labelFontSize);
+    });
+
+    it('ETAP voltage colors are defined for WN, SN, nN', () => {
+      expect(ETAP_VOLTAGE_COLORS.WN).toBeTruthy();
+      expect(ETAP_VOLTAGE_COLORS.SN).toBeTruthy();
+      expect(ETAP_VOLTAGE_COLORS.nN).toBeTruthy();
+      expect(ETAP_VOLTAGE_COLORS.default).toBeTruthy();
     });
   });
 });

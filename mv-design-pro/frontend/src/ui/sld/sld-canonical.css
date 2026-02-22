@@ -1,0 +1,222 @@
+/**
+ * SLD CANONICAL STYLESHEET — IEC 61082 / ETAP / ABB / DIgSILENT
+ *
+ * Professional industrial SLD typography and visual classes.
+ * Imported once in SLDViewCanvas — applies to all canonical layers.
+ *
+ * FONT STACK:
+ * - Monospace: JetBrains Mono → Fira Code → Menlo → monospace
+ * - Sans-serif: Inter → Segoe UI → Arial → sans-serif
+ *
+ * RULES:
+ * - All sizes in px (no rem/em — SVG coordinate space)
+ * - All colors reference ETAP voltage palette
+ * - No !important — specificity via data-sld-role selectors
+ */
+
+/* ==========================================================================
+   § 1 TYPOGRAPHY — Industrial Font Hierarchy
+   ========================================================================== */
+
+/** Node label — station/bus name on trunk spine */
+.sld-label-node {
+  font-family: 'JetBrains Mono', 'Fira Code', 'Menlo', monospace;
+  font-size: 11px;
+  font-weight: 600;
+  fill: #1F2937;
+  pointer-events: none;
+  user-select: none;
+}
+
+/** Segment label — cable/line name between nodes */
+.sld-label-segment {
+  font-family: 'Inter', 'Segoe UI', 'Arial', sans-serif;
+  font-size: 10px;
+  font-weight: 500;
+  fill: #374151;
+  pointer-events: none;
+  user-select: none;
+}
+
+/** Segment parameters — length, cross-section, type */
+.sld-label-params {
+  font-family: 'Inter', 'Segoe UI', 'Arial', sans-serif;
+  font-size: 9px;
+  font-weight: 400;
+  fill: #6B7280;
+  pointer-events: none;
+  user-select: none;
+}
+
+/** Apparatus designation — IEC 81346 (Q0, T1, -W01) */
+.sld-label-apparatus {
+  font-family: 'JetBrains Mono', 'Fira Code', 'Menlo', monospace;
+  font-size: 9px;
+  font-weight: 500;
+  fill: #374151;
+  pointer-events: none;
+  user-select: none;
+}
+
+/** Station title — station name above bounding box */
+.sld-label-station-title {
+  font-family: 'Inter', 'Segoe UI', 'Arial', sans-serif;
+  font-size: 12px;
+  font-weight: 700;
+  fill: #111827;
+  pointer-events: none;
+  user-select: none;
+}
+
+/** IEC 81346 designation tag */
+.sld-label-iec-designation {
+  font-family: 'JetBrains Mono', 'Fira Code', 'Menlo', monospace;
+  font-size: 8px;
+  font-weight: 600;
+  fill: #6B7280;
+  pointer-events: none;
+  user-select: none;
+}
+
+/** Voltage value label */
+.sld-label-voltage {
+  font-family: 'JetBrains Mono', 'Fira Code', 'Menlo', monospace;
+  font-size: 10px;
+  font-weight: 600;
+  pointer-events: none;
+  user-select: none;
+}
+
+/** Current/power flow value */
+.sld-label-flow {
+  font-family: 'JetBrains Mono', 'Fira Code', 'Menlo', monospace;
+  font-size: 9px;
+  font-weight: 500;
+  pointer-events: none;
+  user-select: none;
+}
+
+/* ==========================================================================
+   § 2 VOLTAGE COLOR CLASSES
+   ========================================================================== */
+
+.sld-voltage-wn { fill: #B91C1C; stroke: #B91C1C; }
+.sld-voltage-sn { fill: #1D4ED8; stroke: #1D4ED8; }
+.sld-voltage-nn { fill: #B45309; stroke: #B45309; }
+.sld-voltage-default { fill: #374151; stroke: #374151; }
+
+/* ==========================================================================
+   § 3 STROKE HIERARCHY
+   ========================================================================== */
+
+/** Trunk spine — dominant, heaviest */
+.sld-stroke-trunk {
+  stroke-width: 5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/** Branch line — primary connections */
+.sld-stroke-branch {
+  stroke-width: 2.5;
+  stroke-linecap: round;
+}
+
+/** Station internal — apparatus chain */
+.sld-stroke-station {
+  stroke-width: 2;
+}
+
+/** Overhead line — dashed pattern */
+.sld-line-overhead {
+  stroke-dasharray: 12 6;
+}
+
+/** Cable line — solid */
+.sld-line-cable {
+  stroke-dasharray: none;
+}
+
+/* ==========================================================================
+   § 4 JUNCTION DOT
+   ========================================================================== */
+
+[data-sld-role="junction-dot"] {
+  transition: opacity 0.15s ease;
+}
+
+[data-sld-role="junction-dot"]:hover {
+  opacity: 0.7;
+}
+
+/* ==========================================================================
+   § 5 SYMBOL HOVER / INTERACTIVE
+   ========================================================================== */
+
+[data-etap-symbol]:hover {
+  filter: brightness(1.08);
+  cursor: pointer;
+}
+
+/* ==========================================================================
+   § 6 STATION BOUNDING BOX
+   ========================================================================== */
+
+.sld-station-bbox {
+  fill: rgba(249, 250, 251, 0.5);
+  stroke: #E5E7EB;
+  stroke-width: 1;
+  stroke-dasharray: 4 2;
+  rx: 4;
+  ry: 4;
+}
+
+.sld-station-bbox:hover {
+  fill: rgba(249, 250, 251, 0.8);
+  stroke: #D1D5DB;
+}
+
+/* ==========================================================================
+   § 7 POWER FLOW OVERLAY
+   ========================================================================== */
+
+.sld-power-arrow {
+  fill: currentColor;
+  stroke: none;
+  pointer-events: none;
+}
+
+.sld-power-arrow--generation {
+  fill: #10B981;
+}
+
+.sld-power-arrow--load {
+  fill: #6B7280;
+}
+
+/** Violation marker — red ring */
+.sld-violation-marker {
+  fill: none;
+  stroke: #DC2626;
+  stroke-width: 2;
+  stroke-dasharray: 3 2;
+  opacity: 0.8;
+}
+
+/** Heatmap overlay for voltage magnitude */
+.sld-heatmap-low { stroke: #DC2626; }
+.sld-heatmap-normal { stroke: #10B981; }
+.sld-heatmap-high { stroke: #D97706; }
+
+/* ==========================================================================
+   § 8 ANIMATION KEYFRAMES
+   ========================================================================== */
+
+@keyframes sld-pulse-violation {
+  0%, 100% { opacity: 0.6; }
+  50% { opacity: 1; }
+}
+
+.sld-violation-pulse {
+  animation: sld-pulse-violation 2s ease-in-out infinite;
+}

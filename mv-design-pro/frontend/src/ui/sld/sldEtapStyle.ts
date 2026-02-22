@@ -1754,6 +1754,104 @@ export function getEtapStrokeWidth(
 }
 
 // =============================================================================
+// CANONICAL SLD STYLES (IEC 61082 / ETAP / ABB / DIgSILENT)
+// =============================================================================
+
+/**
+ * Consolidated canonical SLD style tokens for industrial-grade rendering.
+ *
+ * USAGE: Import this object in all canonical renderers.
+ * Single source of truth for stroke, color, font, spacing.
+ */
+export const CANONICAL_SLD_STYLES = {
+  /** Trunk spine (magistrala główna) */
+  trunkSpine: {
+    strokeWidth: 5,
+    color: ETAP_VOLTAGE_COLORS.SN,
+    lineCap: 'round' as const,
+    lineJoin: 'round' as const,
+  },
+  /** Branch line (odgałęzienie kabel/napowietrzna) */
+  branchLine: {
+    strokeWidth: 2.5,
+    color: ETAP_VOLTAGE_COLORS.SN,
+    overheadDash: '12 6',
+    cableDash: 'none',
+  },
+  /** Station internal line (łańcuch aparatów) */
+  stationInternal: {
+    strokeWidth: 2,
+    color: ETAP_VOLTAGE_COLORS.SN,
+  },
+  /** Overhead line differentiation */
+  overheadLine: {
+    strokeDasharray: '12 6',
+    strokeWidth: 2.5,
+  },
+  /** Cable line differentiation */
+  cableLine: {
+    strokeDasharray: 'none',
+    strokeWidth: 2.5,
+  },
+  /** Junction dot (IEC 61082) */
+  junctionDot: {
+    radius: 4,
+    fillColor: 'currentColor',
+    hoverTransition: 'opacity 0.15s ease',
+  },
+  /** Power flow direction arrow */
+  powerArrow: {
+    size: 8,
+    strokeWidth: 1.5,
+    generationColor: '#10B981',
+    loadColor: '#6B7280',
+  },
+  /** Node label (nazwa węzła na magistrali) */
+  nodeLabel: {
+    fontSize: 11,
+    fontWeight: 600,
+    fontFamily: "'JetBrains Mono', 'Inter', monospace",
+    fill: '#1F2937',
+    offsetX: -20,
+  },
+  /** Segment label (nazwa odcinka/kabla) */
+  segmentLabel: {
+    fontSize: 10,
+    fontWeight: 500,
+    fontFamily: "'Inter', sans-serif",
+    fill: '#374151',
+  },
+  /** Segment parameters (długość, przekrój, typ) */
+  segmentParams: {
+    fontSize: 9,
+    fontWeight: 400,
+    fontFamily: "'Inter', sans-serif",
+    fill: '#6B7280',
+  },
+  /** Apparatus label (oznaczenie aparatu w łańcuchu) */
+  apparatusLabel: {
+    fontSize: 9,
+    fontWeight: 500,
+    fontFamily: "'JetBrains Mono', 'Inter', monospace",
+    fill: '#374151',
+  },
+  /** Station title (nazwa stacji) */
+  stationTitle: {
+    fontSize: 12,
+    fontWeight: 700,
+    fontFamily: "'Inter', sans-serif",
+    fill: '#111827',
+  },
+  /** IEC 81346 designation (Q0, T1, -W01 etc.) */
+  iecDesignation: {
+    fontSize: 8,
+    fontWeight: 600,
+    fontFamily: "'JetBrains Mono', 'Inter', monospace",
+    fill: '#6B7280',
+  },
+} as const;
+
+// =============================================================================
 // EXPORT DEFAULT
 // =============================================================================
 
@@ -1792,6 +1890,8 @@ export default {
   HOVER_STYLES,
   SELECTION_STYLES,
   PINNED_STYLES,
+  // Canonical SLD styles (IEC 61082 / ETAP)
+  CANONICAL_SLD_STYLES,
   // Helpers
   getVoltageColor: getEtapVoltageColor,
   getStrokeColor: getEtapStrokeColor,

@@ -63,6 +63,13 @@ export type EtapSymbolId =
   | 'directional_relay'
   | 'earthing_switch'
   | 'load_arrow'
+  // Industrial canonical SLD symbols (IEC 60617/61082 — BLOK B)
+  | 'fuse'
+  | 'surge_arrester'
+  | 'capacitor'
+  | 'reactor'
+  | 'inverter'
+  | 'metering_cubicle'
   // Tree-specific symbols
   | 'load'
   | 'project'
@@ -324,6 +331,67 @@ const SYMBOL_DEFINITIONS: Record<EtapSymbolId, Omit<ResolvedSymbol, 'symbolId'>>
     allowedRotations: [0],
     defaultRotation: 0,
   },
+  // Industrial canonical SLD symbols (IEC 60617/61082 — BLOK B)
+  fuse: {
+    description: 'Bezpiecznik / Fuse',
+    viewBox: '0 0 100 100',
+    ports: {
+      top: { x: 50, y: 0 },
+      bottom: { x: 50, y: 100 },
+    },
+    allowedRotations: [0, 90],
+    defaultRotation: 0,
+  },
+  surge_arrester: {
+    description: 'Ogranicznik przepiec / Surge Arrester',
+    viewBox: '0 0 100 100',
+    ports: {
+      top: { x: 50, y: 0 },
+      bottom: { x: 50, y: 100 },
+    },
+    allowedRotations: [0],
+    defaultRotation: 0,
+  },
+  capacitor: {
+    description: 'Kondensator / Capacitor',
+    viewBox: '0 0 100 100',
+    ports: {
+      top: { x: 50, y: 0 },
+      bottom: { x: 50, y: 100 },
+    },
+    allowedRotations: [0, 90],
+    defaultRotation: 0,
+  },
+  reactor: {
+    description: 'Dławik / Reactor',
+    viewBox: '0 0 100 100',
+    ports: {
+      top: { x: 50, y: 0 },
+      bottom: { x: 50, y: 100 },
+    },
+    allowedRotations: [0, 90],
+    defaultRotation: 0,
+  },
+  inverter: {
+    description: 'Falownik / Inverter',
+    viewBox: '0 0 100 100',
+    ports: {
+      top: { x: 50, y: 0 },
+      bottom: { x: 50, y: 100 },
+    },
+    allowedRotations: [0],
+    defaultRotation: 0,
+  },
+  metering_cubicle: {
+    description: 'Szafka pomiarowa / Metering Cubicle',
+    viewBox: '0 0 100 100',
+    ports: {
+      top: { x: 50, y: 0 },
+      bottom: { x: 50, y: 100 },
+    },
+    allowedRotations: [0],
+    defaultRotation: 0,
+  },
   // Tree-specific symbols
   load: {
     description: 'Odbiornik / Load',
@@ -459,8 +527,7 @@ export function resolveSymbol(symbol: AnySldSymbol): ResolvedSymbol | null {
           // LOAD_SWITCH → circuit_breaker (najbliższy odpowiednik)
           return getSymbolDefinition('circuit_breaker');
         case 'FUSE':
-          // FUSE → disconnector (najbliższy odpowiednik)
-          return getSymbolDefinition('disconnector');
+          return getSymbolDefinition('fuse');
         default:
           // Fallback dla nieznanych switchType
           warnOnce(`[SymbolResolver] Nieznany switchType: ${switchSymbol.switchType}, używam circuit_breaker`);
