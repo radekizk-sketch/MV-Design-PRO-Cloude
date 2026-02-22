@@ -236,6 +236,9 @@ class TestPoint:
         point_id: Stable identifier / label
         i_a_primary: Test current on primary side [A]
     """
+
+    __test__ = False  # Prevent pytest from collecting this as a test class
+
     point_id: str
     i_a_primary: float
 
@@ -341,6 +344,9 @@ class Function51Result:
 @dataclass(frozen=True)
 class TestPointFunctionResults:
     """All function results for a single test point."""
+
+    __test__ = False  # Prevent pytest from collecting this as a test class
+
     f50: Function50Result | None = None
     f51: Function51Result | None = None
 
@@ -368,6 +374,9 @@ class TestPointFunctionResults:
 @dataclass(frozen=True)
 class TestPointResult:
     """Result for a single test point against a relay."""
+
+    __test__ = False  # Prevent pytest from collecting this as a test class
+
     point_id: str
     i_a_secondary: float
     function_results: TestPointFunctionResults
