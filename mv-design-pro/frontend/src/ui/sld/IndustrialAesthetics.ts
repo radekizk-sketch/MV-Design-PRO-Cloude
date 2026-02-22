@@ -576,6 +576,21 @@ export const NN_BUSBAR_WIDTH = 120 as const;
 /** Rozmiar strzałki kierunku mocy [px]. */
 export const POWER_ARROW_SIZE = 8 as const;
 
+/** Padding wewnętrzny bounding-box stacji [px]. */
+export const STATION_BOUNDING_BOX_PADDING = 16 as const;
+
+/** Minimalna długość toru głównego magistrali [px]. */
+export const TRUNK_SPINE_MIN_LENGTH = 200 as const;  // 10 * GRID_BASE
+
+/** Rozmiar fontu etykiety węzła kanonicznego [px]. */
+export const ANNOTATION_FONT_SIZE_NODE = 11 as const;
+
+/** Rozmiar fontu etykiety segmentu [px]. */
+export const ANNOTATION_FONT_SIZE_SEGMENT = 10 as const;
+
+/** Rozmiar fontu parametrów segmentu [px]. */
+export const ANNOTATION_FONT_SIZE_PARAMS = 9 as const;
+
 // =============================================================================
 // STAŁA WERYFIKACYJNA (dla testów)
 // =============================================================================

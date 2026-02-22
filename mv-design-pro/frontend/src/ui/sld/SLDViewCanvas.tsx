@@ -43,6 +43,7 @@ import { BranchRenderer } from './BranchRenderer';
 import { StationFieldRenderer } from './StationFieldRenderer';
 import { JunctionDotLayer } from './JunctionDotLayer';
 import { ETAP_GRID, ETAP_TYPOGRAPHY, ETAP_CANVAS } from './sldEtapStyle';
+import './sld-canonical.css';
 
 /**
  * Read-only symbol renderer using UnifiedSymbolRenderer.

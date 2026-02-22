@@ -86,8 +86,8 @@ const BusbarSymbol: React.FC<Omit<EtapSymbolProps, 'symbolId'>> = ({
 
 /**
  * Circuit Breaker / Wyłącznik
- * ETAP-like visual representation:
- * - CLOSED: Square with X pattern, continuous connections
+ * ETAP/ABB-grade visual representation with trip indicator:
+ * - CLOSED: Square with X pattern, continuous connections, trip coil mark
  * - OPEN: Square with X pattern, gap in bottom connection showing break
  * - UNKNOWN: Dashed outline indicating indeterminate state
  */
@@ -106,18 +106,20 @@ const CircuitBreakerSymbol: React.FC<Omit<EtapSymbolProps, 'symbolId'>> = ({
 
   return (
     <>
+      {/* CB body */}
       <rect
         x="30"
         y="30"
         width="40"
         height="40"
-        fill={fill}
+        fill={fill === 'none' ? 'rgba(255,255,255,0.95)' : fill}
         stroke={stroke}
         strokeWidth={strokeWidth}
         strokeDasharray={rectDasharray}
         opacity={opacity}
         data-testid="sld-switch-state-cb-rect"
       />
+      {/* Cross pattern (IEC standard CB symbol) */}
       <line x1="30" y1="30" x2="70" y2="70" stroke={stroke} strokeWidth={2} opacity={opacity} />
       <line x1="70" y1="30" x2="30" y2="70" stroke={stroke} strokeWidth={2} opacity={opacity} />
       {/* Top connection - always connected */}
@@ -135,13 +137,16 @@ const CircuitBreakerSymbol: React.FC<Omit<EtapSymbolProps, 'symbolId'>> = ({
       ) : (
         <line x1="50" y1="70" x2="50" y2="100" stroke={stroke} strokeWidth={strokeWidth} opacity={opacity} />
       )}
+      {/* Trip coil indicator (small horizontal mark — ETAP convention) */}
+      <line x1="72" y1="48" x2="78" y2="48" stroke={stroke} strokeWidth={1.5} opacity={opacity * 0.6} />
+      <line x1="72" y1="52" x2="78" y2="52" stroke={stroke} strokeWidth={1.5} opacity={opacity * 0.6} />
     </>
   );
 };
 
 /**
  * Disconnector / Rozłącznik
- * ETAP-like visual representation:
+ * ETAP/ABB-grade: blade switch with detailed contact points.
  * - OPEN: Blade angled away (łopatka otwarta)
  * - CLOSED: Blade vertical connecting contacts (łopatka zamknięta)
  * - UNKNOWN: Dashed blade indicating indeterminate state
@@ -190,9 +195,12 @@ const DisconnectorSymbol: React.FC<Omit<EtapSymbolProps, 'symbolId'>> = ({
           data-testid="sld-switch-state-ds-blade-closed"
         />
       )}
-      {/* Fixed contact points */}
+      {/* Fixed contact points — prominent filled dots (ETAP convention) */}
       <circle cx="50" cy="35" r="4" fill={stroke} stroke="none" opacity={opacity} />
       <circle cx="50" cy="65" r="4" fill={stroke} stroke="none" opacity={opacity} />
+      {/* Contact seat marks (horizontal short bars — industrial detail) */}
+      <line x1="44" y1="35" x2="56" y2="35" stroke={stroke} strokeWidth={1.5} opacity={opacity * 0.5} />
+      <line x1="44" y1="65" x2="56" y2="65" stroke={stroke} strokeWidth={1.5} opacity={opacity * 0.5} />
     </>
   );
 };
@@ -236,7 +244,8 @@ const LineCableSymbol: React.FC<Omit<EtapSymbolProps, 'symbolId'>> = ({
 
 /**
  * Two-Winding Transformer / Transformator 2-uzwojeniowy
- * Two overlapping circles (primary and secondary windings).
+ * ETAP/ABB-grade: Two overlapping circles with winding sense dots.
+ * Enhanced with winding polarity indicators and industrial detail.
  */
 const Transformer2wSymbol: React.FC<Omit<EtapSymbolProps, 'symbolId'>> = ({
   stroke = 'currentColor',
@@ -245,11 +254,16 @@ const Transformer2wSymbol: React.FC<Omit<EtapSymbolProps, 'symbolId'>> = ({
   opacity = 1,
 }) => (
   <>
-    <circle cx="50" cy="35" r="20" fill={fill} stroke={stroke} strokeWidth={strokeWidth} opacity={opacity} />
-    <circle cx="50" cy="65" r="20" fill={fill} stroke={stroke} strokeWidth={strokeWidth} opacity={opacity} />
     {/* Connection stubs */}
     <line x1="50" y1="0" x2="50" y2="15" stroke={stroke} strokeWidth={strokeWidth} opacity={opacity} />
     <line x1="50" y1="85" x2="50" y2="100" stroke={stroke} strokeWidth={strokeWidth} opacity={opacity} />
+    {/* Primary winding (WN) */}
+    <circle cx="50" cy="35" r="20" fill={fill === 'none' ? 'rgba(255,255,255,0.95)' : fill} stroke={stroke} strokeWidth={strokeWidth} opacity={opacity} />
+    {/* Secondary winding (SN/nN) */}
+    <circle cx="50" cy="65" r="20" fill={fill === 'none' ? 'rgba(255,255,255,0.95)' : fill} stroke={stroke} strokeWidth={strokeWidth} opacity={opacity} />
+    {/* Winding polarity dots (IEC 60617) */}
+    <circle cx="42" cy="25" r="2.5" fill={stroke} stroke="none" opacity={opacity * 0.8} />
+    <circle cx="42" cy="55" r="2.5" fill={stroke} stroke="none" opacity={opacity * 0.8} />
   </>
 );
 
@@ -276,7 +290,7 @@ const Transformer3wSymbol: React.FC<Omit<EtapSymbolProps, 'symbolId'>> = ({
 
 /**
  * Generator / Generator synchroniczny
- * Circle with G letter inside.
+ * ETAP/ABB-grade: Circle with G + sine wave accent.
  */
 const GeneratorSymbol: React.FC<Omit<EtapSymbolProps, 'symbolId'>> = ({
   stroke = 'currentColor',
@@ -285,10 +299,20 @@ const GeneratorSymbol: React.FC<Omit<EtapSymbolProps, 'symbolId'>> = ({
   opacity = 1,
 }) => (
   <>
-    <circle cx="50" cy="40" r="30" fill={fill} stroke={stroke} strokeWidth={strokeWidth} opacity={opacity} />
-    <text x="50" y="48" textAnchor="middle" fontSize="24" fontWeight="bold" fill={stroke} opacity={opacity}>
+    {/* Main body */}
+    <circle cx="50" cy="40" r="30" fill={fill === 'none' ? 'rgba(255,255,255,0.95)' : fill} stroke={stroke} strokeWidth={strokeWidth} opacity={opacity} />
+    {/* G label */}
+    <text x="50" y="44" textAnchor="middle" fontSize="22" fontWeight="bold" fill={stroke} opacity={opacity}>
       G
     </text>
+    {/* Sine wave accent below G (AC generator indicator) */}
+    <path
+      d="M 38 55 Q 44 49 50 55 Q 56 61 62 55"
+      fill="none"
+      stroke={stroke}
+      strokeWidth={1.5}
+      opacity={opacity * 0.5}
+    />
     {/* Connection stub */}
     <line x1="50" y1="70" x2="50" y2="100" stroke={stroke} strokeWidth={strokeWidth} opacity={opacity} />
   </>
@@ -418,7 +442,7 @@ const GroundSymbol: React.FC<Omit<EtapSymbolProps, 'symbolId'>> = ({
 
 /**
  * Current Transformer / Przekładnik prądowy
- * CT symbol — inline donut style for placement on feeder lines.
+ * ETAP/ABB-grade CT: inline donut with secondary winding indication.
  * PR-SLD-UX-MAX: Compact inline design, detail hierarchy level.
  */
 const CtSymbol: React.FC<Omit<EtapSymbolProps, 'symbolId'>> = ({
@@ -432,10 +456,14 @@ const CtSymbol: React.FC<Omit<EtapSymbolProps, 'symbolId'>> = ({
     <line x1="0" y1="50" x2="35" y2="50" stroke={stroke} strokeWidth={strokeWidth * 0.8} opacity={opacity} />
     <line x1="65" y1="50" x2="100" y2="50" stroke={stroke} strokeWidth={strokeWidth * 0.8} opacity={opacity} />
     {/* CT donut — compact inline */}
-    <circle cx="50" cy="50" r="15" fill={fill === 'none' ? '#FFFFFF' : fill} stroke={stroke} strokeWidth={strokeWidth * 0.7} opacity={opacity} />
+    <circle cx="50" cy="50" r="15" fill={fill === 'none' ? 'rgba(255,255,255,0.95)' : fill} stroke={stroke} strokeWidth={strokeWidth * 0.7} opacity={opacity} />
+    {/* Inner winding indicator */}
     <circle cx="50" cy="50" r="8" fill="none" stroke={stroke} strokeWidth={strokeWidth * 0.5} opacity={opacity * 0.8} />
+    {/* Secondary output taps (measurement leads) */}
+    <line x1="50" y1="65" x2="50" y2="75" stroke={stroke} strokeWidth={strokeWidth * 0.4} opacity={opacity * 0.6} />
+    <line x1="46" y1="75" x2="54" y2="75" stroke={stroke} strokeWidth={strokeWidth * 0.4} opacity={opacity * 0.6} />
     {/* CT marker — small text */}
-    <text x="50" y="75" textAnchor="middle" fontSize="10" fontWeight="500" fill={stroke} opacity={opacity * 0.9}>
+    <text x="50" y="88" textAnchor="middle" fontSize="10" fontWeight="500" fill={stroke} opacity={opacity * 0.9}>
       CT
     </text>
   </>
@@ -699,6 +727,170 @@ const LoadArrowSymbol: React.FC<Omit<EtapSymbolProps, 'symbolId'>> = ({
 );
 
 /**
+ * Fuse / Bezpiecznik
+ * IEC 60617 symbol: rectangle with strikethrough line.
+ */
+const FuseSymbol: React.FC<Omit<EtapSymbolProps, 'symbolId'>> = ({
+  stroke = 'currentColor',
+  fill = 'none',
+  strokeWidth = 3,
+  opacity = 1,
+}) => (
+  <>
+    {/* Top connection */}
+    <line x1="50" y1="0" x2="50" y2="30" stroke={stroke} strokeWidth={strokeWidth} opacity={opacity} />
+    {/* Fuse body — narrow rectangle per IEC 60617 */}
+    <rect x="38" y="30" width="24" height="40" fill={fill} stroke={stroke} strokeWidth={strokeWidth} rx={1} opacity={opacity} />
+    {/* Fuse element — center line */}
+    <line x1="50" y1="30" x2="50" y2="70" stroke={stroke} strokeWidth={strokeWidth * 0.6} opacity={opacity} />
+    {/* Bottom connection */}
+    <line x1="50" y1="70" x2="50" y2="100" stroke={stroke} strokeWidth={strokeWidth} opacity={opacity} />
+  </>
+);
+
+/**
+ * Surge Arrester / Ogranicznik przepięć
+ * IEC 60617 symbol: ground + gap + zigzag varistor element.
+ */
+const SurgeArresterSymbol: React.FC<Omit<EtapSymbolProps, 'symbolId'>> = ({
+  stroke = 'currentColor',
+  strokeWidth = 3,
+  opacity = 1,
+}) => (
+  <>
+    {/* Top connection */}
+    <line x1="50" y1="0" x2="50" y2="25" stroke={stroke} strokeWidth={strokeWidth} opacity={opacity} />
+    {/* Gap plate top */}
+    <line x1="35" y1="25" x2="65" y2="25" stroke={stroke} strokeWidth={strokeWidth} opacity={opacity} />
+    {/* Gap */}
+    <line x1="35" y1="35" x2="65" y2="35" stroke={stroke} strokeWidth={strokeWidth} opacity={opacity} />
+    {/* Varistor body — zigzag */}
+    <polyline
+      points="50,35 40,45 60,55 50,65"
+      fill="none"
+      stroke={stroke}
+      strokeWidth={strokeWidth}
+      strokeLinejoin="round"
+      opacity={opacity}
+    />
+    {/* Bottom connection */}
+    <line x1="50" y1="65" x2="50" y2="78" stroke={stroke} strokeWidth={strokeWidth} opacity={opacity} />
+    {/* Ground */}
+    <line x1="35" y1="78" x2="65" y2="78" stroke={stroke} strokeWidth={strokeWidth} opacity={opacity} />
+    <line x1="40" y1="85" x2="60" y2="85" stroke={stroke} strokeWidth={strokeWidth * 0.7} opacity={opacity} />
+    <line x1="45" y1="92" x2="55" y2="92" stroke={stroke} strokeWidth={strokeWidth * 0.5} opacity={opacity} />
+  </>
+);
+
+/**
+ * Capacitor / Kondensator
+ * IEC 60617 symbol: two parallel plates.
+ */
+const CapacitorSymbol: React.FC<Omit<EtapSymbolProps, 'symbolId'>> = ({
+  stroke = 'currentColor',
+  strokeWidth = 3,
+  opacity = 1,
+}) => (
+  <>
+    {/* Top connection */}
+    <line x1="50" y1="0" x2="50" y2="40" stroke={stroke} strokeWidth={strokeWidth} opacity={opacity} />
+    {/* Top plate */}
+    <line x1="30" y1="40" x2="70" y2="40" stroke={stroke} strokeWidth={strokeWidth} opacity={opacity} />
+    {/* Bottom plate */}
+    <line x1="30" y1="55" x2="70" y2="55" stroke={stroke} strokeWidth={strokeWidth} opacity={opacity} />
+    {/* Bottom connection */}
+    <line x1="50" y1="55" x2="50" y2="100" stroke={stroke} strokeWidth={strokeWidth} opacity={opacity} />
+  </>
+);
+
+/**
+ * Reactor / Dławik
+ * IEC 60617 symbol: coil/inductor with 3 half-loops.
+ */
+const ReactorSymbol: React.FC<Omit<EtapSymbolProps, 'symbolId'>> = ({
+  stroke = 'currentColor',
+  fill = 'none',
+  strokeWidth = 3,
+  opacity = 1,
+}) => (
+  <>
+    {/* Top connection */}
+    <line x1="50" y1="0" x2="50" y2="25" stroke={stroke} strokeWidth={strokeWidth} opacity={opacity} />
+    {/* Coil — three arcs (half-circles) */}
+    <path
+      d="M 50 25 A 12 12 0 0 1 50 49 A 12 12 0 0 1 50 73"
+      fill={fill}
+      stroke={stroke}
+      strokeWidth={strokeWidth}
+      opacity={opacity}
+    />
+    {/* Bottom connection */}
+    <line x1="50" y1="73" x2="50" y2="100" stroke={stroke} strokeWidth={strokeWidth} opacity={opacity} />
+  </>
+);
+
+/**
+ * Inverter / Falownik
+ * IEC 60617 symbol: rectangle with AC/DC wave marks.
+ */
+const InverterSymbol: React.FC<Omit<EtapSymbolProps, 'symbolId'>> = ({
+  stroke = 'currentColor',
+  fill = 'none',
+  strokeWidth = 3,
+  opacity = 1,
+}) => (
+  <>
+    {/* Top connection (DC side) */}
+    <line x1="50" y1="0" x2="50" y2="20" stroke={stroke} strokeWidth={strokeWidth} opacity={opacity} />
+    {/* Inverter body */}
+    <rect x="25" y="20" width="50" height="55" fill={fill} stroke={stroke} strokeWidth={strokeWidth} rx={2} opacity={opacity} />
+    {/* DC mark — straight line with +/- */}
+    <line x1="35" y1="35" x2="65" y2="35" stroke={stroke} strokeWidth={1.5} opacity={opacity} />
+    <line x1="38" y1="32" x2="38" y2="38" stroke={stroke} strokeWidth={1.5} opacity={opacity} />
+    {/* AC mark — sine wave */}
+    <path
+      d="M 35 60 Q 42 50 50 60 Q 58 70 65 60"
+      fill="none"
+      stroke={stroke}
+      strokeWidth={1.5}
+      opacity={opacity}
+    />
+    {/* Diagonal arrow (conversion direction) */}
+    <line x1="35" y1="68" x2="65" y2="28" stroke={stroke} strokeWidth={1} opacity={opacity * 0.6} />
+    {/* Bottom connection (AC side) */}
+    <line x1="50" y1="75" x2="50" y2="100" stroke={stroke} strokeWidth={strokeWidth} opacity={opacity} />
+  </>
+);
+
+/**
+ * Metering Cubicle / Szafka pomiarowa
+ * IEC 61082: rectangle with kWh meter symbol.
+ */
+const MeteringCubicleSymbol: React.FC<Omit<EtapSymbolProps, 'symbolId'>> = ({
+  stroke = 'currentColor',
+  fill = 'none',
+  strokeWidth = 3,
+  opacity = 1,
+}) => (
+  <>
+    {/* Top connection */}
+    <line x1="50" y1="0" x2="50" y2="20" stroke={stroke} strokeWidth={strokeWidth} opacity={opacity} />
+    {/* Cubicle body */}
+    <rect x="25" y="20" width="50" height="55" fill={fill} stroke={stroke} strokeWidth={strokeWidth} rx={2} opacity={opacity} />
+    {/* Meter circle */}
+    <circle cx="50" cy="42" r="12" fill="none" stroke={stroke} strokeWidth={strokeWidth * 0.6} opacity={opacity} />
+    {/* kWh label */}
+    <text x="50" y="46" textAnchor="middle" fontSize="8" fontWeight="500" fill={stroke} opacity={opacity}>
+      kWh
+    </text>
+    {/* Spinning disc indicator */}
+    <line x1="42" y1="60" x2="58" y2="60" stroke={stroke} strokeWidth={1.5} opacity={opacity} />
+    {/* Bottom connection */}
+    <line x1="50" y1="75" x2="50" y2="100" stroke={stroke} strokeWidth={strokeWidth} opacity={opacity} />
+  </>
+);
+
+/**
  * Relay / Przekaźnik zabezpieczeniowy
  * IEC 60617 symbol: rectangle with function label, placed above breaker.
  */
@@ -744,6 +936,13 @@ const SYMBOL_COMPONENTS: Record<EtapSymbolId, React.FC<Omit<EtapSymbolProps, 'sy
   directional_relay: DirectionalRelaySymbol,
   earthing_switch: EarthingSwitchSymbol,
   load_arrow: LoadArrowSymbol,
+  // Industrial canonical SLD symbols (IEC 60617/61082 — BLOK B)
+  fuse: FuseSymbol,
+  surge_arrester: SurgeArresterSymbol,
+  capacitor: CapacitorSymbol,
+  reactor: ReactorSymbol,
+  inverter: InverterSymbol,
+  metering_cubicle: MeteringCubicleSymbol,
   // Tree-specific symbols
   load: LoadSymbol,
   project: ProjectSymbol,
@@ -920,6 +1119,37 @@ export function renderSymbolToString(symbolId: EtapSymbolId): string | null {
       <line x1="47" y1="85" x2="53" y2="85" stroke="#000000" stroke-width="1"/>`,
     load_arrow: `<line x1="50" y1="10" x2="50" y2="45" stroke="#000000" stroke-width="3"/>
       <polygon points="35,45 65,45 50,75" fill="none" stroke="#000000" stroke-width="3" stroke-linejoin="round"/>`,
+    fuse: `<line x1="50" y1="0" x2="50" y2="30" stroke="#000000" stroke-width="3"/>
+      <rect x="38" y="30" width="24" height="40" fill="none" stroke="#000000" stroke-width="3" rx="1"/>
+      <line x1="50" y1="30" x2="50" y2="70" stroke="#000000" stroke-width="1.8"/>
+      <line x1="50" y1="70" x2="50" y2="100" stroke="#000000" stroke-width="3"/>`,
+    surge_arrester: `<line x1="50" y1="0" x2="50" y2="25" stroke="#000000" stroke-width="3"/>
+      <line x1="35" y1="25" x2="65" y2="25" stroke="#000000" stroke-width="3"/>
+      <line x1="35" y1="35" x2="65" y2="35" stroke="#000000" stroke-width="3"/>
+      <polyline points="50,35 40,45 60,55 50,65" fill="none" stroke="#000000" stroke-width="3" stroke-linejoin="round"/>
+      <line x1="50" y1="65" x2="50" y2="78" stroke="#000000" stroke-width="3"/>
+      <line x1="35" y1="78" x2="65" y2="78" stroke="#000000" stroke-width="3"/>
+      <line x1="40" y1="85" x2="60" y2="85" stroke="#000000" stroke-width="2"/>
+      <line x1="45" y1="92" x2="55" y2="92" stroke="#000000" stroke-width="1.5"/>`,
+    capacitor: `<line x1="50" y1="0" x2="50" y2="40" stroke="#000000" stroke-width="3"/>
+      <line x1="30" y1="40" x2="70" y2="40" stroke="#000000" stroke-width="3"/>
+      <line x1="30" y1="55" x2="70" y2="55" stroke="#000000" stroke-width="3"/>
+      <line x1="50" y1="55" x2="50" y2="100" stroke="#000000" stroke-width="3"/>`,
+    reactor: `<line x1="50" y1="0" x2="50" y2="25" stroke="#000000" stroke-width="3"/>
+      <path d="M 50 25 A 12 12 0 0 1 50 49 A 12 12 0 0 1 50 73" fill="none" stroke="#000000" stroke-width="3"/>
+      <line x1="50" y1="73" x2="50" y2="100" stroke="#000000" stroke-width="3"/>`,
+    inverter: `<line x1="50" y1="0" x2="50" y2="20" stroke="#000000" stroke-width="3"/>
+      <rect x="25" y="20" width="50" height="55" fill="none" stroke="#000000" stroke-width="3" rx="2"/>
+      <line x1="35" y1="35" x2="65" y2="35" stroke="#000000" stroke-width="1.5"/>
+      <line x1="38" y1="32" x2="38" y2="38" stroke="#000000" stroke-width="1.5"/>
+      <path d="M 35 60 Q 42 50 50 60 Q 58 70 65 60" fill="none" stroke="#000000" stroke-width="1.5"/>
+      <line x1="50" y1="75" x2="50" y2="100" stroke="#000000" stroke-width="3"/>`,
+    metering_cubicle: `<line x1="50" y1="0" x2="50" y2="20" stroke="#000000" stroke-width="3"/>
+      <rect x="25" y="20" width="50" height="55" fill="none" stroke="#000000" stroke-width="3" rx="2"/>
+      <circle cx="50" cy="42" r="12" fill="none" stroke="#000000" stroke-width="1.8"/>
+      <text x="50" y="46" text-anchor="middle" font-size="8" font-weight="500" fill="#000000">kWh</text>
+      <line x1="42" y1="60" x2="58" y2="60" stroke="#000000" stroke-width="1.5"/>
+      <line x1="50" y1="75" x2="50" y2="100" stroke="#000000" stroke-width="3"/>`,
   };
 
   return svgContent[symbolId] || null;
