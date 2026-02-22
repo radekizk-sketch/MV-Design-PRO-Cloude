@@ -975,22 +975,22 @@ export const SLDView: React.FC<SLDViewProps> = ({
   return (
     <div
       data-testid="sld-view"
-      className="flex flex-col h-full bg-stone-100"
+      className="flex flex-col h-full bg-canvas-bg"
     >
-      {/* Toolbar — ETAP-grade professional */}
+      {/* Pasek narzędzi SLD — klasa przemysłowa */}
       <div
         data-testid="sld-view-toolbar"
-        className="flex items-center justify-between px-4 py-2.5 bg-slate-800 border-b border-slate-700"
+        className="flex items-center justify-between px-4 py-2 bg-chrome-800 border-b border-chrome-700 shadow-toolbar"
       >
         <div className="flex items-center gap-3">
           {/* Logo/Icon */}
           <div className="flex items-center gap-2">
-            <svg className="w-5 h-5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
+            <svg className="w-5 h-5 text-ind-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6A2.25 2.25 0 016 3.75h2.25A2.25 2.25 0 0110.5 6v2.25a2.25 2.25 0 01-2.25 2.25H6a2.25 2.25 0 01-2.25-2.25V6zM3.75 15.75A2.25 2.25 0 016 13.5h2.25a2.25 2.25 0 012.25 2.25V18a2.25 2.25 0 01-2.25 2.25H6A2.25 2.25 0 013.75 18v-2.25zM13.5 6a2.25 2.25 0 012.25-2.25H18A2.25 2.25 0 0120.25 6v2.25A2.25 2.25 0 0118 10.5h-2.25a2.25 2.25 0 01-2.25-2.25V6zM13.5 15.75a2.25 2.25 0 012.25-2.25H18a2.25 2.25 0 012.25 2.25V18A2.25 2.25 0 0118 20.25h-2.25A2.25 2.25 0 0113.5 18v-2.25z" />
             </svg>
-            <h3 className="text-sm font-semibold text-slate-100 tracking-wide">Schemat jednokreskowy</h3>
+            <h3 className="text-sm font-semibold text-chrome-100 tracking-wide">Schemat jednokreskowy</h3>
           </div>
-          <span className="text-xs text-slate-400 font-medium">
+          <span className="text-xs text-chrome-400 font-medium">
             SLD
           </span>
           {/* PR-SLD-06: Mode indicator */}
@@ -1001,7 +1001,7 @@ export const SLDView: React.FC<SLDViewProps> = ({
                 ? 'bg-blue-600 text-white'
                 : isProtectionMode
                 ? 'bg-emerald-600 text-white'
-                : 'bg-slate-600 text-slate-200'
+                : 'bg-chrome-600 text-chrome-200'
             }`}
           >
             {SLD_MODE_LABELS_PL[sldMode]}
@@ -1010,12 +1010,12 @@ export const SLDView: React.FC<SLDViewProps> = ({
 
         <div className="flex items-center gap-1.5">
           {/* Zoom controls — ETAP-grade */}
-          <div className="flex items-center bg-slate-700 rounded overflow-hidden">
+          <div className="flex items-center bg-chrome-700 rounded overflow-hidden">
             <button
               type="button"
               onClick={handleZoomOut}
               disabled={viewport.zoom <= ZOOM_MIN}
-              className="px-2.5 py-1.5 text-sm text-slate-200 hover:bg-slate-600 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+              className="px-2.5 py-1.5 text-sm text-chrome-200 hover:bg-chrome-600 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
               title="Pomniejsz"
               data-testid="sld-zoom-out"
             >
@@ -1024,7 +1024,7 @@ export const SLDView: React.FC<SLDViewProps> = ({
               </svg>
             </button>
             <span
-              className="text-xs text-slate-100 w-12 text-center font-mono bg-slate-600 py-1.5"
+              className="text-xs text-chrome-100 w-12 text-center font-mono bg-chrome-600 py-1.5"
               data-testid="sld-zoom-level"
             >
               {zoomPercent}%
@@ -1033,7 +1033,7 @@ export const SLDView: React.FC<SLDViewProps> = ({
               type="button"
               onClick={handleZoomIn}
               disabled={viewport.zoom >= ZOOM_MAX}
-              className="px-2.5 py-1.5 text-sm text-slate-200 hover:bg-slate-600 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+              className="px-2.5 py-1.5 text-sm text-chrome-200 hover:bg-chrome-600 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
               title="Powiększ"
               data-testid="sld-zoom-in"
             >
@@ -1043,13 +1043,13 @@ export const SLDView: React.FC<SLDViewProps> = ({
             </button>
           </div>
 
-          <div className="w-px h-5 bg-slate-600 mx-1" />
+          <div className="w-px h-5 bg-chrome-600 mx-1" />
 
           {/* Fit & Reset — ETAP-grade buttons */}
           <button
             type="button"
             onClick={handleFitToContent}
-            className="px-3 py-1.5 text-xs font-medium text-slate-200 bg-slate-700 hover:bg-slate-600 rounded transition-colors"
+            className="px-3 py-1.5 text-xs font-medium text-chrome-200 bg-chrome-700 hover:bg-chrome-600 rounded transition-colors"
             title="Dopasuj do schematu (F)"
             aria-label="Dopasuj do schematu"
             data-testid="sld-fit-content"
@@ -1059,7 +1059,7 @@ export const SLDView: React.FC<SLDViewProps> = ({
           <button
             type="button"
             onClick={handleResetView}
-            className="px-3 py-1.5 text-xs font-medium text-slate-300 hover:text-slate-100 hover:bg-slate-700 rounded transition-colors"
+            className="px-3 py-1.5 text-xs font-medium text-chrome-300 hover:text-chrome-100 hover:bg-chrome-700 rounded transition-colors"
             title="Resetuj widok"
             data-testid="sld-reset-view"
           >
@@ -1069,14 +1069,14 @@ export const SLDView: React.FC<SLDViewProps> = ({
           {/* Results overlay toggle */}
           {hasResults && (
             <>
-              <div className="w-px h-5 bg-slate-600 mx-1" />
+              <div className="w-px h-5 bg-chrome-600 mx-1" />
               <button
                 type="button"
                 onClick={() => toggleOverlay()}
                 className={`px-3 py-1.5 text-xs font-medium rounded transition-colors ${
                   overlayVisible
                     ? 'bg-blue-600 text-white'
-                    : 'text-slate-300 hover:text-slate-100 hover:bg-slate-700'
+                    : 'text-chrome-300 hover:text-chrome-100 hover:bg-chrome-700'
                 }`}
                 title={overlayVisible ? 'Ukryj nakładkę wyników' : 'Pokaż nakładkę wyników'}
                 data-testid="sld-overlay-toggle"
@@ -1089,14 +1089,14 @@ export const SLDView: React.FC<SLDViewProps> = ({
           {/* Diagnostics overlay toggle and filter */}
           {hasDiagnostics && (
             <>
-              <div className="w-px h-5 bg-slate-600 mx-1" />
+              <div className="w-px h-5 bg-chrome-600 mx-1" />
               <button
                 type="button"
                 onClick={() => toggleDiagnostics()}
                 className={`px-3 py-1.5 text-xs font-medium rounded transition-colors ${
                   diagnosticsVisible
                     ? 'bg-rose-600 text-white'
-                    : 'text-slate-300 hover:text-slate-100 hover:bg-slate-700'
+                    : 'text-chrome-300 hover:text-chrome-100 hover:bg-chrome-700'
                 }`}
                 title={diagnosticsVisible ? 'Ukryj diagnostykę' : 'Pokaż diagnostykę'}
                 data-testid="sld-diagnostics-toggle"
@@ -1109,7 +1109,7 @@ export const SLDView: React.FC<SLDViewProps> = ({
                 <select
                   value={diagnosticsFilter}
                   onChange={handleFilterChange}
-                  className="px-2 py-1.5 text-xs rounded bg-slate-700 text-slate-200 border border-slate-600 hover:border-slate-500 focus:outline-none focus:ring-1 focus:ring-rose-500"
+                  className="px-2 py-1.5 text-xs rounded bg-chrome-700 text-chrome-200 border border-chrome-600 hover:border-chrome-500 focus:outline-none focus:ring-1 focus:ring-rose-500"
                   title="Filtr"
                   data-testid="sld-diagnostics-filter"
                 >
@@ -1124,15 +1124,15 @@ export const SLDView: React.FC<SLDViewProps> = ({
           )}
 
           {/* PR-SLD-06, PR-SLD-09: Mode selector — ETAP-grade tab bar */}
-          <div className="w-px h-5 bg-slate-600 mx-2" />
-          <div className="flex items-center bg-slate-700 rounded overflow-hidden" data-testid="sld-mode-selector">
+          <div className="w-px h-5 bg-chrome-600 mx-2" />
+          <div className="flex items-center bg-chrome-700 rounded overflow-hidden" data-testid="sld-mode-selector">
             <button
               type="button"
               onClick={() => handleModeChange('EDYCJA')}
               className={`px-3 py-1.5 text-xs font-medium transition-colors ${
                 sldMode === 'EDYCJA'
-                  ? 'bg-slate-500 text-white'
-                  : 'text-slate-300 hover:bg-slate-600 hover:text-slate-100'
+                  ? 'bg-chrome-500 text-white'
+                  : 'text-chrome-300 hover:bg-chrome-600 hover:text-chrome-100'
               }`}
               title="Tryb Edycja"
               data-testid="sld-mode-edit"
@@ -1145,7 +1145,7 @@ export const SLDView: React.FC<SLDViewProps> = ({
               className={`px-3 py-1.5 text-xs font-medium transition-colors ${
                 sldMode === 'WYNIKI'
                   ? 'bg-blue-600 text-white'
-                  : 'text-slate-300 hover:bg-slate-600 hover:text-slate-100'
+                  : 'text-chrome-300 hover:bg-chrome-600 hover:text-chrome-100'
               }`}
               title="Tryb Wyniki"
               data-testid="sld-mode-results"
@@ -1159,7 +1159,7 @@ export const SLDView: React.FC<SLDViewProps> = ({
                 className={`px-3 py-1.5 text-xs font-medium transition-colors ${
                   sldMode === 'ZABEZPIECZENIA'
                     ? 'bg-emerald-600 text-white'
-                    : 'text-slate-300 hover:bg-slate-600 hover:text-slate-100'
+                    : 'text-chrome-300 hover:bg-chrome-600 hover:text-chrome-100'
                 }`}
                 title="Tryb Zabezpieczenia"
                 data-testid="sld-mode-protection"
@@ -1177,7 +1177,7 @@ export const SLDView: React.FC<SLDViewProps> = ({
               className={`px-3 py-1.5 text-xs font-medium rounded transition-colors ${
                 diagnosticLayerVisible
                   ? 'bg-blue-500 text-white'
-                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700'
+                  : 'text-chrome-400 hover:text-chrome-200 hover:bg-chrome-700'
               }`}
               title={diagnosticLayerVisible ? 'Ukryj warstwę diagnostyczną' : 'Pokaż warstwę diagnostyczną'}
               data-testid="sld-diagnostic-layer-toggle"
@@ -1194,7 +1194,7 @@ export const SLDView: React.FC<SLDViewProps> = ({
               className={`px-3 py-1.5 text-xs font-medium rounded transition-colors ${
                 protectionLayerVisible
                   ? 'bg-emerald-500 text-white'
-                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700'
+                  : 'text-chrome-400 hover:text-chrome-200 hover:bg-chrome-700'
               }`}
               title={protectionLayerVisible ? 'Ukryj warstwę zabezpieczeń' : 'Pokaż warstwę zabezpieczeń'}
               data-testid="sld-protection-layer-toggle"
@@ -1204,14 +1204,14 @@ export const SLDView: React.FC<SLDViewProps> = ({
           )}
 
           {/* BLOK 7: Etykiety techniczne toggle */}
-          <div className="w-px h-5 bg-slate-600 mx-1" />
+          <div className="w-px h-5 bg-chrome-600 mx-1" />
           <button
             type="button"
             onClick={() => setTechLabelsVisible((prev) => !prev)}
             className={`px-3 py-1.5 text-xs font-medium rounded transition-colors ${
               techLabelsVisible
                 ? 'bg-teal-600 text-white'
-                : 'text-slate-300 hover:text-slate-100 hover:bg-slate-700'
+                : 'text-chrome-300 hover:text-chrome-100 hover:bg-chrome-700'
             }`}
             title={techLabelsVisible ? 'Ukryj etykiety techniczne' : 'Pokaż etykiety techniczne (load%, NOP, U)'}
             data-testid="sld-tech-labels-toggle"
@@ -1222,7 +1222,7 @@ export const SLDView: React.FC<SLDViewProps> = ({
           {/* BLOK 8: Uruchom obliczenia */}
           {onCalculateClick && (
             <>
-              <div className="w-px h-5 bg-slate-600 mx-1" />
+              <div className="w-px h-5 bg-chrome-600 mx-1" />
               <button
                 type="button"
                 onClick={onCalculateClick}
@@ -1230,7 +1230,7 @@ export const SLDView: React.FC<SLDViewProps> = ({
                 className={`px-3 py-1.5 text-xs font-semibold rounded transition-colors ${
                   canCalculate
                     ? 'bg-green-600 hover:bg-green-500 text-white'
-                    : 'bg-slate-600 text-slate-400 cursor-not-allowed'
+                    : 'bg-chrome-600 text-chrome-400 cursor-not-allowed'
                 }`}
                 title={canCalculate ? 'Uruchom obliczenia' : 'Brak aktywnego przypadku'}
                 data-testid="sld-calculate-btn"
@@ -1241,11 +1241,11 @@ export const SLDView: React.FC<SLDViewProps> = ({
           )}
 
           {/* Export button */}
-          <div className="w-px h-5 bg-slate-600 mx-1" />
+          <div className="w-px h-5 bg-chrome-600 mx-1" />
           <button
             type="button"
             onClick={handleExportClick}
-            className="px-3 py-1.5 text-xs font-medium text-slate-300 hover:text-slate-100 hover:bg-slate-700 rounded transition-colors"
+            className="px-3 py-1.5 text-xs font-medium text-chrome-300 hover:text-chrome-100 hover:bg-chrome-700 rounded transition-colors"
             title="Eksportuj schemat"
             data-testid="sld-export-btn"
           >
@@ -1292,7 +1292,7 @@ export const SLDView: React.FC<SLDViewProps> = ({
               ? 'bg-blue-600/95 text-white border border-blue-500'
               : isProtectionMode
               ? 'bg-emerald-600/95 text-white border border-emerald-500'
-              : 'bg-slate-700/90 text-slate-100 border border-slate-600'
+              : 'bg-chrome-700/90 text-chrome-100 border border-chrome-600'
           }`}
         >
           {/* Mode icon */}
@@ -1371,8 +1371,8 @@ export const SLDView: React.FC<SLDViewProps> = ({
           onClick={() => setLegendVisible((prev) => !prev)}
           className={`absolute bottom-4 left-4 z-10 flex items-center gap-1.5 px-3 py-2 text-xs font-medium rounded-lg shadow-md transition-all duration-150 ${
             legendVisible
-              ? 'bg-slate-800 text-white hover:bg-slate-700'
-              : 'bg-white/95 backdrop-blur-sm border border-slate-300 text-slate-700 hover:bg-white hover:border-slate-400'
+              ? 'bg-chrome-800 text-white hover:bg-chrome-700'
+              : 'bg-white/95 backdrop-blur-sm border border-chrome-300 text-chrome-700 hover:bg-white hover:border-chrome-400'
           }`}
           title={legendVisible ? 'Ukryj legendę' : 'Pokaż legendę'}
           data-testid="sld-legend-toggle"
@@ -1416,31 +1416,31 @@ export const SLDView: React.FC<SLDViewProps> = ({
       {/* Status bar — ETAP-grade professional */}
       <div
         data-testid="sld-view-status"
-        className="flex items-center justify-between px-4 py-1.5 bg-slate-800 border-t border-slate-700 text-xs"
+        className="flex items-center justify-between px-4 py-1.5 bg-chrome-800 border-t border-chrome-700 text-xs"
       >
-        <div className="flex items-center gap-4 text-slate-300">
+        <div className="flex items-center gap-4 text-chrome-300">
           <span className="flex items-center gap-1.5">
-            <svg className="w-3.5 h-3.5 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
+            <svg className="w-3.5 h-3.5 text-chrome-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6A2.25 2.25 0 016 3.75h2.25A2.25 2.25 0 0110.5 6v2.25a2.25 2.25 0 01-2.25 2.25H6a2.25 2.25 0 01-2.25-2.25V6z" />
             </svg>
             <span className="font-mono">{symbols.length}</span> elementów
           </span>
           {selectedElement && (
-            <span className="flex items-center gap-1.5 border-l border-slate-600 pl-4">
-              <svg className="w-3.5 h-3.5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+            <span className="flex items-center gap-1.5 border-l border-chrome-600 pl-4">
+              <svg className="w-3.5 h-3.5 text-ind-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M15 15l-2 5L9 9l11 4-5 2z" />
               </svg>
-              <span className="font-medium text-slate-100">{selectedElement.name}</span>
-              <span className="text-slate-500">({selectedElement.type})</span>
+              <span className="font-medium text-chrome-100">{selectedElement.name}</span>
+              <span className="text-chrome-500">({selectedElement.type})</span>
             </span>
           )}
         </div>
-        <div className="flex items-center gap-4 text-slate-400">
+        <div className="flex items-center gap-4 text-chrome-400">
           {/* PR-SLD-06, PR-SLD-09: Mode status in status bar */}
           {isReadOnlyMode && (
             <span
               data-testid={isResultsMode ? 'sld-status-results-mode' : 'sld-status-protection-mode'}
-              className={`flex items-center gap-1.5 font-medium ${isResultsMode ? 'text-blue-400' : 'text-emerald-400'}`}
+              className={`flex items-center gap-1.5 font-medium ${isResultsMode ? 'text-ind-400' : 'text-emerald-400'}`}
             >
               <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
@@ -1448,7 +1448,7 @@ export const SLDView: React.FC<SLDViewProps> = ({
               {isResultsMode ? 'Tylko odczyt' : 'Tylko odczyt'}
             </span>
           )}
-          <span className="text-slate-500">
+          <span className="text-chrome-500">
             Prawy przycisk: przesuwanie • Scroll/+/−: zoom • F: dopasuj • 0: reset
           </span>
         </div>

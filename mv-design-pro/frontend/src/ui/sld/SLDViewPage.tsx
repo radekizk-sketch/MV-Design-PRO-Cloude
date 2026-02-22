@@ -232,7 +232,7 @@ export const SLDViewPage: React.FC<SLDViewPageProps> = ({
       {showDiagnosticsPanel && (
         <div
           data-testid="sld-diagnostics-sidebar"
-          className={`border-l border-gray-200 bg-white transition-all duration-300 ${
+          className={`border-l border-chrome-200 bg-white transition-all duration-300 ${
             diagnosticsPanelCollapsed ? 'w-10' : 'w-96'
           }`}
         >
@@ -240,7 +240,7 @@ export const SLDViewPage: React.FC<SLDViewPageProps> = ({
           <button
             type="button"
             onClick={toggleDiagnosticsPanel}
-            className="w-full px-2 py-2 text-xs text-gray-600 hover:bg-gray-100 border-b border-gray-200 flex items-center justify-center"
+            className="w-full px-2 py-2 text-xs text-chrome-600 hover:bg-chrome-100 border-b border-chrome-200 flex items-center justify-center"
             title={diagnosticsPanelCollapsed ? 'Rozwin panel diagnostyki' : 'Zwin panel diagnostyki'}
             aria-label={diagnosticsPanelCollapsed ? 'Rozwin panel diagnostyki' : 'Zwin panel diagnostyki'}
           >

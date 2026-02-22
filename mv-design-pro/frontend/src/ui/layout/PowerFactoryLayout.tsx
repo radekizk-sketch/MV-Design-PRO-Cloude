@@ -11,22 +11,24 @@
  *
  * STRUCTURE (ALWAYS VISIBLE):
  * ┌──────────────────────────────────────────────────────────────────┐
+ * │  Menu Bar (opcje nawigacji + skróty klawiaturowe)                │
+ * ├──────────────────────────────────────────────────────────────────┤
  * │                    Active Case Bar (top)                         │
  * ├──────────┬───────────────────────────────────┬──────────────────┤
  * │          │                                   │                  │
- * │ Project  │       SLD Canvas / Content        │    Inspector     │
- * │  Tree    │       (with empty overlay         │    Panel         │
+ * │ Nawigator│       SLD Canvas / Content        │    Inspektor     │
+ * │ projektu │       (with empty overlay         │    właściwości   │
  * │ (left)   │        if no model)               │    (right)       │
  * │          │                                   │                  │
  * ├──────────┴───────────────────────────────────┴──────────────────┤
- * │                    Status Bar (bottom)                           │
+ * │                    Pasek stanu (bottom)                          │
  * └──────────────────────────────────────────────────────────────────┘
  *
  * INVARIANTS:
- * - Project Tree: ZAWSZE widoczny (może być zwinięty, ale NIE ukryty)
- * - SLD Canvas: ZAWSZE widoczny (z overlayem jeśli brak modelu)
- * - Inspector: ZAWSZE widoczny (pokazuje "Brak zaznaczenia" jeśli nic nie wybrano)
- * - Status Bar: ZAWSZE widoczny na dole
+ * - Nawigator projektu: ZAWSZE widoczny (może być zwinięty, ale NIE ukryty)
+ * - Obszar roboczy: ZAWSZE widoczny (z overlayem jeśli brak modelu)
+ * - Inspektor: ZAWSZE widoczny (pokazuje "Brak zaznaczenia" jeśli nic nie wybrano)
+ * - Pasek stanu: ZAWSZE widoczny na dole
  * - Brak "pustych ekranów" — UI ZAWSZE wygląda jak pełnoprawne narzędzie
  *
  * 100% POLISH UI
@@ -34,6 +36,7 @@
 
 import { type ReactNode, useCallback, useState, useMemo, useEffect } from 'react';
 import { clsx } from 'clsx';
+import { MainMenuBar } from '../main-menu';
 import { ActiveCaseBar } from '../active-case-bar';
 import { StatusBar } from '../status-bar';
 import { CaseManager } from '../case-manager';
@@ -82,29 +85,10 @@ interface RunHistoryItem {
 }
 
 export interface PowerFactoryLayoutProps {
-  /**
-   * Main content to render (typically SLD or results page).
-   */
   children: ReactNode;
-
-  /**
-   * Callback for calculate action.
-   */
   onCalculate?: () => void;
-
-  /**
-   * Callback for view results action.
-   */
   onViewResults?: () => void;
-
-  /**
-   * Project name to display in tree.
-   */
   projectName?: string;
-
-  /**
-   * Network elements for the project tree.
-   */
   treeElements?: {
     buses: NetworkElement[];
     lines: NetworkElement[];
@@ -114,77 +98,25 @@ export interface PowerFactoryLayoutProps {
     sources: NetworkElement[];
     loads: NetworkElement[];
   };
-
-  /**
-   * Type counts for catalog section.
-   */
   typeCounts?: {
     lineTypes: number;
     cableTypes: number;
     transformerTypes: number;
     switchEquipmentTypes: number;
   };
-
-  /**
-   * Study cases list.
-   */
   studyCases?: StudyCaseItem[];
-
-  /**
-   * Run history items.
-   */
   runHistory?: RunHistoryItem[];
-
-  /**
-   * Callback when tree node is clicked.
-   */
   onTreeNodeClick?: (node: TreeNode) => void;
-
-  /**
-   * Callback when tree category is clicked.
-   */
   onTreeCategoryClick?: (nodeType: TreeNodeType, elementType?: ElementType) => void;
-
-  /**
-   * Callback when study case is clicked.
-   */
   onTreeStudyCaseClick?: (caseId: string) => void;
-
-  /**
-   * Callback when study case is activated.
-   */
   onTreeStudyCaseActivate?: (caseId: string) => void;
-
-  /**
-   * Callback when run is clicked.
-   */
   onTreeRunClick?: (runId: string) => void;
-
-  /**
-   * Custom inspector content (optional).
-   * If not provided, shows EmptyInspectorPanel.
-   */
   inspectorContent?: ReactNode;
-
-  /**
-   * Validation status for status bar.
-   */
   validationStatus?: 'valid' | 'warnings' | 'errors' | null;
-
-  /**
-   * Number of validation warnings.
-   */
   validationWarnings?: number;
-
-  /**
-   * Number of validation errors.
-   */
   validationErrors?: number;
-
-  /**
-   * Hide inspector panel (only in specific scenarios).
-   */
   hideInspector?: boolean;
+  onMenuAction?: (actionId: string) => void;
 }
 
 // =============================================================================
@@ -209,6 +141,42 @@ const DEFAULT_TYPE_COUNTS = {
 };
 
 // =============================================================================
+// Icons (inline SVG for zero-dependency)
+// =============================================================================
+
+function IconChevronLeft({ className }: { className?: string }) {
+  return (
+    <svg className={clsx('w-4 h-4', className)} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+    </svg>
+  );
+}
+
+function IconChevronRight({ className }: { className?: string }) {
+  return (
+    <svg className={clsx('w-4 h-4', className)} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+    </svg>
+  );
+}
+
+function IconFolder({ className }: { className?: string }) {
+  return (
+    <svg className={clsx('w-5 h-5', className)} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+    </svg>
+  );
+}
+
+function IconClipboard({ className }: { className?: string }) {
+  return (
+    <svg className={clsx('w-5 h-5', className)} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+    </svg>
+  );
+}
+
+// =============================================================================
 // Component
 // =============================================================================
 
@@ -231,6 +199,7 @@ export function PowerFactoryLayout({
   validationWarnings = 0,
   validationErrors = 0,
   hideInspector = false,
+  onMenuAction,
 }: PowerFactoryLayoutProps) {
   // App state
   const caseManagerOpen = useCaseManagerOpen();
@@ -301,10 +270,13 @@ export function PowerFactoryLayout({
 
   return (
     <div
-      className="flex flex-col h-screen bg-gray-100"
+      className="flex flex-col h-screen bg-chrome-100"
       data-testid="powerfactory-layout"
     >
-      {/* Active Case Bar (ALWAYS visible at top) */}
+      {/* Menu główne (ALWAYS visible at top) */}
+      <MainMenuBar onAction={onMenuAction} />
+
+      {/* Pasek aktywnego przypadku (ALWAYS visible) */}
       <ActiveCaseBar
         onChangeCaseClick={handleChangeCaseClick}
         onConfigureClick={handleConfigureClick}
@@ -314,32 +286,37 @@ export function PowerFactoryLayout({
 
       {/* Main Content Area */}
       <div className="flex-1 relative overflow-hidden flex">
-        {/* Project Tree Sidebar (ALWAYS visible, collapsible) */}
+        {/* ================================================================
+         *  Nawigator projektu (ALWAYS visible, collapsible)
+         * ================================================================ */}
         <div
           className={clsx(
-            'flex-shrink-0 border-r border-gray-200 bg-white transition-all duration-300 ease-in-out overflow-hidden flex flex-col',
-            treeSidebarCollapsed ? 'w-12' : 'w-72'
+            'flex-shrink-0 bg-white border-r border-chrome-200 shadow-panel',
+            'transition-all duration-200 ease-in-out overflow-hidden flex flex-col',
+            treeSidebarCollapsed ? 'w-11' : 'w-tree'
           )}
           data-testid="project-tree-sidebar"
           data-collapsed={treeSidebarCollapsed}
         >
-          {/* Sidebar header with toggle */}
-          <div className="flex items-center justify-between border-b border-gray-200 bg-gray-50 px-2 py-2 flex-shrink-0">
+          {/* Panel header */}
+          <div className="ind-panel-header">
             {!treeSidebarCollapsed && (
-              <span className="text-xs font-medium text-gray-700">Nawigator projektu</span>
+              <span>Nawigator projektu</span>
             )}
             <button
               type="button"
               onClick={toggleTreeSidebar}
               className={clsx(
-                'flex h-7 w-7 items-center justify-center rounded text-gray-500 hover:bg-gray-200 hover:text-gray-700',
+                'flex h-6 w-6 items-center justify-center rounded-ind',
+                'text-chrome-400 hover:bg-chrome-200 hover:text-chrome-700',
+                'transition-colors',
                 treeSidebarCollapsed && 'mx-auto'
               )}
-              aria-label={treeSidebarCollapsed ? 'Rozwiń panel nawigacji' : 'Zwiń panel nawigacji'}
-              title={treeSidebarCollapsed ? 'Rozwiń panel nawigacji' : 'Zwiń panel nawigacji'}
+              aria-label={treeSidebarCollapsed ? 'Rozwiń nawigator projektu' : 'Zwiń nawigator projektu'}
+              title={treeSidebarCollapsed ? 'Rozwiń nawigator projektu' : 'Zwiń nawigator projektu'}
               data-testid="project-tree-sidebar-toggle"
             >
-              {treeSidebarCollapsed ? '→' : '←'}
+              {treeSidebarCollapsed ? <IconChevronRight /> : <IconChevronLeft />}
             </button>
           </div>
 
@@ -363,55 +340,60 @@ export function PowerFactoryLayout({
 
           {/* Collapsed state icons */}
           {treeSidebarCollapsed && (
-            <div className="flex flex-col items-center gap-2 p-2" data-testid="project-tree-collapsed-icons">
+            <div className="flex flex-col items-center gap-2 pt-2" data-testid="project-tree-collapsed-icons">
               <button
                 type="button"
                 onClick={toggleTreeSidebar}
-                className="flex h-8 w-8 items-center justify-center rounded text-gray-500 hover:bg-gray-100 hover:text-gray-700"
-                title="Drzewo projektu"
-                aria-label="Otwórz drzewo projektu"
+                className="flex h-8 w-8 items-center justify-center rounded-ind text-chrome-400 hover:bg-chrome-100 hover:text-chrome-700 transition-colors"
+                title="Nawigator projektu"
+                aria-label="Otwórz nawigator projektu"
               >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
-                </svg>
+                <IconFolder />
               </button>
             </div>
           )}
         </div>
 
-        {/* Main Content (SLD Canvas / Page Content) */}
-        <div className="flex-1 overflow-auto" data-testid="main-content">
+        {/* ================================================================
+         *  Obszar roboczy (SLD Canvas / Page Content)
+         * ================================================================ */}
+        <div className="flex-1 overflow-auto bg-canvas-bg" data-testid="main-content">
           {children}
         </div>
 
-        {/* Inspector Panel (ALWAYS visible, collapsible) */}
+        {/* ================================================================
+         *  Inspektor właściwości (ALWAYS visible, collapsible)
+         * ================================================================ */}
         {!hideInspector && (
           <div
             className={clsx(
-              'flex-shrink-0 border-l border-gray-200 bg-white transition-all duration-300 ease-in-out overflow-hidden flex flex-col',
-              inspectorCollapsed ? 'w-10' : 'w-80'
+              'flex-shrink-0 bg-white border-l border-chrome-200 shadow-panel',
+              'transition-all duration-200 ease-in-out overflow-hidden flex flex-col',
+              inspectorCollapsed ? 'w-10' : 'w-inspector'
             )}
             data-testid="inspector-panel-sidebar"
             data-collapsed={inspectorCollapsed}
           >
-            {/* Inspector header with toggle */}
-            <div className="flex items-center justify-between border-b border-gray-200 bg-gray-50 px-2 py-2 flex-shrink-0">
-              {!inspectorCollapsed && (
-                <span className="text-xs font-medium text-gray-700">Właściwości</span>
-              )}
+            {/* Inspector header */}
+            <div className="ind-panel-header">
               <button
                 type="button"
                 onClick={toggleInspector}
                 className={clsx(
-                  'flex h-7 w-7 items-center justify-center rounded text-gray-500 hover:bg-gray-200 hover:text-gray-700',
+                  'flex h-6 w-6 items-center justify-center rounded-ind',
+                  'text-chrome-400 hover:bg-chrome-200 hover:text-chrome-700',
+                  'transition-colors',
                   inspectorCollapsed && 'mx-auto'
                 )}
-                aria-label={inspectorCollapsed ? 'Rozwiń panel właściwości' : 'Zwiń panel właściwości'}
-                title={inspectorCollapsed ? 'Rozwiń panel właściwości' : 'Zwiń panel właściwości'}
+                aria-label={inspectorCollapsed ? 'Rozwiń inspektor właściwości' : 'Zwiń inspektor właściwości'}
+                title={inspectorCollapsed ? 'Rozwiń inspektor właściwości' : 'Zwiń inspektor właściwości'}
                 data-testid="inspector-panel-toggle"
               >
-                {inspectorCollapsed ? '←' : '→'}
+                {inspectorCollapsed ? <IconChevronLeft /> : <IconChevronRight />}
               </button>
+              {!inspectorCollapsed && (
+                <span>Właściwości</span>
+              )}
             </div>
 
             {/* Inspector content (only when not collapsed) */}
@@ -423,17 +405,15 @@ export function PowerFactoryLayout({
 
             {/* Collapsed state icon */}
             {inspectorCollapsed && (
-              <div className="flex flex-col items-center gap-2 p-2" data-testid="inspector-collapsed-icon">
+              <div className="flex flex-col items-center gap-2 pt-2" data-testid="inspector-collapsed-icon">
                 <button
                   type="button"
                   onClick={toggleInspector}
-                  className="flex h-8 w-8 items-center justify-center rounded text-gray-500 hover:bg-gray-100 hover:text-gray-700"
-                  title="Panel właściwości"
-                  aria-label="Otwórz panel właściwości"
+                  className="flex h-8 w-8 items-center justify-center rounded-ind text-chrome-400 hover:bg-chrome-100 hover:text-chrome-700 transition-colors"
+                  title="Inspektor właściwości"
+                  aria-label="Otwórz inspektor właściwości"
                 >
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-                  </svg>
+                  <IconClipboard />
                 </button>
               </div>
             )}
@@ -442,7 +422,7 @@ export function PowerFactoryLayout({
 
         {/* Issue Panel (right sidebar, conditional) */}
         {issuePanelOpen && (
-          <div className="w-80 border-l border-gray-200 bg-white overflow-hidden flex-shrink-0">
+          <div className="w-inspector border-l border-chrome-200 bg-white overflow-hidden flex-shrink-0 shadow-panel">
             <IssuePanelContainer caseId={activeCaseId} />
           </div>
         )}
@@ -456,7 +436,7 @@ export function PowerFactoryLayout({
         />
       </div>
 
-      {/* Status Bar (ALWAYS visible at bottom) */}
+      {/* Pasek stanu (ALWAYS visible at bottom) */}
       <StatusBar
         validationStatus={validationStatus}
         validationWarnings={validationWarnings}
@@ -530,7 +510,7 @@ function CaseManagerPanel({
       {open && (
         <div
           data-testid="case-manager-backdrop"
-          className="absolute inset-0 bg-black/20 z-20"
+          className="absolute inset-0 bg-black/25 z-20 backdrop-blur-[1px]"
           onClick={onClose}
         />
       )}
@@ -540,8 +520,8 @@ function CaseManagerPanel({
         data-testid="case-manager-panel"
         data-open={open}
         className={clsx(
-          'absolute top-0 right-0 h-full w-[480px] bg-white shadow-xl z-30',
-          'transform transition-transform duration-300 ease-in-out',
+          'absolute top-0 right-0 h-full w-[480px] bg-white shadow-modal z-30',
+          'transform transition-transform duration-200 ease-in-out',
           open ? 'translate-x-0' : 'translate-x-full'
         )}
       >
