@@ -211,7 +211,7 @@ describe('SymbolResolver', () => {
       expect(resolved?.symbolId).toBe('circuit_breaker');
     });
 
-    it('should resolve Switch with switchType=FUSE to disconnector', () => {
+    it('should resolve Switch with switchType=FUSE to fuse', () => {
       const fuseSymbol: SwitchSymbol = {
         id: 'sw-4',
         elementId: 'elem-sw-4',
@@ -228,7 +228,7 @@ describe('SymbolResolver', () => {
       const resolved = resolveSymbol(fuseSymbol);
 
       expect(resolved).not.toBeNull();
-      expect(resolved?.symbolId).toBe('disconnector');
+      expect(resolved?.symbolId).toBe('fuse');
     });
 
     it('should resolve Source to utility_feeder', () => {
@@ -331,10 +331,10 @@ describe('SymbolResolver', () => {
   });
 
   describe('getAllSymbolIds', () => {
-    it('should return all 26 ETAP symbol IDs', () => {
+    it('should return all 32 ETAP symbol IDs', () => {
       const ids = getAllSymbolIds();
 
-      expect(ids).toHaveLength(26);
+      expect(ids).toHaveLength(32);
       // Core SLD symbols (15)
       expect(ids).toContain('busbar');
       expect(ids).toContain('circuit_breaker');
@@ -356,6 +356,13 @@ describe('SymbolResolver', () => {
       expect(ids).toContain('directional_relay');
       expect(ids).toContain('earthing_switch');
       expect(ids).toContain('load_arrow');
+      // Industrial canonical SLD symbols (6)
+      expect(ids).toContain('fuse');
+      expect(ids).toContain('surge_arrester');
+      expect(ids).toContain('capacitor');
+      expect(ids).toContain('reactor');
+      expect(ids).toContain('inverter');
+      expect(ids).toContain('metering_cubicle');
       // Tree-specific symbols (6)
       expect(ids).toContain('load');
       expect(ids).toContain('project');
