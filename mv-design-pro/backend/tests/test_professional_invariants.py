@@ -49,7 +49,7 @@ def _get_enm_collection_names() -> set[str]:
     maps to a distinct element type in the network model.
     """
     models_path = ENM_DIR / "models.py"
-    source = models_path.read_text()
+    source = models_path.read_text(encoding="utf-8")
     tree = ast.parse(source)
 
     for node in ast.walk(tree):
@@ -72,7 +72,7 @@ def _get_enm_element_classes() -> set[str]:
     from ENMElement (directly or indirectly via BranchBase).
     """
     models_path = ENM_DIR / "models.py"
-    source = models_path.read_text()
+    source = models_path.read_text(encoding="utf-8")
     tree = ast.parse(source)
 
     # First pass: collect base classes
@@ -127,7 +127,7 @@ def test_complete_elementtype_record():
     assert "protection_assignments" in collection_names, "Missing 'protection_assignments'"
 
     # SLD projection must cover the core element types
-    sld_source = SLD_PROJECTION_PATH.read_text()
+    sld_source = SLD_PROJECTION_PATH.read_text(encoding="utf-8")
     core_sld_types = ["bus", "branch", "transformer", "source", "load", "switch"]
     for sld_type in core_sld_types:
         assert sld_type in sld_source.lower(), (
@@ -136,7 +136,7 @@ def test_complete_elementtype_record():
         )
 
     # NetworkValidator must reference core element categories
-    validator_source = VALIDATOR_PATH.read_text()
+    validator_source = VALIDATOR_PATH.read_text(encoding="utf-8")
     expected_validation_codes = [
         "network.empty",
         "network.disconnected",
@@ -168,7 +168,7 @@ def _find_any_annotations_in_file(filepath: Path) -> list[tuple[int, str]]:
     - to_dict/from_dict methods (serialization boundary)
     - _canonicalize_value (recursive canonicalizer by definition uses Any)
     """
-    source = filepath.read_text()
+    source = filepath.read_text(encoding="utf-8")
     try:
         tree = ast.parse(source)
     except SyntaxError:
@@ -273,7 +273,7 @@ def _get_public_types_from_init(init_path: Path) -> set[str]:
     """Extract public type names from __init__.py __all__ list."""
     if not init_path.exists():
         return set()
-    source = init_path.read_text()
+    source = init_path.read_text(encoding="utf-8")
     try:
         tree = ast.parse(source)
     except SyntaxError:

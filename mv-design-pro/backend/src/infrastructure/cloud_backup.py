@@ -184,8 +184,22 @@ def generate_backup_key(
     return f"{prefix}/{project_id}/{safe_timestamp}_{hash_short}.mvdp.zip"
 
 
+def _normalize_key(key: str) -> str:
+    """
+    Znormalizuj klucz storage do formatu POSIX (separator '/').
+
+    Zamienia backslashe (Windows) na slash, redukuje wielokrotne '//'.
+    Przenośna normalizacja — identyczny wynik na Windows i Linux.
+    """
+    normalized = key.replace("\\", "/")
+    while "//" in normalized:
+        normalized = normalized.replace("//", "/")
+    return normalized
+
+
 def extract_backup_id_from_key(key: str) -> str:
     """Wyodrębnij backup_id z klucza storage."""
+    key = _normalize_key(key)
     filename = key.rsplit("/", maxsplit=1)[-1]
     return filename.removesuffix(".mvdp.zip")
 
@@ -431,8 +445,8 @@ class LocalBackupProvider(CloudBackupProvider):
             project_dir.glob("*.mvdp.zip"), reverse=True
         ):
             stat = file_path.stat()
-            key = str(
-                file_path.relative_to(self._root)
+            key = _normalize_key(
+                str(file_path.relative_to(self._root))
             )
             backup_id = extract_backup_id_from_key(key)
 
@@ -499,7 +513,14 @@ class LocalBackupProvider(CloudBackupProvider):
     def _find_key(
         self, backup_id: str, project_id: str
     ) -> str | None:
-        """Znajdź klucz pliku na podstawie backup_id."""
+        """Znajdź klucz pliku na podstawie backup_id.
+
+        Akceptuje backup_id z separatorem '\\' lub '/' (przenośność Windows/Linux).
+        Zawsze zwraca klucz z separatorem '/' (format POSIX/kanoniczny).
+        """
+        # Normalizuj wejście — na Windows list_backups może zwrócić backslashe
+        backup_id = _normalize_key(backup_id)
+
         project_dir = (
             self._root / self._config.prefix / project_id
         )
@@ -509,7 +530,7 @@ class LocalBackupProvider(CloudBackupProvider):
         target_filename = f"{backup_id}.mvdp.zip"
         candidate = project_dir / target_filename
         if candidate.exists():
-            return str(candidate.relative_to(self._root))
+            return _normalize_key(str(candidate.relative_to(self._root)))
 
         return None
 
