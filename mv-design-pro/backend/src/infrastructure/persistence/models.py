@@ -584,3 +584,83 @@ class DesignEvidenceORM(Base):
         DeterministicJSON(), nullable=False
     )
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+
+# ---------------------------------------------------------------------------
+# ENM Persistence — replaces in-memory _enm_store
+# ---------------------------------------------------------------------------
+
+
+class ENMModelORM(Base):
+    """Energy Network Model persistence — one ENM per case."""
+
+    __tablename__ = "enm_models"
+    __table_args__ = (
+        Index("ix_enm_models_case_id", "case_id"),
+    )
+
+    id: Mapped[UUID] = mapped_column(GUID(), primary_key=True)
+    case_id: Mapped[str] = mapped_column(String(64), nullable=False, unique=True)
+    enm_json: Mapped[dict[str, Any]] = mapped_column(DeterministicJSON(), nullable=False)
+    revision: Mapped[int] = mapped_column(nullable=False, default=1)
+    hash_sha256: Mapped[str] = mapped_column(String(64), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now()
+    )
+
+
+# ---------------------------------------------------------------------------
+# FaultScenario Persistence — replaces in-memory _scenarios dict
+# ---------------------------------------------------------------------------
+
+
+class FaultScenarioORM(Base):
+    """Fault scenario persistence — PR-19/PR-24."""
+
+    __tablename__ = "fault_scenarios"
+    __table_args__ = (
+        Index("ix_fault_scenarios_case_id", "study_case_id"),
+        Index("ix_fault_scenarios_content_hash", "content_hash"),
+    )
+
+    id: Mapped[UUID] = mapped_column(GUID(), primary_key=True)
+    study_case_id: Mapped[UUID] = mapped_column(GUID(), nullable=False)
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    fault_type: Mapped[str] = mapped_column(String(20), nullable=False)
+    config_json: Mapped[dict[str, Any]] = mapped_column(DeterministicJSON(), nullable=False)
+    content_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now()
+    )
+
+
+# ---------------------------------------------------------------------------
+# BatchJob Persistence — replaces in-memory _batches dict
+# ---------------------------------------------------------------------------
+
+
+class BatchJobORM(Base):
+    """Batch execution job persistence — PR-20."""
+
+    __tablename__ = "batch_jobs"
+    __table_args__ = (
+        Index("ix_batch_jobs_case_id", "study_case_id"),
+        Index("ix_batch_jobs_status", "status"),
+    )
+
+    id: Mapped[UUID] = mapped_column(GUID(), primary_key=True)
+    study_case_id: Mapped[UUID] = mapped_column(GUID(), nullable=False)
+    analysis_type: Mapped[str] = mapped_column(String(50), nullable=False)
+    status: Mapped[str] = mapped_column(String(20), nullable=False, default="PENDING")
+    jobs_json: Mapped[dict[str, Any]] = mapped_column(DeterministicJSON(), nullable=False)
+    started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )

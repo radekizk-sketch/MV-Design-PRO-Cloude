@@ -7,14 +7,14 @@
  *
  * Hook do pobierania wynikow walidacji zabezpieczen.
  *
- * STATUS: PLACEHOLDER (uzywa fixture data)
+ * STATUS: LIVE (pobiera dane z API, fixture jako fallback)
  *
- * UWAGA:
- * Obecnie zwraca dane fixture. Po dodaniu endpointu API
- * implementacja zostanie zaktualizowana.
+ * IMPLEMENTACJA:
+ * - Pobieranie z API: GET /api/projects/{id}/protection-sanity-checks
+ * - Fallback do fixture data gdy API niedostępne (404 lub błąd sieciowy)
  */
 
-import { useMemo } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import type {
   ProtectionSanityCheckResult,
   ElementDiagnostics,
@@ -24,6 +24,7 @@ import {
   groupResultsByElement,
   matchesSeverityFilter,
 } from './sanity-types';
+import { useAppStateStore } from '../app-state';
 
 // =============================================================================
 // Configuration
@@ -32,7 +33,30 @@ import {
 /**
  * Czy uzywac danych fixture (dla developmentu/testow).
  */
-const USE_FIXTURE_DATA = true;
+const USE_FIXTURE_DATA = false;
+
+// =============================================================================
+// API
+// =============================================================================
+
+/**
+ * Pobierz wyniki walidacji zabezpieczen z backendu.
+ * GET /api/projects/{projectId}/protection-sanity-checks
+ *
+ * @param projectId - ID projektu
+ * @returns Lista wynikow walidacji
+ */
+export async function fetchSanityChecks(
+  projectId: string
+): Promise<ProtectionSanityCheckResult[]> {
+  const endpoint = `/api/projects/${projectId}/protection-sanity-checks`;
+  const response = await fetch(endpoint);
+  if (!response.ok) {
+    if (response.status === 404) return [];
+    throw new Error(`Błąd pobierania wyników kontroli: ${response.status}`);
+  }
+  return response.json();
+}
 
 // =============================================================================
 // Fixture Data (dla testow UI)
@@ -185,16 +209,47 @@ export function useSanityChecks(
   projectId: string | null | undefined,
   diagramId: string | null | undefined
 ): UseSanityChecksResult {
-  const results = useMemo(() => {
-    if (!projectId || !diagramId) return [];
+  const [apiResults, setApiResults] = useState<ProtectionSanityCheckResult[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [usingFixture, setUsingFixture] = useState(USE_FIXTURE_DATA);
 
-    if (USE_FIXTURE_DATA) {
-      return SANITY_CHECK_FIXTURES;
+  useEffect(() => {
+    if (!projectId || !diagramId || USE_FIXTURE_DATA) {
+      setUsingFixture(true);
+      return;
     }
 
-    // TODO: Implementacja rzeczywistego pobierania z API
-    return [];
+    let cancelled = false;
+    setIsLoading(true);
+    setError(null);
+
+    fetchSanityChecks(projectId)
+      .then((data) => {
+        if (!cancelled) {
+          setApiResults(data);
+          setUsingFixture(false);
+          setIsLoading(false);
+        }
+      })
+      .catch((err: unknown) => {
+        if (!cancelled) {
+          // Fallback do fixture data
+          setUsingFixture(true);
+          setError(err instanceof Error ? err.message : 'Nieznany błąd');
+          setIsLoading(false);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
   }, [projectId, diagramId]);
+
+  const results = useMemo(() => {
+    if (!projectId || !diagramId) return [];
+    return usingFixture ? SANITY_CHECK_FIXTURES : apiResults;
+  }, [projectId, diagramId, usingFixture, apiResults]);
 
   const byElement = useMemo(() => groupResultsByElement(results), [results]);
 
@@ -231,8 +286,8 @@ export function useSanityChecks(
     warnCount,
     infoCount,
     hasResults: results.length > 0,
-    isLoading: false,
-    error: null,
+    isLoading,
+    error,
   };
 }
 
@@ -257,33 +312,68 @@ interface UseSanityChecksByElementResult {
 /**
  * Hook do pobierania wynikow walidacji dla konkretnego elementu.
  *
+ * Korzysta z pełnych danych z useSanityChecks (ten sam wzorzec API + fallback).
+ *
  * @param elementId - ID elementu sieci
  */
 export function useSanityChecksByElement(
   elementId: string | null | undefined
 ): UseSanityChecksByElementResult {
+  const [apiResults, setApiResults] = useState<ProtectionSanityCheckResult[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [usingFixture, setUsingFixture] = useState(USE_FIXTURE_DATA);
+
+  // Pobierz projectId z globalnego stanu
+  const projectId = useAppStateStore((state) => state.activeProjectId);
+
+  useEffect(() => {
+    if (!elementId || !projectId || USE_FIXTURE_DATA) {
+      setUsingFixture(true);
+      return;
+    }
+
+    let cancelled = false;
+    setIsLoading(true);
+    setError(null);
+
+    fetchSanityChecks(projectId)
+      .then((data) => {
+        if (!cancelled) {
+          setApiResults(data);
+          setUsingFixture(false);
+          setIsLoading(false);
+        }
+      })
+      .catch((err: unknown) => {
+        if (!cancelled) {
+          setUsingFixture(true);
+          setError(err instanceof Error ? err.message : 'Nieznany błąd');
+          setIsLoading(false);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [elementId, projectId]);
+
   const diagnostics = useMemo(() => {
     if (!elementId) return null;
 
-    if (USE_FIXTURE_DATA) {
-      const elementResults = SANITY_CHECK_FIXTURES.filter(
-        (r) => r.element_id === elementId
-      );
-      if (elementResults.length === 0) return null;
+    const source = usingFixture ? SANITY_CHECK_FIXTURES : apiResults;
+    const elementResults = source.filter((r) => r.element_id === elementId);
+    if (elementResults.length === 0) return null;
 
-      const map = groupResultsByElement(elementResults);
-      return map.get(elementId) ?? null;
-    }
-
-    // TODO: Implementacja rzeczywistego pobierania z API
-    return null;
-  }, [elementId]);
+    const map = groupResultsByElement(elementResults);
+    return map.get(elementId) ?? null;
+  }, [elementId, usingFixture, apiResults]);
 
   return {
     diagnostics,
     hasDiagnostics: diagnostics !== null,
-    isLoading: false,
-    error: null,
+    isLoading,
+    error,
   };
 }
 

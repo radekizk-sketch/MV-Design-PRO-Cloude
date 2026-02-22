@@ -62,27 +62,52 @@ from application.network_wizard.validator import validate_wizard_state
 router = APIRouter(prefix="/api/cases", tags=["enm"])
 
 # ---------------------------------------------------------------------------
-# In-memory storage (production DB is future scope)
+# Persistence layer — ENM stored in DB via repository, with in-memory fallback
 # ---------------------------------------------------------------------------
 _enm_store: dict[str, EnergyNetworkModel] = {}
 
+# Optional UoW factory — set via configure_enm_persistence()
+_uow_factory: Any = None
+
+
+def configure_enm_persistence(uow_factory: Any) -> None:
+    """Configure ENM persistence with a UoW factory (called at app startup)."""
+    global _uow_factory
+    _uow_factory = uow_factory
+
 
 def _get_enm(case_id: str) -> EnergyNetworkModel:
-    """Get ENM for case, or create empty default."""
-    if case_id not in _enm_store:
-        enm = EnergyNetworkModel(
-            header=ENMHeader(
-                name=f"Model sieci — {case_id[:8]}",
-                defaults=ENMDefaults(),
-            ),
-        )
-        enm.header.hash_sha256 = compute_enm_hash(enm)
-        _enm_store[case_id] = enm
-    return _enm_store[case_id]
+    """Get ENM for case: try DB first, then in-memory cache, then create default."""
+    # Check in-memory cache first (hot path)
+    if case_id in _enm_store:
+        return _enm_store[case_id]
+
+    # Try loading from DB
+    if _uow_factory is not None:
+        try:
+            with _uow_factory() as uow:
+                row = uow.enm.get_by_case_id(case_id)
+                if row is not None:
+                    enm = EnergyNetworkModel.model_validate(row["enm_json"])
+                    _enm_store[case_id] = enm
+                    return enm
+        except Exception:
+            pass  # Fall through to create default
+
+    # Create empty default
+    enm = EnergyNetworkModel(
+        header=ENMHeader(
+            name=f"Model sieci — {case_id[:8]}",
+            defaults=ENMDefaults(),
+        ),
+    )
+    enm.header.hash_sha256 = compute_enm_hash(enm)
+    _enm_store[case_id] = enm
+    return enm
 
 
 def _set_enm(case_id: str, enm: EnergyNetworkModel) -> EnergyNetworkModel:
-    """Store ENM with revision bump and hash recomputation."""
+    """Store ENM with revision bump, hash recomputation, and DB persistence."""
     new_hash = compute_enm_hash(enm)
 
     existing = _enm_store.get(case_id)
@@ -96,6 +121,21 @@ def _set_enm(case_id: str, enm: EnergyNetworkModel) -> EnergyNetworkModel:
     enm.header.hash_sha256 = new_hash
 
     _enm_store[case_id] = enm
+
+    # Persist to DB
+    if _uow_factory is not None:
+        try:
+            with _uow_factory() as uow:
+                uow.enm.upsert(
+                    case_id=case_id,
+                    enm_json=enm.model_dump(mode="json"),
+                    revision=enm.header.revision,
+                    hash_sha256=new_hash,
+                    commit=False,
+                )
+        except Exception:
+            pass  # In-memory cache remains authoritative
+
     return enm
 
 

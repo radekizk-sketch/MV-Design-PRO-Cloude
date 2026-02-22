@@ -9,6 +9,7 @@ from infrastructure.persistence.repositories.analysis_run_index_repository impor
     AnalysisRunIndexRepository,
 )
 from infrastructure.persistence.repositories.analysis_run_repository import AnalysisRunRepository
+from infrastructure.persistence.repositories.batch_job_repository import BatchJobRepository
 from infrastructure.persistence.repositories.case_repository import CaseRepository
 from infrastructure.persistence.repositories.design_evidence_repository import (
     DesignEvidenceRepository,
@@ -17,6 +18,10 @@ from infrastructure.persistence.repositories.design_proposal_repository import (
     DesignProposalRepository,
 )
 from infrastructure.persistence.repositories.design_spec_repository import DesignSpecRepository
+from infrastructure.persistence.repositories.enm_repository import ENMRepository
+from infrastructure.persistence.repositories.fault_scenario_repository import (
+    FaultScenarioRepository,
+)
 from infrastructure.persistence.repositories.network_repository import NetworkRepository
 from infrastructure.persistence.repositories.network_wizard_repository import (
     NetworkWizardRepository,
@@ -51,6 +56,9 @@ class UnitOfWork(AbstractContextManager["UnitOfWork"]):
         self.design_specs: DesignSpecRepository | None = None
         self.design_proposals: DesignProposalRepository | None = None
         self.design_evidence: DesignEvidenceRepository | None = None
+        self.enm: ENMRepository | None = None
+        self.fault_scenarios: FaultScenarioRepository | None = None
+        self.batch_jobs: BatchJobRepository | None = None
 
     def __enter__(self) -> "UnitOfWork":
         self.session = self._session_factory()
@@ -67,6 +75,9 @@ class UnitOfWork(AbstractContextManager["UnitOfWork"]):
         self.design_specs = DesignSpecRepository(self.session)
         self.design_proposals = DesignProposalRepository(self.session)
         self.design_evidence = DesignEvidenceRepository(self.session)
+        self.enm = ENMRepository(self.session)
+        self.fault_scenarios = FaultScenarioRepository(self.session)
+        self.batch_jobs = BatchJobRepository(self.session)
         return self
 
     def __exit__(self, exc_type, exc, tb) -> bool:

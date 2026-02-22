@@ -110,9 +110,19 @@ export const SldEditor: React.FC<SldEditorProps> = ({
   // Load symbols from backend (if projectId/diagramId provided)
   useEffect(() => {
     if (projectId && diagramId) {
-      // TODO P30c: Fetch symbols from backend API
-      // const symbols = await fetchSldSymbols(projectId, diagramId);
-      // sldStore.setSymbols(symbols);
+      const fetchSymbols = async () => {
+        try {
+          const endpoint = `/api/projects/${projectId}/diagrams/${diagramId}/symbols`;
+          const response = await fetch(endpoint);
+          if (response.ok) {
+            const symbols = await response.json();
+            sldStore.setSymbols(symbols);
+          }
+        } catch {
+          // Backend not available — keep initialSymbols
+        }
+      };
+      fetchSymbols();
     }
   }, [projectId, diagramId, sldStore]);
 
