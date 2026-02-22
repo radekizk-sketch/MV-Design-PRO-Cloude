@@ -98,13 +98,35 @@ export const useBatchExecutionStore = create<BatchExecutionState>(
     executeBatch: async (batchId) => {
       set({ isExecuting: true, error: null });
       try {
-        const batch = await api.executeBatch(batchId);
-        // Reload list
-        const { studyCaseId } = get();
-        if (studyCaseId) {
-          await get().loadBatches(studyCaseId);
+        // Dispatch async execution — returns immediately with RUNNING status
+        const batch = await api.executeBatchAsync(batchId);
+        set({ selectedBatch: batch });
+
+        // Poll for completion
+        const pollInterval = 2000; // 2 seconds
+        const maxPolls = 150; // 5 minutes max
+        let polls = 0;
+
+        while (polls < maxPolls) {
+          await new Promise((resolve) => setTimeout(resolve, pollInterval));
+          polls++;
+
+          const updated = await api.getBatch(batchId);
+          set({ selectedBatch: updated });
+
+          if (updated.status === 'DONE' || updated.status === 'FAILED') {
+            // Reload list on completion
+            const { studyCaseId } = get();
+            if (studyCaseId) {
+              await get().loadBatches(studyCaseId);
+            }
+            set({ isExecuting: false });
+            return updated;
+          }
         }
-        set({ isExecuting: false, selectedBatch: batch });
+
+        // Timeout — still executing
+        set({ isExecuting: false });
         return batch;
       } catch (err) {
         const message =

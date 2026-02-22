@@ -283,6 +283,50 @@ def execute_batch(batch_id: str) -> dict[str, Any]:
         ) from exc
 
 
+@router.post(
+    "/api/execution/batches/{batch_id}/execute-async",
+    response_model=BatchResponse,
+)
+def execute_batch_async(batch_id: str) -> dict[str, Any]:
+    """
+    Rozpocznij asynchroniczne wykonywanie zadania wsadowego.
+
+    Zwraca natychmiast z batch.status = RUNNING.
+    Zadanie jest wykonywane w tle przez Celery.
+    Odpytuj GET /api/execution/batches/{batch_id} po aktualny status.
+
+    POST /api/execution/batches/{batch_id}/execute-async
+    """
+    parsed_batch_id = _parse_uuid(batch_id, "batch_id")
+    service = _get_batch_service()
+
+    try:
+        # Validate batch exists and is PENDING
+        batch = service.get_batch(parsed_batch_id)
+        if batch.status.value != "PENDING":
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=f"Batch {batch_id} ma status {batch.status.value} — wymagany PENDING",
+            )
+
+        # Mark as RUNNING immediately
+        batch = batch.mark_running()
+        service._batches[parsed_batch_id] = batch
+
+        # Dispatch Celery task
+        from api.tasks import execute_batch_task
+
+        execute_batch_task.delay(str(parsed_batch_id))
+
+        return batch.to_dict()
+
+    except BatchNotFoundError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(exc),
+        ) from exc
+
+
 @router.get(
     "/api/execution/study-cases/{case_id}/batches",
     response_model=BatchListResponse,

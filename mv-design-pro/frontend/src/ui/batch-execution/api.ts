@@ -58,6 +58,21 @@ export async function executeBatch(
 }
 
 /**
+ * Execute a pending batch job asynchronously.
+ * Returns immediately with RUNNING status.
+ * Poll GET /api/execution/batches/{batchId} for final status.
+ */
+export async function executeBatchAsync(
+  batchId: string
+): Promise<BatchJob> {
+  const response = await fetch(
+    `${API_BASE}/batches/${batchId}/execute-async`,
+    { method: 'POST' }
+  );
+  return handleResponse<BatchJob>(response);
+}
+
+/**
  * List all batch jobs for a study case.
  */
 export async function listBatches(
