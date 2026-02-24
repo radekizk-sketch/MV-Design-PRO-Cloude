@@ -80,6 +80,8 @@ import {
   snapToAestheticGrid,
   deterministicBranchSide,
 } from '../IndustrialAesthetics';
+import { classifyFeeders, type FeederClassification } from './bayClassification';
+import { minimizeCrossings } from './crossingMinimization';
 
 // =============================================================================
 // GEOMETRY CONFIG
@@ -541,6 +543,44 @@ function phase2_build_trunk_topology(
       trunkIndex++;
     }
   }
+
+  // --- HYBRID: Bay classification + crossing minimization ---
+  // Classify feeder types (incomer/feeder/oze/tie) for optimal ordering
+  const feederClassifications = classifyFeeders(graph, rootBusIds);
+
+  // Build target position map for crossing minimization
+  // Each feeder's target X = its natural position based on subgraph center of mass
+  const targetPositions = new Map<string, number>();
+  for (const fc of feederClassifications) {
+    // Find matching feeder start
+    const matchingStart = feederStarts.find(fs => fs.nodeId === fc.feederId);
+    if (matchingStart) {
+      targetPositions.set(fc.feederId, matchingStart.trunkIndex);
+    }
+  }
+
+  // Optimize feeder order via barycenter crossing minimization
+  if (feederClassifications.length > 1 && feederStarts.length > 1) {
+    const optimizedOrder = minimizeCrossings(feederClassifications, targetPositions);
+
+    // Reassign trunk indices based on optimized order
+    const orderMap = new Map<string, number>();
+    for (let i = 0; i < optimizedOrder.length; i++) {
+      orderMap.set(optimizedOrder[i], i);
+    }
+
+    // Reorder feederStarts to match optimized crossing-minimized order
+    for (const fs of feederStarts) {
+      const newIdx = orderMap.get(fs.nodeId);
+      if (newIdx !== undefined) {
+        fs.trunkIndex = newIdx;
+      }
+    }
+
+    // Re-sort by new trunk index for deterministic BFS
+    feederStarts.sort((a, b) => a.trunkIndex - b.trunkIndex);
+  }
+  // --- END HYBRID ---
 
   // BFS from each feeder start → build trunk chains
   // Follow ALL edge types (TRUNK, BRANCH, TRANSFORMER_LINK, etc.)
