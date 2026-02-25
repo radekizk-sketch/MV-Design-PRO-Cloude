@@ -7,6 +7,7 @@ import type {
   StepView,
 } from './types';
 import { sampleProofData } from './sampleData';
+import { useAppStateStore } from '../ui/app-state';
 import {
   buildExportFilename,
   filterSteps,
@@ -61,7 +62,42 @@ function getStepStatusBadge(step: StepView) {
   );
 }
 
-export function ProofInspectorPage({ data = sampleProofData }: ProofInspectorPageProps) {
+export function ProofInspectorPage({ data: dataProp }: ProofInspectorPageProps) {
+  const activeRunId = useAppStateStore((state) => state.activeRunId);
+  const [fetchedProofData, setFetchedProofData] = useState<InspectorView | null>(null);
+
+  useEffect(() => {
+    if (!activeRunId) {
+      setFetchedProofData(null);
+      return;
+    }
+
+    let cancelled = false;
+
+    fetch(`/api/analysis-runs/${activeRunId}/proof`)
+      .then((res) => {
+        if (!res.ok) return null;
+        return res.json();
+      })
+      .then((responseData) => {
+        if (!cancelled && responseData) {
+          setFetchedProofData(responseData as InspectorView);
+        }
+      })
+      .catch(() => {
+        // Backend proof endpoint may not exist yet — silent fallback
+        if (import.meta.env.DEV) {
+          console.debug('[ProofInspector] Proof endpoint unavailable, using sample data');
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [activeRunId]);
+
+  const data: InspectorView = dataProp ?? fetchedProofData ?? sampleProofData;
+
   const [viewMode, setViewMode] = useState<ProofViewMode>('ENGINEERING');
   const [search, setSearch] = useState('');
   const [activeTab, setActiveTab] = useState<ActiveTab>('STEPS');

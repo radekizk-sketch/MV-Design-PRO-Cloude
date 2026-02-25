@@ -1,7 +1,8 @@
 /**
- * App Root — POWERFACTORY_LAYOUT + UI_INTEGRATION_E2E + PROJECT_TREE_PARITY_V1
+ * App Root — UI V3 FULL SYSTEM INTEGRATION
  *
  * CANONICAL ALIGNMENT:
+ * - UI_V3_MASTER_AGENT_PROMPT.md: Full end-to-end system wiring
  * - powerfactory_ui_parity.md: Layout narzędziowy ZAWSZE renderowany
  * - wizard_screens.md § 1.3: Active case bar (always visible)
  * - UI_CORE_ARCHITECTURE.md § 4.1: Navigation structure
@@ -10,11 +11,13 @@
  * > Layout narzędziowy ZAWSZE jest renderowany.
  * > Brak danych = komunikat w obszarze roboczym, a NIE brak UI.
  *
- * Main application entry with:
- * - PowerFactoryLayout with ALWAYS visible Project Tree, Inspector, Status Bar
- * - Hash-based routing with Polish labels
- * - Mode-aware page rendering
- * - Empty state overlays (NOT empty screens)
+ * UI V3 WIRING:
+ * - Project + Case auto-initialization on startup
+ * - Snapshot loading from backend (single source of truth)
+ * - Tree elements derived from ENM snapshot (not hardcoded)
+ * - SLD symbols synced from snapshot (not demo)
+ * - Calculate button triggers real solver execution
+ * - Results navigation on completion
  *
  * Routes (Polish):
  * - "" / "#sld" → Schemat jednokreskowy (SLD Editor)
@@ -27,7 +30,7 @@
  * - "#protection-settings" → Nastawy zabezpieczeń
  */
 
-import { useEffect, useState, useCallback, useMemo } from 'react';
+import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 
 import { ProofInspectorPage } from './proof-inspector';
 import { ProtectionResultsInspectorPage } from './ui/protection-results';
@@ -44,23 +47,36 @@ import { useAppStateStore } from './ui/app-state';
 import { ROUTES, useUrlSelectionSync, getCurrentHashRoute } from './ui/navigation';
 import { useSelectionStore } from './ui/selection';
 import { NotificationToast } from './ui/notifications/NotificationToast';
+import { useSnapshotStore } from './ui/topology/snapshotStore';
+import { useSnapshotSldSync } from './ui/sld/useSnapshotSldSync';
+import { listProjects, createProject } from './ui/projects/api';
+import {
+  listStudyCases,
+  createStudyCase,
+  setActiveStudyCase,
+  createRun,
+  executeRun,
+  getRun,
+} from './ui/study-cases/api';
+import { notify } from './ui/notifications/store';
 import type { TreeNode, TreeNodeType, ElementType } from './ui/types';
+import type { EnergyNetworkModel } from './types/enm';
 
-// PROJECT_TREE_PARITY_V1: Get active project name from store
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+/** Get active project name from store. */
 function useActiveProjectName(): string | null {
   const store = useAppStateStore();
   return (store as { activeProjectName?: string | null }).activeProjectName ?? null;
 }
 
-/**
- * E2E_STABILIZATION: App ready indicator for tests.
- * Set after initial hydration and route sync.
- */
+/** E2E_STABILIZATION: App ready indicator for tests. */
 function useAppReady(): boolean {
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
-    // Mark app as ready after initial render cycle completes
     const timer = requestAnimationFrame(() => {
       setReady(true);
     });
@@ -70,9 +86,7 @@ function useAppReady(): boolean {
   return ready;
 }
 
-/**
- * Check if route is a results route (requires RESULT_VIEW mode).
- */
+/** Check if route is a results route (requires RESULT_VIEW mode). */
 function isResultsRoute(route: string): boolean {
   return (
     route === '#results' ||
@@ -85,6 +99,222 @@ function isResultsRoute(route: string): boolean {
   );
 }
 
+// ---------------------------------------------------------------------------
+// UI V3: Derive tree elements from ENM snapshot (deterministic)
+// ---------------------------------------------------------------------------
+
+interface TreeElementSummary {
+  id: string;
+  name: string;
+  element_type: string;
+  voltage_kv?: number;
+  in_service?: boolean;
+  branch_type?: 'LINE' | 'CABLE';
+}
+
+interface TreeElements {
+  buses: TreeElementSummary[];
+  lines: TreeElementSummary[];
+  cables: TreeElementSummary[];
+  transformers: TreeElementSummary[];
+  switches: TreeElementSummary[];
+  sources: TreeElementSummary[];
+  loads: TreeElementSummary[];
+}
+
+function snapshotToTreeElements(snapshot: EnergyNetworkModel | null): TreeElements {
+  if (!snapshot) {
+    return { buses: [], lines: [], cables: [], transformers: [], switches: [], sources: [], loads: [] };
+  }
+
+  const buses = (snapshot.buses ?? [])
+    .map((b) => ({ id: b.ref_id, name: b.name, element_type: 'Bus', voltage_kv: b.voltage_kv }))
+    .sort((a, b) => a.id.localeCompare(b.id));
+
+  const lines: TreeElementSummary[] = [];
+  const cables: TreeElementSummary[] = [];
+  const switches: TreeElementSummary[] = [];
+
+  for (const br of (snapshot.branches ?? []).sort((a, b) => a.ref_id.localeCompare(b.ref_id))) {
+    if (br.type === 'line_overhead') {
+      lines.push({ id: br.ref_id, name: br.name, element_type: 'Line', branch_type: 'LINE' });
+    } else if (br.type === 'cable') {
+      cables.push({ id: br.ref_id, name: br.name, element_type: 'Cable', branch_type: 'CABLE' });
+    } else if (br.type === 'switch' || br.type === 'breaker' || br.type === 'disconnector' || br.type === 'fuse' || br.type === 'bus_coupler') {
+      switches.push({ id: br.ref_id, name: br.name, element_type: 'Switch' });
+    }
+  }
+
+  const transformers = (snapshot.transformers ?? [])
+    .map((t) => ({ id: t.ref_id, name: t.name, element_type: 'Transformer2W' }))
+    .sort((a, b) => a.id.localeCompare(b.id));
+
+  const sources = (snapshot.sources ?? [])
+    .map((s) => ({ id: s.ref_id, name: s.name, element_type: 'Source' }))
+    .sort((a, b) => a.id.localeCompare(b.id));
+
+  const loads = (snapshot.loads ?? [])
+    .map((l) => ({ id: l.ref_id, name: l.name, element_type: 'Load' }))
+    .sort((a, b) => a.id.localeCompare(b.id));
+
+  return { buses, lines, cables, transformers, switches, sources, loads };
+}
+
+// ---------------------------------------------------------------------------
+// UI V3: Project + Case initialization hook
+// ---------------------------------------------------------------------------
+
+function useProjectInit() {
+  const setActiveProject = useAppStateStore((state) => state.setActiveProject);
+  const setActiveCase = useAppStateStore((state) => state.setActiveCase);
+  const activeProjectId = useAppStateStore((state) => state.activeProjectId);
+  const activeCaseId = useAppStateStore((state) => state.activeCaseId);
+  const refreshFromBackend = useSnapshotStore((state) => state.refreshFromBackend);
+  const initDone = useRef(false);
+
+  useEffect(() => {
+    if (initDone.current) return;
+    initDone.current = true;
+
+    (async () => {
+      try {
+        // 1. Ensure project exists
+        let projectId = activeProjectId;
+        if (!projectId) {
+          const projects = await listProjects();
+          if (projects.length > 0) {
+            projectId = projects[0].id;
+            setActiveProject(projects[0].id, projects[0].name);
+          } else {
+            const newProject = await createProject({ name: 'Nowy projekt' });
+            projectId = newProject.id;
+            setActiveProject(newProject.id, newProject.name);
+          }
+        }
+
+        if (!projectId) return;
+
+        // 2. Ensure study case exists
+        let caseId = activeCaseId;
+        if (!caseId) {
+          const cases = await listStudyCases(projectId);
+          if (cases.length > 0) {
+            caseId = cases[0].id;
+            setActiveCase(cases[0].id, cases[0].name, 'ShortCircuitCase', cases[0].result_status);
+          } else {
+            const newCase = await createStudyCase({
+              project_id: projectId,
+              name: 'Przypadek domyślny',
+              set_active: true,
+            });
+            caseId = newCase.id;
+            setActiveCase(newCase.id, newCase.name, 'ShortCircuitCase', newCase.result_status);
+          }
+        }
+
+        if (!caseId) return;
+
+        // 3. Activate case
+        await setActiveStudyCase(projectId, caseId).catch(() => {
+          // Already active or activation not supported — ignore
+        });
+
+        // 4. Load ENM snapshot
+        await refreshFromBackend(caseId);
+      } catch (err) {
+        // Backend not available — graceful degradation
+        if (import.meta.env.DEV) {
+          console.debug('[useProjectInit] Backend unavailable:', err);
+        }
+      }
+    })();
+  }, [activeProjectId, activeCaseId, setActiveProject, setActiveCase, refreshFromBackend]);
+}
+
+// ---------------------------------------------------------------------------
+// UI V3: Analysis execution (Calculate button)
+// ---------------------------------------------------------------------------
+
+function useCalculateHandler() {
+  const activeCaseId = useAppStateStore((state) => state.activeCaseId);
+  const setActiveRun = useAppStateStore((state) => state.setActiveRun);
+  const setActiveCaseResultStatus = useAppStateStore((state) => state.setActiveCaseResultStatus);
+  const [isCalculating, setIsCalculating] = useState(false);
+
+  const handleCalculate = useCallback(async () => {
+    if (!activeCaseId || isCalculating) {
+      if (!activeCaseId) {
+        notify('Brak aktywnego przypadku obliczeniowego. Utwórz przypadek w kreatorze.', 'warning');
+      }
+      return;
+    }
+
+    setIsCalculating(true);
+    try {
+      // 1. Check eligibility
+      notify('Sprawdzanie gotowości do obliczeń...', 'info');
+      const eligibilityRes = await fetch(`/api/cases/${activeCaseId}/analysis-eligibility`);
+      if (eligibilityRes.ok) {
+        const eligibility = await eligibilityRes.json();
+        const scEntry = eligibility?.entries?.find(
+          (e: { analysis_type: string }) => e.analysis_type === 'short_circuit_3f',
+        );
+        if (scEntry && !scEntry.eligible) {
+          const blockerMsgs = (scEntry.blockers ?? [])
+            .map((b: { message: string }) => b.message)
+            .join('; ');
+          notify(`Sieć nie jest gotowa do obliczeń: ${blockerMsgs || 'brak szczegółów'}`, 'warning');
+          return;
+        }
+      }
+
+      // 2. Create run
+      notify('Tworzenie przebiegu obliczeniowego...', 'info');
+      const run = await createRun(activeCaseId, {
+        analysis_type: 'SC_3F',
+      });
+
+      // 3. Execute
+      notify('Wykonywanie obliczeń zwarciowych (IEC 60909)...', 'info');
+      await executeRun(run.id);
+
+      // 4. Poll until complete (max 60s)
+      let attempts = 0;
+      let currentRun = await getRun(run.id);
+      while (currentRun.status !== 'DONE' && currentRun.status !== 'FAILED' && attempts < 60) {
+        await new Promise((r) => setTimeout(r, 1000));
+        currentRun = await getRun(run.id);
+        attempts++;
+      }
+
+      if (currentRun.status === 'DONE') {
+        setActiveRun(run.id);
+        setActiveCaseResultStatus('FRESH');
+        notify('Obliczenia zakończone pomyślnie. Przejdź do wyników.', 'success');
+        window.location.hash = '#results';
+      } else if (currentRun.status === 'FAILED') {
+        notify('Obliczenia zakończyły się błędem. Sprawdź model sieci.', 'error');
+      } else {
+        notify('Przekroczono limit czasu oczekiwania na wyniki.', 'warning');
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      if (import.meta.env.DEV) {
+        console.debug('[handleCalculate] Error:', message);
+      }
+      notify(`Błąd obliczeń: ${message}`, 'error');
+    } finally {
+      setIsCalculating(false);
+    }
+  }, [activeCaseId, isCalculating, setActiveRun, setActiveCaseResultStatus]);
+
+  return { handleCalculate, isCalculating };
+}
+
+// ---------------------------------------------------------------------------
+// App Component
+// ---------------------------------------------------------------------------
+
 function App() {
   // NAVIGATION_SELECTOR_UI: Use getCurrentHashRoute to strip query params from hash
   const [route, setRoute] = useState(() => getCurrentHashRoute());
@@ -93,12 +323,25 @@ function App() {
   const projectName = useActiveProjectName();
   const selectElement = useSelectionStore((state) => state.selectElement);
   const centerSldOnElement = useSelectionStore((state) => state.centerSldOnElement);
+  const activeCaseId = useAppStateStore((state) => state.activeCaseId);
+
+  // UI V3: Initialize project + case + load snapshot on startup
+  useProjectInit();
+
+  // UI V3: Sync snapshot → SLD symbols (replaces demo mode)
+  useSnapshotSldSync();
+
+  // UI V3: Derive tree elements from ENM snapshot
+  const snapshot = useSnapshotStore((state) => state.snapshot);
+  const treeElements = useMemo(() => snapshotToTreeElements(snapshot), [snapshot]);
+
+  // UI V3: Calculate handler (real solver execution)
+  const { handleCalculate } = useCalculateHandler();
 
   // NAVIGATION_SELECTOR_UI: Sync selection with URL (refresh preserves selection)
   useUrlSelectionSync();
 
   useEffect(() => {
-    // NAVIGATION_SELECTOR_UI: Strip query params when handling hash changes
     const handler = () => setRoute(getCurrentHashRoute());
     window.addEventListener('hashchange', handler);
     return () => window.removeEventListener('hashchange', handler);
@@ -115,26 +358,13 @@ function App() {
     }
   }, [route, setActiveMode]);
 
-  const handleCalculate = useCallback(() => {
-    // TODO: Calculation requires an active case configured
-    // Silent no-op until case management flow is complete
-    if (import.meta.env.DEV) {
-      console.debug('[handleCalculate] No active case - calculation skipped');
-    }
-  }, []);
-
-  /**
-   * Navigate to Results (Przegląd wyników).
-   * UI_INTEGRATION_E2E: Uses #results route.
-   */
+  /** Navigate to Results (Przegląd wyników). */
   const handleViewResults = useCallback(() => {
     window.location.hash = ROUTES.RESULTS.hash;
   }, []);
 
-  // PROJECT_TREE_PARITY_V1: Tree node click handler
-  // Updates selection → syncs URL → triggers Results Table / Inspector update
+  // Tree node click handler
   const handleTreeNodeClick = useCallback((node: TreeNode) => {
-    // Only handle element nodes (not categories)
     if (node.nodeType === 'ELEMENT' && node.elementId && node.elementType) {
       selectElement({
         id: node.elementId,
@@ -145,32 +375,17 @@ function App() {
     }
   }, [selectElement, centerSldOnElement]);
 
-  // PROJECT_TREE_PARITY_V1: Tree category click handler
+  // Tree category click handler
   const handleTreeCategoryClick = useCallback((_nodeType: TreeNodeType, _elementType?: ElementType) => {
-    // Category navigation not yet implemented - silent no-op
-    // Filter by category will be available in future version
     if (import.meta.env.DEV) {
       console.debug('[handleTreeCategoryClick] Category click - filter not yet implemented');
     }
   }, []);
 
-  // PROJECT_TREE_PARITY_V1: Tree run click handler
+  // Tree run click handler
   const handleTreeRunClick = useCallback((runId: string) => {
-    // Navigate to results with run context
     window.location.hash = `#results?run=${runId}`;
   }, []);
-
-  // PROJECT_TREE_PARITY_V1: Mock tree elements for demonstration
-  // In production, this would come from network model store
-  const treeElements = useMemo(() => ({
-    buses: [],
-    lines: [],
-    cables: [],
-    transformers: [],
-    switches: [],
-    sources: [],
-    loads: [],
-  }), []);
 
   // E2E_STABILIZATION: Wrapper with app-ready indicator
   const wrapWithReadyIndicator = (content: React.ReactNode) => (
@@ -201,7 +416,7 @@ function App() {
     );
   }
 
-  // UI_INTEGRATION_E2E + PROJECT_TREE_PARITY_V1: Przegląd wyników (Results Browser)
+  // Przegląd wyników (Results Browser)
   if (route === '#results') {
     return wrapWithReadyIndicator(
       <PowerFactoryLayout {...layoutProps}>
@@ -228,7 +443,7 @@ function App() {
     );
   }
 
-  // P20b: Power Flow Results Inspector
+  // Power Flow Results Inspector
   if (route === '#power-flow-results') {
     return wrapWithReadyIndicator(
       <PowerFactoryLayout {...layoutProps}>
@@ -255,7 +470,7 @@ function App() {
     );
   }
 
-  // Inspektor modelu ENM (v4.2 — diagnostyka inżynierska)
+  // Inspektor modelu ENM
   if (route === '#enm-inspector') {
     return wrapWithReadyIndicator(
       <PowerFactoryLayout {...layoutProps}>
@@ -264,32 +479,32 @@ function App() {
     );
   }
 
-  // PR-24: Scenariusze zwarciowe (Fault Scenarios)
+  // Scenariusze zwarciowe (Fault Scenarios)
   if (route === '#fault-scenarios') {
     return wrapWithReadyIndicator(
       <PowerFactoryLayout {...layoutProps}>
         <div className="flex flex-col h-full">
-          <FaultScenariosPanel studyCaseId={null} />
+          <FaultScenariosPanel studyCaseId={activeCaseId} />
           <FaultScenarioModal />
         </div>
       </PowerFactoryLayout>
     );
   }
 
-  // SLD_READ_ONLY_UI: Podglad schematu jednokreskowego (tylko odczyt)
+  // Podglad schematu jednokreskowego (tylko odczyt)
   if (route === '#sld-view') {
     return wrapWithReadyIndicator(
       <PowerFactoryLayout {...layoutProps}>
-        <SLDViewPage useDemo={true} />
+        <SLDViewPage />
       </PowerFactoryLayout>
     );
   }
 
-  // POWERFACTORY_LAYOUT: Default — SLD Editor Page (ALWAYS shows tools)
-  // This replaces the old DesignerPage with proper PowerFactory-style layout
+  // Default — SLD Editor Page (ALWAYS shows tools)
+  // UI V3: useDemo removed — SLD fed from snapshot via useSnapshotSldSync
   return wrapWithReadyIndicator(
     <PowerFactoryLayout {...layoutProps}>
-      <SldEditorPage useDemo={true} />
+      <SldEditorPage />
     </PowerFactoryLayout>
   );
 }

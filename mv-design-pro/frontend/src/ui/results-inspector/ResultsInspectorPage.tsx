@@ -35,6 +35,7 @@ import {
 } from './types';
 import { VerdictBadge } from '../protection-coordination/ResultsTables';
 import { calculateShortCircuitVerdict, formatMargin } from './shortCircuitVerdict';
+import { useAppStateStore } from '../app-state';
 import { useSelectionStore } from '../selection';
 import type { ElementType } from '../types';
 import { InspectorPanel } from '../inspector';
@@ -514,6 +515,8 @@ export function ResultsInspectorPage({ runId, onClose }: ResultsInspectorPagePro
     toggleOverlay,
   } = useResultsInspectorStore();
 
+  const activeRunId = useAppStateStore((state) => state.activeRunId);
+
   const selectElement = useSelectionStore((state) => state.selectElement);
   const globalSelectedElement = useSelectionStore((state) => state.selectedElement);
   const hasShortCircuit = useHasShortCircuitResults();
@@ -531,6 +534,13 @@ export function ResultsInspectorPage({ runId, onClose }: ResultsInspectorPagePro
       selectRun(runId);
     }
   }, [runId, selectedRunId, selectRun]);
+
+  // Sync global activeRunId to results inspector store on mount
+  useEffect(() => {
+    if (activeRunId) {
+      useResultsInspectorStore.getState().selectRun(activeRunId);
+    }
+  }, [activeRunId]);
 
   // Clear selection when switching tabs
   useEffect(() => {

@@ -11,7 +11,7 @@
  * DETERMINIZM: Klasyfikacja jest deterministyczna — ten sam graf → te same typy.
  */
 
-import type { VisualGraphV1, VisualNodeV1, VisualEdgeV1 } from './visualGraph';
+import type { VisualGraphV1, VisualEdgeV1 } from './visualGraph';
 import { NodeTypeV1, EdgeTypeV1 } from './visualGraph';
 
 // =============================================================================

@@ -80,7 +80,7 @@ import {
   snapToAestheticGrid,
   deterministicBranchSide,
 } from '../IndustrialAesthetics';
-import { classifyFeeders, type FeederClassification } from './bayClassification';
+import { classifyFeeders } from './bayClassification';
 import { minimizeCrossings } from './crossingMinimization';
 
 // =============================================================================

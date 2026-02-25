@@ -27,6 +27,7 @@ import { WizardSldPreview } from './WizardSldPreview';
 import { useWizardStore } from './useWizardStore';
 import type { WizardIssueApi } from './useWizardStore';
 import { useSnapshotStore } from '../topology/snapshotStore';
+import { useAppStateStore } from '../app-state';
 import { clsx } from 'clsx';
 
 // ---------------------------------------------------------------------------
@@ -684,7 +685,9 @@ export function WizardPage() {
   const [isRunning, setIsRunning] = useState(false);
   const [saveStatus, setSaveStatus] = useState<string>('');
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const caseId = getCaseId();
+  // UI V3: Get caseId from global app state (replaces URL hash parsing)
+  const activeCaseId = useAppStateStore((state) => state.activeCaseId);
+  const caseId = activeCaseId ?? getCaseId();
 
   // Wizard store (Zustand)
   const wizardStore = useWizardStore();
