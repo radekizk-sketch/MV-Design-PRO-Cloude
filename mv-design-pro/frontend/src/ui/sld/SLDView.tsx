@@ -55,6 +55,7 @@ import {
 import { useOverlayRuntime, OverlayLegend } from '../sld-overlay';
 import { SldTechLabelsLayer } from './SldTechLabelsLayer';
 import { useCanCalculate, useAppStateStore } from '../app-state';
+import { useSnapshotStore } from '../topology/snapshotStore';
 import { resolveClickAction } from './SldModeInteractionHandler';
 import { useOperationalModeStore } from './operationalModeStore';
 import { EngineeringContextMenu } from '../context-menu/EngineeringContextMenu';
@@ -298,6 +299,24 @@ const TOGGLE_ACTIONS = new Set([
   'undo_snapshot',
 ]);
 
+function mapSelectionHintElementType(rawType: string): ElementType {
+  const normalized = rawType.trim().toLowerCase();
+  const map: Record<string, ElementType> = {
+    bus: 'Bus',
+    branch: 'LineBranch',
+    transformer: 'TransformerBranch',
+    source: 'Source',
+    load: 'Load',
+    generator: 'Generator',
+    substation: 'Station',
+    bay: 'BaySN',
+    measurement: 'Measurement',
+    protection_assignment: 'ProtectionAssignment',
+    switch: 'Switch',
+  };
+  return map[normalized] ?? 'Bus';
+}
+
 /**
  * Main SLD View component.
  */
@@ -342,6 +361,7 @@ export const SLDView: React.FC<SLDViewProps> = ({
   // App state for export metadata (project/case names)
   const activeProjectName = useAppStateStore((state) => state.activeProjectName);
   const activeCaseName = useAppStateStore((state) => state.activeCaseName);
+  const activeCaseId = useAppStateStore((state) => state.activeCaseId);
 
   // BLOK 8 — przycisk uruchomienia obliczeń
   const { allowed: canCalculate } = useCanCalculate();
@@ -385,8 +405,35 @@ export const SLDView: React.FC<SLDViewProps> = ({
   // PR-16: Overlay Runtime Engine
   const overlayRuntime = useOverlayRuntime(symbols);
 
-  // Modal controller for context menu → modal dispatch
-  const modalController = useModalController();
+  const executeDomainOperation = useSnapshotStore((state) => state.executeDomainOperation);
+
+  // Modal controller for context menu → modal dispatch + domain operation
+  const modalController = useModalController(async (canonicalOp, elementId, formData) => {
+    if (!activeCaseId) {
+      notify('Brak aktywnego Study Case — nie można wykonać operacji.', 'error');
+      return false;
+    }
+
+    const response = await executeDomainOperation(activeCaseId, canonicalOp, {
+      element_ref: elementId,
+      source: 'sld_modal',
+      ...formData,
+    });
+
+    if (!response || response.error) {
+      return false;
+    }
+
+    const hint = response.selection_hint;
+    if (hint?.element_id && hint?.element_type) {
+      const hintedType = mapSelectionHintElementType(hint.element_type);
+      selectElement({ id: hint.element_id, type: hintedType, name: hint.element_id });
+      updateUrlWithSelection({ id: hint.element_id, type: hintedType, name: hint.element_id });
+      centerSldOnElement(hint.element_id);
+    }
+
+    return true;
+  });
 
   // Export dialog state
   const [exportDialogOpen, setExportDialogOpen] = useState(false);
@@ -1478,6 +1525,7 @@ export const SLDView: React.FC<SLDViewProps> = ({
       <ModalOverlay
         state={modalController.state}
         onClose={modalController.close}
+        onSubmit={modalController.handleSubmit}
       />
     </div>
   );

@@ -75,6 +75,30 @@ MV-DESIGN-PRO is a functional Medium Voltage network design and analysis system 
 
 ## 3. Active Work
 
+### 3.0 Execution after 10/10 Audit (current)
+
+Objective: Realize remediation plan from `docs/plan/PLAN_10_10_GLOBAL_SN.md` in strict sequence.
+
+Progress:
+- [x] Step I (Topology blockers) — backend CI guardians added for: radial 10, ring 8 + NOP, 2 rings + 2 sources, split+insert determinism (`backend/tests/test_topology_guardians_step1.py`).
+- [x] Step II (Load Flow NR parity) — backend guardian tests added (`backend/tests/test_load_flow_step2_guardians.py`).
+- [x] Step III (IEC 60909 closure) — backend guardian tests added (`backend/tests/test_short_circuit_step3_guardians.py`).
+- [x] Step IV (Catalog materialization gates) — backend guardian tests added (`backend/tests/test_catalog_materialization_step4_guardians.py`).
+- [x] Step V (Global white-box + export) — deterministic trace_id implemented in SC/LF/Protection emitters + regression tests; canonical step-order hardening added (permutation-invariant equation_steps hashing).
+- [x] Step VI (UI↔Solver↔SLD integration) — fixed backend→frontend modal bridge for protection `relay_settings` + tests.
+- [x] Step VII (SLD industrial aesthetics + golden render) — canonical render manifest + 3 golden SLD fixtures (radial, ring+NOP, PV/BESS) + CI guardian snapshots.
+- [x] Step VII.b (SLD click-by-click write-flow) — modal submit wired to `executeDomainOperation` with snapshot update + selection hint sync + regression tests.
+- [x] Step II.a (ExecutionEngine Load Flow unification) — added canonical `execute_run_load_flow()` pipeline with deterministic `LoadFlowRunInput`, ResultSet mapping and radial/ring integration tests.
+
+
+### 3.0.1 Step VII Completion Criteria (SLD industrial aesthetics + golden render)
+
+Done criteria (implemented):
+- Canonical SLD fixture set covers min. 3 scenarios: radial, ring+NOP, PV/BESS.
+- Deterministic render manifest contract includes ordered node/edge geometry and industrial style tokens.
+- Golden snapshot artifacts for render manifest are CI-guarded (determinism + permutation invariance).
+- Regression tests fail on geometry/style drift unless baseline update is explicit.
+
 ### 3.1 Docs Sync to Spec Canon (current)
 
 Objective: Synchronize all repo documentation entrypoints with `docs/spec/` (18 chapters) as the source of truth.

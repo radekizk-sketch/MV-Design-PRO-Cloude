@@ -13,7 +13,6 @@ INVARIANTS:
 from __future__ import annotations
 
 from typing import Any
-from uuid import uuid4
 
 from domain.trace_v2.artifact import (
     AnalysisTypeV2,
@@ -26,6 +25,7 @@ from domain.trace_v2.artifact import (
 )
 from domain.trace_v2.equation_registry_v2 import EquationRegistryV2
 from domain.trace_v2.math_spec_version import CURRENT_MATH_SPEC_VERSION
+from application.trace_emitters.deterministic_ids import deterministic_trace_id
 
 
 def _fmt(x: float) -> str:
@@ -79,8 +79,17 @@ class TraceEmitterSC:
         # Build outputs
         outputs = self._build_outputs(sc_result_dict)
 
+        trace_id = deterministic_trace_id(
+            analysis_type=AnalysisTypeV2.SC.value,
+            snapshot_hash=snapshot_hash,
+            run_hash=run_hash,
+            inputs=inputs,
+            equation_steps=steps,
+            outputs=outputs,
+        )
+
         return build_trace_artifact_v2(
-            trace_id=str(uuid4()),
+            trace_id=trace_id,
             analysis_type=AnalysisTypeV2.SC,
             math_spec_version=math_spec_version,
             snapshot_hash=snapshot_hash,

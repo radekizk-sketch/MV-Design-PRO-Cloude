@@ -47,7 +47,13 @@ from application.solvers.short_circuit_binding import (
 from application.result_mapping.short_circuit_to_resultset_v1 import (
     map_short_circuit_to_resultset_v1,
 )
+from application.result_mapping.load_flow_to_resultset_v1 import (
+    map_power_flow_to_resultset_v1,
+)
+from application.execution_engine.load_flow_run_input import LoadFlowRunInput
 from domain.fault_scenario import FaultScenario
+from network_model.solvers.power_flow_newton import PowerFlowNewtonSolver
+from network_model.solvers.power_flow_result import build_power_flow_result_v1
 
 from .errors import (
     RunBlockedError,
@@ -268,6 +274,138 @@ class ExecutionEngineService:
         self._runs[run_id] = updated
         logger.warning("Failed run %s: %s", run_id, error_message)
         return updated
+
+    # =========================================================================
+    # Load Flow Execution
+    # =========================================================================
+
+    def execute_run_load_flow(
+        self,
+        run_id: UUID,
+        *,
+        load_flow_input: LoadFlowRunInput,
+        readiness_snapshot: dict[str, Any],
+        validation_snapshot: dict[str, Any],
+    ) -> tuple[Run, ResultSet]:
+        """Execute a load-flow run via the canonical ExecutionEngine pipeline."""
+        run = self._get_run(run_id)
+
+        if run.status != RunStatus.PENDING:
+            raise RunBlockedError(
+                [f"Przebieg ma status {run.status.value} — wymagany PENDING"]
+            )
+
+        if run.analysis_type != ExecutionAnalysisType.LOAD_FLOW:
+            raise RunBlockedError(
+                [f"Typ analizy {run.analysis_type.value} nie jest LOAD_FLOW"]
+            )
+
+        run = self.start_run(run_id)
+
+        try:
+            pf_input = load_flow_input.to_power_flow_input()
+            solution = PowerFlowNewtonSolver().solve(pf_input)
+            node_p_injected_pu = {node.node_id: 0.0 for node in load_flow_input.nodes}
+            node_q_injected_pu = {node.node_id: 0.0 for node in load_flow_input.nodes}
+            for ld in load_flow_input.loads:
+                node_p_injected_pu[ld.node_id] = node_p_injected_pu.get(ld.node_id, 0.0) + (ld.p_mw / pf_input.base_mva)
+                node_q_injected_pu[ld.node_id] = node_q_injected_pu.get(ld.node_id, 0.0) + (ld.q_mvar / pf_input.base_mva)
+            for gen in load_flow_input.generators:
+                node_p_injected_pu[gen.node_id] = node_p_injected_pu.get(gen.node_id, 0.0) + (gen.p_mw / pf_input.base_mva)
+            node_p_injected_pu[pf_input.slack.node_id] = float(np.real(solution.slack_power))
+            node_q_injected_pu[pf_input.slack.node_id] = float(np.imag(solution.slack_power))
+
+            pf_result = build_power_flow_result_v1(
+                converged=solution.converged,
+                iterations_count=solution.iterations,
+                tolerance_used=pf_input.options.tolerance,
+                base_mva=pf_input.base_mva,
+                slack_bus_id=pf_input.slack.node_id,
+                node_u_mag=solution.node_u_mag,
+                node_angle=solution.node_angle,
+                node_p_injected_pu=node_p_injected_pu,
+                node_q_injected_pu=node_q_injected_pu,
+                branch_s_from_mva=solution.branch_s_from_mva,
+                branch_s_to_mva=solution.branch_s_to_mva,
+                losses_total=solution.losses_total,
+                slack_power_pu=solution.slack_power,
+            )
+
+            branch_topology = {
+                b.branch_id: (b.from_node_id, b.to_node_id)
+                for b in load_flow_input.branches
+            }
+            bus_voltage_bases = {
+                n.node_id: n.voltage_level_kv
+                for n in load_flow_input.nodes
+            }
+
+            mapped = map_power_flow_to_resultset_v1(
+                pf_result=pf_result,
+                snapshot_hash=load_flow_input.canonical_hash(),
+                run_hash=run.solver_input_hash,
+                input_hash=load_flow_input.canonical_hash(),
+                bus_voltage_bases=bus_voltage_bases,
+                branch_topology=branch_topology,
+            )
+
+            element_results = [
+                ElementResult(
+                    element_ref=node.node_id,
+                    element_type="node",
+                    values={
+                        "voltage_pu": node.voltage_pu,
+                        "angle_deg": node.angle_deg,
+                    },
+                )
+                for node in mapped.nodes
+            ] + [
+                ElementResult(
+                    element_ref=branch.branch_id,
+                    element_type="branch",
+                    values={
+                        "losses_p_mw": branch.losses_p_mw,
+                        "p_from_mw": branch.p_from_mw,
+                    },
+                )
+                for branch in mapped.branches
+            ]
+
+            global_results = {
+                "snapshot_hash": mapped.snapshot_hash,
+                "convergence_status": mapped.convergence_status,
+                "iteration_count": mapped.iteration_count,
+                "totals": mapped.totals.to_dict(),
+                "sld_overlay": {
+                    "nodes": {
+                        n.node_id: {
+                            "voltage_pu": n.voltage_pu,
+                            "angle_deg": n.angle_deg,
+                        }
+                        for n in mapped.nodes
+                    },
+                    "branches": {
+                        b.branch_id: {
+                            "loading_p_from_mw": b.p_from_mw,
+                            "losses_p_mw": b.losses_p_mw,
+                        }
+                        for b in mapped.branches
+                    },
+                },
+            }
+
+            updated_run, result_set = self.complete_run(
+                run_id,
+                validation_snapshot=validation_snapshot,
+                readiness_snapshot=readiness_snapshot,
+                element_results=element_results,
+                global_results=global_results,
+            )
+
+            return updated_run, result_set
+        except Exception:
+            self.fail_run(run_id, "Load-flow execution failed")
+            raise
 
     # =========================================================================
     # Short-Circuit Execution (PR-18)

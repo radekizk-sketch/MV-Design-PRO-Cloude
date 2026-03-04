@@ -49,6 +49,9 @@ export const BACKEND_MODAL_TYPE_MAP: Record<string, ModalId> = {
   'Uzupełnij Z0': MODAL_IDS.MODAL_ZMIEN_PARAMETRY,
   'Uzupełnij Z2': MODAL_IDS.MODAL_ZMIEN_PARAMETRY,
   'Zmień tryb zwarcia': MODAL_IDS.MODAL_ZMIEN_PARAMETRY,
+
+  // Protection API modal type
+  relay_settings: MODAL_IDS.MODAL_DODAJ_ZABEZPIECZENIE,
 };
 
 /**
