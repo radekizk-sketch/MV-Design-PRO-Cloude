@@ -71,14 +71,22 @@ const OP_RESULT_LABELS: Record<string, string> = {
 // ---------------------------------------------------------------------------
 
 export interface ModalControllerProps {
-  onDomainOpComplete?: (canonicalOp: string, elementId: string) => void;
+  onDomainOpComplete?: (
+    canonicalOp: string,
+    elementId: string,
+    formData: Record<string, unknown>,
+  ) => Promise<boolean> | boolean;
 }
 
 /**
  * useModalController — hook managing modal lifecycle for SLD context menu.
  */
 export function useModalController(
-  onDomainOpComplete?: (canonicalOp: string, elementId: string) => void,
+  onDomainOpComplete?: (
+    canonicalOp: string,
+    elementId: string,
+    formData: Record<string, unknown>,
+  ) => Promise<boolean> | boolean,
 ) {
   const [state, setState] = useState<ModalControllerState>(CLOSED_STATE);
 
@@ -119,16 +127,31 @@ export function useModalController(
    * Handle modal submit — domain operation completed.
    */
   const handleSubmit = useCallback(
-    (_formData: Record<string, unknown>) => {
-      if (state.canonicalOp && state.elementId) {
-        const label =
-          OP_RESULT_LABELS[state.canonicalOp] ?? state.canonicalOp;
-        notify(label, 'success');
-        if (onDomainOpComplete) {
-          onDomainOpComplete(state.canonicalOp, state.elementId);
-        }
+    async (formData: Record<string, unknown>) => {
+      if (!state.canonicalOp || !state.elementId) {
+        setState(CLOSED_STATE);
+        return;
       }
-      setState(CLOSED_STATE);
+
+      const label = OP_RESULT_LABELS[state.canonicalOp] ?? state.canonicalOp;
+
+      if (!onDomainOpComplete) {
+        notify(label, 'success');
+        setState(CLOSED_STATE);
+        return;
+      }
+
+      const ok = await onDomainOpComplete(
+        state.canonicalOp,
+        state.elementId,
+        formData,
+      );
+      if (ok) {
+        notify(label, 'success');
+        setState(CLOSED_STATE);
+      } else {
+        notify('Operacja nie została wykonana. Sprawdź dane i spróbuj ponownie.', 'error');
+      }
     },
     [state.canonicalOp, state.elementId, onDomainOpComplete],
   );
@@ -145,7 +168,8 @@ export function useModalController(
 export const ModalOverlay: React.FC<{
   state: ModalControllerState;
   onClose: () => void;
-}> = ({ state, onClose }) => {
+  onSubmit?: (formData: Record<string, unknown>) => void | Promise<void>;
+}> = ({ state, onClose, onSubmit }) => {
   if (!state.isOpen || !state.labelPl) return null;
 
   return (
@@ -197,7 +221,13 @@ export const ModalOverlay: React.FC<{
           </button>
           <button
             type="button"
-            onClick={onClose}
+            onClick={() => {
+              if (onSubmit) {
+                void onSubmit({});
+              } else {
+                onClose();
+              }
+            }}
             className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700"
           >
             Zastosuj

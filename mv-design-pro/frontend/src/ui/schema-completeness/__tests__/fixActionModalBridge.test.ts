@@ -36,6 +36,7 @@ const KNOWN_BACKEND_MODAL_TYPES = [
   'Uzupełnij Z0',
   'Uzupełnij Z2',
   'Zmień tryb zwarcia',
+  'relay_settings',
 ];
 
 // ---------------------------------------------------------------------------
@@ -88,6 +89,7 @@ describe('resolveModalType', () => {
     expect(resolveModalType('Uzupełnij Z0')).toBe(MODAL_IDS.MODAL_ZMIEN_PARAMETRY);
     expect(resolveModalType('Uzupełnij Z2')).toBe(MODAL_IDS.MODAL_ZMIEN_PARAMETRY);
     expect(resolveModalType('Zmień tryb zwarcia')).toBe(MODAL_IDS.MODAL_ZMIEN_PARAMETRY);
+    expect(resolveModalType('relay_settings')).toBe(MODAL_IDS.MODAL_DODAJ_ZABEZPIECZENIE);
   });
 
   it('returns null for null input', () => {
@@ -111,6 +113,20 @@ describe('resolveFixActionToOperation', () => {
     expect(result.actionType).toBe('OPEN_MODAL');
     expect(result.modalId).toBe(MODAL_IDS.MODAL_DODAJ_ZRODLO_SN);
     expect(result.elementRef).toBe('source-1');
+  });
+
+
+  it('resolves OPEN_MODAL relay_settings fix action', () => {
+    const fixAction: FixAction = {
+      action_type: 'OPEN_MODAL',
+      element_ref: 'cb-1',
+      modal_type: 'relay_settings',
+      payload_hint: null,
+    };
+    const result = resolveFixActionToOperation(fixAction);
+    expect(result.actionType).toBe('OPEN_MODAL');
+    expect(result.modalId).toBe(MODAL_IDS.MODAL_DODAJ_ZABEZPIECZENIE);
+    expect(result.elementRef).toBe('cb-1');
   });
 
   it('resolves SELECT_CATALOG fix action', () => {

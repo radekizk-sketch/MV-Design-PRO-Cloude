@@ -9,6 +9,9 @@ Tests:
 
 from __future__ import annotations
 
+import math
+
+from application.trace_emitters.deterministic_ids import deterministic_trace_id
 from application.trace_emitters.sc_emitter import TraceEmitterSC
 from application.trace_emitters.protection_emitter import TraceEmitterProtection
 from application.trace_emitters.load_flow_emitter import TraceEmitterLoadFlow
@@ -163,8 +166,9 @@ class TestTraceEmitterSC:
         )
         # run_hash must be identical
         assert a1.run_hash == a2.run_hash
-        # trace_signature may differ due to uuid trace_id, but run_hash stable
 
+        assert a1.trace_id == a2.trace_id
+        
     def test_anti_double_counting_c(self) -> None:
         """c_factor must appear in exactly one equation step (SC_IKSS)."""
         emitter = TraceEmitterSC()
@@ -260,6 +264,20 @@ class TestTraceEmitterProtection:
         )
         ct_steps = [s for s in artifact.equation_steps if s.eq_id == "PROT_CT_CONVERSION"]
         assert len(ct_steps) == 1
+
+    def test_trace_id_deterministic(self) -> None:
+        emitter = TraceEmitterProtection()
+        a1 = emitter.emit(
+            snapshot_hash="snap456",
+            analysis_input={"template": "default"},
+            protection_result_dict=_protection_result_dict(),
+        )
+        a2 = emitter.emit(
+            snapshot_hash="snap456",
+            analysis_input={"template": "default"},
+            protection_result_dict=_protection_result_dict(),
+        )
+        assert a1.trace_id == a2.trace_id
 
     def test_idmt_step_with_intermediates(self) -> None:
         emitter = TraceEmitterProtection()
@@ -372,6 +390,22 @@ class TestTraceEmitterLoadFlow:
         bus_steps = [s for s in artifact.equation_steps if s.eq_id == "LF_BUS_VOLTAGE"]
         assert len(bus_steps) == 2  # bus_1 + bus_2
 
+    def test_trace_id_deterministic(self) -> None:
+        emitter = TraceEmitterLoadFlow()
+        a1 = emitter.emit(
+            snapshot_hash="snap789",
+            analysis_input={"solver": "newton"},
+            pf_trace_dict=_lf_trace_dict(),
+            pf_result_dict=_lf_result_dict(),
+        )
+        a2 = emitter.emit(
+            snapshot_hash="snap789",
+            analysis_input={"solver": "newton"},
+            pf_trace_dict=_lf_trace_dict(),
+            pf_result_dict=_lf_result_dict(),
+        )
+        assert a1.trace_id == a2.trace_id
+
     def test_per_branch_flow_and_losses(self) -> None:
         emitter = TraceEmitterLoadFlow()
         artifact = emitter.emit(
@@ -384,3 +418,195 @@ class TestTraceEmitterLoadFlow:
         loss_steps = [s for s in artifact.equation_steps if s.eq_id == "LF_BRANCH_LOSSES"]
         assert len(flow_steps) == 1
         assert len(loss_steps) == 1
+
+
+def test_deterministic_trace_id_is_permutation_invariant_for_equation_steps() -> None:
+    """Logical-equivalent step sets must produce identical trace_id."""
+    steps_order_a = [
+        {"step_id": "SC_IKSS_002", "result": {"name": "ikss", "value": 3500.0}},
+        {"step_id": "SC_ZK_001", "result": {"name": "zk", "value": "1.5+j3.2"}},
+    ]
+    steps_order_b = [
+        {"step_id": "SC_ZK_001", "result": {"name": "zk", "value": "1.5+j3.2"}},
+        {"step_id": "SC_IKSS_002", "result": {"name": "ikss", "value": 3500.0}},
+    ]
+
+    trace_id_a = deterministic_trace_id(
+        analysis_type="SC",
+        snapshot_hash="snap123",
+        run_hash="run123",
+        inputs={"fault_node_id": "bus_01"},
+        equation_steps=steps_order_a,
+        outputs={"ikss_a": 3500.0},
+    )
+    trace_id_b = deterministic_trace_id(
+        analysis_type="SC",
+        snapshot_hash="snap123",
+        run_hash="run123",
+        inputs={"fault_node_id": "bus_01"},
+        equation_steps=steps_order_b,
+        outputs={"ikss_a": 3500.0},
+    )
+
+    assert trace_id_a == trace_id_b
+
+
+def test_deterministic_trace_id_is_permutation_invariant_with_duplicate_step_ids() -> None:
+    """Duplicate step_id entries still yield stable trace_id regardless of order."""
+    steps_order_a = [
+        {"step_id": "SC_MISC_999", "result": {"name": "a", "value": 1.0}},
+        {"step_id": "SC_MISC_999", "result": {"name": "b", "value": 2.0}},
+    ]
+    steps_order_b = [
+        {"step_id": "SC_MISC_999", "result": {"name": "b", "value": 2.0}},
+        {"step_id": "SC_MISC_999", "result": {"name": "a", "value": 1.0}},
+    ]
+
+    trace_id_a = deterministic_trace_id(
+        analysis_type="SC",
+        snapshot_hash="snap123",
+        run_hash="run123",
+        inputs={"fault_node_id": "bus_01"},
+        equation_steps=steps_order_a,
+        outputs={"ikss_a": 3500.0},
+    )
+    trace_id_b = deterministic_trace_id(
+        analysis_type="SC",
+        snapshot_hash="snap123",
+        run_hash="run123",
+        inputs={"fault_node_id": "bus_01"},
+        equation_steps=steps_order_b,
+        outputs={"ikss_a": 3500.0},
+    )
+
+    assert trace_id_a == trace_id_b
+
+
+def test_deterministic_trace_id_accepts_tuple_equation_steps() -> None:
+    """The helper should accept immutable Sequence inputs (tuple) as well."""
+    steps_tuple = (
+        {"step_id": "SC_ZK_001", "result": {"name": "zk", "value": "1.5+j3.2"}},
+        {"step_id": "SC_IKSS_002", "result": {"name": "ikss", "value": 3500.0}},
+    )
+
+    trace_id = deterministic_trace_id(
+        analysis_type="SC",
+        snapshot_hash="snap123",
+        run_hash="run123",
+        inputs={"fault_node_id": "bus_01"},
+        equation_steps=steps_tuple,
+        outputs={"ikss_a": 3500.0},
+    )
+
+    assert trace_id.startswith("trace_sc_")
+
+
+def test_deterministic_trace_id_handles_non_finite_floats() -> None:
+    """NaN/Inf values should be normalized deterministically and remain hashable."""
+    trace_id_1 = deterministic_trace_id(
+        analysis_type="SC",
+        snapshot_hash="snap-nf",
+        run_hash="run-nf",
+        inputs={"v_nan": math.nan, "v_pos_inf": math.inf, "v_neg_inf": -math.inf},
+        equation_steps=(),
+        outputs={"ok": 1.0},
+    )
+    trace_id_2 = deterministic_trace_id(
+        analysis_type="SC",
+        snapshot_hash="snap-nf",
+        run_hash="run-nf",
+        inputs={"v_nan": math.nan, "v_pos_inf": math.inf, "v_neg_inf": -math.inf},
+        equation_steps=(),
+        outputs={"ok": 1.0},
+    )
+
+    assert trace_id_1 == trace_id_2
+    assert trace_id_1.startswith("trace_sc_")
+
+
+def test_deterministic_trace_id_is_set_order_invariant() -> None:
+    """Set-like inputs must not affect trace_id due to iteration order."""
+    trace_id_a = deterministic_trace_id(
+        analysis_type="SC",
+        snapshot_hash="snap-set",
+        run_hash="run-set",
+        inputs={"zones": {"A", "B", "C"}},
+        equation_steps=(),
+        outputs={"ok": 1.0},
+    )
+    trace_id_b = deterministic_trace_id(
+        analysis_type="SC",
+        snapshot_hash="snap-set",
+        run_hash="run-set",
+        inputs={"zones": {"C", "A", "B"}},
+        equation_steps=(),
+        outputs={"ok": 1.0},
+    )
+
+    assert trace_id_a == trace_id_b
+
+
+def test_deterministic_trace_id_is_frozenset_order_invariant() -> None:
+    """frozenset inputs should be canonicalized identically to set."""
+    trace_id_a = deterministic_trace_id(
+        analysis_type="SC",
+        snapshot_hash="snap-fset",
+        run_hash="run-fset",
+        inputs={"zones": frozenset(["Z1", "Z2"])},
+        equation_steps=(),
+        outputs={"ok": 1.0},
+    )
+    trace_id_b = deterministic_trace_id(
+        analysis_type="SC",
+        snapshot_hash="snap-fset",
+        run_hash="run-fset",
+        inputs={"zones": frozenset(["Z2", "Z1"])},
+        equation_steps=(),
+        outputs={"ok": 1.0},
+    )
+
+    assert trace_id_a == trace_id_b
+
+
+def test_deterministic_trace_id_handles_complex_values() -> None:
+    """Complex values should be canonicalized to a deterministic JSON-safe shape."""
+    trace_id_a = deterministic_trace_id(
+        analysis_type="SC",
+        snapshot_hash="snap-cplx",
+        run_hash="run-cplx",
+        inputs={"z_equiv": 1.5 + 3.2j},
+        equation_steps=(),
+        outputs={"ok": 1.0},
+    )
+    trace_id_b = deterministic_trace_id(
+        analysis_type="SC",
+        snapshot_hash="snap-cplx",
+        run_hash="run-cplx",
+        inputs={"z_equiv": complex(1.5, 3.2)},
+        equation_steps=(),
+        outputs={"ok": 1.0},
+    )
+
+    assert trace_id_a == trace_id_b
+
+
+def test_deterministic_trace_id_handles_bytes_values() -> None:
+    """bytes/bytearray inputs should be canonicalized deterministically."""
+    trace_id_a = deterministic_trace_id(
+        analysis_type="SC",
+        snapshot_hash="snap-bytes",
+        run_hash="run-bytes",
+        inputs={"blob": b"\x00\xffabc"},
+        equation_steps=(),
+        outputs={"ok": 1.0},
+    )
+    trace_id_b = deterministic_trace_id(
+        analysis_type="SC",
+        snapshot_hash="snap-bytes",
+        run_hash="run-bytes",
+        inputs={"blob": bytearray(b"\x00\xffabc")},
+        equation_steps=(),
+        outputs={"ok": 1.0},
+    )
+
+    assert trace_id_a == trace_id_b
