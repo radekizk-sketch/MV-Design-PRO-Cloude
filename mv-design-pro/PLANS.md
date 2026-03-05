@@ -115,6 +115,7 @@ Tasks:
 - [x] Add docs_guard.py CI guard (PCC + broken link check)
 - [x] Clean remaining duplicate docs in docs/ outside docs/spec/
 - [x] Mark/move deprecated notes and operational files
+- [x] Add reusable Polish master prompt for full-repo architecture audit (`docs/prompts/FULL_REPO_AUDIT_PROMPT_PL.md`)
 
 ---
 
