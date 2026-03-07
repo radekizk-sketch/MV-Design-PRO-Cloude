@@ -30,7 +30,7 @@ import {
   StationKind,
 } from '../topologyInputReader';
 import { buildVisualGraphFromTopology, type AdapterResultV1 } from '../topologyAdapterV2';
-import { convertToVisualGraph } from '../topologyAdapterV1';
+import { convertToVisualGraph } from '../topologyAdapter';
 import {
   computeVisualGraphHash,
   validateVisualGraph,

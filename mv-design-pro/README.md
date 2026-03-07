@@ -83,14 +83,16 @@ npm run dev
 ```bash
 # Backend (canonical)
 cd mv-design-pro/backend && poetry install --with dev
+cd mv-design-pro/backend && poetry run python -c "import pydantic, fastapi; print('OK')"
 cd mv-design-pro/backend && poetry run pytest -q
 
 # Frontend
 cd mv-design-pro/frontend && npm install
 cd mv-design-pro/frontend && npm test
 
-# Frontend e2e
-cd mv-design-pro/frontend && npm run test:e2e
+# Frontend e2e (bootstrap + uruchomienie)
+cd mv-design-pro/frontend && npm run test:e2e:bootstrap
+cd mv-design-pro/frontend && npm run test:e2e -- e2e/create-first-case.spec.ts
 
 # Linting
 cd mv-design-pro/backend && poetry run ruff check src
@@ -100,6 +102,72 @@ cd mv-design-pro/frontend && npm run type-check
 # No-codenames guard
 python mv-design-pro/scripts/no_codenames_guard.py
 ```
+
+
+### Playwright E2E — wariant standardowy
+
+```bash
+cd mv-design-pro/frontend
+npm run test:e2e:bootstrap
+npm run test:e2e -- e2e/create-first-case.spec.ts
+```
+
+### Playwright E2E — wariant proxy / blokada CDN
+
+Mechanizmy odpornościowe zaimplementowane w repo:
+- automatyczne wykrywanie lokalnej przeglądarki (`google-chrome-stable`, `google-chrome`, `chromium`),
+- możliwość jawnego wskazania binarki przez `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH`,
+- fallback instalacyjny w `test:e2e:setup`: najpierw lokalny `./node_modules/.bin/playwright install --with-deps chromium`, potem APT `google-chrome-stable`.
+
+Przykładowe uruchomienie z własną binarką:
+
+```bash
+cd mv-design-pro/frontend
+PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/usr/bin/google-chrome-stable npm run test:e2e:real
+```
+
+Przykład dla mirrorów Playwright (środowiska korporacyjne):
+
+```bash
+cd mv-design-pro/frontend
+PLAYWRIGHT_DOWNLOAD_HOST=https://<twoj-mirror-playwright> npm run test:e2e:setup
+```
+
+
+### Playwright E2E — CI smoke (powtarzalny)
+
+```bash
+cd mv-design-pro/frontend
+npm ci
+npm run test:e2e:setup
+npm run test:e2e -- e2e/create-first-case.spec.ts
+```
+
+### Playwright E2E — pełna ścieżka na realnym backendzie
+
+```bash
+cd mv-design-pro/frontend
+npm ci
+npm run test:e2e:setup:real
+npm run test:e2e:real
+```
+
+Komenda uruchamia krytyczny scenariusz przeglądarkowy bez atrap API:
+- utworzenie przypadku z UI,
+- realne operacje domenowe ENM (GPZ/trunk/station/branch),
+- realne readiness z backendu,
+- realne uruchomienie run i pobranie wyników,
+- weryfikacja niezmienności hash snapshotu po przejściu do wyników.
+
+### Definicja: „aplikacja gotowa do użycia” (V1)
+
+Aplikację uznajemy za gotową do użycia, gdy jednocześnie:
+- backend E2E V1 przechodzi (`tests/e2e/*`, `tests/enm/test_golden_network_v1_e2e.py`),
+- frontend E2E przechodzi: smoke (`create-first-case`) + krytyczny flow na realnym backendzie (`test:e2e:real`),
+- przycisk `Oblicz` tworzy i uruchamia run oraz przechodzi do `#results`,
+- aktywny run jest widoczny w pasku kontekstu,
+- overlay wyników nie mutuje geometrii SLD,
+- działania naprawcze prowadzą do elementu i po naprawie blokery znikają po odświeżeniu gotowości.
 
 ---
 

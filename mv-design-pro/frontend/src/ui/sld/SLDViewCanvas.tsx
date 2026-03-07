@@ -36,7 +36,6 @@ import type { SLDViewCanvasProps, ViewportState } from './types';
 import { calculateEnergization } from './energization';
 import { ConnectionsLayer } from './ConnectionRenderer';
 import { generateConnections } from '../sld-editor/utils/connectionRouting';
-import { useAutoLayout } from '../sld-editor/hooks/useAutoLayout';
 import { UnifiedSymbolRenderer, type SymbolVisualState, type SymbolInteractionHandlers } from './symbols';
 import { TrunkSpineRenderer } from './TrunkSpineRenderer';
 import { BranchRenderer } from './BranchRenderer';
@@ -184,16 +183,13 @@ export const SLDViewCanvas: React.FC<SLDViewCanvasProps> = ({
   height,
   canonicalAnnotations,
 }) => {
-  // AUTO-LAYOUT (N-02): Automatyczne rozmieszczenie przy kazdej zmianie topologii
-  // DETERMINISM: Ten sam model -> ten sam uklad
-  // STABILNOSC: Mala zmiana = mala zmiana ukladu
-  const { layoutSymbols } = useAutoLayout(inputSymbols);
+  // KANONICZNE ZRÓDŁO GEOMETRII (Step VII.c+):
+  // Viewer nie uruchamia lokalnego engine layoutu. Używa wyłącznie geometrii
+  // dostarczonej przez pipeline Snapshot -> SLD symbols.
+  const symbols = inputSymbols;
 
   // Sort symbols for deterministic rendering (by ID)
-  const sortedSymbols = [...layoutSymbols].sort((a, b) => a.id.localeCompare(b.id));
-
-  // Use layout symbols for energization and connections
-  const symbols = layoutSymbols;
+  const sortedSymbols = [...symbols].sort((a, b) => a.id.localeCompare(b.id));
 
   // Calculate energization state (UI-only, deterministic)
   const energizationState = useMemo(() => calculateEnergization(symbols), [symbols]);
@@ -201,6 +197,8 @@ export const SLDViewCanvas: React.FC<SLDViewCanvasProps> = ({
   // Generate connections (N-01: port-to-port, N-05: orthogonal routing)
   // DETERMINISM: Same symbols -> same connections
   const connections = useMemo(() => generateConnections(symbols), [symbols]);
+
+  const showTechnicalCanonicalLabels = viewport.zoom >= 1.35;
 
   // Build energization map for connections
   const connectionEnergizationMap = useMemo(() => {
@@ -277,16 +275,17 @@ export const SLDViewCanvas: React.FC<SLDViewCanvasProps> = ({
               <TrunkSpineRenderer
                 nodes={canonicalAnnotations.trunkNodes}
                 segments={canonicalAnnotations.trunkSegments}
+                showTechnicalLabels={showTechnicalCanonicalLabels}
               />
             </g>
             <g className="sld-branch-points" style={{ pointerEvents: 'none' }}>
               {canonicalAnnotations.branchPoints.map((bp) => (
-                <BranchRenderer key={bp.branchId} branch={bp} />
+                <BranchRenderer key={bp.branchId} branch={bp} showTechnicalLabels={showTechnicalCanonicalLabels} />
               ))}
             </g>
             <g className="sld-station-fields" style={{ pointerEvents: 'none' }}>
               {canonicalAnnotations.stationChains.map((sc) => (
-                <StationFieldRenderer key={sc.stationId} chain={sc} />
+                <StationFieldRenderer key={sc.stationId} chain={sc} showTechnicalLabels={showTechnicalCanonicalLabels} />
               ))}
             </g>
             <g className="sld-junction-dots" style={{ pointerEvents: 'none' }}>

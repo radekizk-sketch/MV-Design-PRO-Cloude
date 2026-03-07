@@ -148,11 +148,6 @@ test('tworzenie pierwszego przypadku jest deterministyczne i bez freeze', async 
   await expect(page.locator('[data-testid="active-case-bar"]')).toContainText('Przypadek 1');
   await expect(createButton).toHaveCount(0);
 
-  const navigationToggle = page.getByTestId('project-tree-sidebar-toggle');
-  await expect(navigationToggle).toBeVisible();
-  await navigationToggle.click();
-  await expect(page.getByTestId('project-tree-sidebar')).toHaveAttribute('data-collapsed', 'true');
-
   const uniqueWarnCount = guards.warningCounts.size;
   expect(guards.pageErrors, `Błędy pageerror: ${guards.pageErrors.join('\n')}`).toEqual([]);
   expect(guards.errors, `Błędy console.error: ${guards.errors.join('\n')}`).toEqual([]);

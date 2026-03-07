@@ -160,6 +160,7 @@ const DEMO_SYMBOLS: AnySldSymbol[] = [
     connectedToNodeId: 'bus_dist',
   } as any,
 ];
+void DEMO_SYMBOLS;
 
 /**
  * Props for SldEditorPage.
@@ -193,11 +194,10 @@ export const SldEditorPage: React.FC<SldEditorPageProps> = ({
   forceEmptyState,
   onOpenCaseManager,
 }) => {
+  void useDemo;
   // Get symbols from store
   const storeSymbols = useSldEditorStore((state) => Array.from(state.symbols.values()));
-  const setSymbols = useSldEditorStore((state) => state.setSymbols);
-
-  // App state
+    // App state
   const hasActiveCase = useHasActiveCase();
   const activeMode = useActiveMode();
   const toggleCaseManager = useAppStateStore((state) => state.toggleCaseManager);
@@ -312,21 +312,8 @@ export const SldEditorPage: React.FC<SldEditorPageProps> = ({
     ]);
   }, []);
 
-  // Determine symbols to display
-  const symbols = useMemo(() => {
-    if (storeSymbols.length > 0) {
-      return storeSymbols;
-    }
-    // Use demo symbols if enabled and no model data
-    return useDemo ? DEMO_SYMBOLS : [];
-  }, [storeSymbols, useDemo]);
-
-  // Load demo symbols into store on mount if demo mode
-  useEffect(() => {
-    if (useDemo && storeSymbols.length === 0) {
-      setSymbols(DEMO_SYMBOLS);
-    }
-  }, [useDemo, storeSymbols.length, setSymbols]);
+  // Determine symbols to display from canonical store only
+  const symbols = useMemo(() => storeSymbols, [storeSymbols]);
 
   // Refresh readiness data when active case changes
   useEffect(() => {
@@ -343,11 +330,11 @@ export const SldEditorPage: React.FC<SldEditorPageProps> = ({
     if (!hasActiveCase) {
       return 'NO_CASE';
     }
-    if (symbols.length === 0 && !useDemo) {
+    if (symbols.length === 0) {
       return 'NO_MODEL';
     }
     return null;
-  }, [forceEmptyState, hasActiveCase, symbols.length, useDemo]);
+  }, [forceEmptyState, hasActiveCase, symbols.length]);
 
   // Handle action from empty overlay
   const handleEmptyAction = useCallback(() => {

@@ -14,6 +14,7 @@
  */
 
 import type { ElementType, SelectedElement } from '../types';
+import { isConnectionNodeLikeId } from '../common/connectionNode';
 
 /**
  * URL parameter keys for selection state.
@@ -63,15 +64,6 @@ const VALID_ELEMENT_TYPES: ElementType[] = [
 ];
 
 
-function isPccLikeSelectionId(id: string): boolean {
-  const normalized = id.toLowerCase();
-  return (
-    normalized.includes('connection_node') ||
-    normalized.startsWith('bus_connection_node') ||
-    normalized.startsWith('connection_') ||
-    normalized.endsWith('_connection_node')
-  );
-}
 
 /**
  * Check if string is valid ElementType.
@@ -95,7 +87,7 @@ export function encodeSelectionToParams(
 ): URLSearchParams {
   const params = new URLSearchParams();
 
-  if (selection && !isPccLikeSelectionId(selection.id)) {
+  if (selection && !isConnectionNodeLikeId(selection.id)) {
     params.set(URL_PARAMS.SELECTION_ID, selection.id);
     params.set(URL_PARAMS.SELECTION_TYPE, selection.type);
     params.set(URL_PARAMS.SELECTION_NAME, selection.name);
@@ -129,7 +121,7 @@ export function decodeSelectionFromParams(
     return null;
   }
 
-  if (isPccLikeSelectionId(id)) {
+  if (isConnectionNodeLikeId(id)) {
     return null;
   }
 
@@ -326,7 +318,7 @@ export function updateUrlWithSelectionAndDiagnostics(
   const params = new URLSearchParams();
 
   // Add selection params
-  if (selection && !isPccLikeSelectionId(selection.id)) {
+  if (selection && !isConnectionNodeLikeId(selection.id)) {
     params.set(URL_PARAMS.SELECTION_ID, selection.id);
     params.set(URL_PARAMS.SELECTION_TYPE, selection.type);
     params.set(URL_PARAMS.SELECTION_NAME, selection.name);

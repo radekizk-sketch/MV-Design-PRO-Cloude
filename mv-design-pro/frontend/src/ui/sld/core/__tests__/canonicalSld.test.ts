@@ -20,7 +20,7 @@ import type {
   BranchPointV1,
   StationApparatusChainV1,
 } from '../layoutResult';
-import { convertToVisualGraph } from '../topologyAdapterV1';
+import { convertToVisualGraph } from '../topologyAdapter';
 import { NodeTypeV1, EdgeTypeV1 } from '../visualGraph';
 import type { VisualGraphV1, VisualNodeV1, VisualEdgeV1 } from '../visualGraph';
 import type {

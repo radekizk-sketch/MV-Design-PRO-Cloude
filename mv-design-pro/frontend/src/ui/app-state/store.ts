@@ -23,6 +23,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { OperatingMode, ResultStatus } from '../types';
+import { useSnapshotStore } from '../topology/snapshotStore';
 
 /**
  * Case kind (type of calculation case).
@@ -231,9 +232,11 @@ export const useAppStateStore = create<AppState>()(
        */
       canCalculate: () => {
         const state = get();
+        const readiness = useSnapshotStore.getState().readiness;
         return (
           state.activeCaseId !== null &&
           state.activeMode === 'MODEL_EDIT' &&
+          (!readiness || readiness.ready) &&
           state.activeCaseResultStatus !== 'FRESH'
         );
       },
@@ -385,6 +388,7 @@ export function useCanCalculate(): { allowed: boolean; reason: string | null } {
   const activeCaseId = useAppStateStore((state) => state.activeCaseId);
   const activeMode = useAppStateStore((state) => state.activeMode);
   const resultStatus = useAppStateStore((state) => state.activeCaseResultStatus);
+  const readiness = useSnapshotStore((state) => state.readiness);
 
   if (!activeCaseId) {
     return { allowed: false, reason: 'Wybierz aktywny przypadek obliczeniowy' };
@@ -394,6 +398,14 @@ export function useCanCalculate(): { allowed: boolean; reason: string | null } {
     return {
       allowed: false,
       reason: 'Obliczenia dozwolone tylko w trybie Edycja modelu',
+    };
+  }
+
+  if (readiness && !readiness.ready) {
+    const blocker = readiness.blockers?.[0];
+    return {
+      allowed: false,
+      reason: blocker?.message_pl ?? 'Model nie jest gotowy do analizy — usuń blokery',
     };
   }
 

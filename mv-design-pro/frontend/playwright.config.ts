@@ -18,6 +18,12 @@
  */
 
 import { defineConfig, devices } from '@playwright/test';
+import { resolveChromiumExecutable } from './scripts/playwright-env.mjs';
+
+const resolvedExecutablePath = process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH ?? resolveChromiumExecutable() ?? undefined;
+
+const useRealBackend = process.env.PLAYWRIGHT_REAL_BACKEND === '1';
+const backendUrl = process.env.PLAYWRIGHT_BACKEND_URL ?? 'http://127.0.0.1:8000';
 
 export default defineConfig({
   testDir: './e2e',
@@ -64,7 +70,7 @@ export default defineConfig({
     screenshot: 'only-on-failure',
 
     // Video only on failure (saves CI storage)
-    video: 'retain-on-failure',
+    video: 'off',
 
     // Fixed viewport for consistent rendering
     viewport: { width: 1280, height: 720 },
@@ -73,6 +79,7 @@ export default defineConfig({
     // This is injected into every page
     launchOptions: {
       slowMo: process.env.CI ? 0 : undefined,
+      executablePath: resolvedExecutablePath,
     },
   },
 
@@ -90,13 +97,32 @@ export default defineConfig({
   ],
 
   // Web server configuration
-  webServer: {
-    command: 'npm run dev',
-    url: 'http://localhost:5173',
-    reuseExistingServer: !process.env.CI,
-    timeout: 120000,
-    // Capture server output for debugging
-    stdout: 'pipe',
-    stderr: 'pipe',
-  },
+  webServer: useRealBackend
+    ? [
+      {
+        command: 'bash -lc "cd ../backend && poetry run uvicorn src.api.main:app --host 0.0.0.0 --port 8000"',
+        url: backendUrl,
+        reuseExistingServer: true,
+        timeout: 120000,
+        stdout: 'pipe',
+        stderr: 'pipe',
+      },
+      {
+        command: process.env.PLAYWRIGHT_DISABLE_WEBSERVER ? 'echo "skip webserver"' : 'npm run dev',
+        url: 'http://localhost:5173',
+        reuseExistingServer: true,
+        timeout: 120000,
+        stdout: 'pipe',
+        stderr: 'pipe',
+      },
+    ]
+    : {
+      command: process.env.PLAYWRIGHT_DISABLE_WEBSERVER ? 'echo "skip webserver"' : 'npm run dev',
+      url: 'http://localhost:5173',
+      reuseExistingServer: true,
+      timeout: 120000,
+      // Capture server output for debugging
+      stdout: 'pipe',
+      stderr: 'pipe',
+    },
 });

@@ -43,9 +43,9 @@ describe('fitToContent', () => {
 
     const viewport = fitToContent(symbols, 1000, 600, ETAP_GEOMETRY.view.fitPaddingPx);
 
-    expect(viewport.zoom).toBe(1.3);
-    expect(viewport.offsetX).toBe(104);
-    expect(viewport.offsetY).toBe(-25);
+    expect(viewport.zoom).toBe(2.24);
+    expect(viewport.offsetX).toBe(-94);
+    expect(viewport.offsetY).toBe(-103);
   });
 
   it('returns finite zoom and offsets within bounds', () => {

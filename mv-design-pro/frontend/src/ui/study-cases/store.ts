@@ -322,14 +322,6 @@ export function useActiveCaseResultStatus(): StudyCaseResultStatus | null {
 }
 
 /**
- * Hook: Check if the active case can be calculated.
- */
-export function useCanCalculate(): boolean {
-  const activeCase = useStudyCasesStore((state) => state.activeCase);
-  return activeCase !== null && activeCase.result_status !== 'FRESH';
-}
-
-/**
  * Hook: Get count of study cases.
  */
 export function useCasesCount(): number {

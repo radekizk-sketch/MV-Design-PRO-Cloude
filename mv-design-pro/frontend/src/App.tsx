@@ -41,9 +41,13 @@ import { EnmInspectorPage } from './ui/enm-inspector';
 import { FaultScenariosPanel, FaultScenarioModal } from './ui/fault-scenarios';
 import { PowerFactoryLayout } from './ui/layout';
 import { useAppStateStore } from './ui/app-state';
+import { useSnapshotStore } from './ui/topology/snapshotStore';
+import { useExecutionRunsStore } from './ui/study-cases/runStore';
+import type { ExecutionAnalysisType } from './ui/study-cases/types';
 import { ROUTES, useUrlSelectionSync, getCurrentHashRoute } from './ui/navigation';
 import { useSelectionStore } from './ui/selection';
 import { NotificationToast } from './ui/notifications/NotificationToast';
+import { notify } from './ui/notifications/store';
 import type { TreeNode, TreeNodeType, ElementType } from './ui/types';
 
 // PROJECT_TREE_PARITY_V1: Get active project name from store
@@ -73,6 +77,20 @@ function useAppReady(): boolean {
 /**
  * Check if route is a results route (requires RESULT_VIEW mode).
  */
+
+function mapAnalysisTypeToExecutionType(
+  analysisType: ReturnType<typeof useAppStateStore.getState>['activeAnalysisType'],
+): ExecutionAnalysisType {
+  switch (analysisType) {
+    case 'LOAD_FLOW':
+      return 'LOAD_FLOW';
+    case 'SHORT_CIRCUIT':
+    case 'PROTECTION':
+    default:
+      return 'SC_3F';
+  }
+}
+
 function isResultsRoute(route: string): boolean {
   return (
     route === '#results' ||
@@ -89,6 +107,11 @@ function App() {
   // NAVIGATION_SELECTOR_UI: Use getCurrentHashRoute to strip query params from hash
   const [route, setRoute] = useState(() => getCurrentHashRoute());
   const setActiveMode = useAppStateStore((state) => state.setActiveMode);
+  const activeCaseId = useAppStateStore((state) => state.activeCaseId);
+  const activeAnalysisType = useAppStateStore((state) => state.activeAnalysisType);
+  const setActiveRun = useAppStateStore((state) => state.setActiveRun);
+  const readiness = useSnapshotStore((state) => state.readiness);
+  const createAndExecuteRun = useExecutionRunsStore((state) => state.createAndExecuteRun);
   const appReady = useAppReady();
   const projectName = useActiveProjectName();
   const selectElement = useSelectionStore((state) => state.selectElement);
@@ -115,13 +138,29 @@ function App() {
     }
   }, [route, setActiveMode]);
 
-  const handleCalculate = useCallback(() => {
-    // TODO: Calculation requires an active case configured
-    // Silent no-op until case management flow is complete
-    if (import.meta.env.DEV) {
-      console.debug('[handleCalculate] No active case - calculation skipped');
+  const handleCalculate = useCallback(async () => {
+    if (!activeCaseId) {
+      notify('Brak aktywnego przypadku obliczeniowego.', 'error');
+      return;
     }
-  }, []);
+
+    if (readiness && !readiness.ready) {
+      const firstBlocker = readiness.blockers?.[0];
+      notify(firstBlocker?.message_pl ?? 'Model nie jest gotowy do analizy.', 'warning');
+      return;
+    }
+
+    try {
+      const analysisType = mapAnalysisTypeToExecutionType(activeAnalysisType);
+      const run = await createAndExecuteRun(activeCaseId, { analysis_type: analysisType });
+      setActiveRun(run.id);
+      notify('Uruchomiono obliczenia. Przejdź do widoku wyników po zakończeniu.', 'success');
+      window.location.hash = ROUTES.RESULTS.hash;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Błąd uruchomienia obliczeń';
+      notify(message, 'error');
+    }
+  }, [activeAnalysisType, activeCaseId, createAndExecuteRun, readiness, setActiveRun]);
 
   /**
    * Navigate to Results (Przegląd wyników).
@@ -280,16 +319,15 @@ function App() {
   if (route === '#sld-view') {
     return wrapWithReadyIndicator(
       <PowerFactoryLayout {...layoutProps}>
-        <SLDViewPage useDemo={true} />
+        <SLDViewPage useDemo={false} />
       </PowerFactoryLayout>
     );
   }
-
   // POWERFACTORY_LAYOUT: Default — SLD Editor Page (ALWAYS shows tools)
   // This replaces the old DesignerPage with proper PowerFactory-style layout
   return wrapWithReadyIndicator(
     <PowerFactoryLayout {...layoutProps}>
-      <SldEditorPage useDemo={true} />
+      <SldEditorPage useDemo={false} />
     </PowerFactoryLayout>
   );
 }

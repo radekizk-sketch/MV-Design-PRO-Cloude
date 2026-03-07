@@ -14,11 +14,13 @@
 
 import { describe, it, expect, beforeEach } from 'vitest';
 import { useAppStateStore } from '../store';
+import { useSnapshotStore } from '../../topology/snapshotStore';
 
 describe('useAppStateStore', () => {
   beforeEach(() => {
     // Reset to initial state before each test
     useAppStateStore.getState().reset();
+    useSnapshotStore.getState().reset();
   });
 
   // ===========================================================================
@@ -257,6 +259,20 @@ describe('useAppStateStore', () => {
         useAppStateStore.getState().setActiveCase('case-1', 'Case', 'ShortCircuitCase', 'OUTDATED');
         useAppStateStore.getState().setActiveMode('MODEL_EDIT');
         expect(useAppStateStore.getState().canCalculate()).toBe(true);
+      });
+
+      it('should return false when readiness has blocker', () => {
+        useAppStateStore.getState().setActiveCase('case-1', 'Case', 'ShortCircuitCase', 'OUTDATED');
+        useAppStateStore.getState().setActiveMode('MODEL_EDIT');
+        useSnapshotStore.setState({ readiness: {
+          ready: false,
+          blockers: [{ code: 'catalog.ref_missing', message_pl: 'Brak katalogu' }],
+          warnings: [],
+          summary: { blocker_count: 1, warning_count: 0 },
+          checked_at: '2026-01-01T00:00:00Z',
+        } });
+
+        expect(useAppStateStore.getState().canCalculate()).toBe(false);
       });
     });
 

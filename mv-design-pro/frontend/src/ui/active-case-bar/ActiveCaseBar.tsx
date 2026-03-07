@@ -80,6 +80,7 @@ export function ActiveCaseBar({
 
   const resultStatus = useAppStateStore((state) => state.activeCaseResultStatus);
   const activeMode = useAppStateStore((state) => state.activeMode);
+  const activeRunId = useAppStateStore((state) => state.activeRunId);
   const toggleCaseManager = useAppStateStore((state) => state.toggleCaseManager);
 
   const handleChangeCaseClick = useCallback(() => {
@@ -168,6 +169,21 @@ export function ActiveCaseBar({
             >
               <span className={statusStyle.dot} />
               <span>{resultStatusLabel}</span>
+            </div>
+          </>
+        )}
+
+
+        {/* Aktywny run */}
+        {hasActiveCase && activeRunId && (
+          <>
+            <div className="ind-divider-v" />
+            <div
+              data-testid="active-run-id"
+              className="px-2 py-0.5 rounded-ind text-[11px] font-mono bg-indigo-50 text-indigo-700 border border-indigo-200"
+              title="Aktywny przebieg obliczeniowy"
+            >
+              Run: {activeRunId}
             </div>
           </>
         )}
