@@ -4,18 +4,17 @@ on:
   push:
     paths:
       - 'frontend/**'
+      - 'backend/**'
       - '.github/workflows/frontend-e2e-smoke.yml'
   pull_request:
     paths:
       - 'frontend/**'
+      - 'backend/**'
       - '.github/workflows/frontend-e2e-smoke.yml'
 
 jobs:
-  create-first-case-smoke:
+  critical-real-backend-e2e:
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: frontend
 
     steps:
       - name: Checkout
@@ -28,11 +27,24 @@ jobs:
           cache: 'npm'
           cache-dependency-path: frontend/package-lock.json
 
-      - name: Install dependencies
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install Poetry
+        uses: abatilo/actions-poetry@v3
+        with:
+          poetry-version: '1.8.3'
+
+      - name: Install frontend deps
+        working-directory: frontend
         run: npm ci
 
-      - name: Install Playwright Chromium
-        run: npx playwright install --with-deps chromium
+      - name: Install backend + browser deps
+        working-directory: frontend
+        run: npm run test:e2e:setup:real
 
-      - name: Run smoke e2e (create first case)
-        run: npx playwright test e2e/create-first-case.spec.ts
+      - name: Run critical E2E on real backend
+        working-directory: frontend
+        run: npm run test:e2e:real

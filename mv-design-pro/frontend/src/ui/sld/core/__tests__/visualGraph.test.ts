@@ -24,7 +24,7 @@ import {
   computeVisualGraphHash,
   validateVisualGraph,
 } from '../visualGraph';
-import { convertToVisualGraph, type TopologyAdapterOptions } from '../topologyAdapterV1';
+import { convertToVisualGraph, type TopologyAdapterOptions } from '../topologyAdapter';
 import { GeneratorKind } from '../topologyInputReader';
 import type { AnySldSymbol, BusSymbol, BranchSymbol, SwitchSymbol, SourceSymbol, LoadSymbol } from '../../../sld-editor/types';
 

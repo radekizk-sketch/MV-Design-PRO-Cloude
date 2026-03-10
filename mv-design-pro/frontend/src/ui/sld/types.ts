@@ -56,6 +56,15 @@ export interface SLDViewProps {
 
   /** Callback uruchamiający obliczenia (BLOK 8 — przycisk Oblicz) */
   onCalculateClick?: () => void;
+
+  /** Minimalne powiększenie przy auto-dopasowaniu (zapobiega miniaturyzacji). */
+  minFitZoom?: number;
+
+  /** Padding [px] używany przy auto-dopasowaniu. */
+  fitPadding?: number;
+
+  /** Kanoniczne adnotacje geometrii (GPZ/trunk/branch/stacje). */
+  canonicalAnnotations?: CanonicalAnnotationsV1 | null;
 }
 
 /**
@@ -136,11 +145,6 @@ export function calculateSymbolsBounds(symbols: AnySldSymbol[]): {
 
     includePoint({ x, y }, halfWidth, halfHeight);
 
-    if ('points' in symbol && Array.isArray(symbol.points)) {
-      for (const point of symbol.points) {
-        includePoint(point, 0, 0);
-      }
-    }
   }
 
   return {
@@ -160,7 +164,8 @@ export function fitToContent(
   symbols: AnySldSymbol[],
   canvasWidth: number,
   canvasHeight: number,
-  padding: number = ETAP_GEOMETRY.view.fitPaddingPx
+  padding: number = ETAP_GEOMETRY.view.fitPaddingPx,
+  minZoom: number = ZOOM_MIN
 ): ViewportState {
   const bounds = calculateSymbolsBounds(symbols);
   if (!bounds) return DEFAULT_VIEWPORT;
@@ -173,7 +178,7 @@ export function fitToContent(
   const scaleX = (canvasWidth - 2 * padding) / width;
   const scaleY = (canvasHeight - 2 * padding) / height;
   const zoom = Math.min(scaleX, scaleY, ZOOM_MAX);
-  const clampedZoom = Math.max(zoom, ZOOM_MIN);
+  const clampedZoom = Math.max(zoom, minZoom);
   const roundedZoom = Math.round(clampedZoom * 100) / 100;
 
   // Calculate offset to center content

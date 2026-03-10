@@ -1,5 +1,5 @@
 /**
- * TopologyAdapterV1 — Public API adaptera Snapshot/SldSymbols → VisualGraphV1.
+ * TopologyAdapter — kanoniczny publiczny adapter Snapshot/SldSymbols → VisualGraphV1.
  *
  * RUN #3C: MIGRACJA NA DOMAIN-DRIVEN PIPELINE.
  *
@@ -44,7 +44,7 @@ export interface TopologyAdapterOptions {
 }
 
 // =============================================================================
-// MAIN ADAPTER (DELEGUJE DO V2 PIPELINE)
+// MAIN ADAPTER (KANONICZNY PIPELINE)
 // =============================================================================
 
 /**

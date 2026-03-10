@@ -330,6 +330,9 @@ export const SLDView: React.FC<SLDViewProps> = ({
   initialZoom = 1.0,
   fitOnMount = true,
   onCalculateClick,
+  minFitZoom = ZOOM_MIN,
+  fitPadding,
+  canonicalAnnotations = null,
 }) => {
   // Viewport state (pan/zoom)
   const [viewport, setViewport] = useState<ViewportState>(() => ({
@@ -458,10 +461,10 @@ export const SLDView: React.FC<SLDViewProps> = ({
    */
   useEffect(() => {
     if (fitOnMount && symbols.length > 0) {
-      const fittedViewport = fitToContent(symbols, width, height);
+      const fittedViewport = fitToContent(symbols, width, height, fitPadding, minFitZoom);
       setViewport(fittedViewport);
     }
-  }, [fitOnMount, symbols, width, height]);
+  }, [fitOnMount, symbols, width, height, minFitZoom, fitPadding]);
 
   /**
    * Center on element when requested by store.
@@ -559,9 +562,9 @@ export const SLDView: React.FC<SLDViewProps> = ({
    * Handle fit to content.
    */
   const handleFitToContent = useCallback(() => {
-    const fittedViewport = fitToContent(symbols, width, height);
+    const fittedViewport = fitToContent(symbols, width, height, fitPadding, minFitZoom);
     setViewport(fittedViewport);
-  }, [symbols, width, height]);
+  }, [symbols, width, height, minFitZoom, fitPadding]);
 
   /**
    * Handle reset view (100%).
@@ -1322,6 +1325,7 @@ export const SLDView: React.FC<SLDViewProps> = ({
           showGrid={showGrid}
           width={width}
           height={height}
+          canonicalAnnotations={canonicalAnnotations}
         />
 
         {/* Results overlay layer */}

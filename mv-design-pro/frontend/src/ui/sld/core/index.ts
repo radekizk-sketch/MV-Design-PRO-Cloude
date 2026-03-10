@@ -30,8 +30,8 @@ export type {
 } from './visualGraph';
 
 // Topology Adapter (public API — delegates to V2 pipeline)
-export { convertToVisualGraph } from './topologyAdapterV1';
-export type { TopologyAdapterOptions } from './topologyAdapterV1';
+export { convertToVisualGraph } from './topologyAdapter';
+export type { TopologyAdapterOptions } from './topologyAdapter';
 
 // TopologyInputReader (domain types + readers)
 export {

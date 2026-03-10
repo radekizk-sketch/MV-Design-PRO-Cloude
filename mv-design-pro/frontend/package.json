@@ -13,10 +13,14 @@
     "test:ci": "vitest run --no-file-parallelism",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
-    "test:e2e": "playwright test",
-    "test:e2e:ui": "playwright test --ui",
+    "test:e2e": "node ./scripts/playwright-run.mjs",
+    "test:e2e:setup": "node ./scripts/playwright-setup.mjs",
+    "test:e2e:ui": "node ./scripts/playwright-run.mjs --ui",
     "type-check": "tsc --noEmit",
-    "guard:codenames": "python ../scripts/no_codenames_guard.py"
+    "guard:codenames": "python ../scripts/no_codenames_guard.py",
+    "test:e2e:bootstrap": "npm ci && npm run test:e2e:setup",
+    "test:e2e:setup:real": "cd ../backend && poetry install --with dev && cd ../frontend && npm run test:e2e:setup",
+    "test:e2e:real": "PLAYWRIGHT_REAL_BACKEND=1 node ./scripts/playwright-run.mjs e2e/critical-run-flow.spec.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.3.4",

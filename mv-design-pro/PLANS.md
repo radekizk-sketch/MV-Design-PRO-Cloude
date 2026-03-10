@@ -89,6 +89,15 @@ Progress:
 - [x] Step VII (SLD industrial aesthetics + golden render) — canonical render manifest + 3 golden SLD fixtures (radial, ring+NOP, PV/BESS) + CI guardian snapshots.
 - [x] Step VII.b (SLD click-by-click write-flow) — modal submit wired to `executeDomainOperation` with snapshot update + selection hint sync + regression tests.
 - [x] Step II.a (ExecutionEngine Load Flow unification) — added canonical `execute_run_load_flow()` pipeline with deterministic `LoadFlowRunInput`, ResultSet mapping and radial/ring integration tests.
+- [x] Step VII.c (SLD adapter hardening) — removed legacy `topologyAdapterV1` module, promoted canonical `topologyAdapter.ts`, and rewired SLD core tests/imports to the canonical adapter entrypoint.
+
+- [x] Step VII.d (SLD geometry closure) — SLD viewer fallback `useAutoLayout` removed, canonical final-geometry tests added (GPZ/trunk/branch/station/ring+NOP + label-collision invariants), and pipeline module status documented in `docs/sld/SLD_PIPELINE_CANONICAL_STATUS.md`.
+- [x] Step VII.f (SLD readability declutter) — reduced default label density in trunk/branch/station renderers; technical parameters visible at higher zoom threshold.
+- [x] Step VII.g (ABB-inspired visual patterning) — added compartment envelopes, bay framing and ANSI 52/50-51 visual tokens in canonical trunk/branch/station renderers.
+- [x] Step VII.h (Główna ścieżka referencyjna SLD) — dodano przełącznik 4 sieci referencyjnych w `#sld-view` z polskimi etykietami i bezpośrednim renderem przez kanoniczny pipeline.
+- [x] Step VII.i (Hierarchia informacji i kompozycja przemysłowa) — wdrożono 3 poziomy informacji, sekcje funkcjonalne stacji SN/nN oraz testy jakości hierarchii wizualnej.
+- [x] Step VII.j (Skala i kompozycja 7/10) — podniesiono skale dopasowania `#sld-view`, powiększono moduły GPZ/stacji/odejść i zaostrzono testy jakości skali oraz hierarchii.
+- [x] Step VII.e (Final SLD visible reference output) — added in-app `#sld-final` reference gallery with 4 rendered canonical geometries (leaf, passthrough, branch, ring+NOP) and UI test coverage.
 
 
 ### 3.0.1 Step VII Completion Criteria (SLD industrial aesthetics + golden render)
@@ -98,6 +107,57 @@ Done criteria (implemented):
 - Deterministic render manifest contract includes ordered node/edge geometry and industrial style tokens.
 - Golden snapshot artifacts for render manifest are CI-guarded (determinism + permutation invariance).
 - Regression tests fail on geometry/style drift unless baseline update is explicit.
+
+### 3.0.2 CI Guard Hardening — identyfikatory connection node (current)
+
+Objective: Ujednolicenie detekcji identyfikatorów `connection node` w URL nawigacji i resolverze inspektora bez duplikowania logiki.
+
+Progress:
+- [x] Wydzielenie wspólnej funkcji `isConnectionNodeLikeId` (`frontend/src/ui/common/connectionNode.ts`).
+- [x] Podpięcie funkcji w `urlState.ts` i `selectionResolver.ts` (jeden kontrakt filtrowania selekcji).
+- [x] Testy regresyjne i jednostkowe frontend przechodzą (`connectionNode.test.ts` + istniejące testy unity/resolver).
+
+
+### 3.0.3 Ścieżka krytyczna E2E — skan i domknięcie bramek (current)
+
+Zakres skanu: `operacja domenowa -> Snapshot -> SLD -> gotowość -> fix actions -> bramka analiz -> wyniki`.
+
+Status ogniw:
+- **Kompletne**
+  - Operacja domenowa -> odpowiedź `DomainOpResponseV1` z `snapshot/logical_views/readiness/fix_actions` (`frontend/src/ui/topology/snapshotStore.ts`, `frontend/src/ui/topology/domainApi.ts`).
+  - Snapshot -> render SLD (SLD odświeżane po update store; brak lokalnego grafu topologii jako źródła prawdy).
+  - Gotowość z backendu materializowana w store i panelach (`snapshotStore`, `ReadinessPanel`).
+- **Częściowe**
+  - Bramka uruchamiania analiz była oparta tylko o aktywny case/mode/status i pomijała `readiness`.
+  - Globalny przycisk obliczeń w `App.tsx` był atrapą (TODO, brak realnego uruchomienia run).
+- **Rozłączone**
+  - UI miało poprawny store wykonania run (`ui/study-cases/runStore.ts`), ale root callback `onCalculate` nie korzystał z niego.
+- **Dublowane lokalnym stanem**
+  - Historyczne wrappery `useCanCalculate` w `study-cases/store.ts` i `study-cases/modeGating.ts` zostały usunięte; pozostała jedna kanoniczna ścieżka `ui/app-state/store.ts` oparta o `snapshotStore.readiness`.
+
+Wdrożone domknięcia:
+- [x] `useCanCalculate()` (app-state) blokuje obliczenia przy `readiness.ready=false` z komunikatem backendowym.
+- [x] `App.tsx` uruchamia realny flow `createAndExecuteRun(...)` zamiast TODO/no-op.
+- [x] Po uruchomieniu run ustawiany jest `activeRunId` i nawigacja do widoku wyników.
+- [x] Dokumentacja uruchomienia backendu rozszerzona o powtarzalny bootstrap środowiska (poetry + test importów).
+- [x] Usunięcie duplikatów bramki `useCanCalculate` (study-cases/* nie eksportuje już historycznych wrapperów).
+- [x] Dodany skrypt `npm run test:e2e:setup` + CI smoke rozszerzone o `critical-run-flow.spec.ts` (detekcja lokalnej przeglądarki + fallback APT + wsparcie `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH`).
+- [x] Browser E2E krytycznej ścieżki przepięte na realny backend (`e2e/critical-run-flow.spec.ts`) — bez `page.route` i bez atrap API.
+
+### 3.0.4 SLD industrial readability tuning (completed)
+
+Zakres zakończony:
+- [x] Wzmocnienie czytelności toru głównego: większa koperta GPZ, dedykowany lewy gutter informacyjny, szersze moduły pól SN, korekta pozycjonowania etykiet segmentów i węzłów (`TrunkSpineRenderer.tsx`).
+- [x] Powiększenie i rebalans odgałęzień: większa ramka pola odgałęźnego, dłuższy przebieg linii odgałęźnej, korekta pozycji etykiet i bąbla zabezpieczeniowego (`BranchRenderer.tsx`).
+- [x] Aktualizacja testu deterministycznego `fitToContent` do aktualnego kontraktu geometrii viewportu (`fitToContent.test.ts`).
+
+
+### 3.0.5 Hotfix CI TypeScript — referenceTopologies (completed)
+
+Zakres zakończony:
+- [x] Usunięto mutacje `push(...)` na kolekcjach `readonly` w `referenceTopologies.ts` (budowa scenariuszy `branch` i `ring` przez niemutowalne złożenie tablic).
+- [x] Usunięto odwołanie do legacy pola `stationBlockBuildResult`; scenariusze referencyjne korzystają z kanonicznego pola `stationBlockDetails` z `AdapterResultV1`.
+- [x] Potwierdzono zielone: `npm run type-check`, zestaw testów SLD kontrakt/determinizm oraz real-backend E2E krytycznej ścieżki.
 
 ### 3.1 Docs Sync to Spec Canon (current)
 
@@ -207,3 +267,24 @@ Current truth: this PLANS.md document.
 ---
 
 **END OF OPERATIONAL PLAN**
+
+
+### 3.0.4 SLD Reset — canonical cutover
+
+- [x] Wyłączono dane demo w głównym widoku SLD (`App.tsx` -> `SldEditorPage useDemo={false}`).
+- [x] Spis inwentaryzacyjny starego/nowego pipeline i kanonicznego cutover: `docs/SLD_RESET_CANONICAL.md`.
+- [x] Krytyczny browser E2E działa na realnym backendzie i potwierdza brak mutacji snapshot hash po run/results.
+
+### 3.0.5 SLD proof package — 4 referencyjne sieci w głównej ścieżce
+
+- [x] `#sld-view` obsługuje query `ref=leaf|pass|branch|ring` i ładuje kanoniczne dane topologiczne bez osobnego ekranu pomocniczego.
+- [x] Dodano `referenceTopologies.ts`: jawne dane wejściowe 4 sieci + przejście przez `buildVisualGraphFromTopology` i `computeLayout` (GPZ/trunk/branch/stacja/ring/NOP).
+- [x] `SLDView` przekazuje `canonicalAnnotations` do `SLDViewCanvas`, więc warstwa GPZ/trunk/branch/station renderuje się w głównym widoku.
+- [x] Dodano test `referenceTopologies.test.ts` (non-empty symbols, annotations, NOP w scenariuszu ring).
+
+### 3.0.6 SLD odbiorowy — skala, czytelność i język polski
+
+- [x] Podniesiono minimalny zoom dopasowania dla scenariuszy referencyjnych (`#sld-view?ref=*`), aby wyeliminować miniaturyzację schematu.
+- [x] Wzmocniono wizualnie GPZ/magistralę/odgałęzienia/stację (większy blok GPZ, mocniejsza oś pionowa, większa ramka stacji, czytelniejsze etykiety).
+- [x] Ujednolicono etykiety scenariuszy referencyjnych do języka polskiego (bez anglicyzmów użytkowych).
+- [x] Dodano testy jakości widoku: minimalna skala, wykorzystanie obszaru, brak mikrotekstu, brak anglicyzmów.

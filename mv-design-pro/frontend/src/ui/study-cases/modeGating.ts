@@ -155,40 +155,6 @@ export function useCanEditCaseConfig(): boolean {
 }
 
 /**
- * Hook: Can run calculations?
- */
-export function useCanCalculate(): {
-  canCalculate: boolean;
-  blockedReason: string | null;
-} {
-  const mode = useSelectionStore((state) => state.mode);
-  const activeCase = useStudyCasesStore((state) => state.activeCase);
-
-  if (mode !== 'MODEL_EDIT') {
-    return {
-      canCalculate: false,
-      blockedReason: 'Obliczenia dozwolone tylko w trybie Edycja modelu',
-    };
-  }
-
-  if (!activeCase) {
-    return {
-      canCalculate: false,
-      blockedReason: 'Wymagany aktywny przypadek obliczeniowy',
-    };
-  }
-
-  if (activeCase.result_status === 'FRESH') {
-    return {
-      canCalculate: false,
-      blockedReason: 'Wyniki są aktualne — brak potrzeby przeliczania',
-    };
-  }
-
-  return { canCalculate: true, blockedReason: null };
-}
-
-/**
  * Hook: Notify that NetworkModel has changed.
  * Marks ALL cases as OUTDATED.
  */

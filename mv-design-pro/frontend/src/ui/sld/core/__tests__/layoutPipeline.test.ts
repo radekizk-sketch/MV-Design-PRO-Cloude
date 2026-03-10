@@ -26,7 +26,7 @@ import {
   LAYOUT_RESULT_VERSION,
 } from '../layoutResult';
 import type { LayoutResultV1 } from '../layoutResult';
-import { convertToVisualGraph } from '../topologyAdapterV1';
+import { convertToVisualGraph } from '../topologyAdapter';
 import { computeVisualGraphHash, NodeTypeV1, EdgeTypeV1 } from '../visualGraph';
 import type { AnySldSymbol, BusSymbol, BranchSymbol, SwitchSymbol, SourceSymbol, LoadSymbol } from '../../../sld-editor/types';
 
