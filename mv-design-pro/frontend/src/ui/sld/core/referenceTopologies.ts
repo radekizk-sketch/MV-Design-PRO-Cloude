@@ -64,32 +64,52 @@ function buildScenarioInput(scenarioId: ReferenceScenarioId): TopologyInputV1 {
 
   if (scenarioId === 'branch') {
     const input = buildBaseInput('canon_branch');
-    input.connectionNodes.push(
-      { id: 'bus_b1_sn', name: 'B1 SN', voltageKv: 15, stationId: 'stb', busIndex: null, inService: true },
-      { id: 'bus_b1_nn', name: 'B1 nN', voltageKv: 0.4, stationId: 'stb', busIndex: null, inService: true },
-    );
-    input.branches.push(
-      { id: 'line_s1_b1', name: 'S1-B1', fromNodeId: 'bus_s1_sn', toNodeId: 'bus_b1_sn', kind: BranchKind.LINE, isNormallyOpen: false, inService: true, catalogRef: 'AFL-70', lengthKm: 0.6, ratedPowerMva: null, voltageHvKv: null, voltageLvKv: null },
-      { id: 'tr_b1', name: 'TR B1', fromNodeId: 'bus_b1_sn', toNodeId: 'bus_b1_nn', kind: BranchKind.TR_LINK, isNormallyOpen: false, inService: true, catalogRef: 'TR-250', lengthKm: null, ratedPowerMva: 0.25, voltageHvKv: 15, voltageLvKv: 0.4 },
-    );
-    input.stations.push({ id: 'stb', name: 'Stacja B1', stationType: StationKind.DISTRIBUTION, voltageKv: 15, busIds: ['bus_b1_sn', 'bus_b1_nn'], branchIds: [], switchIds: [], transformerIds: ['tr_b1'] });
-    input.loads.push({ id: 'load_b1', name: 'Odbiór B1', nodeId: 'bus_b1_nn', inService: true, pMw: 0.08, qMvar: 0.02 });
-    return input;
+    return {
+      ...input,
+      connectionNodes: [
+        ...input.connectionNodes,
+        { id: 'bus_b1_sn', name: 'B1 SN', voltageKv: 15, stationId: 'stb', busIndex: null, inService: true },
+        { id: 'bus_b1_nn', name: 'B1 nN', voltageKv: 0.4, stationId: 'stb', busIndex: null, inService: true },
+      ],
+      branches: [
+        ...input.branches,
+        { id: 'line_s1_b1', name: 'S1-B1', fromNodeId: 'bus_s1_sn', toNodeId: 'bus_b1_sn', kind: BranchKind.LINE, isNormallyOpen: false, inService: true, catalogRef: 'AFL-70', lengthKm: 0.6, ratedPowerMva: null, voltageHvKv: null, voltageLvKv: null },
+        { id: 'tr_b1', name: 'TR B1', fromNodeId: 'bus_b1_sn', toNodeId: 'bus_b1_nn', kind: BranchKind.TR_LINK, isNormallyOpen: false, inService: true, catalogRef: 'TR-250', lengthKm: null, ratedPowerMva: 0.25, voltageHvKv: 15, voltageLvKv: 0.4 },
+      ],
+      stations: [
+        ...input.stations,
+        { id: 'stb', name: 'Stacja B1', stationType: StationKind.DISTRIBUTION, voltageKv: 15, busIds: ['bus_b1_sn', 'bus_b1_nn'], branchIds: [], switchIds: [], transformerIds: ['tr_b1'] },
+      ],
+      loads: [
+        ...input.loads,
+        { id: 'load_b1', name: 'Odbiór B1', nodeId: 'bus_b1_nn', inService: true, pMw: 0.08, qMvar: 0.02 },
+      ],
+    };
   }
 
   const input = buildBaseInput('canon_ring');
-  input.connectionNodes.push(
-    { id: 'bus_s3_sn', name: 'S3 SN', voltageKv: 15, stationId: 'st3', busIndex: null, inService: true },
-    { id: 'bus_s3_nn', name: 'S3 nN', voltageKv: 0.4, stationId: 'st3', busIndex: null, inService: true },
-  );
-  input.branches.push(
-    { id: 'line_s2_s3', name: 'S2-S3', fromNodeId: 'bus_s2_sn', toNodeId: 'bus_s3_sn', kind: BranchKind.LINE, isNormallyOpen: false, inService: true, catalogRef: 'AFL-120', lengthKm: 0.75, ratedPowerMva: null, voltageHvKv: null, voltageLvKv: null },
-    { id: 'line_s3_s1_nop', name: 'S3-S1 punkt normalnie otwarty', fromNodeId: 'bus_s3_sn', toNodeId: 'bus_s1_sn', kind: BranchKind.LINE, isNormallyOpen: true, inService: true, catalogRef: 'AFL-120', lengthKm: 0.9, ratedPowerMva: null, voltageHvKv: null, voltageLvKv: null },
-    { id: 'tr_s3', name: 'TR S3', fromNodeId: 'bus_s3_sn', toNodeId: 'bus_s3_nn', kind: BranchKind.TR_LINK, isNormallyOpen: false, inService: true, catalogRef: 'TR-400', lengthKm: null, ratedPowerMva: 0.4, voltageHvKv: 15, voltageLvKv: 0.4 },
-  );
-  input.stations.push({ id: 'st3', name: 'Stacja 3', stationType: StationKind.DISTRIBUTION, voltageKv: 15, busIds: ['bus_s3_sn', 'bus_s3_nn'], branchIds: [], switchIds: [], transformerIds: ['tr_s3'] });
-  input.loads.push({ id: 'load_s3', name: 'Odbiór S3', nodeId: 'bus_s3_nn', inService: true, pMw: 0.12, qMvar: 0.04 });
-  return input;
+  return {
+    ...input,
+    connectionNodes: [
+      ...input.connectionNodes,
+      { id: 'bus_s3_sn', name: 'S3 SN', voltageKv: 15, stationId: 'st3', busIndex: null, inService: true },
+      { id: 'bus_s3_nn', name: 'S3 nN', voltageKv: 0.4, stationId: 'st3', busIndex: null, inService: true },
+    ],
+    branches: [
+      ...input.branches,
+      { id: 'line_s2_s3', name: 'S2-S3', fromNodeId: 'bus_s2_sn', toNodeId: 'bus_s3_sn', kind: BranchKind.LINE, isNormallyOpen: false, inService: true, catalogRef: 'AFL-120', lengthKm: 0.75, ratedPowerMva: null, voltageHvKv: null, voltageLvKv: null },
+      { id: 'line_s3_s1_nop', name: 'S3-S1 punkt normalnie otwarty', fromNodeId: 'bus_s3_sn', toNodeId: 'bus_s1_sn', kind: BranchKind.LINE, isNormallyOpen: true, inService: true, catalogRef: 'AFL-120', lengthKm: 0.9, ratedPowerMva: null, voltageHvKv: null, voltageLvKv: null },
+      { id: 'tr_s3', name: 'TR S3', fromNodeId: 'bus_s3_sn', toNodeId: 'bus_s3_nn', kind: BranchKind.TR_LINK, isNormallyOpen: false, inService: true, catalogRef: 'TR-400', lengthKm: null, ratedPowerMva: 0.4, voltageHvKv: 15, voltageLvKv: 0.4 },
+    ],
+    stations: [
+      ...input.stations,
+      { id: 'st3', name: 'Stacja 3', stationType: StationKind.DISTRIBUTION, voltageKv: 15, busIds: ['bus_s3_sn', 'bus_s3_nn'], branchIds: [], switchIds: [], transformerIds: ['tr_s3'] },
+    ],
+    loads: [
+      ...input.loads,
+      { id: 'load_s3', name: 'Odbiór S3', nodeId: 'bus_s3_nn', inService: true, pMw: 0.12, qMvar: 0.04 },
+    ],
+  };
 }
 
 function routeToPoints(routeSegments: readonly { from: { x: number; y: number }; to: { x: number; y: number } }[]): { x: number; y: number }[] {
@@ -168,7 +188,7 @@ function createSymbols(input: TopologyInputV1, layout: ReturnType<typeof compute
 export function buildReferenceScenario(scenarioId: ReferenceScenarioId): ReferenceScenarioResult {
   const input = buildScenarioInput(scenarioId);
   const adapter = buildVisualGraphFromTopology(input);
-  const layout = computeLayout(adapter.graph, DEFAULT_LAYOUT_CONFIG, adapter.stationBlockBuildResult);
+  const layout = computeLayout(adapter.graph, DEFAULT_LAYOUT_CONFIG, adapter.stationBlockDetails);
   const symbols = createSymbols(input, layout);
 
   return {

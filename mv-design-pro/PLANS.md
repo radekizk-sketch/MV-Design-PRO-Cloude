@@ -151,6 +151,14 @@ Zakres zakończony:
 - [x] Powiększenie i rebalans odgałęzień: większa ramka pola odgałęźnego, dłuższy przebieg linii odgałęźnej, korekta pozycji etykiet i bąbla zabezpieczeniowego (`BranchRenderer.tsx`).
 - [x] Aktualizacja testu deterministycznego `fitToContent` do aktualnego kontraktu geometrii viewportu (`fitToContent.test.ts`).
 
+
+### 3.0.5 Hotfix CI TypeScript — referenceTopologies (completed)
+
+Zakres zakończony:
+- [x] Usunięto mutacje `push(...)` na kolekcjach `readonly` w `referenceTopologies.ts` (budowa scenariuszy `branch` i `ring` przez niemutowalne złożenie tablic).
+- [x] Usunięto odwołanie do legacy pola `stationBlockBuildResult`; scenariusze referencyjne korzystają z kanonicznego pola `stationBlockDetails` z `AdapterResultV1`.
+- [x] Potwierdzono zielone: `npm run type-check`, zestaw testów SLD kontrakt/determinizm oraz real-backend E2E krytycznej ścieżki.
+
 ### 3.1 Docs Sync to Spec Canon (current)
 
 Objective: Synchronize all repo documentation entrypoints with `docs/spec/` (18 chapters) as the source of truth.
