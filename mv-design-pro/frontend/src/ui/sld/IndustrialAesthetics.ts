@@ -99,8 +99,12 @@ export const OFFSET_POLE = 60 as const;  // 3 * GRID_BASE
 // =============================================================================
 
 /**
- * Grubość linii magistrali (szyny zbiorczej) [px].
- * Magistrala = linia dominująca (najgrubsza).
+ * Grubość linii magistrali (kabel/linia napowietrzna SN) [px].
+ * Magistrala = ciągły przewód SN, linia dominująca (najgrubsza).
+ *
+ * ELEKTROENERGETYKA: Magistrala NIE jest szyną zbiorczą.
+ * Szyny zbiorcze SN istnieją w: GPZ (główna) i stacjach (lokalne rozdzielnice).
+ * Magistrala to kabel/linia napowietrzna łącząca te punkty.
  */
 export const BUSBAR_STROKE_WIDTH = 3 as const;
 

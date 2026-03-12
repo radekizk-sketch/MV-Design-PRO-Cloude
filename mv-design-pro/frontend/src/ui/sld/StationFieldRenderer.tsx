@@ -1,11 +1,14 @@
 /**
  * StationFieldRenderer — ABB-standard apparatus chain renderer
  *
- * Clean, compact station layout with:
- * - Clear compartment boundaries
- * - Proper ABB bay subdivision
- * - Minimal label clutter
- * - Professional SN/nN section separation
+ * ELEKTROENERGETYKA: Stacja SN/nN ma:
+ * - Rozdzielnicę SN z własną szyną SN (krótka szyna wewnętrzna)
+ * - Łańcuch aparatów (rozłącznik, wyłącznik, CT) podłączony do szyny SN
+ * - Transformator SN/nN
+ * - Szynę nN po stronie wtórnej transformatora
+ *
+ * Szyna SN w stacji ≠ szyna SN w GPZ.
+ * GPZ ma szynę zbiorczą SN (główną). Stacja ma szynę rozdzielnicy SN (lokalną).
  */
 import React from 'react';
 import type { StationApparatusChainV1 } from './core/layoutResult';
@@ -29,6 +32,8 @@ export interface StationFieldRendererProps {
 const SYMBOL_SIZE = 28;
 const LABEL_OFFSET_X = 28;
 const JUNCTION_HALF_STEP = APPARATUS_CHAIN_STEP_Y / 2;
+/** Width of station-internal SN busbar (rozdzielnica SN) [px]. */
+const STATION_SN_BUSBAR_WIDTH = 80;
 
 function mapSymbolType(symbolType: string): EtapSymbolId {
   const mapping: Record<string, EtapSymbolId> = {
@@ -87,7 +92,7 @@ export const StationFieldRenderer: React.FC<StationFieldRendererProps> = ({
         strokeWidth={1.2}
       />
 
-      {/* SN section outline — ABB compartment */}
+      {/* Rozdzielnica SN section outline */}
       <rect
         x={baseX - stationWidth / 2 + 10}
         y={baseY - 16}
@@ -110,7 +115,31 @@ export const StationFieldRenderer: React.FC<StationFieldRendererProps> = ({
         {stationTypeLabel}
       </text>
 
-      {/* Apparatus chain */}
+      {/* ═══ Szyna SN rozdzielnicy — station-internal SN busbar ═══
+           ELEKTROENERGETYKA: Każda stacja SN/nN ma rozdzielnicę SN
+           z własną szyną SN. Ta szyna jest podłączona do magistrali
+           przez kabel odgałęźny. Aparaty łączą się DO tej szyny. */}
+      <g data-sld-role="station-sn-busbar">
+        <line
+          x1={baseX - STATION_SN_BUSBAR_WIDTH / 2}
+          y1={baseY - JUNCTION_HALF_STEP}
+          x2={baseX + STATION_SN_BUSBAR_WIDTH / 2}
+          y2={baseY - JUNCTION_HALF_STEP}
+          stroke={colorSN}
+          strokeWidth={5}
+          strokeLinecap="round"
+        />
+        <JunctionDot x={baseX} y={baseY - JUNCTION_HALF_STEP} color={colorSN} />
+        <text
+          x={baseX + STATION_SN_BUSBAR_WIDTH / 2 + 8}
+          y={baseY - JUNCTION_HALF_STEP + 4}
+          className="sld-label-params"
+        >
+          SN
+        </text>
+      </g>
+
+      {/* Apparatus chain — connected to station SN busbar */}
       {chain.apparatus.map((item, index) => {
         const itemY = baseY + index * APPARATUS_CHAIN_STEP_Y;
         const symbolId = mapSymbolType(item.symbolType);
@@ -317,7 +346,7 @@ export const StationFieldRenderer: React.FC<StationFieldRendererProps> = ({
                             x={SYMBOL_SIZE / 4}
                             y={SYMBOL_SIZE / 4 + 3}
                             textAnchor="middle"
-                            fontSize={9}
+                            fontSize={10}
                             fill={colorNN}
                           >
                             {feeder.type === 'generator_pv' ? 'PV' : 'B'}

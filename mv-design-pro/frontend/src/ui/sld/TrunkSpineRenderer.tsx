@@ -20,8 +20,8 @@ export interface TrunkSpineRendererProps {
 }
 
 /**
- * ABB-standard busbar width calculation.
- * Busbar width scales with number of fields connected.
+ * GPZ busbar width calculation (the ONLY real SN busbar in the network).
+ * Width scales with number of line fields (pola liniowe) connected to GPZ.
  * Minimum 200px, grows by GRID_BASE*4 per additional field.
  */
 function gpzBusbarWidth(fieldCount: number): number {
@@ -143,72 +143,46 @@ export const TrunkSpineRenderer: React.FC<TrunkSpineRendererProps> = ({
       />
 
       {/* ═══════════════════════════════════════════════════════════
-          TRUNK NODES (SN fields) — ABB compact bay style
+          TRUNK NODES — T-junction tap-off points (IEC 61082)
+
+          ELEKTROENERGETYKA: Węzeł magistrali to punkt odgałęzienia
+          na ciągłym kablu/linii napowietrznej. NIE jest szyną zbiorczą.
+          Szyna SN istnieje TYLKO w GPZ (powyżej).
           ═══════════════════════════════════════════════════════════ */}
-      {sortedNodes.map((node) => {
-        // Horizontal SN busbar at each node — ABB standard
-        const nodeBusbarHalf = 28;
+      {sortedNodes.map((node) => (
+        <g key={`field-${node.nodeId}`} data-sld-role="trunk-tap-point" data-node-id={node.nodeId}>
+          {/* IEC 61082 junction dot — tap-off point on continuous trunk line */}
+          <JunctionDot x={trunkX} y={node.position.y} color={color} />
 
-        return (
-          <g key={`field-${node.nodeId}`} data-sld-role="sn-field-module" data-node-id={node.nodeId}>
-            {/* Bay outline — ABB subtle compartment */}
-            <rect
-              x={trunkX - nodeBusbarHalf - 8}
-              y={node.position.y - 18}
-              width={nodeBusbarHalf * 2 + 16}
-              height={36}
-              rx={3}
-              ry={3}
-              fill="rgba(255, 255, 255, 0.5)"
-              stroke="#CBD5E1"
-              strokeWidth={0.8}
-              strokeDasharray="3 2"
-            />
-
-            {/* Horizontal SN busbar at node — ALWAYS horizontal */}
-            <line
-              x1={trunkX - nodeBusbarHalf}
-              y1={node.position.y}
-              x2={trunkX + nodeBusbarHalf}
-              y2={node.position.y}
-              stroke={color}
-              strokeWidth={5}
-              strokeLinecap="round"
-            />
-
-            {/* Junction dot at trunk intersection */}
-            <JunctionDot x={trunkX} y={node.position.y} color={color} />
-
-            {/* Node label — left side, compact */}
+          {/* Node label — left side of trunk */}
+          <text
+            x={trunkX - 14}
+            y={node.position.y - 6}
+            textAnchor="end"
+            className="sld-label-node"
+          >
+            {node.nodeId}
+          </text>
+          <text
+            x={trunkX - 14}
+            y={node.position.y + 8}
+            textAnchor="end"
+            className="sld-label-params"
+          >
+            {node.kmFromGPZ.toFixed(2)} km
+          </text>
+          {showTechnicalLabels && (
             <text
-              x={trunkX - nodeBusbarHalf - 14}
-              y={node.position.y - 4}
-              textAnchor="end"
-              className="sld-label-node"
-            >
-              {node.nodeId}
-            </text>
-            <text
-              x={trunkX - nodeBusbarHalf - 14}
-              y={node.position.y + 10}
+              x={trunkX - 14}
+              y={node.position.y + 20}
               textAnchor="end"
               className="sld-label-params"
             >
-              {node.kmFromGPZ.toFixed(2)} km
+              {node.voltageKV.toFixed(1)}kV Ik3={node.ikss3p.toFixed(1)}kA
             </text>
-            {showTechnicalLabels && (
-              <text
-                x={trunkX - nodeBusbarHalf - 14}
-                y={node.position.y + 22}
-                textAnchor="end"
-                className="sld-label-params"
-              >
-                {node.voltageKV.toFixed(1)}kV Ik3={node.ikss3p.toFixed(1)}kA
-              </text>
-            )}
-          </g>
-        );
-      })}
+          )}
+        </g>
+      ))}
 
       {/* ═══════════════════════════════════════════════════════════
           TRUNK SEGMENTS — Cable/line labels between nodes

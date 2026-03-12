@@ -143,10 +143,17 @@
   stroke-dasharray: none;
 }
 
-/* SN busbar — horizontal, ABB-grade prominence */
+/* GPZ SN busbar — main distribution busbar (szyna zbiorcza GPZ), horizontal, ABB-grade */
 .sld-sn-busbar {
   stroke: #1D4ED8;
   stroke-width: 8;
+  stroke-linecap: round;
+}
+
+/* Station SN busbar — local rozdzielnica SN busbar inside station, horizontal */
+.sld-station-sn-busbar {
+  stroke: #1D4ED8;
+  stroke-width: 5;
   stroke-linecap: round;
 }
 

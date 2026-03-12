@@ -19,7 +19,7 @@ export interface BranchRendererProps {
 /**
  * ABB-standard branch renderer.
  * Clean, compact layout with clear apparatus designation.
- * Feeder exits vertically from horizontal trunk busbar.
+ * Branch exits horizontally from trunk T-junction tap-off point.
  */
 export const BranchRenderer: React.FC<BranchRendererProps> = ({
   branch,
