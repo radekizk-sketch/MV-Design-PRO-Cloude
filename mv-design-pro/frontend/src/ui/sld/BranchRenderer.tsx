@@ -16,118 +16,129 @@ export interface BranchRendererProps {
   showTechnicalLabels?: boolean;
 }
 
+/**
+ * ABB-standard branch renderer.
+ * Clean, compact layout with clear apparatus designation.
+ * Feeder exits vertically from horizontal trunk busbar.
+ */
 export const BranchRenderer: React.FC<BranchRendererProps> = ({
   branch,
   color = ETAP_VOLTAGE_COLORS.SN,
   showTechnicalLabels = false,
 }) => {
   const { position } = branch;
-  const branchEndX = position.x + STATION_FIELD_OFFSET_X + BRANCH_APPARATUS_WIDTH + 380;
+  const branchEndX = position.x + STATION_FIELD_OFFSET_X + BRANCH_APPARATUS_WIDTH + 260;
   const midY = position.y;
-  const dropY = midY + 104;
+  const dropY = midY + 80;
   const dashArray = branch.branchLine.isOverhead ? OVERHEAD_DASH_ARRAY : undefined;
+  const apparatusX = position.x + STATION_FIELD_OFFSET_X;
 
   return (
     <g data-sld-role="branch-point" data-branch-id={branch.branchId}>
+      {/* Bay outline — ABB compact compartment */}
       <rect
-        x={position.x + STATION_FIELD_OFFSET_X - 30}
-        y={midY - 42}
-        width={BRANCH_APPARATUS_WIDTH + 432}
-        height={104}
-        className="sld-abb-bay"
-        rx={5}
-        ry={5}
+        x={apparatusX - 12}
+        y={midY - 28}
+        width={BRANCH_APPARATUS_WIDTH + 24}
+        height={56}
+        rx={4}
+        ry={4}
+        fill="rgba(255, 255, 255, 0.45)"
+        stroke="#CBD5E1"
+        strokeWidth={0.8}
+        strokeDasharray="3 2"
       />
 
+      {/* Trunk-to-apparatus horizontal connection */}
       <JunctionDot x={position.x} y={midY} color={color} />
-
       <line
         x1={position.x}
         y1={midY}
-        x2={position.x + STATION_FIELD_OFFSET_X}
+        x2={apparatusX}
         y2={midY}
         stroke={color}
-        strokeWidth={BRANCH_LINE_STROKE_WIDTH + 0.9}
+        strokeWidth={BRANCH_LINE_STROKE_WIDTH}
         strokeLinecap="round"
       />
 
+      {/* Branch apparatus (CB) */}
       <g data-sld-role="branch-apparatus">
-        <JunctionDot x={position.x + STATION_FIELD_OFFSET_X} y={midY} color={color} />
+        <JunctionDot x={apparatusX} y={midY} color={color} />
         <line
-          x1={position.x + STATION_FIELD_OFFSET_X}
+          x1={apparatusX}
           y1={midY}
-          x2={position.x + STATION_FIELD_OFFSET_X + BRANCH_APPARATUS_WIDTH}
+          x2={apparatusX + BRANCH_APPARATUS_WIDTH}
           y2={midY}
           stroke={color}
-          strokeWidth={BRANCH_LINE_STROKE_WIDTH + 0.6}
+          strokeWidth={BRANCH_LINE_STROKE_WIDTH}
           strokeLinecap="round"
         />
+        {/* CB symbol — diagonal slash */}
         <line
-          x1={position.x + STATION_FIELD_OFFSET_X + 10}
-          y1={midY - 8}
-          x2={position.x + STATION_FIELD_OFFSET_X + 30}
-          y2={midY + 8}
+          x1={apparatusX + 10}
+          y1={midY - 7}
+          x2={apparatusX + 30}
+          y2={midY + 7}
           stroke={color}
-          strokeWidth={BRANCH_LINE_STROKE_WIDTH + 0.8}
+          strokeWidth={BRANCH_LINE_STROKE_WIDTH + 0.5}
         />
-        <JunctionDot x={position.x + STATION_FIELD_OFFSET_X + BRANCH_APPARATUS_WIDTH} y={midY} color={color} />
+        <JunctionDot x={apparatusX + BRANCH_APPARATUS_WIDTH} y={midY} color={color} />
 
+        {/* ANSI code tag — ABB convention */}
         <rect
-          x={position.x + STATION_FIELD_OFFSET_X + BRANCH_APPARATUS_WIDTH / 2 - 9}
-          y={midY + 4}
-          width={18}
-          height={14}
-          className="sld-abb-ansi-tag"
+          x={apparatusX + BRANCH_APPARATUS_WIDTH / 2 - 8}
+          y={midY + 6}
+          width={16}
+          height={12}
           rx={2}
           ry={2}
+          fill="rgba(255, 255, 255, 0.95)"
+          stroke="#475569"
+          strokeWidth={0.8}
         />
         <text
-          x={position.x + STATION_FIELD_OFFSET_X + BRANCH_APPARATUS_WIDTH / 2}
-          y={midY + 14}
+          x={apparatusX + BRANCH_APPARATUS_WIDTH / 2}
+          y={midY + 15}
           textAnchor="middle"
           className="sld-abb-ansi-tag-text"
         >
           52
         </text>
+
+        {/* Apparatus designation — above */}
         <text
-          x={position.x + STATION_FIELD_OFFSET_X + BRANCH_APPARATUS_WIDTH / 2}
-          y={midY - 12}
+          x={apparatusX + BRANCH_APPARATUS_WIDTH / 2}
+          y={midY - 14}
           textAnchor="middle"
-          className="sld-info-primary sld-iec-designation"
+          className="sld-label-iec-designation"
         >
           {branch.branchApparatus.designation}
         </text>
+
+        {/* Field name — below bay */}
         <text
-          x={position.x + STATION_FIELD_OFFSET_X + BRANCH_APPARATUS_WIDTH / 2}
-          y={midY + 34}
+          x={apparatusX + BRANCH_APPARATUS_WIDTH / 2}
+          y={midY + 30}
           textAnchor="middle"
-          className="sld-info-secondary sld-apparatus-label"
+          className="sld-label-params"
         >
-          Pole odgałęźne {branch.physicalLocation} {branch.physicalLocationId}
+          Pole {branch.physicalLocation}
         </text>
-        {showTechnicalLabels && (
-          <text
-            x={position.x + STATION_FIELD_OFFSET_X + BRANCH_APPARATUS_WIDTH / 2}
-            y={midY + 50}
-            textAnchor="middle"
-            className="sld-info-tertiary sld-apparatus-params"
-          >
-            In={branch.branchApparatus.ratedCurrent_A} A • Ur={branch.branchApparatus.ratedVoltage_kV} kV
-          </text>
-        )}
       </g>
 
+      {/* Branch feeder line — horizontal run */}
       <line
-        x1={position.x + STATION_FIELD_OFFSET_X + BRANCH_APPARATUS_WIDTH}
+        x1={apparatusX + BRANCH_APPARATUS_WIDTH}
         y1={midY}
         x2={branchEndX}
         y2={midY}
         stroke={color}
-        strokeWidth={BRANCH_LINE_STROKE_WIDTH + 0.8}
+        strokeWidth={BRANCH_LINE_STROKE_WIDTH}
         strokeDasharray={dashArray}
         strokeLinecap="round"
       />
 
+      {/* Vertical drop at branch end — feeder exit */}
       <line
         x1={branchEndX}
         y1={midY}
@@ -141,39 +152,47 @@ export const BranchRenderer: React.FC<BranchRendererProps> = ({
       <JunctionDot x={branchEndX} y={midY} color={color} />
       <JunctionDot x={branchEndX} y={dropY} color={color} />
 
+      {/* Power flow direction arrow */}
       <polygon
         points={`0,-${POWER_ARROW_SIZE / 2} ${POWER_ARROW_SIZE},0 0,${POWER_ARROW_SIZE / 2}`}
         fill={color}
-        transform={`translate(${position.x + STATION_FIELD_OFFSET_X + BRANCH_APPARATUS_WIDTH + 92},${midY})`}
+        transform={`translate(${apparatusX + BRANCH_APPARATUS_WIDTH + 60},${midY})`}
       />
 
+      {/* Branch line label — right of apparatus, compact */}
       <text
-        x={position.x + STATION_FIELD_OFFSET_X + BRANCH_APPARATUS_WIDTH + 48}
-        y={midY - 14}
-        className="sld-info-primary sld-segment-label"
+        x={apparatusX + BRANCH_APPARATUS_WIDTH + 36}
+        y={midY - 10}
+        className="sld-label-segment"
       >
         {branch.branchLine.designation}
       </text>
       <text
-        x={position.x + STATION_FIELD_OFFSET_X + BRANCH_APPARATUS_WIDTH + 48}
-        y={midY + 2}
-        className="sld-info-secondary sld-segment-label"
+        x={apparatusX + BRANCH_APPARATUS_WIDTH + 36}
+        y={midY + 4}
+        className="sld-label-params"
       >
-        Linia odgałęźna {branch.branchLine.cableType} • {branch.branchLine.lengthKm.toFixed(3)} km
+        {branch.branchLine.cableType} • {branch.branchLine.lengthKm.toFixed(3)} km
       </text>
       {showTechnicalLabels && (
         <text
-          x={position.x + STATION_FIELD_OFFSET_X + BRANCH_APPARATUS_WIDTH + 48}
-          y={midY + 18}
-          className="sld-info-tertiary sld-segment-params"
+          x={apparatusX + BRANCH_APPARATUS_WIDTH + 36}
+          y={midY + 16}
+          className="sld-label-params"
         >
-          R={branch.branchLine.resistance_ohm.toFixed(3)}&Omega; • X={branch.branchLine.reactance_ohm.toFixed(3)}&Omega; • Iz={branch.branchLine.ampacity_A} A
+          R={branch.branchLine.resistance_ohm.toFixed(3)}&Omega; X={branch.branchLine.reactance_ohm.toFixed(3)}&Omega;
         </text>
       )}
 
-      <g transform={`translate(${position.x + STATION_FIELD_OFFSET_X + BRANCH_APPARATUS_WIDTH + 14}, ${midY - 31})`}>
-        <circle r={10} className="sld-abb-relay-bubble" />
-        <text textAnchor="middle" y={4} className="sld-abb-relay-bubble-text">
+      {/* Protection relay bubble — ABB ANSI style */}
+      <g transform={`translate(${apparatusX + BRANCH_APPARATUS_WIDTH + 14}, ${midY - 24})`}>
+        <circle
+          r={9}
+          fill="rgba(255, 255, 255, 0.95)"
+          stroke="#475569"
+          strokeWidth={0.8}
+        />
+        <text textAnchor="middle" y={3} className="sld-abb-relay-bubble-text">
           50/51
         </text>
       </g>
