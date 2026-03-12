@@ -8,7 +8,7 @@ function buildManifest(name: string, build: () => ReturnType<typeof buildFixture
   const input = build();
   const adapter = buildVisualGraphFromTopology(input);
   const layout = computeLayout(adapter.graph, undefined, adapter.stationBlockDetails);
-  return buildSldRenderManifest({ scenarioId: name, visualGraph: adapter.graph, layoutResult: layout });
+  return buildSldRenderManifest({ scenarioId: name, visualGraph: adapter.graph, layoutResult: layout, visualTopology: adapter.visualTopology });
 }
 
 describe('SLD Render Manifest Golden (Step VII)', () => {
@@ -45,9 +45,26 @@ describe('SLD Render Manifest Golden (Step VII)', () => {
       const adapter2 = buildVisualGraphFromTopology(permuted);
       const layout1 = computeLayout(adapter1.graph, undefined, adapter1.stationBlockDetails);
       const layout2 = computeLayout(adapter2.graph, undefined, adapter2.stationBlockDetails);
-      const m1 = buildSldRenderManifest({ scenarioId: name, visualGraph: adapter1.graph, layoutResult: layout1 });
-      const m2 = buildSldRenderManifest({ scenarioId: name, visualGraph: adapter2.graph, layoutResult: layout2 });
+      const m1 = buildSldRenderManifest({ scenarioId: name, visualGraph: adapter1.graph, layoutResult: layout1, visualTopology: adapter1.visualTopology });
+      const m2 = buildSldRenderManifest({ scenarioId: name, visualGraph: adapter2.graph, layoutResult: layout2, visualTopology: adapter2.visualTopology });
       expect(m1).toEqual(m2);
     });
   }
+
+  it('dodaje podsumowanie kontraktu topologii wizualnej, gdy jest przekazane', () => {
+    const input = buildFixtureRadial();
+    const adapter = buildVisualGraphFromTopology(input);
+    const layout = computeLayout(adapter.graph, undefined, adapter.stationBlockDetails);
+    const manifest = buildSldRenderManifest({
+      scenarioId: 'visual-topology-summary',
+      visualGraph: adapter.graph,
+      layoutResult: layout,
+      visualTopology: adapter.visualTopology,
+    });
+
+    expect(manifest.visualTopologySummary).toBeDefined();
+    expect(manifest.visualTopologySummary?.segmentyMagistrali).toBeGreaterThan(0);
+    expect(manifest.visualTopologySummary?.stacje).toBeGreaterThan(0);
+  });
+
 });

@@ -148,6 +148,44 @@ function runPipeline(symbols: AnySldSymbol[]): LayoutResultV1 {
   return computeLayout(graph);
 }
 
+function runPipelineWithGraph(symbols: AnySldSymbol[]): { graph: ReturnType<typeof convertToVisualGraph>; layout: LayoutResultV1 } {
+  const graph = convertToVisualGraph(symbols);
+  const layout = computeLayout(graph);
+  return { graph, layout };
+}
+
+
+// =============================================================================
+// GPZ BUSBAR + FIELD CANON
+// =============================================================================
+
+describe('Layout Pipeline — kanon GPZ: szyna pozioma, pola pionowo w dół', () => {
+  it('GN-SLD-01: szyna SN GPZ jest pozioma, a odejścia trunk startują pionowo', () => {
+    const { graph, layout } = runPipelineWithGraph(buildGN01());
+
+    const rootBus = layout.nodePlacements.find((p) => p.nodeId === 'bus_sn_main');
+    expect(rootBus).toBeDefined();
+    expect(rootBus!.size.width).toBeGreaterThan(rootBus!.size.height);
+
+    const rootBusEdges = graph.edges
+      .filter((e) => e.edgeType === EdgeTypeV1.TRUNK)
+      .filter((e) => e.fromPortRef.nodeId === 'bus_sn_main' || e.toPortRef.nodeId === 'bus_sn_main')
+      .map((e) => layout.edgeRoutes.find((r) => r.edgeId === e.id))
+      .filter((r): r is NonNullable<typeof r> => Boolean(r));
+
+    expect(rootBusEdges.length).toBeGreaterThan(0);
+
+    for (const route of rootBusEdges) {
+      const first = route.segments[0];
+      expect(first).toBeDefined();
+      // pion z szyny GPZ: X stałe
+      expect(first.from.x).toBe(first.to.x);
+      // kierunek w dół
+      expect(first.to.y).toBeGreaterThanOrEqual(first.from.y);
+    }
+  });
+});
+
 // =============================================================================
 // HASH STABILITY (100x)
 // =============================================================================

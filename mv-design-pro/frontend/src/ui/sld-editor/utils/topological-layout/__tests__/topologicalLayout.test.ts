@@ -555,11 +555,12 @@ describe('Global Orientation', () => {
     expect(config.feederDirection).toBe('down');
   });
 
-  it('should resolve left-right orientation', () => {
+  it('should canonicalize left-right orientation to top-down for SN/GPZ', () => {
     const config = resolveOrientation('left-right');
-    expect(config.mainAxis).toBe('horizontal');
-    expect(config.busbarAxis).toBe('vertical');
-    expect(config.feederDirection).toBe('right');
+    expect(config.orientation).toBe('top-down');
+    expect(config.mainAxis).toBe('vertical');
+    expect(config.busbarAxis).toBe('horizontal');
+    expect(config.feederDirection).toBe('down');
   });
 });
 

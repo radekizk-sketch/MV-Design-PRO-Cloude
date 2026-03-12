@@ -169,6 +169,17 @@ exports[`SLD Render Manifest Golden (Step VII) > pv_bess: matches golden snapsho
   "specVersion": "1.0",
   "styleTokenHash": "e53cef0fa145ad2db2e47172828930e2c81ef627ccf00c34a7e47d5350e170c1",
   "visualGraphHash": "65ac8dff",
+  "visualTopologySummary": {
+    "gpz": 1,
+    "nopy": 0,
+    "polaSn": 3,
+    "punktyRozgalezien": 0,
+    "ringi": 0,
+    "segmentyMagistrali": 1,
+    "segmentyOdgalezien": 0,
+    "stacje": 1,
+    "szynySn": 2,
+  },
 }
 `;
 
@@ -297,6 +308,17 @@ exports[`SLD Render Manifest Golden (Step VII) > radial: matches golden snapshot
   "specVersion": "1.0",
   "styleTokenHash": "e53cef0fa145ad2db2e47172828930e2c81ef627ccf00c34a7e47d5350e170c1",
   "visualGraphHash": "97a8c332",
+  "visualTopologySummary": {
+    "gpz": 1,
+    "nopy": 0,
+    "polaSn": 1,
+    "punktyRozgalezien": 0,
+    "ringi": 0,
+    "segmentyMagistrali": 1,
+    "segmentyOdgalezien": 0,
+    "stacje": 1,
+    "szynySn": 2,
+  },
 }
 `;
 
@@ -465,5 +487,16 @@ exports[`SLD Render Manifest Golden (Step VII) > ring_nop: matches golden snapsh
   "specVersion": "1.0",
   "styleTokenHash": "e53cef0fa145ad2db2e47172828930e2c81ef627ccf00c34a7e47d5350e170c1",
   "visualGraphHash": "85937d1f",
+  "visualTopologySummary": {
+    "gpz": 1,
+    "nopy": 1,
+    "polaSn": 0,
+    "punktyRozgalezien": 0,
+    "ringi": 1,
+    "segmentyMagistrali": 3,
+    "segmentyOdgalezien": 0,
+    "stacje": 0,
+    "szynySn": 4,
+  },
 }
 `;

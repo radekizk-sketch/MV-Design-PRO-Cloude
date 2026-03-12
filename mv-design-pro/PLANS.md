@@ -152,6 +152,42 @@ Zakres zakończony:
 - [x] Aktualizacja testu deterministycznego `fitToContent` do aktualnego kontraktu geometrii viewportu (`fitToContent.test.ts`).
 
 
+
+### 3.0.6a SLD: logical_views jako kanoniczna segmentacja trunk/branch/ring (completed)
+
+Zakres zakończony:
+- [x] Rozszerzono `TopologyInputV1` o strukturę `logicalViews` (trunks/branches/rings) oraz mapowanie z `snapshot.logical_views` w `readTopologyFromENM`.
+- [x] `TopologyAdapterV2.segmentTopology()` używa jawnych segmentów z `logicalViews` jako pierwszego źródła klasyfikacji (`TRUNK`/`BRANCH`/`SECONDARY_CONNECTOR`) i dopiero przy braku danych wraca do deterministycznego BFS fallback.
+- [x] Dodano test regresyjny wymuszający priorytet `logicalViews` nad heurystyką segmentacji w `topologyAdapterV2.test.ts`.
+- [x] Zaktualizowano dokument kanoniczny SLD o regułę „logical_views first”.
+
+### 3.0.6b SLD: model właściwy kontraktu topologii wizualnej (completed)
+
+Zakres zakończony:
+- [x] Dodano `VisualTopologyContractV1` jako jawny kontrakt wyjściowy adaptera z klasami: GPZ, szyna SN, pole SN, trunk, branch, punkt rozgałęzienia, stacja, ring, NOP.
+- [x] `buildVisualGraphFromTopology()` zwraca `visualTopology` obok `graph` i `stationBlockDetails`, więc aktywny pipeline ma formalny model semantyczny (nie tylko klasyfikację krawędzi).
+- [x] Rola stacji (`koncowa`/`przelotowa`/`odgalezna`/`sekcyjna`) jest wyprowadzana z embeddingu stacji i materializowana do kontraktu wizualnego.
+- [x] Ring/NOP są modelowane jawnie (`RingConnectorVisual`, `NopVisual`) i utrzymują powiązanie z `domainElementId` dla selekcji/inspektora.
+- [x] Dodano testy regresyjne kontraktu semantycznego i deterministycznego 100x.
+
+
+### 3.0.6c SLD: domknięcie kontraktu semantycznego w artefaktach renderu (completed)
+
+Zakres zakończony:
+- [x] Wzmocniono `VisualTopologyContractV1`: segmenty trunk/branch/ring/NOP obejmują wyłącznie klasy liniowe SN (bez TR_LINK/BUS_LINK).
+- [x] Scenariusze referencyjne (`leaf/pass/branch/ring`) materializują jawne `logicalViews`, aby aktywna ścieżka testowa nie opierała się na fallbacku BFS.
+- [x] `SldRenderManifest` otrzymał opcjonalne `visualTopologySummary` zliczające klasy bytów (GPZ/szyny/pola/trunk/branch/stacje/ringi/NOP) dla audytu semantyka↔render.
+- [x] Zaktualizowano golden snapshoty manifestu i testy regresyjne.
+
+
+### 3.0.6d SLD: twarda reguła geometrii GPZ (completed)
+
+Zakres zakończony:
+- [x] Wymuszono globalnie kanon orientacji SN/GPZ w silniku topologicznym: szyna GPZ pozioma, odejścia pionowo w dół (także przy żądaniu `left-right`).
+- [x] Dodano regresyjny test w `layoutPipeline.test.ts` potwierdzający poziomą szynę GPZ i pionowy start odejść trunk.
+- [x] Zaktualizowano test orientacji `topologicalLayout.test.ts` do kanonicznego mapowania `left-right -> top-down` dla SN.
+
+
 ### 3.0.5 Hotfix CI TypeScript — referenceTopologies (completed)
 
 Zakres zakończony:

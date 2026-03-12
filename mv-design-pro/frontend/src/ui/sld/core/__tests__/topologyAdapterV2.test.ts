@@ -434,6 +434,24 @@ describe('TopologyAdapterV2 — Domain-driven', () => {
       expect(nopEdge!.isNormallyOpen).toBe(true);
     });
 
+
+    it('test_logical_views_drive_trunk_branch_secondary_when_present', () => {
+      const input: TopologyInputV1 = {
+        ...buildGN_DOM_01(),
+        logicalViews: {
+          trunks: [{ id: 'trunk_main', segmentIds: ['line2'] }],
+          branches: [{ id: 'branch_1', segmentIds: ['line1'] }],
+          rings: [{ id: 'ring_1', segmentIds: ['line3'], normallyOpenSegmentId: null }],
+        },
+      };
+
+      const result = buildVisualGraphFromTopology(input);
+      const edgeByBranchId = (branchId: string) => result.graph.edges.find(e => e.id === `edge_${branchId}`);
+
+      expect(edgeByBranchId('line2')?.edgeType).toBe(EdgeTypeV1.TRUNK);
+      expect(edgeByBranchId('line1')?.edgeType).toBe(EdgeTypeV1.BRANCH);
+      expect(edgeByBranchId('line3')?.edgeType).toBe(EdgeTypeV1.SECONDARY_CONNECTOR);
+    });
     it('test_trunk_branch_classification_stable — trunk exists in radial', () => {
       const input = buildGN_DOM_01();
       const result = buildVisualGraphFromTopology(input);

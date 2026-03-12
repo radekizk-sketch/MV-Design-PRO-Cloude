@@ -201,6 +201,31 @@ export interface TopologyFixAction {
   readonly fixHint: string;
 }
 
+/** Jawny widok logiczny trunk z Snapshot.logical_views.trunks[]. */
+export interface LogicalTrunkViewV1 {
+  readonly id: string;
+  readonly segmentIds: readonly string[];
+}
+
+/** Jawny widok logiczny odgalezienia z Snapshot.logical_views.branches[]. */
+export interface LogicalBranchViewV1 {
+  readonly id: string;
+  readonly segmentIds: readonly string[];
+}
+
+/** Jawny widok logiczny ukladu wtórnego (ring/NOP). */
+export interface LogicalRingViewV1 {
+  readonly id: string;
+  readonly segmentIds: readonly string[];
+  readonly normallyOpenSegmentId: string | null;
+}
+
+export interface TopologyLogicalViewsV1 {
+  readonly trunks: readonly LogicalTrunkViewV1[];
+  readonly branches: readonly LogicalBranchViewV1[];
+  readonly rings: readonly LogicalRingViewV1[];
+}
+
 // =============================================================================
 // TOPOLOGY INPUT (AGGREGATE)
 // =============================================================================
@@ -222,6 +247,7 @@ export interface TopologyInputV1 {
   readonly sources: readonly TopologySourceV1[];
   readonly loads: readonly TopologyLoadV1[];
   readonly protectionBindings: readonly TopologyProtectionV1[];
+  readonly logicalViews?: TopologyLogicalViewsV1;
   readonly fixActions: readonly TopologyFixAction[];
 }
 
@@ -569,6 +595,24 @@ export function readTopologyFromENM(
     isEnabled: pa.is_enabled,
   }));
 
+  const logicalViewsRaw = enm.logical_views;
+
+  const logicalViews: TopologyLogicalViewsV1 = {
+    trunks: (logicalViewsRaw?.trunks ?? []).map((trunk, idx) => ({
+      id: trunk.corridor_ref ?? `trunk_${idx + 1}`,
+      segmentIds: [...(trunk.segments ?? [])].sort(),
+    })).sort((a, b) => a.id.localeCompare(b.id)),
+    branches: (logicalViewsRaw?.branches ?? []).map((branch, idx) => ({
+      id: branch.branch_id ?? `branch_${idx + 1}`,
+      segmentIds: [...(branch.segments ?? [])].sort(),
+    })).sort((a, b) => a.id.localeCompare(b.id)),
+    rings: (logicalViewsRaw?.secondary_connectors ?? []).map((connector, idx) => ({
+      id: connector.connector_id ?? `ring_${idx + 1}`,
+      segmentIds: connector.segment_ref ? [connector.segment_ref] : [],
+      normallyOpenSegmentId: connector.segment_ref ?? null,
+    })).sort((a, b) => a.id.localeCompare(b.id)),
+  };
+
   return {
     snapshotId,
     snapshotFingerprint: enm.header.hash_sha256,
@@ -580,6 +624,7 @@ export function readTopologyFromENM(
     sources: sortById(sources),
     loads: sortById(loads),
     protectionBindings: sortById(protectionBindings),
+    logicalViews,
     fixActions: [...fixActions].sort((a, b) => a.code.localeCompare(b.code) || (a.elementRef ?? '').localeCompare(b.elementRef ?? '')),
   };
 }
@@ -777,6 +822,7 @@ export function readTopologyFromSymbols(
     sources: sortById(sources),
     loads: sortById(loads),
     protectionBindings: [],
+    logicalViews: { trunks: [], branches: [], rings: [] },
     fixActions: [...fixActions].sort((a, b) => a.code.localeCompare(b.code) || (a.elementRef ?? '').localeCompare(b.elementRef ?? '')),
   };
 }

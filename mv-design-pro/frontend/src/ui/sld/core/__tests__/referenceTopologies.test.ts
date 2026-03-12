@@ -18,4 +18,15 @@ describe('referenceTopologies', () => {
     const hasNop = result.input.branches.some((branch) => branch.isNormallyOpen);
     expect(hasNop).toBe(true);
   });
+
+  it('scenariusze referencyjne mają jawne logicalViews dla trunk/branch/ring', () => {
+    const leaf = buildReferenceScenario('leaf').input.logicalViews;
+    const branch = buildReferenceScenario('branch').input.logicalViews;
+    const ring = buildReferenceScenario('ring').input.logicalViews;
+
+    expect((leaf?.trunks.length ?? 0) > 0).toBe(true);
+    expect((branch?.branches.length ?? 0) > 0).toBe(true);
+    expect((ring?.rings.length ?? 0) > 0).toBe(true);
+  });
+
 });

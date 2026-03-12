@@ -42,6 +42,11 @@ function buildBaseInput(snapshotId: string): TopologyInputV1 {
       { id: 'load_s2', name: 'Odbiór S2', nodeId: 'bus_s2_nn', inService: true, pMw: 0.1, qMvar: 0.03 },
     ],
     protectionBindings: [],
+    logicalViews: {
+      trunks: [{ id: 'trunk_main', segmentIds: ['line_g_s1', 'line_s1_s2'] }],
+      branches: [],
+      rings: [],
+    },
     fixActions: [],
   };
 }
@@ -55,6 +60,11 @@ function buildScenarioInput(scenarioId: ReferenceScenarioId): TopologyInputV1 {
       branches: input.branches.filter((b) => !['line_s1_s2', 'tr_s2'].includes(b.id)),
       stations: input.stations.filter((s) => s.id !== 'st2'),
       loads: input.loads.filter((l) => l.id !== 'load_s2'),
+      logicalViews: {
+        trunks: [{ id: 'trunk_leaf', segmentIds: ['line_g_s1'] }],
+        branches: [],
+        rings: [],
+      },
     };
   }
 
@@ -84,6 +94,11 @@ function buildScenarioInput(scenarioId: ReferenceScenarioId): TopologyInputV1 {
         ...input.loads,
         { id: 'load_b1', name: 'Odbiór B1', nodeId: 'bus_b1_nn', inService: true, pMw: 0.08, qMvar: 0.02 },
       ],
+      logicalViews: {
+        trunks: [{ id: 'trunk_branch_main', segmentIds: ['line_g_s1', 'line_s1_s2'] }],
+        branches: [{ id: 'branch_s1_b1', segmentIds: ['line_s1_b1'] }],
+        rings: [],
+      },
     };
   }
 
@@ -109,6 +124,11 @@ function buildScenarioInput(scenarioId: ReferenceScenarioId): TopologyInputV1 {
       ...input.loads,
       { id: 'load_s3', name: 'Odbiór S3', nodeId: 'bus_s3_nn', inService: true, pMw: 0.12, qMvar: 0.04 },
     ],
+    logicalViews: {
+      trunks: [{ id: 'trunk_ring_main', segmentIds: ['line_g_s1', 'line_s1_s2', 'line_s2_s3'] }],
+      branches: [],
+      rings: [{ id: 'ring_s3_s1', segmentIds: ['line_s3_s1_nop'], normallyOpenSegmentId: 'line_s3_s1_nop' }],
+    },
   };
 }
 
