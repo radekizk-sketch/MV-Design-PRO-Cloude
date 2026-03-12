@@ -50,12 +50,15 @@ MV-Design-PRO/
 │   ├── INDEX.md                  # UI documentation index
 │   ├── ui/                       # UI contracts (root-level)
 │   ├── sld/                      # SLD layout contracts
-│   └── system/                   # System-level docs
+│   ├── system/                   # System-level docs
+│   ├── audyt/                    # Audit reports (e.g. AUDYT_10_10_GLOBAL_SN.md)
+│   └── plan/                     # Execution plans (e.g. PLAN_10_10_GLOBAL_SN.md)
 ├── mv-design-pro/                # Main application
-│   ├── SYSTEM_SPEC.md            # Executive overview + navigation hub (BINDING)
-│   ├── AGENTS.md                 # Agent governance rules (BINDING)
-│   ├── ARCHITECTURE.md           # Technical architecture reference (BINDING)
-│   ├── PLANS.md                  # Operational status & next steps (LIVING)
+│   ├── SYSTEM_SPEC.md            # Executive overview + navigation hub (BINDING, v4.0)
+│   ├── AGENTS.md                 # Agent governance rules (BINDING, v4.0)
+│   ├── ARCHITECTURE.md           # Technical architecture reference (BINDING, v4.0)
+│   ├── PLANS.md                  # Operational status & next steps (LIVING, v5.0)
+│   ├── POWERFACTORY_COMPLIANCE.md# PowerFactory alignment checklist (BINDING, v3.0)
 │   ├── docker-compose.yml        # 6 services: backend, frontend, postgres, mongodb, redis, celery
 │   ├── backend/
 │   │   ├── pyproject.toml        # Poetry configuration
@@ -112,7 +115,7 @@ MV-Design-PRO/
 │   │   │   ├── solver_input/     # Solver input preparation, contracts, eligibility
 │   │   │   ├── solvers/          # Solver wrapper/dispatcher layer
 │   │   │   └── whitebox/         # Top-level trace, proof, equation registry, LaTeX
-│   │   ├── tests/                # Backend tests (~241 files, 1600+ tests)
+│   │   ├── tests/                # Backend tests (1600+ tests)
 │   │   │   ├── conftest.py
 │   │   │   ├── analysis/         # Analysis layer tests
 │   │   │   ├── api/              # API endpoint tests
@@ -142,7 +145,7 @@ MV-Design-PRO/
 │   │   │   ├── proof-inspector/  # Proof inspector UI module
 │   │   │   ├── types/            # Shared TypeScript type definitions
 │   │   │   ├── test/             # Test infrastructure (setup.ts)
-│   │   │   └── ui/               # React components (by feature)
+│   │   │   └── ui/               # React components (50+ feature modules)
 │   │   │       ├── sld/          # Single Line Diagram (primary)
 │   │   │       │   ├── core/     # VisualGraph, TopologyAdapter, LayoutPipeline, StationBlockBuilder
 │   │   │       │   ├── etap_symbols/
@@ -154,28 +157,59 @@ MV-Design-PRO/
 │   │   │       ├── sld-overlay/  # Result overlays on SLD
 │   │   │       ├── wizard/       # Network wizard (switchgear config)
 │   │   │       ├── study-cases/  # Study case manager
+│   │   │       ├── case-manager/ # Case lifecycle management
+│   │   │       ├── active-case-bar/    # Active case display bar
 │   │   │       ├── results-browser/    # Results hierarchy browser
 │   │   │       ├── results-inspector/  # Result details inspector
 │   │   │       ├── results-workspace/  # Results view container
+│   │   │       ├── results/            # Results module
+│   │   │       ├── run-results-inspector/ # Run-level result inspector
 │   │   │       ├── proof/              # Proof pack display
 │   │   │       ├── protection/         # Protection library browser
 │   │   │       ├── protection-coordination/ # TCC charts, protection curves
+│   │   │       ├── protection-curves/  # Protection curve rendering
 │   │   │       ├── protection-diagnostics/
+│   │   │       ├── protection-engine-v1/ # Protection engine interface
+│   │   │       ├── protection-results/ # Protection result display
+│   │   │       ├── protection-comparison/ # A/B comparison for protection
 │   │   │       ├── property-grid/      # Element property editor
 │   │   │       ├── catalog/            # Type library browser
 │   │   │       ├── topology/           # Topology tree
 │   │   │       ├── power-flow-results/ # Load flow results
+│   │   │       ├── power-flow-comparison/ # Load flow A/B comparison
 │   │   │       ├── context-menu/       # Context menu actions
 │   │   │       ├── app-state/          # Global Zustand store
 │   │   │       ├── history/            # Undo/redo
 │   │   │       ├── selection/          # Element selection
 │   │   │       ├── mode-gate/          # Expert mode gating
 │   │   │       ├── contracts/          # API contract definitions
-│   │   │       └── ...                 # 40+ UI feature modules
+│   │   │       ├── analysis-eligibility/ # Analysis pre-check display
+│   │   │       ├── batch-execution/    # Batch analysis execution
+│   │   │       ├── data-manager/       # Data management panel
+│   │   │       ├── engineering-readiness/ # Readiness gate UI
+│   │   │       ├── enm-inspector/      # ENM model inspector
+│   │   │       ├── fault-scenarios/    # Fault scenario configuration
+│   │   │       ├── main-menu/          # Application main menu
+│   │   │       ├── navigation/         # App navigation
+│   │   │       ├── notifications/      # Notification display
+│   │   │       ├── project-archive/    # Project ZIP import/export
+│   │   │       ├── project-tree/       # Project hierarchy tree
+│   │   │       ├── projects/           # Projects list/management
+│   │   │       ├── reference-patterns/ # Reference network patterns
+│   │   │       ├── schema-completeness/ # Schema completeness display
+│   │   │       ├── status-bar/         # Application status bar
+│   │   │       ├── voltage-profile/    # Voltage profile charts
+│   │   │       ├── compare/            # General comparison view
+│   │   │       ├── comparison/         # Comparison module
+│   │   │       ├── comparisons/        # Comparisons list
+│   │   │       ├── inspector/          # Generic inspector
+│   │   │       ├── inspector-panel/    # Inspector panel wrapper
+│   │   │       ├── issue-panel/        # Validation issue panel
+│   │   │       └── ...                 # shared/, common/, config/, layout/, types.ts
 │   │   └── e2e/                  # Playwright end-to-end tests
-│   ├── scripts/                  # CI/CD guard scripts (28 scripts)
+│   ├── scripts/                  # CI/CD guard scripts (33 scripts)
 │   └── docs/                     # Detailed documentation (150+ files)
-│       ├── spec/                 # DETAILED SPECIFICATION (18 chapters - SOURCE OF TRUTH)
+│       ├── spec/                 # DETAILED SPECIFICATION (18 chapters + supplements - SOURCE OF TRUTH)
 │       ├── ui/                   # UI contracts (35+ canonical contracts)
 │       ├── proof_engine/         # Proof Pack specifications
 │       ├── analysis/             # Analysis specifications
@@ -185,6 +219,7 @@ MV-Design-PRO/
 │       ├── domain/               # Domain model specs
 │       ├── export/               # Export specifications
 │       ├── audit/                # Audit reports, historical exec plans
+│       ├── prompts/              # AI prompt engineering templates
 │       └── tests/                # Test specifications (golden networks)
 ```
 
@@ -194,13 +229,14 @@ Authority order (highest first):
 
 | Priority | Document | Purpose |
 |----------|----------|---------|
-| 1 | `mv-design-pro/docs/spec/` (18 chapters) | **Detailed specification** - SOURCE OF TRUTH |
+| 1 | `mv-design-pro/docs/spec/` (18 chapters + supplements) | **Detailed specification** - SOURCE OF TRUTH |
 | 2 | `mv-design-pro/docs/spec/AUDIT_SPEC_VS_CODE.md` | Spec-vs-code gap analysis + decision matrix |
-| 3 | `mv-design-pro/SYSTEM_SPEC.md` | Executive overview + navigation hub |
-| 4 | `mv-design-pro/ARCHITECTURE.md` | Technical architecture reference |
-| 5 | `mv-design-pro/AGENTS.md` | Agent governance rules |
-| 6 | `mv-design-pro/PLANS.md` | Operational status & next steps (LIVING) |
-| 7 | `docs/INDEX.md` | UI contracts index |
+| 3 | `mv-design-pro/SYSTEM_SPEC.md` | Executive overview + navigation hub (v4.0) |
+| 4 | `mv-design-pro/ARCHITECTURE.md` | Technical architecture reference (v4.0) |
+| 5 | `mv-design-pro/AGENTS.md` | Agent governance rules (v4.0) |
+| 6 | `mv-design-pro/POWERFACTORY_COMPLIANCE.md` | PowerFactory alignment checklist (v3.0) |
+| 7 | `mv-design-pro/PLANS.md` | Operational status & next steps (LIVING, v5.0) |
+| 8 | `docs/INDEX.md` | UI contracts index |
 
 In case of conflict: `docs/spec/` wins. Always consult before making architectural changes.
 
@@ -299,6 +335,12 @@ Project codenames (P7, P11, P14, P17, P20, etc.) must **NEVER** appear in:
 
 Use Polish labels instead. Enforced by `scripts/no_codenames_guard.py`.
 
+### 9. No Heuristics in Solvers
+Load flow and protection solvers must NOT apply heuristics, guesses, or undocumented corrections. Enforced by `scripts/load_flow_no_heuristics_guard.py` and `scripts/protection_no_heuristics_guard.py`.
+
+### 10. Catalog Binding Rule
+All network elements must reference catalog types. Direct parameter injection bypassing the catalog is forbidden. Enforced by `scripts/catalog_binding_guard.py`, `catalog_enforcement_guard.py`, `catalog_gate_guard.py`.
+
 ## Development Commands
 
 ### Backend
@@ -338,11 +380,32 @@ npm install       # alternative
 npm test
 # Equivalent: vitest run --no-file-parallelism
 
+# Run tests for CI
+npm run test:ci
+
 # Run tests in watch mode
 npm run test:watch
 
-# Run e2e tests (Playwright)
+# Run tests with coverage
+npm run test:coverage
+
+# Run e2e tests (Playwright, mock backend)
 npm run test:e2e
+
+# Run e2e against real backend (critical path)
+npm run test:e2e:real
+
+# Set up Playwright dependencies
+npm run test:e2e:setup
+
+# E2E with UI debugger
+npm run test:e2e:ui
+
+# Bootstrap e2e (npm ci + setup)
+npm run test:e2e:bootstrap
+
+# Full e2e bootstrap with real backend
+npm run test:e2e:setup:real
 
 # Type checking
 npm run type-check
@@ -374,23 +437,58 @@ docker-compose logs -f backend
 docker-compose down
 ```
 
-### Guard Scripts
+### Guard Scripts (33 total)
 ```bash
 cd mv-design-pro
 
-# Key guards (all run in CI)
-python scripts/pcc_zero_guard.py              # Prevent PCC in NetworkModel
-python scripts/domain_no_guessing_guard.py    # Domain model validation
-python scripts/canonical_ops_guard.py         # Canonical operations check
-python scripts/readiness_codes_guard.py       # Readiness gate validation
-python scripts/no_codenames_guard.py          # Block codenames in UI
-python scripts/dialog_completeness_guard.py   # Dialog contract completeness
-python scripts/local_truth_guard.py           # Local vs remote consistency
-python scripts/sld_determinism_guards.py      # SLD rendering determinism
-python scripts/arch_guard.py                  # Architecture layer boundaries
-python scripts/docs_guard.py                  # Documentation integrity
-python scripts/solver_boundary_guard.py       # Solver layer isolation
-python scripts/trace_determinism_guard.py     # Trace output determinism
+# Architecture & domain integrity
+python scripts/arch_guard.py                      # Architecture layer boundaries
+python scripts/pcc_zero_guard.py                  # Prevent PCC in NetworkModel
+python scripts/domain_no_guessing_guard.py        # Domain model validation
+python scripts/solver_boundary_guard.py           # Solver layer isolation
+python scripts/solver_diff_guard.py               # Solver output diff guard
+
+# Operations & canonicalization
+python scripts/canonical_ops_guard.py             # Canonical operations check
+python scripts/readiness_codes_guard.py           # Readiness gate validation
+python scripts/audit_contract_guard.py            # Audit contract compliance
+
+# Catalog guards
+python scripts/catalog_binding_guard.py           # Catalog binding enforcement
+python scripts/catalog_enforcement_guard.py       # Catalog usage enforcement
+python scripts/catalog_gate_guard.py              # Catalog gate checks
+python scripts/transformer_catalog_voltage_guard.py # Transformer catalog voltage
+
+# UI / UX guards
+python scripts/no_codenames_guard.py              # Block codenames in UI strings
+python scripts/test_no_codenames_guard.py         # Block codenames in test artifacts
+python scripts/forbidden_ui_terms_guard.py        # Block forbidden UI terminology
+python scripts/dead_click_guard.py                # Detect dead/unhandled UI actions
+python scripts/fix_action_completeness_guard.py   # Fix action completeness
+python scripts/dialog_completeness_guard.py       # Dialog contract completeness
+python scripts/nn_source_menu_guard.py            # Source menu guard
+python scripts/guard_ux_flow_v1.py                # UX flow v1 compliance
+
+# Physics separation guards
+python scripts/overlay_no_physics_guard.py        # Overlay layer physics prohibition
+python scripts/physics_label_guard.py             # Physics label validation
+python scripts/trace_ui_leak_guard.py             # Prevent trace data leaking to UI
+python scripts/load_flow_no_heuristics_guard.py   # No heuristics in load flow
+python scripts/protection_no_heuristics_guard.py  # No heuristics in protection
+python scripts/no_direct_fault_params_guard.py    # No direct fault param injection
+
+# SLD & determinism guards
+python scripts/sld_determinism_guards.py          # SLD rendering determinism
+python scripts/trace_determinism_guard.py         # Trace output determinism
+python scripts/fault_scenarios_determinism_guard.py # Fault scenario determinism
+python scripts/results_workspace_determinism_guard.py # Results workspace determinism
+
+# Schema guards
+python scripts/resultset_v1_schema_guard.py       # ResultSet v1 schema compliance
+
+# Documentation
+python scripts/docs_guard.py                      # Documentation integrity
+python scripts/local_truth_guard.py               # Local vs remote consistency
 ```
 
 ## CI/CD Pipelines
@@ -439,7 +537,7 @@ All 4 workflows run on push and pull_request:
 
 ## Testing Guidelines
 
-### Backend Tests (~241 files, 1600+ tests)
+### Backend Tests (1600+ tests)
 - Located in `mv-design-pro/backend/tests/`
 - Use pytest with asyncio mode auto
 - Mark integration tests with `@pytest.mark.integration`
@@ -453,7 +551,7 @@ All 4 workflows run on push and pull_request:
   - `tests/golden/` - Golden network fixtures
   - `tests/ci/` - CI guard validation tests
 
-### Frontend Tests (~138 files)
+### Frontend Tests (190+ test files)
 - Unit tests with Vitest in `src/**/__tests__/`
 - E2E tests with Playwright in `e2e/`
 - Component tests use @testing-library/react
@@ -466,6 +564,7 @@ All 4 workflows run on push and pull_request:
   - `sld/core/__tests__/topologyAdapterV2.test.ts`
   - `sld/core/__tests__/switchgearConfig.test.ts`
   - `sld/core/__tests__/switchgearConfig.hashParity.test.ts`
+- Critical E2E (real backend): `e2e/critical-run-flow.spec.ts` via `npm run test:e2e:real`
 
 ## Proof Engine
 
@@ -500,6 +599,20 @@ The Proof Engine generates mathematical proofs from solver results:
 - PDF (`proof.pdf`)
 - DOCX
 
+## Project Status (as of 2026-03)
+
+The system is fully functional with:
+- 4 solvers (IEC 60909 SC, NR/GS/FD Power Flow)
+- 8+ proof packs (SC3F, VDROP, Equipment, PF, Losses, Protection, Earthing, LF Voltage)
+- 12+ analysis modules (Protection, Voltage, Normative, Coverage, Sensitivity, Comparison, Recommendations)
+- Full frontend: SLD editor (industrial ETAP/ABB/DIgSILENT grade), Results Browser, Case Manager, Proof Inspector, Protection Diagnostics
+- 1600+ backend tests
+- Project import/export (ZIP, deterministic, versioned)
+- CAD geometry editing in SLD
+- PDF/DOCX report generation
+- ENM v1.0 (EnergyNetworkModel)
+- Active work: Phase 3.0 post-10/10 audit (see `PLANS.md` and `docs/plan/PLAN_10_10_GLOBAL_SN.md`)
+
 ## Common Tasks
 
 ### Adding a New Element Type
@@ -522,7 +635,7 @@ The Proof Engine generates mathematical proofs from solver results:
 2. Follow layer boundaries (no physics in UI)
 3. Use Polish labels, no project codenames
 4. Add tests (Vitest for unit, Playwright for e2e)
-5. Run `npm run guard:codenames` to verify
+5. Run `npm run guard:codenames` and `scripts/forbidden_ui_terms_guard.py` to verify
 
 ### Working with Study Cases
 - Cases store config only, not model data
@@ -530,17 +643,31 @@ The Proof Engine generates mathematical proofs from solver results:
 - Clone creates new case with NONE status (no results copied)
 - Only ONE case active at a time
 
+### Adding Catalog Types
+1. Review `mv-design-pro/POWERFACTORY_COMPLIANCE.md` for catalog compliance rules
+2. Add to `network_model/catalog/` (types are immutable once published)
+3. Run catalog guards: `catalog_binding_guard.py`, `catalog_enforcement_guard.py`, `catalog_gate_guard.py`
+
 ### Running All Guards Locally
 ```bash
 cd mv-design-pro
 python scripts/pcc_zero_guard.py
 python scripts/no_codenames_guard.py
+python scripts/forbidden_ui_terms_guard.py
 python scripts/domain_no_guessing_guard.py
 python scripts/canonical_ops_guard.py
 python scripts/readiness_codes_guard.py
 python scripts/sld_determinism_guards.py
 python scripts/arch_guard.py
 python scripts/docs_guard.py
+python scripts/catalog_binding_guard.py
+python scripts/overlay_no_physics_guard.py
+python scripts/load_flow_no_heuristics_guard.py
+python scripts/protection_no_heuristics_guard.py
+python scripts/trace_determinism_guard.py
+python scripts/fault_scenarios_determinism_guard.py
+python scripts/results_workspace_determinism_guard.py
+python scripts/resultset_v1_schema_guard.py
 ```
 
 ## Important Warnings
@@ -551,10 +678,13 @@ python scripts/docs_guard.py
 4. **NEVER** create shadow/duplicate data models
 5. **NEVER** bypass NetworkValidator before solver execution
 6. **NEVER** use project codenames (P11, P14, etc.) in UI strings
-7. **ALWAYS** maintain WHITE BOX traceability in solvers
-8. **ALWAYS** preserve deterministic behavior (same input = same output)
-9. **ALWAYS** consult `docs/spec/` before architectural changes
-10. **ALWAYS** run relevant guards before pushing changes
+7. **NEVER** apply heuristics or undocumented corrections in load flow or protection solvers
+8. **NEVER** bypass catalog type binding (use catalog types, not direct parameter injection)
+9. **ALWAYS** maintain WHITE BOX traceability in solvers
+10. **ALWAYS** preserve deterministic behavior (same input = same output)
+11. **ALWAYS** consult `docs/spec/` before architectural changes
+12. **ALWAYS** run relevant guards before pushing changes
+13. **ALWAYS** consult `POWERFACTORY_COMPLIANCE.md` when adding/modifying network model elements
 
 ## Escalation
 
@@ -587,12 +717,17 @@ If any rule conflict is detected:
 |--------|---------|
 | Run backend tests | `cd mv-design-pro/backend && poetry run pytest -q` |
 | Run frontend tests | `cd mv-design-pro/frontend && npm test` |
+| Run frontend tests (CI) | `cd mv-design-pro/frontend && npm run test:ci` |
+| Run e2e tests | `cd mv-design-pro/frontend && npm run test:e2e` |
+| Run e2e (real backend) | `cd mv-design-pro/frontend && npm run test:e2e:real` |
 | Type check frontend | `cd mv-design-pro/frontend && npm run type-check` |
 | Lint frontend | `cd mv-design-pro/frontend && npm run lint` |
 | Lint Python | `cd mv-design-pro/backend && poetry run ruff check src` |
 | Format Python | `cd mv-design-pro/backend && poetry run black src tests` |
 | Check codenames | `cd mv-design-pro && python scripts/no_codenames_guard.py` |
 | Check PCC guard | `cd mv-design-pro && python scripts/pcc_zero_guard.py` |
+| Check catalog binding | `cd mv-design-pro && python scripts/catalog_binding_guard.py` |
+| Check physics leaks | `cd mv-design-pro && python scripts/overlay_no_physics_guard.py` |
 | Check docs guard | `cd mv-design-pro && python scripts/docs_guard.py` |
 | Start dev servers | `cd mv-design-pro && docker-compose up -d` |
 | Build frontend | `cd mv-design-pro/frontend && npm run build` |
