@@ -1,5 +1,6 @@
 import { computeLayoutResultHash, type LayoutResultV1, type NodePlacementV1, type EdgeRouteV1 } from './layoutResult';
 import { computeVisualGraphHash, type VisualGraphV1 } from './visualGraph';
+import type { VisualTopologyContractV1 } from './visualTopologyContract';
 import { ETAP_STROKE, ETAP_VOLTAGE_COLORS, ETAP_VOLTAGE_MAP, getVisualHierarchyLevel, VISUAL_HIERARCHY } from '../sldEtapStyle';
 
 function syncHashHex(input: string): string {
@@ -53,12 +54,26 @@ export interface SldRenderEdgeManifestV1 {
   readonly strokeWidth: number;
 }
 
+
+export interface SldVisualTopologySummaryV1 {
+  readonly gpz: number;
+  readonly szynySn: number;
+  readonly polaSn: number;
+  readonly segmentyMagistrali: number;
+  readonly segmentyOdgalezien: number;
+  readonly punktyRozgalezien: number;
+  readonly stacje: number;
+  readonly ringi: number;
+  readonly nopy: number;
+}
+
 export interface SldRenderManifestV1 {
   readonly specVersion: '1.0';
   readonly scenarioId: string;
   readonly layoutHash: string;
   readonly visualGraphHash: string;
   readonly styleTokenHash: string;
+  readonly visualTopologySummary?: SldVisualTopologySummaryV1;
   readonly nodes: readonly SldRenderNodeManifestV1[];
   readonly edges: readonly SldRenderEdgeManifestV1[];
 }
@@ -109,6 +124,7 @@ export function buildSldRenderManifest(params: {
   scenarioId: string;
   visualGraph: VisualGraphV1;
   layoutResult: LayoutResultV1;
+  visualTopology?: VisualTopologyContractV1 | null;
 }): SldRenderManifestV1 {
   const nodeById = new Map(params.visualGraph.nodes.map((n) => [n.id, n]));
 
@@ -149,6 +165,21 @@ export function buildSldRenderManifest(params: {
     layoutHash: computeLayoutResultHash(params.layoutResult),
     visualGraphHash: computeVisualGraphHash(params.visualGraph),
     styleTokenHash: buildStyleTokenHash(),
+    ...(params.visualTopology
+      ? {
+        visualTopologySummary: {
+          gpz: params.visualTopology.gpz.length,
+          szynySn: params.visualTopology.busbarsSn.length,
+          polaSn: params.visualTopology.fieldsSn.length,
+          segmentyMagistrali: params.visualTopology.trunkSegments.length,
+          segmentyOdgalezien: params.visualTopology.branchSegments.length,
+          punktyRozgalezien: params.visualTopology.branchJunctions.length,
+          stacje: params.visualTopology.stations.length,
+          ringi: params.visualTopology.ringConnectors.length,
+          nopy: params.visualTopology.nops.length,
+        },
+      }
+      : {}),
     nodes,
     edges,
   };

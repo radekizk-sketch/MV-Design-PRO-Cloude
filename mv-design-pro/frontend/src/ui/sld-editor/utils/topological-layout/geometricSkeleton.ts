@@ -71,16 +71,12 @@ export const DEFAULT_GEOMETRY_CONFIG: LayoutGeometryConfig = {
 export function resolveOrientation(
   orientation: GlobalOrientation = 'top-down'
 ): OrientationConfig {
-  if (orientation === 'left-right') {
-    return {
-      orientation: 'left-right',
-      mainAxis: 'horizontal',
-      busbarAxis: 'vertical',
-      feederDirection: 'right',
-    };
-  }
+  // KANON SN/GPZ: szyna SN jest pozioma, a pola/odejścia schodzą pionowo w dół.
+  // Dlatego nawet żądanie "left-right" nie może odwrócić osi szyny GPZ.
+  // Zachowujemy API wejściowe dla kompatybilności, ale geometria jest zawsze top-down.
+  const canonicalOrientation: GlobalOrientation = orientation === 'left-right' ? 'top-down' : orientation;
   return {
-    orientation: 'top-down',
+    orientation: canonicalOrientation,
     mainAxis: 'vertical',
     busbarAxis: 'horizontal',
     feederDirection: 'down',

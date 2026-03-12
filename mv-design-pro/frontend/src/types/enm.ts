@@ -342,6 +342,8 @@ export interface EnergyNetworkModel {
   corridors: Corridor[];
   measurements: Measurement[];
   protection_assignments: ProtectionAssignment[];
+  /** Opcjonalne widoki logiczne Snapshota (kanoniczne wejście segmentacji SLD). */
+  logical_views?: LogicalViewsV1;
 }
 
 // ---------------------------------------------------------------------------

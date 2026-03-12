@@ -40,6 +40,10 @@ import {
   type StationBlockBuildResult,
   type SegmentationEdgeSets,
 } from './stationBlockBuilder';
+import {
+  buildVisualTopologyContract,
+  type VisualTopologyContractV1,
+} from './visualTopologyContract';
 
 // =============================================================================
 // ADAPTER RESULT
@@ -55,6 +59,8 @@ export interface AdapterResultV1 {
   readonly fixActions: readonly TopologyFixAction[];
   /** Szczegoly pol/urzadzen/anchorow per stacja (RUN #3D) */
   readonly stationBlockDetails: StationBlockBuildResult;
+  /** Jawny kontrakt topologii wizualnej (KROK B). */
+  readonly visualTopology: VisualTopologyContractV1;
 }
 
 // =============================================================================
@@ -247,6 +253,24 @@ function segmentTopology(
   input: TopologyInputV1,
   nodeIdSet: ReadonlySet<string>,
 ): SegmentationResult {
+  const logicalViews = input.logicalViews ?? { trunks: [], branches: [], rings: [] };
+  const trunkFromLogical = new Set<string>(logicalViews.trunks.flatMap(t => t.segmentIds));
+  const branchFromLogical = new Set<string>(logicalViews.branches.flatMap(b => b.segmentIds));
+  const secondaryFromLogical = new Set<string>(logicalViews.rings.flatMap(r => r.segmentIds));
+
+  if (trunkFromLogical.size > 0 || branchFromLogical.size > 0 || secondaryFromLogical.size > 0) {
+    for (const b of input.branches) {
+      if (b.isNormallyOpen) {
+        secondaryFromLogical.add(b.id);
+      }
+    }
+    return {
+      trunkEdgeIds: trunkFromLogical,
+      branchEdgeIds: branchFromLogical,
+      secondaryEdgeIds: secondaryFromLogical,
+    };
+  }
+
   // Buduj adjacency list z aktywnych galezi (nie-NOP)
   const activeBranches = input.branches.filter(b => !b.isNormallyOpen && b.inService);
   const adj = new Map<string, { nodeId: string; branchId: string }[]>();
@@ -775,6 +799,8 @@ export function buildVisualGraphFromTopology(
 
   const stationBlockDetails = buildStationBlocks(input, segmentationEdgeSets);
 
+  const visualTopology = buildVisualTopologyContract(input, segmentationEdgeSets, stationBlockDetails);
+
   // Merge field/device fixActions into adapter fixActions (with stable code mapping)
   for (const fa of stationBlockDetails.fixActions) {
     fixActions.push({
@@ -791,6 +817,7 @@ export function buildVisualGraphFromTopology(
       (a, b) => a.code.localeCompare(b.code) || (a.elementRef ?? '').localeCompare(b.elementRef ?? ''),
     ),
     stationBlockDetails,
+    visualTopology,
   };
 }
 

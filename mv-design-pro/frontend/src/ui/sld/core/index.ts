@@ -62,6 +62,21 @@ export type {
 export { buildVisualGraphFromTopology } from './topologyAdapterV2';
 export type { AdapterResultV1 } from './topologyAdapterV2';
 
+// Visual Topology Contract (KROK B: model właściwy GPZ/szyna/pole/trunk/branch/stacja/ring/NOP)
+export { buildVisualTopologyContract } from './visualTopologyContract';
+export type {
+  VisualTopologyContractV1,
+  GpzVisual,
+  BusbarSnVisual,
+  FieldSnVisual,
+  TrunkSegmentVisual,
+  BranchSegmentVisual,
+  BranchJunctionVisual,
+  StationVisual,
+  RingConnectorVisual,
+  NopVisual,
+} from './visualTopologyContract';
+
 // LayoutResult contract types
 export {
   LAYOUT_RESULT_VERSION,
