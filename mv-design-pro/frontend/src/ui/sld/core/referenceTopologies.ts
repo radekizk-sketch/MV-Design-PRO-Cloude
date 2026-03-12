@@ -2,9 +2,9 @@ import type { AnySldSymbol, BranchSymbol, BusSymbol, LoadSymbol, SourceSymbol } 
 import { computeLayout, DEFAULT_LAYOUT_CONFIG } from './layoutPipeline';
 import type { CanonicalAnnotationsV1 } from './layoutResult';
 import { buildVisualGraphFromTopology } from './topologyAdapterV2';
-import { BranchKind, StationKind, type TopologyInputV1 } from './topologyInputReader';
+import { BranchKind, GeneratorKind, StationKind, type TopologyInputV1 } from './topologyInputReader';
 
-export type ReferenceScenarioId = 'leaf' | 'pass' | 'branch' | 'ring';
+export type ReferenceScenarioId = 'leaf' | 'pass' | 'branch' | 'ring' | 'multi';
 
 export interface ReferenceScenarioResult {
   readonly scenarioId: ReferenceScenarioId;
@@ -51,7 +51,97 @@ function buildBaseInput(snapshotId: string): TopologyInputV1 {
   };
 }
 
+function buildMultiInput(): TopologyInputV1 {
+  return {
+    snapshotId: 'canon_multi',
+    snapshotFingerprint: 'canon_multi_fp',
+    connectionNodes: [
+      { id: 'bus_b1_nn', name: 'B1 nN', voltageKv: 0.4, stationId: null, busIndex: null, inService: true },
+      { id: 'bus_b1_sn', name: 'B1 SN', voltageKv: 15, stationId: 'stb1', busIndex: null, inService: true },
+      { id: 'bus_b2_nn', name: 'B2 nN', voltageKv: 0.4, stationId: null, busIndex: null, inService: true },
+      { id: 'bus_b2_sn', name: 'B2 SN', voltageKv: 15, stationId: 'stb2', busIndex: null, inService: true },
+      { id: 'bus_b3_nn', name: 'B3 nN', voltageKv: 0.4, stationId: null, busIndex: null, inService: true },
+      { id: 'bus_b3_sn', name: 'B3 SN', voltageKv: 15, stationId: 'stb3', busIndex: null, inService: true },
+      { id: 'bus_b4_nn', name: 'B4 nN', voltageKv: 0.4, stationId: null, busIndex: null, inService: true },
+      { id: 'bus_b4_sn', name: 'B4 SN', voltageKv: 15, stationId: 'stb4', busIndex: null, inService: true },
+      { id: 'bus_gpz', name: 'GPZ', voltageKv: 15, stationId: null, busIndex: null, inService: true },
+      { id: 'bus_s1_nn', name: 'S1 nN', voltageKv: 0.4, stationId: null, busIndex: null, inService: true },
+      { id: 'bus_s1_sn', name: 'S1 SN', voltageKv: 15, stationId: 'st1', busIndex: null, inService: true },
+      { id: 'bus_s2_nn', name: 'S2 nN', voltageKv: 0.4, stationId: null, busIndex: null, inService: true },
+      { id: 'bus_s2_sn', name: 'S2 SN', voltageKv: 15, stationId: 'st2', busIndex: null, inService: true },
+      { id: 'bus_s3_nn', name: 'S3 nN', voltageKv: 0.4, stationId: null, busIndex: null, inService: true },
+      { id: 'bus_s3_sn', name: 'S3 SN', voltageKv: 15, stationId: 'st3', busIndex: null, inService: true },
+      { id: 'bus_s4_sn_a', name: 'S4 SN-A', voltageKv: 15, stationId: 'st4', busIndex: null, inService: true },
+      { id: 'bus_s4_sn_b', name: 'S4 SN-B', voltageKv: 15, stationId: 'st4', busIndex: null, inService: true },
+      { id: 'bus_s5_nn', name: 'S5 nN', voltageKv: 0.4, stationId: null, busIndex: null, inService: true },
+      { id: 'bus_s5_sn', name: 'S5 SN', voltageKv: 15, stationId: 'st5', busIndex: null, inService: true },
+    ],
+    branches: [
+      { id: 'buslink_s4', name: 'Sprzeglo S4', fromNodeId: 'bus_s4_sn_a', toNodeId: 'bus_s4_sn_b', kind: BranchKind.BUS_LINK, isNormallyOpen: false, inService: true, catalogRef: null, lengthKm: null, ratedPowerMva: null, voltageHvKv: null, voltageLvKv: null },
+      { id: 'line_b1_b2', name: 'B1-B2', fromNodeId: 'bus_b1_sn', toNodeId: 'bus_b2_sn', kind: BranchKind.CABLE, isNormallyOpen: false, inService: true, catalogRef: 'XRUHAKXS-120', lengthKm: 0.5, ratedPowerMva: null, voltageHvKv: null, voltageLvKv: null },
+      { id: 'line_g_s1', name: 'GPZ-S1', fromNodeId: 'bus_gpz', toNodeId: 'bus_s1_sn', kind: BranchKind.LINE, isNormallyOpen: false, inService: true, catalogRef: 'AFL-120', lengthKm: 1.5, ratedPowerMva: null, voltageHvKv: null, voltageLvKv: null },
+      { id: 'line_s1_b4', name: 'S1-B4', fromNodeId: 'bus_s1_sn', toNodeId: 'bus_b4_sn', kind: BranchKind.CABLE, isNormallyOpen: false, inService: true, catalogRef: 'XRUHAKXS-120', lengthKm: 0.8, ratedPowerMva: null, voltageHvKv: null, voltageLvKv: null },
+      { id: 'line_s1_s2', name: 'S1-S2', fromNodeId: 'bus_s1_sn', toNodeId: 'bus_s2_sn', kind: BranchKind.LINE, isNormallyOpen: false, inService: true, catalogRef: 'AFL-120', lengthKm: 1.2, ratedPowerMva: null, voltageHvKv: null, voltageLvKv: null },
+      { id: 'line_s2_b1', name: 'S2-B1', fromNodeId: 'bus_s2_sn', toNodeId: 'bus_b1_sn', kind: BranchKind.CABLE, isNormallyOpen: false, inService: true, catalogRef: 'XRUHAKXS-120', lengthKm: 0.7, ratedPowerMva: null, voltageHvKv: null, voltageLvKv: null },
+      { id: 'line_s2_s3', name: 'S2-S3', fromNodeId: 'bus_s2_sn', toNodeId: 'bus_s3_sn', kind: BranchKind.LINE, isNormallyOpen: false, inService: true, catalogRef: 'AFL-120', lengthKm: 0.9, ratedPowerMva: null, voltageHvKv: null, voltageLvKv: null },
+      { id: 'line_s3_b3', name: 'S3-B3', fromNodeId: 'bus_s3_sn', toNodeId: 'bus_b3_sn', kind: BranchKind.CABLE, isNormallyOpen: false, inService: true, catalogRef: 'XRUHAKXS-120', lengthKm: 0.6, ratedPowerMva: null, voltageHvKv: null, voltageLvKv: null },
+      { id: 'line_s3_s4', name: 'S3-S4', fromNodeId: 'bus_s3_sn', toNodeId: 'bus_s4_sn_a', kind: BranchKind.LINE, isNormallyOpen: false, inService: true, catalogRef: 'AFL-120', lengthKm: 2.0, ratedPowerMva: null, voltageHvKv: null, voltageLvKv: null },
+      { id: 'line_s4_s5', name: 'S4-S5', fromNodeId: 'bus_s4_sn_b', toNodeId: 'bus_s5_sn', kind: BranchKind.LINE, isNormallyOpen: false, inService: true, catalogRef: 'AFL-120', lengthKm: 2.5, ratedPowerMva: null, voltageHvKv: null, voltageLvKv: null },
+      { id: 'line_s5_s1_nop', name: 'S5-S1 punkt normalnie otwarty', fromNodeId: 'bus_s5_sn', toNodeId: 'bus_s1_sn', kind: BranchKind.LINE, isNormallyOpen: true, inService: true, catalogRef: 'AFL-120', lengthKm: 2.2, ratedPowerMva: null, voltageHvKv: null, voltageLvKv: null },
+      { id: 'tr_b1', name: 'TR B1', fromNodeId: 'bus_b1_sn', toNodeId: 'bus_b1_nn', kind: BranchKind.TR_LINK, isNormallyOpen: false, inService: true, catalogRef: 'TR-250', lengthKm: null, ratedPowerMva: 0.25, voltageHvKv: 15, voltageLvKv: 0.4 },
+      { id: 'tr_b2', name: 'TR B2', fromNodeId: 'bus_b2_sn', toNodeId: 'bus_b2_nn', kind: BranchKind.TR_LINK, isNormallyOpen: false, inService: true, catalogRef: 'TR-160', lengthKm: null, ratedPowerMva: 0.16, voltageHvKv: 15, voltageLvKv: 0.4 },
+      { id: 'tr_b3', name: 'TR B3', fromNodeId: 'bus_b3_sn', toNodeId: 'bus_b3_nn', kind: BranchKind.TR_LINK, isNormallyOpen: false, inService: true, catalogRef: 'TR-250', lengthKm: null, ratedPowerMva: 0.25, voltageHvKv: 15, voltageLvKv: 0.4 },
+      { id: 'tr_b4', name: 'TR B4', fromNodeId: 'bus_b4_sn', toNodeId: 'bus_b4_nn', kind: BranchKind.TR_LINK, isNormallyOpen: false, inService: true, catalogRef: 'TR-400', lengthKm: null, ratedPowerMva: 0.4, voltageHvKv: 15, voltageLvKv: 0.4 },
+      { id: 'tr_s1', name: 'TR S1', fromNodeId: 'bus_s1_sn', toNodeId: 'bus_s1_nn', kind: BranchKind.TR_LINK, isNormallyOpen: false, inService: true, catalogRef: 'TR-630', lengthKm: null, ratedPowerMva: 0.63, voltageHvKv: 15, voltageLvKv: 0.4 },
+      { id: 'tr_s2', name: 'TR S2', fromNodeId: 'bus_s2_sn', toNodeId: 'bus_s2_nn', kind: BranchKind.TR_LINK, isNormallyOpen: false, inService: true, catalogRef: 'TR-400', lengthKm: null, ratedPowerMva: 0.4, voltageHvKv: 15, voltageLvKv: 0.4 },
+      { id: 'tr_s3', name: 'TR S3', fromNodeId: 'bus_s3_sn', toNodeId: 'bus_s3_nn', kind: BranchKind.TR_LINK, isNormallyOpen: false, inService: true, catalogRef: 'TR-400', lengthKm: null, ratedPowerMva: 0.4, voltageHvKv: 15, voltageLvKv: 0.4 },
+      { id: 'tr_s5', name: 'TR S5', fromNodeId: 'bus_s5_sn', toNodeId: 'bus_s5_nn', kind: BranchKind.TR_LINK, isNormallyOpen: false, inService: true, catalogRef: 'TR-250', lengthKm: null, ratedPowerMva: 0.25, voltageHvKv: 15, voltageLvKv: 0.4 },
+    ],
+    devices: [],
+    stations: [
+      { id: 'st1', name: 'Stacja 1 (przelotowa)', stationType: StationKind.DISTRIBUTION, voltageKv: 15, busIds: ['bus_s1_sn'], branchIds: [], switchIds: [], transformerIds: ['tr_s1'] },
+      { id: 'st2', name: 'Stacja 2 (odgaleźna)', stationType: StationKind.DISTRIBUTION, voltageKv: 15, busIds: ['bus_s2_sn'], branchIds: [], switchIds: [], transformerIds: ['tr_s2'] },
+      { id: 'st3', name: 'Stacja 3 (przelotowa)', stationType: StationKind.DISTRIBUTION, voltageKv: 15, busIds: ['bus_s3_sn'], branchIds: [], switchIds: [], transformerIds: ['tr_s3'] },
+      { id: 'st4', name: 'Stacja 4 (sekcyjna)', stationType: StationKind.SWITCHING, voltageKv: 15, busIds: ['bus_s4_sn_a', 'bus_s4_sn_b'], branchIds: [], switchIds: [], transformerIds: [] },
+      { id: 'st5', name: 'Stacja 5 (końcowa)', stationType: StationKind.DISTRIBUTION, voltageKv: 15, busIds: ['bus_s5_sn'], branchIds: [], switchIds: [], transformerIds: ['tr_s5'] },
+      { id: 'stb1', name: 'Stacja B1 (przelotowa)', stationType: StationKind.DISTRIBUTION, voltageKv: 15, busIds: ['bus_b1_sn'], branchIds: [], switchIds: [], transformerIds: ['tr_b1'] },
+      { id: 'stb2', name: 'Stacja B2 (końcowa)', stationType: StationKind.DISTRIBUTION, voltageKv: 15, busIds: ['bus_b2_sn'], branchIds: [], switchIds: [], transformerIds: ['tr_b2'] },
+      { id: 'stb3', name: 'Stacja B3 (końcowa)', stationType: StationKind.DISTRIBUTION, voltageKv: 15, busIds: ['bus_b3_sn'], branchIds: [], switchIds: [], transformerIds: ['tr_b3'] },
+      { id: 'stb4', name: 'Stacja B4 (końcowa z PV)', stationType: StationKind.DISTRIBUTION, voltageKv: 15, busIds: ['bus_b4_sn'], branchIds: [], switchIds: [], transformerIds: ['tr_b4'] },
+    ],
+    generators: [
+      { id: 'gen_pv_b4', name: 'PV B4', nodeId: 'bus_b4_nn', kind: GeneratorKind.PV, catalogRef: null, inService: true, ratedPowerMw: 0.5, blockingTransformerId: null, connectionVariant: 'nn_side', stationRef: 'stb4' },
+    ],
+    sources: [{ id: 'src_gpz', name: 'Zasilanie GPZ', nodeId: 'bus_gpz', inService: true }],
+    loads: [
+      { id: 'load_b1', name: 'Odbiór B1', nodeId: 'bus_b1_nn', inService: true, pMw: 0.08, qMvar: 0.02 },
+      { id: 'load_b2', name: 'Odbiór B2', nodeId: 'bus_b2_nn', inService: true, pMw: 0.05, qMvar: 0.01 },
+      { id: 'load_b3', name: 'Odbiór B3', nodeId: 'bus_b3_nn', inService: true, pMw: 0.1, qMvar: 0.03 },
+      { id: 'load_b4', name: 'Odbiór B4', nodeId: 'bus_b4_nn', inService: true, pMw: 0.12, qMvar: 0.03 },
+      { id: 'load_s1', name: 'Odbiór S1', nodeId: 'bus_s1_nn', inService: true, pMw: 0.3, qMvar: 0.08 },
+      { id: 'load_s2', name: 'Odbiór S2', nodeId: 'bus_s2_nn', inService: true, pMw: 0.2, qMvar: 0.06 },
+      { id: 'load_s3', name: 'Odbiór S3', nodeId: 'bus_s3_nn', inService: true, pMw: 0.18, qMvar: 0.05 },
+      { id: 'load_s5', name: 'Odbiór S5', nodeId: 'bus_s5_nn', inService: true, pMw: 0.1, qMvar: 0.03 },
+    ],
+    protectionBindings: [],
+    logicalViews: {
+      trunks: [{ id: 'trunk_main', segmentIds: ['line_g_s1', 'line_s1_s2', 'line_s2_s3', 'line_s3_s4', 'line_s4_s5'] }],
+      branches: [
+        { id: 'branch_s1_b4', segmentIds: ['line_s1_b4'] },
+        { id: 'branch_s2_b1', segmentIds: ['line_s2_b1', 'line_b1_b2'] },
+        { id: 'branch_s3_b3', segmentIds: ['line_s3_b3'] },
+      ],
+      rings: [{ id: 'ring_s5_s1', segmentIds: ['line_s5_s1_nop'], normallyOpenSegmentId: 'line_s5_s1_nop' }],
+    },
+    fixActions: [],
+  };
+}
+
 function buildScenarioInput(scenarioId: ReferenceScenarioId): TopologyInputV1 {
+  if (scenarioId === 'multi') {
+    return buildMultiInput();
+  }
+
   if (scenarioId === 'leaf') {
     const input = buildBaseInput('canon_leaf');
     return {
