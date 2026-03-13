@@ -312,7 +312,20 @@
 }
 
 /* ==========================================================================
-   § 10 INFORMATION HIERARCHY
+   § 10 PARAMETER BOX — IEC-grade label backgrounds
+   ========================================================================== */
+
+/** Parameter box background (white, bordered, readable over lines) */
+.sld-param-box {
+  fill: rgba(255, 255, 255, 0.92);
+  stroke: #CBD5E1;
+  stroke-width: 0.7;
+  rx: 3;
+  ry: 3;
+}
+
+/* ==========================================================================
+   § 11 INFORMATION HIERARCHY
    ========================================================================== */
 
 .sld-info-primary {

@@ -61,11 +61,34 @@ export const BranchRenderer: React.FC<BranchRendererProps> = ({
         strokeLinecap="round"
       />
 
-      {/* Branch apparatus (CB) */}
+      {/* Branch apparatus (CB) — IEC 60617 circuit breaker */}
       <g data-sld-role="branch-apparatus">
         <JunctionDot x={apparatusX} y={midY} color={color} />
+        {/* Connection line through apparatus */}
         <line
           x1={apparatusX}
+          y1={midY}
+          x2={apparatusX + 6}
+          y2={midY}
+          stroke={color}
+          strokeWidth={BRANCH_LINE_STROKE_WIDTH}
+          strokeLinecap="round"
+        />
+        {/* CB body — filled square with X (IEC 60617) */}
+        <rect
+          x={apparatusX + 6}
+          y={midY - 10}
+          width={20}
+          height={20}
+          fill="rgba(255,255,255,0.95)"
+          stroke={color}
+          strokeWidth={BRANCH_LINE_STROKE_WIDTH}
+        />
+        <line x1={apparatusX + 6} y1={midY - 10} x2={apparatusX + 26} y2={midY + 10} stroke={color} strokeWidth={1.5} />
+        <line x1={apparatusX + 26} y1={midY - 10} x2={apparatusX + 6} y2={midY + 10} stroke={color} strokeWidth={1.5} />
+        {/* Continuation after CB */}
+        <line
+          x1={apparatusX + 26}
           y1={midY}
           x2={apparatusX + BRANCH_APPARATUS_WIDTH}
           y2={midY}
@@ -73,21 +96,12 @@ export const BranchRenderer: React.FC<BranchRendererProps> = ({
           strokeWidth={BRANCH_LINE_STROKE_WIDTH}
           strokeLinecap="round"
         />
-        {/* CB symbol — diagonal slash */}
-        <line
-          x1={apparatusX + 10}
-          y1={midY - 7}
-          x2={apparatusX + 30}
-          y2={midY + 7}
-          stroke={color}
-          strokeWidth={BRANCH_LINE_STROKE_WIDTH + 0.5}
-        />
         <JunctionDot x={apparatusX + BRANCH_APPARATUS_WIDTH} y={midY} color={color} />
 
         {/* ANSI code tag — ABB convention */}
         <rect
           x={apparatusX + BRANCH_APPARATUS_WIDTH / 2 - 8}
-          y={midY + 6}
+          y={midY + 12}
           width={16}
           height={12}
           rx={2}
@@ -98,7 +112,7 @@ export const BranchRenderer: React.FC<BranchRendererProps> = ({
         />
         <text
           x={apparatusX + BRANCH_APPARATUS_WIDTH / 2}
-          y={midY + 15}
+          y={midY + 21}
           textAnchor="middle"
           className="sld-abb-ansi-tag-text"
         >
@@ -159,17 +173,24 @@ export const BranchRenderer: React.FC<BranchRendererProps> = ({
         transform={`translate(${apparatusX + BRANCH_APPARATUS_WIDTH + 60},${midY})`}
       />
 
-      {/* Branch line label — right of apparatus, compact */}
+      {/* Branch line label — parameter box with background */}
+      <rect
+        x={apparatusX + BRANCH_APPARATUS_WIDTH + 32}
+        y={midY - 18}
+        width={150}
+        height={30}
+        className="sld-param-box"
+      />
       <text
         x={apparatusX + BRANCH_APPARATUS_WIDTH + 36}
-        y={midY - 10}
+        y={midY - 6}
         className="sld-label-segment"
       >
         {branch.branchLine.designation}
       </text>
       <text
         x={apparatusX + BRANCH_APPARATUS_WIDTH + 36}
-        y={midY + 4}
+        y={midY + 8}
         className="sld-label-params"
       >
         {branch.branchLine.cableType} • {branch.branchLine.lengthKm.toFixed(3)} km
@@ -184,15 +205,21 @@ export const BranchRenderer: React.FC<BranchRendererProps> = ({
         </text>
       )}
 
-      {/* Protection relay bubble — ABB ANSI style */}
+      {/* Protection relay — ABB ANSI rect box */}
       <g transform={`translate(${apparatusX + BRANCH_APPARATUS_WIDTH + 14}, ${midY - 24})`}>
-        <circle
-          r={9}
+        <line x1={-14} y1={24} x2={-14} y2={0} stroke={color} strokeWidth={1} strokeDasharray="3 2" />
+        <rect
+          x={-22}
+          y={-8}
+          width={22}
+          height={16}
+          rx={2}
+          ry={2}
           fill="rgba(255, 255, 255, 0.95)"
           stroke="#475569"
           strokeWidth={0.8}
         />
-        <text textAnchor="middle" y={3} className="sld-abb-relay-bubble-text">
+        <text x={-11} y={3} textAnchor="middle" className="sld-abb-ansi-tag-text">
           50/51
         </text>
       </g>

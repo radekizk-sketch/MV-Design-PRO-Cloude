@@ -20,7 +20,7 @@ import {
   STATION_INTERNAL_STROKE,
   NN_BUSBAR_WIDTH,
 } from './IndustrialAesthetics';
-import { ETAP_VOLTAGE_COLORS } from './sldEtapStyle';
+import { ETAP_VOLTAGE_COLORS, DER_FEEDER_COLORS } from './sldEtapStyle';
 
 export interface StationFieldRendererProps {
   chain: StationApparatusChainV1;
@@ -49,6 +49,14 @@ function mapSymbolType(symbolType: string): EtapSymbolId {
     ground: 'ground',
   };
   return mapping[symbolType] ?? 'disconnector';
+}
+
+function derFeederColor(feederType: string, fallback: string): string {
+  if (feederType === 'generator_pv') return DER_FEEDER_COLORS.pv;
+  if (feederType === 'generator_bess') return DER_FEEDER_COLORS.bess;
+  if (feederType === 'generator_wind') return DER_FEEDER_COLORS.wind;
+  if (feederType === 'load') return DER_FEEDER_COLORS.load;
+  return fallback;
 }
 
 function formatParams(params: Record<string, string | number>): string {
@@ -311,15 +319,16 @@ export const StationFieldRenderer: React.FC<StationFieldRendererProps> = ({
                   const feederCount = chain.nnBusbar.feeders.length;
                   const feederSpacing = NN_BUSBAR_WIDTH / (feederCount + 1);
                   const feederX = baseX - NN_BUSBAR_WIDTH / 2 + (fIdx + 1) * feederSpacing;
+                  const fColor = derFeederColor(feeder.type, colorNN);
                   return (
-                    <g key={feeder.designation} data-sld-role="nn-feeder">
+                    <g key={feeder.designation} data-sld-role="nn-feeder" data-feeder-type={feeder.type}>
                       <JunctionDot x={feederX} y={nnY} color={colorNN} />
                       <line
                         x1={feederX}
                         y1={nnY}
                         x2={feederX}
                         y2={nnY + APPARATUS_CHAIN_STEP_Y}
-                        stroke={colorNN}
+                        stroke={fColor}
                         strokeWidth={STATION_INTERNAL_STROKE}
                       />
                       {feeder.type === 'load' && (
@@ -327,29 +336,56 @@ export const StationFieldRenderer: React.FC<StationFieldRendererProps> = ({
                           <polygon
                             points={`${SYMBOL_SIZE / 4},0 0,${SYMBOL_SIZE / 2} ${SYMBOL_SIZE / 2},${SYMBOL_SIZE / 2}`}
                             fill="none"
-                            stroke={colorNN}
+                            stroke={fColor}
                             strokeWidth={STATION_INTERNAL_STROKE}
                           />
                         </g>
                       )}
-                      {(feeder.type === 'generator_pv' || feeder.type === 'generator_bess') && (
+                      {feeder.type === 'generator_pv' && (
                         <g transform={`translate(${feederX - SYMBOL_SIZE / 4}, ${nnY + APPARATUS_CHAIN_STEP_Y})`}>
-                          <circle
-                            cx={SYMBOL_SIZE / 4}
-                            cy={SYMBOL_SIZE / 4}
-                            r={SYMBOL_SIZE / 4}
+                          {/* PV panel — grid icon */}
+                          <rect
+                            x={0}
+                            y={0}
+                            width={SYMBOL_SIZE / 2}
+                            height={SYMBOL_SIZE / 2 - 4}
                             fill="none"
-                            stroke={colorNN}
+                            stroke={fColor}
                             strokeWidth={STATION_INTERNAL_STROKE}
+                          />
+                          <line x1={SYMBOL_SIZE / 4} y1={0} x2={SYMBOL_SIZE / 4} y2={SYMBOL_SIZE / 2 - 4} stroke={fColor} strokeWidth={1} />
+                          <line x1={0} y1={(SYMBOL_SIZE / 2 - 4) / 2} x2={SYMBOL_SIZE / 2} y2={(SYMBOL_SIZE / 2 - 4) / 2} stroke={fColor} strokeWidth={1} />
+                        </g>
+                      )}
+                      {feeder.type === 'generator_bess' && (
+                        <g transform={`translate(${feederX - SYMBOL_SIZE / 4}, ${nnY + APPARATUS_CHAIN_STEP_Y})`}>
+                          {/* BESS — battery icon */}
+                          <rect
+                            x={0}
+                            y={2}
+                            width={SYMBOL_SIZE / 2}
+                            height={SYMBOL_SIZE / 2 - 4}
+                            fill="none"
+                            stroke={fColor}
+                            strokeWidth={STATION_INTERNAL_STROKE}
+                          />
+                          <rect
+                            x={SYMBOL_SIZE / 8}
+                            y={0}
+                            width={SYMBOL_SIZE / 4}
+                            height={2}
+                            fill={fColor}
+                            stroke="none"
                           />
                           <text
                             x={SYMBOL_SIZE / 4}
-                            y={SYMBOL_SIZE / 4 + 3}
+                            y={SYMBOL_SIZE / 4 + 1}
                             textAnchor="middle"
-                            fontSize={10}
-                            fill={colorNN}
+                            fontSize={8}
+                            fontWeight={700}
+                            fill={fColor}
                           >
-                            {feeder.type === 'generator_pv' ? 'PV' : 'B'}
+                            B
                           </text>
                         </g>
                       )}
@@ -358,6 +394,7 @@ export const StationFieldRenderer: React.FC<StationFieldRendererProps> = ({
                         y={nnY + APPARATUS_CHAIN_STEP_Y + SYMBOL_SIZE / 2 + 12}
                         textAnchor="middle"
                         className="sld-label-params"
+                        fill={fColor}
                       >
                         {feeder.designation} {feeder.power_kW}kW
                       </text>

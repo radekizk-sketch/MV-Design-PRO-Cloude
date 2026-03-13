@@ -209,17 +209,25 @@ export const TrunkSpineRenderer: React.FC<TrunkSpineRendererProps> = ({
                 strokeLinecap="round"
               />
             )}
+            {/* Parameter box background */}
+            <rect
+              x={trunkX + 12}
+              y={midY - 14}
+              width={140}
+              height={30}
+              className="sld-param-box"
+            />
             {/* Segment label — right side, compact */}
             <text
               x={trunkX + 16}
-              y={midY - 6}
+              y={midY - 2}
               className="sld-label-segment"
             >
               {seg.designation}
             </text>
             <text
               x={trunkX + 16}
-              y={midY + 8}
+              y={midY + 12}
               className="sld-label-params"
             >
               {seg.cableType} • {seg.lengthKm.toFixed(3)} km

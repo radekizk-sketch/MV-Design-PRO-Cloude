@@ -217,6 +217,21 @@ export const GENERATION_COLORS = {
 } as const;
 
 /**
+ * DER feeder colors for nN busbar feeders.
+ * Used in StationFieldRenderer to color-code DER type on nN side.
+ */
+export const DER_FEEDER_COLORS = {
+  /** Load / Odbiornik — red-orange (consumption) */
+  load: '#EF4444', // red-500
+  /** PV (Photovoltaic) — solar gold */
+  pv: '#EAB308', // yellow-500
+  /** BESS (Battery) — emerald green */
+  bess: '#10B981', // emerald-500
+  /** Wind Farm — sky blue */
+  wind: '#0EA5E9', // sky-500
+} as const;
+
+/**
  * Power flow direction indicator styles.
  * Used to visually distinguish generation from consumption.
  */

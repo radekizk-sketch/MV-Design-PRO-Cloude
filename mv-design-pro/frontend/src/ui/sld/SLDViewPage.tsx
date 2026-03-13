@@ -21,7 +21,6 @@ import { useSelectionStore } from '../selection/store';
 import { ProtectionDiagnosticsPanel } from '../results/ProtectionDiagnosticsPanel';
 import { SldInspectorPanel } from './inspector';
 import { buildReferenceScenario, type ReferenceScenarioId } from './core/referenceTopologies';
-import { SchematIdeowySLD } from './iec-sld';
 
 
 /**
@@ -92,7 +91,6 @@ export const SLDViewPage: React.FC<SLDViewPageProps> = ({
   const [inspectorPanelVisible, setInspectorPanelVisible] = useState(true);
 
   const [referenceScenarioId, setReferenceScenarioId] = useState<ReferenceScenarioId | null>(null);
-  const [showIecSld, setShowIecSld] = useState(false);
 
   useEffect(() => {
     const updateScenario = () => setReferenceScenarioId(readReferenceScenarioFromHash());
@@ -147,9 +145,9 @@ export const SLDViewPage: React.FC<SLDViewPageProps> = ({
           <span className="text-xs font-semibold text-chrome-700">Siec referencyjna:</span>
           <button
             type="button"
-            onClick={() => { handleReferenceScenarioChange(null); setShowIecSld(false); }}
+            onClick={() => handleReferenceScenarioChange(null)}
             className={`px-2 py-1 text-xs rounded border ${
-              referenceScenarioId === null && !showIecSld
+              referenceScenarioId === null
                 ? 'border-blue-600 bg-blue-50 text-blue-700'
                 : 'border-chrome-300 text-chrome-700 hover:bg-chrome-50'
             }`}
@@ -160,9 +158,9 @@ export const SLDViewPage: React.FC<SLDViewPageProps> = ({
             <button
               key={scenarioId}
               type="button"
-              onClick={() => { handleReferenceScenarioChange(scenarioId); setShowIecSld(false); }}
+              onClick={() => handleReferenceScenarioChange(scenarioId)}
               className={`px-2 py-1 text-xs rounded border ${
-                referenceScenarioId === scenarioId && !showIecSld
+                referenceScenarioId === scenarioId
                   ? 'border-blue-600 bg-blue-50 text-blue-700'
                   : 'border-chrome-300 text-chrome-700 hover:bg-chrome-50'
               }`}
@@ -170,36 +168,17 @@ export const SLDViewPage: React.FC<SLDViewPageProps> = ({
               {REFERENCE_SCENARIO_LABELS_PL[scenarioId]}
             </button>
           ))}
-          <span className="text-xs text-chrome-400 mx-1">|</span>
-          <button
-            type="button"
-            onClick={() => setShowIecSld(true)}
-            data-testid="iec-sld-toggle"
-            className={`px-2 py-1 text-xs rounded border font-semibold ${
-              showIecSld
-                ? 'border-blue-600 bg-blue-50 text-blue-700'
-                : 'border-chrome-300 text-chrome-700 hover:bg-chrome-50'
-            }`}
-          >
-            Schemat ideowy IEC (ABB/ETAP)
-          </button>
         </div>
         <div className="flex-1 min-h-0">
-          {showIecSld ? (
-            <div className="h-full overflow-auto" data-testid="iec-sld-container">
-              <SchematIdeowySLD />
-            </div>
-          ) : (
-            <SLDView
-              symbols={symbols}
-              selectedElement={selectedElement}
-              showGrid={true}
-              fitOnMount={true}
-              minFitZoom={referenceScenario ? 1.0 : undefined}
-              fitPadding={referenceScenario ? 18 : undefined}
-              canonicalAnnotations={referenceScenario?.canonicalAnnotations ?? null}
-            />
-          )}
+          <SLDView
+            symbols={symbols}
+            selectedElement={selectedElement}
+            showGrid={true}
+            fitOnMount={true}
+            minFitZoom={referenceScenario ? 1.0 : undefined}
+            fitPadding={referenceScenario ? 18 : undefined}
+            canonicalAnnotations={referenceScenario?.canonicalAnnotations ?? null}
+          />
         </div>
       </div>
 
