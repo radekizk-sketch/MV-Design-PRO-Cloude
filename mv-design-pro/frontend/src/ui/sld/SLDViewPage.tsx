@@ -50,13 +50,16 @@ function readReferenceScenarioFromHash(): ReferenceScenarioId | null {
   return null;
 }
 
-const REFERENCE_SCENARIOS: readonly ReferenceScenarioId[] = ['leaf', 'pass', 'branch', 'ring'];
+const REFERENCE_SCENARIOS: readonly ReferenceScenarioId[] = ['leaf', 'pass', 'branch', 'ring', 'multi', 'terrain', 'sectional'];
 
 const REFERENCE_SCENARIO_LABELS_PL: Readonly<Record<ReferenceScenarioId, string>> = {
   leaf: 'GPZ → magistrala → stacja końcowa',
   pass: 'GPZ → magistrala → stacja przelotowa',
   branch: 'Magistrala → odgałęzienie → stacja odgałęźna',
   ring: 'Magistrala + pierścień + punkt normalnie otwarty',
+  multi: 'Sieć wieloodgałęźna z pierścieniem i PV',
+  terrain: 'Sieć terenowa — pełna topologia MV',
+  sectional: 'GPZ → przelotowa → sekcyjna → końcowa',
 };
 
 function setReferenceScenarioInHash(scenarioId: ReferenceScenarioId | null): void {

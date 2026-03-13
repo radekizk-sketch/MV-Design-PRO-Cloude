@@ -32,6 +32,9 @@ import type {
   TopologyBranchV1,
   TopologyStationV1,
   TopologyFixAction,
+  LogicalTrunkViewExtV1,
+  LogicalBranchViewExtV1,
+  LogicalRingViewV1,
 } from './topologyInputReader';
 import { BranchKind, GeneratorKind, StationKind } from './topologyInputReader';
 
@@ -40,10 +43,25 @@ import {
   type StationBlockBuildResult,
   type SegmentationEdgeSets,
 } from './stationBlockBuilder';
+import { EmbeddingRoleV1 } from './fieldDeviceContracts';
 import {
   buildVisualTopologyContract,
   type VisualTopologyContractV1,
 } from './visualTopologyContract';
+
+// =============================================================================
+// EXTENDED LOGICAL VIEWS
+// =============================================================================
+
+/**
+ * Extended logical views with station ordering and junction points.
+ * Built from TopologyInput logical views + segmentation result.
+ */
+export interface ExtendedLogicalViewsV1 {
+  readonly trunks: readonly LogicalTrunkViewExtV1[];
+  readonly branches: readonly LogicalBranchViewExtV1[];
+  readonly rings: readonly LogicalRingViewV1[];
+}
 
 // =============================================================================
 // ADAPTER RESULT
@@ -61,6 +79,8 @@ export interface AdapterResultV1 {
   readonly stationBlockDetails: StationBlockBuildResult;
   /** Jawny kontrakt topologii wizualnej (KROK B). */
   readonly visualTopology: VisualTopologyContractV1;
+  /** Extended logical views with station ordering and junction metadata. */
+  readonly extendedLogicalViews: ExtendedLogicalViewsV1;
 }
 
 // =============================================================================
@@ -417,6 +437,236 @@ function classifyEdgeType(
     return EdgeTypeV1.SECONDARY_CONNECTOR;
   }
   return EdgeTypeV1.BRANCH;
+}
+
+// =============================================================================
+// EXTENDED LOGICAL VIEWS BUILDER
+// =============================================================================
+
+/**
+ * Builds extended logical views with station ordering and junction metadata.
+ *
+ * For trunks: walks segments in chain order to find embedded stations,
+ * determines station role from StationBlockDetails embedding.
+ *
+ * For branches: finds the junction node where the branch connects to a trunk
+ * and builds ordered station list along the branch.
+ *
+ * DETERMINISM: stable ordering via sorted segment/node/station IDs.
+ */
+export function buildExtendedLogicalViews(
+  input: TopologyInputV1,
+  _segmentation: SegmentationResult,
+  stationBlockDetails: StationBlockBuildResult,
+): ExtendedLogicalViewsV1 {
+  const logicalViews = input.logicalViews ?? { trunks: [], branches: [], rings: [] };
+
+  // Build lookup: busId → stationId
+  const busToStation = new Map<string, string>();
+  for (const station of input.stations) {
+    for (const busId of station.busIds) {
+      busToStation.set(busId, station.id);
+    }
+  }
+
+  // Build lookup: branchId → branch
+  const branchById = new Map<string, TopologyBranchV1>();
+  for (const b of input.branches) {
+    branchById.set(b.id, b);
+  }
+
+  // Build lookup: stationId → embeddingRole
+  const embeddingByStation = new Map<string, string>();
+  for (const block of stationBlockDetails.stationBlocks) {
+    embeddingByStation.set(block.blockId, block.embeddingRole);
+  }
+
+  // All trunk segment IDs (for junction detection in branches)
+  const allTrunkSegmentIds = new Set<string>(
+    logicalViews.trunks.flatMap(t => t.segmentIds),
+  );
+
+  // Build node→trunk-segment adjacency for junction detection
+  const trunkNodeSet = new Set<string>();
+  for (const segId of allTrunkSegmentIds) {
+    const branch = branchById.get(segId);
+    if (branch) {
+      trunkNodeSet.add(branch.fromNodeId);
+      trunkNodeSet.add(branch.toNodeId);
+    }
+  }
+
+  // --- Build extended trunks ---
+  const extTrunks: LogicalTrunkViewExtV1[] = logicalViews.trunks.map(trunk => {
+    const orderedNodes = buildOrderedNodeChain(trunk.segmentIds, branchById);
+    const seenStations = new Set<string>();
+    const orderedStations: {
+      stationId: string;
+      role: 'przelotowa' | 'odgalezna' | 'sekcyjna' | 'koncowa';
+      attachedBranchIds: readonly string[];
+    }[] = [];
+
+    for (const nodeId of orderedNodes) {
+      const stationId = busToStation.get(nodeId);
+      if (stationId && !seenStations.has(stationId)) {
+        seenStations.add(stationId);
+        const embedding = embeddingByStation.get(stationId);
+        const role = embeddingToRole(embedding);
+
+        // Find branch IDs attached to this station (from logicalViews.branches)
+        const attachedBranchIds: string[] = [];
+        for (const br of logicalViews.branches) {
+          const branchSegments = br.segmentIds;
+          if (branchSegments.length === 0) continue;
+          // A branch attaches to a station if any of its segments touch a bus in the station
+          for (const segId of branchSegments) {
+            const seg = branchById.get(segId);
+            if (!seg) continue;
+            const fromStation = busToStation.get(seg.fromNodeId);
+            const toStation = busToStation.get(seg.toNodeId);
+            if (fromStation === stationId || toStation === stationId) {
+              attachedBranchIds.push(br.id);
+              break;
+            }
+          }
+        }
+
+        orderedStations.push({
+          stationId,
+          role,
+          attachedBranchIds: attachedBranchIds.sort(),
+        });
+      }
+    }
+
+    return {
+      id: trunk.id,
+      segmentIds: trunk.segmentIds,
+      orderedStations,
+    };
+  });
+
+  // --- Build extended branches ---
+  const extBranches: LogicalBranchViewExtV1[] = logicalViews.branches.map(branch => {
+    // Find junction node: a node in the branch segments that also belongs to the trunk
+    let junctionNodeId: string | null = null;
+    const orderedNodes = buildOrderedNodeChain(branch.segmentIds, branchById);
+
+    for (const nodeId of orderedNodes) {
+      if (trunkNodeSet.has(nodeId)) {
+        junctionNodeId = nodeId;
+        break;
+      }
+    }
+
+    // Build ordered station IDs along the branch
+    const seenStations = new Set<string>();
+    const orderedStationIds: string[] = [];
+    for (const nodeId of orderedNodes) {
+      const stationId = busToStation.get(nodeId);
+      if (stationId && !seenStations.has(stationId)) {
+        seenStations.add(stationId);
+        orderedStationIds.push(stationId);
+      }
+    }
+
+    return {
+      id: branch.id,
+      segmentIds: branch.segmentIds,
+      junctionNodeId,
+      orderedStationIds,
+    };
+  });
+
+  return {
+    trunks: extTrunks,
+    branches: extBranches,
+    rings: [...logicalViews.rings],
+  };
+}
+
+/**
+ * Builds an ordered chain of node IDs by walking segments in topological order.
+ *
+ * Given a set of segment IDs, builds an adjacency graph and walks from one end
+ * to the other, producing a deterministic ordered list of nodes.
+ */
+function buildOrderedNodeChain(
+  segmentIds: readonly string[],
+  branchById: ReadonlyMap<string, TopologyBranchV1>,
+): string[] {
+  if (segmentIds.length === 0) return [];
+
+  // Build adjacency: nodeId → [{nodeId, segmentId}]
+  const adj = new Map<string, { nodeId: string; segmentId: string }[]>();
+  const nodeSet = new Set<string>();
+
+  for (const segId of segmentIds) {
+    const branch = branchById.get(segId);
+    if (!branch) continue;
+
+    const from = branch.fromNodeId;
+    const to = branch.toNodeId;
+    if (from === to) continue;
+
+    nodeSet.add(from);
+    nodeSet.add(to);
+
+    if (!adj.has(from)) adj.set(from, []);
+    if (!adj.has(to)) adj.set(to, []);
+    adj.get(from)!.push({ nodeId: to, segmentId: segId });
+    adj.get(to)!.push({ nodeId: from, segmentId: segId });
+  }
+
+  if (nodeSet.size === 0) return [];
+
+  // Sort adjacency for determinism
+  for (const [, neighbors] of adj) {
+    neighbors.sort((a, b) => a.segmentId.localeCompare(b.segmentId));
+  }
+
+  // Find chain start: node with degree 1 (endpoint), tie-break by ID sort
+  const sortedNodes = [...nodeSet].sort();
+  let startNode = sortedNodes[0];
+  for (const nodeId of sortedNodes) {
+    if ((adj.get(nodeId)?.length ?? 0) === 1) {
+      startNode = nodeId;
+      break;
+    }
+  }
+
+  // Walk the chain from startNode
+  const visited = new Set<string>();
+  const chain: string[] = [];
+  let current: string | null = startNode;
+
+  while (current && !visited.has(current)) {
+    visited.add(current);
+    chain.push(current);
+    const neighbors: { nodeId: string; segmentId: string }[] = adj.get(current) ?? [];
+    let next: string | null = null;
+    for (const { nodeId } of neighbors) {
+      if (!visited.has(nodeId)) {
+        next = nodeId;
+        break;
+      }
+    }
+    current = next;
+  }
+
+  return chain;
+}
+
+/**
+ * Maps EmbeddingRoleV1 to Polish station role label.
+ */
+function embeddingToRole(
+  embedding: string | undefined,
+): 'przelotowa' | 'odgalezna' | 'sekcyjna' | 'koncowa' {
+  if (embedding === EmbeddingRoleV1.TRUNK_INLINE) return 'przelotowa';
+  if (embedding === EmbeddingRoleV1.TRUNK_BRANCH) return 'odgalezna';
+  if (embedding === EmbeddingRoleV1.LOCAL_SECTIONAL) return 'sekcyjna';
+  return 'koncowa';
 }
 
 // =============================================================================
@@ -801,6 +1051,9 @@ export function buildVisualGraphFromTopology(
 
   const visualTopology = buildVisualTopologyContract(input, segmentationEdgeSets, stationBlockDetails);
 
+  // --- 14. Build extended logical views (station ordering + junction metadata) ---
+  const extendedLogicalViews = buildExtendedLogicalViews(input, segmentation, stationBlockDetails);
+
   // Merge field/device fixActions into adapter fixActions (with stable code mapping)
   for (const fa of stationBlockDetails.fixActions) {
     fixActions.push({
@@ -818,6 +1071,7 @@ export function buildVisualGraphFromTopology(
     ),
     stationBlockDetails,
     visualTopology,
+    extendedLogicalViews,
   };
 }
 
