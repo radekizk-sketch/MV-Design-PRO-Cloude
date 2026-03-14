@@ -56,6 +56,9 @@ export type {
   TopologyProtectionFunctionV1,
   TopologyFixAction,
   SymbolBridgeMetadata,
+  LogicalTrunkStationV1,
+  LogicalTrunkViewExtV1,
+  LogicalBranchViewExtV1,
 } from './topologyInputReader';
 
 // TopologyAdapterV2 (domain-driven builder)
@@ -75,6 +78,14 @@ export type {
   StationVisual,
   RingConnectorVisual,
   NopVisual,
+  RozdzielniaSnVisual,
+  PoleZasilajaceVisual,
+  PoleMagistraloweVisual,
+  PoleTransformatoweVisual,
+  PoleSekcyjneVisual,
+  PolePomiaroweVisual,
+  SecondarySegmentVisual,
+  WezelLiniowyVisual,
 } from './visualTopologyContract';
 
 // LayoutResult contract types

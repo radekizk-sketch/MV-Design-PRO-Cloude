@@ -48,39 +48,39 @@ export interface EtapSymbolProps {
 
 /**
  * Busbar / Szyna zbiorcza
- * Horizontal thick bar representing electrical busbar.
- * PR-SLD-UX-MAX: Enhanced with prominent visual weight and subtle fill.
+ * ALWAYS HORIZONTAL thick bar — ABB standard.
+ * ABB busbar: bold stroke, round caps, dominant visual weight.
  */
 const BusbarSymbol: React.FC<Omit<EtapSymbolProps, 'symbolId'>> = ({
   stroke = 'currentColor',
-  fill = 'none',
   strokeWidth = 3,
   opacity = 1,
 }) => (
   <>
-    {/* Main busbar body — thick, prominent */}
-    <rect
-      x="2"
-      y="44"
-      width="96"
-      height="12"
-      fill={fill === 'none' ? 'rgba(255,255,255,0.9)' : fill}
-      stroke={stroke}
-      strokeWidth={strokeWidth}
-      opacity={opacity}
-      rx={1}
-      ry={1}
+    {/* Shadow for depth — ABB convention */}
+    <line
+      x1="4"
+      y1="52"
+      x2="96"
+      y2="52"
+      stroke="rgba(0,0,0,0.08)"
+      strokeWidth={strokeWidth + 4}
+      strokeLinecap="round"
     />
-    {/* Center line for visual emphasis */}
+    {/* Main busbar — HORIZONTAL, bold, ABB-grade */}
     <line
       x1="2"
       y1="50"
       x2="98"
       y2="50"
       stroke={stroke}
-      strokeWidth={strokeWidth * 0.4}
-      opacity={opacity * 0.5}
+      strokeWidth={strokeWidth + 2}
+      strokeLinecap="round"
+      opacity={opacity}
     />
+    {/* End caps — ABB filled dots */}
+    <circle cx="4" cy="50" r={2.5} fill={stroke} stroke="none" opacity={opacity} />
+    <circle cx="96" cy="50" r={2.5} fill={stroke} stroke="none" opacity={opacity} />
   </>
 );
 

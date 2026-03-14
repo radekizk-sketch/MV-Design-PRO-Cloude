@@ -217,6 +217,21 @@ export const GENERATION_COLORS = {
 } as const;
 
 /**
+ * DER feeder colors for nN busbar feeders.
+ * Used in StationFieldRenderer to color-code DER type on nN side.
+ */
+export const DER_FEEDER_COLORS = {
+  /** Load / Odbiornik — red-orange (consumption) */
+  load: '#EF4444', // red-500
+  /** PV (Photovoltaic) — solar gold */
+  pv: '#EAB308', // yellow-500
+  /** BESS (Battery) — emerald green */
+  bess: '#10B981', // emerald-500
+  /** Wind Farm — sky blue */
+  wind: '#0EA5E9', // sky-500
+} as const;
+
+/**
  * Power flow direction indicator styles.
  * Used to visually distinguish generation from consumption.
  */
@@ -543,17 +558,17 @@ export const ETAP_SYMBOL_SIZES = {
  * Professional, calm, engineered appearance.
  */
 export const ETAP_CANVAS = {
-  /** Primary background color — warm off-white like technical paper */
-  backgroundColor: '#FAFAF8', // warm gray-50
-  /** Subtle paper texture gradient (top to bottom) */
-  gradientStart: '#FAFAFA', // neutral gray-50
-  gradientEnd: '#F5F5F4', // stone-100
+  /** Primary background — clean white (ABB standard drawing paper) */
+  backgroundColor: '#FFFFFF',
+  /** Subtle gradient (top to bottom) — barely perceptible warmth */
+  gradientStart: '#FEFEFE',
+  gradientEnd: '#FAFAFA',
   /** Border around canvas area */
-  borderColor: '#E7E5E4', // stone-300
+  borderColor: '#E5E7EB', // gray-200
   /** Shadow for depth */
-  shadowColor: 'rgba(0, 0, 0, 0.04)',
+  shadowColor: 'rgba(0, 0, 0, 0.03)',
   /** Canvas inner glow for depth */
-  innerGlowColor: 'rgba(255, 255, 255, 0.6)',
+  innerGlowColor: 'rgba(255, 255, 255, 0.8)',
 } as const;
 
 // =============================================================================
@@ -569,22 +584,22 @@ export const ETAP_GRID = {
   size: 20,
   /** Major grid every N cells */
   majorEvery: 5,
-  /** Minor grid color — very subtle, warm tone */
-  minorColor: '#EBEBEA', // warm gray-200
-  /** Major grid color — slightly visible, cool accent */
-  majorColor: '#DDDCDA', // warm gray-300
-  /** Axis/origin color — distinctive but not dominant */
-  axisColor: '#C4C3C1', // warm gray-400
+  /** Minor grid color — ABB very subtle, clean gray */
+  minorColor: '#F1F5F9', // slate-100 (nearly invisible)
+  /** Major grid color — ABB subtle blue-gray */
+  majorColor: '#E2E8F0', // slate-200
+  /** Axis/origin color — ABB soft reference axis */
+  axisColor: '#CBD5E1', // slate-300
   /** Minor stroke width */
-  minorStrokeWidth: 0.5,
+  minorStrokeWidth: 0.4,
   /** Major stroke width */
-  majorStrokeWidth: 0.75,
+  majorStrokeWidth: 0.6,
   /** Axis stroke width */
-  axisStrokeWidth: 1,
+  axisStrokeWidth: 0.8,
   /** Default visibility */
   defaultVisible: true,
-  /** Grid opacity (allows canvas background to show through) */
-  opacity: 0.8,
+  /** Grid opacity — ABB: very subtle, diagram dominates */
+  opacity: 0.6,
 } as const;
 
 // =============================================================================
