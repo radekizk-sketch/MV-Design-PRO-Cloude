@@ -28,6 +28,7 @@ import { useSldModeStore } from '../../sldModeStore';
 import type {
   UseSldCompareSelectionResult,
   CompareSelection,
+  CompareConnectionSelection,
   ComparePropertySection,
   CompareElement,
   CompareSelectionType,
@@ -46,6 +47,7 @@ import type {
   SwitchSymbol,
   SourceSymbol,
   LoadSymbol,
+  Connection,
 } from '../../../sld-editor/types';
 import {
   compareAllSections,
@@ -345,6 +347,48 @@ export function useSldCompareSelection(): UseSldCompareSelectionResult {
     return compareAllSections(sectionsA, sectionsB);
   }, [compareSelection]);
 
+  // Oblicz porównanie połączeń (2 gałęzie — porównanie tras/kierunków)
+  const compareConnectionSelection = useMemo<CompareConnectionSelection | null>(() => {
+    if (!compareSelection) return null;
+    // Connection comparison applies only when both elements are branches/switches
+    const { elementA, elementB } = compareSelection;
+    const isBranchA = elementA.elementType === 'LineBranch' || elementA.elementType === 'TransformerBranch';
+    const isBranchB = elementB.elementType === 'LineBranch' || elementB.elementType === 'TransformerBranch';
+
+    if (!isBranchA || !isBranchB) return null;
+
+    const branchA = elementA.symbol as BranchSymbol;
+    const branchB = elementB.symbol as BranchSymbol;
+
+    const connA: Connection = {
+      id: `conn_${branchA.elementId}`,
+      fromSymbolId: branchA.fromNodeId,
+      fromPortName: 'bottom',
+      toSymbolId: branchA.toNodeId,
+      toPortName: 'top',
+      path: branchA.points ?? [],
+    };
+
+    const connB: Connection = {
+      id: `conn_${branchB.elementId}`,
+      fromSymbolId: branchB.fromNodeId,
+      fromPortName: 'bottom',
+      toSymbolId: branchB.toNodeId,
+      toPortName: 'top',
+      path: branchB.points ?? [],
+    };
+
+    const fromSymbolA = Array.from(symbols.values()).find(s => s.elementId === branchA.fromNodeId) ?? null;
+    const toSymbolA = Array.from(symbols.values()).find(s => s.elementId === branchA.toNodeId) ?? null;
+    const fromSymbolB = Array.from(symbols.values()).find(s => s.elementId === branchB.fromNodeId) ?? null;
+    const toSymbolB = Array.from(symbols.values()).find(s => s.elementId === branchB.toNodeId) ?? null;
+
+    return {
+      connectionA: { connectionId: connA.id, connection: connA, fromSymbol: fromSymbolA, toSymbol: toSymbolA },
+      connectionB: { connectionId: connB.id, connection: connB, fromSymbol: fromSymbolB, toSymbol: toSymbolB },
+    };
+  }, [compareSelection, symbols]);
+
   // Oblicz liczbę różnic
   const totalDifferences = useMemo(() => {
     return countTotalDifferences(compareSections);
@@ -359,7 +403,7 @@ export function useSldCompareSelection(): UseSldCompareSelectionResult {
     selectionType,
     isCompareMode,
     compareSelection,
-    compareConnectionSelection: null, // TODO: Obsługa porównania połączeń w przyszłości
+    compareConnectionSelection,
     compareSections,
     mode,
     isResultsMode,

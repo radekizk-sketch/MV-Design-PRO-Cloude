@@ -69,8 +69,8 @@ export function buildSldSemanticModel(
   // Build trunk segments
   const trunks = buildTrunks(input, extendedLogicalViews, branchById, blockByStation);
 
-  // Build branch paths
-  const branchPaths = buildBranchPaths(input, extendedLogicalViews, branchById);
+  // Build branch paths (pass trunks for parentTrunkId resolution)
+  const branchPaths = buildBranchPaths(input, extendedLogicalViews, branchById, trunks);
 
   // Classify stations
   const inlineStations: SldInlineStationV1[] = [];
@@ -277,7 +277,20 @@ function buildBranchPaths(
   _input: TopologyInputV1,
   logicalViews: ExtendedLogicalViewsV1,
   branchById: ReadonlyMap<string, TopologyBranchV1>,
+  trunks: readonly SldTrunkV1[],
 ): SldBranchPathV1[] {
+  // Build junction→trunk lookup: for each trunk, collect all node IDs from segments
+  const junctionToTrunk = new Map<string, string>();
+  for (const trunk of trunks) {
+    for (const seg of trunk.orderedSegments) {
+      if (seg.fromNodeId) junctionToTrunk.set(seg.fromNodeId, trunk.id);
+      if (seg.toNodeId) junctionToTrunk.set(seg.toNodeId, trunk.id);
+    }
+    for (const ref of trunk.orderedStationRefs) {
+      junctionToTrunk.set(ref.stationId, trunk.id);
+    }
+  }
+
   return logicalViews.branches.map(branch => {
     const orderedSegments: SldSegmentV1[] = branch.segmentIds.map(segId => {
       const b = branchById.get(segId);
@@ -293,10 +306,14 @@ function buildBranchPaths(
       };
     });
 
+    // Derive parentTrunkId from junction node → trunk mapping
+    const junctionId = branch.junctionNodeId ?? null;
+    const parentTrunkId = junctionId ? (junctionToTrunk.get(junctionId) ?? null) : null;
+
     return {
       id: branch.id,
-      junctionNodeId: branch.junctionNodeId ?? null,
-      parentTrunkId: null, // TODO: derive from junction → trunk mapping
+      junctionNodeId: junctionId,
+      parentTrunkId,
       orderedSegments,
       orderedStationIds: branch.orderedStationIds ?? [],
     };
