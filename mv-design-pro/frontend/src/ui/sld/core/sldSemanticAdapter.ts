@@ -9,7 +9,6 @@
  */
 
 import type { AdapterResultV1, ExtendedLogicalViewsV1 } from './topologyAdapterV2';
-import type { StationBlockBuildResult } from './stationBlockBuilder';
 import type { TopologyInputV1, TopologyBranchV1 } from './topologyInputReader';
 import { BranchKind } from './topologyInputReader';
 import { EmbeddingRoleV1, type FieldV1, type DeviceV1, FieldRoleV1 } from './fieldDeviceContracts';
@@ -221,10 +220,10 @@ export function buildSldSemanticModel(
 // =============================================================================
 
 function buildTrunks(
-  input: TopologyInputV1,
+  _input: TopologyInputV1,
   logicalViews: ExtendedLogicalViewsV1,
   branchById: ReadonlyMap<string, TopologyBranchV1>,
-  blockByStation: ReadonlyMap<string, { blockId: string; embeddingRole: EmbeddingRoleV1 }>,
+  _blockByStation: ReadonlyMap<string, { blockId: string; embeddingRole: EmbeddingRoleV1 }>,
 ): SldTrunkV1[] {
   return logicalViews.trunks.map(trunk => {
     const orderedSegments: SldSegmentV1[] = trunk.segmentIds.map(segId => {
@@ -275,7 +274,7 @@ function buildTrunks(
 }
 
 function buildBranchPaths(
-  input: TopologyInputV1,
+  _input: TopologyInputV1,
   logicalViews: ExtendedLogicalViewsV1,
   branchById: ReadonlyMap<string, TopologyBranchV1>,
 ): SldBranchPathV1[] {
@@ -368,7 +367,6 @@ function mapFieldRoleToBayRole(fieldRole: FieldRoleV1): BayRoleSldType {
     case FieldRoleV1.COUPLER_SN: return BayRoleSld.COUPLER;
     case FieldRoleV1.PV_SN: return BayRoleSld.PV;
     case FieldRoleV1.BESS_SN: return BayRoleSld.BESS;
-    case FieldRoleV1.MEASUREMENT: return BayRoleSld.MEASUREMENT;
     default: return BayRoleSld.LINE_IN;
   }
 }
