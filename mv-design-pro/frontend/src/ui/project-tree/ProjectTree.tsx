@@ -33,6 +33,8 @@ import { useSelectionStore } from '../selection/store';
 import { useTreeSelection } from '../selection/hooks';
 import { TreeEtapSymbolIcon } from './TreeEtapSymbolIcon';
 import { getTreeSymbol, getResultStatusTooltip } from './treeSymbolMap';
+import { useCatalogTreeNodes, extractMissingCounts } from './useCatalogTreeNodes';
+import type { CatalogMissingCounts } from './useCatalogTreeNodes';
 
 // ============================================================================
 // Tree Node Labels (Polish)
@@ -127,6 +129,12 @@ interface ProjectTreeProps {
     transformerTypes: number;
     switchEquipmentTypes: number;
   };
+  /** Readiness blockers z snapshotStore — do wyliczenia statusów katalogowych */
+  readinessBlockers?: Array<{
+    code: string;
+    element_ref: string | null;
+    message_pl: string;
+  }>;
   // P10: Study cases list
   studyCases?: StudyCaseItem[];
   // P11c: Run history list (for Results Browser)
@@ -134,6 +142,8 @@ interface ProjectTreeProps {
   resultsCount?: number;
   onNodeClick?: (node: TreeNode) => void;
   onCategoryClick?: (nodeType: TreeNodeType, elementType?: ElementType) => void;
+  /** Callback: otwórz przeglądarkę katalogową na danej zakładce */
+  onCatalogBrowse?: (treeNodeType: TreeNodeType) => void;
   // P10: Study case callbacks
   onStudyCaseClick?: (caseId: string) => void;
   onStudyCaseActivate?: (caseId: string) => void;
@@ -149,11 +159,13 @@ export function ProjectTree({
   projectName = 'Nowy projekt',
   elements,
   typeCounts = { lineTypes: 0, cableTypes: 0, transformerTypes: 0, switchEquipmentTypes: 0 },
+  readinessBlockers = [],
   studyCases = [],
   runHistory = [],
   resultsCount: _resultsCount = 0,
   onNodeClick,
   onCategoryClick,
+  onCatalogBrowse,
   onStudyCaseClick,
   onStudyCaseActivate,
   onRunClick,
@@ -161,6 +173,21 @@ export function ProjectTree({
   const { treeExpandedNodes, expandTreeNode, collapseTreeNode } = useSelectionStore();
   const { selectedElement, handleTreeClick } = useTreeSelection();
   const mode = useSelectionStore((state) => state.mode);
+
+  // Wylicz statusy katalogowe z readiness blockers (zero zgadywania)
+  const catalogMissing: CatalogMissingCounts = useMemo(
+    () =>
+      extractMissingCounts(readinessBlockers, {
+        lines: elements.lines.map((e) => ({ ref_id: e.id, type: 'line_overhead' })),
+        cables: elements.cables.map((e) => ({ ref_id: e.id, type: 'cable' })),
+        transformers: elements.transformers.map((e) => ({ ref_id: e.id })),
+        switches: elements.switches.map((e) => ({ ref_id: e.id })),
+      }),
+    [readinessBlockers, elements]
+  );
+
+  // Buduj podwęzły TYPE_CATALOG z rejestru (deterministyczne)
+  const catalogTreeNodes = useCatalogTreeNodes(typeCounts, catalogMissing);
 
   // Build tree structure
   const tree = useMemo((): TreeNode => {
@@ -322,32 +349,7 @@ export function ProjectTree({
           id: 'type-catalog',
           label: TREE_NODE_LABELS.TYPE_CATALOG,
           nodeType: 'TYPE_CATALOG',
-          children: [
-            {
-              id: 'line-types',
-              label: TREE_NODE_LABELS.LINE_TYPES,
-              nodeType: 'LINE_TYPES',
-              count: typeCounts.lineTypes,
-            },
-            {
-              id: 'cable-types',
-              label: TREE_NODE_LABELS.CABLE_TYPES,
-              nodeType: 'CABLE_TYPES',
-              count: typeCounts.cableTypes,
-            },
-            {
-              id: 'transformer-types',
-              label: TREE_NODE_LABELS.TRANSFORMER_TYPES,
-              nodeType: 'TRANSFORMER_TYPES',
-              count: typeCounts.transformerTypes,
-            },
-            {
-              id: 'switch-equipment-types',
-              label: TREE_NODE_LABELS.SWITCH_EQUIPMENT_TYPES,
-              nodeType: 'SWITCH_EQUIPMENT_TYPES',
-              count: typeCounts.switchEquipmentTypes,
-            },
-          ],
+          children: catalogTreeNodes,
         },
         {
           id: 'cases',
@@ -403,7 +405,7 @@ export function ProjectTree({
         },
       ],
     };
-  }, [projectName, elements, typeCounts, studyCases, runHistory]);
+  }, [projectName, elements, catalogTreeNodes, studyCases, runHistory]);
 
   // Handle node toggle
   const handleToggle = useCallback(
@@ -440,6 +442,14 @@ export function ProjectTree({
           // P11c: Other runs - use existing handler
           onRunClick?.(node.runId);
         }
+      } else if (
+        node.nodeType === 'LINE_TYPES' ||
+        node.nodeType === 'CABLE_TYPES' ||
+        node.nodeType === 'TRANSFORMER_TYPES' ||
+        node.nodeType === 'SWITCH_EQUIPMENT_TYPES'
+      ) {
+        // Catalog type node click — otwórz przeglądarkę katalogową
+        onCatalogBrowse?.(node.nodeType);
       } else if (TREE_NODE_TO_ELEMENT_TYPE[node.nodeType]) {
         // Category click - open Data Manager
         onCategoryClick?.(node.nodeType, TREE_NODE_TO_ELEMENT_TYPE[node.nodeType]);
@@ -449,7 +459,7 @@ export function ProjectTree({
         onCategoryClick?.(node.nodeType);
       }
     },
-    [handleTreeClick, onNodeClick, onCategoryClick, onStudyCaseClick, onRunClick]
+    [handleTreeClick, onNodeClick, onCategoryClick, onCatalogBrowse, onStudyCaseClick, onRunClick]
   );
 
   // P10: Handle study case double-click (activate)
