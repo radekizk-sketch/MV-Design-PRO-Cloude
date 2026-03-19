@@ -543,11 +543,13 @@ function phase2_build_trunk_topology(
   }
 
   // BFS from each feeder start → build trunk chains
-  // Follow ALL edge types (TRUNK, BRANCH, TRANSFORMER_LINK, etc.)
-  // because adapter may classify multi-feeder paths as BRANCH
-  const isTraversableEdge = (edgeType: string): boolean => {
+  // Follow ONLY trunk-forming edges (TRUNK, BUS_COUPLER, TRANSFORMER_LINK).
+  // BRANCH edges are NOT followed in phase2 — they will be placed with
+  // horizontal offset in phase3 to produce the ETAP/ABB layout style:
+  // trunk vertical, branches horizontal to the side.
+  const isTrunkFormingEdge = (edgeType: string): boolean => {
     return edgeType === EdgeTypeV1.TRUNK ||
-           edgeType === EdgeTypeV1.BRANCH ||
+           edgeType === EdgeTypeV1.BUS_COUPLER ||
            edgeType === EdgeTypeV1.TRANSFORMER_LINK;
   };
 
@@ -569,14 +571,145 @@ function phase2_build_trunk_topology(
         depthInTrunk: depth,
       });
 
-      // Continue BFS along traversable edges
+      // Continue BFS along trunk-forming edges only
       const nextNeighbors = (adj.get(nodeId) ?? [])
-        .filter(n => isTraversableEdge(n.edge.edgeType) && !visited.has(n.nodeId))
+        .filter(n => isTrunkFormingEdge(n.edge.edgeType) && !visited.has(n.nodeId))
         .sort((a, b) => a.nodeId.localeCompare(b.nodeId));
 
       for (const nn of nextNeighbors) {
         queue.push({ nodeId: nn.nodeId, depth: depth + 1 });
       }
+    }
+  }
+
+  // Phase 2b: Place branch bus nodes with horizontal offset from trunk.
+  // Branch buses (connected via BRANCH edges to trunk nodes) get their own
+  // sub-trunk axis offset to the side, producing L-shape branch layout.
+  const branchEdges = graph.edges
+    .filter(e => e.edgeType === EdgeTypeV1.BRANCH)
+    .sort((a, b) => a.id.localeCompare(b.id));
+
+  // Track branch lane index per trunk node for deterministic side assignment
+  const branchLanePerParent = new Map<string, number>();
+
+  for (const branchEdge of branchEdges) {
+    const fromId = branchEdge.fromPortRef.nodeId;
+    const toId = branchEdge.toPortRef.nodeId;
+
+    // Determine which end is on the trunk and which is the branch target
+    const fromOnTrunk = state.trunkAssignments.has(fromId);
+    const toOnTrunk = state.trunkAssignments.has(toId);
+
+    // Only process edges where one end is on trunk, other is not yet placed
+    if (fromOnTrunk && !toOnTrunk && !visited.has(toId)) {
+      const parentAssignment = state.trunkAssignments.get(fromId)!;
+      const branchNode = graph.nodes.find(n => n.id === toId);
+      if (!branchNode) continue;
+
+      // Skip loads — they're placed in phase3
+      if (branchNode.nodeType === NodeTypeV1.LOAD) continue;
+
+      // Determine branch lane (offset from parent trunk axis)
+      const laneKey = fromId;
+      const lane = (branchLanePerParent.get(laneKey) ?? 0) + 1;
+      branchLanePerParent.set(laneKey, lane);
+
+      const side = deterministicBranchSide(toId);
+      const branchX = snap(parentAssignment.trunkX + side * BRANCH_OFFSET_X * lane);
+      const branchDepth = parentAssignment.depthInTrunk;
+
+      visited.add(toId);
+      state.trunkAssignments.set(toId, {
+        trunkIndex: parentAssignment.trunkIndex,
+        trunkX: branchX,
+        depthInTrunk: branchDepth,
+      });
+
+      // BFS from branch node to find continuation (B1→B2, B4→B5→B6)
+      // BRANCH continuation: same branchX (B1→B2 stays on same axis)
+      // Sub-branch: new offset (B4→B6 when B4 already has B4→B5)
+      const branchQueue: Array<{ nodeId: string; depth: number; axisX: number }> = [
+        { nodeId: toId, depth: branchDepth, axisX: branchX },
+      ];
+
+      let isFirst = true;
+      while (branchQueue.length > 0) {
+        const { nodeId: bNodeId, depth: bDepth, axisX: currentAxisX } = branchQueue.shift()!;
+        if (!isFirst && visited.has(bNodeId)) continue;
+        isFirst = false;
+
+        if (!state.trunkAssignments.has(bNodeId)) {
+          visited.add(bNodeId);
+          state.trunkAssignments.set(bNodeId, {
+            trunkIndex: parentAssignment.trunkIndex,
+            trunkX: currentAxisX,
+            depthInTrunk: bDepth + 1,
+          });
+        }
+
+        // Find BRANCH and TRANSFORMER_LINK neighbors
+        const bNeighbors = (adj.get(bNodeId) ?? [])
+          .filter(n => (n.edge.edgeType === EdgeTypeV1.BRANCH ||
+                        n.edge.edgeType === EdgeTypeV1.TRANSFORMER_LINK) &&
+                       !visited.has(n.nodeId))
+          .sort((a, b) => a.nodeId.localeCompare(b.nodeId));
+
+        // Count SN bus neighbors via BRANCH edges (to detect multi-branch nodes)
+        const branchBusNeighbors = bNeighbors.filter(n => {
+          const node = graph.nodes.find(nd => nd.id === n.nodeId);
+          return node && isBusType(node.nodeType) && n.edge.edgeType === EdgeTypeV1.BRANCH;
+        });
+
+        // If this node has exactly 1 BRANCH-bus neighbor → continuation (same axis)
+        // If this node has 2+ BRANCH-bus neighbors → first continues, rest are sub-branches
+        let continuationUsed = false;
+
+        for (const bn of bNeighbors) {
+          const bnNode = graph.nodes.find(n => n.id === bn.nodeId);
+          if (!bnNode) continue;
+
+          if (bnNode && isBusType(bnNode.nodeType) && bn.edge.edgeType === EdgeTypeV1.BRANCH) {
+            if (!continuationUsed || branchBusNeighbors.length <= 1) {
+              // Continuation: same axis X, deeper Y
+              continuationUsed = true;
+              branchQueue.push({ nodeId: bn.nodeId, depth: bDepth + 1, axisX: currentAxisX });
+            } else {
+              // Sub-branch: offset from current branch axis
+              const subSide = deterministicBranchSide(bn.nodeId);
+              const subBranchX = snap(currentAxisX + subSide * BRANCH_OFFSET_X);
+              visited.add(bn.nodeId);
+              state.trunkAssignments.set(bn.nodeId, {
+                trunkIndex: parentAssignment.trunkIndex,
+                trunkX: subBranchX,
+                depthInTrunk: bDepth + 1,
+              });
+              branchQueue.push({ nodeId: bn.nodeId, depth: bDepth + 1, axisX: subBranchX });
+            }
+          } else {
+            // TRANSFORMER_LINK or non-bus: follow on same axis
+            branchQueue.push({ nodeId: bn.nodeId, depth: bDepth + 1, axisX: currentAxisX });
+          }
+        }
+      }
+    } else if (toOnTrunk && !fromOnTrunk && !visited.has(fromId)) {
+      // Reverse direction — same logic
+      const parentAssignment = state.trunkAssignments.get(toId)!;
+      const branchNode = graph.nodes.find(n => n.id === fromId);
+      if (!branchNode || branchNode.nodeType === NodeTypeV1.LOAD) continue;
+
+      const laneKey = toId;
+      const lane = (branchLanePerParent.get(laneKey) ?? 0) + 1;
+      branchLanePerParent.set(laneKey, lane);
+
+      const side = deterministicBranchSide(fromId);
+      const branchX = snap(parentAssignment.trunkX + side * BRANCH_OFFSET_X * lane);
+
+      visited.add(fromId);
+      state.trunkAssignments.set(fromId, {
+        trunkIndex: parentAssignment.trunkIndex,
+        trunkX: branchX,
+        depthInTrunk: parentAssignment.depthInTrunk,
+      });
     }
   }
 

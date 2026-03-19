@@ -35,9 +35,9 @@ exports[`SLD Render Manifest Golden (Step VII) > pv_bess: matches golden snapsho
       "edgeType": "BRANCH",
       "isNormallyOpen": false,
       "laneIndex": 0,
-      "segmentCount": 1,
+      "segmentCount": 2,
       "strokeWidth": 2.5,
-      "totalLengthPx": 140,
+      "totalLengthPx": 300,
     },
     {
       "edgeId": "edge_src_src_gpz",
@@ -58,7 +58,7 @@ exports[`SLD Render Manifest Golden (Step VII) > pv_bess: matches golden snapsho
       "totalLengthPx": 100,
     },
   ],
-  "layoutHash": "bdf6d574",
+  "layoutHash": "c6b5082f",
   "nodes": [
     {
       "elementType": "Bus",
@@ -135,7 +135,7 @@ exports[`SLD Render Manifest Golden (Step VII) > pv_bess: matches golden snapsho
       "strokeWidth": 2.5,
       "voltageColor": "#374151",
       "width": 60,
-      "x": 320,
+      "x": 160,
       "y": 660,
     },
     {
@@ -200,9 +200,9 @@ exports[`SLD Render Manifest Golden (Step VII) > radial: matches golden snapshot
       "edgeType": "BRANCH",
       "isNormallyOpen": false,
       "laneIndex": 0,
-      "segmentCount": 1,
+      "segmentCount": 2,
       "strokeWidth": 2.5,
-      "totalLengthPx": 140,
+      "totalLengthPx": 300,
     },
     {
       "edgeId": "edge_src_src_gpz",
@@ -223,7 +223,7 @@ exports[`SLD Render Manifest Golden (Step VII) > radial: matches golden snapshot
       "totalLengthPx": 100,
     },
   ],
-  "layoutHash": "9556453b",
+  "layoutHash": "0ee0903a",
   "nodes": [
     {
       "elementType": "Bus",
@@ -274,7 +274,7 @@ exports[`SLD Render Manifest Golden (Step VII) > radial: matches golden snapshot
       "strokeWidth": 2.5,
       "voltageColor": "#374151",
       "width": 60,
-      "x": 320,
+      "x": 160,
       "y": 660,
     },
     {
@@ -357,18 +357,18 @@ exports[`SLD Render Manifest Golden (Step VII) > ring_nop: matches golden snapsh
       "edgeType": "BRANCH",
       "isNormallyOpen": false,
       "laneIndex": 0,
-      "segmentCount": 1,
+      "segmentCount": 2,
       "strokeWidth": 2.5,
-      "totalLengthPx": 140,
+      "totalLengthPx": 300,
     },
     {
       "edgeId": "edge_load_load_r3",
       "edgeType": "BRANCH",
       "isNormallyOpen": false,
       "laneIndex": 0,
-      "segmentCount": 1,
+      "segmentCount": 2,
       "strokeWidth": 2.5,
-      "totalLengthPx": 140,
+      "totalLengthPx": 260,
     },
     {
       "edgeId": "edge_nop_r3_g",
@@ -389,7 +389,7 @@ exports[`SLD Render Manifest Golden (Step VII) > ring_nop: matches golden snapsh
       "totalLengthPx": 300,
     },
   ],
-  "layoutHash": "53f7a496",
+  "layoutHash": "c701176b",
   "nodes": [
     {
       "elementType": "Bus",
@@ -453,8 +453,8 @@ exports[`SLD Render Manifest Golden (Step VII) > ring_nop: matches golden snapsh
       "strokeWidth": 2.5,
       "voltageColor": "#374151",
       "width": 60,
-      "x": 320,
-      "y": 700,
+      "x": 160,
+      "y": 660,
     },
     {
       "elementType": "Load",
@@ -466,7 +466,7 @@ exports[`SLD Render Manifest Golden (Step VII) > ring_nop: matches golden snapsh
       "strokeWidth": 2.5,
       "voltageColor": "#374151",
       "width": 60,
-      "x": 320,
+      "x": 440,
       "y": 760,
     },
     {
