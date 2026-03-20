@@ -154,6 +154,7 @@ def guard_single_layout_engine() -> List[str]:
         "computeLayout",  # RUN #3B — canonical 6-phase pipeline
         "computeFullLayout",  # engine/sld-layout/pipeline — deleguje do computeLayout
         "executeBusbarAutoLayout",  # busbar adapter — deleguje do computeBusbarAutoLayout
+        "computeBayLayout",  # bayRenderer — station-internal device geometry, not a layout engine
     }
 
     for path, func_name in layout_entrypoints:
