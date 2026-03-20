@@ -891,6 +891,28 @@ const MeteringCubicleSymbol: React.FC<Omit<EtapSymbolProps, 'symbolId'>> = ({
 );
 
 /**
+ * Motor / Silnik
+ * IEC 60617 symbol: circle with letter M.
+ */
+const MotorSymbol: React.FC<Omit<EtapSymbolProps, 'symbolId'>> = ({
+  stroke = 'currentColor',
+  fill = 'none',
+  strokeWidth = 3,
+  opacity = 1,
+}) => (
+  <>
+    {/* Connection stub from top */}
+    <line x1="50" y1="0" x2="50" y2="20" stroke={stroke} strokeWidth={strokeWidth} opacity={opacity} />
+    {/* Motor circle */}
+    <circle cx="50" cy="50" r="30" fill={fill === 'none' ? 'rgba(255,255,255,0.95)' : fill} stroke={stroke} strokeWidth={strokeWidth} opacity={opacity} />
+    {/* Letter M */}
+    <text x="50" y="58" textAnchor="middle" fontSize="28" fontWeight="bold" fill={stroke} opacity={opacity}>
+      M
+    </text>
+  </>
+);
+
+/**
  * Relay / Przekaźnik zabezpieczeniowy
  * IEC 60617 symbol: rectangle with function label, placed above breaker.
  */
@@ -943,6 +965,7 @@ const SYMBOL_COMPONENTS: Record<EtapSymbolId, React.FC<Omit<EtapSymbolProps, 'sy
   reactor: ReactorSymbol,
   inverter: InverterSymbol,
   metering_cubicle: MeteringCubicleSymbol,
+  motor: MotorSymbol,
   // Tree-specific symbols
   load: LoadSymbol,
   project: ProjectSymbol,
@@ -1150,6 +1173,9 @@ export function renderSymbolToString(symbolId: EtapSymbolId): string | null {
       <text x="50" y="46" text-anchor="middle" font-size="8" font-weight="500" fill="#000000">kWh</text>
       <line x1="42" y1="60" x2="58" y2="60" stroke="#000000" stroke-width="1.5"/>
       <line x1="50" y1="75" x2="50" y2="100" stroke="#000000" stroke-width="3"/>`,
+    motor: `<line x1="50" y1="0" x2="50" y2="20" stroke="#000000" stroke-width="3"/>
+      <circle cx="50" cy="50" r="30" fill="none" stroke="#000000" stroke-width="3"/>
+      <text x="50" y="58" text-anchor="middle" font-size="28" font-weight="bold" fill="#000000">M</text>`,
   };
 
   return svgContent[symbolId] || null;
