@@ -16,9 +16,11 @@ import type {
   EnergyNetworkModel,
   OverheadLine,
   Cable,
+  SwitchBranch,
   Transformer,
   Source,
   Load,
+  Generator,
   ValidationResult,
 } from '../../types/enm';
 import { computeWizardState, getStepStatusColor, getOverallStatusLabel } from './wizardStateMachine';
@@ -104,6 +106,12 @@ async function runShortCircuit(caseId: string): Promise<Record<string, unknown>>
   return r.json();
 }
 
+async function runPowerFlow(caseId: string): Promise<Record<string, unknown>> {
+  const r = await fetch(`${API_BASE}/api/cases/${caseId}/runs/power-flow`, { method: 'POST' });
+  if (!r.ok) throw new Error(`Run PF: ${r.status}`);
+  return r.json();
+}
+
 // ---------------------------------------------------------------------------
 // Reusable UI components — Industrial Grade
 // ---------------------------------------------------------------------------
@@ -173,14 +181,63 @@ function AddButton({ onClick, label }: { onClick: () => void; label: string }) {
 type StepProps = { enm: EnergyNetworkModel; onChange: (e: EnergyNetworkModel) => void };
 
 function StepK1({ enm, onChange }: StepProps) {
+  const VOLTAGE_OPTIONS = [6, 10, 15, 20, 30];
+  const NETWORK_TYPES = [
+    { value: 'promieniowy', label: 'Promieniowy' },
+    { value: 'pierścieniowy', label: 'Pierścieniowy' },
+    { value: 'mieszany', label: 'Mieszany' },
+  ];
+
+  const headerMeta = (((enm.header as unknown) as Record<string, unknown>).meta ?? {}) as Record<string, unknown>;
+  const voltageSn = (headerMeta.voltage_sn_kv as number) ?? 15;
+  const networkType = (headerMeta.network_type as string) ?? 'promieniowy';
+
+  const updateHeaderMeta = (key: string, value: unknown) => {
+    const newMeta = { ...headerMeta, [key]: value };
+    const newHeader = { ...enm.header, meta: newMeta } as typeof enm.header;
+    let newEnm = { ...enm, header: newHeader };
+
+    // When voltage changes, propagate to source bus
+    if (key === 'voltage_sn_kv' && typeof value === 'number') {
+      const sourceBusIdx = newEnm.buses.findIndex((b) => b.tags.includes('source'));
+      if (sourceBusIdx >= 0) {
+        const buses = [...newEnm.buses];
+        buses[sourceBusIdx] = { ...buses[sourceBusIdx], voltage_kv: value };
+        newEnm = { ...newEnm, buses };
+      }
+    }
+
+    onChange(newEnm);
+  };
+
   return (
     <div>
+      <SectionTitle>Informacje o projekcie</SectionTitle>
       <FieldRow label="Nazwa projektu">
         <Input value={enm.header.name} onChange={(v) => onChange({ ...enm, header: { ...enm.header, name: v } })} placeholder="np. GPZ Centrum" />
       </FieldRow>
       <FieldRow label="Opis">
         <Input value={enm.header.description ?? ''} onChange={(v) => onChange({ ...enm, header: { ...enm.header, description: v || null } })} placeholder="Opcjonalny opis projektu" />
       </FieldRow>
+
+      <SectionTitle>Parametry systemu</SectionTitle>
+      <FieldRow label="Napięcie znamionowe SN" unit="kV">
+        <Select value={String(voltageSn)} onChange={(v) => updateHeaderMeta('voltage_sn_kv', Number(v))}>
+          {VOLTAGE_OPTIONS.map((kv) => (
+            <option key={kv} value={String(kv)}>{kv} kV</option>
+          ))}
+        </Select>
+      </FieldRow>
+      <HelpText>Napięcie zostanie automatycznie ustawione na szynie źródłowej GPZ.</HelpText>
+
+      <FieldRow label="Układ sieci">
+        <Select value={networkType} onChange={(v) => updateHeaderMeta('network_type', v)}>
+          {NETWORK_TYPES.map((nt) => (
+            <option key={nt.value} value={nt.value}>{nt.label}</option>
+          ))}
+        </Select>
+      </FieldRow>
+
       <FieldRow label="Częstotliwość" unit="Hz">
         <Input type="number" value={enm.header.defaults.frequency_hz} onChange={(v) => onChange({ ...enm, header: { ...enm.header, defaults: { ...enm.header.defaults, frequency_hz: Number(v) || 50 } } })} />
       </FieldRow>
@@ -192,32 +249,35 @@ function StepK2({ enm, onChange }: StepProps) {
   const bus = enm.buses.find((b) => b.tags.includes('source'));
   const src = enm.sources[0];
 
-  const update = (patch: { busName?: string; voltage?: number; sk3?: number; rx?: number; model?: Source['model'] }) => {
+  const updateBus = (patch: Partial<{ name: string; voltage_kv: number }>) => {
     const busRef = bus?.ref_id ?? 'bus_sn_main';
-    const srcRef = src?.ref_id ?? 'source_grid';
     const buses = [...enm.buses];
-    const sources = [...enm.sources];
     const bi = buses.findIndex((b) => b.ref_id === busRef);
     if (bi < 0) {
-      buses.push({ id: crypto.randomUUID(), ref_id: busRef, name: patch.busName ?? 'Szyna główna SN', tags: ['source'], meta: {}, voltage_kv: patch.voltage ?? 15, phase_system: '3ph' });
+      buses.push({ id: crypto.randomUUID(), ref_id: busRef, name: patch.name ?? 'Szyna główna SN', tags: ['source'], meta: {}, voltage_kv: patch.voltage_kv ?? 15, phase_system: '3ph' });
     } else {
-      if (patch.busName !== undefined) buses[bi] = { ...buses[bi], name: patch.busName };
-      if (patch.voltage !== undefined) buses[bi] = { ...buses[bi], voltage_kv: patch.voltage };
+      buses[bi] = { ...buses[bi], ...patch };
     }
+    onChange({ ...enm, buses });
+  };
+
+  const updateSrc = (patch: Partial<Source>) => {
+    const busRef = bus?.ref_id ?? 'bus_sn_main';
+    const srcRef = src?.ref_id ?? 'source_grid';
+    const sources = [...enm.sources];
     const si = sources.findIndex((s) => s.ref_id === srcRef);
     if (si < 0) {
-      sources.push({ id: crypto.randomUUID(), ref_id: srcRef, name: 'Sieć zasilająca', tags: [], meta: {}, bus_ref: busRef, model: patch.model ?? 'short_circuit_power', sk3_mva: patch.sk3 ?? 250, rx_ratio: patch.rx ?? 0.1 });
+      sources.push({ id: crypto.randomUUID(), ref_id: srcRef, name: 'Sieć zasilająca', tags: [], meta: {}, bus_ref: busRef, model: 'short_circuit_power', sk3_mva: 250, rx_ratio: 0.1, c_max: 1.1, c_min: 1.0, ...patch });
     } else {
-      if (patch.sk3 !== undefined) sources[si] = { ...sources[si], sk3_mva: patch.sk3 };
-      if (patch.rx !== undefined) sources[si] = { ...sources[si], rx_ratio: patch.rx };
-      if (patch.model !== undefined) sources[si] = { ...sources[si], model: patch.model };
+      sources[si] = { ...sources[si], ...patch };
     }
-    onChange({ ...enm, buses, sources });
+    onChange({ ...enm, sources });
   };
+
+  const model = src?.model ?? 'short_circuit_power';
 
   return (
     <div>
-      {/* GPZ emphasis — this is the starting point */}
       <div className="mb-4 p-3 bg-ind-50 border border-ind-200 rounded-md">
         <div className="flex items-center gap-2 mb-1">
           <svg className="w-4 h-4 text-ind-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
@@ -225,48 +285,148 @@ function StepK2({ enm, onChange }: StepProps) {
           </svg>
           <span className="text-sm font-semibold text-ind-800">Punkt zasilania GPZ</span>
         </div>
-        <p className="text-xs text-ind-600">Zdefiniuj szynę główną SN i parametry sieci zasilającej. To jest punkt wyjścia do budowy całej sieci.</p>
+        <p className="text-xs text-ind-600">Szyna główna SN, parametry sieci zasilającej i współczynniki napięciowe IEC 60909.</p>
       </div>
 
       <SectionTitle>Szyna źródłowa</SectionTitle>
-      <FieldRow label="Nazwa szyny"><Input value={bus?.name ?? 'Szyna główna SN'} onChange={(v) => update({ busName: v })} /></FieldRow>
-      <FieldRow label="Napięcie znamionowe" unit="kV"><Input type="number" value={bus?.voltage_kv ?? 15} onChange={(v) => update({ voltage: Number(v) || 15 })} /></FieldRow>
+      <FieldRow label="Nazwa szyny"><Input value={bus?.name ?? 'Szyna główna SN'} onChange={(v) => updateBus({ name: v })} /></FieldRow>
+      <FieldRow label="Napięcie znamionowe" unit="kV"><Input type="number" value={bus?.voltage_kv ?? 15} onChange={(v) => updateBus({ voltage_kv: Number(v) || 15 })} /></FieldRow>
 
       <SectionTitle>Źródło zasilania</SectionTitle>
       <FieldRow label="Model">
-        <Select value={src?.model ?? 'short_circuit_power'} onChange={(v) => update({ model: v as Source['model'] })}>
-          <option value="short_circuit_power">Moc zwarciowa Sk&quot;</option>
+        <Select value={model} onChange={(v) => updateSrc({ model: v as Source['model'] })}>
+          <option value="short_circuit_power">Moc zwarciowa Sk&#34;</option>
           <option value="thevenin">Impedancja Thevenin (R, X)</option>
           <option value="external_grid">Sieć zewnętrzna</option>
         </Select>
       </FieldRow>
-      <FieldRow label="Sk''" unit="MVA"><Input type="number" value={src?.sk3_mva ?? 250} onChange={(v) => update({ sk3: Number(v) || 0 })} /></FieldRow>
-      <FieldRow label="R/X"><Input type="number" value={src?.rx_ratio ?? 0.1} onChange={(v) => update({ rx: Number(v) || 0.1 })} /></FieldRow>
+
+      {(model === 'short_circuit_power' || model === 'external_grid') && (
+        <>
+          <FieldRow label="Sk&#34;" unit="MVA"><Input type="number" value={src?.sk3_mva ?? 250} onChange={(v) => updateSrc({ sk3_mva: Number(v) || 0 })} /></FieldRow>
+          <FieldRow label="R/X"><Input type="number" value={src?.rx_ratio ?? 0.1} onChange={(v) => updateSrc({ rx_ratio: Number(v) || 0.1 })} /></FieldRow>
+        </>
+      )}
+
+      {model === 'thevenin' && (
+        <>
+          <FieldRow label="R" unit="&Omega;"><Input type="number" value={src?.r_ohm ?? 0} onChange={(v) => updateSrc({ r_ohm: Number(v) || 0 })} /></FieldRow>
+          <FieldRow label="X" unit="&Omega;"><Input type="number" value={src?.x_ohm ?? 0} onChange={(v) => updateSrc({ x_ohm: Number(v) || 0 })} /></FieldRow>
+        </>
+      )}
+
+      <SectionTitle>Współczynniki napięciowe IEC 60909</SectionTitle>
+      <HelpText>Współczynniki c_max i c_min korygują napięcie przed obliczeniem prądów zwarciowych.</HelpText>
+      <FieldRow label="c_max"><Input type="number" value={src?.c_max ?? 1.1} onChange={(v) => updateSrc({ c_max: Number(v) || 1.1 })} /></FieldRow>
+      <FieldRow label="c_min"><Input type="number" value={src?.c_min ?? 1.0} onChange={(v) => updateSrc({ c_min: Number(v) || 1.0 })} /></FieldRow>
+
+      <SectionTitle>Składowa zerowa źródła (Z0)</SectionTitle>
+      <HelpText>Wymagana do obliczeń zwarć doziemnych (1F). Podaj stosunek Z0/Z1 lub bezpośrednio R0, X0.</HelpText>
+      <FieldRow label="Z0/Z1"><Input type="number" value={src?.z0_z1_ratio ?? ''} onChange={(v) => updateSrc({ z0_z1_ratio: v ? Number(v) : null })} placeholder="np. 1.0" /></FieldRow>
+      <FieldRow label="R0" unit="&Omega;"><Input type="number" value={src?.r0_ohm ?? ''} onChange={(v) => updateSrc({ r0_ohm: v ? Number(v) : null })} placeholder="opcjonalne" /></FieldRow>
+      <FieldRow label="X0" unit="&Omega;"><Input type="number" value={src?.x0_ohm ?? ''} onChange={(v) => updateSrc({ x0_ohm: v ? Number(v) : null })} placeholder="opcjonalne" /></FieldRow>
     </div>
   );
 }
 
 function StepK3({ enm, onChange }: StepProps) {
+  const sourceBus = enm.buses.find((b) => b.tags.includes('source'));
   const extra = enm.buses.filter((b) => !b.tags.includes('source'));
-  const addBus = () => {
-    const n = extra.length + 1;
-    onChange({ ...enm, buses: [...enm.buses, { id: crypto.randomUUID(), ref_id: `bus_sn_${n}`, name: `Szyna SN ${n}`, tags: [], meta: {}, voltage_kv: enm.buses[0]?.voltage_kv ?? 15, phase_system: '3ph' }] });
+  const couplers = enm.branches.filter((b): b is SwitchBranch => b.type === 'bus_coupler');
+  const allRefs = enm.buses.map((b) => b.ref_id);
+
+  const addBusSN = () => {
+    const n = extra.filter((b) => !b.tags.includes('nn')).length + 1;
+    onChange({ ...enm, buses: [...enm.buses, { id: crypto.randomUUID(), ref_id: `bus_sn_${Date.now()}`, name: `Szyna SN sekcja ${n}`, tags: [], meta: {}, voltage_kv: sourceBus?.voltage_kv ?? 15, phase_system: '3ph' }] });
   };
-  const rm = (ref: string) => onChange({ ...enm, buses: enm.buses.filter((b) => b.ref_id !== ref), branches: enm.branches.filter((br) => br.from_bus_ref !== ref && br.to_bus_ref !== ref) });
+  const addBusNN = () => {
+    const n = extra.filter((b) => b.tags.includes('nn')).length + 1;
+    onChange({ ...enm, buses: [...enm.buses, { id: crypto.randomUUID(), ref_id: `bus_nn_${Date.now()}`, name: `Szyna nN ${n}`, tags: ['nn'], meta: {}, voltage_kv: 0.4, phase_system: '3ph' }] });
+  };
+  const updBus = (ref: string, p: Partial<{ name: string; voltage_kv: number; zone: string | null }>) =>
+    onChange({ ...enm, buses: enm.buses.map((b) => b.ref_id === ref ? { ...b, ...p } : b) });
+  const rmBus = (ref: string) => onChange({
+    ...enm,
+    buses: enm.buses.filter((b) => b.ref_id !== ref),
+    branches: enm.branches.filter((br) => br.from_bus_ref !== ref && br.to_bus_ref !== ref),
+  });
+
+  const addCoupler = () => {
+    if (allRefs.length < 2) return;
+    const c: SwitchBranch = {
+      id: crypto.randomUUID(), ref_id: `coupler_${Date.now()}`, name: `Sprzęgło ${couplers.length + 1}`,
+      tags: [], meta: {}, type: 'bus_coupler',
+      from_bus_ref: allRefs[0], to_bus_ref: allRefs[1] ?? allRefs[0], status: 'open',
+    };
+    onChange({ ...enm, branches: [...enm.branches, c] });
+  };
+  const updCoupler = (ref: string, p: Partial<SwitchBranch>) =>
+    onChange({ ...enm, branches: enm.branches.map((b) => b.ref_id === ref ? { ...b, ...p } as typeof b : b) });
+  const rmCoupler = (ref: string) =>
+    onChange({ ...enm, branches: enm.branches.filter((b) => b.ref_id !== ref) });
 
   return (
     <div>
-      <HelpText>Dodaj dodatkowe szyny (sekcje) i sprzęgła. Każda szyna reprezentuje jedną sekcję rozdzielnicy.</HelpText>
-      <div className="space-y-1.5">
+      <HelpText>Szyny zborcze SN i nN. Każda szyna to jedna sekcja rozdzielnicy. Sprzęgło łączy dwie sekcje (NO = normalnie otwarte).</HelpText>
+
+      {/* Source bus — read-only */}
+      {sourceBus && (
+        <div className="wizard-card flex items-center mb-2 bg-ind-50 border-ind-200">
+          <span className="flex-1 text-sm font-medium text-ind-800">{sourceBus.name}</span>
+          <span className="ind-badge ind-badge-ok text-[10px] mr-2">GPZ</span>
+          <span className="text-xs text-chrome-400">{sourceBus.voltage_kv} kV</span>
+        </div>
+      )}
+
+      <SectionTitle>Szyny dodatkowe</SectionTitle>
+      <div className="space-y-2">
         {extra.map((b) => (
-          <div key={b.ref_id} className="wizard-card flex items-center">
-            <span className="flex-1 text-sm font-medium text-ind-800">{b.name}</span>
-            <span className="text-xs text-chrome-400 mr-3">{b.voltage_kv} kV</span>
-            <RemoveButton onClick={() => rm(b.ref_id)} />
+          <div key={b.ref_id} className="wizard-card">
+            <div className="wizard-card-header">
+              <span className="text-sm font-semibold text-ind-800">{b.name}</span>
+              <div className="flex items-center gap-1">
+                {b.tags.includes('nn') && <span className="ind-badge ind-badge-info text-[10px]">nN</span>}
+                <RemoveButton onClick={() => rmBus(b.ref_id)} />
+              </div>
+            </div>
+            <FieldRow label="Nazwa"><Input value={b.name} onChange={(v) => updBus(b.ref_id, { name: v })} /></FieldRow>
+            <FieldRow label="Napięcie" unit="kV"><Input type="number" value={b.voltage_kv} onChange={(v) => updBus(b.ref_id, { voltage_kv: Number(v) || 0.4 })} /></FieldRow>
+            <FieldRow label="Strefa (opcjonalnie)"><Input value={b.zone ?? ''} onChange={(v) => updBus(b.ref_id, { zone: v || null })} placeholder="np. Sekcja A" /></FieldRow>
           </div>
         ))}
       </div>
-      <AddButton onClick={addBus} label="Dodaj szynę" />
+      <div className="flex gap-2 mt-3">
+        <AddButton onClick={addBusSN} label="Dodaj szynę SN" />
+        <AddButton onClick={addBusNN} label="Dodaj szynę nN (0,4 kV)" />
+      </div>
+
+      {/* Bus couplers */}
+      <SectionTitle>Sprzęgła (łączniki międzysystemowe)</SectionTitle>
+      <div className="space-y-2">
+        {couplers.map((c) => (
+          <div key={c.ref_id} className="wizard-card">
+            <div className="wizard-card-header">
+              <span className="text-sm font-semibold text-ind-800">{c.name}</span>
+              <div className="flex items-center gap-1">
+                <span className={clsx('ind-badge text-[10px]', c.status === 'closed' ? 'ind-badge-ok' : 'ind-badge-warn')}>
+                  {c.status === 'closed' ? 'Zamknięty' : 'Otwarty'}
+                </span>
+                <RemoveButton onClick={() => rmCoupler(c.ref_id)} />
+              </div>
+            </div>
+            <FieldRow label="Z szyny"><Select value={c.from_bus_ref} onChange={(v) => updCoupler(c.ref_id, { from_bus_ref: v })}>{allRefs.map((r) => <option key={r} value={r}>{enm.buses.find((b) => b.ref_id === r)?.name ?? r}</option>)}</Select></FieldRow>
+            <FieldRow label="Do szyny"><Select value={c.to_bus_ref} onChange={(v) => updCoupler(c.ref_id, { to_bus_ref: v })}>{allRefs.map((r) => <option key={r} value={r}>{enm.buses.find((b) => b.ref_id === r)?.name ?? r}</option>)}</Select></FieldRow>
+            <FieldRow label="Stan">
+              <Select value={c.status} onChange={(v) => updCoupler(c.ref_id, { status: v as 'closed' | 'open' })}>
+                <option value="open">Otwarty (NO)</option>
+                <option value="closed">Zamknięty (NC)</option>
+              </Select>
+            </FieldRow>
+          </div>
+        ))}
+      </div>
+      {allRefs.length >= 2 && <AddButton onClick={addCoupler} label="Dodaj sprzęgło" />}
+      {allRefs.length < 2 && <HelpText>Dodaj co najmniej 2 szyny, aby móc utworzyć sprzęgło.</HelpText>}
     </div>
   );
 }
@@ -277,121 +437,71 @@ function StepK4({ enm, onChange }: StepProps) {
   const [pickerOpen, setPickerOpen] = useState(false);
   const [pickerCategory, setPickerCategory] = useState<TypeCategory>('LINE');
   const [pickerTargetRef, setPickerTargetRef] = useState<string | null>(null);
+  const [expandedZ0, setExpandedZ0] = useState<Record<string, boolean>>({});
+  const [expandedRating, setExpandedRating] = useState<Record<string, boolean>>({});
 
   const add = (branchType: 'line_overhead' | 'cable') => {
     const n = lines.length + 1;
     const isLine = branchType === 'line_overhead';
-    const nl = {
-      id: crypto.randomUUID(),
-      ref_id: `${isLine ? 'line' : 'cable'}_L${String(n).padStart(2, '0')}`,
-      name: isLine ? `Linia L${n}` : `Kabel K${n}`,
-      tags: [], meta: {},
-      type: branchType,
-      from_bus_ref: refs[0] ?? '', to_bus_ref: refs[1] ?? refs[0] ?? '',
-      status: 'closed' as const, length_km: 1, r_ohm_per_km: 0, x_ohm_per_km: 0,
-    };
+    const nl = { id: crypto.randomUUID(), ref_id: `${isLine ? 'line' : 'cable'}_${Date.now()}`, name: isLine ? `Linia L${n}` : `Kabel K${n}`, tags: [] as string[], meta: {}, type: branchType, from_bus_ref: refs[0] ?? '', to_bus_ref: refs[1] ?? refs[0] ?? '', status: 'closed' as const, length_km: 1, r_ohm_per_km: 0, x_ohm_per_km: 0 };
     onChange({ ...enm, branches: [...enm.branches, nl as OverheadLine | Cable] });
   };
-  const upd = (ref: string, p: Partial<OverheadLine | Cable>) => onChange({ ...enm, branches: enm.branches.map((b) => (b.ref_id === ref ? ({ ...b, ...p } as typeof b) : b)) });
+  const upd = (ref: string, p: Record<string, unknown>) => onChange({ ...enm, branches: enm.branches.map((b) => (b.ref_id === ref ? ({ ...b, ...p }) as typeof b : b)) });
   const rm = (ref: string) => onChange({ ...enm, branches: enm.branches.filter((b) => b.ref_id !== ref) });
 
-  const openCatalogPicker = (branchRefId: string, branchType: string) => {
-    setPickerTargetRef(branchRefId);
-    setPickerCategory(branchType === 'cable' ? 'CABLE' : 'LINE');
-    setPickerOpen(true);
-  };
-
-  const handleTypeSelected = (typeId: string, typeName: string) => {
-    if (!pickerTargetRef) return;
-    const branch = enm.branches.find((b) => b.ref_id === pickerTargetRef) as OverheadLine | Cable | undefined;
-    if (!branch) return;
-    // Parametry zostaną zmaterializowane po przypisaniu katalogu przez backend
-    // Na razie zapisujemy catalog_ref — readiness gate odblokuje obliczenia
-    upd(pickerTargetRef, {
-      catalog_ref: typeId,
-      parameter_source: 'CATALOG',
-      name: typeName,
-    } as Partial<OverheadLine | Cable>);
-    setPickerOpen(false);
-    setPickerTargetRef(null);
-  };
+  const openPicker = (branchRefId: string, branchType: string) => { setPickerTargetRef(branchRefId); setPickerCategory(branchType === 'cable' ? 'CABLE' : 'LINE'); setPickerOpen(true); };
+  const handleTypeSelected = (typeId: string, typeName: string) => { if (!pickerTargetRef) return; upd(pickerTargetRef, { catalog_ref: typeId, parameter_source: 'CATALOG', name: typeName }); setPickerOpen(false); setPickerTargetRef(null); };
+  const catLock = (l: OverheadLine | Cable) => l.catalog_ref ? 'opacity-60 pointer-events-none' : '';
 
   return (
     <div>
-      <HelpText>Dodaj linie napowietrzne lub kable SN. Wybierz typ z katalogu — parametry elektryczne zostaną wypełnione automatycznie.</HelpText>
+      <HelpText>Linie napowietrzne i kable SN. Wybierz typ z katalogu lub wpisz parametry ręcznie.</HelpText>
       <div className="space-y-3">
         {lines.map((l) => (
           <div key={l.ref_id} className="wizard-card">
             <div className="wizard-card-header">
               <span className="text-sm font-semibold text-ind-800">{l.name}</span>
               <div className="flex items-center gap-1">
-                {l.catalog_ref ? (
-                  <span className="ind-badge ind-badge-ok text-[10px]">Katalog</span>
-                ) : (
-                  <span className="ind-badge ind-badge-warn text-[10px]">Brak typu</span>
-                )}
+                {l.catalog_ref ? <span className="ind-badge ind-badge-ok text-[10px]">Katalog</span> : <span className="ind-badge ind-badge-warn text-[10px]">Brak typu</span>}
                 <RemoveButton onClick={() => rm(l.ref_id)} />
               </div>
             </div>
-
-            {/* Typ z katalogu */}
             <FieldRow label="Typ z katalogu">
               <div className="flex items-center gap-2">
-                <span className="text-sm text-chrome-600 flex-1 truncate">
-                  {l.catalog_ref ? l.name : 'Nie wybrano'}
-                </span>
-                <button
-                  onClick={() => openCatalogPicker(l.ref_id, l.type)}
-                  className="ind-btn text-ind-600 bg-ind-50 hover:bg-ind-100 border border-ind-200 text-[11px] whitespace-nowrap"
-                >
-                  {l.catalog_ref ? 'Zmień typ' : 'Wybierz z katalogu'}
-                </button>
-                {l.catalog_ref && (
-                  <button
-                    onClick={() => upd(l.ref_id, { catalog_ref: null, parameter_source: null } as Partial<OverheadLine>)}
-                    className="ind-btn text-red-500 bg-red-50 hover:bg-red-100 border border-red-200 text-[11px]"
-                  >
-                    Wyczyść
-                  </button>
-                )}
+                <span className="text-sm text-chrome-600 flex-1 truncate">{l.catalog_ref ? l.name : 'Nie wybrano'}</span>
+                <button onClick={() => openPicker(l.ref_id, l.type)} className="ind-btn text-ind-600 bg-ind-50 hover:bg-ind-100 border border-ind-200 text-[11px] whitespace-nowrap">{l.catalog_ref ? 'Zmień typ' : 'Wybierz z katalogu'}</button>
+                {l.catalog_ref && <button onClick={() => upd(l.ref_id, { catalog_ref: null, parameter_source: null })} className="ind-btn text-red-500 bg-red-50 hover:bg-red-100 border border-red-200 text-[11px]">Wyczyść</button>}
               </div>
             </FieldRow>
-
-            <FieldRow label="Rodzaj">
-              <Select value={l.type} onChange={(v) => upd(l.ref_id, { type: v as 'line_overhead' | 'cable' })}>
-                <option value="line_overhead">Linia napowietrzna</option>
-                <option value="cable">Kabel</option>
-              </Select>
-            </FieldRow>
+            <FieldRow label="Rodzaj"><Select value={l.type} onChange={(v) => upd(l.ref_id, { type: v })}><option value="line_overhead">Linia napowietrzna</option><option value="cable">Kabel</option></Select></FieldRow>
+            {l.type === 'cable' && <FieldRow label="Izolacja"><Select value={(l as Cable).insulation ?? 'XLPE'} onChange={(v) => upd(l.ref_id, { insulation: v })}><option value="XLPE">XLPE</option><option value="PVC">PVC</option><option value="PAPER">Papierowa</option></Select></FieldRow>}
             <FieldRow label="Nazwa"><Input value={l.name} onChange={(v) => upd(l.ref_id, { name: v })} /></FieldRow>
             <FieldRow label="Z szyny"><Select value={l.from_bus_ref} onChange={(v) => upd(l.ref_id, { from_bus_ref: v })}>{refs.map((r) => <option key={r} value={r}>{r}</option>)}</Select></FieldRow>
             <FieldRow label="Do szyny"><Select value={l.to_bus_ref} onChange={(v) => upd(l.ref_id, { to_bus_ref: v })}>{refs.map((r) => <option key={r} value={r}>{r}</option>)}</Select></FieldRow>
             <FieldRow label="Długość" unit="km"><Input type="number" value={l.length_km} onChange={(v) => upd(l.ref_id, { length_km: Number(v) || 0 })} /></FieldRow>
-
-            {/* Parametry elektryczne — read-only gdy z katalogu */}
-            <div className={l.catalog_ref ? 'opacity-60 pointer-events-none' : ''}>
-              {l.catalog_ref && (
-                <div className="text-[10px] text-ind-500 mb-1 mt-2 font-medium">Parametry z katalogu (tylko odczyt)</div>
-              )}
-              <FieldRow label="R" unit="&Omega;/km"><Input type="number" value={l.r_ohm_per_km} onChange={(v) => upd(l.ref_id, { r_ohm_per_km: Number(v) || 0 })} /></FieldRow>
-              <FieldRow label="X" unit="&Omega;/km"><Input type="number" value={l.x_ohm_per_km} onChange={(v) => upd(l.ref_id, { x_ohm_per_km: Number(v) || 0 })} /></FieldRow>
+            <div className={catLock(l)}>
+              {l.catalog_ref && <div className="text-[10px] text-ind-500 mb-1 mt-2 font-medium">Parametry z katalogu (tylko odczyt)</div>}
+              <FieldRow label="R1" unit="&Omega;/km"><Input type="number" value={l.r_ohm_per_km} onChange={(v) => upd(l.ref_id, { r_ohm_per_km: Number(v) || 0 })} /></FieldRow>
+              <FieldRow label="X1" unit="&Omega;/km"><Input type="number" value={l.x_ohm_per_km} onChange={(v) => upd(l.ref_id, { x_ohm_per_km: Number(v) || 0 })} /></FieldRow>
+              <FieldRow label="B1" unit="S/km"><Input type="number" value={l.b_siemens_per_km ?? ''} onChange={(v) => upd(l.ref_id, { b_siemens_per_km: v ? Number(v) : null })} placeholder="susceptancja" /></FieldRow>
             </div>
+            <button onClick={() => setExpandedRating((s) => ({ ...s, [l.ref_id]: !s[l.ref_id] }))} className="text-[11px] text-ind-600 hover:underline mt-2">{expandedRating[l.ref_id] ? '\u25BE' : '\u25B8'} Obciążalność i wytrzymałość</button>
+            {expandedRating[l.ref_id] && <div className={catLock(l)}>
+              <FieldRow label="In" unit="A"><Input type="number" value={l.rating?.in_a ?? ''} onChange={(v) => upd(l.ref_id, { rating: { ...l.rating, in_a: v ? Number(v) : null } })} placeholder="obciążalność" /></FieldRow>
+              <FieldRow label="Ith" unit="kA"><Input type="number" value={l.rating?.ith_ka ?? ''} onChange={(v) => upd(l.ref_id, { rating: { ...l.rating, ith_ka: v ? Number(v) : null } })} /></FieldRow>
+              <FieldRow label="Idyn" unit="kA"><Input type="number" value={l.rating?.idyn_ka ?? ''} onChange={(v) => upd(l.ref_id, { rating: { ...l.rating, idyn_ka: v ? Number(v) : null } })} /></FieldRow>
+            </div>}
+            <button onClick={() => setExpandedZ0((s) => ({ ...s, [l.ref_id]: !s[l.ref_id] }))} className="text-[11px] text-ind-600 hover:underline mt-1">{expandedZ0[l.ref_id] ? '\u25BE' : '\u25B8'} Składowa zerowa (Z0)</button>
+            {expandedZ0[l.ref_id] && <div className={catLock(l)}>
+              <FieldRow label="R0" unit="&Omega;/km"><Input type="number" value={l.r0_ohm_per_km ?? ''} onChange={(v) => upd(l.ref_id, { r0_ohm_per_km: v ? Number(v) : null })} /></FieldRow>
+              <FieldRow label="X0" unit="&Omega;/km"><Input type="number" value={l.x0_ohm_per_km ?? ''} onChange={(v) => upd(l.ref_id, { x0_ohm_per_km: v ? Number(v) : null })} /></FieldRow>
+              <FieldRow label="B0" unit="S/km"><Input type="number" value={l.b0_siemens_per_km ?? ''} onChange={(v) => upd(l.ref_id, { b0_siemens_per_km: v ? Number(v) : null })} /></FieldRow>
+            </div>}
           </div>
         ))}
       </div>
-      <div className="flex gap-2 mt-3">
-        <AddButton onClick={() => add('line_overhead')} label="Dodaj linię" />
-        <AddButton onClick={() => add('cable')} label="Dodaj kabel" />
-      </div>
-
-      {/* TypePicker modal */}
-      <TypePicker
-        category={pickerCategory}
-        currentTypeId={lines.find((l) => l.ref_id === pickerTargetRef)?.catalog_ref ?? null}
-        onSelectType={handleTypeSelected}
-        onClose={() => { setPickerOpen(false); setPickerTargetRef(null); }}
-        isOpen={pickerOpen}
-      />
+      <div className="flex gap-2 mt-3"><AddButton onClick={() => add('line_overhead')} label="Dodaj linię" /><AddButton onClick={() => add('cable')} label="Dodaj kabel" /></div>
+      <TypePicker category={pickerCategory} currentTypeId={lines.find((l) => l.ref_id === pickerTargetRef)?.catalog_ref ?? null} onSelectType={handleTypeSelected} onClose={() => { setPickerOpen(false); setPickerTargetRef(null); }} isOpen={pickerOpen} />
     </div>
   );
 }
@@ -496,7 +606,9 @@ function StepK6({ enm, onChange }: StepProps) {
   const refs = enm.buses.map((b) => b.ref_id);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [pickerTargetRef, setPickerTargetRef] = useState<string | null>(null);
+  const [pickerTarget, setPickerTarget] = useState<'load' | 'generator'>('load');
 
+  // --- Loads ---
   const addLoad = () => {
     const n = enm.loads.length + 1;
     onChange({ ...enm, loads: [...enm.loads, { id: crypto.randomUUID(), ref_id: `load_${n}`, name: `Odbiór ${n}`, tags: [], meta: {}, bus_ref: refs[refs.length - 1] ?? '', p_mw: 1, q_mvar: 0.3, model: 'pq' as const }] });
@@ -504,16 +616,34 @@ function StepK6({ enm, onChange }: StepProps) {
   const updLoad = (ref: string, p: Partial<Load>) => onChange({ ...enm, loads: enm.loads.map((l) => l.ref_id === ref ? { ...l, ...p } : l) });
   const rmLoad = (ref: string) => onChange({ ...enm, loads: enm.loads.filter((l) => l.ref_id !== ref) });
 
+  // --- Generators (OZE) ---
+  const addGen = (genType: Generator['gen_type']) => {
+    const n = enm.generators.length + 1;
+    const labels: Record<string, string> = { pv_inverter: 'PV', wind_inverter: 'Wiatr', bess: 'BESS', synchronous: 'Gen. synchr.' };
+    const label = labels[genType ?? ''] ?? 'Generator';
+    const gen: Generator = { id: crypto.randomUUID(), ref_id: `gen_${Date.now()}`, name: `${label} ${n}`, tags: [], meta: {}, bus_ref: refs[refs.length - 1] ?? '', p_mw: 0.5, q_mvar: 0, gen_type: genType ?? 'pv_inverter', connection_variant: genType === 'synchronous' ? null : 'nn_side' };
+    onChange({ ...enm, generators: [...enm.generators, gen] });
+  };
+  const updGen = (ref: string, p: Partial<Generator>) => onChange({ ...enm, generators: enm.generators.map((g) => g.ref_id === ref ? { ...g, ...p } : g) });
+  const rmGen = (ref: string) => onChange({ ...enm, generators: enm.generators.filter((g) => g.ref_id !== ref) });
+
   const handleTypeSelected = (typeId: string, typeName: string) => {
     if (!pickerTargetRef) return;
-    updLoad(pickerTargetRef, {
-      catalog_ref: typeId,
-      parameter_source: 'CATALOG',
-      name: typeName,
-    });
+    if (pickerTarget === 'load') {
+      updLoad(pickerTargetRef, { catalog_ref: typeId, parameter_source: 'CATALOG', name: typeName });
+    } else {
+      updGen(pickerTargetRef, { catalog_ref: typeId, parameter_source: 'CATALOG', name: typeName });
+    }
     setPickerOpen(false);
     setPickerTargetRef(null);
   };
+
+  const GEN_TYPES: { value: NonNullable<Generator['gen_type']>; label: string }[] = [
+    { value: 'pv_inverter', label: 'Fotowoltaika (PV)' },
+    { value: 'wind_inverter', label: 'Turbina wiatrowa' },
+    { value: 'bess', label: 'Magazyn energii (BESS)' },
+    { value: 'synchronous', label: 'Generator synchroniczny' },
+  ];
 
   return (
     <div>
@@ -526,6 +656,12 @@ function StepK6({ enm, onChange }: StepProps) {
               <span className="text-sm font-semibold text-ind-800">{ld.name}</span>
               <RemoveButton onClick={() => rmLoad(ld.ref_id)} />
             </div>
+            <FieldRow label="Typ z katalogu">
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-chrome-600 flex-1 truncate">{ld.catalog_ref ? ld.name : 'Nie wybrano'}</span>
+                <button onClick={() => { setPickerTargetRef(ld.ref_id); setPickerTarget('load'); setPickerOpen(true); }} className="ind-btn text-ind-600 bg-ind-50 hover:bg-ind-100 border border-ind-200 text-[11px] whitespace-nowrap">{ld.catalog_ref ? 'Zmień typ' : 'Wybierz z katalogu'}</button>
+              </div>
+            </FieldRow>
             <FieldRow label="Nazwa"><Input value={ld.name} onChange={(v) => updLoad(ld.ref_id, { name: v })} /></FieldRow>
             <FieldRow label="Szyna"><Select value={ld.bus_ref} onChange={(v) => updLoad(ld.ref_id, { bus_ref: v })}>{refs.map((r) => <option key={r} value={r}>{r}</option>)}</Select></FieldRow>
             <FieldRow label="P" unit="MW"><Input type="number" value={ld.p_mw} onChange={(v) => updLoad(ld.ref_id, { p_mw: Number(v) || 0 })} /></FieldRow>
@@ -541,10 +677,56 @@ function StepK6({ enm, onChange }: StepProps) {
       </div>
       <AddButton onClick={addLoad} label="Dodaj odbiór" />
 
+      <SectionTitle>Źródła rozproszone (OZE / BESS)</SectionTitle>
+      <HelpText>Generatory, instalacje PV, turbiny wiatrowe i magazyny energii. Dla każdego źródła określ wariant przyłączenia do sieci SN.</HelpText>
+      <div className="space-y-3">
+        {enm.generators.map((g) => (
+          <div key={g.ref_id} className="wizard-card">
+            <div className="wizard-card-header">
+              <span className="text-sm font-semibold text-ind-800">{g.name}</span>
+              <div className="flex items-center gap-1">
+                {g.gen_type && <span className="ind-badge ind-badge-info text-[10px]">{g.gen_type === 'pv_inverter' ? 'PV' : g.gen_type === 'wind_inverter' ? 'Wiatr' : g.gen_type === 'bess' ? 'BESS' : 'Synchr.'}</span>}
+                <RemoveButton onClick={() => rmGen(g.ref_id)} />
+              </div>
+            </div>
+            <FieldRow label="Nazwa"><Input value={g.name} onChange={(v) => updGen(g.ref_id, { name: v })} /></FieldRow>
+            <FieldRow label="Typ">
+              <Select value={g.gen_type ?? 'pv_inverter'} onChange={(v) => updGen(g.ref_id, { gen_type: v as Generator['gen_type'] })}>
+                {GEN_TYPES.map((gt) => <option key={gt.value} value={gt.value}>{gt.label}</option>)}
+              </Select>
+            </FieldRow>
+            <FieldRow label="Szyna"><Select value={g.bus_ref} onChange={(v) => updGen(g.ref_id, { bus_ref: v })}>{refs.map((r) => <option key={r} value={r}>{r}</option>)}</Select></FieldRow>
+            <FieldRow label="P" unit="MW"><Input type="number" value={g.p_mw} onChange={(v) => updGen(g.ref_id, { p_mw: Number(v) || 0 })} /></FieldRow>
+            <FieldRow label="Q" unit="Mvar"><Input type="number" value={g.q_mvar ?? 0} onChange={(v) => updGen(g.ref_id, { q_mvar: Number(v) || 0 })} /></FieldRow>
+            {g.gen_type !== 'synchronous' && (
+              <FieldRow label="Wariant przyłączenia">
+                <Select value={g.connection_variant ?? ''} onChange={(v) => updGen(g.ref_id, { connection_variant: (v || null) as Generator['connection_variant'] })}>
+                  <option value="">Nie określono</option>
+                  <option value="nn_side">Po stronie nN (przez trafo stacji)</option>
+                  <option value="block_transformer">Transformator blokowy do SN</option>
+                </Select>
+              </FieldRow>
+            )}
+            {g.gen_type !== 'synchronous' && (
+              <FieldRow label="Liczba równoległych"><Input type="number" value={g.n_parallel ?? 1} onChange={(v) => updGen(g.ref_id, { n_parallel: Number(v) || 1 })} /></FieldRow>
+            )}
+          </div>
+        ))}
+      </div>
+      <div className="flex gap-2 mt-3 flex-wrap">
+        {GEN_TYPES.map((gt) => (
+          <AddButton key={gt.value} onClick={() => addGen(gt.value)} label={`Dodaj ${gt.label}`} />
+        ))}
+      </div>
+
       {/* TypePicker modal */}
       <TypePicker
-        category={'LOAD' as TypeCategory}
-        currentTypeId={enm.loads.find((l) => l.ref_id === pickerTargetRef)?.catalog_ref ?? null}
+        category={(pickerTarget === 'generator' ? 'GENERATOR' : 'LOAD') as TypeCategory}
+        currentTypeId={
+          pickerTarget === 'generator'
+            ? (enm.generators.find((g) => g.ref_id === pickerTargetRef)?.catalog_ref ?? null)
+            : (enm.loads.find((l) => l.ref_id === pickerTargetRef)?.catalog_ref ?? null)
+        }
         onSelectType={handleTypeSelected}
         onClose={() => { setPickerOpen(false); setPickerTargetRef(null); }}
         isOpen={pickerOpen}
@@ -663,17 +845,21 @@ function StepK9({ enm }: { enm: EnergyNetworkModel }) {
   );
 }
 
-function StepK10({ validation, wizardState, runResult, isRunning, onRun }: {
-  validation: ValidationResult | null; wizardState: WizardState | null; runResult: Record<string, unknown> | null; isRunning: boolean; onRun: () => void;
+function StepK10({ validation, wizardState, runResult, isRunning, onRun, onRunPF, pfResult, isPFRunning }: {
+  validation: ValidationResult | null; wizardState: WizardState | null;
+  runResult: Record<string, unknown> | null; isRunning: boolean; onRun: () => void;
+  pfResult: Record<string, unknown> | null; isPFRunning: boolean; onRunPF: () => void;
 }) {
   const canRun = validation?.status !== 'FAIL';
-  const results = (runResult as { results?: Array<Record<string, unknown>> })?.results ?? [];
+  const scResults = (runResult as { results?: Array<Record<string, unknown>> })?.results ?? [];
+  const pfBuses = (pfResult as { bus_results?: Array<Record<string, unknown>> })?.bus_results ?? [];
+  const pfBranches = (pfResult as { branch_results?: Array<Record<string, unknown>> })?.branch_results ?? [];
   const rm = wizardState?.readinessMatrix;
 
   const analysisItems = [
-    { key: 'sc3f', label: 'Zwarcie 3F', ready: rm?.shortCircuit3F, btn: 'Uruchom zwarcia 3F' },
-    { key: 'sc1f', label: 'Zwarcie 1F', ready: rm?.shortCircuit1F, btn: null },
-    { key: 'lf', label: 'Rozpływ mocy', ready: rm?.loadFlow, btn: null },
+    { key: 'sc3f', label: 'Zwarcie 3F', ready: rm?.shortCircuit3F },
+    { key: 'sc1f', label: 'Zwarcie 1F', ready: rm?.shortCircuit1F },
+    { key: 'lf', label: 'Rozpływ mocy', ready: rm?.loadFlow },
   ];
 
   return (
@@ -714,26 +900,49 @@ function StepK10({ validation, wizardState, runResult, isRunning, onRun }: {
         </div>
       )}
 
-      <button data-testid="run-sc-btn" onClick={onRun} disabled={!canRun || isRunning} className="ind-btn-calculate text-sm px-6 py-2">
-        {isRunning ? (
-          <>
-            <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
-              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-            </svg>
-            Obliczanie...
-          </>
-        ) : (
-          <>
-            <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-              <path d="M6.3 2.841A1.5 1.5 0 004 4.11V15.89a1.5 1.5 0 002.3 1.269l9.344-5.89a1.5 1.5 0 000-2.538L6.3 2.84z" />
-            </svg>
-            Uruchom zwarcia 3F
-          </>
-        )}
-      </button>
+      {/* Run buttons */}
+      <div className="flex gap-3 flex-wrap">
+        <button data-testid="run-sc-btn" onClick={onRun} disabled={!canRun || isRunning} className="ind-btn-calculate text-sm px-6 py-2">
+          {isRunning ? (
+            <>
+              <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+              </svg>
+              Obliczanie zwarć...
+            </>
+          ) : (
+            <>
+              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                <path d="M6.3 2.841A1.5 1.5 0 004 4.11V15.89a1.5 1.5 0 002.3 1.269l9.344-5.89a1.5 1.5 0 000-2.538L6.3 2.84z" />
+              </svg>
+              Uruchom zwarcia 3F
+            </>
+          )}
+        </button>
 
-      {results.length > 0 && (
+        <button data-testid="run-pf-btn" onClick={onRunPF} disabled={!canRun || isPFRunning} className="ind-btn-calculate text-sm px-6 py-2">
+          {isPFRunning ? (
+            <>
+              <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+              </svg>
+              Obliczanie rozpływu...
+            </>
+          ) : (
+            <>
+              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                <path d="M6.3 2.841A1.5 1.5 0 004 4.11V15.89a1.5 1.5 0 002.3 1.269l9.344-5.89a1.5 1.5 0 000-2.538L6.3 2.84z" />
+              </svg>
+              Uruchom rozpływ mocy
+            </>
+          )}
+        </button>
+      </div>
+
+      {/* SC Results */}
+      {scResults.length > 0 && (
         <div className="mt-4" data-testid="sc-results">
           <SectionTitle>Wyniki zwarć 3F</SectionTitle>
           <div className="overflow-hidden rounded-md border border-chrome-200">
@@ -748,13 +957,75 @@ function StepK10({ validation, wizardState, runResult, isRunning, onRun }: {
                 </tr>
               </thead>
               <tbody className="divide-y divide-chrome-100">
-                {results.map((r, i) => (
+                {scResults.map((r, i) => (
                   <tr key={i} className="hover:bg-chrome-50">
                     <td className="px-3 py-2 font-mono text-xs text-chrome-600">{String(r.fault_node_id ?? '').slice(0, 12)}...</td>
                     <td className="px-3 py-2 text-right font-mono">{Number(r.ikss_a ?? 0).toFixed(1)}</td>
                     <td className="px-3 py-2 text-right font-mono">{Number(r.ip_a ?? 0).toFixed(1)}</td>
                     <td className="px-3 py-2 text-right font-mono">{Number(r.ith_a ?? 0).toFixed(1)}</td>
                     <td className="px-3 py-2 text-right font-mono">{Number(r.sk_mva ?? 0).toFixed(2)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* PF Bus Results */}
+      {pfBuses.length > 0 && (
+        <div className="mt-4" data-testid="pf-bus-results">
+          <SectionTitle>Rozpływ mocy — napięcia węzłowe</SectionTitle>
+          <div className="overflow-hidden rounded-md border border-chrome-200">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="bg-chrome-50 border-b border-chrome-200">
+                  <th className="text-left px-3 py-2 text-xs font-semibold text-chrome-500 uppercase tracking-wider">Szyna</th>
+                  <th className="text-right px-3 py-2 text-xs font-semibold text-chrome-500 uppercase tracking-wider">U [kV]</th>
+                  <th className="text-right px-3 py-2 text-xs font-semibold text-chrome-500 uppercase tracking-wider">U [p.u.]</th>
+                  <th className="text-right px-3 py-2 text-xs font-semibold text-chrome-500 uppercase tracking-wider">P [MW]</th>
+                  <th className="text-right px-3 py-2 text-xs font-semibold text-chrome-500 uppercase tracking-wider">Q [Mvar]</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-chrome-100">
+                {pfBuses.map((r, i) => (
+                  <tr key={i} className="hover:bg-chrome-50">
+                    <td className="px-3 py-2 font-mono text-xs text-chrome-600">{String(r.bus_id ?? r.bus_ref ?? '').slice(0, 16)}</td>
+                    <td className="px-3 py-2 text-right font-mono">{Number(r.v_kv ?? 0).toFixed(3)}</td>
+                    <td className="px-3 py-2 text-right font-mono">{Number(r.v_pu ?? 0).toFixed(4)}</td>
+                    <td className="px-3 py-2 text-right font-mono">{Number(r.p_mw ?? 0).toFixed(3)}</td>
+                    <td className="px-3 py-2 text-right font-mono">{Number(r.q_mvar ?? 0).toFixed(3)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* PF Branch Results */}
+      {pfBranches.length > 0 && (
+        <div className="mt-4" data-testid="pf-branch-results">
+          <SectionTitle>Rozpływ mocy — przepływy gałęziowe</SectionTitle>
+          <div className="overflow-hidden rounded-md border border-chrome-200">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="bg-chrome-50 border-b border-chrome-200">
+                  <th className="text-left px-3 py-2 text-xs font-semibold text-chrome-500 uppercase tracking-wider">Gałąź</th>
+                  <th className="text-right px-3 py-2 text-xs font-semibold text-chrome-500 uppercase tracking-wider">P_from [MW]</th>
+                  <th className="text-right px-3 py-2 text-xs font-semibold text-chrome-500 uppercase tracking-wider">Q_from [Mvar]</th>
+                  <th className="text-right px-3 py-2 text-xs font-semibold text-chrome-500 uppercase tracking-wider">I [A]</th>
+                  <th className="text-right px-3 py-2 text-xs font-semibold text-chrome-500 uppercase tracking-wider">Straty [kW]</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-chrome-100">
+                {pfBranches.map((r, i) => (
+                  <tr key={i} className="hover:bg-chrome-50">
+                    <td className="px-3 py-2 font-mono text-xs text-chrome-600">{String(r.branch_id ?? r.branch_ref ?? '').slice(0, 16)}</td>
+                    <td className="px-3 py-2 text-right font-mono">{Number(r.p_from_mw ?? 0).toFixed(3)}</td>
+                    <td className="px-3 py-2 text-right font-mono">{Number(r.q_from_mvar ?? 0).toFixed(3)}</td>
+                    <td className="px-3 py-2 text-right font-mono">{Number(r.i_a ?? r.i_from_a ?? 0).toFixed(1)}</td>
+                    <td className="px-3 py-2 text-right font-mono">{Number(r.losses_kw ?? 0).toFixed(2)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -868,6 +1139,8 @@ export function WizardPage() {
   const [validation, setValidation] = useState<ValidationResult | null>(null);
   const [runResult, setRunResult] = useState<Record<string, unknown> | null>(null);
   const [isRunning, setIsRunning] = useState(false);
+  const [pfResult, setPfResult] = useState<Record<string, unknown> | null>(null);
+  const [isPFRunning, setIsPFRunning] = useState(false);
   const [saveStatus, setSaveStatus] = useState<string>('');
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const caseId = getCaseId();
@@ -920,6 +1193,11 @@ export function WizardPage() {
   const handleRun = useCallback(async () => {
     setIsRunning(true); setRunResult(null);
     try { setRunResult(await runShortCircuit(caseId)); } catch (e) { setRunResult({ error: String(e) }); } finally { setIsRunning(false); }
+  }, [caseId]);
+
+  const handleRunPF = useCallback(async () => {
+    setIsPFRunning(true); setPfResult(null);
+    try { setPfResult(await runPowerFlow(caseId)); } catch (e) { setPfResult({ error: String(e) }); } finally { setIsPFRunning(false); }
   }, [caseId]);
 
   const handleNext = useCallback(async () => {
@@ -995,7 +1273,7 @@ export function WizardPage() {
           {step.id === 'K7' && <StepK7 enm={enm} onChange={handleChange} />}
           {step.id === 'K8' && <StepK8 validation={validation} onGoToStep={setCurrentStep} />}
           {step.id === 'K9' && <StepK9 enm={enm} />}
-          {step.id === 'K10' && <StepK10 validation={validation} wizardState={wizardState} runResult={runResult} isRunning={isRunning} onRun={handleRun} />}
+          {step.id === 'K10' && <StepK10 validation={validation} wizardState={wizardState} runResult={runResult} isRunning={isRunning} onRun={handleRun} pfResult={pfResult} isPFRunning={isPFRunning} onRunPF={handleRunPF} />}
 
           {/* Navigation buttons */}
           <div className="flex justify-between mt-8 pt-4 border-t border-chrome-200">
