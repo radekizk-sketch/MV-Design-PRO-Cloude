@@ -380,7 +380,7 @@ function buildBayDevices(
   // Track the current Y for sequential on-path devices.
   let currentPathY = busbarY + DEVICE_Y_FROM_BUSBAR;
   // Track the MIDSTREAM Y for OFF_PATH alignment (off-path uses the midstream slot y).
-  let midstreamY = busbarY + DEVICE_Y_FROM_BUSBAR + DEVICE_VERTICAL_STEP;
+  const midstreamY = busbarY + DEVICE_Y_FROM_BUSBAR + DEVICE_VERTICAL_STEP;
 
   // Pre-scan to find the midstream Y slot for OFF_PATH devices.
   // If there is a MIDSTREAM device, use its computed Y; otherwise use the slot.
