@@ -12,8 +12,8 @@
  * Handles:
  * - Single-select: PropertyGrid (classic)
  * - Multi-select: PropertyGridMultiEdit (P30c)
- * - Type assignment (assign type_ref)
- * - Type clearing (set type_ref to null)
+ * - Type assignment via domain operation assign_catalog_to_element
+ * - Type clearing via domain operation assign_catalog_to_element (null)
  * - Element data refresh after type changes
  */
 
@@ -23,14 +23,9 @@ import { PropertyGridMultiEdit } from './PropertyGridMultiEdit';
 import { TypePicker } from '../catalog/TypePicker';
 import { DiagnosticsSection } from '../inspector/DiagnosticsSection';
 import { useMultiSelection } from '../selection';
-import {
-  assignTypeToBranch,
-  assignTypeToTransformer,
-  assignEquipmentTypeToSwitch,
-  clearTypeFromBranch,
-  clearTypeFromTransformer,
-  clearEquipmentTypeFromSwitch,
-} from '../catalog/api';
+import { useSnapshotStore } from '../topology/snapshotStore';
+import { useAppStateStore } from '../app-state';
+import { notify } from '../notifications/store';
 import type { ElementType, ValidationMessage } from '../types';
 import type { TypeCategory } from '../catalog/types';
 import type { ElementData } from './multi-edit-helpers';
@@ -60,7 +55,7 @@ interface PropertyGridContainerProps {
  * P30c: Automatically detects single vs multi-select mode.
  */
 export function PropertyGridContainer({
-  projectId,
+  projectId: _projectId,
   elementId,
   elementType,
   elementName,
@@ -76,6 +71,10 @@ export function PropertyGridContainer({
   const [typePickerCategory, setTypePickerCategory] = useState<TypeCategory | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Domain operation integration (replaces legacy API)
+  const executeDomainOperation = useSnapshotStore((state) => state.executeDomainOperation);
+  const activeCaseId = useAppStateStore((state) => state.activeCaseId);
 
   // Determine type category and current type_ref based on element type
   const getTypeCategoryAndRef = (): { category: TypeCategory | null; currentTypeRef: string | null } => {
@@ -111,77 +110,69 @@ export function PropertyGridContainer({
     setError(null);
   }, [elementType, elementData]);
 
-  // Handle "Clear Type" button click
+  // Handle "Clear Type" — via domain operation assign_catalog_to_element (null)
   const handleClearType = useCallback(async () => {
-    if (!elementId) return;
+    if (!elementId || !activeCaseId) {
+      if (!activeCaseId) notify('Brak aktywnego Study Case', 'error');
+      return;
+    }
 
     setIsProcessing(true);
     setError(null);
 
     try {
-      switch (elementType) {
-        case 'LineBranch':
-          await clearTypeFromBranch(projectId, elementId);
-          break;
-        case 'TransformerBranch':
-          await clearTypeFromTransformer(projectId, elementId);
-          break;
-        case 'Switch':
-          await clearEquipmentTypeFromSwitch(projectId, elementId);
-          break;
-        default:
-          throw new Error(`Unsupported element type: ${elementType}`);
-      }
+      const response = await executeDomainOperation(activeCaseId, 'assign_catalog_to_element', {
+        element_ref: elementId,
+        catalog_item_id: null,
+        source: 'property_grid',
+      });
 
-      // Refresh element data
-      if (onDataRefresh) {
-        onDataRefresh();
+      if (response && !response.error) {
+        notify('Typ z katalogu wyczyszczony', 'success');
+        if (onDataRefresh) onDataRefresh();
+      } else {
+        setError(response?.error ?? 'Nieznany błąd');
       }
     } catch (err) {
-      const errorMsg = err instanceof Error ? err.message : 'Unknown error';
+      const errorMsg = err instanceof Error ? err.message : 'Nieznany błąd';
       setError(`Błąd czyszczenia typu: ${errorMsg}`);
-      console.error('Error clearing type:', err);
     } finally {
       setIsProcessing(false);
     }
-  }, [projectId, elementId, elementType, onDataRefresh]);
+  }, [elementId, activeCaseId, executeDomainOperation, onDataRefresh]);
 
-  // Handle type selection from TypePicker
+  // Handle type selection — via domain operation assign_catalog_to_element
   const handleSelectType = useCallback(
-    async (typeId: string, _typeName: string) => {
-      if (!elementId) return;
+    async (typeId: string, typeName: string) => {
+      if (!elementId || !activeCaseId) {
+        if (!activeCaseId) notify('Brak aktywnego Study Case', 'error');
+        return;
+      }
 
       setIsProcessing(true);
       setError(null);
 
       try {
-        switch (elementType) {
-          case 'LineBranch':
-            await assignTypeToBranch(projectId, elementId, typeId);
-            break;
-          case 'TransformerBranch':
-            await assignTypeToTransformer(projectId, elementId, typeId);
-            break;
-          case 'Switch':
-            await assignEquipmentTypeToSwitch(projectId, elementId, typeId);
-            break;
-          default:
-            throw new Error(`Unsupported element type: ${elementType}`);
-        }
+        const response = await executeDomainOperation(activeCaseId, 'assign_catalog_to_element', {
+          element_ref: elementId,
+          catalog_item_id: typeId,
+          source: 'property_grid',
+        });
 
-        // Refresh element data
-        if (onDataRefresh) {
-          onDataRefresh();
+        if (response && !response.error) {
+          notify(`Przypisano typ: ${typeName}`, 'success');
+          if (onDataRefresh) onDataRefresh();
+        } else {
+          setError(response?.error ?? 'Nieznany błąd');
         }
       } catch (err) {
-        const errorMsg = err instanceof Error ? err.message : 'Unknown error';
+        const errorMsg = err instanceof Error ? err.message : 'Nieznany błąd';
         setError(`Błąd przypisywania typu: ${errorMsg}`);
-        console.error('Error assigning type:', err);
       } finally {
         setIsProcessing(false);
       }
     },
-    [projectId, elementId, elementType, onDataRefresh]
+    [elementId, activeCaseId, executeDomainOperation, onDataRefresh],
   );
 
   const { currentTypeRef } = getTypeCategoryAndRef();

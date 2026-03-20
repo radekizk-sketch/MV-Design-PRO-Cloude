@@ -59,10 +59,14 @@ import { useSnapshotStore } from '../topology/snapshotStore';
 import { resolveClickAction } from './SldModeInteractionHandler';
 import { useOperationalModeStore } from './operationalModeStore';
 import { EngineeringContextMenu } from '../context-menu/EngineeringContextMenu';
-import type { EngineeringContextMenuState } from '../context-menu/EngineeringContextMenu';
+import type { EngineeringContextMenuState, CatalogGateRequest } from '../context-menu/EngineeringContextMenu';
+import type { CatalogNamespace as GateCatalogNamespace } from '../context-menu/catalogGate';
 import { useLabelModeStore } from './labelModeStore';
 import { notify } from '../notifications/store';
 import { useModalController, ModalOverlay } from './ModalController';
+import { TypePicker } from '../catalog/TypePicker';
+import { NAMESPACE_TO_PICKER_CATEGORY } from '../catalog/elementCatalogRegistry';
+import type { CatalogNamespace, TypeCategory } from '../catalog/types';
 
 /**
  * Default canvas dimensions.
@@ -438,6 +442,85 @@ export const SLDView: React.FC<SLDViewProps> = ({
     return true;
   });
 
+  // ---------------------------------------------------------------------------
+  // Bramka katalogowa — stan pickera typu
+  // ---------------------------------------------------------------------------
+  const [catalogPickerState, setCatalogPickerState] = useState<{
+    isOpen: boolean;
+    category: TypeCategory | null;
+    namespace: CatalogNamespace | null;
+    pendingOp: CatalogGateRequest | null;
+  }>({ isOpen: false, category: null, namespace: null, pendingOp: null });
+
+  /**
+   * Callback bramki katalogowej: operacja wymaga typu z katalogu.
+   * Zamiast otwierać modal od razu, najpierw otwiera TypePicker.
+   * Po wyborze typu → dispatch do ModalController z catalog_binding.
+   */
+  const handleCatalogRequired = useCallback(
+    (request: CatalogGateRequest) => {
+      // Zamknij menu kontekstowe
+      setContextMenuState(CONTEXT_MENU_CLOSED);
+
+      const ns = request.namespace as CatalogNamespace;
+      const category = NAMESPACE_TO_PICKER_CATEGORY[ns] ?? null;
+
+      if (!category) {
+        notify(`Nieznany namespace katalogu: ${request.namespace}`, 'error');
+        return;
+      }
+
+      setCatalogPickerState({
+        isOpen: true,
+        category,
+        namespace: ns,
+        pendingOp: request,
+      });
+    },
+    [],
+  );
+
+  /**
+   * Użytkownik wybrał typ z katalogu — teraz otwieramy modal operacji
+   * z catalog_binding wstrzykniętym do danych początkowych.
+   */
+  const handleCatalogTypeSelected = useCallback(
+    (typeId: string, typeName: string) => {
+      const pending = catalogPickerState.pendingOp;
+      if (!pending) return;
+
+      // Zamknij TypePicker
+      setCatalogPickerState({ isOpen: false, category: null, namespace: null, pendingOp: null });
+
+      // Zaznacz element na SLD
+      selectElement({
+        id: pending.elementId,
+        type: pending.elementType,
+        name: pending.elementId,
+      });
+
+      // Dispatch do ModalController z catalog_binding w initialFormData
+      modalController.dispatch(
+        pending.operationId,
+        pending.elementId,
+        pending.elementType,
+        {
+          catalog_binding: {
+            item_id: typeId,
+            name: typeName,
+            namespace: catalogPickerState.namespace,
+          },
+          catalog_ref: typeId,
+        },
+      );
+    },
+    [catalogPickerState, selectElement, modalController],
+  );
+
+  const handleCatalogPickerClose = useCallback(() => {
+    setCatalogPickerState({ isOpen: false, category: null, namespace: null, pendingOp: null });
+  }, []);
+
   // Export dialog state
   const [exportDialogOpen, setExportDialogOpen] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
@@ -455,6 +538,45 @@ export const SLDView: React.FC<SLDViewProps> = ({
 
   // State for cursor visual (refs don't trigger re-renders)
   const [cursorStyle, setCursorStyle] = useState<'default' | 'grabbing'>('default');
+
+  /**
+   * Nasłuchuj zdarzenia 'open-fix-modal' z ReadinessPanel — otwórz TypePicker.
+   * Zdarzenie jest emitowane przez EngineeringReadinessPanelContainer
+   * kiedy inżynier klika [Napraw] przy brakującym katalogu.
+   */
+  useEffect(() => {
+    const handleFixModal = (e: Event) => {
+      const detail = (e as CustomEvent).detail as {
+        actionType?: string;
+        elementRef?: string;
+        payloadHint?: Record<string, unknown>;
+      };
+
+      if (detail.actionType === 'SELECT_CATALOG') {
+        // Odczytaj namespace z payload_hint (backend zwraca namespace jako hint)
+        const ns = (detail.payloadHint?.catalog_namespace ?? detail.payloadHint?.namespace ?? 'KABEL_SN') as CatalogNamespace;
+        const category = NAMESPACE_TO_PICKER_CATEGORY[ns] ?? null;
+
+        if (category && detail.elementRef) {
+          setCatalogPickerState({
+            isOpen: true,
+            category,
+            namespace: ns,
+            pendingOp: {
+              operationId: 'assign_catalog_to_element',
+              elementId: detail.elementRef,
+              elementType: 'LineBranch',
+              namespace: ns as GateCatalogNamespace,
+              label: '',
+            },
+          });
+        }
+      }
+    };
+
+    window.addEventListener('open-fix-modal', handleFixModal);
+    return () => window.removeEventListener('open-fix-modal', handleFixModal);
+  }, []);
 
   /**
    * Fit to content on mount if enabled.
@@ -1005,6 +1127,30 @@ export const SLDView: React.FC<SLDViewProps> = ({
     [viewport.zoom, sldOverlay, activeProjectName, activeCaseName]
   );
 
+  // ---------------------------------------------------------------------------
+  // Wire D: Readiness blockers → SLD symbol highlighting
+  // ---------------------------------------------------------------------------
+  const readiness = useSnapshotStore((state) => state.readiness);
+  const highlightedElements = useMemo(() => {
+    const map = new Map<string, 'HIGH' | 'WARN' | 'INFO'>();
+    if (!readiness) return map;
+
+    // Blockery = czerwona obwódka (HIGH)
+    for (const blocker of readiness.blockers) {
+      if (blocker.element_ref) {
+        map.set(blocker.element_ref, 'HIGH');
+      }
+    }
+    // Ostrzeżenia = pomarańczowa obwódka (WARN)
+    for (const warning of readiness.warnings) {
+      if (warning.element_ref && !map.has(warning.element_ref)) {
+        map.set(warning.element_ref, 'WARN');
+      }
+    }
+
+    return map;
+  }, [readiness]);
+
   // Zoom percentage for display
   const zoomPercent = Math.round(viewport.zoom * 100);
 
@@ -1326,6 +1472,7 @@ export const SLDView: React.FC<SLDViewProps> = ({
           width={width}
           height={height}
           canonicalAnnotations={canonicalAnnotations}
+          highlightedElements={highlightedElements}
         />
 
         {/* Results overlay layer */}
@@ -1523,6 +1670,7 @@ export const SLDView: React.FC<SLDViewProps> = ({
         mode={isResultsMode ? 'RESULT_VIEW' : isProtectionMode ? 'RESULT_VIEW' : 'MODEL_EDIT'}
         onClose={handleContextMenuClose}
         onOperation={handleContextMenuOperation}
+        onCatalogRequired={handleCatalogRequired}
       />
 
       {/* Modal overlay — opened by context menu dispatch */}
@@ -1531,6 +1679,16 @@ export const SLDView: React.FC<SLDViewProps> = ({
         onClose={modalController.close}
         onSubmit={modalController.handleSubmit}
       />
+
+      {/* Bramka katalogowa — TypePicker otwarty PRZED modalem operacji */}
+      {catalogPickerState.isOpen && catalogPickerState.category && (
+        <TypePicker
+          category={catalogPickerState.category}
+          onSelectType={handleCatalogTypeSelected}
+          onClose={handleCatalogPickerClose}
+          isOpen={catalogPickerState.isOpen}
+        />
+      )}
     </div>
   );
 };

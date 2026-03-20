@@ -94,6 +94,13 @@ export interface SLDViewCanvasProps {
 
   /** Canonical SLD annotations (Phase 7 output, optional) */
   canonicalAnnotations?: CanonicalAnnotationsV1 | null;
+
+  /**
+   * Elementy podświetlone przez gotowość inżynieryjną (readiness blockers).
+   * Klucz: elementId/symbolId, wartość: severity ('HIGH' | 'WARN' | 'INFO').
+   * Symbole z tego zbioru renderują się z kolorową obwódką walidacji.
+   */
+  highlightedElements?: ReadonlyMap<string, 'HIGH' | 'WARN' | 'INFO'>;
 }
 
 /**
