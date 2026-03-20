@@ -27,6 +27,8 @@ import { WizardSldPreview } from './WizardSldPreview';
 import { useWizardStore } from './useWizardStore';
 import type { WizardIssueApi } from './useWizardStore';
 import { useSnapshotStore } from '../topology/snapshotStore';
+import { TypePicker } from '../catalog/TypePicker';
+import type { TypeCategory } from '../catalog/types';
 import { clsx } from 'clsx';
 
 // ---------------------------------------------------------------------------
@@ -272,73 +274,229 @@ function StepK3({ enm, onChange }: StepProps) {
 function StepK4({ enm, onChange }: StepProps) {
   const lines = enm.branches.filter((b): b is OverheadLine | Cable => b.type === 'line_overhead' || b.type === 'cable');
   const refs = enm.buses.map((b) => b.ref_id);
-  const add = () => {
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [pickerCategory, setPickerCategory] = useState<TypeCategory>('LINE');
+  const [pickerTargetRef, setPickerTargetRef] = useState<string | null>(null);
+
+  const add = (branchType: 'line_overhead' | 'cable') => {
     const n = lines.length + 1;
-    const nl: OverheadLine = { id: crypto.randomUUID(), ref_id: `line_L${String(n).padStart(2, '0')}`, name: `Linia L${n}`, tags: [], meta: {}, type: 'line_overhead', from_bus_ref: refs[0] ?? '', to_bus_ref: refs[1] ?? refs[0] ?? '', status: 'closed', length_km: 5, r_ohm_per_km: 0.443, x_ohm_per_km: 0.340 };
-    onChange({ ...enm, branches: [...enm.branches, nl] });
+    const isLine = branchType === 'line_overhead';
+    const nl = {
+      id: crypto.randomUUID(),
+      ref_id: `${isLine ? 'line' : 'cable'}_L${String(n).padStart(2, '0')}`,
+      name: isLine ? `Linia L${n}` : `Kabel K${n}`,
+      tags: [], meta: {},
+      type: branchType,
+      from_bus_ref: refs[0] ?? '', to_bus_ref: refs[1] ?? refs[0] ?? '',
+      status: 'closed' as const, length_km: 1, r_ohm_per_km: 0, x_ohm_per_km: 0,
+    };
+    onChange({ ...enm, branches: [...enm.branches, nl as OverheadLine | Cable] });
   };
   const upd = (ref: string, p: Partial<OverheadLine | Cable>) => onChange({ ...enm, branches: enm.branches.map((b) => (b.ref_id === ref ? ({ ...b, ...p } as typeof b) : b)) });
   const rm = (ref: string) => onChange({ ...enm, branches: enm.branches.filter((b) => b.ref_id !== ref) });
 
+  const openCatalogPicker = (branchRefId: string, branchType: string) => {
+    setPickerTargetRef(branchRefId);
+    setPickerCategory(branchType === 'cable' ? 'CABLE' : 'LINE');
+    setPickerOpen(true);
+  };
+
+  const handleTypeSelected = (typeId: string, typeName: string) => {
+    if (!pickerTargetRef) return;
+    const branch = enm.branches.find((b) => b.ref_id === pickerTargetRef) as OverheadLine | Cable | undefined;
+    if (!branch) return;
+    // Parametry zostaną zmaterializowane po przypisaniu katalogu przez backend
+    // Na razie zapisujemy catalog_ref — readiness gate odblokuje obliczenia
+    upd(pickerTargetRef, {
+      catalog_ref: typeId,
+      parameter_source: 'CATALOG',
+      name: typeName,
+    } as Partial<OverheadLine | Cable>);
+    setPickerOpen(false);
+    setPickerTargetRef(null);
+  };
+
   return (
     <div>
+      <HelpText>Dodaj linie napowietrzne lub kable SN. Wybierz typ z katalogu — parametry elektryczne zostaną wypełnione automatycznie.</HelpText>
       <div className="space-y-3">
         {lines.map((l) => (
           <div key={l.ref_id} className="wizard-card">
             <div className="wizard-card-header">
               <span className="text-sm font-semibold text-ind-800">{l.name}</span>
-              <RemoveButton onClick={() => rm(l.ref_id)} />
+              <div className="flex items-center gap-1">
+                {l.catalog_ref ? (
+                  <span className="ind-badge ind-badge-ok text-[10px]">Katalog</span>
+                ) : (
+                  <span className="ind-badge ind-badge-warn text-[10px]">Brak typu</span>
+                )}
+                <RemoveButton onClick={() => rm(l.ref_id)} />
+              </div>
             </div>
+
+            {/* Typ z katalogu */}
+            <FieldRow label="Typ z katalogu">
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-chrome-600 flex-1 truncate">
+                  {l.catalog_ref ? l.name : 'Nie wybrano'}
+                </span>
+                <button
+                  onClick={() => openCatalogPicker(l.ref_id, l.type)}
+                  className="ind-btn text-ind-600 bg-ind-50 hover:bg-ind-100 border border-ind-200 text-[11px] whitespace-nowrap"
+                >
+                  {l.catalog_ref ? 'Zmień typ' : 'Wybierz z katalogu'}
+                </button>
+                {l.catalog_ref && (
+                  <button
+                    onClick={() => upd(l.ref_id, { catalog_ref: null, parameter_source: null } as Partial<OverheadLine>)}
+                    className="ind-btn text-red-500 bg-red-50 hover:bg-red-100 border border-red-200 text-[11px]"
+                  >
+                    Wyczyść
+                  </button>
+                )}
+              </div>
+            </FieldRow>
+
+            <FieldRow label="Rodzaj">
+              <Select value={l.type} onChange={(v) => upd(l.ref_id, { type: v as 'line_overhead' | 'cable' })}>
+                <option value="line_overhead">Linia napowietrzna</option>
+                <option value="cable">Kabel</option>
+              </Select>
+            </FieldRow>
             <FieldRow label="Nazwa"><Input value={l.name} onChange={(v) => upd(l.ref_id, { name: v })} /></FieldRow>
             <FieldRow label="Z szyny"><Select value={l.from_bus_ref} onChange={(v) => upd(l.ref_id, { from_bus_ref: v })}>{refs.map((r) => <option key={r} value={r}>{r}</option>)}</Select></FieldRow>
             <FieldRow label="Do szyny"><Select value={l.to_bus_ref} onChange={(v) => upd(l.ref_id, { to_bus_ref: v })}>{refs.map((r) => <option key={r} value={r}>{r}</option>)}</Select></FieldRow>
             <FieldRow label="Długość" unit="km"><Input type="number" value={l.length_km} onChange={(v) => upd(l.ref_id, { length_km: Number(v) || 0 })} /></FieldRow>
-            <FieldRow label="R" unit="&Omega;/km"><Input type="number" value={l.r_ohm_per_km} onChange={(v) => upd(l.ref_id, { r_ohm_per_km: Number(v) || 0 })} /></FieldRow>
-            <FieldRow label="X" unit="&Omega;/km"><Input type="number" value={l.x_ohm_per_km} onChange={(v) => upd(l.ref_id, { x_ohm_per_km: Number(v) || 0 })} /></FieldRow>
+
+            {/* Parametry elektryczne — read-only gdy z katalogu */}
+            <div className={l.catalog_ref ? 'opacity-60 pointer-events-none' : ''}>
+              {l.catalog_ref && (
+                <div className="text-[10px] text-ind-500 mb-1 mt-2 font-medium">Parametry z katalogu (tylko odczyt)</div>
+              )}
+              <FieldRow label="R" unit="&Omega;/km"><Input type="number" value={l.r_ohm_per_km} onChange={(v) => upd(l.ref_id, { r_ohm_per_km: Number(v) || 0 })} /></FieldRow>
+              <FieldRow label="X" unit="&Omega;/km"><Input type="number" value={l.x_ohm_per_km} onChange={(v) => upd(l.ref_id, { x_ohm_per_km: Number(v) || 0 })} /></FieldRow>
+            </div>
           </div>
         ))}
       </div>
-      <AddButton onClick={add} label="Dodaj linię / kabel" />
+      <div className="flex gap-2 mt-3">
+        <AddButton onClick={() => add('line_overhead')} label="Dodaj linię" />
+        <AddButton onClick={() => add('cable')} label="Dodaj kabel" />
+      </div>
+
+      {/* TypePicker modal */}
+      <TypePicker
+        category={pickerCategory}
+        currentTypeId={lines.find((l) => l.ref_id === pickerTargetRef)?.catalog_ref ?? null}
+        onSelectType={handleTypeSelected}
+        onClose={() => { setPickerOpen(false); setPickerTargetRef(null); }}
+        isOpen={pickerOpen}
+      />
     </div>
   );
 }
 
 function StepK5({ enm, onChange }: StepProps) {
   const refs = enm.buses.map((b) => b.ref_id);
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [pickerTargetRef, setPickerTargetRef] = useState<string | null>(null);
+
   const add = () => {
     const n = enm.transformers.length + 1;
-    const t: Transformer = { id: crypto.randomUUID(), ref_id: `trafo_T${n}`, name: `Transformator T${n}`, tags: [], meta: {}, hv_bus_ref: refs[0] ?? '', lv_bus_ref: refs[1] ?? refs[0] ?? '', sn_mva: 25, uhv_kv: 110, ulv_kv: 15, uk_percent: 12, pk_kw: 120 };
+    const t: Transformer = { id: crypto.randomUUID(), ref_id: `trafo_T${n}`, name: `Transformator T${n}`, tags: [], meta: {}, hv_bus_ref: refs[0] ?? '', lv_bus_ref: refs[1] ?? refs[0] ?? '', sn_mva: 0, uhv_kv: 0, ulv_kv: 0, uk_percent: 0, pk_kw: 0 };
     onChange({ ...enm, transformers: [...enm.transformers, t] });
   };
   const upd = (ref: string, p: Partial<Transformer>) => onChange({ ...enm, transformers: enm.transformers.map((t) => t.ref_id === ref ? { ...t, ...p } : t) });
   const rm = (ref: string) => onChange({ ...enm, transformers: enm.transformers.filter((t) => t.ref_id !== ref) });
 
+  const handleTypeSelected = (typeId: string, typeName: string) => {
+    if (!pickerTargetRef) return;
+    upd(pickerTargetRef, {
+      catalog_ref: typeId,
+      parameter_source: 'CATALOG',
+      name: typeName,
+    });
+    setPickerOpen(false);
+    setPickerTargetRef(null);
+  };
+
   return (
     <div>
+      <HelpText>Dodaj transformatory SN/nN. Wybierz typ z katalogu — dane znamionowe zostaną wypełnione automatycznie.</HelpText>
       <div className="space-y-3">
         {enm.transformers.map((t) => (
           <div key={t.ref_id} className="wizard-card">
             <div className="wizard-card-header">
               <span className="text-sm font-semibold text-ind-800">{t.name}</span>
-              <RemoveButton onClick={() => rm(t.ref_id)} />
+              <div className="flex items-center gap-1">
+                {t.catalog_ref ? (
+                  <span className="ind-badge ind-badge-ok text-[10px]">Katalog</span>
+                ) : (
+                  <span className="ind-badge ind-badge-warn text-[10px]">Brak typu</span>
+                )}
+                <RemoveButton onClick={() => rm(t.ref_id)} />
+              </div>
             </div>
+
+            {/* Typ z katalogu */}
+            <FieldRow label="Typ z katalogu">
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-chrome-600 flex-1 truncate">
+                  {t.catalog_ref ? t.name : 'Nie wybrano'}
+                </span>
+                <button
+                  onClick={() => { setPickerTargetRef(t.ref_id); setPickerOpen(true); }}
+                  className="ind-btn text-ind-600 bg-ind-50 hover:bg-ind-100 border border-ind-200 text-[11px] whitespace-nowrap"
+                >
+                  {t.catalog_ref ? 'Zmień typ' : 'Wybierz z katalogu'}
+                </button>
+                {t.catalog_ref && (
+                  <button
+                    onClick={() => upd(t.ref_id, { catalog_ref: null, parameter_source: null })}
+                    className="ind-btn text-red-500 bg-red-50 hover:bg-red-100 border border-red-200 text-[11px]"
+                  >
+                    Wyczyść
+                  </button>
+                )}
+              </div>
+            </FieldRow>
+
             <FieldRow label="Szyna GN"><Select value={t.hv_bus_ref} onChange={(v) => upd(t.ref_id, { hv_bus_ref: v })}>{refs.map((r) => <option key={r} value={r}>{r}</option>)}</Select></FieldRow>
             <FieldRow label="Szyna DN"><Select value={t.lv_bus_ref} onChange={(v) => upd(t.ref_id, { lv_bus_ref: v })}>{refs.map((r) => <option key={r} value={r}>{r}</option>)}</Select></FieldRow>
-            <FieldRow label="Sn" unit="MVA"><Input type="number" value={t.sn_mva} onChange={(v) => upd(t.ref_id, { sn_mva: Number(v) || 0 })} /></FieldRow>
-            <FieldRow label="UGN" unit="kV"><Input type="number" value={t.uhv_kv} onChange={(v) => upd(t.ref_id, { uhv_kv: Number(v) || 0 })} /></FieldRow>
-            <FieldRow label="UDN" unit="kV"><Input type="number" value={t.ulv_kv} onChange={(v) => upd(t.ref_id, { ulv_kv: Number(v) || 0 })} /></FieldRow>
-            <FieldRow label="uk" unit="%"><Input type="number" value={t.uk_percent} onChange={(v) => upd(t.ref_id, { uk_percent: Number(v) || 0 })} /></FieldRow>
-            <FieldRow label="Pk" unit="kW"><Input type="number" value={t.pk_kw} onChange={(v) => upd(t.ref_id, { pk_kw: Number(v) || 0 })} /></FieldRow>
+
+            {/* Dane znamionowe — read-only gdy z katalogu */}
+            <div className={t.catalog_ref ? 'opacity-60 pointer-events-none' : ''}>
+              {t.catalog_ref && (
+                <div className="text-[10px] text-ind-500 mb-1 mt-2 font-medium">Dane znamionowe z katalogu (tylko odczyt)</div>
+              )}
+              <FieldRow label="Sn" unit="MVA"><Input type="number" value={t.sn_mva} onChange={(v) => upd(t.ref_id, { sn_mva: Number(v) || 0 })} /></FieldRow>
+              <FieldRow label="UGN" unit="kV"><Input type="number" value={t.uhv_kv} onChange={(v) => upd(t.ref_id, { uhv_kv: Number(v) || 0 })} /></FieldRow>
+              <FieldRow label="UDN" unit="kV"><Input type="number" value={t.ulv_kv} onChange={(v) => upd(t.ref_id, { ulv_kv: Number(v) || 0 })} /></FieldRow>
+              <FieldRow label="uk" unit="%"><Input type="number" value={t.uk_percent} onChange={(v) => upd(t.ref_id, { uk_percent: Number(v) || 0 })} /></FieldRow>
+              <FieldRow label="Pk" unit="kW"><Input type="number" value={t.pk_kw} onChange={(v) => upd(t.ref_id, { pk_kw: Number(v) || 0 })} /></FieldRow>
+            </div>
           </div>
         ))}
       </div>
       <AddButton onClick={add} label="Dodaj transformator" />
+
+      {/* TypePicker modal */}
+      <TypePicker
+        category={'TRANSFORMER' as TypeCategory}
+        currentTypeId={enm.transformers.find((t) => t.ref_id === pickerTargetRef)?.catalog_ref ?? null}
+        onSelectType={handleTypeSelected}
+        onClose={() => { setPickerOpen(false); setPickerTargetRef(null); }}
+        isOpen={pickerOpen}
+      />
     </div>
   );
 }
 
 function StepK6({ enm, onChange }: StepProps) {
   const refs = enm.buses.map((b) => b.ref_id);
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [pickerTargetRef, setPickerTargetRef] = useState<string | null>(null);
+
   const addLoad = () => {
     const n = enm.loads.length + 1;
     onChange({ ...enm, loads: [...enm.loads, { id: crypto.randomUUID(), ref_id: `load_${n}`, name: `Odbiór ${n}`, tags: [], meta: {}, bus_ref: refs[refs.length - 1] ?? '', p_mw: 1, q_mvar: 0.3, model: 'pq' as const }] });
@@ -346,9 +504,21 @@ function StepK6({ enm, onChange }: StepProps) {
   const updLoad = (ref: string, p: Partial<Load>) => onChange({ ...enm, loads: enm.loads.map((l) => l.ref_id === ref ? { ...l, ...p } : l) });
   const rmLoad = (ref: string) => onChange({ ...enm, loads: enm.loads.filter((l) => l.ref_id !== ref) });
 
+  const handleTypeSelected = (typeId: string, typeName: string) => {
+    if (!pickerTargetRef) return;
+    updLoad(pickerTargetRef, {
+      catalog_ref: typeId,
+      parameter_source: 'CATALOG',
+      name: typeName,
+    });
+    setPickerOpen(false);
+    setPickerTargetRef(null);
+  };
+
   return (
     <div>
       <SectionTitle>Odbiory</SectionTitle>
+      <HelpText>Dodaj odbiorniki mocy. Opcjonalnie wybierz typ z katalogu — parametry mocy zostaną wypełnione automatycznie.</HelpText>
       <div className="space-y-3">
         {enm.loads.map((ld) => (
           <div key={ld.ref_id} className="wizard-card">
@@ -356,13 +526,29 @@ function StepK6({ enm, onChange }: StepProps) {
               <span className="text-sm font-semibold text-ind-800">{ld.name}</span>
               <RemoveButton onClick={() => rmLoad(ld.ref_id)} />
             </div>
+            <FieldRow label="Nazwa"><Input value={ld.name} onChange={(v) => updLoad(ld.ref_id, { name: v })} /></FieldRow>
             <FieldRow label="Szyna"><Select value={ld.bus_ref} onChange={(v) => updLoad(ld.ref_id, { bus_ref: v })}>{refs.map((r) => <option key={r} value={r}>{r}</option>)}</Select></FieldRow>
             <FieldRow label="P" unit="MW"><Input type="number" value={ld.p_mw} onChange={(v) => updLoad(ld.ref_id, { p_mw: Number(v) || 0 })} /></FieldRow>
             <FieldRow label="Q" unit="Mvar"><Input type="number" value={ld.q_mvar} onChange={(v) => updLoad(ld.ref_id, { q_mvar: Number(v) || 0 })} /></FieldRow>
+            <FieldRow label="Model">
+              <Select value={ld.model} onChange={(v) => updLoad(ld.ref_id, { model: v as 'pq' | 'zip' })}>
+                <option value="pq">Stała moc (PQ)</option>
+                <option value="zip">Model ZIP</option>
+              </Select>
+            </FieldRow>
           </div>
         ))}
       </div>
       <AddButton onClick={addLoad} label="Dodaj odbiór" />
+
+      {/* TypePicker modal */}
+      <TypePicker
+        category={'LOAD' as TypeCategory}
+        currentTypeId={enm.loads.find((l) => l.ref_id === pickerTargetRef)?.catalog_ref ?? null}
+        onSelectType={handleTypeSelected}
+        onClose={() => { setPickerOpen(false); setPickerTargetRef(null); }}
+        isOpen={pickerOpen}
+      />
     </div>
   );
 }
