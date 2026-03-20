@@ -139,6 +139,13 @@ export const ROUTES: Record<string, RouteDefinition> = {
     icon: 'SWG',
     requiredMode: 'MODEL_EDIT',
   },
+  CATALOG: {
+    hash: '#catalog',
+    label: 'Biblioteka typow',
+    description: 'Przegladanie i zarzadzanie katalogiem typow elementow sieci',
+    icon: 'CAT',
+    requiredMode: undefined,
+  },
 };
 
 /**

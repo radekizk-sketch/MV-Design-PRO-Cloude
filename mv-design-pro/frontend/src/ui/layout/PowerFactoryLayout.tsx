@@ -117,6 +117,7 @@ export interface PowerFactoryLayoutProps {
   validationErrors?: number;
   hideInspector?: boolean;
   onMenuAction?: (actionId: string) => void;
+  networkStats?: { nodeCount?: number; branchCount?: number };
 }
 
 // =============================================================================
@@ -200,6 +201,7 @@ export function PowerFactoryLayout({
   validationErrors = 0,
   hideInspector = false,
   onMenuAction,
+  networkStats,
 }: PowerFactoryLayoutProps) {
   // App state
   const caseManagerOpen = useCaseManagerOpen();
@@ -441,6 +443,7 @@ export function PowerFactoryLayout({
         validationStatus={validationStatus}
         validationWarnings={validationWarnings}
         validationErrors={validationErrors}
+        networkStats={networkStats}
       />
     </div>
   );
