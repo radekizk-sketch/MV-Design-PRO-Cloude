@@ -52,6 +52,7 @@ import { NotificationToast } from './ui/notifications/NotificationToast';
 import { notify } from './ui/notifications/store';
 import type { TreeNode, TreeNodeType, ElementType } from './ui/types';
 import { TypeLibraryBrowser } from './ui/catalog';
+import { PowerDistributionPage } from './ui/power-distribution';
 import { CaseConfigPage } from './ui/study-cases/CaseConfigPage';
 import { ProtectionSettingsPage } from './ui/protection-engine-v1/ProtectionSettingsPage';
 import { InspectorResolver } from './ui/inspector-panel';
@@ -394,6 +395,15 @@ function App() {
     return wrapWithReadyIndicator(
       <PowerFactoryLayout {...layoutProps}>
         <ProtectionSettingsPage />
+      </PowerFactoryLayout>
+    );
+  }
+
+  // Architektura rozdzialu mocy (Power Distribution Architecture)
+  if (route === '#power-distribution') {
+    return wrapWithReadyIndicator(
+      <PowerFactoryLayout {...layoutProps}>
+        <PowerDistributionPage />
       </PowerFactoryLayout>
     );
   }
