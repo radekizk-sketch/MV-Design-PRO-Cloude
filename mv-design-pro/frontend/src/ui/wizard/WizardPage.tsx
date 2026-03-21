@@ -21,6 +21,7 @@ import type {
   Source,
   Load,
   Generator,
+  GroundingConfig,
   ValidationResult,
 } from '../../types/enm';
 import { computeWizardState, getStepStatusColor, getOverallStatusLabel } from './wizardStateMachine';
@@ -510,6 +511,9 @@ function StepK5({ enm, onChange }: StepProps) {
   const refs = enm.buses.map((b) => b.ref_id);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [pickerTargetRef, setPickerTargetRef] = useState<string | null>(null);
+  const [expandedTap, setExpandedTap] = useState<Record<string, boolean>>({});
+
+  const VECTOR_GROUPS = ['Dyn5', 'Dyn11', 'Yyn0', 'Yzn5', 'Dzn0'];
 
   const add = () => {
     const n = enm.transformers.length + 1;
@@ -529,6 +533,8 @@ function StepK5({ enm, onChange }: StepProps) {
     setPickerOpen(false);
     setPickerTargetRef(null);
   };
+
+  const hasTapChanger = (t: Transformer) => t.tap_min != null || t.tap_max != null || t.tap_position != null || t.tap_step_percent != null;
 
   return (
     <div>
@@ -574,6 +580,14 @@ function StepK5({ enm, onChange }: StepProps) {
             <FieldRow label="Szyna GN"><Select value={t.hv_bus_ref} onChange={(v) => upd(t.ref_id, { hv_bus_ref: v })}>{refs.map((r) => <option key={r} value={r}>{r}</option>)}</Select></FieldRow>
             <FieldRow label="Szyna DN"><Select value={t.lv_bus_ref} onChange={(v) => upd(t.ref_id, { lv_bus_ref: v })}>{refs.map((r) => <option key={r} value={r}>{r}</option>)}</Select></FieldRow>
 
+            {/* Grupa polaczen */}
+            <FieldRow label="Grupa połączeń">
+              <Select value={t.vector_group ?? ''} onChange={(v) => upd(t.ref_id, { vector_group: v || null })}>
+                <option value="">Nie określono</option>
+                {VECTOR_GROUPS.map((vg) => <option key={vg} value={vg}>{vg}</option>)}
+              </Select>
+            </FieldRow>
+
             {/* Dane znamionowe — read-only gdy z katalogu */}
             <div className={t.catalog_ref ? 'opacity-60 pointer-events-none' : ''}>
               {t.catalog_ref && (
@@ -584,7 +598,42 @@ function StepK5({ enm, onChange }: StepProps) {
               <FieldRow label="UDN" unit="kV"><Input type="number" value={t.ulv_kv} onChange={(v) => upd(t.ref_id, { ulv_kv: Number(v) || 0 })} /></FieldRow>
               <FieldRow label="uk" unit="%"><Input type="number" value={t.uk_percent} onChange={(v) => upd(t.ref_id, { uk_percent: Number(v) || 0 })} /></FieldRow>
               <FieldRow label="Pk" unit="kW"><Input type="number" value={t.pk_kw} onChange={(v) => upd(t.ref_id, { pk_kw: Number(v) || 0 })} /></FieldRow>
+              <FieldRow label="P0 (straty jałowe)" unit="kW"><Input type="number" value={t.p0_kw ?? ''} onChange={(v) => upd(t.ref_id, { p0_kw: v ? Number(v) : null })} placeholder="opcjonalne" /></FieldRow>
+              <FieldRow label="I0 (prąd jałowy)" unit="%"><Input type="number" value={t.i0_percent ?? ''} onChange={(v) => upd(t.ref_id, { i0_percent: v ? Number(v) : null })} placeholder="opcjonalne" /></FieldRow>
             </div>
+
+            {/* Przełącznik zaczepów */}
+            <button onClick={() => setExpandedTap((s) => ({ ...s, [t.ref_id]: !s[t.ref_id] }))} className="text-[11px] text-ind-600 hover:underline mt-2">
+              {expandedTap[t.ref_id] ? '\u25BE' : '\u25B8'} Przełącznik zaczepów
+              {hasTapChanger(t) && <span className="ind-badge ind-badge-ok text-[10px] ml-2">Skonfigurowany</span>}
+            </button>
+            {expandedTap[t.ref_id] && (
+              <div className="mt-1">
+                <div className="flex items-center gap-2 mb-2">
+                  <input
+                    type="checkbox"
+                    checked={hasTapChanger(t)}
+                    onChange={(e) => {
+                      if (e.target.checked) {
+                        upd(t.ref_id, { tap_position: 0, tap_min: -5, tap_max: 5, tap_step_percent: 2.5 });
+                      } else {
+                        upd(t.ref_id, { tap_position: null, tap_min: null, tap_max: null, tap_step_percent: null });
+                      }
+                    }}
+                    className="rounded border-chrome-300"
+                  />
+                  <span className="text-xs text-chrome-600">Posiada podobciążeniowy przełącznik zaczepów</span>
+                </div>
+                {hasTapChanger(t) && (
+                  <>
+                    <FieldRow label="Aktualna pozycja"><Input type="number" value={t.tap_position ?? 0} onChange={(v) => upd(t.ref_id, { tap_position: v !== '' ? Number(v) : null })} /></FieldRow>
+                    <FieldRow label="Zakres min"><Input type="number" value={t.tap_min ?? -5} onChange={(v) => upd(t.ref_id, { tap_min: v !== '' ? Number(v) : null })} /></FieldRow>
+                    <FieldRow label="Zakres max"><Input type="number" value={t.tap_max ?? 5} onChange={(v) => upd(t.ref_id, { tap_max: v !== '' ? Number(v) : null })} /></FieldRow>
+                    <FieldRow label="Krok zaczepów" unit="%"><Input type="number" value={t.tap_step_percent ?? 2.5} onChange={(v) => upd(t.ref_id, { tap_step_percent: v !== '' ? Number(v) : null })} /></FieldRow>
+                  </>
+                )}
+              </div>
+            )}
           </div>
         ))}
       </div>
@@ -607,6 +656,17 @@ function StepK6({ enm, onChange }: StepProps) {
   const [pickerOpen, setPickerOpen] = useState(false);
   const [pickerTargetRef, setPickerTargetRef] = useState<string | null>(null);
   const [pickerTarget, setPickerTarget] = useState<'load' | 'generator'>('load');
+  const [expandedLimits, setExpandedLimits] = useState<Record<string, boolean>>({});
+
+  // --- cos phi helper (UI convenience, not physics) ---
+  const computeCosPhi = (p: number, q: number): number => {
+    if (p === 0 && q === 0) return 1;
+    return Math.cos(Math.atan2(q, p));
+  };
+  const qFromCosPhi = (p: number, cosPhi: number): number => {
+    if (cosPhi <= 0 || cosPhi > 1) return 0;
+    return p * Math.tan(Math.acos(cosPhi));
+  };
 
   // --- Loads ---
   const addLoad = () => {
@@ -666,6 +726,20 @@ function StepK6({ enm, onChange }: StepProps) {
             <FieldRow label="Szyna"><Select value={ld.bus_ref} onChange={(v) => updLoad(ld.ref_id, { bus_ref: v })}>{refs.map((r) => <option key={r} value={r}>{r}</option>)}</Select></FieldRow>
             <FieldRow label="P" unit="MW"><Input type="number" value={ld.p_mw} onChange={(v) => updLoad(ld.ref_id, { p_mw: Number(v) || 0 })} /></FieldRow>
             <FieldRow label="Q" unit="Mvar"><Input type="number" value={ld.q_mvar} onChange={(v) => updLoad(ld.ref_id, { q_mvar: Number(v) || 0 })} /></FieldRow>
+            <FieldRow label="cos phi">
+              <div className="flex items-center gap-2">
+                <Input type="number" value={Number(computeCosPhi(ld.p_mw, ld.q_mvar).toFixed(4))} onChange={(v) => {
+                  const cp = Number(v);
+                  if (cp > 0 && cp <= 1) {
+                    updLoad(ld.ref_id, { q_mvar: Number(qFromCosPhi(ld.p_mw, cp).toFixed(4)) });
+                  }
+                }} />
+                <span className="text-[10px] text-chrome-400 whitespace-nowrap">Zmiana przelicza Q</span>
+              </div>
+            </FieldRow>
+            <FieldRow label="Liczba identycznych">
+              <Input type="number" value={ld.quantity ?? 1} onChange={(v) => updLoad(ld.ref_id, { quantity: Number(v) >= 1 ? Math.round(Number(v)) : 1 })} placeholder="1" />
+            </FieldRow>
             <FieldRow label="Model">
               <Select value={ld.model} onChange={(v) => updLoad(ld.ref_id, { model: v as 'pq' | 'zip' })}>
                 <option value="pq">Stała moc (PQ)</option>
@@ -689,6 +763,25 @@ function StepK6({ enm, onChange }: StepProps) {
                 <RemoveButton onClick={() => rmGen(g.ref_id)} />
               </div>
             </div>
+            <FieldRow label="Typ z katalogu">
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-chrome-600 flex-1 truncate">{g.catalog_ref ? g.name : 'Nie wybrano'}</span>
+                <button
+                  onClick={() => { setPickerTargetRef(g.ref_id); setPickerTarget('generator'); setPickerOpen(true); }}
+                  className="ind-btn text-ind-600 bg-ind-50 hover:bg-ind-100 border border-ind-200 text-[11px] whitespace-nowrap"
+                >
+                  {g.catalog_ref ? 'Zmień typ' : 'Wybierz z katalogu'}
+                </button>
+                {g.catalog_ref && (
+                  <button
+                    onClick={() => updGen(g.ref_id, { catalog_ref: null, parameter_source: null })}
+                    className="ind-btn text-red-500 bg-red-50 hover:bg-red-100 border border-red-200 text-[11px]"
+                  >
+                    Wyczyść
+                  </button>
+                )}
+              </div>
+            </FieldRow>
             <FieldRow label="Nazwa"><Input value={g.name} onChange={(v) => updGen(g.ref_id, { name: v })} /></FieldRow>
             <FieldRow label="Typ">
               <Select value={g.gen_type ?? 'pv_inverter'} onChange={(v) => updGen(g.ref_id, { gen_type: v as Generator['gen_type'] })}>
@@ -709,6 +802,22 @@ function StepK6({ enm, onChange }: StepProps) {
             )}
             {g.gen_type !== 'synchronous' && (
               <FieldRow label="Liczba równoległych"><Input type="number" value={g.n_parallel ?? 1} onChange={(v) => updGen(g.ref_id, { n_parallel: Number(v) || 1 })} /></FieldRow>
+            )}
+
+            {/* Limity mocy — collapsible */}
+            <button onClick={() => setExpandedLimits((s) => ({ ...s, [g.ref_id]: !s[g.ref_id] }))} className="text-[11px] text-ind-600 hover:underline mt-2">
+              {expandedLimits[g.ref_id] ? '\u25BE' : '\u25B8'} Limity mocy (P, Q)
+              {g.limits && (g.limits.p_min_mw != null || g.limits.p_max_mw != null || g.limits.q_min_mvar != null || g.limits.q_max_mvar != null) && (
+                <span className="ind-badge ind-badge-ok text-[10px] ml-2">Skonfigurowane</span>
+              )}
+            </button>
+            {expandedLimits[g.ref_id] && (
+              <div className="mt-1">
+                <FieldRow label="P_min" unit="MW"><Input type="number" value={g.limits?.p_min_mw ?? ''} onChange={(v) => updGen(g.ref_id, { limits: { ...g.limits, p_min_mw: v !== '' ? Number(v) : null } })} placeholder="opcjonalne" /></FieldRow>
+                <FieldRow label="P_max" unit="MW"><Input type="number" value={g.limits?.p_max_mw ?? ''} onChange={(v) => updGen(g.ref_id, { limits: { ...g.limits, p_max_mw: v !== '' ? Number(v) : null } })} placeholder="opcjonalne" /></FieldRow>
+                <FieldRow label="Q_min" unit="Mvar"><Input type="number" value={g.limits?.q_min_mvar ?? ''} onChange={(v) => updGen(g.ref_id, { limits: { ...g.limits, q_min_mvar: v !== '' ? Number(v) : null } })} placeholder="opcjonalne" /></FieldRow>
+                <FieldRow label="Q_max" unit="Mvar"><Input type="number" value={g.limits?.q_max_mvar ?? ''} onChange={(v) => updGen(g.ref_id, { limits: { ...g.limits, q_max_mvar: v !== '' ? Number(v) : null } })} placeholder="opcjonalne" /></FieldRow>
+              </div>
             )}
           </div>
         ))}
@@ -735,12 +844,108 @@ function StepK6({ enm, onChange }: StepProps) {
   );
 }
 
-function StepK7({ enm }: StepProps) {
+function StepK7({ enm, onChange }: StepProps) {
   const noZ0 = enm.branches.filter((b): b is OverheadLine | Cable => (b.type === 'line_overhead' || b.type === 'cable') && b.r0_ohm_per_km == null && b.x0_ohm_per_km == null);
   const srcNoZ0 = enm.sources.filter((s) => s.r0_ohm == null && s.x0_ohm == null && s.z0_z1_ratio == null);
+  const [expandedGrounding, setExpandedGrounding] = useState<Record<string, boolean>>({});
+
+  const GROUNDING_TYPES: { value: NonNullable<GroundingConfig['type']>; label: string }[] = [
+    { value: 'isolated', label: 'Izolowany' },
+    { value: 'petersen_coil', label: 'Cewka Petersena' },
+    { value: 'directly_grounded', label: 'Bezpośrednio uziemiony' },
+    { value: 'resistor_grounded', label: 'Uziemiony przez rezystor' },
+  ];
+
+  const sourceBus = enm.buses.find((b) => b.tags.includes('source'));
+
+  const updBusGrounding = (busRef: string, grounding: GroundingConfig | null) => {
+    onChange({ ...enm, buses: enm.buses.map((b) => b.ref_id === busRef ? { ...b, grounding } : b) });
+  };
+
+  // Compute Z0 status label for summary table
+  const getZ0Status = (elementType: string, element: OverheadLine | Cable | Source): string => {
+    if (elementType === 'branch') {
+      const br = element as OverheadLine | Cable;
+      return (br.r0_ohm_per_km != null || br.x0_ohm_per_km != null) ? 'Kompletne' : 'Brak';
+    }
+    const src = element as Source;
+    return (src.r0_ohm != null || src.x0_ohm != null || src.z0_z1_ratio != null) ? 'Kompletne' : 'Brak';
+  };
+
   return (
     <div>
-      <HelpText>Przegląd kompletności składowej zerowej (Z0). Elementy bez Z0 ograniczają analizy zwarć doziemnych.</HelpText>
+      <HelpText>Przegląd kompletności składowej zerowej (Z0) i konfiguracji uziemienia. Elementy bez Z0 ograniczają analizy zwarć doziemnych.</HelpText>
+
+      {/* Grounding configuration for source bus */}
+      <SectionTitle>Konfiguracja uziemienia punktu neutralnego</SectionTitle>
+      <HelpText>Typ uziemienia punktu gwiazdowego sieci SN wpływa na prądy zwarć doziemnych.</HelpText>
+
+      {sourceBus && (
+        <div className="wizard-card mb-3">
+          <div className="wizard-card-header">
+            <span className="text-sm font-semibold text-ind-800">{sourceBus.name}</span>
+            <span className="ind-badge ind-badge-ok text-[10px]">Szyna źródłowa</span>
+          </div>
+          <FieldRow label="Typ uziemienia">
+            <Select value={sourceBus.grounding?.type ?? 'isolated'} onChange={(v) => {
+              const gType = v as GroundingConfig['type'];
+              const prev = sourceBus.grounding;
+              updBusGrounding(sourceBus.ref_id, { type: gType, r_ohm: prev?.r_ohm ?? null, x_ohm: prev?.x_ohm ?? null });
+            }}>
+              {GROUNDING_TYPES.map((gt) => <option key={gt.value} value={gt.value}>{gt.label}</option>)}
+            </Select>
+          </FieldRow>
+          {(sourceBus.grounding?.type === 'resistor_grounded' || sourceBus.grounding?.type === 'petersen_coil') && (
+            <>
+              <FieldRow label="R" unit="&Omega;">
+                <Input type="number" value={sourceBus.grounding?.r_ohm ?? ''} onChange={(v) => updBusGrounding(sourceBus.ref_id, { ...sourceBus.grounding!, r_ohm: v !== '' ? Number(v) : null })} placeholder="opcjonalne" />
+              </FieldRow>
+              <FieldRow label="X" unit="&Omega;">
+                <Input type="number" value={sourceBus.grounding?.x_ohm ?? ''} onChange={(v) => updBusGrounding(sourceBus.ref_id, { ...sourceBus.grounding!, x_ohm: v !== '' ? Number(v) : null })} placeholder="opcjonalne" />
+              </FieldRow>
+            </>
+          )}
+        </div>
+      )}
+
+      {/* Other buses grounding — collapsible */}
+      {enm.buses.filter((b) => !b.tags.includes('source')).length > 0 && (
+        <>
+          <button onClick={() => setExpandedGrounding((s) => ({ ...s, __other_buses: !s.__other_buses }))} className="text-[11px] text-ind-600 hover:underline mt-2 mb-2">
+            {expandedGrounding.__other_buses ? '\u25BE' : '\u25B8'} Uziemienie pozostałych szyn ({enm.buses.filter((b) => !b.tags.includes('source')).length})
+          </button>
+          {expandedGrounding.__other_buses && (
+            <div className="space-y-2 mb-3">
+              {enm.buses.filter((b) => !b.tags.includes('source')).map((bus) => (
+                <div key={bus.ref_id} className="wizard-card">
+                  <div className="wizard-card-header">
+                    <span className="text-sm font-semibold text-ind-800">{bus.name}</span>
+                    <span className="text-xs text-chrome-400">{bus.voltage_kv} kV</span>
+                  </div>
+                  <FieldRow label="Typ uziemienia">
+                    <Select value={bus.grounding?.type ?? 'isolated'} onChange={(v) => {
+                      const gType = v as GroundingConfig['type'];
+                      const prev = bus.grounding;
+                      updBusGrounding(bus.ref_id, { type: gType, r_ohm: prev?.r_ohm ?? null, x_ohm: prev?.x_ohm ?? null });
+                    }}>
+                      {GROUNDING_TYPES.map((gt) => <option key={gt.value} value={gt.value}>{gt.label}</option>)}
+                    </Select>
+                  </FieldRow>
+                  {(bus.grounding?.type === 'resistor_grounded' || bus.grounding?.type === 'petersen_coil') && (
+                    <>
+                      <FieldRow label="R" unit="&Omega;"><Input type="number" value={bus.grounding?.r_ohm ?? ''} onChange={(v) => updBusGrounding(bus.ref_id, { ...bus.grounding!, r_ohm: v !== '' ? Number(v) : null })} placeholder="opcjonalne" /></FieldRow>
+                      <FieldRow label="X" unit="&Omega;"><Input type="number" value={bus.grounding?.x_ohm ?? ''} onChange={(v) => updBusGrounding(bus.ref_id, { ...bus.grounding!, x_ohm: v !== '' ? Number(v) : null })} placeholder="opcjonalne" /></FieldRow>
+                    </>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </>
+      )}
+
+      {/* Z0 status warnings */}
+      <SectionTitle>Status składowej zerowej (Z0)</SectionTitle>
       {noZ0.length > 0 && (
         <div className="mb-3 p-3 bg-status-warn-light border border-amber-200 rounded-md text-sm">
           <span className="font-semibold text-amber-800">Gałęzie bez Z0:</span>{' '}
@@ -754,10 +959,62 @@ function StepK7({ enm }: StepProps) {
         </div>
       )}
       {noZ0.length === 0 && srcNoZ0.length === 0 && (
-        <div className="p-3 bg-status-ok-light border border-emerald-200 rounded-md text-sm text-emerald-800 font-medium">
+        <div className="mb-3 p-3 bg-status-ok-light border border-emerald-200 rounded-md text-sm text-emerald-800 font-medium">
           Wszystkie elementy mają kompletne składowe zerowe.
         </div>
       )}
+
+      {/* Summary table */}
+      <SectionTitle>Podsumowanie — uziemienie i Z0</SectionTitle>
+      <div className="overflow-hidden rounded-md border border-chrome-200">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="bg-chrome-50 border-b border-chrome-200">
+              <th className="text-left px-3 py-2 text-xs font-semibold text-chrome-500 uppercase tracking-wider">Element</th>
+              <th className="text-left px-3 py-2 text-xs font-semibold text-chrome-500 uppercase tracking-wider">Z0 Status</th>
+              <th className="text-left px-3 py-2 text-xs font-semibold text-chrome-500 uppercase tracking-wider">Typ uziemienia</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-chrome-100">
+            {/* Buses */}
+            {enm.buses.map((bus) => (
+              <tr key={bus.ref_id} className="hover:bg-chrome-50">
+                <td className="px-3 py-2 font-mono text-xs text-chrome-600">{bus.name}</td>
+                <td className="px-3 py-2 text-xs text-chrome-400">—</td>
+                <td className="px-3 py-2">
+                  <span className={clsx('ind-badge text-[10px]', bus.grounding ? 'ind-badge-ok' : 'ind-badge-warn')}>
+                    {bus.grounding ? GROUNDING_TYPES.find((gt) => gt.value === bus.grounding!.type)?.label ?? bus.grounding.type : 'Izolowany'}
+                  </span>
+                </td>
+              </tr>
+            ))}
+            {/* Branches */}
+            {enm.branches.filter((b): b is OverheadLine | Cable => b.type === 'line_overhead' || b.type === 'cable').map((br) => (
+              <tr key={br.ref_id} className="hover:bg-chrome-50">
+                <td className="px-3 py-2 font-mono text-xs text-chrome-600">{br.name}</td>
+                <td className="px-3 py-2">
+                  <span className={clsx('ind-badge text-[10px]', getZ0Status('branch', br) === 'Kompletne' ? 'ind-badge-ok' : 'ind-badge-warn')}>
+                    {getZ0Status('branch', br)}
+                  </span>
+                </td>
+                <td className="px-3 py-2 text-xs text-chrome-400">—</td>
+              </tr>
+            ))}
+            {/* Sources */}
+            {enm.sources.map((src) => (
+              <tr key={src.ref_id} className="hover:bg-chrome-50">
+                <td className="px-3 py-2 font-mono text-xs text-chrome-600">{src.name}</td>
+                <td className="px-3 py-2">
+                  <span className={clsx('ind-badge text-[10px]', getZ0Status('source', src as unknown as Source) === 'Kompletne' ? 'ind-badge-ok' : 'ind-badge-warn')}>
+                    {getZ0Status('source', src as unknown as Source)}
+                  </span>
+                </td>
+                <td className="px-3 py-2 text-xs text-chrome-400">—</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }

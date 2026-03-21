@@ -54,6 +54,8 @@ export interface ElementCounts {
   readonly branches: number;
   readonly loads: number;
   readonly generators: number;
+  readonly measurements: number;
+  readonly protectionAssignments: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -153,6 +155,18 @@ function evaluateK5(enm: EnergyNetworkModel): StepState {
     if (t.sn_mva <= 0) {
       issues.push({ code: 'K5_SN_ZERO', severity: 'BLOCKER', messagePl: `Trafo ${t.name}: Sn = 0`, elementRef: t.ref_id });
     }
+    if (!t.vector_group) {
+      issues.push({ code: 'K5_NO_VECTOR_GROUP', severity: 'INFO', messagePl: `Trafo ${t.name}: brak grupy połączeń`, elementRef: t.ref_id });
+    }
+    if (t.p0_kw == null || t.p0_kw <= 0) {
+      issues.push({ code: 'K5_NO_P0', severity: 'INFO', messagePl: `Trafo ${t.name}: brak strat jałowych P0`, elementRef: t.ref_id });
+    }
+    if (t.hv_bus_ref === t.lv_bus_ref) {
+      issues.push({ code: 'K5_SAME_BUS', severity: 'BLOCKER', messagePl: `Trafo ${t.name}: ta sama szyna po obu stronach`, elementRef: t.ref_id });
+    }
+    if (t.uhv_kv <= t.ulv_kv) {
+      issues.push({ code: 'K5_VOLTAGE_ORDER', severity: 'IMPORTANT', messagePl: `Trafo ${t.name}: napięcie GN ≤ napięcie DN`, elementRef: t.ref_id });
+    }
   }
 
   // Transformers are optional - not a blocker if missing
@@ -164,17 +178,38 @@ function evaluateK5(enm: EnergyNetworkModel): StepState {
 
 function evaluateK6(enm: EnergyNetworkModel): StepState {
   const issues: StepIssue[] = [];
-  const loadCnt = enm.loads.length + enm.generators.length;
-  const completion = loadCnt > 0 ? 100 : 0;
+  const loadCnt = enm.loads.length;
+  const genCnt = enm.generators.length;
+  const totalCnt = loadCnt + genCnt;
 
   for (const ld of enm.loads) {
     if (!enm.buses.some(b => b.ref_id === ld.bus_ref)) {
       issues.push({ code: 'K6_LOAD_DANGLING', severity: 'BLOCKER', messagePl: `Odbiór ${ld.name}: szyna nie istnieje`, elementRef: ld.ref_id });
     }
+    if (ld.p_mw <= 0) {
+      issues.push({ code: 'K6_LOAD_P_ZERO', severity: 'IMPORTANT', messagePl: `Odbiór ${ld.name}: moc czynna P ≤ 0`, elementRef: ld.ref_id });
+    }
+  }
+
+  for (const gen of enm.generators) {
+    if (!gen.bus_ref) {
+      issues.push({ code: 'K6_GEN_NO_BUS', severity: 'BLOCKER', messagePl: `Generator ${gen.name}: brak przypisanej szyny`, elementRef: gen.ref_id });
+    }
+    if ((gen.gen_type === 'pv_inverter' || gen.gen_type === 'bess') && gen.connection_variant == null) {
+      issues.push({ code: 'K6_GEN_NO_CONN_VARIANT', severity: 'IMPORTANT', messagePl: `Generator ${gen.name}: brak wariantu przyłączenia`, elementRef: gen.ref_id });
+    }
+  }
+
+  // Completion based on element counts (not just binary)
+  let completion = 0;
+  if (totalCnt > 0) {
+    const loadPart = loadCnt > 0 ? 50 : 0;
+    const genPart = genCnt > 0 ? 50 : 0;
+    completion = loadPart + genPart;
   }
 
   const status: StepStatus = issues.some(i => i.severity === 'BLOCKER')
-    ? 'error' : loadCnt > 0 ? 'complete' : 'empty';
+    ? 'error' : totalCnt > 0 ? 'complete' : 'empty';
 
   return { stepId: 'K6', status, completionPercent: completion, issues };
 }
@@ -193,6 +228,26 @@ function evaluateK7(enm: EnergyNetworkModel): StepState {
   }
   if (srcWithoutZ0.length > 0) {
     issues.push({ code: 'K7_SRC_NO_Z0', severity: 'INFO', messagePl: `${srcWithoutZ0.length} źródeł bez impedancji zerowej Z0` });
+  }
+
+  // Check grounding configuration on source buses
+  for (const src of enm.sources) {
+    const srcBus = enm.buses.find(b => b.ref_id === src.bus_ref);
+    if (srcBus && srcBus.grounding == null) {
+      issues.push({ code: 'K7_SRC_BUS_NO_GROUND', severity: 'INFO', messagePl: `Szyna źródłowa ${srcBus.name}: brak konfiguracji uziemienia`, elementRef: srcBus.ref_id });
+    }
+  }
+
+  // Check transformer neutral grounding for vector groups with 'n' suffix
+  for (const t of enm.transformers) {
+    if (t.vector_group) {
+      const vg = t.vector_group.toLowerCase();
+      if (vg.endsWith('n') || vg.includes('n0') || vg.includes('yn')) {
+        if (t.hv_neutral == null && t.lv_neutral == null) {
+          issues.push({ code: 'K7_TRAFO_NEUTRAL_UNDEF', severity: 'INFO', messagePl: `Trafo ${t.name}: grupa połączeń ${t.vector_group} wymaga definicji uziemienia punktu neutralnego`, elementRef: t.ref_id });
+        }
+      }
+    }
   }
 
   const total = lines.length + enm.sources.length;
@@ -320,6 +375,8 @@ export function computeWizardState(enm: EnergyNetworkModel): WizardState {
       branches: enm.branches.length,
       loads: enm.loads.length,
       generators: enm.generators.length,
+      measurements: (enm.measurements ?? []).length,
+      protectionAssignments: (enm.protection_assignments ?? []).length,
     },
   };
 }
@@ -446,6 +503,18 @@ export function getStepForElement(
   const corrIdx = enm.corridors.findIndex(c => c.ref_id === elementRefId);
   if (corrIdx >= 0) {
     return { stepId: 'K4', elementType: 'corridor', sectionIndex: corrIdx };
+  }
+
+  // Szukaj w measurements → K7 (pomiary/instrumentacja)
+  const measIdx = (enm.measurements ?? []).findIndex(m => m.ref_id === elementRefId);
+  if (measIdx >= 0) {
+    return { stepId: 'K7', elementType: 'measurement', sectionIndex: measIdx };
+  }
+
+  // Szukaj w protection_assignments → K8 (walidacja zabezpieczeń)
+  const protIdx = (enm.protection_assignments ?? []).findIndex(p => p.ref_id === elementRefId);
+  if (protIdx >= 0) {
+    return { stepId: 'K8', elementType: 'protection_assignment', sectionIndex: protIdx };
   }
 
   return null;

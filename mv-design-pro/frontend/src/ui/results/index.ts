@@ -10,10 +10,14 @@ export {
   useIsCalculateEnabled,
   useResultStatusMessage,
   useCanEnterResultView,
+  useSelectedRunId,
+  useRunHistory,
+  useLastAnalysisType,
   type CalculationResult,
+  type RunHistoryEntry,
 } from './resultsStore';
 
-export { ResultStatusBar } from './ResultStatusBar';
+export { ResultStatusBar, type CalculationAnalysisType } from './ResultStatusBar';
 
 export {
   useSafeModeTransition,

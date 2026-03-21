@@ -27,6 +27,19 @@ export interface CalculationResult {
   calculationId: string;
   timestamp: string;
   snapshotId: string;
+  analysisType?: 'SC_3F' | 'SC_1F' | 'LOAD_FLOW';
+  elementCount?: number;
+}
+
+/**
+ * Run history entry for tracking all past runs.
+ */
+export interface RunHistoryEntry {
+  runId: string;
+  analysisType: 'SC_3F' | 'SC_1F' | 'LOAD_FLOW';
+  timestamp: string;
+  status: 'FRESH' | 'OUTDATED';
+  caseName: string;
 }
 
 /**
@@ -38,6 +51,12 @@ interface ResultsState {
 
   // Last calculation result (if any)
   lastResult: CalculationResult | null;
+
+  // Selected run ID for results viewing
+  selectedRunId: string | null;
+
+  // Run history (all past runs, sorted newest first)
+  runHistory: RunHistoryEntry[];
 
   // Validation state for [Oblicz] button
   isValidForCalculation: boolean;
@@ -52,6 +71,8 @@ interface ResultsState {
   reset: () => void;
   setValidation: (isValid: boolean, errors?: string[]) => void;
   setCalculating: (calculating: boolean) => void;
+  selectRun: (runId: string | null) => void;
+  addRunHistory: (entry: RunHistoryEntry) => void;
 }
 
 /**
@@ -66,6 +87,8 @@ export const useResultsStore = create<ResultsState>((set, _get) => ({
   // Initial state: no results
   status: 'NONE',
   lastResult: null,
+  selectedRunId: null,
+  runHistory: [],
   isValidForCalculation: false,
   validationErrors: [],
   isCalculating: false,
@@ -117,6 +140,23 @@ export const useResultsStore = create<ResultsState>((set, _get) => ({
   setCalculating: (calculating) =>
     set(() => ({
       isCalculating: calculating,
+    })),
+
+  /**
+   * Select a specific run for viewing.
+   */
+  selectRun: (runId) =>
+    set(() => ({
+      selectedRunId: runId,
+    })),
+
+  /**
+   * Add a run to history.
+   * Maintains newest-first ordering (deterministic).
+   */
+  addRunHistory: (entry) =>
+    set((state) => ({
+      runHistory: [entry, ...state.runHistory],
     })),
 }));
 
@@ -172,4 +212,25 @@ export function useResultStatusMessage(): {
  */
 export function useCanEnterResultView(): boolean {
   return useResultsStore((state) => state.status === 'FRESH');
+}
+
+/**
+ * Hook: Get selected run ID for results viewing.
+ */
+export function useSelectedRunId(): string | null {
+  return useResultsStore((state) => state.selectedRunId);
+}
+
+/**
+ * Hook: Get run history.
+ */
+export function useRunHistory(): RunHistoryEntry[] {
+  return useResultsStore((state) => state.runHistory);
+}
+
+/**
+ * Hook: Get last analysis type.
+ */
+export function useLastAnalysisType(): string | null {
+  return useResultsStore((state) => state.lastResult?.analysisType ?? null);
 }
