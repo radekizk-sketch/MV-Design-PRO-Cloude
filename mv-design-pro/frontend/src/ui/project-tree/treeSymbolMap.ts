@@ -157,6 +157,16 @@ export const TREE_SYMBOL_MAP: Record<TreeNodeType, TreeSymbolDefinition> = {
     ariaLabel: 'Runy rozpływu',
   },
 
+  // SC: Short circuit results
+  SHORT_CIRCUIT_RESULTS: {
+    symbolId: 'results',
+    ariaLabel: 'Wyniki zwarć',
+  },
+  SHORT_CIRCUIT_RUNS: {
+    symbolId: 'folder',
+    ariaLabel: 'Runy zwarciowe',
+  },
+
   // PR-9: New network element categories
   GENERATORS: {
     symbolId: 'utility_feeder',

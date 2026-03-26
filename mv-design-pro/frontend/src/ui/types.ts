@@ -257,6 +257,8 @@ export type TreeNodeType =
   | 'PROTECTION_COMPARISONS'  // P15c: Protection comparisons subcategory
   | 'POWER_FLOW_RESULTS'  // P20b: Power flow results category
   | 'POWER_FLOW_RUNS'     // P20b: Power flow runs subcategory
+  | 'SHORT_CIRCUIT_RESULTS'  // SC results category (Zwarcia)
+  | 'SHORT_CIRCUIT_RUNS'     // SC runs subcategory
   | 'GENERATORS'           // PR-9: Generator / OZE category
   | 'MEASUREMENTS'         // PR-9: Measurement transformers (CT/VT) category
   | 'PROTECTION_ASSIGNMENTS' // PR-9: Protection assignment category
@@ -287,6 +289,8 @@ export interface TreeNode {
   solverKind?: string; // For RUN_ITEM nodes - solver type (PF, SC)
   createdAt?: string; // For RUN_ITEM nodes - timestamp
   caseId?: string; // For RUN_ITEM nodes - parent case UUID
+  // Service status for ELEMENT nodes
+  inService?: boolean; // For ELEMENT nodes - service status indicator
 }
 
 // ============================================================================

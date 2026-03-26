@@ -139,8 +139,12 @@ export function deriveEmbeddingRole(
     });
     derivedRole = EmbeddingRoleV1.TRUNK_LEAF;
   }
-  // Resztkowy: 0 trunk + branch edges → TRUNK_BRANCH
-  else if (trunkCount === 0 && branchCount >= 1) {
+  // Resztkowy: 0 trunk + 1 branch edge → końcowa na odgałęzieniu
+  else if (trunkCount === 0 && branchCount === 1) {
+    derivedRole = EmbeddingRoleV1.TRUNK_LEAF;
+  }
+  // Resztkowy: 0 trunk + 2+ branch edges → TRUNK_BRANCH
+  else if (trunkCount === 0 && branchCount >= 2) {
     derivedRole = EmbeddingRoleV1.TRUNK_BRANCH;
   }
   // Safety fallback

@@ -25,6 +25,8 @@
  * - "#power-flow-results" → Wyniki rozpływu
  * - "#wizard" → Kreator sieci (K1-K10)
  * - "#protection-settings" → Nastawy zabezpieczeń
+ * - "#catalog" → Biblioteka typów (Type Library Browser)
+ * - "#case-config" → Konfiguracja przypadku obliczeniowego
  */
 
 import { useEffect, useState, useCallback, useMemo } from 'react';
@@ -49,6 +51,12 @@ import { useSelectionStore } from './ui/selection';
 import { NotificationToast } from './ui/notifications/NotificationToast';
 import { notify } from './ui/notifications/store';
 import type { TreeNode, TreeNodeType, ElementType } from './ui/types';
+import { TypeLibraryBrowser } from './ui/catalog';
+import { PowerDistributionPage } from './ui/power-distribution';
+import { CaseConfigPage } from './ui/study-cases/CaseConfigPage';
+import { ProtectionSettingsPage } from './ui/protection-engine-v1/ProtectionSettingsPage';
+import { InspectorResolver } from './ui/inspector-panel';
+import { useNetworkTreeElements, useNetworkStats } from './ui/topology/useNetworkTreeElements';
 
 // PROJECT_TREE_PARITY_V1: Get active project name from store
 function useActiveProjectName(): string | null {
@@ -199,17 +207,9 @@ function App() {
     window.location.hash = `#results?run=${runId}`;
   }, []);
 
-  // PROJECT_TREE_PARITY_V1: Mock tree elements for demonstration
-  // In production, this would come from network model store
-  const treeElements = useMemo(() => ({
-    buses: [],
-    lines: [],
-    cables: [],
-    transformers: [],
-    switches: [],
-    sources: [],
-    loads: [],
-  }), []);
+  // Network tree elements derived from ENM snapshot (replaces mock data)
+  const treeElements = useNetworkTreeElements();
+  const networkStats = useNetworkStats();
 
   // E2E_STABILIZATION: Wrapper with app-ready indicator
   const wrapWithReadyIndicator = (content: React.ReactNode) => (
@@ -220,6 +220,57 @@ function App() {
     </div>
   );
 
+  // Derive validation status from readiness
+  const validationStatus = useMemo(() => {
+    if (!readiness) return undefined;
+    const blockerCount = readiness.blockers?.length ?? 0;
+    const warningCount = readiness.warnings?.length ?? 0;
+    if (blockerCount > 0) return 'errors' as const;
+    if (warningCount > 0) return 'warnings' as const;
+    return 'valid' as const;
+  }, [readiness]);
+
+  // Menu action handler — routes navigation from MainMenuBar
+  const handleMenuAction = useCallback((actionId: string) => {
+    switch (actionId) {
+      case 'sld':
+        window.location.hash = '';
+        break;
+      case 'wizard':
+        window.location.hash = '#wizard';
+        break;
+      case 'catalog':
+        window.location.hash = '#catalog';
+        break;
+      case 'results':
+        window.location.hash = '#results';
+        break;
+      case 'proof':
+      case 'whitebox':
+        window.location.hash = '#proof';
+        break;
+      case 'protection':
+        window.location.hash = '#protection-settings';
+        break;
+      case 'case-manager':
+        useAppStateStore.getState().toggleCaseManager(true);
+        break;
+      case 'run-sc-3f':
+      case 'run-sc-1f':
+      case 'run-power-flow':
+        handleCalculate();
+        break;
+      case 'navigator':
+      case 'inspector':
+        // Toggle panels — handled by layout
+        break;
+      default:
+        if (import.meta.env.DEV) {
+          console.debug(`[handleMenuAction] Unhandled action: ${actionId}`);
+        }
+    }
+  }, [handleCalculate]);
+
   // Common layout props for PowerFactoryLayout
   const layoutProps = {
     onCalculate: handleCalculate,
@@ -229,6 +280,12 @@ function App() {
     onTreeNodeClick: handleTreeNodeClick,
     onTreeCategoryClick: handleTreeCategoryClick,
     onTreeRunClick: handleTreeRunClick,
+    inspectorContent: <InspectorResolver />,
+    validationStatus: validationStatus,
+    validationWarnings: readiness?.warnings?.length ?? 0,
+    validationErrors: readiness?.blockers?.length ?? 0,
+    onMenuAction: handleMenuAction,
+    networkStats: networkStats,
   };
 
   // PR-22: Unified Results Workspace (Run / Batch / Compare / Overlay)
@@ -311,6 +368,42 @@ function App() {
           <FaultScenariosPanel studyCaseId={null} />
           <FaultScenarioModal />
         </div>
+      </PowerFactoryLayout>
+    );
+  }
+
+  // Biblioteka typow (Catalog / Type Library Browser)
+  if (route === '#catalog') {
+    return wrapWithReadyIndicator(
+      <PowerFactoryLayout {...layoutProps} hideInspector={true}>
+        <TypeLibraryBrowser />
+      </PowerFactoryLayout>
+    );
+  }
+
+  // Konfiguracja przypadku obliczeniowego
+  if (route === '#case-config') {
+    return wrapWithReadyIndicator(
+      <PowerFactoryLayout {...layoutProps}>
+        <CaseConfigPage />
+      </PowerFactoryLayout>
+    );
+  }
+
+  // Nastawy zabezpieczen
+  if (route === '#protection-settings') {
+    return wrapWithReadyIndicator(
+      <PowerFactoryLayout {...layoutProps}>
+        <ProtectionSettingsPage />
+      </PowerFactoryLayout>
+    );
+  }
+
+  // Architektura rozdzialu mocy (Power Distribution Architecture)
+  if (route === '#power-distribution') {
+    return wrapWithReadyIndicator(
+      <PowerFactoryLayout {...layoutProps}>
+        <PowerDistributionPage />
       </PowerFactoryLayout>
     );
   }

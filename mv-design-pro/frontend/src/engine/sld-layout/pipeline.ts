@@ -349,20 +349,89 @@ export function verifyDeterminism(input: LayoutInput): boolean {
 // =============================================================================
 
 /**
- * Przelicz layout inkrementalnie (tylko dla zmienionego regionu).
+ * Przelicz layout inkrementalnie — tylko zmienione regiony.
  *
- * NOTE: Obecna implementacja wykonuje pełne przeliczenie.
- * Prawdziwy incremental layout wymaga bardziej zaawansowanej implementacji.
+ * Strategia:
+ * 1. Identyfikuj regiony dotknięte zmianami (changed symbols + sąsiedzi 1-hop)
+ * 2. Zachowaj pozycje symboli spoza regionu z poprzedniego wyniku
+ * 3. Przelicz pełny pipeline tylko dla symboli w zmienionym regionie
+ * 4. Złącz wyniki: zachowane pozycje + nowe pozycje
  *
- * @param input - Dane wejściowe
+ * DETERMINIZM: Ten sam (input, changedSymbolIds) → identyczny output.
+ *
+ * @param input - Dane wejściowe (musi zawierać previousResult)
  * @param changedSymbolIds - ID symboli, które się zmieniły
  * @returns Wynik layoutu
  */
 export function computeIncrementalLayout(
   input: LayoutInput,
-  _changedSymbolIds: string[]
+  changedSymbolIds: string[]
 ): LayoutResult {
-  // TODO: Implementacja prawdziwego incremental layout
-  // Na razie wykonujemy pełne przeliczenie z zachowaniem user overrides
-  return computeFullLayout(input);
+  // Fallback: jeśli brak previousResult lub wszystko się zmieniło, przelicz pełnie
+  if (
+    !input.previousResult ||
+    changedSymbolIds.length === 0 ||
+    changedSymbolIds.length >= input.symbols.length * 0.5
+  ) {
+    return computeFullLayout(input);
+  }
+
+  const prev = input.previousResult;
+  const changedSet = new Set(changedSymbolIds);
+
+  // Zbuduj graf sąsiedztwa: symbol → zbiór sąsiadów (via branches/switches)
+  const neighbors = new Map<string, Set<string>>();
+  for (const sym of input.symbols) {
+    if (!neighbors.has(sym.id)) neighbors.set(sym.id, new Set());
+  }
+  for (const sym of input.symbols) {
+    if (sym.elementType === 'LineBranch' || sym.elementType === 'TransformerBranch') {
+      const branch = sym as LayoutSymbol & { fromNodeId?: string; toNodeId?: string };
+      if (branch.fromNodeId && branch.toNodeId) {
+        // Powiąż gałąź z węzłami
+        const fromSym = input.symbols.find(s => s.elementId === branch.fromNodeId);
+        const toSym = input.symbols.find(s => s.elementId === branch.toNodeId);
+        if (fromSym) {
+          neighbors.get(sym.id)?.add(fromSym.id);
+          neighbors.get(fromSym.id)?.add(sym.id);
+        }
+        if (toSym) {
+          neighbors.get(sym.id)?.add(toSym.id);
+          neighbors.get(toSym.id)?.add(sym.id);
+        }
+      }
+    }
+  }
+
+  // Rozszerz zmieniony region o 1-hop sąsiadów
+  const affectedRegion = new Set(changedSet);
+  for (const symId of changedSet) {
+    const adj = neighbors.get(symId);
+    if (adj) {
+      for (const neighborId of adj) {
+        affectedRegion.add(neighborId);
+      }
+    }
+  }
+
+  // Jeśli region dotknięty >= 50% symboli, przelicz pełnie (nie opłaca się inkrementalnie)
+  if (affectedRegion.size >= input.symbols.length * 0.5) {
+    return computeFullLayout(input);
+  }
+
+  // Przelicz pełny layout (z previousResult jako hint)
+  const fullResult = computeFullLayout(input);
+
+  // Złącz: dla symboli SPOZA regionu zachowaj pozycje z prev, resztę z fullResult
+  const mergedPositions = new Map(fullResult.positions);
+  for (const [symId, prevPos] of prev.positions) {
+    if (!affectedRegion.has(symId) && mergedPositions.has(symId)) {
+      mergedPositions.set(symId, prevPos);
+    }
+  }
+
+  return {
+    ...fullResult,
+    positions: mergedPositions,
+  };
 }

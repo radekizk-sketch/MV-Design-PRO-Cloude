@@ -220,9 +220,29 @@ export interface LogicalRingViewV1 {
   readonly normallyOpenSegmentId: string | null;
 }
 
+/** Ordered list of station IDs along a trunk. */
+export interface LogicalTrunkStationV1 {
+  readonly stationId: string;
+  readonly role: 'przelotowa' | 'odgalezna' | 'sekcyjna' | 'koncowa';
+  readonly attachedBranchIds: readonly string[];
+}
+
+/** Extended trunk view with station ordering and junction points. */
+export interface LogicalTrunkViewExtV1 extends LogicalTrunkViewV1 {
+  readonly orderedStations: readonly LogicalTrunkStationV1[];
+}
+
+/** Extended branch view with junction point metadata. */
+export interface LogicalBranchViewExtV1 extends LogicalBranchViewV1 {
+  /** Node ID where this branch attaches to the trunk. */
+  readonly junctionNodeId: string | null;
+  /** Ordered station IDs along the branch. */
+  readonly orderedStationIds: readonly string[];
+}
+
 export interface TopologyLogicalViewsV1 {
-  readonly trunks: readonly LogicalTrunkViewV1[];
-  readonly branches: readonly LogicalBranchViewV1[];
+  readonly trunks: readonly (LogicalTrunkViewV1 | LogicalTrunkViewExtV1)[];
+  readonly branches: readonly (LogicalBranchViewV1 | LogicalBranchViewExtV1)[];
   readonly rings: readonly LogicalRingViewV1[];
 }
 

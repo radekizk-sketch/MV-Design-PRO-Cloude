@@ -48,39 +48,39 @@ export interface EtapSymbolProps {
 
 /**
  * Busbar / Szyna zbiorcza
- * Horizontal thick bar representing electrical busbar.
- * PR-SLD-UX-MAX: Enhanced with prominent visual weight and subtle fill.
+ * ALWAYS HORIZONTAL thick bar — ABB standard.
+ * ABB busbar: bold stroke, round caps, dominant visual weight.
  */
 const BusbarSymbol: React.FC<Omit<EtapSymbolProps, 'symbolId'>> = ({
   stroke = 'currentColor',
-  fill = 'none',
   strokeWidth = 3,
   opacity = 1,
 }) => (
   <>
-    {/* Main busbar body — thick, prominent */}
-    <rect
-      x="2"
-      y="44"
-      width="96"
-      height="12"
-      fill={fill === 'none' ? 'rgba(255,255,255,0.9)' : fill}
-      stroke={stroke}
-      strokeWidth={strokeWidth}
-      opacity={opacity}
-      rx={1}
-      ry={1}
+    {/* Shadow for depth — ABB convention */}
+    <line
+      x1="4"
+      y1="52"
+      x2="96"
+      y2="52"
+      stroke="rgba(0,0,0,0.08)"
+      strokeWidth={strokeWidth + 4}
+      strokeLinecap="round"
     />
-    {/* Center line for visual emphasis */}
+    {/* Main busbar — HORIZONTAL, bold, ABB-grade */}
     <line
       x1="2"
       y1="50"
       x2="98"
       y2="50"
       stroke={stroke}
-      strokeWidth={strokeWidth * 0.4}
-      opacity={opacity * 0.5}
+      strokeWidth={strokeWidth + 2}
+      strokeLinecap="round"
+      opacity={opacity}
     />
+    {/* End caps — ABB filled dots */}
+    <circle cx="4" cy="50" r={2.5} fill={stroke} stroke="none" opacity={opacity} />
+    <circle cx="96" cy="50" r={2.5} fill={stroke} stroke="none" opacity={opacity} />
   </>
 );
 
@@ -891,6 +891,28 @@ const MeteringCubicleSymbol: React.FC<Omit<EtapSymbolProps, 'symbolId'>> = ({
 );
 
 /**
+ * Motor / Silnik
+ * IEC 60617 symbol: circle with letter M.
+ */
+const MotorSymbol: React.FC<Omit<EtapSymbolProps, 'symbolId'>> = ({
+  stroke = 'currentColor',
+  fill = 'none',
+  strokeWidth = 3,
+  opacity = 1,
+}) => (
+  <>
+    {/* Connection stub from top */}
+    <line x1="50" y1="0" x2="50" y2="20" stroke={stroke} strokeWidth={strokeWidth} opacity={opacity} />
+    {/* Motor circle */}
+    <circle cx="50" cy="50" r="30" fill={fill === 'none' ? 'rgba(255,255,255,0.95)' : fill} stroke={stroke} strokeWidth={strokeWidth} opacity={opacity} />
+    {/* Letter M */}
+    <text x="50" y="58" textAnchor="middle" fontSize="28" fontWeight="bold" fill={stroke} opacity={opacity}>
+      M
+    </text>
+  </>
+);
+
+/**
  * Relay / Przekaźnik zabezpieczeniowy
  * IEC 60617 symbol: rectangle with function label, placed above breaker.
  */
@@ -943,6 +965,7 @@ const SYMBOL_COMPONENTS: Record<EtapSymbolId, React.FC<Omit<EtapSymbolProps, 'sy
   reactor: ReactorSymbol,
   inverter: InverterSymbol,
   metering_cubicle: MeteringCubicleSymbol,
+  motor: MotorSymbol,
   // Tree-specific symbols
   load: LoadSymbol,
   project: ProjectSymbol,
@@ -1150,6 +1173,9 @@ export function renderSymbolToString(symbolId: EtapSymbolId): string | null {
       <text x="50" y="46" text-anchor="middle" font-size="8" font-weight="500" fill="#000000">kWh</text>
       <line x1="42" y1="60" x2="58" y2="60" stroke="#000000" stroke-width="1.5"/>
       <line x1="50" y1="75" x2="50" y2="100" stroke="#000000" stroke-width="3"/>`,
+    motor: `<line x1="50" y1="0" x2="50" y2="20" stroke="#000000" stroke-width="3"/>
+      <circle cx="50" cy="50" r="30" fill="none" stroke="#000000" stroke-width="3"/>
+      <text x="50" y="58" text-anchor="middle" font-size="28" font-weight="bold" fill="#000000">M</text>`,
   };
 
   return svgContent[symbolId] || null;

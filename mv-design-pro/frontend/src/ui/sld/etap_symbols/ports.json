@@ -161,6 +161,86 @@
       },
       "allowedRotations": [0, 90],
       "defaultRotation": 0
+    },
+    "earthing_switch": {
+      "description": "Uziemnik / Earthing Switch",
+      "viewBox": "0 0 100 100",
+      "ports": {
+        "top": { "x": 50, "y": 0 }
+      },
+      "allowedRotations": [0],
+      "defaultRotation": 0,
+      "notes": "Single port — blade connects to ground symbol below"
+    },
+    "fuse": {
+      "description": "Bezpiecznik / Fuse",
+      "viewBox": "0 0 100 100",
+      "ports": {
+        "top": { "x": 50, "y": 0 },
+        "bottom": { "x": 50, "y": 100 }
+      },
+      "allowedRotations": [0, 90],
+      "defaultRotation": 0
+    },
+    "surge_arrester": {
+      "description": "Ogranicznik przepięć / Surge Arrester",
+      "viewBox": "0 0 100 100",
+      "ports": {
+        "top": { "x": 50, "y": 0 }
+      },
+      "allowedRotations": [0],
+      "defaultRotation": 0,
+      "notes": "Single port — ground symbol integrated at bottom"
+    },
+    "capacitor": {
+      "description": "Kondensator / Capacitor",
+      "viewBox": "0 0 100 100",
+      "ports": {
+        "top": { "x": 50, "y": 0 },
+        "bottom": { "x": 50, "y": 100 }
+      },
+      "allowedRotations": [0, 90],
+      "defaultRotation": 0
+    },
+    "reactor": {
+      "description": "Dławik / Reactor",
+      "viewBox": "0 0 100 100",
+      "ports": {
+        "top": { "x": 50, "y": 0 },
+        "bottom": { "x": 50, "y": 100 }
+      },
+      "allowedRotations": [0, 90],
+      "defaultRotation": 0
+    },
+    "motor": {
+      "description": "Silnik / Motor",
+      "viewBox": "0 0 100 100",
+      "ports": {
+        "top": { "x": 50, "y": 0 }
+      },
+      "allowedRotations": [0],
+      "defaultRotation": 0,
+      "notes": "Circle with M — single connection port at top"
+    },
+    "metering_cubicle": {
+      "description": "Szafka pomiarowa / Metering Cubicle",
+      "viewBox": "0 0 100 100",
+      "ports": {
+        "top": { "x": 50, "y": 0 },
+        "bottom": { "x": 50, "y": 100 }
+      },
+      "allowedRotations": [0],
+      "defaultRotation": 0
+    },
+    "load": {
+      "description": "Odbiornik / Load",
+      "viewBox": "0 0 100 100",
+      "ports": {
+        "top": { "x": 50, "y": 0 }
+      },
+      "allowedRotations": [0, 180],
+      "defaultRotation": 0,
+      "notes": "Downward triangle — single connection port at top"
     }
   },
   "portTransformations": {

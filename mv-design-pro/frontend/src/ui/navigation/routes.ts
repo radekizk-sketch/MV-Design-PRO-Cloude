@@ -139,6 +139,20 @@ export const ROUTES: Record<string, RouteDefinition> = {
     icon: 'SWG',
     requiredMode: 'MODEL_EDIT',
   },
+  CATALOG: {
+    hash: '#catalog',
+    label: 'Biblioteka typow',
+    description: 'Przegladanie i zarzadzanie katalogiem typow elementow sieci',
+    icon: 'CAT',
+    requiredMode: undefined,
+  },
+  POWER_DISTRIBUTION: {
+    hash: '#power-distribution',
+    label: 'Architektura rozdzialu mocy',
+    description: 'Kreator pol i aparatow rozdzielnic SN/nN z wizualizacja ETAP',
+    icon: 'PWR',
+    requiredMode: 'MODEL_EDIT',
+  },
 };
 
 /**

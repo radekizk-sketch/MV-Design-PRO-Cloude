@@ -70,6 +70,7 @@ export type EtapSymbolId =
   | 'reactor'
   | 'inverter'
   | 'metering_cubicle'
+  | 'motor'
   // Tree-specific symbols
   | 'load'
   | 'project'
@@ -388,6 +389,15 @@ const SYMBOL_DEFINITIONS: Record<EtapSymbolId, Omit<ResolvedSymbol, 'symbolId'>>
     ports: {
       top: { x: 50, y: 0 },
       bottom: { x: 50, y: 100 },
+    },
+    allowedRotations: [0],
+    defaultRotation: 0,
+  },
+  motor: {
+    description: 'Silnik / Motor',
+    viewBox: '0 0 100 100',
+    ports: {
+      top: { x: 50, y: 0 },
     },
     allowedRotations: [0],
     defaultRotation: 0,

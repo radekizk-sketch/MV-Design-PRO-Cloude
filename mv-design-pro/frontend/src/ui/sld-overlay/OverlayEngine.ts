@@ -123,3 +123,72 @@ export function formatBadgeValue(value: number | null, decimals: number = 2): st
   if (value === null) return '';
   return value.toFixed(decimals);
 }
+
+/**
+ * Format power engineering badge with unit.
+ *
+ * DETERMINISTIC: Same value + unit → identical output.
+ * No physics — purely formatting.
+ *
+ * @param value - Numeric value or null
+ * @param unit - Physical unit string (kV, A, kA, MW, Mvar, %, p.u.)
+ * @param decimals - Number of decimal places (default: 2)
+ * @returns Formatted string with unit or empty string for null
+ */
+export function formatBadgeWithUnit(
+  value: number | null,
+  unit: string,
+  decimals: number = 2
+): string {
+  if (value === null) return '';
+  return `${value.toFixed(decimals)} ${unit}`;
+}
+
+/**
+ * Format percentage badge value.
+ *
+ * @param value - Value in fraction (0.0-1.0) or percentage (0-100)
+ * @param isFraction - True if value is 0.0-1.0, false if 0-100
+ * @returns Formatted percentage string
+ */
+export function formatPercentBadge(
+  value: number | null,
+  isFraction: boolean = false
+): string {
+  if (value === null) return '';
+  const pct = isFraction ? value * 100 : value;
+  return `${pct.toFixed(1)} %`;
+}
+
+/**
+ * Get overlay summary statistics from a style map.
+ * Counts elements per visual state — NO physics.
+ *
+ * @param styleMap - Pre-computed style map
+ * @returns Count per visual state
+ */
+export function getOverlaySummary(
+  styleMap: Map<string, ResolvedOverlayStyle>
+): {
+  total: number;
+  ok: number;
+  warning: number;
+  critical: number;
+  inactive: number;
+} {
+  let ok = 0;
+  let warning = 0;
+  let critical = 0;
+  let inactive = 0;
+
+  for (const style of styleMap.values()) {
+    switch (style.visualState) {
+      case 'OK': ok++; break;
+      case 'WARNING': warning++; break;
+      case 'CRITICAL': critical++; break;
+      case 'INACTIVE': inactive++; break;
+    }
+  }
+
+  return { total: styleMap.size, ok, warning, critical, inactive };
+}

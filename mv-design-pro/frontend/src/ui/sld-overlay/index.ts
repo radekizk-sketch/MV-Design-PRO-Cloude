@@ -12,12 +12,18 @@
  */
 
 // Types
+// Types
 export type {
   OverlayVisualState,
   OverlayElement,
   OverlayLegendEntry,
   OverlayPayloadV1,
+  OverlayAnalysisType,
   ResolvedOverlayStyle,
+  PowerFlowOverlayBadges,
+  ShortCircuitOverlayBadges,
+  ProtectionCoverageOverlayBadges,
+  VariantDeltaOverlayBadges,
 } from './overlayTypes';
 
 export {
@@ -25,6 +31,7 @@ export {
   STROKE_TOKEN_MAP,
   ANIMATION_TOKEN_MAP,
   VISUAL_STATE_STYLE,
+  OVERLAY_ANALYSIS_LABELS,
 } from './overlayTypes';
 
 // Store
@@ -36,6 +43,9 @@ export {
   applyOverlayToSymbols,
   getElementOverlayStyle,
   formatBadgeValue,
+  formatBadgeWithUnit,
+  formatPercentBadge,
+  getOverlaySummary,
 } from './OverlayEngine';
 
 // Hook

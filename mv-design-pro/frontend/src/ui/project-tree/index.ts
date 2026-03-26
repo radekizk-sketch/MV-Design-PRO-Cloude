@@ -16,3 +16,5 @@ export {
   getResultStatusTooltip,
 } from './treeSymbolMap';
 export type { TreeSymbolDefinition } from './treeSymbolMap';
+export { useCatalogTreeNodes, extractMissingCounts } from './useCatalogTreeNodes';
+export type { CatalogTypeCounts, CatalogMissingCounts } from './useCatalogTreeNodes';

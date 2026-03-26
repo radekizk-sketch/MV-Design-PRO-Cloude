@@ -107,13 +107,34 @@ export const SldEditor: React.FC<SldEditorProps> = ({
     }
   }, [initialSymbols, sldStore]);
 
-  // Load symbols from backend (if projectId/diagramId provided)
+  // P30c: Load symbols from backend API (if projectId/diagramId provided)
   useEffect(() => {
-    if (projectId && diagramId) {
-      // TODO P30c: Fetch symbols from backend API
-      // const symbols = await fetchSldSymbols(projectId, diagramId);
-      // sldStore.setSymbols(symbols);
-    }
+    if (!projectId || !diagramId) return;
+
+    let cancelled = false;
+    const endpoint = `/api/projects/${encodeURIComponent(projectId)}/sld/${encodeURIComponent(diagramId)}/symbols`;
+
+    fetch(endpoint)
+      .then((res) => {
+        if (!res.ok) {
+          throw new Error(`SLD fetch failed: ${res.status} ${res.statusText}`);
+        }
+        return res.json() as Promise<{ symbols?: AnySldSymbol[] }>;
+      })
+      .then((data) => {
+        if (!cancelled && data.symbols && data.symbols.length > 0) {
+          sldStore.setSymbols(data.symbols);
+        }
+      })
+      .catch((err: unknown) => {
+        if (!cancelled) {
+          console.warn('[SldEditor] Could not load symbols from backend:', err);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
   }, [projectId, diagramId, sldStore]);
 
   // Notify parent of symbol changes

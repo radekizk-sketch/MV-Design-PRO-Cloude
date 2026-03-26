@@ -49,17 +49,21 @@ import './sld-canonical.css';
  *
  * PR-SLD-04: Uses the same renderer as editor for consistency.
  */
+type IssueSeverity = 'HIGH' | 'WARN' | 'INFO';
+
 interface SymbolProps {
   symbol: AnySldSymbol;
   selected: boolean;
   onClick: (symbolId: string, elementType: ElementType, elementName: string) => void;
   energized: boolean;
+  /** Severity z readiness blockers — podświetla symbol kolorową obwódką */
+  readinessSeverity?: IssueSeverity | null;
 }
 
 /**
  * Main symbol component using unified ETAP symbols.
  */
-const Symbol: React.FC<SymbolProps> = ({ symbol, selected, onClick, energized }) => {
+const Symbol: React.FC<SymbolProps> = ({ symbol, selected, onClick, energized, readinessSeverity }) => {
   // Handle click - adapts the unified renderer's interface to viewer's onClick
   const handleClick = useCallback(
     (symbolId: string) => {
@@ -73,8 +77,8 @@ const Symbol: React.FC<SymbolProps> = ({ symbol, selected, onClick, energized })
     selected,
     inService: symbol.inService,
     energized,
-    highlighted: false,
-    highlightSeverity: null,
+    highlighted: !!readinessSeverity,
+    highlightSeverity: readinessSeverity ?? null,
   };
 
   // Build interaction handlers - viewer only needs onClick
@@ -182,6 +186,7 @@ export const SLDViewCanvas: React.FC<SLDViewCanvasProps> = ({
   width,
   height,
   canonicalAnnotations,
+  highlightedElements,
 }) => {
   // KANONICZNE ZRÓDŁO GEOMETRII (Step VII.c+):
   // Viewer nie uruchamia lokalnego engine layoutu. Używa wyłącznie geometrii
@@ -257,16 +262,23 @@ export const SLDViewCanvas: React.FC<SLDViewCanvasProps> = ({
           energizationMap={connectionEnergizationMap}
         />
 
-        {/* Render symbols with energization state */}
-        {sortedSymbols.map((symbol) => (
-          <Symbol
-            key={symbol.id}
-            symbol={symbol}
-            selected={symbol.id === selectedId || symbol.elementId === selectedId}
-            onClick={onSymbolClick}
-            energized={energizationState.energizedElements.get(symbol.id) ?? true}
-          />
-        ))}
+        {/* Render symbols with energization + readiness state */}
+        {sortedSymbols.map((symbol) => {
+          const elementRef = symbol.elementId ?? symbol.id;
+          const severity = highlightedElements?.get(elementRef)
+            ?? highlightedElements?.get(symbol.id)
+            ?? null;
+          return (
+            <Symbol
+              key={symbol.id}
+              symbol={symbol}
+              selected={symbol.id === selectedId || symbol.elementId === selectedId}
+              onClick={onSymbolClick}
+              energized={energizationState.energizedElements.get(symbol.id) ?? true}
+              readinessSeverity={severity}
+            />
+          );
+        })}
 
         {/* Canonical SLD layers (Phase 7) — pointerEvents: none to avoid blocking interaction */}
         {canonicalAnnotations && (

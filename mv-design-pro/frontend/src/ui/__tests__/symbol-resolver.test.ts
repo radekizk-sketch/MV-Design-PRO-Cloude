@@ -331,10 +331,10 @@ describe('SymbolResolver', () => {
   });
 
   describe('getAllSymbolIds', () => {
-    it('should return all 32 ETAP symbol IDs', () => {
+    it('should return all 33 ETAP symbol IDs', () => {
       const ids = getAllSymbolIds();
 
-      expect(ids).toHaveLength(32);
+      expect(ids).toHaveLength(33);
       // Core SLD symbols (15)
       expect(ids).toContain('busbar');
       expect(ids).toContain('circuit_breaker');
@@ -363,6 +363,7 @@ describe('SymbolResolver', () => {
       expect(ids).toContain('reactor');
       expect(ids).toContain('inverter');
       expect(ids).toContain('metering_cubicle');
+      expect(ids).toContain('motor');
       // Tree-specific symbols (6)
       expect(ids).toContain('load');
       expect(ids).toContain('project');
