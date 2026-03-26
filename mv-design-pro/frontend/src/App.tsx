@@ -53,6 +53,7 @@ import { notify } from './ui/notifications/store';
 import type { TreeNode, TreeNodeType, ElementType } from './ui/types';
 import { TypeLibraryBrowser } from './ui/catalog';
 import { PowerDistributionPage } from './ui/power-distribution';
+import { SldDemonstratorPage } from './ui/power-distribution/SldDemonstratorPage';
 import { CaseConfigPage } from './ui/study-cases/CaseConfigPage';
 import { ProtectionSettingsPage } from './ui/protection-engine-v1/ProtectionSettingsPage';
 import { InspectorResolver } from './ui/inspector-panel';
@@ -395,6 +396,15 @@ function App() {
     return wrapWithReadyIndicator(
       <PowerFactoryLayout {...layoutProps}>
         <ProtectionSettingsPage />
+      </PowerFactoryLayout>
+    );
+  }
+
+  // Silnik SLD — demonstrator sieci kontrolnych
+  if (route === '#sld-engine') {
+    return wrapWithReadyIndicator(
+      <PowerFactoryLayout {...layoutProps} hideInspector={true}>
+        <SldDemonstratorPage />
       </PowerFactoryLayout>
     );
   }

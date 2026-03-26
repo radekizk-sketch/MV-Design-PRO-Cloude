@@ -153,6 +153,13 @@ export const ROUTES: Record<string, RouteDefinition> = {
     icon: 'PWR',
     requiredMode: 'MODEL_EDIT',
   },
+  SLD_ENGINE: {
+    hash: '#sld-engine',
+    label: 'Silnik SLD',
+    description: 'Demonstrator kanoniczny silnika SLD z sieciami kontrolnymi',
+    icon: 'ENG',
+    requiredMode: undefined,
+  },
 };
 
 /**

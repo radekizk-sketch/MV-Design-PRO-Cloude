@@ -5,6 +5,7 @@
  */
 
 export { PowerDistributionPage } from './PowerDistributionPage';
+export { SldDemonstratorPage } from './SldDemonstratorPage';
 export { BaySvgRenderer } from './BaySvgRenderer';
 export type { BaySvgRendererProps } from './BaySvgRenderer';
 export { usePowerDistributionStore, useStation, useSelectedFieldId, useSelectedDeviceId } from './store';
