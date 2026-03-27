@@ -1,9 +1,9 @@
 /**
- * Selection Resolver — testy PR-05.
+ * Selection Resolver — testy.
  *
  * INVARIANTS:
  * - resolveSelectionRef: ten sam elementId + ENM → identyczny SelectionRef
- * - mapowanie SLD → ENM → wizard step jest poprawne
+ * - mapowanie SLD → ENM → kategoria budowy jest poprawna
  * - właściwości ENM są zbudowane poprawnie
  */
 
@@ -120,19 +120,19 @@ describe('resolveSelectionRef', () => {
   const enm = makeMinimalEnm();
 
   describe('Bus resolution', () => {
-    it('resolves source bus to K2', () => {
+    it('resolves source bus — kategoria trunk', () => {
       const result = resolveSelectionRef('bus_gpz_110', 'Bus', enm);
       expect(result).not.toBeNull();
       expect(result!.selectionRef.elementId).toBe('bus_gpz_110');
       expect(result!.selectionRef.element_type).toBe('bus');
-      expect(result!.wizardStepId).toBe('K2');
+      expect(result!.buildCategoryHint).toBe('trunk');
     });
 
-    it('resolves non-source bus to K3', () => {
+    it('resolves non-source bus — kategoria trunk', () => {
       const result = resolveSelectionRef('bus_gpz_15', 'Bus', enm);
       expect(result).not.toBeNull();
       expect(result!.selectionRef.elementId).toBe('bus_gpz_15');
-      expect(result!.wizardStepId).toBe('K3');
+      expect(result!.buildCategoryHint).toBe('trunk');
     });
 
     it('returns null for unknown bus', () => {
@@ -142,38 +142,38 @@ describe('resolveSelectionRef', () => {
   });
 
   describe('Branch resolution', () => {
-    it('resolves cable to K4', () => {
+    it('resolves cable — kategoria trunk', () => {
       const result = resolveSelectionRef('cab_01', 'LineBranch', enm);
       expect(result).not.toBeNull();
       expect(result!.selectionRef.element_type).toBe('branch');
-      expect(result!.wizardStepId).toBe('K4');
+      expect(result!.buildCategoryHint).toBe('trunk');
     });
   });
 
   describe('Transformer resolution', () => {
-    it('resolves transformer to K5', () => {
+    it('resolves transformer — kategoria transformer', () => {
       const result = resolveSelectionRef('tr_gpz_t1', 'TransformerBranch', enm);
       expect(result).not.toBeNull();
       expect(result!.selectionRef.element_type).toBe('transformer');
-      expect(result!.wizardStepId).toBe('K5');
+      expect(result!.buildCategoryHint).toBe('transformer');
     });
   });
 
   describe('Source resolution', () => {
-    it('resolves source to K2', () => {
+    it('resolves source — kategoria source', () => {
       const result = resolveSelectionRef('src_grid', 'Source', enm);
       expect(result).not.toBeNull();
       expect(result!.selectionRef.element_type).toBe('source');
-      expect(result!.wizardStepId).toBe('K2');
+      expect(result!.buildCategoryHint).toBe('source');
     });
   });
 
   describe('Load resolution', () => {
-    it('resolves load to K6', () => {
+    it('resolves load — kategoria load', () => {
       const result = resolveSelectionRef('load_01', 'Load', enm);
       expect(result).not.toBeNull();
       expect(result!.selectionRef.element_type).toBe('load');
-      expect(result!.wizardStepId).toBe('K6');
+      expect(result!.buildCategoryHint).toBe('load');
     });
   });
 

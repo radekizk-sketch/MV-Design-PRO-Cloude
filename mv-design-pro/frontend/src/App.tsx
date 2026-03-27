@@ -23,7 +23,7 @@
  * - "#proof" → Ślad obliczeń (Proof)
  * - "#protection-results" → Wyniki zabezpieczeń
  * - "#power-flow-results" → Wyniki rozpływu
- * - "#wizard" → Kreator sieci (K1-K10)
+ * - "#network-build" → Budowa sieci (panel procesowy)
  * - "#protection-settings" → Nastawy zabezpieczeń
  * - "#catalog" → Biblioteka typów (Type Library Browser)
  * - "#case-config" → Konfiguracja przypadku obliczeniowego
@@ -38,7 +38,7 @@ import { ReferencePatternsPage } from './ui/reference-patterns';
 import { ResultsInspectorPage } from './ui/results-inspector';
 import { ResultsWorkspacePage } from './ui/results-workspace';
 import { SLDViewPage, SldEditorPage } from './ui/sld';
-import { WizardPage } from './ui/wizard';
+import { ProcessBuildPage } from './ui/network-build';
 import { EnmInspectorPage } from './ui/enm-inspector';
 import { FaultScenariosPanel, FaultScenarioModal } from './ui/fault-scenarios';
 import { PowerFactoryLayout } from './ui/layout';
@@ -236,8 +236,8 @@ function App() {
       case 'sld':
         window.location.hash = '';
         break;
-      case 'wizard':
-        window.location.hash = '#wizard';
+      case 'network-build':
+        window.location.hash = '#network-build';
         break;
       case 'catalog':
         window.location.hash = '#catalog';
@@ -342,11 +342,11 @@ function App() {
     );
   }
 
-  // Kreator sieci (Wizard K1-K10)
-  if (route === '#wizard') {
+  // Budowa sieci (ProcessPanel — panel procesowy)
+  if (route === '#network-build') {
     return wrapWithReadyIndicator(
       <PowerFactoryLayout {...layoutProps}>
-        <WizardPage />
+        <ProcessBuildPage />
       </PowerFactoryLayout>
     );
   }

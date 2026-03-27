@@ -43,6 +43,10 @@ import { CaseManager } from '../case-manager';
 import { IssuePanelContainer } from '../issue-panel';
 import { ProjectTree } from '../project-tree/ProjectTree';
 import { EmptyInspectorPanel } from '../inspector-panel/EmptyInspectorPanel';
+import { ProcessPanel } from '../network-build/ProcessPanel';
+import { OperationFormRouter } from '../network-build/OperationFormRouter';
+import { ReadinessBar } from '../network-build/ReadinessBar';
+import { useNetworkBuildStore } from '../network-build/networkBuildStore';
 import {
   useAppStateStore,
   useCaseManagerOpen,
@@ -217,9 +221,14 @@ export function PowerFactoryLayout({
   // Panel states
   const [treeSidebarCollapsed, setTreeSidebarCollapsed] = useState(false);
   const [inspectorCollapsed, setInspectorCollapsed] = useState(false);
+  const [leftPanelMode, setLeftPanelMode] = useState<'build' | 'tree'>('build');
+
+  // Network build store — active operation form
+  const activeOperationForm = useNetworkBuildStore((s) => s.activeOperationForm);
 
   // Derived state
   const isReadOnly = activeMode === 'RESULT_VIEW';
+  const showBuildPanel = activeMode === 'MODEL_EDIT' && leftPanelMode === 'build';
 
   // Toggle handlers
   const toggleTreeSidebar = useCallback(() => {
@@ -257,8 +266,12 @@ export function PowerFactoryLayout({
     toggleCaseManager(false);
   }, [toggleCaseManager]);
 
-  // Inspector content - show custom content, selection-based, or empty state
+  // Inspector content - show operation form, custom content, selection-based, or empty state
   const resolvedInspectorContent = useMemo(() => {
+    // When an operation form is active, show it in the inspector area
+    if (activeOperationForm) {
+      return <OperationFormRouter />;
+    }
     if (inspectorContent) {
       return inspectorContent;
     }
@@ -268,7 +281,7 @@ export function PowerFactoryLayout({
         isReadOnly={isReadOnly}
       />
     );
-  }, [inspectorContent, selectedElement, isReadOnly]);
+  }, [activeOperationForm, inspectorContent, selectedElement, isReadOnly]);
 
   return (
     <div
@@ -300,10 +313,44 @@ export function PowerFactoryLayout({
           data-testid="project-tree-sidebar"
           data-collapsed={treeSidebarCollapsed}
         >
-          {/* Panel header */}
+          {/* Panel header with mode toggle */}
           <div className="ind-panel-header">
             {!treeSidebarCollapsed && (
-              <span>Nawigator projektu</span>
+              <div className="flex items-center gap-1">
+                {activeMode === 'MODEL_EDIT' && (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => setLeftPanelMode('build')}
+                      className={clsx(
+                        'px-2 py-0.5 text-[10px] rounded-sm transition-colors',
+                        leftPanelMode === 'build'
+                          ? 'bg-ind-100 text-ind-800 font-medium'
+                          : 'text-chrome-500 hover:bg-chrome-100',
+                      )}
+                      data-testid="left-panel-mode-build"
+                    >
+                      Budowa
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setLeftPanelMode('tree')}
+                      className={clsx(
+                        'px-2 py-0.5 text-[10px] rounded-sm transition-colors',
+                        leftPanelMode === 'tree'
+                          ? 'bg-ind-100 text-ind-800 font-medium'
+                          : 'text-chrome-500 hover:bg-chrome-100',
+                      )}
+                      data-testid="left-panel-mode-tree"
+                    >
+                      Nawigator
+                    </button>
+                  </>
+                )}
+                {activeMode !== 'MODEL_EDIT' && (
+                  <span>Nawigator projektu</span>
+                )}
+              </div>
             )}
             <button
               type="button"
@@ -314,16 +361,21 @@ export function PowerFactoryLayout({
                 'transition-colors',
                 treeSidebarCollapsed && 'mx-auto'
               )}
-              aria-label={treeSidebarCollapsed ? 'Rozwiń nawigator projektu' : 'Zwiń nawigator projektu'}
-              title={treeSidebarCollapsed ? 'Rozwiń nawigator projektu' : 'Zwiń nawigator projektu'}
+              aria-label={treeSidebarCollapsed ? 'Rozwiń panel boczny' : 'Zwiń panel boczny'}
+              title={treeSidebarCollapsed ? 'Rozwiń panel boczny' : 'Zwiń panel boczny'}
               data-testid="project-tree-sidebar-toggle"
             >
               {treeSidebarCollapsed ? <IconChevronRight /> : <IconChevronLeft />}
             </button>
           </div>
 
-          {/* ProjectTree (only when not collapsed) */}
-          {!treeSidebarCollapsed && (
+          {/* Panel content: ProcessPanel or ProjectTree (only when not collapsed) */}
+          {!treeSidebarCollapsed && showBuildPanel && (
+            <div className="flex-1 overflow-hidden">
+              <ProcessPanel />
+            </div>
+          )}
+          {!treeSidebarCollapsed && !showBuildPanel && (
             <div className="flex-1 overflow-hidden">
               <ProjectTree
                 projectName={projectName}
@@ -347,8 +399,8 @@ export function PowerFactoryLayout({
                 type="button"
                 onClick={toggleTreeSidebar}
                 className="flex h-8 w-8 items-center justify-center rounded-ind text-chrome-400 hover:bg-chrome-100 hover:text-chrome-700 transition-colors"
-                title="Nawigator projektu"
-                aria-label="Otwórz nawigator projektu"
+                title={showBuildPanel ? 'Panel budowy sieci' : 'Nawigator projektu'}
+                aria-label={showBuildPanel ? 'Otwórz panel budowy sieci' : 'Otwórz nawigator projektu'}
               >
                 <IconFolder />
               </button>
@@ -437,6 +489,9 @@ export function PowerFactoryLayout({
           onViewResults={onViewResults}
         />
       </div>
+
+      {/* Pasek gotowości (MODEL_EDIT only) */}
+      {activeMode === 'MODEL_EDIT' && <ReadinessBar />}
 
       {/* Pasek stanu (ALWAYS visible at bottom) */}
       <StatusBar

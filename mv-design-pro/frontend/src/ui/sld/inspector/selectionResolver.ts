@@ -1,10 +1,8 @@
 /**
  * Selection Resolver — mapowanie selekcji SLD → ENM SelectionRef.
  *
- * PR-05: Integracja Inspector ↔ ENM ↔ Wizard
- *
  * Funkcja resolveSelectionRef() tworzy SelectionRef z klikniętego symbolu SLD,
- * umożliwiając nawigację do odpowiedniego kroku kreatora i wyświetlenie
+ * umożliwiając nawigację do odpowiedniego elementu i wyświetlenie
  * właściwości ENM w inspektorze.
  *
  * DETERMINIZM: Ten sam symbol + ENM → identyczny SelectionRef.
@@ -12,7 +10,6 @@
  */
 
 import type { SelectionRef, EnergyNetworkModel } from '../../../types/enm';
-import { getStepForElement } from '../../wizard/wizardStateMachine';
 import { isConnectionNodeLikeId } from '../../common/connectionNode';
 
 // =============================================================================
@@ -39,8 +36,8 @@ export interface ResolvedSelection {
   /** Referencja do elementu ENM */
   selectionRef: SelectionRef;
 
-  /** Krok kreatora powiązany z elementem */
-  wizardStepId: string | null;
+  /** Kategoria elementu w procesie budowy */
+  buildCategoryHint: string | null;
 
   /** Nazwa elementu (z ENM, nie z SLD) */
   enmName: string | null;
@@ -148,14 +145,14 @@ export function resolveSelectionRef(
   // 2. Mapuj na typ ENM
   const enmType = SLD_TO_ENM_TYPE[sldElementType];
 
-  // 3. Znajdź krok kreatora
-  const stepMapping = getStepForElement(enm, enmRefId);
+  // 3. Mapuj kategorię budowy
+  const buildCategoryHint = mapElementToBuildCategory(sldElementType);
 
   // 4. Zbuduj SelectionRef
   const selectionRef: SelectionRef = {
     elementId: enmRefId,
     element_type: enmType,
-    wizard_step_hint: stepMapping?.stepId ?? 'K1',
+    wizard_step_hint: buildCategoryHint,
   };
 
   // 5. Pobierz nazwę z ENM
@@ -166,10 +163,36 @@ export function resolveSelectionRef(
 
   return {
     selectionRef,
-    wizardStepId: stepMapping?.stepId ?? null,
+    buildCategoryHint,
     enmName,
     enmProperties,
   };
+}
+
+/**
+ * Mapuje typ elementu SLD na kategorię procesu budowy sieci.
+ * Deterministyczne: ten sam typ → ta sama kategoria.
+ */
+function mapElementToBuildCategory(sldElementType: SldElementType): string {
+  switch (sldElementType) {
+    case 'Source':
+      return 'source';
+    case 'Bus':
+    case 'LineBranch':
+      return 'trunk';
+    case 'STATION':
+      return 'station';
+    case 'TransformerBranch':
+      return 'transformer';
+    case 'Switch':
+      return 'switch';
+    case 'Load':
+      return 'load';
+    case 'GENERATOR':
+      return 'oze';
+    default:
+      return 'unknown';
+  }
 }
 
 // =============================================================================
