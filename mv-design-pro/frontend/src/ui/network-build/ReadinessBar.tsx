@@ -17,8 +17,8 @@ import { useCallback, useState } from 'react';
 import { clsx } from 'clsx';
 import { useNetworkBuildDerived, useNetworkBuildStore } from './networkBuildStore';
 import { useSelectionStore } from '../selection';
+import { resolveModalType } from '../schema-completeness/fixActionModalBridge';
 import type { FixAction } from '../../types/enm';
-import type { CanonicalOpName } from '../../types/domainOps';
 
 // =============================================================================
 // Category filter
@@ -36,29 +36,48 @@ const CATEGORY_LABELS: Record<FilterCategory, string> = {
 
 function categorizeBlocker(code: string): FilterCategory {
   const lc = code.toLowerCase();
-  if (lc.includes('topology') || lc.includes('island') || lc.includes('disconnected') || lc.includes('voltage_mismatch')) {
+  if (
+    lc.includes('topology') || lc.includes('island') || lc.includes('disconnected') ||
+    lc.includes('voltage_mismatch') || lc.includes('grounding') || lc.includes('isolated')
+  ) {
     return 'topologia';
   }
-  if (lc.includes('catalog') || lc.includes('missing_type') || lc.includes('no_catalog')) {
+  if (
+    lc.includes('catalog') || lc.includes('missing_type') || lc.includes('no_catalog') ||
+    lc.includes('impedance') || lc.includes('zero_seq') || lc.includes('missing_rating')
+  ) {
     return 'katalogi';
   }
-  if (lc.includes('switch_state') || lc.includes('nop') || lc.includes('normal_state') || lc.includes('coupler')) {
+  if (
+    lc.includes('switch_state') || lc.includes('nop') || lc.includes('normal_state') ||
+    lc.includes('coupler') || lc.includes('tap_position') || lc.includes('operating')
+  ) {
     return 'eksploatacja';
   }
   return 'analiza';
 }
 
 // =============================================================================
-// Fix action mapping — action_type → domain operation
+// Fix action resolution — uses canonical FixActionType values from backend
 // =============================================================================
 
-const ACTION_TYPE_TO_OP: Record<string, CanonicalOpName> = {
-  assign_catalog: 'assign_catalog_to_element',
-  add_transformer: 'add_transformer_sn_nn',
-  set_nop: 'set_normal_open_point',
-  add_source: 'add_grid_source_sn',
-  open_catalog: 'assign_catalog_to_element',
-  navigate: 'update_element_parameters',
+/**
+ * Blocker code → fallback modal_type when backend doesn't send modal_type.
+ * Used only for OPEN_MODAL actions where modal_type is null.
+ */
+const CODE_TO_MODAL_TYPE: Record<string, string> = {
+  missing_source: 'SourceModal',
+  no_source: 'SourceModal',
+  missing_transformer: 'TransformerModal',
+  no_transformer: 'TransformerModal',
+  missing_catalog: 'CatalogPicker',
+  no_catalog: 'CatalogPicker',
+  missing_protection: 'ProtectionBindingModal',
+  no_protection: 'ProtectionBindingModal',
+  missing_load: 'LoadModal',
+  missing_generator: 'GeneratorModal',
+  missing_field_device: 'FieldDeviceModal',
+  missing_bay: 'FieldDeviceModal',
 };
 
 // =============================================================================
@@ -95,15 +114,50 @@ export function ReadinessBar({ className }: ReadinessBarProps) {
 
   const handleFixAction = useCallback(
     (action: FixAction) => {
-      // Navigate to element first
-      if (action.element_ref) {
-        handleNavigateToElement(action.element_ref);
-      }
+      const payload = action.element_ref ? { element_ref: action.element_ref } : {};
 
-      // Try to open a form based on action_type
-      const opName = ACTION_TYPE_TO_OP[action.action_type];
-      if (opName && action.element_ref) {
-        openOperationForm(opName, { element_ref: action.element_ref });
+      switch (action.action_type) {
+        case 'NAVIGATE_TO_ELEMENT': {
+          if (action.element_ref) {
+            handleNavigateToElement(action.element_ref);
+          }
+          break;
+        }
+        case 'OPEN_MODAL': {
+          if (action.element_ref) {
+            handleNavigateToElement(action.element_ref);
+          }
+          const modalType = action.modal_type ?? CODE_TO_MODAL_TYPE[action.code] ?? null;
+          const modalId = resolveModalType(modalType);
+          if (modalId) {
+            window.dispatchEvent(
+              new CustomEvent('modal:open', { detail: { modalId, context: payload } }),
+            );
+          } else {
+            // Fallback: open parameter editor for the element
+            openOperationForm('update_element_parameters', payload);
+          }
+          break;
+        }
+        case 'SELECT_CATALOG': {
+          if (action.element_ref) {
+            handleNavigateToElement(action.element_ref);
+          }
+          openOperationForm('assign_catalog_to_element', payload);
+          break;
+        }
+        case 'ADD_MISSING_DEVICE': {
+          const devModalType = action.modal_type ?? CODE_TO_MODAL_TYPE[action.code] ?? null;
+          const devModalId = resolveModalType(devModalType);
+          if (devModalId) {
+            window.dispatchEvent(
+              new CustomEvent('modal:open', { detail: { modalId: devModalId, context: payload } }),
+            );
+          }
+          break;
+        }
+        default:
+          break;
       }
     },
     [handleNavigateToElement, openOperationForm],

@@ -13,13 +13,15 @@ import { MissingCatalogReview } from './MissingCatalogReview';
 import { TransformerReview } from './TransformerReview';
 import { SwitchReview } from './SwitchReview';
 import { OzeReview } from './OzeReview';
+import { ReadinessBlockersReview } from './ReadinessBlockersReview';
+import { IncompleteStationsReview } from './IncompleteStationsReview';
 import { useSnapshotStore } from '../../topology/snapshotStore';
 
 // =============================================================================
 // Types
 // =============================================================================
 
-export type ReviewTab = 'catalog' | 'transformers' | 'switches' | 'oze';
+export type ReviewTab = 'catalog' | 'transformers' | 'switches' | 'oze' | 'readiness' | 'stations';
 
 interface TabDef {
   id: ReviewTab;
@@ -32,6 +34,8 @@ const TABS: readonly TabDef[] = [
   { id: 'transformers', label: 'Transformatory', description: 'Przegląd parametrów transformatorów SN/nN' },
   { id: 'switches', label: 'Łączniki', description: 'Stany łączników, NOP, konfiguracja' },
   { id: 'oze', label: 'OZE / BESS', description: 'Źródła odnawialne i magazyny energii' },
+  { id: 'readiness', label: 'Blokery', description: 'Wszystkie blokery gotowości do analizy' },
+  { id: 'stations', label: 'Stacje', description: 'Kompletność stacji SN/nN' },
 ] as const;
 
 // =============================================================================
@@ -48,9 +52,10 @@ export interface MassReviewPanelProps {
 export function MassReviewPanel({ isOpen, onClose, initialTab = 'catalog', className }: MassReviewPanelProps) {
   const [activeTab, setActiveTab] = useState<ReviewTab>(initialTab);
   const snapshot = useSnapshotStore((s) => s.snapshot);
+  const readiness = useSnapshotStore((s) => s.readiness);
 
   const counts = useMemo(() => {
-    if (!snapshot) return { catalog: 0, transformers: 0, switches: 0, oze: 0 };
+    if (!snapshot) return { catalog: 0, transformers: 0, switches: 0, oze: 0, readiness: 0, stations: 0 };
 
     let missingCatalog = 0;
     for (const b of snapshot.branches ?? []) {
@@ -68,8 +73,10 @@ export function MassReviewPanel({ isOpen, onClose, initialTab = 'catalog', class
         (b) => switchTypes.includes(b.type),
       ).length,
       oze: snapshot.generators?.length ?? 0,
+      readiness: readiness?.blockers?.length ?? 0,
+      stations: snapshot.substations?.length ?? 0,
     };
-  }, [snapshot]);
+  }, [snapshot, readiness]);
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
@@ -157,6 +164,8 @@ export function MassReviewPanel({ isOpen, onClose, initialTab = 'catalog', class
           {activeTab === 'transformers' && <TransformerReview />}
           {activeTab === 'switches' && <SwitchReview />}
           {activeTab === 'oze' && <OzeReview />}
+          {activeTab === 'readiness' && <ReadinessBlockersReview />}
+          {activeTab === 'stations' && <IncompleteStationsReview />}
         </div>
       </div>
     </div>

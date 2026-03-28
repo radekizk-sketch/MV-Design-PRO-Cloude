@@ -410,20 +410,27 @@ export function selectBlockersByCategory(readiness: ReadinessInfo | null): {
       code.includes('topology') ||
       code.includes('island') ||
       code.includes('disconnected') ||
-      code.includes('voltage_mismatch')
+      code.includes('voltage_mismatch') ||
+      code.includes('grounding') ||
+      code.includes('isolated')
     ) {
       result.topologia++;
     } else if (
       code.includes('catalog') ||
       code.includes('missing_type') ||
-      code.includes('no_catalog')
+      code.includes('no_catalog') ||
+      code.includes('impedance') ||
+      code.includes('zero_seq') ||
+      code.includes('missing_rating')
     ) {
       result.katalogi++;
     } else if (
       code.includes('switch_state') ||
       code.includes('nop') ||
       code.includes('normal_state') ||
-      code.includes('coupler')
+      code.includes('coupler') ||
+      code.includes('tap_position') ||
+      code.includes('operating')
     ) {
       result.eksploatacja++;
     } else {

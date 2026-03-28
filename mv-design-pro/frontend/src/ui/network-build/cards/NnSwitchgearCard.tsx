@@ -257,7 +257,38 @@ export function NnSwitchgearCard({ elementId }: { elementId: string }) {
             ],
     };
 
-    return [identSection, nnSection, loadsSection, sourcesSection];
+    // Power balance section
+    const balanceMw = totalGenMw - totalLoadMw;
+    const bilansSection: CardSection = {
+      id: 'bilans',
+      label: 'Bilans mocy',
+      fields: [
+        {
+          key: 'total_gen',
+          label: 'Generacja P_gen',
+          value: totalGenMw * 1000,
+          unit: 'kW',
+          source: 'calculated',
+        },
+        {
+          key: 'total_load',
+          label: 'Obciążenie P_load',
+          value: totalLoadMw * 1000,
+          unit: 'kW',
+          source: 'calculated',
+        },
+        {
+          key: 'balance',
+          label: 'Nadwyżka / Deficyt',
+          value: balanceMw * 1000,
+          unit: 'kW',
+          source: 'calculated',
+          severity: balanceMw > 0 ? 'warning' : 'ok',
+        },
+      ],
+    };
+
+    return [identSection, nnSection, loadsSection, bilansSection, sourcesSection];
   }, [station, nnBuses, ozeBays, nnLoads, pvGenerators, bessGenerators, windGenerators, stationGenerators]);
 
   const handleAddPV = useCallback(() => {

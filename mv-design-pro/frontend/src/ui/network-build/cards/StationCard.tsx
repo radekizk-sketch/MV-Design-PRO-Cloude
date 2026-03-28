@@ -11,6 +11,7 @@ import { useMemo, useCallback } from 'react';
 import { ObjectCard, type CardSection, type CardAction } from './ObjectCard';
 import { useSnapshotStore } from '../../topology/snapshotStore';
 import { useNetworkBuildStore } from '../networkBuildStore';
+import { useAppStateStore } from '../../app-state';
 
 // =============================================================================
 // Helpers
@@ -70,6 +71,7 @@ export function StationCard({ elementId }: { elementId: string }) {
   const readiness = useSnapshotStore((s) => s.readiness);
   const openOperationForm = useNetworkBuildStore((s) => s.openOperationForm);
   const closeObjectCard = useNetworkBuildStore((s) => s.closeObjectCard);
+  const activeMode = useAppStateStore((s) => s.activeMode);
 
   const station = useMemo(
     () => snapshot?.substations?.find((s) => s.id === elementId),
@@ -176,25 +178,47 @@ export function StationCard({ elementId }: { elementId: string }) {
           : [{ key: 'no_bays', label: 'Brak pól', value: 'Nie zdefiniowano pól SN', severity: 'warning' as const }],
     };
 
-    // Transformatory — każdy transformator jako wiersz
-    const trFields = stationTransformers.map((tr) => ({
-      key: `tr_${tr.ref_id}`,
-      label: tr.name,
-      value: `${tr.sn_mva * 1000} kVA / uk=${tr.uk_percent}%`,
-      source: tr.catalog_ref ? ('catalog' as const) : ('instance' as const),
-    }));
+    // Transformer-to-bay assignment enrichment (via equipment_refs)
+    const enrichedTrFields = stationTransformers.map((tr) => {
+      const trBay = stationBays.find((bay) =>
+        bay.bay_role === 'TR' && bay.equipment_refs?.includes(tr.ref_id),
+      );
+      const bayInfo = trBay ? ` → Pole: ${trBay.name}` : '';
+      return {
+        key: `tr_${tr.ref_id}`,
+        label: tr.name,
+        value: `${tr.sn_mva * 1000} kVA / uk=${tr.uk_percent}%${bayInfo}`,
+        source: tr.catalog_ref ? ('catalog' as const) : ('instance' as const),
+      };
+    });
 
     const transformersSection: CardSection = {
       id: 'transformers',
       label: 'Transformatory',
       fields:
-        trFields.length > 0
-          ? trFields
+        enrichedTrFields.length > 0
+          ? enrichedTrFields
           : [{ key: 'no_tr', label: 'Brak transformatora', value: 'Brak przypisanego transformatora', severity: 'warning' as const }],
     };
 
-    return [identSection, strukturaSection, baysSection, transformersSection];
-  }, [station, stationBays, stationTransformers, snBuses, nnBuses]);
+    const result: CardSection[] = [identSection, strukturaSection, baysSection, transformersSection];
+
+    if (activeMode === 'RESULT_VIEW') {
+      result.push({
+        id: 'analysis',
+        label: 'Wyniki analizy',
+        fields: [
+          { key: 'u_bus_pu', label: 'Napięcie U szyny', value: null, unit: 'pu', source: 'calculated' },
+          { key: 'ik3', label: 'Prąd zwarciowy Ik₃', value: null, unit: 'kA', source: 'calculated' },
+          { key: 'ik1', label: 'Prąd zwarciowy Ik₁', value: null, unit: 'kA', source: 'calculated' },
+          { key: 'max_tr_loading', label: 'Maks. obciążenie trafo', value: null, unit: '%', source: 'calculated' },
+          { key: 'no_results', label: 'Status', value: 'Brak wyników — uruchom analizę', severity: 'warning' },
+        ],
+      });
+    }
+
+    return result;
+  }, [station, stationBays, stationTransformers, snBuses, nnBuses, activeMode]);
 
   const handleAddTransformer = useCallback(() => {
     openOperationForm('add_transformer_sn_nn', { station_ref: elementId });

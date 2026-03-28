@@ -11,6 +11,7 @@ import { useMemo, useCallback } from 'react';
 import { ObjectCard, type CardSection, type CardAction } from './ObjectCard';
 import { useSnapshotStore } from '../../topology/snapshotStore';
 import { useNetworkBuildStore } from '../networkBuildStore';
+import { useAppStateStore } from '../../app-state';
 
 // =============================================================================
 // Helpers
@@ -47,6 +48,7 @@ export function SourceCard({ elementId }: { elementId: string }) {
   const readiness = useSnapshotStore((s) => s.readiness);
   const openOperationForm = useNetworkBuildStore((s) => s.openOperationForm);
   const closeObjectCard = useNetworkBuildStore((s) => s.closeObjectCard);
+  const activeMode = useAppStateStore((s) => s.activeMode);
 
   const source = useMemo(
     () => snapshot?.sources?.find((src) => src.ref_id === elementId),
@@ -166,8 +168,24 @@ export function SourceCard({ elementId }: { elementId: string }) {
       ],
     };
 
-    return [identSection, paramSection, busSection, catalogSection];
-  }, [source, bus]);
+    const result: CardSection[] = [identSection, paramSection, busSection, catalogSection];
+
+    if (activeMode === 'RESULT_VIEW') {
+      result.push({
+        id: 'analysis',
+        label: 'Wyniki analizy',
+        fields: [
+          { key: 'p_gen', label: 'Moc czynna P', value: null, unit: 'MW', source: 'calculated' },
+          { key: 'q_gen', label: 'Moc bierna Q', value: null, unit: 'Mvar', source: 'calculated' },
+          { key: 'i_source', label: 'Prąd zasilania I', value: null, unit: 'A', source: 'calculated' },
+          { key: 'ik3_contribution', label: 'Wkład Ik₃', value: null, unit: 'kA', source: 'calculated' },
+          { key: 'no_results', label: 'Status', value: 'Brak wyników — uruchom analizę', severity: 'warning' },
+        ],
+      });
+    }
+
+    return result;
+  }, [source, bus, activeMode]);
 
   const handleEditParams = useCallback(() => {
     openOperationForm('update_element_parameters', { element_ref: elementId, element_type: 'source' });

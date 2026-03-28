@@ -20,7 +20,7 @@ import { useSnapshotStore } from '../topology/snapshotStore';
 import { useSelectionStore } from '../selection';
 import { useNetworkBuildStore } from './networkBuildStore';
 import { useAppStateStore } from '../app-state';
-import type { EnergyNetworkModel, ReadinessInfo, Branch } from '../../types/enm';
+import type { EnergyNetworkModel, ReadinessInfo, Branch, LogicalViewsV1 } from '../../types/enm';
 import type { CanonicalOpName } from '../../types/domainOps';
 
 // =============================================================================
@@ -92,10 +92,50 @@ function isLineCable(b: Branch): b is Branch & { type: 'line_overhead' | 'cable'
 // Helpers: build sections from ENM element
 // =============================================================================
 
+function findParentStation(
+  elementId: string,
+  snapshot: EnergyNetworkModel,
+): string | null {
+  // Check bays for equipment_refs
+  const bay = snapshot.bays?.find((b) => b.equipment_refs?.includes(elementId));
+  if (bay) {
+    const station = snapshot.substations?.find((s) => s.id === bay.substation_ref);
+    return station?.name ?? null;
+  }
+  // Check transformer_refs
+  const trStation = snapshot.substations?.find((s) =>
+    s.transformer_refs?.includes(elementId),
+  );
+  if (trStation) return trStation.name;
+  // Check generator station_ref
+  const gen = snapshot.generators?.find((g) => g.ref_id === elementId);
+  if (gen?.station_ref) {
+    const station = snapshot.substations?.find((s) => s.id === gen.station_ref);
+    return station?.name ?? null;
+  }
+  // Check by bus_ref for loads/generators
+  const load = snapshot.loads?.find((l) => l.ref_id === elementId);
+  const busRef = load?.bus_ref ?? gen?.bus_ref;
+  if (busRef) {
+    const station = snapshot.substations?.find((s) => s.bus_refs?.includes(busRef));
+    return station?.name ?? null;
+  }
+  // Check branches by bus refs
+  const branch = snapshot.branches?.find((b) => b.ref_id === elementId);
+  if (branch) {
+    const fromStation = snapshot.substations?.find((s) =>
+      s.bus_refs?.includes(branch.from_bus_ref),
+    );
+    if (fromStation) return fromStation.name;
+  }
+  return null;
+}
+
 function buildSectionsForElement(
   elementId: string,
   snapshot: EnergyNetworkModel | null,
   readiness: ReadinessInfo | null,
+  logicalViews?: LogicalViewsV1 | null,
 ): { sections: PropertySection[]; elementType: string; elementName: string; actions: QuickAction[] } {
   if (!snapshot) return { sections: [], elementType: '', elementName: '', actions: [] };
 
@@ -138,6 +178,26 @@ function buildSectionsForElement(
         { key: 'status', label: 'Stan', value: branch.status },
       ],
     });
+    // Parent station and role context
+    const branchParent = findParentStation(elementId, snapshot);
+    if (branchParent) {
+      sections[sections.length - 1].fields.push(
+        { key: 'parent_station', label: 'Stacja nadrzędna', value: branchParent },
+      );
+    }
+    // Role context from logical views
+    if (logicalViews) {
+      let roleLabel = '—';
+      const isTrunk = logicalViews.trunks?.some((t) => t.segments?.includes(elementId));
+      const isBranch = logicalViews.branches?.some((br) => br.segments?.includes(elementId));
+      const isSecondary = logicalViews.secondary_connectors?.some((sc) => sc.segment_ref === elementId);
+      if (isTrunk) roleLabel = 'Magistrala';
+      else if (isBranch) roleLabel = 'Odgałęzienie';
+      else if (isSecondary) roleLabel = 'Połączenie pierścieniowe';
+      sections[sections.length - 1].fields.push(
+        { key: 'role', label: 'Rola w sieci', value: roleLabel },
+      );
+    }
     sections.push({
       id: 'topology', label: 'Topologia', fields: [
         { key: 'from_bus', label: 'Szyna początkowa', value: branch.from_bus_ref },
@@ -340,14 +400,15 @@ export function InspectorEngineeringView({ className }: InspectorEngineeringView
   const selectedElements = useSelectionStore((s) => s.selectedElements);
   const snapshot = useSnapshotStore((s) => s.snapshot);
   const readiness = useSnapshotStore((s) => s.readiness);
+  const logicalViews = useSnapshotStore((s) => s.logicalViews);
   const openOperationForm = useNetworkBuildStore((s) => s.openOperationForm);
   const activeMode = useAppStateStore((s) => s.activeMode);
 
   const elementId = selectedElements.length > 0 ? selectedElements[0].id : null;
 
   const { sections, elementType, elementName, actions } = useMemo(
-    () => buildSectionsForElement(elementId ?? '', snapshot, readiness),
-    [elementId, snapshot, readiness],
+    () => buildSectionsForElement(elementId ?? '', snapshot, readiness, logicalViews),
+    [elementId, snapshot, readiness, logicalViews],
   );
 
   const handleAction = useCallback(

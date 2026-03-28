@@ -11,6 +11,7 @@ import { useMemo, useCallback } from 'react';
 import { ObjectCard, type CardSection, type CardAction } from './ObjectCard';
 import { useSnapshotStore } from '../../topology/snapshotStore';
 import { useNetworkBuildStore } from '../networkBuildStore';
+import { useAppStateStore } from '../../app-state';
 import type { OverheadLine, Cable } from '../../../types/enm';
 
 // =============================================================================
@@ -66,8 +67,10 @@ function statusDotFromReadiness(
 export function LineSegmentCard({ elementId }: { elementId: string }) {
   const snapshot = useSnapshotStore((s) => s.snapshot);
   const readiness = useSnapshotStore((s) => s.readiness);
+  const logicalViews = useSnapshotStore((s) => s.logicalViews);
   const openOperationForm = useNetworkBuildStore((s) => s.openOperationForm);
   const closeObjectCard = useNetworkBuildStore((s) => s.closeObjectCard);
+  const activeMode = useAppStateStore((s) => s.activeMode);
 
   const branch = useMemo(() => {
     const found = snapshot?.branches?.find((b) => b.ref_id === elementId);
@@ -248,8 +251,48 @@ export function LineSegmentCard({ elementId }: { elementId: string }) {
       ],
     };
 
-    return [identSection, topoSection, paramSection, catalogSection];
-  }, [branch, fromBus, toBus]);
+    // Role context from logical views
+    let roleLabel = '—';
+    if (logicalViews) {
+      const isTrunk = logicalViews.trunks?.some(
+        (t) => t.segments?.includes(elementId),
+      );
+      const isBranch = logicalViews.branches?.some(
+        (br) => br.segments?.includes(elementId),
+      );
+      const isSecondary = logicalViews.secondary_connectors?.some(
+        (sc) => sc.segment_ref === elementId,
+      );
+      if (isTrunk) roleLabel = 'Magistrala';
+      else if (isBranch) roleLabel = 'Odgałęzienie';
+      else if (isSecondary) roleLabel = 'Połączenie pierścieniowe';
+    }
+
+    identSection.fields.push({
+      key: 'role',
+      label: 'Rola w sieci',
+      value: roleLabel,
+    });
+
+    const result: CardSection[] = [identSection, topoSection, paramSection, catalogSection];
+
+    if (activeMode === 'RESULT_VIEW') {
+      result.push({
+        id: 'analysis',
+        label: 'Wyniki analizy',
+        fields: [
+          { key: 'p_flow', label: 'Przepływ P', value: null, unit: 'MW', source: 'calculated' },
+          { key: 'q_flow', label: 'Przepływ Q', value: null, unit: 'Mvar', source: 'calculated' },
+          { key: 'i_flow', label: 'Prąd I', value: null, unit: 'A', source: 'calculated' },
+          { key: 'loading', label: 'Obciążenie In', value: null, unit: '%', source: 'calculated' },
+          { key: 'du_percent', label: 'Spadek napięcia ΔU', value: null, unit: '%', source: 'calculated' },
+          { key: 'no_results', label: 'Status', value: 'Brak wyników — uruchom analizę', severity: 'warning' },
+        ],
+      });
+    }
+
+    return result;
+  }, [branch, fromBus, toBus, logicalViews, activeMode, elementId]);
 
   const handleAssignCatalog = useCallback(() => {
     openOperationForm('assign_catalog_to_element', {

@@ -11,6 +11,7 @@ import { useMemo, useCallback } from 'react';
 import { ObjectCard, type CardSection, type CardAction } from './ObjectCard';
 import { useSnapshotStore } from '../../topology/snapshotStore';
 import { useNetworkBuildStore } from '../networkBuildStore';
+import { useAppStateStore } from '../../app-state';
 
 // =============================================================================
 // Helpers
@@ -50,6 +51,7 @@ export function TransformerCard({ elementId }: { elementId: string }) {
   const readiness = useSnapshotStore((s) => s.readiness);
   const openOperationForm = useNetworkBuildStore((s) => s.openOperationForm);
   const closeObjectCard = useNetworkBuildStore((s) => s.closeObjectCard);
+  const activeMode = useAppStateStore((s) => s.activeMode);
 
   const transformer = useMemo(
     () => snapshot?.transformers?.find((t) => t.ref_id === elementId),
@@ -236,8 +238,27 @@ export function TransformerCard({ elementId }: { elementId: string }) {
       ],
     };
 
-    return [identSection, topoSection, paramSection, neutralSection, catalogSection];
-  }, [transformer, hvBus, lvBus, parentStation]);
+    const result: CardSection[] = [identSection, topoSection, paramSection, neutralSection, catalogSection];
+
+    if (activeMode === 'RESULT_VIEW') {
+      result.push({
+        id: 'analysis',
+        label: 'Wyniki analizy',
+        fields: [
+          { key: 'p_flow', label: 'Przepływ P', value: null, unit: 'MW', source: 'calculated' },
+          { key: 'q_flow', label: 'Przepływ Q', value: null, unit: 'Mvar', source: 'calculated' },
+          { key: 'i_hv', label: 'Prąd strona WN', value: null, unit: 'A', source: 'calculated' },
+          { key: 'i_lv', label: 'Prąd strona nN', value: null, unit: 'A', source: 'calculated' },
+          { key: 'loading', label: 'Obciążenie Sn', value: null, unit: '%', source: 'calculated' },
+          { key: 'losses', label: 'Straty ΔP', value: null, unit: 'kW', source: 'calculated' },
+          { key: 'tap_actual', label: 'Zaczep aktualny', value: null, source: 'calculated' },
+          { key: 'no_results', label: 'Status', value: 'Brak wyników — uruchom analizę', severity: 'warning' },
+        ],
+      });
+    }
+
+    return result;
+  }, [transformer, hvBus, lvBus, parentStation, activeMode]);
 
   const handleAssignCatalog = useCallback(() => {
     openOperationForm('assign_catalog_to_element', {

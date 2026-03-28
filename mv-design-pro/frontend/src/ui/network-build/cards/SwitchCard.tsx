@@ -12,6 +12,7 @@ import { useMemo, useCallback } from 'react';
 import { ObjectCard, type CardSection, type CardAction } from './ObjectCard';
 import { useSnapshotStore } from '../../topology/snapshotStore';
 import { useNetworkBuildStore } from '../networkBuildStore';
+import { useAppStateStore } from '../../app-state';
 import type { SwitchBranch, FuseBranch } from '../../../types/enm';
 
 // =============================================================================
@@ -85,6 +86,7 @@ export function SwitchCard({ elementId }: { elementId: string }) {
   const readiness = useSnapshotStore((s) => s.readiness);
   const openOperationForm = useNetworkBuildStore((s) => s.openOperationForm);
   const closeObjectCard = useNetworkBuildStore((s) => s.closeObjectCard);
+  const activeMode = useAppStateStore((s) => s.activeMode);
 
   const branch = useMemo(() => {
     const found = snapshot?.branches?.find((b) => b.ref_id === elementId);
@@ -250,8 +252,23 @@ export function SwitchCard({ elementId }: { elementId: string }) {
       ],
     };
 
-    return [identSection, topoSection, stateSection, catalogSection];
-  }, [branch, fromBus, toBus, isNop, parentBay, parentStation]);
+    const result: CardSection[] = [identSection, topoSection, stateSection, catalogSection];
+
+    if (activeMode === 'RESULT_VIEW') {
+      result.push({
+        id: 'analysis',
+        label: 'Wyniki analizy',
+        fields: [
+          { key: 'i_through', label: 'Prąd przepływający I', value: null, unit: 'A', source: 'calculated' },
+          { key: 'ik3_through', label: 'Prąd zwarciowy Ik₃', value: null, unit: 'kA', source: 'calculated' },
+          { key: 'breaking_capacity', label: 'Zdolność wyłączalna', value: null, unit: '%', source: 'calculated' },
+          { key: 'no_results', label: 'Status', value: 'Brak wyników — uruchom analizę', severity: 'warning' },
+        ],
+      });
+    }
+
+    return result;
+  }, [branch, fromBus, toBus, isNop, parentBay, parentStation, activeMode]);
 
   const handleToggleState = useCallback(() => {
     openOperationForm('update_element_parameters', {
