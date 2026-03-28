@@ -68,8 +68,7 @@ import type { StationBlockBuildResult } from './stationBlockBuilder';
 import type { LayoutEngineOptions } from './layoutEngine';
 import { createLayoutEngine } from './layoutEngine';
 import { buildSldSemanticGraphFromVisualGraph } from './semanticGraphBuilder';
-import { buildLayoutInputGraph } from './layoutInputGraph';
-import { buildLegacyVisualGraphFromLayoutInput } from './legacyVisualGraphBridge';
+import { buildLayoutInputGraph, type LayoutInputGraphV1 } from './layoutInputGraph';
 import {
   GRID_BASE,
   GRID_SPACING_MAIN,
@@ -1854,19 +1853,41 @@ export function computeLayout(
   stationBlockDetails?: StationBlockBuildResult,
   options: LayoutEngineOptions = { strategy: 'legacy' },
 ): LayoutResultV1 {
+  if ((options.strategy ?? 'legacy') === 'legacy') {
+    return legacyPipelineInternal(graph, config, stationBlockDetails);
+  }
+
   const semanticGraph = buildSldSemanticGraphFromVisualGraph(graph);
-  const layoutInput = buildLayoutInputGraph(semanticGraph, {
+  const baseLayoutInput = buildLayoutInputGraph(semanticGraph, {
     minSpacing: options.minSpacing,
     maxSpacing: options.maxSpacing,
   });
+  const legacyDimensions = new Map(
+    graph.nodes.map((node) => [node.id, { width: node.attributes.width, height: node.attributes.height }] as const),
+  );
+  const layoutInput: LayoutInputGraphV1 = {
+    ...baseLayoutInput,
+    nodes: baseLayoutInput.nodes.map((node) => {
+      const legacy = legacyDimensions.get(node.id);
+      if (!legacy) return node;
+      const width = legacy.width ?? node.symbolProfile.width;
+      const height = legacy.height ?? node.symbolProfile.height;
+      if (width === node.symbolProfile.width && height === node.symbolProfile.height) return node;
+      return {
+        ...node,
+        symbolProfile: {
+          ...node.symbolProfile,
+          width,
+          height,
+        },
+      };
+    }),
+  };
 
   const engine = createLayoutEngine(options, {
-    legacyLayout: (legacyInput, legacyConfig, legacyStationBlockDetails) =>
-      legacyPipelineInternal(
-        buildLegacyVisualGraphFromLayoutInput(legacyInput),
-        legacyConfig,
-        legacyStationBlockDetails,
-      ),
+    legacyLayout: () => {
+      throw new Error('Legacy callback is disabled in canonical computeLayout path.');
+    },
   });
   return engine.compute(layoutInput, config, stationBlockDetails).layout;
 }
