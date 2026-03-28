@@ -517,6 +517,28 @@ class TestCatalogGateInsertBranchPole:
         )
         assert result.get("snapshot") is not None, f"Błąd: {result.get('error')}"
 
+    def test_reject_branch_pole_with_invalid_catalog_binding_without_snapshot_mutation(self):
+        """Niepoprawny catalog_binding (bez item_id) → catalog.ref_required i brak nowego branch_point."""
+        enm = _empty_enm()
+        snapshot = _add_gpz(enm)
+        snapshot = _add_overhead_line_with_catalog(snapshot)
+
+        seg_ref = _get_first_overhead_line_ref(snapshot)
+        branch_points_before = len(snapshot.get("branch_points", []))
+
+        result = execute_domain_operation(
+            enm_dict=snapshot,
+            op_name="insert_branch_pole_on_segment_sn",
+            payload={
+                "segment_id": seg_ref,
+                "catalog_binding": {"namespace": "mv_branch_points"},  # brak item_id
+            },
+        )
+
+        assert result.get("error_code") == "catalog.ref_required"
+        assert result.get("snapshot") is None
+        assert len(snapshot.get("branch_points", [])) == branch_points_before
+
 
 # ===========================================================================
 # TEST 9: insert_zksn_on_segment_sn bez katalogu → odrzucenie
@@ -659,3 +681,30 @@ class TestCatalogGateInsertSectionSwitch:
         # Oryginalny snapshot przekazany do operacji nie moze byc zmieniony
         assert len(snapshot.get("branches", [])) == branches_before
         assert len(snapshot.get("buses", [])) == buses_before
+
+    def test_reject_section_switch_with_invalid_catalog_binding_without_snapshot_mutation(self):
+        """Niepoprawny catalog_binding (bez item_id) → catalog.ref_required i brak nowego łącznika."""
+        enm = _empty_enm()
+        snapshot = _add_gpz(enm)
+        snapshot = _add_segment_with_catalog(snapshot)
+
+        seg_ref = _get_first_cable_ref(snapshot)
+        switch_count_before = sum(
+            1 for branch in snapshot.get("branches", []) if branch.get("type") in {"switch", "breaker"}
+        )
+
+        result = execute_domain_operation(
+            enm_dict=snapshot,
+            op_name="insert_section_switch_sn",
+            payload={
+                "segment_id": seg_ref,
+                "catalog_binding": {"namespace": "APARAT_SN"},  # brak item_id
+            },
+        )
+
+        assert result.get("error_code") == "catalog.ref_required"
+        assert result.get("snapshot") is None
+        switch_count_after = sum(
+            1 for branch in snapshot.get("branches", []) if branch.get("type") in {"switch", "breaker"}
+        )
+        assert switch_count_after == switch_count_before

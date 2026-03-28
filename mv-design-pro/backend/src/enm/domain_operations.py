@@ -97,6 +97,26 @@ def _quantize_ratio(value: float, quantum: float = 1e-6) -> float:
     return round(value / quantum) * quantum
 
 
+def _resolve_catalog_ref(catalog_ref: Any, catalog_binding: Any) -> str | None:
+    """Rozwiąż catalog_ref z jawnego pola albo z catalog_binding.item_id.
+
+    Zwraca None, gdy referencja jest pusta/niepoprawna.
+    """
+    if isinstance(catalog_ref, str):
+        normalized = catalog_ref.strip()
+        if normalized:
+            return normalized
+
+    if isinstance(catalog_binding, dict):
+        binding_item = catalog_binding.get("item_id")
+        if isinstance(binding_item, str):
+            normalized = binding_item.strip()
+            if normalized:
+                return normalized
+
+    return None
+
+
 # ---------------------------------------------------------------------------
 # Helpers — snapshot utilities
 # ---------------------------------------------------------------------------
@@ -909,18 +929,15 @@ def continue_trunk_segment_sn(enm: dict[str, Any], payload: dict[str, Any]) -> d
             "trunk.dlugosc_missing",
         )
 
-    catalog_ref = segment.get("catalog_ref")
     # Bramka katalogowa (ENM) — segment SN WYMAGA catalog_ref
     catalog_binding = segment.get("catalog_binding") or payload.get("catalog_binding")
-    if not catalog_ref and not catalog_binding:
+    catalog_ref = _resolve_catalog_ref(segment.get("catalog_ref"), catalog_binding)
+    if not catalog_ref:
         return _error_response(
             "Odcinek SN wymaga powiązania z katalogiem. "
             "Podaj catalog_ref lub catalog_binding w payload segmentu.",
             "catalog.ref_required",
         )
-    # Wyciagnij catalog_ref z catalog_binding jesli nie podano bezposrednio
-    if not catalog_ref and catalog_binding:
-        catalog_ref = catalog_binding.get("item_id") if isinstance(catalog_binding, dict) else None
     segment_name = segment.get("name")
 
     seed = _compute_seed({
@@ -1333,16 +1350,12 @@ def insert_station_on_segment_sn(enm: dict[str, Any], payload: dict[str, Any]) -
         tr_catalog = transformer.get("transformer_catalog_ref")
         tr_catalog_binding = transformer.get("catalog_binding") or payload.get("catalog_binding")
         # Bramka katalogowa (ENM) — transformator WYMAGA catalog_ref
-        if not tr_catalog and not tr_catalog_binding:
+        tr_catalog = _resolve_catalog_ref(tr_catalog, tr_catalog_binding)
+        if not tr_catalog:
             return _error_response(
                 "Transformator SN/nN wymaga powiązania z katalogiem. "
                 "Podaj transformer_catalog_ref lub catalog_binding w payload transformatora.",
                 "catalog.ref_required",
-            )
-        if not tr_catalog and tr_catalog_binding:
-            tr_catalog = (
-                tr_catalog_binding.get("item_id")
-                if isinstance(tr_catalog_binding, dict) else None
             )
         tr_data = {
             "device_type": "transformer",
@@ -1485,19 +1498,14 @@ def _insert_branch_point_on_segment_sn(
         )
 
     # Bramka katalogowa — punkt rozgałęzienia WYMAGA catalog_ref PRZED utworzeniem
-    bp_catalog_ref = payload.get("catalog_ref")
     bp_catalog_binding = payload.get("catalog_binding")
-    if not bp_catalog_ref and not bp_catalog_binding:
+    bp_catalog_ref = _resolve_catalog_ref(payload.get("catalog_ref"), bp_catalog_binding)
+    if not bp_catalog_ref:
         type_label = "Słup rozgałęźny" if branch_point_type == "branch_pole" else "ZKSN"
         return _error_response(
             f"{type_label} SN wymaga powiązania z katalogiem. "
             "Podaj catalog_ref lub catalog_binding w payload.",
             "catalog.ref_required",
-        )
-    if not bp_catalog_ref and bp_catalog_binding:
-        bp_catalog_ref = (
-            bp_catalog_binding.get("item_id")
-            if isinstance(bp_catalog_binding, dict) else None
         )
 
     insert_at = payload.get("insert_at", {"mode": "RATIO", "value": 0.5})
@@ -1686,18 +1694,13 @@ def start_branch_segment_sn(enm: dict[str, Any], payload: dict[str, Any]) -> dic
         )
 
     # Bramka katalogowa (ENM) — segment odgalezienia WYMAGA catalog_ref
-    branch_catalog_ref = segment.get("catalog_ref")
     branch_catalog_binding = segment.get("catalog_binding") or payload.get("catalog_binding")
-    if not branch_catalog_ref and not branch_catalog_binding:
+    branch_catalog_ref = _resolve_catalog_ref(segment.get("catalog_ref"), branch_catalog_binding)
+    if not branch_catalog_ref:
         return _error_response(
             "Odcinek odgałęzienia SN wymaga powiązania z katalogiem. "
             "Podaj catalog_ref lub catalog_binding w payload segmentu.",
             "catalog.ref_required",
-        )
-    if not branch_catalog_ref and branch_catalog_binding:
-        branch_catalog_ref = (
-            branch_catalog_binding.get("item_id")
-            if isinstance(branch_catalog_binding, dict) else None
         )
 
     seed = _compute_seed({
@@ -1788,18 +1791,13 @@ def insert_section_switch_sn(enm: dict[str, Any], payload: dict[str, Any]) -> di
         return _error_response(f"Odcinek '{segment_id}' nie istnieje.", "switch.segment_not_found")
 
     # Bramka katalogowa — łącznik SN WYMAGA catalog_ref aparatu PRZED utworzeniem
-    switch_catalog_ref = payload.get("catalog_ref")
     switch_catalog_binding = payload.get("catalog_binding")
-    if not switch_catalog_ref and not switch_catalog_binding:
+    switch_catalog_ref = _resolve_catalog_ref(payload.get("catalog_ref"), switch_catalog_binding)
+    if not switch_catalog_ref:
         return _error_response(
             "Łącznik sekcyjny SN wymaga powiązania z katalogiem. "
             "Podaj catalog_ref lub catalog_binding aparatu w payload.",
             "catalog.ref_required",
-        )
-    if not switch_catalog_ref and switch_catalog_binding:
-        switch_catalog_ref = (
-            switch_catalog_binding.get("item_id")
-            if isinstance(switch_catalog_binding, dict) else None
         )
 
     from_bus_ref = segment.get("from_bus_ref")
@@ -1998,18 +1996,13 @@ def connect_secondary_ring_sn(enm: dict[str, Any], payload: dict[str, Any]) -> d
         )
 
     # Bramka katalogowa (ENM) — segment pierscienia WYMAGA catalog_ref
-    ring_catalog_ref = segment.get("catalog_ref")
     ring_catalog_binding = segment.get("catalog_binding") or payload.get("catalog_binding")
-    if not ring_catalog_ref and not ring_catalog_binding:
+    ring_catalog_ref = _resolve_catalog_ref(segment.get("catalog_ref"), ring_catalog_binding)
+    if not ring_catalog_ref:
         return _error_response(
             "Segment zamknięcia pierścienia wymaga powiązania z katalogiem. "
             "Podaj catalog_ref lub catalog_binding w payload segmentu.",
             "catalog.ref_required",
-        )
-    if not ring_catalog_ref and ring_catalog_binding:
-        ring_catalog_ref = (
-            ring_catalog_binding.get("item_id")
-            if isinstance(ring_catalog_binding, dict) else None
         )
 
     branch_type = "cable" if rodzaj == "KABEL" else "line_overhead"
@@ -2107,18 +2100,13 @@ def add_transformer_sn_nn(enm: dict[str, Any], payload: dict[str, Any]) -> dict[
         return _error_response("Brak szyn HV/LV.", "transformer.buses_missing")
 
     # Bramka katalogowa (ENM) — transformator WYMAGA catalog_ref
-    standalone_catalog = payload.get("transformer_catalog_ref")
     standalone_binding = payload.get("catalog_binding")
-    if not standalone_catalog and not standalone_binding:
+    standalone_catalog = _resolve_catalog_ref(payload.get("transformer_catalog_ref"), standalone_binding)
+    if not standalone_catalog:
         return _error_response(
             "Transformator SN/nN wymaga powiązania z katalogiem. "
             "Podaj transformer_catalog_ref lub catalog_binding w payload.",
             "catalog.ref_required",
-        )
-    if not standalone_catalog and standalone_binding:
-        standalone_catalog = (
-            standalone_binding.get("item_id")
-            if isinstance(standalone_binding, dict) else None
         )
 
     seed = _compute_seed({"op": "add_transformer", "hv": hv_bus_ref, "lv": lv_bus_ref})
