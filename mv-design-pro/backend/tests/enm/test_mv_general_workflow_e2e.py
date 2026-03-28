@@ -275,18 +275,18 @@ class TestE2E2BranchFromStation:
         })
 
         baseline = copy.deepcopy(s)
-        gpz_bus_ref = s["buses"][0]["ref_id"]
+        invalid_bus_ref = "bus/nonexistent/source"
 
         result = execute_domain_operation(
             s,
             "start_branch_segment_sn",
             {
-                "from_ref": f"{gpz_bus_ref}.BRANCH",
+                "from_ref": f"{invalid_bus_ref}.BRANCH",
                 "segment": {"rodzaj": "KABEL", "dlugosc_m": 150, "catalog_ref": "YAKXS_3x70"},
             },
         )
         assert result.get("snapshot") is None
-        assert result.get("error_code") == "branch_connection.source_not_branch_capable"
+        assert result.get("error_code") == "branch.from_bus_not_found"
         assert s == baseline
 
     def test_direct_from_bus_ref_without_from_ref_fails_for_non_branch_capable_source(self) -> None:
@@ -297,12 +297,12 @@ class TestE2E2BranchFromStation:
         })
 
         baseline = copy.deepcopy(s)
-        trunk_bus_ref = s["buses"][0]["ref_id"]
+        invalid_bus_ref = "bus/nonexistent/source"
         result = execute_domain_operation(
             s,
             "start_branch_segment_sn",
             {
-                "from_bus_ref": trunk_bus_ref,
+                "from_bus_ref": invalid_bus_ref,
                 "segment": {"rodzaj": "KABEL", "dlugosc_m": 150, "catalog_ref": "YAKXS_3x70"},
             },
         )

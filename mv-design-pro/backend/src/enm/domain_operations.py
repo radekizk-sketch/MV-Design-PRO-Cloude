@@ -532,6 +532,14 @@ def _resolve_branch_from_ref(enm: dict[str, Any], from_ref: str) -> tuple[str | 
             return None, "branch_connection.source_not_branch_capable"
         return feeder_bay.get("bus_ref"), None
 
+    if element_ref.startswith("bus/"):
+        if port_id != "BRANCH":
+            return None, "branch_connection.invalid_source_port"
+        bus = next((b for b in enm.get("buses", []) if b.get("ref_id") == element_ref), None)
+        if not bus:
+            return None, "branch.from_bus_not_found"
+        return element_ref, None
+
     bp = next((b for b in enm.get("branch_points", []) if b.get("ref_id") == element_ref), None)
     if not bp:
         return None, "branch_connection.source_not_branch_capable"
@@ -606,6 +614,10 @@ def _lookup_branch_from_ref_for_bus(
             for idx, bus_ref in enumerate(ports.get("BRANCH", []), start=1):
                 if bus_ref == from_bus_ref:
                     candidates.append(f"{bp_ref}.BRANCH_{idx}")
+
+    bus = next((b for b in enm.get("buses", []) if b.get("ref_id") == from_bus_ref), None)
+    if bus:
+        candidates.append(f"{from_bus_ref}.BRANCH")
 
     unique = sorted(set(candidates))
     if len(unique) != 1:
