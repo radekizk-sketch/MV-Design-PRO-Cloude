@@ -535,10 +535,15 @@ def _resolve_branch_from_ref(enm: dict[str, Any], from_ref: str) -> tuple[str | 
         return None, "branch_connection.invalid_source_port"
     element_ref, port_id = from_ref.split(".", 1)
 
+    if port_id == "BRANCH":
+        bus = next((b for b in enm.get("buses", []) if b.get("ref_id") == element_ref), None)
+        if bus:
+            return element_ref, None
+
     if element_ref.startswith("stn/"):
         sub = next((s for s in enm.get("substations", []) if s.get("ref_id") == element_ref), None)
         if not sub:
-            return None, "branch.from_bus_not_found"
+            return None, "branch_connection.source_not_branch_capable"
         if port_id != "BRANCH":
             return None, "branch_connection.invalid_source_port"
         feeder_bay = next(
@@ -551,6 +556,14 @@ def _resolve_branch_from_ref(enm: dict[str, Any], from_ref: str) -> tuple[str | 
         if not feeder_bay:
             return None, "branch_connection.source_not_branch_capable"
         return feeder_bay.get("bus_ref"), None
+
+    if element_ref.startswith("bus/"):
+        if port_id != "BRANCH":
+            return None, "branch_connection.invalid_source_port"
+        bus = next((b for b in enm.get("buses", []) if b.get("ref_id") == element_ref), None)
+        if not bus:
+            return None, "branch.from_bus_not_found"
+        return element_ref, None
 
     bp = next((b for b in enm.get("branch_points", []) if b.get("ref_id") == element_ref), None)
     if not bp:
@@ -580,6 +593,62 @@ def _resolve_branch_from_ref(enm: dict[str, Any], from_ref: str) -> tuple[str | 
         if bp.get("branch_occupied", {}).get(port_id):
             return None, "branch_point.branch_port_occupied"
         return branch_ports[idx], None
+
+    return None, "branch_connection.source_not_branch_capable"
+
+
+def _lookup_branch_from_ref_for_bus(
+    enm: dict[str, Any],
+    from_bus_ref: str,
+) -> tuple[str | None, str | None]:
+    """Legacy lookup: wyznacz from_ref na podstawie from_bus_ref.
+
+    Dopuszcza wyłącznie źródła branch-capable:
+    - station.BRANCH (bay_role=FEEDER)
+    - branch_pole.BRANCH
+    - zksn.BRANCH_n
+    """
+    structured_candidates: list[str] = []
+
+    for sub in enm.get("substations", []):
+        sub_ref = sub.get("ref_id")
+        if not sub_ref:
+            continue
+        feeder_bay = next(
+            (
+                bay for bay in enm.get("bays", [])
+                if bay.get("substation_ref") == sub_ref
+                and bay.get("bay_role") == "FEEDER"
+                and bay.get("bus_ref") == from_bus_ref
+            ),
+            None,
+        )
+        if feeder_bay:
+            structured_candidates.append(f"{sub_ref}.BRANCH")
+
+    for bp in enm.get("branch_points", []):
+        bp_ref = bp.get("ref_id")
+        ports = bp.get("ports", {})
+        if not bp_ref:
+            continue
+        if bp.get("branch_point_type") == "branch_pole":
+            branch_bus = ports.get("BRANCH", [None])[0] if isinstance(ports.get("BRANCH"), list) else None
+            if branch_bus == from_bus_ref:
+                structured_candidates.append(f"{bp_ref}.BRANCH")
+        if bp.get("branch_point_type") == "zksn":
+            for idx, bus_ref in enumerate(ports.get("BRANCH", []), start=1):
+                if bus_ref == from_bus_ref:
+                    structured_candidates.append(f"{bp_ref}.BRANCH_{idx}")
+
+    unique_structured = sorted(set(structured_candidates))
+    if len(unique_structured) == 1:
+        return unique_structured[0], None
+    if len(unique_structured) > 1:
+        return None, "branch_connection.source_not_branch_capable"
+
+    bus = next((b for b in enm.get("buses", []) if b.get("ref_id") == from_bus_ref), None)
+    if bus:
+        return f"{from_bus_ref}.BRANCH", None
 
     return None, "branch_connection.source_not_branch_capable"
 
@@ -769,6 +838,34 @@ def _error_response(message: str, code: str = "UNKNOWN") -> dict[str, Any]:
     }
 
 
+def _require_catalog_ref(
+    payload_ref: Any,
+    payload_binding: Any,
+    context_code: str,
+) -> str | dict[str, Any]:
+    """Zwróć kanoniczny catalog_ref albo odpowiedź błędu catalog.ref_required."""
+    error_message = (
+        f"{context_code}: wymagane powiązanie z katalogiem "
+        "(catalog_ref lub poprawne catalog_binding.item_id)."
+    )
+    if isinstance(payload_ref, str):
+        normalized_ref = payload_ref.strip()
+        if normalized_ref:
+            return normalized_ref
+
+    if payload_binding is not None:
+        if not isinstance(payload_binding, dict):
+            return _error_response(error_message, "catalog.ref_required")
+        binding_item_id = payload_binding.get("item_id")
+        if isinstance(binding_item_id, str):
+            normalized_item_id = binding_item_id.strip()
+            if normalized_item_id:
+                return normalized_item_id
+        return _error_response(error_message, "catalog.ref_required")
+
+    return _error_response(error_message, "catalog.ref_required")
+
+
 # ---------------------------------------------------------------------------
 # 1. add_grid_source_sn
 # ---------------------------------------------------------------------------
@@ -929,15 +1026,13 @@ def continue_trunk_segment_sn(enm: dict[str, Any], payload: dict[str, Any]) -> d
             "trunk.dlugosc_missing",
         )
 
-    # Bramka katalogowa (ENM) — segment SN WYMAGA catalog_ref
-    catalog_binding = segment.get("catalog_binding") or payload.get("catalog_binding")
-    catalog_ref = _resolve_catalog_ref(segment.get("catalog_ref"), catalog_binding)
-    if not catalog_ref:
-        return _error_response(
-            "Odcinek SN wymaga powiązania z katalogiem. "
-            "Podaj catalog_ref lub catalog_binding w payload segmentu.",
-            "catalog.ref_required",
-        )
+    catalog_ref = _require_catalog_ref(
+        payload_ref=segment.get("catalog_ref"),
+        payload_binding=segment.get("catalog_binding") or payload.get("catalog_binding"),
+        context_code="continue_trunk_segment_sn",
+    )
+    if isinstance(catalog_ref, dict):
+        return catalog_ref
     segment_name = segment.get("name")
 
     seed = _compute_seed({
@@ -1347,16 +1442,13 @@ def insert_station_on_segment_sn(enm: dict[str, Any], payload: dict[str, Any]) -
 
     # --- Create Transformer ---
     if transformer.get("create", True):
-        tr_catalog = transformer.get("transformer_catalog_ref")
-        tr_catalog_binding = transformer.get("catalog_binding") or payload.get("catalog_binding")
-        # Bramka katalogowa (ENM) — transformator WYMAGA catalog_ref
-        tr_catalog = _resolve_catalog_ref(tr_catalog, tr_catalog_binding)
-        if not tr_catalog:
-            return _error_response(
-                "Transformator SN/nN wymaga powiązania z katalogiem. "
-                "Podaj transformer_catalog_ref lub catalog_binding w payload transformatora.",
-                "catalog.ref_required",
-            )
+        tr_catalog = _require_catalog_ref(
+            payload_ref=transformer.get("transformer_catalog_ref"),
+            payload_binding=transformer.get("catalog_binding") or payload.get("catalog_binding"),
+            context_code="insert_station_on_segment_sn.transformer",
+        )
+        if isinstance(tr_catalog, dict):
+            return tr_catalog
         tr_data = {
             "device_type": "transformer",
             "ref_id": tr_id,
@@ -1497,16 +1589,13 @@ def _insert_branch_point_on_segment_sn(
             "branch_point.invalid_parent_medium",
         )
 
-    # Bramka katalogowa — punkt rozgałęzienia WYMAGA catalog_ref PRZED utworzeniem
-    bp_catalog_binding = payload.get("catalog_binding")
-    bp_catalog_ref = _resolve_catalog_ref(payload.get("catalog_ref"), bp_catalog_binding)
-    if not bp_catalog_ref:
-        type_label = "Słup rozgałęźny" if branch_point_type == "branch_pole" else "ZKSN"
-        return _error_response(
-            f"{type_label} SN wymaga powiązania z katalogiem. "
-            "Podaj catalog_ref lub catalog_binding w payload.",
-            "catalog.ref_required",
-        )
+    bp_catalog_ref = _require_catalog_ref(
+        payload_ref=payload.get("catalog_ref"),
+        payload_binding=payload.get("catalog_binding"),
+        context_code=f"_insert_branch_point_on_segment_sn.{branch_point_type}",
+    )
+    if isinstance(bp_catalog_ref, dict):
+        return bp_catalog_ref
 
     insert_at = payload.get("insert_at", {"mode": "RATIO", "value": 0.5})
     length_km = float(segment.get("length_km", 0.0))
@@ -1658,22 +1747,39 @@ def insert_zksn_on_segment_sn(enm: dict[str, Any], payload: dict[str, Any]) -> d
 def start_branch_segment_sn(enm: dict[str, Any], payload: dict[str, Any]) -> dict[str, Any]:
     """Dodaj odgałęzienie SN z istniejącej szyny.
 
-    Wymaga jawnego from_bus_ref — brak auto-detekcji.
+    Wymaga jawnego from_ref (port BRANCH na stacji lub branch-poincie).
+    from_bus_ref jest obsługiwane wyłącznie jako pole kompatybilności
+    i musi mapować się 1:1 do bus_ref rozwiązanego z from_ref.
     """
-    from_bus_ref = payload.get("from_bus_ref")
     from_ref = payload.get("from_ref")
+    from_bus_ref = payload.get("from_bus_ref")
     segment = payload.get("segment", {})
 
-    if not from_bus_ref and from_ref:
-        resolved_bus_ref, err_code = _resolve_branch_from_ref(enm, from_ref)
-        if err_code:
-            return _error_response("Nieprawidłowe źródło odgałęzienia.", err_code)
-        from_bus_ref = resolved_bus_ref
-    if not from_bus_ref:
+    if not from_ref and from_bus_ref:
+        inferred_from_ref, lookup_err = _lookup_branch_from_ref_for_bus(enm, from_bus_ref)
+        if lookup_err:
+            return _error_response(
+                "Pole from_bus_ref bez from_ref jest niedozwolone dla źródła "
+                "nieobsługującego portu BRANCH.",
+                "branch_connection.source_not_branch_capable",
+            )
+        from_ref = inferred_from_ref
+    if not from_ref:
         return _error_response(
-            "Brak identyfikatora szyny źródłowej (from_bus_ref/from_ref). "
+            "Brak referencji portu źródłowego (from_ref). "
             "Kliknij port BRANCH na stacji, słupie lub ZKSN w SLD.",
-            "branch.from_bus_missing",
+            "branch.from_ref_required",
+        )
+
+    resolved_bus_ref, err_code = _resolve_branch_from_ref(enm, from_ref)
+    if err_code:
+        return _error_response("Nieprawidłowe źródło odgałęzienia.", err_code)
+    from_bus_ref = resolved_bus_ref
+
+    if payload.get("from_bus_ref") and payload.get("from_bus_ref") != from_bus_ref:
+        return _error_response(
+            "Pole from_bus_ref nie zgadza się z bus_ref wynikającym z from_ref.",
+            "branch_connection.source_not_branch_capable",
         )
 
     from_bus = None
@@ -1693,15 +1799,13 @@ def start_branch_segment_sn(enm: dict[str, Any], payload: dict[str, Any]) -> dic
             "branch.dlugosc_missing",
         )
 
-    # Bramka katalogowa (ENM) — segment odgalezienia WYMAGA catalog_ref
-    branch_catalog_binding = segment.get("catalog_binding") or payload.get("catalog_binding")
-    branch_catalog_ref = _resolve_catalog_ref(segment.get("catalog_ref"), branch_catalog_binding)
-    if not branch_catalog_ref:
-        return _error_response(
-            "Odcinek odgałęzienia SN wymaga powiązania z katalogiem. "
-            "Podaj catalog_ref lub catalog_binding w payload segmentu.",
-            "catalog.ref_required",
-        )
+    branch_catalog_ref = _require_catalog_ref(
+        payload_ref=segment.get("catalog_ref"),
+        payload_binding=segment.get("catalog_binding") or payload.get("catalog_binding"),
+        context_code="start_branch_segment_sn",
+    )
+    if isinstance(branch_catalog_ref, dict):
+        return branch_catalog_ref
 
     seed = _compute_seed({
         "op": "start_branch",
@@ -1790,15 +1894,13 @@ def insert_section_switch_sn(enm: dict[str, Any], payload: dict[str, Any]) -> di
     if not segment:
         return _error_response(f"Odcinek '{segment_id}' nie istnieje.", "switch.segment_not_found")
 
-    # Bramka katalogowa — łącznik SN WYMAGA catalog_ref aparatu PRZED utworzeniem
-    switch_catalog_binding = payload.get("catalog_binding")
-    switch_catalog_ref = _resolve_catalog_ref(payload.get("catalog_ref"), switch_catalog_binding)
-    if not switch_catalog_ref:
-        return _error_response(
-            "Łącznik sekcyjny SN wymaga powiązania z katalogiem. "
-            "Podaj catalog_ref lub catalog_binding aparatu w payload.",
-            "catalog.ref_required",
-        )
+    switch_catalog_ref = _require_catalog_ref(
+        payload_ref=payload.get("catalog_ref"),
+        payload_binding=payload.get("catalog_binding"),
+        context_code="insert_section_switch_sn",
+    )
+    if isinstance(switch_catalog_ref, dict):
+        return switch_catalog_ref
 
     from_bus_ref = segment.get("from_bus_ref")
     to_bus_ref = segment.get("to_bus_ref")
@@ -2099,15 +2201,13 @@ def add_transformer_sn_nn(enm: dict[str, Any], payload: dict[str, Any]) -> dict[
     if not hv_bus_ref or not lv_bus_ref:
         return _error_response("Brak szyn HV/LV.", "transformer.buses_missing")
 
-    # Bramka katalogowa (ENM) — transformator WYMAGA catalog_ref
-    standalone_binding = payload.get("catalog_binding")
-    standalone_catalog = _resolve_catalog_ref(payload.get("transformer_catalog_ref"), standalone_binding)
-    if not standalone_catalog:
-        return _error_response(
-            "Transformator SN/nN wymaga powiązania z katalogiem. "
-            "Podaj transformer_catalog_ref lub catalog_binding w payload.",
-            "catalog.ref_required",
-        )
+    standalone_catalog = _require_catalog_ref(
+        payload_ref=payload.get("transformer_catalog_ref"),
+        payload_binding=payload.get("catalog_binding"),
+        context_code="add_transformer_sn_nn",
+    )
+    if isinstance(standalone_catalog, dict):
+        return standalone_catalog
 
     seed = _compute_seed({"op": "add_transformer", "hv": hv_bus_ref, "lv": lv_bus_ref})
     tr_ref = f"tr/{seed}/transformer"
@@ -2219,8 +2319,88 @@ def update_element_parameters(enm: dict[str, Any], payload: dict[str, Any]) -> d
     if not loc:
         return _error_response(f"Element '{element_ref}' nie znaleziony.", "params.element_not_found")
 
-    new_enm = copy.deepcopy(enm)
     coll, idx = loc
+    current_element = enm[coll][idx]
+
+    generator_type = str(current_element.get("gen_type") or "").upper()
+    generator_requires_catalog = (
+        coll == "generators"
+        and generator_type in {"PV_INVERTER", "WIND_INVERTER", "BESS", "BESS_INVERTER"}
+    )
+    catalog_guard_collections = {"branches", "transformers", "branch_points"}
+    guarded_catalog_binding = coll in catalog_guard_collections or generator_requires_catalog
+    if guarded_catalog_binding:
+        if "catalog_ref" in parameters:
+            catalog_ref = parameters.get("catalog_ref")
+            if catalog_ref is None or (isinstance(catalog_ref, str) and not catalog_ref.strip()):
+                return _error_response("Element fizyczny wymaga przypiętego katalogu.", "catalog.ref_required")
+
+        effective_source_mode = parameters.get("source_mode", current_element.get("source_mode"))
+        effective_namespace = parameters.get("catalog_namespace", current_element.get("catalog_namespace"))
+        if effective_source_mode is not None or effective_namespace is not None:
+            if effective_source_mode == "KATALOG" and not effective_namespace:
+                return _error_response(
+                    "Brak spójnego source_mode/catalog_namespace dla elementu fizycznego.",
+                    "catalog.ref_required",
+                )
+            if effective_source_mode in {"MIGRACJA", "EKSPERCKI_RECZNY"} and effective_namespace:
+                return _error_response(
+                    "Brak spójnego source_mode/catalog_namespace dla elementu fizycznego.",
+                    "catalog.ref_required",
+                )
+
+        if "materialized_params" in parameters:
+            materialized = parameters.get("materialized_params")
+            if effective_source_mode == "KATALOG":
+                if not isinstance(materialized, dict) or not materialized:
+                    return _error_response(
+                        "materialized_params musi być kompletne dla source_mode=KATALOG.",
+                        "catalog.ref_required",
+                    )
+                required_keys = {"branch_point_type", "parent_segment_id", "ports"}
+                if coll == "branch_points" and not required_keys.issubset(materialized.keys()):
+                    return _error_response(
+                        "materialized_params dla punktu rozgałęzienia jest niekompletne.",
+                        "catalog.ref_required",
+                    )
+
+    if coll in {"branches", "transformers", "branch_points", "generators"}:
+        immutable_keys = {"ref_id", "id", "type"}
+        allowlist_by_collection = {
+            "branches": {
+                "name", "status", "length_km", "r_ohm_per_km", "x_ohm_per_km",
+                "b_siemens_per_km", "r0_ohm_per_km", "x0_ohm_per_km", "b0_siemens_per_km",
+                "rating", "insulation", "catalog_ref", "parameter_source", "overrides",
+                "meta", "source_mode", "catalog_namespace",
+            },
+            "transformers": {
+                "name", "sn_mva", "uhv_kv", "ulv_kv", "uk_percent", "pk_kw", "p0_kw",
+                "i0_percent", "vector_group", "hv_neutral", "lv_neutral", "tap_position",
+                "tap_min", "tap_max", "tap_step_percent", "catalog_ref", "parameter_source",
+                "overrides", "meta", "source_mode", "catalog_namespace",
+            },
+            "branch_points": {
+                "name", "switch_state", "catalog_ref", "catalog_namespace", "catalog_version",
+                "source_mode", "materialized_params", "completeness_status", "runtime_inputs",
+                "branch_occupied", "ports", "meta",
+            },
+            "generators": {
+                "name", "p_mw", "q_mvar", "catalog_ref", "quantity", "n_parallel",
+                "parameter_source", "overrides", "limits", "connection_variant",
+                "blocking_transformer_ref", "station_ref", "meta", "in_service",
+            },
+        }
+        illegal_keys = sorted(
+            key for key in parameters
+            if key not in immutable_keys and key not in allowlist_by_collection[coll]
+        )
+        if illegal_keys:
+            return _error_response(
+                f"Niedozwolone pola aktualizacji dla '{coll}': {', '.join(illegal_keys)}.",
+                "params.key_not_allowed",
+            )
+
+    new_enm = copy.deepcopy(enm)
     for key, value in parameters.items():
         if key not in ("ref_id", "id", "type"):
             new_enm[coll][idx][key] = value

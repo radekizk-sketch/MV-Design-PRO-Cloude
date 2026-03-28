@@ -15,7 +15,7 @@ from __future__ import annotations
 
 import enum
 from dataclasses import dataclass, field
-from typing import Any, FrozenSet
+from typing import Any, FrozenSet, Mapping
 
 # ============================================================
 # 1. KANONICZNE NAZWY OPERACJI
@@ -837,7 +837,7 @@ class OperationResponseContract:
 
     Every operation MUST return this structure.
     """
-    snapshot: Any  # New ENM snapshot (immutable)
+    snapshot: Mapping[str, object]  # New ENM snapshot (immutable)
     logical_views: dict[str, Any]  # Deterministic projections
     readiness: dict[str, Any]  # Readiness codes with priorities
     fix_actions: list[dict[str, Any]]  # Fix action list

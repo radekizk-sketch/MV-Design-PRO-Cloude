@@ -636,6 +636,48 @@ def _has_transformer_in_path(enm: dict[str, Any], station: dict[str, Any]) -> bo
     return bool(station.get("transformer_refs"))
 
 
+def _resolve_catalog_ref(
+    direct_ref: Any,
+    binding: Any,
+) -> tuple[str | None, str | None]:
+    """Wyznacz catalog_ref z jawnego pola lub catalog_binding.
+
+    Zwraca (catalog_ref, error_code). error_code != None oznacza niepoprawny binding.
+    """
+    if isinstance(direct_ref, str) and direct_ref.strip():
+        return direct_ref.strip(), None
+
+    if binding is None:
+        return None, "catalog.ref_required"
+
+    if not isinstance(binding, dict):
+        return None, "catalog.binding_invalid"
+
+    item_id = binding.get("item_id")
+    if not isinstance(item_id, str) or not item_id.strip():
+        return None, "catalog.binding_invalid"
+
+    return item_id.strip(), None
+
+
+def _validate_required_materialization(
+    materialized_params: Any,
+    required_fields: list[str],
+) -> tuple[dict[str, Any] | None, str | None]:
+    """Sprawdź kompletność materialized_params dla pól wymaganych przez solver."""
+    if not isinstance(materialized_params, dict):
+        return None, "catalog.materialization_incomplete"
+
+    normalized = {}
+    for field in required_fields:
+        value = materialized_params.get(field)
+        if value is None:
+            return None, "catalog.materialization_incomplete"
+        normalized[field] = value
+
+    return normalized, None
+
+
 def add_nn_outgoing_field(enm: dict[str, Any], payload: dict[str, Any]) -> dict[str, Any]:
     """Dodaj odpływ nN do szyny nN."""
     bus_nn_ref = payload.get("bus_nn_ref")
@@ -752,6 +794,26 @@ def add_pv_inverter_nn(enm: dict[str, Any], payload: dict[str, Any]) -> dict[str
         )
 
     pv_spec = payload.get("pv_spec", {})
+    catalog_ref, catalog_error = _resolve_catalog_ref(
+        pv_spec.get("catalog_item_id"),
+        pv_spec.get("catalog_binding") or payload.get("catalog_binding"),
+    )
+    if catalog_error:
+        return _error_response(
+            "Falownik PV wymaga poprawnego powiązania z katalogiem (catalog_ref/catalog_binding).",
+            catalog_error,
+        )
+
+    materialized_params, materialization_error = _validate_required_materialization(
+        pv_spec.get("materialized_params"),
+        required_fields=["rated_power_ac_kw", "max_power_kw", "control_mode"],
+    )
+    if materialization_error:
+        return _error_response(
+            "Falownik PV wymaga pełnej materializacji parametrów katalogowych.",
+            materialization_error,
+        )
+
     seed = _compute_seed({"op": "pv_nn", "bus": bus_nn_ref, "p": pv_spec.get("rated_power_ac_kw", 0)})
     pv_ref = _make_id("pv", seed, "inverter")
 
@@ -763,7 +825,10 @@ def add_pv_inverter_nn(enm: dict[str, Any], payload: dict[str, Any]) -> dict[str
         "gen_type": "PV_INVERTER",
         "p_mw": (pv_spec.get("rated_power_ac_kw") or 0) / 1000.0,
         "q_mvar": 0.0,
-        "catalog_ref": pv_spec.get("catalog_item_id"),
+        "catalog_ref": catalog_ref,
+        "catalog_namespace": "ZRODLO_NN_PV",
+        "source_mode": "KATALOG",
+        "materialized_params": materialized_params,
         "station_ref": station_ref,
         "in_service": True,
         "tags": [],
@@ -796,6 +861,26 @@ def add_bess_inverter_nn(enm: dict[str, Any], payload: dict[str, Any]) -> dict[s
         )
 
     bess_spec = payload.get("bess_spec", {})
+    catalog_ref, catalog_error = _resolve_catalog_ref(
+        bess_spec.get("inverter_catalog_id"),
+        bess_spec.get("catalog_binding") or payload.get("catalog_binding"),
+    )
+    if catalog_error:
+        return _error_response(
+            "Falownik BESS wymaga poprawnego powiązania z katalogiem (catalog_ref/catalog_binding).",
+            catalog_error,
+        )
+
+    materialized_params, materialization_error = _validate_required_materialization(
+        bess_spec.get("materialized_params"),
+        required_fields=["usable_capacity_kwh", "charge_power_kw", "discharge_power_kw", "operation_mode"],
+    )
+    if materialization_error:
+        return _error_response(
+            "Falownik BESS wymaga pełnej materializacji parametrów katalogowych.",
+            materialization_error,
+        )
+
     seed = _compute_seed({"op": "bess_nn", "bus": bus_nn_ref, "e": bess_spec.get("usable_capacity_kwh", 0)})
     bess_ref = _make_id("bess", seed, "inverter")
 
@@ -807,7 +892,10 @@ def add_bess_inverter_nn(enm: dict[str, Any], payload: dict[str, Any]) -> dict[s
         "gen_type": "BESS_INVERTER",
         "p_mw": (bess_spec.get("charge_power_kw") or 0) / 1000.0,
         "q_mvar": 0.0,
-        "catalog_ref": bess_spec.get("inverter_catalog_id"),
+        "catalog_ref": catalog_ref,
+        "catalog_namespace": "ZRODLO_NN_BESS",
+        "source_mode": "KATALOG",
+        "materialized_params": materialized_params,
         "station_ref": station_ref,
         "in_service": True,
         "tags": [],
