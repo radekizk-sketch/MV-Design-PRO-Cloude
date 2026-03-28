@@ -587,8 +587,9 @@ export interface ReadinessInfo {
 
 export interface FixAction {
   code: string;
-  action_type: string;
+  action_type: 'OPEN_MODAL' | 'NAVIGATE_TO_ELEMENT' | 'SELECT_CATALOG' | 'ADD_MISSING_DEVICE';
   element_ref: string | null;
+  modal_type: string | null;
   panel: string | null;
   step: string | null;
   focus: string | null;

@@ -6,7 +6,7 @@
  * 2. SLD updates after snapshot change
  * 3. Snapshot store properly handles all operations
  * 4. Readiness matrix is always computable
- * 5. Wizard state machine is deterministic
+ * 5. Network build store selectors are deterministic
  * 6. Store sync mechanisms work correctly
  *
  * BINDING: Any failure blocks merge.
@@ -21,8 +21,13 @@ import {
   selectBlockerCount,
 } from '../topology/snapshotStore';
 import { useTopologyStore } from '../topology/store';
-import { useWizardStore } from '../wizard/useWizardStore';
-import { computeWizardState } from '../wizard/wizardStateMachine';
+import {
+  useNetworkBuildStore,
+  computeBuildPhase,
+  selectStationSummaries,
+  selectBlockersByCategory,
+  buildPhaseLabel,
+} from '../network-build/networkBuildStore';
 import type { EnergyNetworkModel } from '../../types/enm';
 import {
   computeLayout,
@@ -269,51 +274,45 @@ describe('FAZA 6: SLD deterministic rendering after snapshot change', () => {
 });
 
 // =============================================================================
-// test_wizard_state_machine_deterministic
+// test_network_build_store_deterministic
 // =============================================================================
 
-describe('FAZA 6: Wizard state machine is deterministic', () => {
-  it('empty ENM produces consistent wizard state', () => {
-    const enm = createMinimalENM();
-    const state1 = computeWizardState(enm);
-    const state2 = computeWizardState(enm);
+describe('FAZA 6: Network build store selectors are deterministic', () => {
+  it('empty snapshot produces NO_SOURCE phase', () => {
+    const phase1 = computeBuildPhase(null, null, null);
+    const phase2 = computeBuildPhase(null, null, null);
 
-    expect(state1.overallStatus).toBe(state2.overallStatus);
-    expect(state1.steps.length).toBe(state2.steps.length);
-    expect(state1.elementCounts).toEqual(state2.elementCounts);
+    expect(phase1).toBe('NO_SOURCE');
+    expect(phase1).toBe(phase2);
   });
 
-  it('wizard state reflects ENM element counts', () => {
+  it('ENM with source produces HAS_SOURCE phase', () => {
     const enm = createMinimalENM();
-    const state = computeWizardState(enm);
+    const phase = computeBuildPhase(enm, null, null);
 
-    expect(state.elementCounts.buses).toBe(1);
-    expect(state.elementCounts.sources).toBe(1);
+    expect(phase).toBe('HAS_SOURCE');
   });
 
-  it('wizard state with network has correct counts', () => {
-    const enm = createNetworkWithLoad();
-    const state = computeWizardState(enm);
-
-    expect(state.elementCounts.buses).toBe(2);
-    expect(state.elementCounts.sources).toBe(1);
-    expect(state.elementCounts.loads).toBe(1);
-    expect(state.elementCounts.branches).toBe(1);
+  it('build phase label is always defined', () => {
+    const phases = ['NO_SOURCE', 'HAS_SOURCE', 'HAS_TRUNKS', 'HAS_STATIONS', 'READY'] as const;
+    for (const phase of phases) {
+      const label = buildPhaseLabel(phase);
+      expect(label).toBeTruthy();
+      expect(typeof label).toBe('string');
+    }
   });
 
-  it('wizard state has all 10 steps', () => {
+  it('station summaries are deterministic', () => {
     const enm = createMinimalENM();
-    const state = computeWizardState(enm);
-    expect(state.steps.length).toBe(10);
+    const s1 = selectStationSummaries(enm, null);
+    const s2 = selectStationSummaries(enm, null);
+    expect(s1).toEqual(s2);
   });
 
-  it('wizard readiness matrix is always defined', () => {
-    const enm = createMinimalENM();
-    const state = computeWizardState(enm);
-
-    expect(state.readinessMatrix).toBeDefined();
-    expect(state.readinessMatrix.shortCircuit3F).toBeDefined();
-    expect(state.readinessMatrix.loadFlow).toBeDefined();
+  it('blockers by category sums to total', () => {
+    const result = selectBlockersByCategory(null);
+    expect(result.total).toBe(0);
+    expect(result.topologia + result.katalogi + result.eksploatacja + result.analiza).toBe(result.total);
   });
 });
 
@@ -339,46 +338,41 @@ describe('FAZA 6: Topology store has snapshot sync', () => {
 });
 
 // =============================================================================
-// test_wizard_store_sync
+// test_network_build_store_sync
 // =============================================================================
 
-describe('FAZA 6: Wizard store has snapshot sync', () => {
+describe('FAZA 6: Network build store has correct actions', () => {
   beforeEach(() => {
-    useWizardStore.getState().reset();
+    useNetworkBuildStore.getState().reset();
   });
 
-  it('wizard store has applyStep action', () => {
-    const store = useWizardStore.getState();
-    expect(typeof store.applyStep).toBe('function');
+  it('network build store has openOperationForm action', () => {
+    const store = useNetworkBuildStore.getState();
+    expect(typeof store.openOperationForm).toBe('function');
   });
 
-  it('wizard store has recomputeFromEnm action', () => {
-    const store = useWizardStore.getState();
-    expect(typeof store.recomputeFromEnm).toBe('function');
+  it('network build store has closeOperationForm action', () => {
+    const store = useNetworkBuildStore.getState();
+    expect(typeof store.closeOperationForm).toBe('function');
   });
 
-  it('wizard store has checkCanProceed action', () => {
-    const store = useWizardStore.getState();
-    expect(typeof store.checkCanProceed).toBe('function');
+  it('network build store has toggleSection action', () => {
+    const store = useNetworkBuildStore.getState();
+    expect(typeof store.toggleSection).toBe('function');
   });
 
-  it('wizard store recomputeFromEnm updates state', () => {
-    const enm = createMinimalENM();
-    useWizardStore.getState().recomputeFromEnm(enm);
-
-    const state = useWizardStore.getState();
-    expect(state.wizardState).not.toBeNull();
-    expect(state.wizardState!.steps.length).toBe(10);
-    expect(state.wizardState!.elementCounts.buses).toBe(1);
+  it('network build store openOperationForm sets form', () => {
+    useNetworkBuildStore.getState().openOperationForm('add_grid_source_sn', { test: true });
+    const state = useNetworkBuildStore.getState();
+    expect(state.activeOperationForm).not.toBeNull();
+    expect(state.activeOperationForm?.op).toBe('add_grid_source_sn');
   });
 
-  it('wizard store initial state is clean', () => {
-    const state = useWizardStore.getState();
-    expect(state.currentStep).toBe(0);
-    expect(state.canProceed).toBe(true);
-    expect(state.isApplying).toBe(false);
-    expect(state.applyError).toBeNull();
-    expect(state.transitionBlockers).toEqual([]);
+  it('network build store initial state is clean', () => {
+    const state = useNetworkBuildStore.getState();
+    expect(state.activeOperationForm).toBeNull();
+    expect(state.activeObjectCard).toBeNull();
+    expect(state.collapsedSections.size).toBe(0);
   });
 });
 

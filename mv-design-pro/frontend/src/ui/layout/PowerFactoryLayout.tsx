@@ -43,6 +43,18 @@ import { CaseManager } from '../case-manager';
 import { IssuePanelContainer } from '../issue-panel';
 import { ProjectTree } from '../project-tree/ProjectTree';
 import { EmptyInspectorPanel } from '../inspector-panel/EmptyInspectorPanel';
+import { ProcessPanel } from '../network-build/ProcessPanel';
+import { OperationFormRouter } from '../network-build/OperationFormRouter';
+import { ReadinessBar } from '../network-build/ReadinessBar';
+import { InspectorEngineeringView } from '../network-build/InspectorEngineeringView';
+import { GlobalSearch } from '../network-build/GlobalSearch';
+import { TopContextBar } from '../network-build/TopContextBar';
+import { SldVisualModes } from '../network-build/SldVisualModes';
+import { MassReviewPanel } from '../network-build/mass-review';
+import { CatalogBrowser } from '../network-build/CatalogBrowser';
+import { ProjectMetadataModal } from '../network-build/ProjectMetadataModal';
+import { SnapshotHistoryModal } from '../network-build/SnapshotHistoryModal';
+import { useNetworkBuildStore } from '../network-build/networkBuildStore';
 import {
   useAppStateStore,
   useCaseManagerOpen,
@@ -217,9 +229,33 @@ export function PowerFactoryLayout({
   // Panel states
   const [treeSidebarCollapsed, setTreeSidebarCollapsed] = useState(false);
   const [inspectorCollapsed, setInspectorCollapsed] = useState(false);
+  const [leftPanelMode, setLeftPanelMode] = useState<'build' | 'tree'>('build');
+
+  // Network build store — active operation form
+  const activeOperationForm = useNetworkBuildStore((s) => s.activeOperationForm);
+
+  // Modal/overlay states
+  const [globalSearchOpen, setGlobalSearchOpen] = useState(false);
+  const [massReviewOpen, setMassReviewOpen] = useState(false);
+  const [catalogBrowserOpen, setCatalogBrowserOpen] = useState(false);
+  const [projectMetadataOpen, setProjectMetadataOpen] = useState(false);
+  const [snapshotHistoryOpen, setSnapshotHistoryOpen] = useState(false);
+
+  // Keyboard shortcut: Ctrl+K → Global Search
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+        e.preventDefault();
+        setGlobalSearchOpen((prev) => !prev);
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, []);
 
   // Derived state
   const isReadOnly = activeMode === 'RESULT_VIEW';
+  const showBuildPanel = activeMode === 'MODEL_EDIT' && leftPanelMode === 'build';
 
   // Toggle handlers
   const toggleTreeSidebar = useCallback(() => {
@@ -257,8 +293,16 @@ export function PowerFactoryLayout({
     toggleCaseManager(false);
   }, [toggleCaseManager]);
 
-  // Inspector content - show custom content, selection-based, or empty state
+  // Inspector content - show operation form, engineering inspector, custom content, or empty state
   const resolvedInspectorContent = useMemo(() => {
+    // When an operation form is active, show it in the inspector area
+    if (activeOperationForm) {
+      return <OperationFormRouter />;
+    }
+    // When element selected in MODEL_EDIT, show engineering inspector
+    if (activeMode === 'MODEL_EDIT' && selectedElement) {
+      return <InspectorEngineeringView />;
+    }
     if (inspectorContent) {
       return inspectorContent;
     }
@@ -268,7 +312,7 @@ export function PowerFactoryLayout({
         isReadOnly={isReadOnly}
       />
     );
-  }, [inspectorContent, selectedElement, isReadOnly]);
+  }, [activeOperationForm, inspectorContent, selectedElement, isReadOnly]);
 
   return (
     <div
@@ -286,6 +330,19 @@ export function PowerFactoryLayout({
         onResultsClick={handleResultsClick}
       />
 
+      {/* TopContextBar — kontekstowy pasek z fazą budowy + quick actions */}
+      {activeMode === 'MODEL_EDIT' && (
+        <TopContextBar
+          projectName={projectName}
+          caseName={activeCaseId ?? undefined}
+          onOpenGlobalSearch={() => setGlobalSearchOpen(true)}
+          onOpenCatalogBrowser={() => setCatalogBrowserOpen(true)}
+          onOpenMassReview={() => setMassReviewOpen(true)}
+          onOpenProjectMetadata={() => setProjectMetadataOpen(true)}
+          onOpenSnapshotHistory={() => setSnapshotHistoryOpen(true)}
+        />
+      )}
+
       {/* Main Content Area */}
       <div className="flex-1 relative overflow-hidden flex">
         {/* ================================================================
@@ -300,10 +357,44 @@ export function PowerFactoryLayout({
           data-testid="project-tree-sidebar"
           data-collapsed={treeSidebarCollapsed}
         >
-          {/* Panel header */}
+          {/* Panel header with mode toggle */}
           <div className="ind-panel-header">
             {!treeSidebarCollapsed && (
-              <span>Nawigator projektu</span>
+              <div className="flex items-center gap-1">
+                {activeMode === 'MODEL_EDIT' && (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => setLeftPanelMode('build')}
+                      className={clsx(
+                        'px-2 py-0.5 text-[10px] rounded-sm transition-colors',
+                        leftPanelMode === 'build'
+                          ? 'bg-ind-100 text-ind-800 font-medium'
+                          : 'text-chrome-500 hover:bg-chrome-100',
+                      )}
+                      data-testid="left-panel-mode-build"
+                    >
+                      Budowa
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setLeftPanelMode('tree')}
+                      className={clsx(
+                        'px-2 py-0.5 text-[10px] rounded-sm transition-colors',
+                        leftPanelMode === 'tree'
+                          ? 'bg-ind-100 text-ind-800 font-medium'
+                          : 'text-chrome-500 hover:bg-chrome-100',
+                      )}
+                      data-testid="left-panel-mode-tree"
+                    >
+                      Nawigator
+                    </button>
+                  </>
+                )}
+                {activeMode !== 'MODEL_EDIT' && (
+                  <span>Nawigator projektu</span>
+                )}
+              </div>
             )}
             <button
               type="button"
@@ -314,16 +405,21 @@ export function PowerFactoryLayout({
                 'transition-colors',
                 treeSidebarCollapsed && 'mx-auto'
               )}
-              aria-label={treeSidebarCollapsed ? 'Rozwiń nawigator projektu' : 'Zwiń nawigator projektu'}
-              title={treeSidebarCollapsed ? 'Rozwiń nawigator projektu' : 'Zwiń nawigator projektu'}
+              aria-label={treeSidebarCollapsed ? 'Rozwiń panel boczny' : 'Zwiń panel boczny'}
+              title={treeSidebarCollapsed ? 'Rozwiń panel boczny' : 'Zwiń panel boczny'}
               data-testid="project-tree-sidebar-toggle"
             >
               {treeSidebarCollapsed ? <IconChevronRight /> : <IconChevronLeft />}
             </button>
           </div>
 
-          {/* ProjectTree (only when not collapsed) */}
-          {!treeSidebarCollapsed && (
+          {/* Panel content: ProcessPanel or ProjectTree (only when not collapsed) */}
+          {!treeSidebarCollapsed && showBuildPanel && (
+            <div className="flex-1 overflow-hidden">
+              <ProcessPanel />
+            </div>
+          )}
+          {!treeSidebarCollapsed && !showBuildPanel && (
             <div className="flex-1 overflow-hidden">
               <ProjectTree
                 projectName={projectName}
@@ -347,8 +443,8 @@ export function PowerFactoryLayout({
                 type="button"
                 onClick={toggleTreeSidebar}
                 className="flex h-8 w-8 items-center justify-center rounded-ind text-chrome-400 hover:bg-chrome-100 hover:text-chrome-700 transition-colors"
-                title="Nawigator projektu"
-                aria-label="Otwórz nawigator projektu"
+                title={showBuildPanel ? 'Panel budowy sieci' : 'Nawigator projektu'}
+                aria-label={showBuildPanel ? 'Otwórz panel budowy sieci' : 'Otwórz nawigator projektu'}
               >
                 <IconFolder />
               </button>
@@ -359,8 +455,14 @@ export function PowerFactoryLayout({
         {/* ================================================================
          *  Obszar roboczy (SLD Canvas / Page Content)
          * ================================================================ */}
-        <div className="flex-1 overflow-auto bg-canvas-bg" data-testid="main-content">
-          {children}
+        <div className="flex-1 overflow-auto bg-canvas-bg flex flex-col" data-testid="main-content">
+          {/* SLD Visual Modes toolbar */}
+          {activeMode === 'MODEL_EDIT' && (
+            <SldVisualModes className="flex-shrink-0 mx-2 mt-1" />
+          )}
+          <div className="flex-1 overflow-auto">
+            {children}
+          </div>
         </div>
 
         {/* ================================================================
@@ -438,12 +540,54 @@ export function PowerFactoryLayout({
         />
       </div>
 
+      {/* Pasek gotowości (MODEL_EDIT only) */}
+      {activeMode === 'MODEL_EDIT' && <ReadinessBar />}
+
       {/* Pasek stanu (ALWAYS visible at bottom) */}
       <StatusBar
         validationStatus={validationStatus}
         validationWarnings={validationWarnings}
         validationErrors={validationErrors}
         networkStats={networkStats}
+      />
+
+      {/* Global Search overlay (Ctrl+K) */}
+      <GlobalSearch
+        isOpen={globalSearchOpen}
+        onClose={() => setGlobalSearchOpen(false)}
+      />
+
+      {/* Mass Review Panel */}
+      <MassReviewPanel
+        isOpen={massReviewOpen}
+        onClose={() => setMassReviewOpen(false)}
+      />
+
+      {/* Catalog Browser */}
+      {catalogBrowserOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/30"
+          onClick={() => setCatalogBrowserOpen(false)}
+        >
+          <div
+            className="bg-white rounded-lg shadow-2xl w-[800px] max-w-[95vw] h-[600px] max-h-[85vh] overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <CatalogBrowser />
+          </div>
+        </div>
+      )}
+
+      {/* Project Metadata Modal */}
+      <ProjectMetadataModal
+        isOpen={projectMetadataOpen}
+        onClose={() => setProjectMetadataOpen(false)}
+      />
+
+      {/* Snapshot History Modal */}
+      <SnapshotHistoryModal
+        isOpen={snapshotHistoryOpen}
+        onClose={() => setSnapshotHistoryOpen(false)}
       />
     </div>
   );

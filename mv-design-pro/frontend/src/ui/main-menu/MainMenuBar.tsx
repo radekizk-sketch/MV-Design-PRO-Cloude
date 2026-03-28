@@ -80,7 +80,7 @@ const MENU_GROUPS: MenuGroup[] = [
       { id: 'navigator', label: 'Nawigator projektu', shortcut: 'Ctrl+1' },
       { id: 'inspector', label: 'Inspektor właściwości', shortcut: 'Ctrl+2' },
       { id: 'sld', label: 'Schemat jednokreskowy', shortcut: 'Ctrl+3' },
-      { id: 'wizard', label: 'Kreator sieci', shortcut: 'Ctrl+4' },
+      { id: 'network-build', label: 'Budowa sieci', shortcut: 'Ctrl+4' },
       { id: 'sep-1', label: '', separator: true },
       { id: 'zoom-in', label: 'Powiększ', shortcut: '+' },
       { id: 'zoom-out', label: 'Pomniejsz', shortcut: '-' },

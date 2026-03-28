@@ -97,11 +97,11 @@ export const ROUTES: Record<string, RouteDefinition> = {
     icon: 'REF',
     requiredMode: 'RESULT_VIEW',
   },
-  WIZARD: {
-    hash: '#wizard',
-    label: 'Kreator sieci',
-    description: 'Kreator budowy sieci SN/nN krok po kroku (K1-K10)',
-    icon: 'WIZ',
+  NETWORK_BUILD: {
+    hash: '#network-build',
+    label: 'Budowa sieci',
+    description: 'Panel procesowy budowy sieci SN od GPZ krok po kroku',
+    icon: 'BLD',
     requiredMode: 'MODEL_EDIT',
   },
   CASE_CONFIG: {
