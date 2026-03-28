@@ -1650,22 +1650,36 @@ def insert_zksn_on_segment_sn(enm: dict[str, Any], payload: dict[str, Any]) -> d
 def start_branch_segment_sn(enm: dict[str, Any], payload: dict[str, Any]) -> dict[str, Any]:
     """Dodaj odgałęzienie SN z istniejącej szyny.
 
-    Wymaga jawnego from_bus_ref — brak auto-detekcji.
+    Wymaga jawnego from_ref (port BRANCH na stacji lub branch-poincie).
+    from_bus_ref jest obsługiwane wyłącznie jako pole kompatybilności
+    i musi mapować się 1:1 do bus_ref rozwiązanego z from_ref.
     """
-    from_bus_ref = payload.get("from_bus_ref")
     from_ref = payload.get("from_ref")
+    from_bus_ref = payload.get("from_bus_ref")
     segment = payload.get("segment", {})
 
-    if not from_bus_ref and from_ref:
-        resolved_bus_ref, err_code = _resolve_branch_from_ref(enm, from_ref)
-        if err_code:
-            return _error_response("Nieprawidłowe źródło odgałęzienia.", err_code)
-        from_bus_ref = resolved_bus_ref
-    if not from_bus_ref:
+    if not from_ref:
+        if from_bus_ref:
+            return _error_response(
+                "Pole from_bus_ref bez from_ref jest niedozwolone. "
+                "Użyj jawnego wskazania portu BRANCH (from_ref).",
+                "branch_connection.source_not_branch_capable",
+            )
         return _error_response(
-            "Brak identyfikatora szyny źródłowej (from_bus_ref/from_ref). "
+            "Brak referencji portu źródłowego (from_ref). "
             "Kliknij port BRANCH na stacji, słupie lub ZKSN w SLD.",
-            "branch.from_bus_missing",
+            "branch.from_ref_required",
+        )
+
+    resolved_bus_ref, err_code = _resolve_branch_from_ref(enm, from_ref)
+    if err_code:
+        return _error_response("Nieprawidłowe źródło odgałęzienia.", err_code)
+    from_bus_ref = resolved_bus_ref
+
+    if payload.get("from_bus_ref") and payload.get("from_bus_ref") != from_bus_ref:
+        return _error_response(
+            "Pole from_bus_ref nie zgadza się z bus_ref wynikającym z from_ref.",
+            "branch_connection.source_not_branch_capable",
         )
 
     from_bus = None
