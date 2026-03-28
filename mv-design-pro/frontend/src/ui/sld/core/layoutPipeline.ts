@@ -65,6 +65,11 @@ import {
 } from './layoutResult';
 import type { StationBlockDetailV1 } from './fieldDeviceContracts';
 import type { StationBlockBuildResult } from './stationBlockBuilder';
+import type { LayoutEngineOptions } from './layoutEngine';
+import { createLayoutEngine } from './layoutEngine';
+import { buildSldSemanticGraphFromVisualGraph } from './semanticGraphBuilder';
+import { buildLayoutInputGraph } from './layoutInputGraph';
+import { buildLegacyVisualGraphFromLayoutInput } from './legacyVisualGraphBridge';
 import {
   GRID_BASE,
   GRID_SPACING_MAIN,
@@ -1709,7 +1714,7 @@ function phase7_generate_canonical_annotations(
  * @param stationBlockDetails Opcjonalne szczegóły pól/urządzeń (RUN #3D)
  * @returns LayoutResultV1 — zamrożony wynik layoutu
  */
-export function computeLayout(
+export function computeLegacyLayout(
   graph: VisualGraphV1,
   config: LayoutGeometryConfigV1 = DEFAULT_LAYOUT_CONFIG,
   stationBlockDetails?: StationBlockBuildResult,
@@ -1834,4 +1839,34 @@ export function computeLayout(
   const result: LayoutResultV1 = { ...resultWithoutHash, hash };
 
   return canonicalizeLayoutResult(result);
+}
+
+/**
+ * Publiczny punkt wejścia layoutu SLD.
+ *
+ * Domyślnie zachowuje kompatybilność wsteczną (`strategy: 'legacy'`),
+ * a jednocześnie umożliwia przełączenie na nowy LayoutEngine
+ * (strategia greedy/force-directed + routing ortogonalny/diagonalny).
+ */
+export function computeLayout(
+  graph: VisualGraphV1,
+  config: LayoutGeometryConfigV1 = DEFAULT_LAYOUT_CONFIG,
+  stationBlockDetails?: StationBlockBuildResult,
+  options: LayoutEngineOptions = { strategy: 'legacy' },
+): LayoutResultV1 {
+  const semanticGraph = buildSldSemanticGraphFromVisualGraph(graph);
+  const layoutInput = buildLayoutInputGraph(semanticGraph, {
+    minSpacing: options.minSpacing,
+    maxSpacing: options.maxSpacing,
+  });
+
+  const engine = createLayoutEngine(options, {
+    legacyLayout: (legacyInput, legacyConfig, legacyStationBlockDetails) =>
+      computeLegacyLayout(
+        buildLegacyVisualGraphFromLayoutInput(legacyInput),
+        legacyConfig,
+        legacyStationBlockDetails,
+      ),
+  });
+  return engine.compute(layoutInput, config, stationBlockDetails).layout;
 }

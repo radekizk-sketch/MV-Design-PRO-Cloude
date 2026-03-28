@@ -114,8 +114,61 @@ export type {
 } from './layoutResult';
 
 // Layout Pipeline
-export { computeLayout, DEFAULT_LAYOUT_CONFIG } from './layoutPipeline';
+export { computeLayout, computeLegacyLayout, DEFAULT_LAYOUT_CONFIG } from './layoutPipeline';
 export type { LayoutGeometryConfigV1 } from './layoutPipeline';
+
+// LayoutEngine V2 (placement + routing decoupled from rendering)
+export { LayoutEngine, createLayoutEngine } from './layoutEngine';
+export type {
+  LayoutEngineOptions,
+  LayoutEngineOutputV1,
+  LayoutLayerPlanV1,
+  LabelPlacementV1,
+  PlacementStrategy,
+  RoutingStyle,
+  LayoutEnginePhaseColors,
+} from './layoutEngine';
+
+// Canonical semantic contract (Snapshot -> Semantic -> LayoutInput)
+export {
+  SLD_SEMANTIC_GRAPH_VERSION,
+  SemanticNodeTypeV1,
+  SemanticClassV1,
+  DomainElementTypeV1,
+  canonicalizeSldSemanticGraph,
+  computeSldSemanticGraphFingerprint,
+} from './sldSemanticGraph';
+export type {
+  SldSemanticGraphV1,
+  SemanticNodeV1,
+  SemanticEdgeV1,
+  SemanticPortV1,
+  SemanticNodeAttributesV1,
+  StationKindV1,
+  GeneratorKindV1,
+  SemanticContainerV1,
+} from './sldSemanticGraph';
+
+export {
+  buildSldSemanticGraphFromVisualGraph,
+  buildSldSemanticGraphFromTopologyInput,
+} from './semanticGraphBuilder';
+
+export {
+  LAYOUT_INPUT_GRAPH_VERSION,
+  buildLayoutInputGraph,
+  classifyEdgeSemanticClass,
+} from './layoutInputGraph';
+export type {
+  LayoutInputGraphV1,
+  LayoutNodeInputV1,
+  LayoutEdgeInputV1,
+  LayoutPortV1,
+  SymbolProfileV1,
+  PortGeometryProfileV1,
+} from './layoutInputGraph';
+
+export { buildLegacyVisualGraphFromLayoutInput } from './legacyVisualGraphBridge';
 
 // Station Block Builder (RUN #3D: adapter mapping + embedding role derivation)
 export {
