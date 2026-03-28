@@ -21,6 +21,10 @@ from typing import Any
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field
 
+from api.domain_ops_policy import (
+    extract_catalog_binding,
+    validate_and_materialize_catalog_binding,
+)
 from domain.canonical_operations import (
     CANONICAL_OPERATIONS,
     resolve_operation_name,
@@ -143,17 +147,16 @@ async def execute_domain_operation(
 
     # Enforce catalog binding for operations creating technical elements
     if spec.creates_elements:
-        binding_errors = _enforce_catalog_binding(resolved_name, request.payload)
-        if binding_errors:
+        policy_error, _ = validate_and_materialize_catalog_binding(
+            resolved_name, request.payload
+        )
+        if policy_error:
             raise HTTPException(
                 status_code=422,
                 detail={
-                    "code": "catalog.binding_required",
-                    "message_pl": "Element techniczny wymaga powiązania z katalogiem",
-                    "errors": [
-                        {"code": e["code"], "message_pl": e["message_pl"]}
-                        for e in binding_errors
-                    ],
+                    "code": policy_error.code,
+                    "message_pl": policy_error.message_pl,
+                    "errors": policy_error.errors,
                     "fix_action": {
                         "action_type": "OPEN_MODAL",
                         "modal_type": "CatalogPicker",
@@ -275,70 +278,6 @@ async def list_operations() -> dict[str, Any]:
 # ---------------------------------------------------------------------------
 # Internal helpers
 # ---------------------------------------------------------------------------
-
-
-# Operations that require catalog binding in their payload
-_CATALOG_REQUIRED_OPERATIONS: frozenset[str] = frozenset({
-    "continue_trunk_segment_sn",
-    "start_branch_segment_sn",
-    "insert_station_on_segment_sn",
-    "add_transformer_sn_nn",
-    "add_nn_load",
-    "add_pv_inverter_nn",
-    "add_bess_inverter_nn",
-    "add_relay",
-    "add_ct",
-    "add_vt",
-    "add_nn_outgoing_field",
-    "insert_section_switch_sn",
-})
-
-
-def _enforce_catalog_binding(
-    operation: str,
-    payload: dict[str, Any],
-) -> list[dict[str, Any]]:
-    """Enforce catalog binding requirement for technical element operations."""
-    if operation not in _CATALOG_REQUIRED_OPERATIONS:
-        return []
-
-    # Find catalog_binding in payload (may be nested)
-    binding_data = _extract_catalog_binding(payload)
-    if binding_data is None:
-        return [
-            {
-                "code": "catalog.binding_required",
-                "message_pl": (
-                    f"Operacja '{operation}' wymaga powiązania z katalogiem "
-                    "(brak 'catalog_binding' w payload)"
-                ),
-            }
-        ]
-
-    # Validate binding completeness
-    from network_model.catalog.materialization import validate_catalog_binding
-
-    errors = validate_catalog_binding(binding_data)
-    return [
-        {"code": e.code, "message_pl": e.message_pl}
-        for e in errors
-    ]
-
-
-def _extract_catalog_binding(payload: dict[str, Any]) -> dict[str, Any] | None:
-    """Extract catalog_binding from payload (searching nested structures)."""
-    # Direct binding
-    if "catalog_binding" in payload:
-        return payload["catalog_binding"]
-
-    # Nested in segment, branch, load, pv_source, protection, etc.
-    for key in ("segment", "branch", "load", "pv_source", "bess_source",
-                "protection", "transformer_spec", "relay_catalog_binding"):
-        nested = payload.get(key)
-        if isinstance(nested, dict) and "catalog_binding" in nested:
-            return nested["catalog_binding"]
-
-    return None
 
 
 def _infer_namespace(operation: str) -> str:

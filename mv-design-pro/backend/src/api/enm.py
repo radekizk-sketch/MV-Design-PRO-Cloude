@@ -22,6 +22,7 @@ from fastapi import APIRouter, HTTPException
 
 from pydantic import BaseModel, Field
 
+from api.domain_ops_policy import validate_and_materialize_catalog_binding
 from enm.hash import compute_enm_hash
 from enm.mapping import map_enm_to_network_graph
 from enm.models import EnergyNetworkModel, ENMDefaults, ENMHeader
@@ -46,6 +47,7 @@ from enm.topology_ops import (
 from enm.validator import ENMValidator, ValidationResult
 
 from application.eligibility_service import EligibilityService
+from domain.canonical_operations import resolve_operation_name
 
 from application.network_wizard.schema import (
     ApplyStepResponse,
@@ -683,6 +685,21 @@ async def domain_ops(case_id: str, req: DomainOpEnvelopeModel) -> dict[str, Any]
                 f"Konflikt wersji: oczekiwany hash '{req.snapshot_base_hash}', "
                 f"aktualny '{current_hash}'. Odśwież snapshot i spróbuj ponownie."
             ),
+        )
+
+    resolved_name = resolve_operation_name(req.operation.name)
+    policy_error, _ = validate_and_materialize_catalog_binding(
+        resolved_name,
+        req.operation.payload,
+    )
+    if policy_error:
+        raise HTTPException(
+            status_code=422,
+            detail={
+                "code": policy_error.code,
+                "message_pl": policy_error.message_pl,
+                "errors": policy_error.errors,
+            },
         )
 
     result = execute_domain_operation(
