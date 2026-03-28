@@ -40,6 +40,7 @@ import { UnifiedSymbolRenderer, type SymbolVisualState, type SymbolInteractionHa
 import { TrunkSpineRenderer } from './TrunkSpineRenderer';
 import { BranchRenderer } from './BranchRenderer';
 import { StationFieldRenderer } from './StationFieldRenderer';
+import { InlineBranchObjectRenderer } from './InlineBranchObjectRenderer';
 import { JunctionDotLayer } from './JunctionDotLayer';
 import { ETAP_GRID, ETAP_TYPOGRAPHY, ETAP_CANVAS } from './sldEtapStyle';
 import './sld-canonical.css';
@@ -300,6 +301,19 @@ export const SLDViewCanvas: React.FC<SLDViewCanvasProps> = ({
                 <StationFieldRenderer key={sc.stationId} chain={sc} showTechnicalLabels={showTechnicalCanonicalLabels} />
               ))}
             </g>
+            {(canonicalAnnotations.inlineBranchObjects?.length ?? 0) > 0 && (
+              <g className="sld-inline-branch-objects">
+                {canonicalAnnotations.inlineBranchObjects!.map((obj) => (
+                  <InlineBranchObjectRenderer
+                    key={obj.nodeId}
+                    obj={obj}
+                    selected={obj.nodeId === selectedId}
+                    onClick={(nodeId) => onSymbolClick(nodeId, 'Station', obj.label)}
+                    showTechnicalLabels={showTechnicalCanonicalLabels}
+                  />
+                ))}
+              </g>
+            )}
             <g className="sld-junction-dots" style={{ pointerEvents: 'none' }}>
               <JunctionDotLayer annotations={canonicalAnnotations} />
             </g>

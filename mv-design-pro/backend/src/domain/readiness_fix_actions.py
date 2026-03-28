@@ -178,6 +178,118 @@ def _fix_lf_damping(
 
 
 # ---------------------------------------------------------------------------
+# BranchPointSN validation codes
+# ---------------------------------------------------------------------------
+
+
+def _fix_branch_point_invalid_medium(
+    element_id: str | None, _et: str | None,
+) -> FixAction:
+    return FixAction(
+        action_type="NAVIGATE_TO_ELEMENT",
+        element_ref=element_id,
+        payload_hint={"action": "remove_or_replace_on_correct_segment_type"},
+    )
+
+
+def _fix_branch_point_catalog_ref(
+    element_id: str | None, _et: str | None,
+) -> FixAction:
+    return FixAction(
+        action_type="SELECT_CATALOG",
+        element_ref=element_id,
+        modal_type="BranchPointCatalogPicker",
+        payload_hint={"required": "catalog_ref"},
+    )
+
+
+def _fix_branch_point_switch_state(
+    element_id: str | None, _et: str | None,
+) -> FixAction:
+    return FixAction(
+        action_type="OPEN_MODAL",
+        element_ref=element_id,
+        modal_type="BranchPointSwitchStateModal",
+        payload_hint={"required": "switch_state"},
+    )
+
+
+def _fix_branch_point_port_occupied(
+    element_id: str | None, _et: str | None,
+) -> FixAction:
+    return FixAction(
+        action_type="NAVIGATE_TO_ELEMENT",
+        element_ref=element_id,
+        payload_hint={"action": "select_free_branch_port"},
+    )
+
+
+def _fix_branch_point_required_port(
+    element_id: str | None, _et: str | None,
+) -> FixAction:
+    return FixAction(
+        action_type="OPEN_MODAL",
+        element_ref=element_id,
+        modal_type="BranchPointPortsModal",
+        payload_hint={"required": "branch_port_count"},
+    )
+
+
+def _fix_zksn_branch_count(
+    element_id: str | None, _et: str | None,
+) -> FixAction:
+    return FixAction(
+        action_type="OPEN_MODAL",
+        element_ref=element_id,
+        modal_type="InsertZksnForm",
+        payload_hint={"required": "branch_ports_count"},
+    )
+
+
+def _fix_branch_connection_invalid_port(
+    element_id: str | None, _et: str | None,
+) -> FixAction:
+    return FixAction(
+        action_type="OPEN_MODAL",
+        element_ref=element_id,
+        modal_type="StartBranchModal",
+        payload_hint={"required": "valid_branch_port"},
+    )
+
+
+def _fix_branch_connection_not_capable(
+    element_id: str | None, _et: str | None,
+) -> FixAction:
+    return FixAction(
+        action_type="NAVIGATE_TO_ELEMENT",
+        element_ref=element_id,
+        payload_hint={"action": "use_branch_capable_source_object"},
+    )
+
+
+def _fix_oze_transformer_required(
+    element_id: str | None, _et: str | None,
+) -> FixAction:
+    return FixAction(
+        action_type="OPEN_MODAL",
+        element_ref=element_id,
+        modal_type="AddTransformerModal",
+        payload_hint={"required": "block_transformer_for_oze"},
+    )
+
+
+def _fix_bess_transformer_required(
+    element_id: str | None, _et: str | None,
+) -> FixAction:
+    return FixAction(
+        action_type="OPEN_MODAL",
+        element_ref=element_id,
+        modal_type="AddTransformerModal",
+        payload_hint={"required": "block_transformer_for_bess"},
+    )
+
+
+# ---------------------------------------------------------------------------
 # Mapping tables
 # ---------------------------------------------------------------------------
 
@@ -200,6 +312,18 @@ _FIX_ACTION_MAP: dict[
     "generator.nn_variant_requires_station_transformer": _fix_station_nn_without_transformer,
     "generator.block_variant_requires_block_transformer": _fix_generator_block_transformer,
     "generator.block_transformer_catalog_missing": _fix_catalog_ref_missing,
+    # BranchPointSN validation
+    "branch_point.invalid_parent_medium": _fix_branch_point_invalid_medium,
+    "branch_point.catalog_ref_missing": _fix_branch_point_catalog_ref,
+    "branch_point.switch_state_missing": _fix_branch_point_switch_state,
+    "branch_point.branch_port_occupied": _fix_branch_point_port_occupied,
+    "branch_point.required_port_missing": _fix_branch_point_required_port,
+    "zksn.branch_count_invalid": _fix_zksn_branch_count,
+    "branch_connection.invalid_source_port": _fix_branch_connection_invalid_port,
+    "branch_connection.source_not_branch_capable": _fix_branch_connection_not_capable,
+    # OZE / BESS
+    "oze.transformer_required": _fix_oze_transformer_required,
+    "bess.transformer_required": _fix_bess_transformer_required,
     # Topology warnings
     "E003": _fix_graph_island,
     "W005": _fix_topology_ref_invalid,
@@ -258,6 +382,18 @@ KNOWN_BLOCKER_CODES: frozenset[str] = frozenset({
     "LF_SLACK_DISTRIBUTED_MISSING_SPEC",
     "LF_SLACK_DISTRIBUTED_EMPTY",
     "LF_CUSTOM_INITIAL_EMPTY",
+    # BranchPointSN (branch_pole / ZKSN)
+    "branch_point.invalid_parent_medium",
+    "branch_point.catalog_ref_missing",
+    "branch_point.switch_state_missing",
+    "branch_point.branch_port_occupied",
+    "branch_point.required_port_missing",
+    "zksn.branch_count_invalid",
+    "branch_connection.invalid_source_port",
+    "branch_connection.source_not_branch_capable",
+    # OZE / BESS
+    "oze.transformer_required",
+    "bess.transformer_required",
 })
 
 # Codes prefixes for device_missing (parametric)

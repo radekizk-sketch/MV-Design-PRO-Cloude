@@ -29,6 +29,8 @@ from .models import (
     ProtectionAssignment,
     ProtectionSetting,
     ParameterOverride,
+    BranchPointSN,
+    BranchPointSNPorts,
 )
 from .hash import compute_enm_hash
 from .mapping import map_enm_to_network_graph
@@ -64,6 +66,8 @@ __all__ = [
     "ProtectionAssignment",
     "ProtectionSetting",
     "ParameterOverride",
+    "BranchPointSN",
+    "BranchPointSNPorts",
     "compute_enm_hash",
     "map_enm_to_network_graph",
     "ENMValidator",

@@ -19,3 +19,5 @@ export { SwitchCard } from './SwitchCard';
 export { BayCard } from './BayCard';
 export { NnSwitchgearCard } from './NnSwitchgearCard';
 export { RenewableSourceCard } from './RenewableSourceCard';
+export { BranchPoleCard } from './BranchPoleCard';
+export { ZksnCard } from './ZksnCard';

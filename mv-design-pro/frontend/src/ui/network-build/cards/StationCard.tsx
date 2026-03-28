@@ -27,6 +27,14 @@ function stationTypeLabel(stationType: string): string {
       return 'Stacja rozdzielcza SN';
     case 'customer':
       return 'Stacja odbiorcy';
+    case 'inline':
+      return 'Stacja przelotowa';
+    case 'branch':
+      return 'Stacja odgałęźna';
+    case 'terminal':
+      return 'Stacja końcowa';
+    case 'sectional':
+      return 'Stacja sekcyjna';
     default:
       return stationType;
   }
