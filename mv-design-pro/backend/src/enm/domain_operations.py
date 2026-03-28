@@ -755,6 +755,10 @@ def _require_catalog_ref(
     context_code: str,
 ) -> str | dict[str, Any]:
     """Zwróć kanoniczny catalog_ref albo odpowiedź błędu catalog.ref_required."""
+    error_message = (
+        f"{context_code}: wymagane powiązanie z katalogiem "
+        "(catalog_ref lub poprawne catalog_binding.item_id)."
+    )
     if isinstance(payload_ref, str):
         normalized_ref = payload_ref.strip()
         if normalized_ref:
@@ -762,24 +766,15 @@ def _require_catalog_ref(
 
     if payload_binding is not None:
         if not isinstance(payload_binding, dict):
-            return _error_response(
-                f"{context_code}: wymagane catalog_ref lub poprawne catalog_binding.item_id.",
-                "catalog.ref_required",
-            )
+            return _error_response(error_message, "catalog.ref_required")
         binding_item_id = payload_binding.get("item_id")
         if isinstance(binding_item_id, str):
             normalized_item_id = binding_item_id.strip()
             if normalized_item_id:
                 return normalized_item_id
-        return _error_response(
-            f"{context_code}: wymagane catalog_ref lub poprawne catalog_binding.item_id.",
-            "catalog.ref_required",
-        )
+        return _error_response(error_message, "catalog.ref_required")
 
-    return _error_response(
-        f"{context_code}: wymagane catalog_ref lub poprawne catalog_binding.item_id.",
-        "catalog.ref_required",
-    )
+    return _error_response(error_message, "catalog.ref_required")
 
 
 # ---------------------------------------------------------------------------
