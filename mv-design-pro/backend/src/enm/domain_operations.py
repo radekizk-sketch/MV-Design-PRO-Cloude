@@ -515,10 +515,15 @@ def _resolve_branch_from_ref(enm: dict[str, Any], from_ref: str) -> tuple[str | 
         return None, "branch_connection.invalid_source_port"
     element_ref, port_id = from_ref.split(".", 1)
 
+    if port_id == "BRANCH":
+        bus = next((b for b in enm.get("buses", []) if b.get("ref_id") == element_ref), None)
+        if bus:
+            return element_ref, None
+
     if element_ref.startswith("stn/"):
         sub = next((s for s in enm.get("substations", []) if s.get("ref_id") == element_ref), None)
         if not sub:
-            return None, "branch.from_bus_not_found"
+            return None, "branch_connection.source_not_branch_capable"
         if port_id != "BRANCH":
             return None, "branch_connection.invalid_source_port"
         feeder_bay = next(
@@ -583,7 +588,7 @@ def _lookup_branch_from_ref_for_bus(
     - branch_pole.BRANCH
     - zksn.BRANCH_n
     """
-    candidates: list[str] = []
+    structured_candidates: list[str] = []
 
     for sub in enm.get("substations", []):
         sub_ref = sub.get("ref_id")
@@ -599,7 +604,7 @@ def _lookup_branch_from_ref_for_bus(
             None,
         )
         if feeder_bay:
-            candidates.append(f"{sub_ref}.BRANCH")
+            structured_candidates.append(f"{sub_ref}.BRANCH")
 
     for bp in enm.get("branch_points", []):
         bp_ref = bp.get("ref_id")
@@ -609,20 +614,23 @@ def _lookup_branch_from_ref_for_bus(
         if bp.get("branch_point_type") == "branch_pole":
             branch_bus = ports.get("BRANCH", [None])[0] if isinstance(ports.get("BRANCH"), list) else None
             if branch_bus == from_bus_ref:
-                candidates.append(f"{bp_ref}.BRANCH")
+                structured_candidates.append(f"{bp_ref}.BRANCH")
         if bp.get("branch_point_type") == "zksn":
             for idx, bus_ref in enumerate(ports.get("BRANCH", []), start=1):
                 if bus_ref == from_bus_ref:
-                    candidates.append(f"{bp_ref}.BRANCH_{idx}")
+                    structured_candidates.append(f"{bp_ref}.BRANCH_{idx}")
+
+    unique_structured = sorted(set(structured_candidates))
+    if len(unique_structured) == 1:
+        return unique_structured[0], None
+    if len(unique_structured) > 1:
+        return None, "branch_connection.source_not_branch_capable"
 
     bus = next((b for b in enm.get("buses", []) if b.get("ref_id") == from_bus_ref), None)
     if bus:
-        candidates.append(f"{from_bus_ref}.BRANCH")
+        return f"{from_bus_ref}.BRANCH", None
 
-    unique = sorted(set(candidates))
-    if len(unique) != 1:
-        return None, "branch_connection.source_not_branch_capable"
-    return unique[0], None
+    return None, "branch_connection.source_not_branch_capable"
 
 
 def _get_catalog_safe():
