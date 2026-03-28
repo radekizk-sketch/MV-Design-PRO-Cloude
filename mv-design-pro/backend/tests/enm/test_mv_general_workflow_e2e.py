@@ -12,6 +12,7 @@ E2E-5: Stacje odbiorcze + odgałęzienia OZE/BESS + gotowość do obliczeń
 
 from __future__ import annotations
 
+import copy
 import pytest
 from enm.models import EnergyNetworkModel, ENMHeader, ENMDefaults
 from enm.domain_operations import execute_domain_operation
@@ -212,6 +213,7 @@ class TestE2E1MultiObjectFeeder:
 
 class TestE2E2BranchFromStation:
     def test_branch_from_station_branch_port(self) -> None:
+        """Legacy from_bus_ref-only path is accepted iff it maps to branch-capable source."""
         s = _empty_enm()
         s = op(s, "add_grid_source_sn", {"voltage_kv": 15.0, "sk3_mva": 250.0})
         s = op(s, "continue_trunk_segment_sn", {
@@ -228,16 +230,17 @@ class TestE2E2BranchFromStation:
         # Odgałęzienie przez from_bus_ref (szyna stacji)
         branch_bus = sub.get("bus_refs", [None])[0] if sub.get("bus_refs") else None
 
-        if branch_bus:
-            result = execute_domain_operation(
-                s,
-                "start_branch_segment_sn",
-                {
-                    "from_bus_ref": branch_bus,
-                    "segment": {"rodzaj": "KABEL", "dlugosc_m": 200, "catalog_ref": "YAKXS_3x70"},
-                },
-            )
-            assert not result.get("error"), f"Błąd: {result.get('error')}"
+        assert branch_bus is not None
+        result = execute_domain_operation(
+            s,
+            "start_branch_segment_sn",
+            {
+                "from_bus_ref": branch_bus,
+                "segment": {"rodzaj": "KABEL", "dlugosc_m": 200, "catalog_ref": "YAKXS_3x70"},
+            },
+        )
+        assert not result.get("error"), f"Błąd: {result.get('error')}"
+        assert result.get("snapshot") is not None
 
     def test_branch_from_station_via_from_ref(self) -> None:
         """start_branch_segment_sn przez from_ref=<station_ref>.BRANCH."""
@@ -261,13 +264,51 @@ class TestE2E2BranchFromStation:
                 "segment": {"rodzaj": "KABEL", "dlugosc_m": 150, "catalog_ref": "YAKXS_3x70"},
             },
         )
-        # Either succeeds (branch bus found) or gives clear error about missing port
-        if result.get("error"):
-            assert result.get("error_code") in (
-                "branch.from_bus_missing",
-                "branch_point.required_port_missing",
-                "branch_connection.source_not_branch_capable",
-            ), f"Nieoczekiwany błąd: {result.get('error_code')} — {result.get('error')}"
+        assert not result.get("error"), f"Błąd: {result.get('error')}"
+        assert result.get("snapshot") is not None
+
+    def test_non_branch_capable_source_fails_and_snapshot_unchanged(self) -> None:
+        s = _empty_enm()
+        s = op(s, "add_grid_source_sn", {"voltage_kv": 15.0, "sk3_mva": 250.0})
+        s = op(s, "continue_trunk_segment_sn", {
+            "segment": {"rodzaj": "KABEL", "dlugosc_m": 400, "catalog_ref": "YAKXS_3x95"},
+        })
+
+        baseline = copy.deepcopy(s)
+        invalid_bus_ref = "bus/nonexistent/source"
+
+        result = execute_domain_operation(
+            s,
+            "start_branch_segment_sn",
+            {
+                "from_ref": f"{invalid_bus_ref}.BRANCH",
+                "segment": {"rodzaj": "KABEL", "dlugosc_m": 150, "catalog_ref": "YAKXS_3x70"},
+            },
+        )
+        assert result.get("snapshot") is None
+        assert result.get("error_code") == "branch.from_bus_not_found"
+        assert s == baseline
+
+    def test_direct_from_bus_ref_without_from_ref_fails_for_non_branch_capable_source(self) -> None:
+        s = _empty_enm()
+        s = op(s, "add_grid_source_sn", {"voltage_kv": 15.0, "sk3_mva": 250.0})
+        s = op(s, "continue_trunk_segment_sn", {
+            "segment": {"rodzaj": "KABEL", "dlugosc_m": 400, "catalog_ref": "YAKXS_3x95"},
+        })
+
+        baseline = copy.deepcopy(s)
+        invalid_bus_ref = "bus/nonexistent/source"
+        result = execute_domain_operation(
+            s,
+            "start_branch_segment_sn",
+            {
+                "from_bus_ref": invalid_bus_ref,
+                "segment": {"rodzaj": "KABEL", "dlugosc_m": 150, "catalog_ref": "YAKXS_3x70"},
+            },
+        )
+        assert result.get("snapshot") is None
+        assert result.get("error_code") == "branch_connection.source_not_branch_capable"
+        assert s == baseline
 
 
 # ---------------------------------------------------------------------------

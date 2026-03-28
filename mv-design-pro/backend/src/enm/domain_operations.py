@@ -515,10 +515,15 @@ def _resolve_branch_from_ref(enm: dict[str, Any], from_ref: str) -> tuple[str | 
         return None, "branch_connection.invalid_source_port"
     element_ref, port_id = from_ref.split(".", 1)
 
+    if port_id == "BRANCH":
+        bus = next((b for b in enm.get("buses", []) if b.get("ref_id") == element_ref), None)
+        if bus:
+            return element_ref, None
+
     if element_ref.startswith("stn/"):
         sub = next((s for s in enm.get("substations", []) if s.get("ref_id") == element_ref), None)
         if not sub:
-            return None, "branch.from_bus_not_found"
+            return None, "branch_connection.source_not_branch_capable"
         if port_id != "BRANCH":
             return None, "branch_connection.invalid_source_port"
         feeder_bay = next(
@@ -531,6 +536,14 @@ def _resolve_branch_from_ref(enm: dict[str, Any], from_ref: str) -> tuple[str | 
         if not feeder_bay:
             return None, "branch_connection.source_not_branch_capable"
         return feeder_bay.get("bus_ref"), None
+
+    if element_ref.startswith("bus/"):
+        if port_id != "BRANCH":
+            return None, "branch_connection.invalid_source_port"
+        bus = next((b for b in enm.get("buses", []) if b.get("ref_id") == element_ref), None)
+        if not bus:
+            return None, "branch.from_bus_not_found"
+        return element_ref, None
 
     bp = next((b for b in enm.get("branch_points", []) if b.get("ref_id") == element_ref), None)
     if not bp:
@@ -560,6 +573,62 @@ def _resolve_branch_from_ref(enm: dict[str, Any], from_ref: str) -> tuple[str | 
         if bp.get("branch_occupied", {}).get(port_id):
             return None, "branch_point.branch_port_occupied"
         return branch_ports[idx], None
+
+    return None, "branch_connection.source_not_branch_capable"
+
+
+def _lookup_branch_from_ref_for_bus(
+    enm: dict[str, Any],
+    from_bus_ref: str,
+) -> tuple[str | None, str | None]:
+    """Legacy lookup: wyznacz from_ref na podstawie from_bus_ref.
+
+    Dopuszcza wyłącznie źródła branch-capable:
+    - station.BRANCH (bay_role=FEEDER)
+    - branch_pole.BRANCH
+    - zksn.BRANCH_n
+    """
+    structured_candidates: list[str] = []
+
+    for sub in enm.get("substations", []):
+        sub_ref = sub.get("ref_id")
+        if not sub_ref:
+            continue
+        feeder_bay = next(
+            (
+                bay for bay in enm.get("bays", [])
+                if bay.get("substation_ref") == sub_ref
+                and bay.get("bay_role") == "FEEDER"
+                and bay.get("bus_ref") == from_bus_ref
+            ),
+            None,
+        )
+        if feeder_bay:
+            structured_candidates.append(f"{sub_ref}.BRANCH")
+
+    for bp in enm.get("branch_points", []):
+        bp_ref = bp.get("ref_id")
+        ports = bp.get("ports", {})
+        if not bp_ref:
+            continue
+        if bp.get("branch_point_type") == "branch_pole":
+            branch_bus = ports.get("BRANCH", [None])[0] if isinstance(ports.get("BRANCH"), list) else None
+            if branch_bus == from_bus_ref:
+                structured_candidates.append(f"{bp_ref}.BRANCH")
+        if bp.get("branch_point_type") == "zksn":
+            for idx, bus_ref in enumerate(ports.get("BRANCH", []), start=1):
+                if bus_ref == from_bus_ref:
+                    structured_candidates.append(f"{bp_ref}.BRANCH_{idx}")
+
+    unique_structured = sorted(set(structured_candidates))
+    if len(unique_structured) == 1:
+        return unique_structured[0], None
+    if len(unique_structured) > 1:
+        return None, "branch_connection.source_not_branch_capable"
+
+    bus = next((b for b in enm.get("buses", []) if b.get("ref_id") == from_bus_ref), None)
+    if bus:
+        return f"{from_bus_ref}.BRANCH", None
 
     return None, "branch_connection.source_not_branch_capable"
 
@@ -1658,22 +1727,39 @@ def insert_zksn_on_segment_sn(enm: dict[str, Any], payload: dict[str, Any]) -> d
 def start_branch_segment_sn(enm: dict[str, Any], payload: dict[str, Any]) -> dict[str, Any]:
     """Dodaj odgałęzienie SN z istniejącej szyny.
 
-    Wymaga jawnego from_bus_ref — brak auto-detekcji.
+    Wymaga jawnego from_ref (port BRANCH na stacji lub branch-poincie).
+    from_bus_ref jest obsługiwane wyłącznie jako pole kompatybilności
+    i musi mapować się 1:1 do bus_ref rozwiązanego z from_ref.
     """
-    from_bus_ref = payload.get("from_bus_ref")
     from_ref = payload.get("from_ref")
+    from_bus_ref = payload.get("from_bus_ref")
     segment = payload.get("segment", {})
 
-    if not from_bus_ref and from_ref:
-        resolved_bus_ref, err_code = _resolve_branch_from_ref(enm, from_ref)
-        if err_code:
-            return _error_response("Nieprawidłowe źródło odgałęzienia.", err_code)
-        from_bus_ref = resolved_bus_ref
-    if not from_bus_ref:
+    if not from_ref and from_bus_ref:
+        inferred_from_ref, lookup_err = _lookup_branch_from_ref_for_bus(enm, from_bus_ref)
+        if lookup_err:
+            return _error_response(
+                "Pole from_bus_ref bez from_ref jest niedozwolone dla źródła "
+                "nieobsługującego portu BRANCH.",
+                "branch_connection.source_not_branch_capable",
+            )
+        from_ref = inferred_from_ref
+    if not from_ref:
         return _error_response(
-            "Brak identyfikatora szyny źródłowej (from_bus_ref/from_ref). "
+            "Brak referencji portu źródłowego (from_ref). "
             "Kliknij port BRANCH na stacji, słupie lub ZKSN w SLD.",
-            "branch.from_bus_missing",
+            "branch.from_ref_required",
+        )
+
+    resolved_bus_ref, err_code = _resolve_branch_from_ref(enm, from_ref)
+    if err_code:
+        return _error_response("Nieprawidłowe źródło odgałęzienia.", err_code)
+    from_bus_ref = resolved_bus_ref
+
+    if payload.get("from_bus_ref") and payload.get("from_bus_ref") != from_bus_ref:
+        return _error_response(
+            "Pole from_bus_ref nie zgadza się z bus_ref wynikającym z from_ref.",
+            "branch_connection.source_not_branch_capable",
         )
 
     from_bus = None
