@@ -121,3 +121,85 @@ class TestRunDispatch:
         assert data["analysis_type"] == "short_circuit_3f"
         assert len(data["results"]) >= 1
         assert data["results"][0]["ikss_a"] > 0
+
+
+class TestDomainOpsCatalogPolicy:
+    def test_domain_ops_rejects_missing_catalog_binding_and_keeps_snapshot(self, client):
+        case_id = "test-case-domain-ops-1"
+
+        add_source = client.post(
+            f"/api/cases/{case_id}/enm/domain-ops",
+            json={
+                "operation": {
+                    "name": "add_grid_source_sn",
+                    "payload": {"voltage_kv": 15.0, "sk3_mva": 250.0},
+                },
+            },
+        )
+        assert add_source.status_code == 200
+
+        before = client.get(f"/api/cases/{case_id}/enm").json()
+        before_hash = before["header"]["hash_sha256"]
+
+        malformed = client.post(
+            f"/api/cases/{case_id}/enm/domain-ops",
+            json={
+                "snapshot_base_hash": before_hash,
+                "operation": {
+                    "name": "continue_trunk_segment_sn",
+                    "payload": {
+                        "from_terminal": {"type": "source"},
+                        "segment": {"rodzaj": "KABEL", "dlugosc_m": 200.0},
+                    },
+                },
+            },
+        )
+        assert malformed.status_code == 422
+        body = malformed.json()
+        assert body["detail"]["code"] == "catalog.ref_required"
+
+        after = client.get(f"/api/cases/{case_id}/enm").json()
+        assert after["header"]["hash_sha256"] == before_hash
+        assert after["branches"] == before["branches"]
+
+    def test_domain_ops_rejects_malformed_catalog_binding_and_keeps_snapshot(self, client):
+        case_id = "test-case-domain-ops-2"
+
+        add_source = client.post(
+            f"/api/cases/{case_id}/enm/domain-ops",
+            json={
+                "operation": {
+                    "name": "add_grid_source_sn",
+                    "payload": {"voltage_kv": 15.0, "sk3_mva": 250.0},
+                },
+            },
+        )
+        assert add_source.status_code == 200
+
+        before = client.get(f"/api/cases/{case_id}/enm").json()
+        before_hash = before["header"]["hash_sha256"]
+
+        malformed = client.post(
+            f"/api/cases/{case_id}/enm/domain-ops",
+            json={
+                "snapshot_base_hash": before_hash,
+                "operation": {
+                    "name": "continue_trunk_segment_sn",
+                    "payload": {
+                        "from_terminal": {"type": "source"},
+                        "segment": {
+                            "rodzaj": "KABEL",
+                            "dlugosc_m": 200.0,
+                            "catalog_binding": {"namespace": "KABEL_SN"},
+                        },
+                    },
+                },
+            },
+        )
+        assert malformed.status_code == 422
+        body = malformed.json()
+        assert body["detail"]["code"] == "catalog.ref_required"
+
+        after = client.get(f"/api/cases/{case_id}/enm").json()
+        assert after["header"]["hash_sha256"] == before_hash
+        assert after["branches"] == before["branches"]
