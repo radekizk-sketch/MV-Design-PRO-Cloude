@@ -174,7 +174,7 @@ class _SentinelType:
     pass
 
 
-_SENTINEL: Any = _SentinelType()
+_SENTINEL: object = _SentinelType()
 
 
 # ---------------------------------------------------------------------------

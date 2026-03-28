@@ -115,8 +115,8 @@ class FieldChange:
     """Zmiana wartosci pola elementu."""
 
     field_name: str
-    old_value: Any
-    new_value: Any
+    old_value: object
+    new_value: object
     label_pl: str
 
     def to_dict(self) -> dict[str, Any]:
