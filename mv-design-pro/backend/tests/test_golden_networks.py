@@ -129,6 +129,7 @@ class TestGN03SNRingNOP:
             r = execute_domain_operation(enm, "insert_section_switch_sn", {
                 "segment_id": branches[1]["ref_id"],
                 "insert_at": {"mode": "RATIO", "value": 0.5},
+                "catalog_ref": "APARAT_SN_ROZLACZNIK",
             })
             enm = r["snapshot"]
 

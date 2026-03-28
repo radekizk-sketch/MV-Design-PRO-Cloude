@@ -422,3 +422,240 @@ class TestCatalogGateErrorFormat:
             },
         )
         assert result["error_code"] == "catalog.ref_required"
+
+
+# ===========================================================================
+# TEST 8: insert_branch_pole_on_segment_sn bez katalogu → odrzucenie
+# ===========================================================================
+
+
+def _add_overhead_line_with_catalog(enm_dict: dict) -> dict:
+    """Dodaj odcinek linii napowietrznej Z katalogiem i zwroc snapshot."""
+    result = execute_domain_operation(
+        enm_dict=enm_dict,
+        op_name="continue_trunk_segment_sn",
+        payload={
+            "segment": {
+                "rodzaj": "LINIA",
+                "dlugosc_m": 800,
+                "catalog_ref": "AFL_3x50",
+            },
+        },
+    )
+    assert result.get("snapshot") is not None, f"Error: {result.get('error')}"
+    return result["snapshot"]
+
+
+def _get_first_overhead_line_ref(snapshot: dict) -> str:
+    """Znajdz pierwszy odcinek linii napowietrznej."""
+    for branch in snapshot.get("branches", []):
+        if branch.get("type") == "line_overhead":
+            return branch["ref_id"]
+    raise ValueError("Brak odcinka linii napowietrznej")
+
+
+class TestCatalogGateInsertBranchPole:
+    def test_reject_branch_pole_without_catalog(self):
+        """insert_branch_pole_on_segment_sn BEZ catalog_ref → error catalog.ref_required."""
+        enm = _empty_enm()
+        snapshot = _add_gpz(enm)
+        snapshot = _add_overhead_line_with_catalog(snapshot)
+
+        seg_ref = _get_first_overhead_line_ref(snapshot)
+
+        result = execute_domain_operation(
+            enm_dict=snapshot,
+            op_name="insert_branch_pole_on_segment_sn",
+            payload={
+                "segment_id": seg_ref,
+                "name": "Słup testowy",
+                "insert_at": {"mode": "RATIO", "value": 0.5},
+                # BRAK catalog_ref i catalog_binding
+            },
+        )
+        assert result.get("error") is not None, "Operacja powinna zwrócić błąd"
+        assert result["error_code"] == "catalog.ref_required"
+        assert result.get("snapshot") is None
+
+    def test_accept_branch_pole_with_catalog_ref(self):
+        """insert_branch_pole_on_segment_sn Z catalog_ref → sukces."""
+        enm = _empty_enm()
+        snapshot = _add_gpz(enm)
+        snapshot = _add_overhead_line_with_catalog(snapshot)
+
+        seg_ref = _get_first_overhead_line_ref(snapshot)
+
+        result = execute_domain_operation(
+            enm_dict=snapshot,
+            op_name="insert_branch_pole_on_segment_sn",
+            payload={
+                "segment_id": seg_ref,
+                "name": "Słup rozgałęźny SN",
+                "catalog_ref": "SLUP_BP_001",
+                "insert_at": {"mode": "RATIO", "value": 0.5},
+            },
+        )
+        assert result.get("snapshot") is not None, f"Błąd: {result.get('error')}"
+        assert result.get("error") is None or result.get("error") == ""
+
+    def test_accept_branch_pole_with_catalog_binding(self):
+        """insert_branch_pole_on_segment_sn Z catalog_binding → sukces."""
+        enm = _empty_enm()
+        snapshot = _add_gpz(enm)
+        snapshot = _add_overhead_line_with_catalog(snapshot)
+
+        seg_ref = _get_first_overhead_line_ref(snapshot)
+
+        result = execute_domain_operation(
+            enm_dict=snapshot,
+            op_name="insert_branch_pole_on_segment_sn",
+            payload={
+                "segment_id": seg_ref,
+                "catalog_binding": {"item_id": "SLUP_BP_001", "namespace": "mv_branch_points"},
+                "insert_at": {"mode": "RATIO", "value": 0.5},
+            },
+        )
+        assert result.get("snapshot") is not None, f"Błąd: {result.get('error')}"
+
+
+# ===========================================================================
+# TEST 9: insert_zksn_on_segment_sn bez katalogu → odrzucenie
+# ===========================================================================
+
+
+class TestCatalogGateInsertZKSN:
+    def test_reject_zksn_without_catalog(self):
+        """insert_zksn_on_segment_sn BEZ catalog_ref → error catalog.ref_required."""
+        enm = _empty_enm()
+        snapshot = _add_gpz(enm)
+        snapshot = _add_segment_with_catalog(snapshot)  # kabel
+
+        seg_ref = _get_first_cable_ref(snapshot)
+
+        result = execute_domain_operation(
+            enm_dict=snapshot,
+            op_name="insert_zksn_on_segment_sn",
+            payload={
+                "segment_id": seg_ref,
+                "name": "ZKSN testowy",
+                "insert_at": {"mode": "RATIO", "value": 0.5},
+                # BRAK catalog_ref i catalog_binding
+            },
+        )
+        assert result.get("error") is not None, "Operacja powinna zwrócić błąd"
+        assert result["error_code"] == "catalog.ref_required"
+        assert result.get("snapshot") is None
+
+    def test_accept_zksn_with_catalog_ref(self):
+        """insert_zksn_on_segment_sn Z catalog_ref → sukces."""
+        enm = _empty_enm()
+        snapshot = _add_gpz(enm)
+        snapshot = _add_segment_with_catalog(snapshot)
+
+        seg_ref = _get_first_cable_ref(snapshot)
+
+        result = execute_domain_operation(
+            enm_dict=snapshot,
+            op_name="insert_zksn_on_segment_sn",
+            payload={
+                "segment_id": seg_ref,
+                "catalog_ref": "ZKSN_TYPE_001",
+                "insert_at": {"mode": "RATIO", "value": 0.5},
+                "switch_state": "CLOSED",
+            },
+        )
+        assert result.get("snapshot") is not None, f"Błąd: {result.get('error')}"
+        assert result.get("error") is None or result.get("error") == ""
+
+
+# ===========================================================================
+# TEST 10: insert_section_switch_sn bez katalogu → odrzucenie
+# ===========================================================================
+
+
+class TestCatalogGateInsertSectionSwitch:
+    def test_reject_section_switch_without_catalog(self):
+        """insert_section_switch_sn BEZ catalog_ref → error catalog.ref_required."""
+        enm = _empty_enm()
+        snapshot = _add_gpz(enm)
+        snapshot = _add_segment_with_catalog(snapshot)
+
+        seg_ref = _get_first_cable_ref(snapshot)
+
+        result = execute_domain_operation(
+            enm_dict=snapshot,
+            op_name="insert_section_switch_sn",
+            payload={
+                "segment_id": seg_ref,
+                "switch_type": "ROZLACZNIK",
+                "normal_state": "closed",
+                # BRAK catalog_ref i catalog_binding
+            },
+        )
+        assert result.get("error") is not None, "Operacja powinna zwrócić błąd"
+        assert result["error_code"] == "catalog.ref_required"
+        assert result.get("snapshot") is None
+
+    def test_accept_section_switch_with_catalog_ref(self):
+        """insert_section_switch_sn Z catalog_ref → sukces."""
+        enm = _empty_enm()
+        snapshot = _add_gpz(enm)
+        snapshot = _add_segment_with_catalog(snapshot)
+
+        seg_ref = _get_first_cable_ref(snapshot)
+
+        result = execute_domain_operation(
+            enm_dict=snapshot,
+            op_name="insert_section_switch_sn",
+            payload={
+                "segment_id": seg_ref,
+                "switch_type": "ROZLACZNIK",
+                "catalog_ref": "APARAT_SN_ROZLACZNIK_001",
+            },
+        )
+        assert result.get("snapshot") is not None, f"Błąd: {result.get('error')}"
+        assert result.get("error") is None or result.get("error") == ""
+
+    def test_accept_section_switch_with_catalog_binding(self):
+        """insert_section_switch_sn Z catalog_binding → sukces."""
+        enm = _empty_enm()
+        snapshot = _add_gpz(enm)
+        snapshot = _add_segment_with_catalog(snapshot)
+
+        seg_ref = _get_first_cable_ref(snapshot)
+
+        result = execute_domain_operation(
+            enm_dict=snapshot,
+            op_name="insert_section_switch_sn",
+            payload={
+                "segment_id": seg_ref,
+                "catalog_binding": {
+                    "item_id": "APARAT_SN_ROZLACZNIK_001",
+                    "namespace": "APARAT_SN",
+                },
+            },
+        )
+        assert result.get("snapshot") is not None, f"Błąd: {result.get('error')}"
+
+    def test_section_switch_snapshot_unchanged_on_failure(self):
+        """Snapshot NIE jest modyfikowany gdy brak katalogu (guard przed mutacją)."""
+        enm = _empty_enm()
+        snapshot = _add_gpz(enm)
+        snapshot = _add_segment_with_catalog(snapshot)
+
+        seg_ref = _get_first_cable_ref(snapshot)
+        branches_before = len(snapshot.get("branches", []))
+        buses_before = len(snapshot.get("buses", []))
+
+        result = execute_domain_operation(
+            enm_dict=snapshot,
+            op_name="insert_section_switch_sn",
+            payload={
+                "segment_id": seg_ref,
+                # BRAK katalogu
+            },
+        )
+        assert result.get("error_code") == "catalog.ref_required"
+        # Oryginalny snapshot przekazany do operacji nie moze byc zmieniony
+        assert len(snapshot.get("branches", [])) == branches_before
+        assert len(snapshot.get("buses", [])) == buses_before

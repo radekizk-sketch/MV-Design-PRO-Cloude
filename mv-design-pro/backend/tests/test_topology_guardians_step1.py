@@ -117,7 +117,11 @@ def test_topology_ring_8_stations_with_nop() -> None:
         execute_domain_operation(
             enm,
             "insert_section_switch_sn",
-            {"segment_id": target_segment, "insert_at": {"mode": "RATIO", "value": 0.5}},
+            {
+                "segment_id": target_segment,
+                "insert_at": {"mode": "RATIO", "value": 0.5},
+                "catalog_ref": "APARAT_SN_ROZLACZNIK",
+            },
         ),
         "insert_section_switch_sn",
     )
