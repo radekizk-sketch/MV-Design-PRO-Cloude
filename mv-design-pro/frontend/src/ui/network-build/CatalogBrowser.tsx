@@ -2,13 +2,14 @@
  * CatalogBrowser — Profesjonalna przeglądarka katalogów typów.
  *
  * Lewe drzewo kategorii (namespace), prawy panel z listą typów i podglądem.
- * Integruje się z elementCatalogRegistry + TypePicker + useCatalogAssignment.
+ * Integruje się z API katalogowym (brak mocków).
  *
  * BINDING: 100% PL etykiety.
  */
 
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { clsx } from 'clsx';
+import { fetchTypesByCategory, type TypeCategory } from '../catalog';
 
 // =============================================================================
 // Types
@@ -70,31 +71,35 @@ const NAMESPACE_ICONS: Record<CatalogNamespace, string> = {
 };
 
 const NAMESPACE_PARAM_LABELS: Partial<Record<CatalogNamespace, Record<string, string>>> = {
-  LINIA_SN: { r_ohm_per_km: "R' [Ω/km]", x_ohm_per_km: "X' [Ω/km]", in_a: 'In [A]' },
-  KABEL_SN: { r_ohm_per_km: "R' [Ω/km]", x_ohm_per_km: "X' [Ω/km]", in_a: 'In [A]', insulation: 'Izolacja' },
-  TRAFO_SN_NN: { sn_mva: 'Sn [MVA]', uk_percent: 'uk [%]', pk_kw: 'Pk [kW]', vector_group: 'Grupa' },
-  APARAT_SN: { rated_current_a: 'In [A]', rated_voltage_kv: 'Un [kV]', breaking_capacity_ka: 'Ics [kA]' },
-  ZRODLO_NN_PV: { rated_power_kw: 'Pn [kW]', max_power_kw: 'Pmax [kW]' },
-  ZRODLO_NN_BESS: { capacity_kwh: 'E [kWh]', charge_kw: 'Pch [kW]', discharge_kw: 'Pdis [kW]' },
+  LINIA_SN: { r_ohm_per_km: "R' [Ω/km]", x_ohm_per_km: "X' [Ω/km]", rated_current_a: 'In [A]' },
+  KABEL_SN: { r_ohm_per_km: "R' [Ω/km]", x_ohm_per_km: "X' [Ω/km]", rated_current_a: 'In [A]', insulation_type: 'Izolacja' },
+  TRAFO_SN_NN: { rated_power_mva: 'Sn [MVA]', uk_percent: 'uk [%]', pk_kw: 'Pk [kW]', vector_group: 'Grupa' },
+  APARAT_SN: { in_a: 'In [A]', un_kv: 'Un [kV]', ik_ka: 'Ics [kA]' },
+  APARAT_NN: { in_a: 'In [A]', un_kv: 'Un [kV]', ik_ka: 'Ics [kA]' },
 };
 
-// =============================================================================
-// Mock data generator (will be replaced by API)
-// =============================================================================
+const NAMESPACE_TO_CATEGORY: Partial<Record<CatalogNamespace, TypeCategory>> = {
+  LINIA_SN: 'LINE',
+  KABEL_SN: 'CABLE',
+  TRAFO_SN_NN: 'TRANSFORMER',
+  APARAT_SN: 'SWITCH_EQUIPMENT',
+  APARAT_NN: 'SWITCH_EQUIPMENT',
+};
 
-function getMockTypesForNamespace(ns: CatalogNamespace): CatalogTypeEntry[] {
-  const paramLabels = NAMESPACE_PARAM_LABELS[ns] ?? {};
-  const paramKeys = Object.keys(paramLabels);
-  // Generate 3-5 sample types
-  const count = 3 + Math.floor(ns.length % 3);
-  return Array.from({ length: count }, (_, i) => ({
-    id: `${ns.toLowerCase()}_type_${i + 1}`,
-    name: `${NAMESPACE_LABELS[ns]} Typ ${i + 1}`,
-    manufacturer: i % 2 === 0 ? 'ABB' : 'Schneider Electric',
-    parameters: Object.fromEntries(
-      paramKeys.map((k) => [k, `—`]),
-    ),
-  }));
+function mapCatalogTypeEntry(raw: Record<string, unknown>): CatalogTypeEntry {
+  const id = String(raw.id ?? '');
+  const name = String(raw.name ?? id);
+  const manufacturer = raw.manufacturer ? String(raw.manufacturer) : undefined;
+  const parameters: Record<string, string | number> = {};
+
+  for (const [key, value] of Object.entries(raw)) {
+    if (['id', 'name', 'manufacturer'].includes(key)) continue;
+    if (typeof value === 'string' || typeof value === 'number') {
+      parameters[key] = value;
+    }
+  }
+
+  return { id, name, manufacturer, parameters };
 }
 
 // =============================================================================
@@ -111,10 +116,46 @@ export function CatalogBrowser({ className, onSelectType, onClose }: CatalogBrow
   const [activeNamespace, setActiveNamespace] = useState<CatalogNamespace>('KABEL_SN');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedTypeId, setSelectedTypeId] = useState<string | null>(null);
+  const [types, setTypes] = useState<CatalogTypeEntry[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const allNamespaces = useMemo(() => Object.keys(NAMESPACE_LABELS) as CatalogNamespace[], []);
 
-  const types = useMemo(() => getMockTypesForNamespace(activeNamespace), [activeNamespace]);
+  useEffect(() => {
+    const category = NAMESPACE_TO_CATEGORY[activeNamespace] ?? null;
+    setSelectedTypeId(null);
+
+    if (!category) {
+      setTypes([]);
+      setError('Dla tej przestrzeni katalogowej brak obsługi API w tym widoku.');
+      setLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+    setLoading(true);
+    setError(null);
+
+    fetchTypesByCategory(category)
+      .then((items) => {
+        if (cancelled) return;
+        setTypes(items.map((item) => mapCatalogTypeEntry(item as unknown as Record<string, unknown>)));
+      })
+      .catch((err: unknown) => {
+        if (cancelled) return;
+        const message = err instanceof Error ? err.message : 'Błąd pobierania katalogu';
+        setError(message);
+        setTypes([]);
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [activeNamespace]);
 
   const filteredTypes = useMemo(() => {
     if (!searchQuery.trim()) return types;
@@ -139,7 +180,6 @@ export function CatalogBrowser({ className, onSelectType, onClose }: CatalogBrow
 
   const handleSelectNamespace = useCallback((ns: CatalogNamespace) => {
     setActiveNamespace(ns);
-    setSelectedTypeId(null);
     setSearchQuery('');
   }, []);
 
@@ -151,13 +191,10 @@ export function CatalogBrowser({ className, onSelectType, onClose }: CatalogBrow
 
   return (
     <div className={clsx('flex flex-col h-full bg-white', className)} data-testid="catalog-browser">
-      {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 bg-gray-50">
         <div>
           <h3 className="text-sm font-semibold text-gray-800">Przeglądarka katalogów</h3>
-          <p className="text-[10px] text-gray-500 mt-0.5">
-            Wybierz kategorię i typ elementu
-          </p>
+          <p className="text-[10px] text-gray-500 mt-0.5">Wybierz kategorię i typ elementu</p>
         </div>
         {onClose && (
           <button
@@ -173,9 +210,7 @@ export function CatalogBrowser({ className, onSelectType, onClose }: CatalogBrow
         )}
       </div>
 
-      {/* Body */}
       <div className="flex flex-1 overflow-hidden">
-        {/* Left: Category tree */}
         <div className="w-48 border-r border-gray-200 overflow-y-auto flex-shrink-0">
           <div className="py-1">
             {allNamespaces.map((ns) => (
@@ -197,9 +232,7 @@ export function CatalogBrowser({ className, onSelectType, onClose }: CatalogBrow
           </div>
         </div>
 
-        {/* Right: Type list + preview */}
         <div className="flex-1 flex flex-col overflow-hidden">
-          {/* Search */}
           <div className="px-3 py-2 border-b border-gray-100">
             <input
               type="text"
@@ -210,9 +243,16 @@ export function CatalogBrowser({ className, onSelectType, onClose }: CatalogBrow
             />
           </div>
 
-          {/* Type list */}
           <div className="flex-1 overflow-y-auto">
-            {filteredTypes.length === 0 ? (
+            {loading ? (
+              <div className="flex items-center justify-center h-full">
+                <p className="text-[11px] text-gray-500">Ładowanie katalogu…</p>
+              </div>
+            ) : error ? (
+              <div className="flex items-center justify-center h-full px-4">
+                <p className="text-[11px] text-red-600 text-center">{error}</p>
+              </div>
+            ) : filteredTypes.length === 0 ? (
               <div className="flex items-center justify-center h-full">
                 <p className="text-[11px] text-gray-400">Brak typów w tej kategorii</p>
               </div>
@@ -253,7 +293,6 @@ export function CatalogBrowser({ className, onSelectType, onClose }: CatalogBrow
             )}
           </div>
 
-          {/* Selected type preview */}
           {selectedType && (
             <div className="border-t border-gray-200 px-3 py-2 bg-gray-50">
               <div className="flex items-center justify-between">

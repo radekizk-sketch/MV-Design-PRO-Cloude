@@ -122,6 +122,8 @@ export interface TopologyStationV1 {
   readonly id: string;
   readonly name: string;
   readonly stationType: StationKind;
+  /** Jawny typ punktu rozgałęzienia SN dla renderu SLD. */
+  readonly branchPointType?: 'branch_pole' | 'zksn' | null;
   /** Napiecie znamionowe [kV]. null = brak danych (dziedziczone z busow). */
   readonly voltageKv: number | null;
   readonly busIds: readonly string[];
@@ -389,6 +391,7 @@ export function readTopologyFromENM(
       id: sub.ref_id,
       name: sub.name,
       stationType: enmStationKind(sub),
+      branchPointType: null,
       voltageKv: sub.bus_refs.length > 0
         ? (busVoltageMap.get(sub.bus_refs[0]) ?? null)
         : null,
@@ -398,6 +401,22 @@ export function readTopologyFromENM(
       transformerIds: [...sub.transformer_refs].sort(),
     };
   });
+
+  // Branch points SN (słup rozgałęźny / ZKSN) jako jawne obiekty renderu SLD.
+  for (const bp of enm.branch_points ?? []) {
+    stations.push({
+      id: bp.ref_id,
+      name: bp.name,
+      stationType: StationKind.SWITCHING,
+      branchPointType: bp.branch_point_type,
+      voltageKv: busVoltageMap.get(bp.bus_ref) ?? null,
+      busIds: [bp.bus_ref],
+      branchIds: [],
+      switchIds: [],
+      transformerIds: [],
+    });
+    stationBusMap.set(bp.bus_ref, bp.ref_id);
+  }
 
   // Uzupelnij stationId na connection nodes
   const connectionNodesWithStation = connectionNodes.map((cn) => ({

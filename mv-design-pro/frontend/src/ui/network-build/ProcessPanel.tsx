@@ -204,6 +204,14 @@ function TrunksSection({
     [openForm],
   );
 
+  const handleInsertBranchPole = useCallback(() => {
+    openForm('insert_branch_pole_on_segment_sn');
+  }, [openForm]);
+
+  const handleInsertZksn = useCallback(() => {
+    openForm('insert_zksn_on_segment_sn');
+  }, [openForm]);
+
   return (
     <div className="px-3 py-2 space-y-2">
       {trunks.length === 0 ? (
@@ -248,6 +256,25 @@ function TrunksSection({
           ))}
         </div>
       )}
+
+      <div className="border-t border-chrome-100 pt-2 space-y-1">
+        <p className="text-[10px] text-chrome-500 font-medium uppercase">Wstaw obiekt w odcinek SN</p>
+        <ActionButton
+          label="+ Wstaw stację"
+          onClick={() => openForm('insert_station_on_segment_sn')}
+          testId="btn-insert-object-station"
+        />
+        <ActionButton
+          label="+ Wstaw słup rozgałęźny"
+          onClick={handleInsertBranchPole}
+          testId="btn-insert-object-branch-pole"
+        />
+        <ActionButton
+          label="+ Wstaw ZKSN"
+          onClick={handleInsertZksn}
+          testId="btn-insert-object-zksn"
+        />
+      </div>
     </div>
   );
 }

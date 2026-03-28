@@ -7,7 +7,7 @@
  * BINDING: 100% PL etykiety.
  */
 
-import { useCallback } from 'react';
+import { useCallback, useState } from 'react';
 import {
   SectionSwitchModal,
   type SectionSwitchFormData,
@@ -15,12 +15,14 @@ import {
 import { useSnapshotStore } from '../../topology/snapshotStore';
 import { useNetworkBuildStore } from '../networkBuildStore';
 import { useAppStateStore } from '../../app-state';
+import { validateCatalogFirst } from './catalogFirstRules';
 
 export function InsertSectionSwitchForm() {
   const context = useNetworkBuildStore((s) => s.activeOperationForm?.context);
   const closeForm = useNetworkBuildStore((s) => s.closeOperationForm);
   const executeDomainOperation = useSnapshotStore((s) => s.executeDomainOperation);
   const activeCaseId = useAppStateStore((s) => s.activeCaseId);
+  const [catalogError, setCatalogError] = useState<string | null>(null);
 
   const segmentRef = (context?.segmentRef as string) ?? '';
   const segmentLabel = (context?.segmentLabel as string) ?? segmentRef;
@@ -28,7 +30,7 @@ export function InsertSectionSwitchForm() {
   const handleSubmit = useCallback(
     async (data: SectionSwitchFormData) => {
       if (!activeCaseId) return;
-      await executeDomainOperation(activeCaseId, 'insert_section_switch_sn', {
+      const payload = {
         ref_id: data.ref_id,
         name: data.name,
         switch_kind: data.switch_kind,
@@ -36,7 +38,14 @@ export function InsertSectionSwitchForm() {
         segment_ref: data.segment_ref,
         position_on_segment: data.position_on_segment,
         catalog_binding: data.catalog_binding,
-      });
+      };
+      const validationError = validateCatalogFirst('insert_section_switch_sn', payload);
+      if (validationError) {
+        setCatalogError(validationError);
+        return;
+      }
+      setCatalogError(null);
+      await executeDomainOperation(activeCaseId, 'insert_section_switch_sn', payload);
       closeForm();
     },
     [activeCaseId, executeDomainOperation, closeForm],
@@ -44,6 +53,9 @@ export function InsertSectionSwitchForm() {
 
   return (
     <div className="h-full overflow-y-auto" data-testid="insert-section-switch-form">
+      {catalogError && (
+        <p className="px-4 py-2 text-xs text-red-600 bg-red-50 border-b border-red-200">{catalogError}</p>
+      )}
       <SectionSwitchModal
         isOpen={true}
         segmentRef={segmentRef}

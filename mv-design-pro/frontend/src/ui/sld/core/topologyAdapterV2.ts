@@ -115,6 +115,13 @@ function classifyStationType(
   branchCountFromStation: number,
   fixActions: TopologyFixAction[],
 ): NodeTypeV1 {
+  if (station.branchPointType === 'branch_pole') {
+    return NodeTypeV1.STATION_SN_NN_C;
+  }
+  if (station.branchPointType === 'zksn') {
+    return NodeTypeV1.STATION_SN_NN_D;
+  }
+
   const busCount = station.busIds.length;
 
   // DISTRIBUTION z transformatorem → TYPE_B (SN + nN to dwie szyny, ale nie sekcyjna)

@@ -16,6 +16,7 @@ import {
 import { useSnapshotStore } from '../../topology/snapshotStore';
 import { useNetworkBuildStore } from '../networkBuildStore';
 import { useAppStateStore } from '../../app-state';
+import { validateCatalogFirst } from './catalogFirstRules';
 
 type OzeKind = 'PV' | 'BESS';
 
@@ -29,6 +30,7 @@ export function AddOzeSourceForm() {
   const defaultKind: OzeKind =
     activeForm?.op === 'add_bess_inverter_nn' ? 'BESS' : 'PV';
   const [ozeKind, setOzeKind] = useState<OzeKind>(defaultKind);
+  const [catalogError, setCatalogError] = useState<string | null>(null);
 
   const fieldOptions = useMemo<Array<{ ref_id: string; name: string; kind: string }>>(() => {
     const raw = context?.fieldOptions;
@@ -39,7 +41,7 @@ export function AddOzeSourceForm() {
   const handlePVSubmit = useCallback(
     async (data: PVInverterFormData) => {
       if (!activeCaseId) return;
-      await executeDomainOperation(activeCaseId, 'add_pv_inverter_nn', {
+      const payload = {
         placement: data.placement,
         existing_field_ref: data.existing_field_ref,
         new_field_switch_kind: data.new_field_switch_kind,
@@ -59,7 +61,14 @@ export function AddOzeSourceForm() {
         existing_measurement_ref: data.existing_measurement_ref,
         source_name: data.source_name,
         work_profile_ref: data.work_profile_ref,
-      });
+      };
+      const validationError = validateCatalogFirst('add_pv_inverter_nn', payload);
+      if (validationError) {
+        setCatalogError(validationError);
+        return;
+      }
+      setCatalogError(null);
+      await executeDomainOperation(activeCaseId, 'add_pv_inverter_nn', payload);
       closeForm();
     },
     [activeCaseId, executeDomainOperation, closeForm],
@@ -68,7 +77,7 @@ export function AddOzeSourceForm() {
   const handleBESSSubmit = useCallback(
     async (data: BESSInverterFormData) => {
       if (!activeCaseId) return;
-      await executeDomainOperation(activeCaseId, 'add_bess_inverter_nn', {
+      const payload = {
         placement: data.placement,
         existing_field_ref: data.existing_field_ref,
         new_field_switch_kind: data.new_field_switch_kind,
@@ -87,7 +96,14 @@ export function AddOzeSourceForm() {
         soc_max_percent: data.soc_max_percent,
         source_name: data.source_name,
         time_profile_ref: data.time_profile_ref,
-      });
+      };
+      const validationError = validateCatalogFirst('add_bess_inverter_nn', payload);
+      if (validationError) {
+        setCatalogError(validationError);
+        return;
+      }
+      setCatalogError(null);
+      await executeDomainOperation(activeCaseId, 'add_bess_inverter_nn', payload);
       closeForm();
     },
     [activeCaseId, executeDomainOperation, closeForm],
@@ -123,6 +139,9 @@ export function AddOzeSourceForm() {
 
       {/* Formularz */}
       <div className="flex-1 overflow-y-auto">
+        {catalogError && (
+          <p className="px-4 py-2 text-xs text-red-600 bg-red-50 border-b border-red-200">{catalogError}</p>
+        )}
         {ozeKind === 'PV' ? (
           <PVInverterModal
             isOpen={true}

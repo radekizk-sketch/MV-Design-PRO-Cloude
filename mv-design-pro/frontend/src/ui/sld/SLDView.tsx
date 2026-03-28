@@ -162,6 +162,8 @@ const CONTEXT_MENU_OP_MAP: Record<string, string> = {
   insert_station_b: 'insert_station_on_segment_sn',
   insert_station_c: 'insert_station_on_segment_sn',
   insert_station_d: 'insert_station_on_segment_sn',
+  insert_branch_pole: 'insert_branch_pole_on_segment_sn',
+  insert_zksn: 'insert_zksn_on_segment_sn',
   add_section_switch: 'insert_section_switch_sn',
   insert_section_switch: 'insert_section_switch_sn',
   insert_disconnector: 'insert_section_switch_sn',

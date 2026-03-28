@@ -78,6 +78,8 @@ const ELEMENT_TYPE_LABELS: Record<string, string> = {
   ct: 'Przekładnik prądowy',
   vt: 'Przekładnik napięciowy',
   relay: 'Zabezpieczenie',
+  branch_pole: 'Słup rozgałęźny SN',
+  zksn: 'ZKSN SN',
 };
 
 // =============================================================================
@@ -222,8 +224,49 @@ function buildSectionsForElement(
     actions.push({ id: 'assign_catalog', label: 'Przypisz katalog', op: 'assign_catalog_to_element', context: { element_ref: branch.ref_id } });
     if (isLineCable(branch)) {
       actions.push({ id: 'insert_station', label: 'Wstaw stację', op: 'insert_station_on_segment_sn', context: { segment_ref: branch.ref_id } });
+      if (branch.type === 'line_overhead') {
+        actions.push({ id: 'insert_branch_pole', label: 'Wstaw słup rozgałęźny', op: 'insert_branch_pole_on_segment_sn', context: { segment_ref: branch.ref_id } });
+      }
+      if (branch.type === 'cable') {
+        actions.push({ id: 'insert_zksn', label: 'Wstaw ZKSN', op: 'insert_zksn_on_segment_sn', context: { segment_ref: branch.ref_id } });
+      }
       actions.push({ id: 'insert_switch', label: 'Wstaw łącznik', op: 'insert_section_switch_sn', context: { segmentRef: branch.ref_id, segmentLabel: branch.name } });
     }
+  }
+
+  // Try branch points
+  const branchPoint = snapshot.branch_points?.find((bp) => bp.ref_id === elementId);
+  if (branchPoint) {
+    elementType = branchPoint.branch_point_type;
+    elementName = branchPoint.name;
+    sections.push({
+      id: 'ident',
+      label: 'Identyfikacja',
+      fields: [
+        { key: 'ref_id', label: 'Identyfikator', value: branchPoint.ref_id },
+        { key: 'name', label: 'Nazwa', value: branchPoint.name },
+        { key: 'type', label: 'Typ', value: ELEMENT_TYPE_LABELS[branchPoint.branch_point_type] ?? branchPoint.branch_point_type },
+      ],
+    });
+    sections.push({
+      id: 'topology',
+      label: 'Topologia',
+      fields: [
+        { key: 'parent_segment_id', label: 'Segment nadrzędny', value: branchPoint.parent_segment_id },
+        { key: 'main_in', label: 'Port MAIN_IN', value: branchPoint.ports?.MAIN_IN ?? '—' },
+        { key: 'main_out', label: 'Port MAIN_OUT', value: branchPoint.ports?.MAIN_OUT ?? '—' },
+        { key: 'branch_ports', label: 'Porty BRANCH', value: branchPoint.ports?.BRANCH?.join(', ') ?? '—' },
+      ],
+    });
+    sections.push({
+      id: 'catalog',
+      label: 'Katalog',
+      fields: [
+        { key: 'catalog_ref', label: 'Pozycja katalogowa', value: branchPoint.catalog_ref ?? '—' },
+      ],
+    });
+    const defaultPort = branchPoint.branch_point_type === 'branch_pole' ? 'BRANCH' : 'BRANCH_1';
+    actions.push({ id: 'add_branch', label: 'Dodaj odgałęzienie', op: 'start_branch_segment_sn', context: { from_ref: `${branchPoint.ref_id}.${defaultPort}` } });
   }
 
   // Try transformers

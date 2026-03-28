@@ -5,8 +5,7 @@
  * Montowany w prawym panelu PowerFactoryLayout jako alternatywa do inspektora
  * gdy użytkownik inicjuje operację budowy sieci.
  *
- * Każdy formularz to wrapper nad istniejącym modalem z ui/topology/modals/,
- * zintegrowany z snapshotStore.executeDomainOperation.
+ * Formularze są osadzone inline i spięte z executeDomainOperation.
  *
  * BINDING: 100% PL etykiety.
  */
@@ -16,11 +15,15 @@ import { useNetworkBuildStore } from './networkBuildStore';
 import { AddGridSourceForm } from './forms/AddGridSourceForm';
 import { ContinueTrunkForm } from './forms/ContinueTrunkForm';
 import { InsertStationForm } from './forms/InsertStationForm';
+import { InsertBranchPoleForm } from './forms/InsertBranchPoleForm';
+import { InsertZksnForm } from './forms/InsertZksnForm';
 import { StartBranchForm } from './forms/StartBranchForm';
 import { ConnectRingForm } from './forms/ConnectRingForm';
 import { InsertSectionSwitchForm } from './forms/InsertSectionSwitchForm';
 import { AddTransformerForm } from './forms/AddTransformerForm';
 import { AddOzeSourceForm } from './forms/AddOzeSourceForm';
+import { AssignCatalogForm } from './forms/AssignCatalogForm';
+import { UpdateElementParametersForm } from './forms/UpdateElementParametersForm';
 
 // =============================================================================
 // Form metadata (PL labels per operation)
@@ -38,6 +41,14 @@ const FORM_META: Record<string, { title: string; description: string }> = {
   insert_station_on_segment_sn: {
     title: 'Wstawienie stacji w segment',
     description: 'Osadź stację SN/nN w wybranym punkcie segmentu magistrali',
+  },
+  insert_branch_pole_on_segment_sn: {
+    title: 'Wstawienie słupa rozgałęźnego',
+    description: 'Osadź słup rozgałęźny na odcinku linii napowietrznej SN',
+  },
+  insert_zksn_on_segment_sn: {
+    title: 'Wstawienie ZKSN',
+    description: 'Osadź ZKSN na odcinku kablowym SN',
   },
   start_branch_segment_sn: {
     title: 'Rozpoczęcie odgałęzienia',
@@ -89,6 +100,10 @@ function renderFormComponent(op: string, closeForm: () => void): React.ReactNode
       return <ContinueTrunkForm />;
     case 'insert_station_on_segment_sn':
       return <InsertStationForm />;
+    case 'insert_branch_pole_on_segment_sn':
+      return <InsertBranchPoleForm />;
+    case 'insert_zksn_on_segment_sn':
+      return <InsertZksnForm />;
     case 'start_branch_segment_sn':
       return <StartBranchForm />;
     case 'connect_secondary_ring_sn':
@@ -102,6 +117,10 @@ function renderFormComponent(op: string, closeForm: () => void): React.ReactNode
     case 'add_pv_inverter_nn':
     case 'add_bess_inverter_nn':
       return <AddOzeSourceForm />;
+    case 'assign_catalog_to_element':
+      return <AssignCatalogForm />;
+    case 'update_element_parameters':
+      return <UpdateElementParametersForm />;
     default:
       return (
         <FallbackForm
