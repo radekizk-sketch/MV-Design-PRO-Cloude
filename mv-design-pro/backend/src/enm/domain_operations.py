@@ -97,6 +97,26 @@ def _quantize_ratio(value: float, quantum: float = 1e-6) -> float:
     return round(value / quantum) * quantum
 
 
+def _resolve_catalog_ref(catalog_ref: Any, catalog_binding: Any) -> str | None:
+    """Rozwiąż catalog_ref z jawnego pola albo z catalog_binding.item_id.
+
+    Zwraca None, gdy referencja jest pusta/niepoprawna.
+    """
+    if isinstance(catalog_ref, str):
+        normalized = catalog_ref.strip()
+        if normalized:
+            return normalized
+
+    if isinstance(catalog_binding, dict):
+        binding_item = catalog_binding.get("item_id")
+        if isinstance(binding_item, str):
+            normalized = binding_item.strip()
+            if normalized:
+                return normalized
+
+    return None
+
+
 # ---------------------------------------------------------------------------
 # Helpers — snapshot utilities
 # ---------------------------------------------------------------------------
@@ -2078,18 +2098,13 @@ def connect_secondary_ring_sn(enm: dict[str, Any], payload: dict[str, Any]) -> d
         )
 
     # Bramka katalogowa (ENM) — segment pierscienia WYMAGA catalog_ref
-    ring_catalog_ref = segment.get("catalog_ref")
     ring_catalog_binding = segment.get("catalog_binding") or payload.get("catalog_binding")
-    if not ring_catalog_ref and not ring_catalog_binding:
+    ring_catalog_ref = _resolve_catalog_ref(segment.get("catalog_ref"), ring_catalog_binding)
+    if not ring_catalog_ref:
         return _error_response(
             "Segment zamknięcia pierścienia wymaga powiązania z katalogiem. "
             "Podaj catalog_ref lub catalog_binding w payload segmentu.",
             "catalog.ref_required",
-        )
-    if not ring_catalog_ref and ring_catalog_binding:
-        ring_catalog_ref = (
-            ring_catalog_binding.get("item_id")
-            if isinstance(ring_catalog_binding, dict) else None
         )
 
     branch_type = "cable" if rodzaj == "KABEL" else "line_overhead"
