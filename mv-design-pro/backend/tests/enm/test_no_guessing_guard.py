@@ -93,25 +93,40 @@ class TestNoDefaultLength:
 
 
 class TestNoDefaultLengthBranch:
-    """start_branch_segment_sn z jawnym from_bus_ref ale BEZ dlugosc_m -> blad."""
+    """start_branch_segment_sn z poprawnym zrodlem ale BEZ dlugosc_m -> blad."""
 
     def test_no_default_length_branch(self):
-        """Call start_branch_segment_sn with explicit from_bus_ref but NO dlugosc_m.
+        """Call start_branch_segment_sn with explicit branch-capable source but NO dlugosc_m.
 
         Canon rule: branch segment length must be explicitly provided.
         """
         _, snapshot = _build_gpz_plus_segments(1)
 
-        # Pick the first bus as from_bus_ref
-        buses = snapshot.get("buses", [])
-        assert len(buses) >= 1, "Need at least one bus"
-        from_bus_ref = buses[0]["ref_id"]
+        # Dodaj stację branch, żeby mieć poprawny port źródłowy BRANCH
+        first_segment = snapshot.get("branches", [])[0]["ref_id"]
+        station_result = execute_domain_operation(
+            enm_dict=snapshot,
+            op_name="insert_station_on_segment_sn",
+            payload={
+                "segment_id": first_segment,
+                "name": "Stacja testowa",
+                "station_type": "branch",
+                "transformer": {"transformer_catalog_ref": "TRAFO-0.63MVA"},
+                "station": {"nn_voltage_kv": 0.4},
+                "nn_voltage_kv": 0.4,
+            },
+        )
+        assert station_result.get("snapshot") is not None, (
+            f"Prerequisite failed: {station_result.get('error')}"
+        )
+        snapshot = station_result["snapshot"]
+        sub_ref = snapshot.get("substations", [])[-1]["ref_id"]
 
         result = execute_domain_operation(
             enm_dict=snapshot,
             op_name="start_branch_segment_sn",
             payload={
-                "from_bus_ref": from_bus_ref,
+                "from_ref": f"{sub_ref}.BRANCH",
                 "segment": {"rodzaj": "KABEL"},  # NO dlugosc_m
             },
         )
@@ -130,10 +145,10 @@ class TestNoDefaultLengthBranch:
 
 
 class TestNoAutoDetectBranchSource:
-    """start_branch_segment_sn BEZ from_bus_ref -> blad from_bus_missing."""
+    """start_branch_segment_sn BEZ from_ref -> blad from_ref_required."""
 
     def test_no_auto_detect_branch_source(self):
-        """Call start_branch_segment_sn with NO from_bus_ref.
+        """Call start_branch_segment_sn with NO from_ref.
 
         Canon rule: the source bus for a branch must be explicitly clicked
         in the SLD. The system MUST NOT auto-detect or guess.
@@ -144,15 +159,15 @@ class TestNoAutoDetectBranchSource:
             enm_dict=snapshot,
             op_name="start_branch_segment_sn",
             payload={
-                # NO from_bus_ref
+                # NO from_ref
                 "segment": {"rodzaj": "KABEL", "dlugosc_m": 300, "catalog_ref": "YAKXS_3x120"},
             },
         )
 
         error_code = result.get("error_code", "")
         error_msg = result.get("error", "")
-        assert "from_bus_missing" in error_code, (
-            f"Expected error_code containing 'from_bus_missing', "
+        assert "from_ref_required" in error_code, (
+            f"Expected error_code containing 'from_ref_required', "
             f"got error_code='{error_code}', error='{error_msg}'"
         )
 

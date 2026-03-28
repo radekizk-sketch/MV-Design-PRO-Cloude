@@ -564,6 +564,55 @@ def _resolve_branch_from_ref(enm: dict[str, Any], from_ref: str) -> tuple[str | 
     return None, "branch_connection.source_not_branch_capable"
 
 
+def _lookup_branch_from_ref_for_bus(
+    enm: dict[str, Any],
+    from_bus_ref: str,
+) -> tuple[str | None, str | None]:
+    """Legacy lookup: wyznacz from_ref na podstawie from_bus_ref.
+
+    Dopuszcza wyłącznie źródła branch-capable:
+    - station.BRANCH (bay_role=FEEDER)
+    - branch_pole.BRANCH
+    - zksn.BRANCH_n
+    """
+    candidates: list[str] = []
+
+    for sub in enm.get("substations", []):
+        sub_ref = sub.get("ref_id")
+        if not sub_ref:
+            continue
+        feeder_bay = next(
+            (
+                bay for bay in enm.get("bays", [])
+                if bay.get("substation_ref") == sub_ref
+                and bay.get("bay_role") == "FEEDER"
+                and bay.get("bus_ref") == from_bus_ref
+            ),
+            None,
+        )
+        if feeder_bay:
+            candidates.append(f"{sub_ref}.BRANCH")
+
+    for bp in enm.get("branch_points", []):
+        bp_ref = bp.get("ref_id")
+        ports = bp.get("ports", {})
+        if not bp_ref:
+            continue
+        if bp.get("branch_point_type") == "branch_pole":
+            branch_bus = ports.get("BRANCH", [None])[0] if isinstance(ports.get("BRANCH"), list) else None
+            if branch_bus == from_bus_ref:
+                candidates.append(f"{bp_ref}.BRANCH")
+        if bp.get("branch_point_type") == "zksn":
+            for idx, bus_ref in enumerate(ports.get("BRANCH", []), start=1):
+                if bus_ref == from_bus_ref:
+                    candidates.append(f"{bp_ref}.BRANCH_{idx}")
+
+    unique = sorted(set(candidates))
+    if len(unique) != 1:
+        return None, "branch_connection.source_not_branch_capable"
+    return unique[0], None
+
+
 def _get_catalog_safe():
     """Załaduj katalog MV (bezpieczne — zwraca None przy braku)."""
     try:
@@ -1658,13 +1707,16 @@ def start_branch_segment_sn(enm: dict[str, Any], payload: dict[str, Any]) -> dic
     from_bus_ref = payload.get("from_bus_ref")
     segment = payload.get("segment", {})
 
-    if not from_ref:
-        if from_bus_ref:
+    if not from_ref and from_bus_ref:
+        inferred_from_ref, lookup_err = _lookup_branch_from_ref_for_bus(enm, from_bus_ref)
+        if lookup_err:
             return _error_response(
-                "Pole from_bus_ref bez from_ref jest niedozwolone. "
-                "Użyj jawnego wskazania portu BRANCH (from_ref).",
+                "Pole from_bus_ref bez from_ref jest niedozwolone dla źródła "
+                "nieobsługującego portu BRANCH.",
                 "branch_connection.source_not_branch_capable",
             )
+        from_ref = inferred_from_ref
+    if not from_ref:
         return _error_response(
             "Brak referencji portu źródłowego (from_ref). "
             "Kliknij port BRANCH na stacji, słupie lub ZKSN w SLD.",

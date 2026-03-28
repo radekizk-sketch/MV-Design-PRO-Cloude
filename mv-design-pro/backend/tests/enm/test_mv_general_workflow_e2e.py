@@ -213,7 +213,7 @@ class TestE2E1MultiObjectFeeder:
 
 class TestE2E2BranchFromStation:
     def test_branch_from_station_branch_port(self) -> None:
-        """Legacy from_bus_ref without from_ref must be rejected."""
+        """Legacy from_bus_ref-only path is accepted iff it maps to branch-capable source."""
         s = _empty_enm()
         s = op(s, "add_grid_source_sn", {"voltage_kv": 15.0, "sk3_mva": 250.0})
         s = op(s, "continue_trunk_segment_sn", {
@@ -239,8 +239,8 @@ class TestE2E2BranchFromStation:
                 "segment": {"rodzaj": "KABEL", "dlugosc_m": 200, "catalog_ref": "YAKXS_3x70"},
             },
         )
-        assert result.get("snapshot") is None
-        assert result.get("error_code") == "branch_connection.source_not_branch_capable"
+        assert not result.get("error"), f"Błąd: {result.get('error')}"
+        assert result.get("snapshot") is not None
 
     def test_branch_from_station_via_from_ref(self) -> None:
         """start_branch_segment_sn przez from_ref=<station_ref>.BRANCH."""
@@ -282,6 +282,27 @@ class TestE2E2BranchFromStation:
             "start_branch_segment_sn",
             {
                 "from_ref": f"{gpz_bus_ref}.BRANCH",
+                "segment": {"rodzaj": "KABEL", "dlugosc_m": 150, "catalog_ref": "YAKXS_3x70"},
+            },
+        )
+        assert result.get("snapshot") is None
+        assert result.get("error_code") == "branch_connection.source_not_branch_capable"
+        assert s == baseline
+
+    def test_direct_from_bus_ref_without_from_ref_fails_for_non_branch_capable_source(self) -> None:
+        s = _empty_enm()
+        s = op(s, "add_grid_source_sn", {"voltage_kv": 15.0, "sk3_mva": 250.0})
+        s = op(s, "continue_trunk_segment_sn", {
+            "segment": {"rodzaj": "KABEL", "dlugosc_m": 400, "catalog_ref": "YAKXS_3x95"},
+        })
+
+        baseline = copy.deepcopy(s)
+        trunk_bus_ref = s["buses"][0]["ref_id"]
+        result = execute_domain_operation(
+            s,
+            "start_branch_segment_sn",
+            {
+                "from_bus_ref": trunk_bus_ref,
                 "segment": {"rodzaj": "KABEL", "dlugosc_m": 150, "catalog_ref": "YAKXS_3x70"},
             },
         )
