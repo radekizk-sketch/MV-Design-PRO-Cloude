@@ -64,7 +64,9 @@ export type ActiveObjectCard =
   | { kind: 'switch'; elementId: string }
   | { kind: 'bay'; elementId: string }
   | { kind: 'nn_switchgear'; elementId: string }
-  | { kind: 'renewable_source'; elementId: string };
+  | { kind: 'renewable_source'; elementId: string }
+  | { kind: 'branch_pole'; elementId: string }
+  | { kind: 'zksn'; elementId: string };
 
 /** Port odgałęźny wolny do użycia. */
 export interface AvailableBranchPort {

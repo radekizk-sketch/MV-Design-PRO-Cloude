@@ -52,6 +52,7 @@ import {
   type TrunkNodeAnnotationV1,
   type TrunkSegmentAnnotationV1,
   type BranchPointV1,
+  type InlineBranchObjectV1,
   type StationApparatusChainV1,
   type StationApparatusItemV1,
   type NNFeederV1,
@@ -1667,11 +1668,30 @@ function phase7_generate_canonical_annotations(
     });
   }
 
+  // Build inline branch objects (BRANCH_POLE and ZKSN_NODE)
+  const inlineBranchObjects: InlineBranchObjectV1[] = [];
+  const inlineBranchNodes = graph.nodes
+    .filter(n => n.nodeType === NodeTypeV1.BRANCH_POLE || n.nodeType === NodeTypeV1.ZKSN_NODE)
+    .sort((a, b) => a.id.localeCompare(b.id));
+
+  for (const node of inlineBranchNodes) {
+    const placement = placementMap.get(node.id);
+    if (!placement) continue;
+    inlineBranchObjects.push({
+      nodeId: node.id,
+      objectType: node.nodeType === NodeTypeV1.BRANCH_POLE ? 'branch_pole' : 'zksn',
+      label: node.attributes.label,
+      position: { x: placement.position.x, y: placement.position.y },
+      branchPortCount: node.nodeType === NodeTypeV1.ZKSN_NODE ? 2 : 1,
+    });
+  }
+
   return {
     trunkNodes,
     trunkSegments,
     branchPoints,
     stationChains,
+    inlineBranchObjects,
   };
 }
 

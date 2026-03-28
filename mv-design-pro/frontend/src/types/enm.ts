@@ -286,7 +286,9 @@ export interface BranchPointSN extends ENMElement {
   parent_segment_id: string;
   bus_ref: string;
   catalog_ref?: string | null;
-  source_mode?: string | null;
+  catalog_namespace?: string | null;
+  catalog_version?: string | null;
+  source_mode?: 'KATALOG' | 'MIGRACJA' | 'EKSPERCKI_RECZNY' | null;
   ports: {
     MAIN_IN: string;
     MAIN_OUT: string;
@@ -294,6 +296,9 @@ export interface BranchPointSN extends ENMElement {
   };
   branch_occupied?: Record<string, string> | null;
   switch_state?: 'open' | 'closed' | null;
+  materialized_params?: Record<string, unknown> | null;
+  completeness_status?: 'KOMPLETNY' | 'NIEKOMPLETNY' | 'BRAK_KATALOGU' | null;
+  runtime_inputs?: Record<string, unknown> | null;
 }
 
 // ---------------------------------------------------------------------------

@@ -75,6 +75,10 @@ export const NodeTypeV1 = {
   SWITCH_DISCONNECTOR: 'SWITCH_DISCONNECTOR',
   SWITCH_LOAD_SWITCH: 'SWITCH_LOAD_SWITCH',
   SWITCH_FUSE: 'SWITCH_FUSE',
+  /** Słup rozgałęźny SN — osadzony na linii napowietrznej, nie jest stacją */
+  BRANCH_POLE: 'BRANCH_POLE',
+  /** Złączka kablowa / ZKSN — osadzona na kablu SN, nie jest stacją */
+  ZKSN_NODE: 'ZKSN_NODE',
 } as const;
 
 export type NodeTypeV1 = (typeof NodeTypeV1)[keyof typeof NodeTypeV1];

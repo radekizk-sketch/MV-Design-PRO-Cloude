@@ -116,10 +116,12 @@ function classifyStationType(
   fixActions: TopologyFixAction[],
 ): NodeTypeV1 {
   if (station.branchPointType === 'branch_pole') {
-    return NodeTypeV1.STATION_SN_NN_C;
+    // Słup rozgałęźny — wyodrębniony typ węzła, NIE stacja
+    return NodeTypeV1.BRANCH_POLE;
   }
   if (station.branchPointType === 'zksn') {
-    return NodeTypeV1.STATION_SN_NN_D;
+    // ZKSN — wyodrębniony typ węzła, NIE stacja
+    return NodeTypeV1.ZKSN_NODE;
   }
 
   const busCount = station.busIds.length;

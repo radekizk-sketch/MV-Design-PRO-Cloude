@@ -330,9 +330,23 @@ class ProtectionAssignment(ENMElement):
 
 
 class Substation(ENMElement):
-    """Stacja SN/nn — logiczny kontener z rozdzielnicami."""
+    """Stacja SN/nn — logiczny kontener z rozdzielnicami.
 
-    station_type: Literal["gpz", "mv_lv", "switching", "customer"]
+    station_type semantics:
+    - gpz: Główny Punkt Zasilający (source substation)
+    - mv_lv: Stacja transformatorowa SN/nN (distribution substation)
+    - switching: Stacja rozłącznikowa / sekcyjna (switching station)
+    - customer: Stacja odbiorcza (customer substation)
+    - inline: Stacja przelotowa (pass-through on main feeder)
+    - branch: Stacja odgałęźna (branch from main feeder)
+    - terminal: Stacja końcowa (feeder terminus)
+    - sectional: Stacja sekcyjna (sectional splitting station)
+    """
+
+    station_type: Literal[
+        "gpz", "mv_lv", "switching", "customer",
+        "inline", "branch", "terminal", "sectional",
+    ]
     bus_refs: list[str] = []
     transformer_refs: list[str] = []
     entry_point_ref: str | None = None
@@ -379,6 +393,53 @@ class Corridor(ENMElement):
 
 
 # ---------------------------------------------------------------------------
+# BranchPointSN — Punkt rozgałęzienia SN (Słup rozgałęźny / ZKSN)
+# ---------------------------------------------------------------------------
+
+
+class BranchPointSNPorts(BaseModel):
+    """Porty topologiczne punktu rozgałęzienia SN."""
+
+    MAIN_IN: str
+    MAIN_OUT: str
+    BRANCH: list[str] = []
+
+
+class BranchPointSN(ENMElement):
+    """Punkt rozgałęzienia SN — słup rozgałęźny lub ZKSN.
+
+    HARD RULES:
+    - BranchPoleMV (branch_point_type='branch_pole'): tylko na linii napowietrznej
+    - ZksnMV (branch_point_type='zksn'): tylko na kablu SN
+
+    Pola katalogowe:
+    - catalog_ref: identyfikator pozycji katalogowej
+    - catalog_namespace: przestrzeń nazw katalogu (domyślnie 'mv_branch_points')
+    - catalog_version: wersja pozycji katalogowej
+    - source_mode: sposób wprowadzenia parametrów
+
+    Pola runtime:
+    - materialized_params: zmaterializowane parametry z katalogu
+    - completeness_status: status kompletności
+    - runtime_inputs: dane wejściowe podane przez użytkownika
+    """
+
+    branch_point_type: Literal["branch_pole", "zksn"]
+    parent_segment_id: str
+    bus_ref: str
+    catalog_ref: str | None = None
+    catalog_namespace: str | None = None
+    catalog_version: str | None = None
+    source_mode: Literal["KATALOG", "MIGRACJA", "EKSPERCKI_RECZNY"] = "KATALOG"
+    ports: BranchPointSNPorts | None = None
+    branch_occupied: dict[str, str] = {}
+    switch_state: Literal["open", "closed"] | None = None
+    materialized_params: dict | None = None
+    completeness_status: Literal["KOMPLETNY", "NIEKOMPLETNY", "BRAK_KATALOGU"] | None = None
+    runtime_inputs: dict | None = None
+
+
+# ---------------------------------------------------------------------------
 # ROOT
 # ---------------------------------------------------------------------------
 
@@ -397,3 +458,4 @@ class EnergyNetworkModel(BaseModel):
     corridors: list[Corridor] = []
     measurements: list[Measurement] = []
     protection_assignments: list[ProtectionAssignment] = []
+    branch_points: list[BranchPointSN] = []

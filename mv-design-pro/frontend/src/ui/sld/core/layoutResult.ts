@@ -391,6 +391,23 @@ export interface ProtectionRelayV1 {
 }
 
 /**
+ * Obiekt wbudowany na torze głównym SN — słup rozgałęźny lub ZKSN.
+ * Renderowany jako mały symbol liniowy (NIE stacja) bezpośrednio na torze.
+ */
+export interface InlineBranchObjectV1 {
+  /** ID węzła w grafie wizualnym */
+  readonly nodeId: string;
+  /** Typ obiektu: słup rozgałęźny (linia napowietrzna) lub ZKSN (kabel) */
+  readonly objectType: 'branch_pole' | 'zksn';
+  /** Etykieta wyświetlana na SLD */
+  readonly label: string;
+  /** Pozycja centrum obiektu w przestrzeni layoutu */
+  readonly position: PointV1;
+  /** Liczba portów BRANCH (1 dla branch_pole, 1–2 dla ZKSN) */
+  readonly branchPortCount: number;
+}
+
+/**
  * Kontener adnotacji kanonicznego SLD (Phase 7 output).
  * Immutable, sorted, deterministic.
  */
@@ -399,6 +416,8 @@ export interface CanonicalAnnotationsV1 {
   readonly trunkSegments: readonly TrunkSegmentAnnotationV1[];
   readonly branchPoints: readonly BranchPointV1[];
   readonly stationChains: readonly StationApparatusChainV1[];
+  /** Obiekty wbudowane na torze: słup rozgałęźny SN i ZKSN. Opcjonalne dla wstecznej zgodności. */
+  readonly inlineBranchObjects?: readonly InlineBranchObjectV1[];
 }
 
 // =============================================================================

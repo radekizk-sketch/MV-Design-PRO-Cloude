@@ -516,6 +516,8 @@ def _resolve_branch_from_ref(enm: dict[str, Any], from_ref: str) -> tuple[str | 
     if bp.get("branch_point_type") == "branch_pole":
         if port_id != "BRANCH":
             return None, "branch_connection.invalid_source_port"
+        if bp.get("branch_occupied", {}).get(port_id):
+            return None, "branch_point.branch_port_occupied"
         bus_ref = ports.get("BRANCH", [None])[0] if isinstance(ports.get("BRANCH"), list) else None
         if not bus_ref:
             return None, "branch_point.required_port_missing"
@@ -1047,13 +1049,35 @@ def insert_station_on_segment_sn(enm: dict[str, Any], payload: dict[str, Any]) -
             "topology.segment_not_sn",
         )
 
-    # Accept station_type from station dict OR root payload
-    station_type = station.get("station_type") or payload.get("station_type", "")
+    # Accept station_type from station dict OR root payload.
+    # Supports both legacy shorthand (A/B/C/D) and semantic labels.
+    _SEMANTIC_TO_LEGACY: dict[str, str] = {
+        "inline": "B",       # Stacja przelotowa → typ B (IN+OUT+TR)
+        "branch": "C",       # Stacja odgałęźna → typ C (IN+OUT+BRANCH+TR)
+        "terminal": "A",     # Stacja końcowa → typ A (liść)
+        "sectional": "D",    # Stacja sekcyjna → typ D (ze sprzęgłem)
+    }
+    _SUBSTATION_TYPE_MAP: dict[str, str] = {
+        "A": "mv_lv",
+        "B": "inline",
+        "C": "branch",
+        "D": "sectional",
+        "inline": "inline",
+        "branch": "branch",
+        "terminal": "terminal",
+        "sectional": "sectional",
+    }
+    station_type_raw = station.get("station_type") or payload.get("station_type", "")
+    # Map semantic → legacy for internal logic
+    station_type = _SEMANTIC_TO_LEGACY.get(station_type_raw, station_type_raw)
     if station_type not in ("A", "B", "C", "D"):
         return _error_response(
-            f"Typ stacji '{station_type}' jest nieprawidłowy. Wymagane: A, B, C lub D.",
+            f"Typ stacji '{station_type_raw}' jest nieprawidłowy. "
+            "Wymagane: A, B, C, D, inline, branch, terminal lub sectional.",
             "station.insert.station_type_invalid",
         )
+    # The semantic station_type stored in substation record
+    substation_semantic_type = _SUBSTATION_TYPE_MAP.get(station_type_raw, "mv_lv")
 
     # Validate insert_at
     insert_mode = insert_at.get("mode", "RATIO")
@@ -1213,15 +1237,15 @@ def insert_station_on_segment_sn(enm: dict[str, Any], payload: dict[str, Any]) -
     ev_seq += 1
     events.append({"event_seq": ev_seq, "event_type": "STATION_CREATED", "element_id": stn_id})
 
-    # Create Substation
+    # Create Substation — use semantic type (inline/branch/terminal/sectional/mv_lv)
     new_enm.setdefault("substations", []).append({
         "ref_id": stn_id,
-        "name": station.get("station_name") or f"Stacja {station_type}",
-        "station_type": "mv_lv",
+        "name": station.get("station_name") or payload.get("name") or f"Stacja {station_type_raw or station_type}",
+        "station_type": substation_semantic_type,
         "bus_refs": [sn_bus_id],
         "transformer_refs": [],
         "tags": [],
-        "meta": {"station_type_sn": station_type},
+        "meta": {"station_type_sn": station_type, "station_type_semantic": station_type_raw},
     })
     created.append(stn_id)
 
@@ -1524,13 +1548,17 @@ def _insert_branch_point_on_segment_sn(
         created.append(port_bus)
         branch_port_bus_refs.append(port_bus)
 
+    catalog_ref = payload.get("catalog_ref")
+    completeness = "KOMPLETNY" if catalog_ref else "BRAK_KATALOGU"
     new_enm.setdefault("branch_points", []).append({
         "ref_id": bp_ref,
         "name": payload.get("name") or ("Słup rozgałęźny SN" if branch_point_type == "branch_pole" else "ZKSN SN"),
         "branch_point_type": branch_point_type,
         "parent_segment_id": segment_id,
         "bus_ref": bp_bus_ref,
-        "catalog_ref": payload.get("catalog_ref"),
+        "catalog_ref": catalog_ref,
+        "catalog_namespace": payload.get("catalog_namespace") or "mv_branch_points",
+        "catalog_version": payload.get("catalog_version"),
         "source_mode": payload.get("source_mode") or "KATALOG",
         "ports": {
             "MAIN_IN": from_bus_ref,
@@ -1539,6 +1567,13 @@ def _insert_branch_point_on_segment_sn(
         },
         "branch_occupied": {},
         "switch_state": payload.get("switch_state"),
+        "materialized_params": payload.get("materialized_params"),
+        "completeness_status": completeness,
+        "runtime_inputs": {
+            "name": payload.get("name"),
+            "branch_ports_count": branch_ports_count,
+            "insert_at": insert_at,
+        },
     })
     created.append(bp_ref)
 

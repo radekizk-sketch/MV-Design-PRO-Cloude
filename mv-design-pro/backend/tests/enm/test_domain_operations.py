@@ -940,8 +940,9 @@ class TestStationTypeDSectional:
         )
 
         # Find the station that was just created
+        # Type D maps to station_type="sectional" (semantic) — also accept legacy "mv_lv"/"switching"
         new_subs = [sub for sub in s.get("substations", [])
-                    if sub.get("station_type") in ("mv_lv", "switching")]
+                    if sub.get("station_type") in ("mv_lv", "switching", "sectional")]
         assert len(new_subs) >= 1, "Type D station should create a substation"
 
         # The station should have at least 2 bus_refs (section buses)
