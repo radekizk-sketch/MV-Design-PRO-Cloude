@@ -5,84 +5,22 @@
  * Montowany w prawym panelu PowerFactoryLayout jako alternatywa do inspektora
  * gdy użytkownik inicjuje operację budowy sieci.
  *
+ * Każdy formularz to wrapper nad istniejącym modalem z ui/topology/modals/,
+ * zintegrowany z snapshotStore.executeDomainOperation.
+ *
  * BINDING: 100% PL etykiety.
  */
 
 import { clsx } from 'clsx';
 import { useNetworkBuildStore } from './networkBuildStore';
-
-// =============================================================================
-// Placeholder form components (będą zastąpione pełnymi formularzami w Fazie 2)
-// =============================================================================
-
-interface PlaceholderFormProps {
-  title: string;
-  description: string;
-  onClose: () => void;
-  context?: Record<string, unknown>;
-}
-
-function PlaceholderForm({ title, description, onClose, context }: PlaceholderFormProps) {
-  return (
-    <div className="flex flex-col h-full">
-      {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-chrome-200 bg-chrome-50">
-        <div>
-          <h3 className="text-sm font-semibold text-chrome-800">{title}</h3>
-          <p className="text-[10px] text-chrome-500 mt-0.5">{description}</p>
-        </div>
-        <button
-          type="button"
-          onClick={onClose}
-          className="flex h-7 w-7 items-center justify-center rounded-ind text-chrome-400 hover:bg-chrome-200 hover:text-chrome-700"
-          aria-label="Zamknij formularz"
-          data-testid="operation-form-close"
-        >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-          </svg>
-        </button>
-      </div>
-
-      {/* Body placeholder */}
-      <div className="flex-1 p-4 overflow-y-auto">
-        <div className="rounded-lg border-2 border-dashed border-chrome-200 p-6 text-center">
-          <p className="text-xs text-chrome-500">
-            Formularz w trakcie implementacji.
-          </p>
-          {context && Object.keys(context).length > 0 && (
-            <div className="mt-3 text-[10px] text-chrome-400 text-left bg-chrome-50 rounded p-2">
-              <p className="font-semibold mb-1">Kontekst:</p>
-              {Object.entries(context).map(([key, value]) => (
-                <div key={key}>
-                  <span className="text-chrome-500">{key}:</span> {String(value)}
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Footer */}
-      <div className="flex items-center justify-end gap-2 px-4 py-3 border-t border-chrome-200 bg-chrome-50">
-        <button
-          type="button"
-          onClick={onClose}
-          className="px-3 py-1.5 text-xs text-chrome-600 hover:text-chrome-800 rounded-ind hover:bg-chrome-100"
-        >
-          Anuluj
-        </button>
-        <button
-          type="button"
-          disabled
-          className="px-3 py-1.5 text-xs bg-ind-600 text-white rounded-ind opacity-50 cursor-not-allowed"
-        >
-          Zatwierdź
-        </button>
-      </div>
-    </div>
-  );
-}
+import { AddGridSourceForm } from './forms/AddGridSourceForm';
+import { ContinueTrunkForm } from './forms/ContinueTrunkForm';
+import { InsertStationForm } from './forms/InsertStationForm';
+import { StartBranchForm } from './forms/StartBranchForm';
+import { ConnectRingForm } from './forms/ConnectRingForm';
+import { InsertSectionSwitchForm } from './forms/InsertSectionSwitchForm';
+import { AddTransformerForm } from './forms/AddTransformerForm';
+import { AddOzeSourceForm } from './forms/AddOzeSourceForm';
 
 // =============================================================================
 // Form metadata (PL labels per operation)
@@ -140,6 +78,80 @@ const FORM_META: Record<string, { title: string; description: string }> = {
 };
 
 // =============================================================================
+// Form component routing
+// =============================================================================
+
+function renderFormComponent(op: string, closeForm: () => void): React.ReactNode {
+  switch (op) {
+    case 'add_grid_source_sn':
+      return <AddGridSourceForm />;
+    case 'continue_trunk_segment_sn':
+      return <ContinueTrunkForm />;
+    case 'insert_station_on_segment_sn':
+      return <InsertStationForm />;
+    case 'start_branch_segment_sn':
+      return <StartBranchForm />;
+    case 'connect_secondary_ring_sn':
+      return <ConnectRingForm />;
+    case 'set_normal_open_point':
+      return <ConnectRingForm />;
+    case 'insert_section_switch_sn':
+      return <InsertSectionSwitchForm />;
+    case 'add_transformer_sn_nn':
+      return <AddTransformerForm />;
+    case 'add_pv_inverter_nn':
+    case 'add_bess_inverter_nn':
+      return <AddOzeSourceForm />;
+    default:
+      return (
+        <FallbackForm
+          title={FORM_META[op]?.title ?? op}
+          description={FORM_META[op]?.description ?? 'Operacja domenowa'}
+          onClose={closeForm}
+        />
+      );
+  }
+}
+
+// =============================================================================
+// Fallback (for assign_catalog, update_element_parameters, future ops)
+// =============================================================================
+
+interface FallbackFormProps {
+  title: string;
+  description: string;
+  onClose: () => void;
+}
+
+function FallbackForm({ title, description, onClose }: FallbackFormProps) {
+  return (
+    <div className="flex flex-col h-full">
+      <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 bg-gray-50">
+        <div>
+          <h3 className="text-sm font-semibold text-gray-800">{title}</h3>
+          <p className="text-[10px] text-gray-500 mt-0.5">{description}</p>
+        </div>
+        <button
+          type="button"
+          onClick={onClose}
+          className="flex h-7 w-7 items-center justify-center rounded text-gray-400 hover:bg-gray-200 hover:text-gray-700"
+          aria-label="Zamknij formularz"
+        >
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
+      <div className="flex-1 p-4 flex items-center justify-center">
+        <p className="text-xs text-gray-500">
+          Formularz dostępny przez modal kontekstowy
+        </p>
+      </div>
+    </div>
+  );
+}
+
+// =============================================================================
 // OperationFormRouter
 // =============================================================================
 
@@ -153,21 +165,9 @@ export function OperationFormRouter({ className }: OperationFormRouterProps) {
 
   if (!activeForm) return null;
 
-  const meta = FORM_META[activeForm.op] ?? {
-    title: activeForm.op,
-    description: 'Operacja domenowa',
-  };
-
-  // In Phase 2, this will route to dedicated form components
-  // For now, render placeholder with metadata
   return (
     <div className={clsx('h-full', className)} data-testid="operation-form-router">
-      <PlaceholderForm
-        title={meta.title}
-        description={meta.description}
-        onClose={closeForm}
-        context={activeForm.context}
-      />
+      {renderFormComponent(activeForm.op, closeForm)}
     </div>
   );
 }
