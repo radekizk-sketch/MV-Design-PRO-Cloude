@@ -60,17 +60,22 @@ def _build_base_network_with_line_catalog() -> dict:
 def test_catalog_missing_blocks_analysis() -> None:
     enm = _build_base_network_with_line_catalog()
     branch_ref = enm["branches"][0]["ref_id"]
+    before_hash = _hash_snapshot(enm)
 
-    # Symulacja braku katalogu na instancji (przez update elementu)
+    # Próba usunięcia katalogu przez update ma być blokowana.
     r = execute_domain_operation(
         enm,
         "update_element_parameters",
         {"element_ref": branch_ref, "parameters": {"catalog_ref": None}},
     )
-    assert r.get("error") is None
-    enm = r["snapshot"]
+    assert r.get("error_code") == "catalog.ref_required"
+    assert r.get("snapshot") is None
+    assert _hash_snapshot(enm) == before_hash
 
-    refresh = execute_domain_operation(enm, "refresh_snapshot", {})
+    # Symulacja legacy/migracji: katalog faktycznie utracony poza operacją domenową.
+    enm_missing_catalog = json.loads(json.dumps(enm))
+    enm_missing_catalog["branches"][0]["catalog_ref"] = None
+    refresh = execute_domain_operation(enm_missing_catalog, "refresh_snapshot", {})
     blocker_codes = [b["code"] for b in refresh["readiness"]["blockers"]]
 
     assert "E009" in blocker_codes, "Brak katalogu powinien blokować gotowość analizy (E009)"
@@ -81,12 +86,8 @@ def test_catalog_bind_unblocks_analysis() -> None:
     enm = _build_base_network_with_line_catalog()
     branch_ref = enm["branches"][0]["ref_id"]
 
-    # najpierw usuń katalog -> blocker E009
-    enm = execute_domain_operation(
-        enm,
-        "update_element_parameters",
-        {"element_ref": branch_ref, "parameters": {"catalog_ref": None}},
-    )["snapshot"]
+    # Scenariusz legacy: wejściowy ENM zawiera brak catalog_ref.
+    enm["branches"][0]["catalog_ref"] = None
 
     before = execute_domain_operation(enm, "refresh_snapshot", {})
     before_codes = [b["code"] for b in before["readiness"]["blockers"]]

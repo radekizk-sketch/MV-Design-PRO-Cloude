@@ -2304,8 +2304,88 @@ def update_element_parameters(enm: dict[str, Any], payload: dict[str, Any]) -> d
     if not loc:
         return _error_response(f"Element '{element_ref}' nie znaleziony.", "params.element_not_found")
 
-    new_enm = copy.deepcopy(enm)
     coll, idx = loc
+    current_element = enm[coll][idx]
+
+    generator_type = str(current_element.get("gen_type") or "").upper()
+    generator_requires_catalog = (
+        coll == "generators"
+        and generator_type in {"PV_INVERTER", "WIND_INVERTER", "BESS", "BESS_INVERTER"}
+    )
+    catalog_guard_collections = {"branches", "transformers", "branch_points"}
+    guarded_catalog_binding = coll in catalog_guard_collections or generator_requires_catalog
+    if guarded_catalog_binding:
+        if "catalog_ref" in parameters:
+            catalog_ref = parameters.get("catalog_ref")
+            if catalog_ref is None or (isinstance(catalog_ref, str) and not catalog_ref.strip()):
+                return _error_response("Element fizyczny wymaga przypiętego katalogu.", "catalog.ref_required")
+
+        effective_source_mode = parameters.get("source_mode", current_element.get("source_mode"))
+        effective_namespace = parameters.get("catalog_namespace", current_element.get("catalog_namespace"))
+        if effective_source_mode is not None or effective_namespace is not None:
+            if effective_source_mode == "KATALOG" and not effective_namespace:
+                return _error_response(
+                    "Brak spójnego source_mode/catalog_namespace dla elementu fizycznego.",
+                    "catalog.ref_required",
+                )
+            if effective_source_mode in {"MIGRACJA", "EKSPERCKI_RECZNY"} and effective_namespace:
+                return _error_response(
+                    "Brak spójnego source_mode/catalog_namespace dla elementu fizycznego.",
+                    "catalog.ref_required",
+                )
+
+        if "materialized_params" in parameters:
+            materialized = parameters.get("materialized_params")
+            if effective_source_mode == "KATALOG":
+                if not isinstance(materialized, dict) or not materialized:
+                    return _error_response(
+                        "materialized_params musi być kompletne dla source_mode=KATALOG.",
+                        "catalog.ref_required",
+                    )
+                required_keys = {"branch_point_type", "parent_segment_id", "ports"}
+                if coll == "branch_points" and not required_keys.issubset(materialized.keys()):
+                    return _error_response(
+                        "materialized_params dla punktu rozgałęzienia jest niekompletne.",
+                        "catalog.ref_required",
+                    )
+
+    if coll in {"branches", "transformers", "branch_points", "generators"}:
+        immutable_keys = {"ref_id", "id", "type"}
+        allowlist_by_collection = {
+            "branches": {
+                "name", "status", "length_km", "r_ohm_per_km", "x_ohm_per_km",
+                "b_siemens_per_km", "r0_ohm_per_km", "x0_ohm_per_km", "b0_siemens_per_km",
+                "rating", "insulation", "catalog_ref", "parameter_source", "overrides",
+                "meta", "source_mode", "catalog_namespace",
+            },
+            "transformers": {
+                "name", "sn_mva", "uhv_kv", "ulv_kv", "uk_percent", "pk_kw", "p0_kw",
+                "i0_percent", "vector_group", "hv_neutral", "lv_neutral", "tap_position",
+                "tap_min", "tap_max", "tap_step_percent", "catalog_ref", "parameter_source",
+                "overrides", "meta", "source_mode", "catalog_namespace",
+            },
+            "branch_points": {
+                "name", "switch_state", "catalog_ref", "catalog_namespace", "catalog_version",
+                "source_mode", "materialized_params", "completeness_status", "runtime_inputs",
+                "branch_occupied", "ports", "meta",
+            },
+            "generators": {
+                "name", "p_mw", "q_mvar", "catalog_ref", "quantity", "n_parallel",
+                "parameter_source", "overrides", "limits", "connection_variant",
+                "blocking_transformer_ref", "station_ref", "meta", "in_service",
+            },
+        }
+        illegal_keys = sorted(
+            key for key in parameters
+            if key not in immutable_keys and key not in allowlist_by_collection[coll]
+        )
+        if illegal_keys:
+            return _error_response(
+                f"Niedozwolone pola aktualizacji dla '{coll}': {', '.join(illegal_keys)}.",
+                "params.key_not_allowed",
+            )
+
+    new_enm = copy.deepcopy(enm)
     for key, value in parameters.items():
         if key not in ("ref_id", "id", "type"):
             new_enm[coll][idx][key] = value
