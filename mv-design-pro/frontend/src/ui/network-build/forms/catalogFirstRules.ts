@@ -19,6 +19,7 @@ const REQUIRED_CATALOG_MESSAGE: Record<string, string> = {
   insert_zksn_on_segment_sn: 'Wybierz typ ZKSN z katalogu przed wstawieniem.',
   add_transformer_sn_nn: 'Wybierz transformator z katalogu przed dodaniem do stacji.',
   insert_section_switch_sn: 'Wybierz aparat z katalogu przed wstawieniem łącznika.',
+  connect_secondary_ring_sn: 'Wybierz typ kabla/linii pierścienia z katalogu przed domknięciem pętli.',
   add_pv_inverter_nn: 'Wybierz falownik PV z katalogu przed dodaniem źródła.',
   add_bess_inverter_nn: 'Wybierz falownik i magazyn BESS z katalogu przed dodaniem źródła.',
 };
@@ -48,6 +49,10 @@ export function validateCatalogFirst(op: string, payload: Payload): string | nul
         : REQUIRED_CATALOG_MESSAGE[op];
     case 'insert_section_switch_sn':
       return isNonEmptyString(payload.catalog_binding)
+        ? null
+        : REQUIRED_CATALOG_MESSAGE[op];
+    case 'connect_secondary_ring_sn':
+      return isNonEmptyString(payload.catalog_binding as string)
         ? null
         : REQUIRED_CATALOG_MESSAGE[op];
     case 'add_pv_inverter_nn':

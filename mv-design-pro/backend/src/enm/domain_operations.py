@@ -299,6 +299,30 @@ def _build_readiness(enm: dict[str, Any]) -> dict[str, Any]:
                     "severity": "BLOKUJACE",
                 })
 
+        # Domain-level check: switches/breakers without catalog_ref
+        for b in enm.get("branches", []):
+            b_type = b.get("type", "")
+            if b_type in ("switch", "breaker") and not b.get("catalog_ref"):
+                b_ref = b.get("ref_id", "")
+                blockers.append({
+                    "code": "switch.catalog_ref_missing",
+                    "message_pl": (
+                        f"Łącznik '{b.get('name', b_ref)}' "
+                        "nie ma przypisanej referencji katalogowej."
+                    ),
+                    "element_ref": b_ref,
+                    "severity": "BLOKUJACE",
+                })
+                fix_actions.append({
+                    "code": "switch.catalog_ref_missing",
+                    "action_type": "SELECT_CATALOG",
+                    "element_ref": b_ref,
+                    "panel": "catalog",
+                    "step": "switch",
+                    "focus": b_ref,
+                    "message_pl": "Wybierz pozycję katalogową dla łącznika.",
+                })
+
         has_any_blocker = len(blockers) > 0
         return {
             "ready": readiness.ready and not has_any_blocker,
@@ -1460,6 +1484,22 @@ def _insert_branch_point_on_segment_sn(
             "branch_point.invalid_parent_medium",
         )
 
+    # Bramka katalogowa — punkt rozgałęzienia WYMAGA catalog_ref PRZED utworzeniem
+    bp_catalog_ref = payload.get("catalog_ref")
+    bp_catalog_binding = payload.get("catalog_binding")
+    if not bp_catalog_ref and not bp_catalog_binding:
+        type_label = "Słup rozgałęźny" if branch_point_type == "branch_pole" else "ZKSN"
+        return _error_response(
+            f"{type_label} SN wymaga powiązania z katalogiem. "
+            "Podaj catalog_ref lub catalog_binding w payload.",
+            "catalog.ref_required",
+        )
+    if not bp_catalog_ref and bp_catalog_binding:
+        bp_catalog_ref = (
+            bp_catalog_binding.get("item_id")
+            if isinstance(bp_catalog_binding, dict) else None
+        )
+
     insert_at = payload.get("insert_at", {"mode": "RATIO", "value": 0.5})
     length_km = float(segment.get("length_km", 0.0))
     ratio = float(insert_at.get("value", 0.5))
@@ -1548,15 +1588,15 @@ def _insert_branch_point_on_segment_sn(
         created.append(port_bus)
         branch_port_bus_refs.append(port_bus)
 
-    catalog_ref = payload.get("catalog_ref")
-    completeness = "KOMPLETNY" if catalog_ref else "BRAK_KATALOGU"
+    # bp_catalog_ref already validated above (cannot be None here)
+    completeness = "KOMPLETNY"
     new_enm.setdefault("branch_points", []).append({
         "ref_id": bp_ref,
         "name": payload.get("name") or ("Słup rozgałęźny SN" if branch_point_type == "branch_pole" else "ZKSN SN"),
         "branch_point_type": branch_point_type,
         "parent_segment_id": segment_id,
         "bus_ref": bp_bus_ref,
-        "catalog_ref": catalog_ref,
+        "catalog_ref": bp_catalog_ref,
         "catalog_namespace": payload.get("catalog_namespace") or "mv_branch_points",
         "catalog_version": payload.get("catalog_version"),
         "source_mode": payload.get("source_mode") or "KATALOG",
@@ -1747,6 +1787,21 @@ def insert_section_switch_sn(enm: dict[str, Any], payload: dict[str, Any]) -> di
     if not segment:
         return _error_response(f"Odcinek '{segment_id}' nie istnieje.", "switch.segment_not_found")
 
+    # Bramka katalogowa — łącznik SN WYMAGA catalog_ref aparatu PRZED utworzeniem
+    switch_catalog_ref = payload.get("catalog_ref")
+    switch_catalog_binding = payload.get("catalog_binding")
+    if not switch_catalog_ref and not switch_catalog_binding:
+        return _error_response(
+            "Łącznik sekcyjny SN wymaga powiązania z katalogiem. "
+            "Podaj catalog_ref lub catalog_binding aparatu w payload.",
+            "catalog.ref_required",
+        )
+    if not switch_catalog_ref and switch_catalog_binding:
+        switch_catalog_ref = (
+            switch_catalog_binding.get("item_id")
+            if isinstance(switch_catalog_binding, dict) else None
+        )
+
     from_bus_ref = segment.get("from_bus_ref")
     to_bus_ref = segment.get("to_bus_ref")
     length_km = segment.get("length_km", 1.0)
@@ -1852,6 +1907,9 @@ def insert_section_switch_sn(enm: dict[str, Any], payload: dict[str, Any]) -> di
         "from_bus_ref": switch_bus_ref,
         "to_bus_ref": switch_bus2_ref,
         "status": normal_state,
+        "source_mode": "KATALOG",
+        "catalog_namespace": "APARAT_SN",
+        "catalog_ref": switch_catalog_ref,
     })
     if result.success:
         new_enm = result.enm
