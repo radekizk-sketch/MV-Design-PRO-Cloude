@@ -659,3 +659,109 @@ class TestCatalogGateInsertSectionSwitch:
         # Oryginalny snapshot przekazany do operacji nie moze byc zmieniony
         assert len(snapshot.get("branches", [])) == branches_before
         assert len(snapshot.get("buses", [])) == buses_before
+
+
+@pytest.mark.parametrize(
+    "malformed_binding",
+    [None, {}, {"item_id": ""}, {"item_id": "   "}, "not-a-dict", 123, []],
+)
+def test_catalog_gate_rejects_malformed_bindings(malformed_binding):
+    """Wszystkie operacje z shared helperem odrzucają błędne catalog_binding."""
+    enm = _empty_enm()
+    snapshot = _add_gpz(enm)
+    snapshot = _add_segment_with_catalog(snapshot)
+    seg_ref = _get_first_cable_ref(snapshot)
+
+    # 1) continue_trunk_segment_sn
+    result = execute_domain_operation(
+        enm_dict=snapshot,
+        op_name="continue_trunk_segment_sn",
+        payload={
+            "segment": {
+                "rodzaj": "KABEL",
+                "dlugosc_m": 50,
+                "catalog_binding": malformed_binding,
+            },
+        },
+    )
+    assert result.get("error_code") == "catalog.ref_required"
+    assert result.get("changes", {}).get("created_element_ids", []) == []
+
+    # 2) insert_station_on_segment_sn (transformer branch)
+    result = execute_domain_operation(
+        enm_dict=snapshot,
+        op_name="insert_station_on_segment_sn",
+        payload={
+            "segment_ref": seg_ref,
+            "station_type": "A",
+            "insert_at": {"value": 0.5},
+            "station": {"sn_voltage_kv": 15.0, "nn_voltage_kv": 0.4},
+            "sn_fields": ["IN", "OUT"],
+            "transformer": {
+                "create": True,
+                "catalog_binding": malformed_binding,
+            },
+        },
+    )
+    assert result.get("error_code") == "catalog.ref_required"
+    assert result.get("changes", {}).get("created_element_ids", []) == []
+
+    # 3) _insert_branch_point_on_segment_sn (via insert_zksn_on_segment_sn)
+    result = execute_domain_operation(
+        enm_dict=snapshot,
+        op_name="insert_zksn_on_segment_sn",
+        payload={
+            "segment_id": seg_ref,
+            "catalog_binding": malformed_binding,
+            "insert_at": {"mode": "RATIO", "value": 0.5},
+        },
+    )
+    assert result.get("error_code") == "catalog.ref_required"
+    assert result.get("changes", {}).get("created_element_ids", []) == []
+
+    # 4) start_branch_segment_sn
+    bus_ref = _get_sn_bus_ref(snapshot)
+    result = execute_domain_operation(
+        enm_dict=snapshot,
+        op_name="start_branch_segment_sn",
+        payload={
+            "from_bus_ref": bus_ref,
+            "segment": {
+                "rodzaj": "KABEL",
+                "dlugosc_m": 60,
+                "catalog_binding": malformed_binding,
+            },
+        },
+    )
+    assert result.get("error_code") == "catalog.ref_required"
+    assert result.get("changes", {}).get("created_element_ids", []) == []
+
+    # 5) insert_section_switch_sn
+    result = execute_domain_operation(
+        enm_dict=snapshot,
+        op_name="insert_section_switch_sn",
+        payload={
+            "segment_id": seg_ref,
+            "catalog_binding": malformed_binding,
+        },
+    )
+    assert result.get("error_code") == "catalog.ref_required"
+    assert result.get("changes", {}).get("created_element_ids", []) == []
+
+    # 6) add_transformer_sn_nn
+    buses = snapshot.get("buses", [])
+    if len(buses) < 2:
+        pytest.skip("Za mało szyn do testu transformatora")
+    hv_ref = buses[0]["ref_id"]
+    lv_ref = buses[-1]["ref_id"]
+    result = execute_domain_operation(
+        enm_dict=snapshot,
+        op_name="add_transformer_sn_nn",
+        payload={
+            "hv_bus_ref": hv_ref,
+            "lv_bus_ref": lv_ref,
+            "catalog_binding": malformed_binding,
+        },
+    )
+    assert result.get("error_code") == "catalog.ref_required"
+    assert result.get("changes", {}).get("created_element_ids", []) == []
