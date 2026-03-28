@@ -281,6 +281,21 @@ export interface Junction extends ENMElement {
   junction_type: 'T_node' | 'sectionalizer' | 'recloser_point' | 'NO_point';
 }
 
+export interface BranchPointSN extends ENMElement {
+  branch_point_type: 'branch_pole' | 'zksn';
+  parent_segment_id: string;
+  bus_ref: string;
+  catalog_ref?: string | null;
+  source_mode?: string | null;
+  ports: {
+    MAIN_IN: string;
+    MAIN_OUT: string;
+    BRANCH: string[];
+  };
+  branch_occupied?: Record<string, string> | null;
+  switch_state?: 'open' | 'closed' | null;
+}
+
 // ---------------------------------------------------------------------------
 // Corridor (magistrala — ciąg linii SN)
 // ---------------------------------------------------------------------------
@@ -339,6 +354,7 @@ export interface EnergyNetworkModel {
   substations: Substation[];
   bays: Bay[];
   junctions: Junction[];
+  branch_points?: BranchPointSN[];
   corridors: Corridor[];
   measurements: Measurement[];
   protection_assignments: ProtectionAssignment[];

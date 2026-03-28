@@ -305,6 +305,14 @@ export function LineSegmentCard({ elementId }: { elementId: string }) {
     openOperationForm('insert_station_on_segment_sn', { segment_id: elementId });
   }, [openOperationForm, elementId]);
 
+  const handleInsertBranchPole = useCallback(() => {
+    openOperationForm('insert_branch_pole_on_segment_sn', { segment_id: elementId });
+  }, [openOperationForm, elementId]);
+
+  const handleInsertZksn = useCallback(() => {
+    openOperationForm('insert_zksn_on_segment_sn', { segment_id: elementId });
+  }, [openOperationForm, elementId]);
+
   const handleInsertSwitch = useCallback(() => {
     openOperationForm('insert_section_switch_sn', { segment_id: elementId });
   }, [openOperationForm, elementId]);
@@ -322,13 +330,29 @@ export function LineSegmentCard({ elementId }: { elementId: string }) {
       variant: 'secondary',
       onClick: handleInsertStation,
     },
+    ...(branch?.type === 'line_overhead'
+      ? [{
+          id: 'insert_branch_pole',
+          label: 'Wstaw słup rozgałęźny',
+          variant: 'secondary' as const,
+          onClick: handleInsertBranchPole,
+        }]
+      : []),
+    ...(branch?.type === 'cable'
+      ? [{
+          id: 'insert_zksn',
+          label: 'Wstaw ZKSN',
+          variant: 'secondary' as const,
+          onClick: handleInsertZksn,
+        }]
+      : []),
     {
       id: 'insert_switch',
       label: 'Wstaw łącznik',
       variant: 'secondary',
       onClick: handleInsertSwitch,
     },
-  ], [handleAssignCatalog, handleInsertStation, handleInsertSwitch, branch?.catalog_ref]);
+  ], [handleAssignCatalog, handleInsertStation, handleInsertBranchPole, handleInsertZksn, handleInsertSwitch, branch?.catalog_ref]);
 
   if (!branch) return null;
 

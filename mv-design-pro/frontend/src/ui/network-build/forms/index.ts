@@ -1,15 +1,19 @@
 /**
  * Network Build Forms — barrel export.
  *
- * Każdy formularz to wrapper nad istniejącym modalem z ui/topology/modals/,
- * renderowany inline w panelu inspektora zamiast jako overlay.
+ * Formularze operacji domenowych renderowane inline w panelu inspektora.
  */
 
 export { AddGridSourceForm } from './AddGridSourceForm';
 export { ContinueTrunkForm } from './ContinueTrunkForm';
 export { InsertStationForm } from './InsertStationForm';
+export { InsertBranchPoleForm } from './InsertBranchPoleForm';
+export { InsertZksnForm } from './InsertZksnForm';
 export { StartBranchForm } from './StartBranchForm';
 export { ConnectRingForm } from './ConnectRingForm';
 export { InsertSectionSwitchForm } from './InsertSectionSwitchForm';
 export { AddTransformerForm } from './AddTransformerForm';
 export { AddOzeSourceForm } from './AddOzeSourceForm';
+
+export { AssignCatalogForm } from './AssignCatalogForm';
+export { UpdateElementParametersForm } from './UpdateElementParametersForm';

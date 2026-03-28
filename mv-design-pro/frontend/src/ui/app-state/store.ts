@@ -272,6 +272,11 @@ export const useAppStateStore = create<AppState>()(
     }),
     {
       name: 'mv-design-app-state',
+      version: 1,
+      migrate: (persistedState: unknown, version) => {
+        if (version === 1) return persistedState as AppState;
+        return persistedState as AppState;
+      },
       // Only persist project and case IDs, not transient state
       partialize: (state) => ({
         activeProjectId: state.activeProjectId,

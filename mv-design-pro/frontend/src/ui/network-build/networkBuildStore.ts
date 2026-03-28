@@ -41,6 +41,8 @@ export type ActiveOperationForm =
   | { op: 'add_grid_source_sn'; context?: Record<string, unknown> }
   | { op: 'continue_trunk_segment_sn'; context?: Record<string, unknown> }
   | { op: 'insert_station_on_segment_sn'; context?: Record<string, unknown> }
+  | { op: 'insert_branch_pole_on_segment_sn'; context?: Record<string, unknown> }
+  | { op: 'insert_zksn_on_segment_sn'; context?: Record<string, unknown> }
   | { op: 'start_branch_segment_sn'; context?: Record<string, unknown> }
   | { op: 'insert_section_switch_sn'; context?: Record<string, unknown> }
   | { op: 'connect_secondary_ring_sn'; context?: Record<string, unknown> }

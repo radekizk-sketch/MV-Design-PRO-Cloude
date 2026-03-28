@@ -8,7 +8,7 @@
  * BINDING: 100% PL etykiety.
  */
 
-import { useCallback, useMemo } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import {
   TransformerStationModal,
   type TransformerStationFormData,
@@ -16,6 +16,7 @@ import {
 import { useSnapshotStore, selectBusOptions } from '../../topology/snapshotStore';
 import { useNetworkBuildStore } from '../networkBuildStore';
 import { useAppStateStore } from '../../app-state';
+import { validateCatalogFirst } from './catalogFirstRules';
 
 export function AddTransformerForm() {
   const context = useNetworkBuildStore((s) => s.activeOperationForm?.context);
@@ -23,6 +24,7 @@ export function AddTransformerForm() {
   const executeDomainOperation = useSnapshotStore((s) => s.executeDomainOperation);
   const snapshot = useSnapshotStore((s) => s.snapshot);
   const activeCaseId = useAppStateStore((s) => s.activeCaseId);
+  const [catalogError, setCatalogError] = useState<string | null>(null);
 
   const busOptions = useMemo(() => selectBusOptions(snapshot), [snapshot]);
 
@@ -38,7 +40,7 @@ export function AddTransformerForm() {
   const handleSubmit = useCallback(
     async (data: TransformerStationFormData) => {
       if (!activeCaseId) return;
-      await executeDomainOperation(activeCaseId, 'add_transformer_sn_nn', {
+      const payload = {
         ref_id: data.ref_id,
         name: data.name,
         hv_bus_ref: data.hv_bus_ref,
@@ -48,7 +50,14 @@ export function AddTransformerForm() {
         parameter_source: data.parameter_source,
         overrides: data.overrides,
         station_ref: (context?.station_ref as string) ?? undefined,
-      });
+      };
+      const validationError = validateCatalogFirst('add_transformer_sn_nn', payload);
+      if (validationError) {
+        setCatalogError(validationError);
+        return;
+      }
+      setCatalogError(null);
+      await executeDomainOperation(activeCaseId, 'add_transformer_sn_nn', payload);
       closeForm();
     },
     [activeCaseId, executeDomainOperation, closeForm, context],
@@ -56,6 +65,9 @@ export function AddTransformerForm() {
 
   return (
     <div className="h-full overflow-y-auto" data-testid="add-transformer-form">
+      {catalogError && (
+        <p className="px-4 py-2 text-xs text-red-600 bg-red-50 border-b border-red-200">{catalogError}</p>
+      )}
       <TransformerStationModal
         isOpen={true}
         mode="create"

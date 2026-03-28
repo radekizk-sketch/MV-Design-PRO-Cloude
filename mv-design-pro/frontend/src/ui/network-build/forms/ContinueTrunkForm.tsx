@@ -7,7 +7,7 @@
  * BINDING: 100% PL etykiety.
  */
 
-import { useCallback, useMemo } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import {
   TrunkContinueModal,
   type TrunkContinueFormData,
@@ -15,6 +15,7 @@ import {
 import { useSnapshotStore } from '../../topology/snapshotStore';
 import { useNetworkBuildStore } from '../networkBuildStore';
 import { useAppStateStore } from '../../app-state';
+import { validateCatalogFirst } from './catalogFirstRules';
 
 export function ContinueTrunkForm() {
   const context = useNetworkBuildStore((s) => s.activeOperationForm?.context);
@@ -24,6 +25,7 @@ export function ContinueTrunkForm() {
 
   const trunkId = (context?.trunkId as string) ?? '';
   const terminalId = (context?.terminalId as string) ?? '';
+  const [catalogError, setCatalogError] = useState<string | null>(null);
 
   const initialData = useMemo<Partial<TrunkContinueFormData>>(() => {
     if (!context) return {};
@@ -37,7 +39,7 @@ export function ContinueTrunkForm() {
   const handleSubmit = useCallback(
     async (data: TrunkContinueFormData) => {
       if (!activeCaseId) return;
-      await executeDomainOperation(activeCaseId, 'continue_trunk_segment_sn', {
+      const payload = {
         trunk_id: trunkId,
         terminal_id: terminalId,
         segment_kind: data.segment_kind,
@@ -46,7 +48,14 @@ export function ContinueTrunkForm() {
         direction: data.direction,
         catalog_binding: data.catalog_binding,
         notes: data.notes,
-      });
+      };
+      const validationError = validateCatalogFirst('continue_trunk_segment_sn', payload);
+      if (validationError) {
+        setCatalogError(validationError);
+        return;
+      }
+      setCatalogError(null);
+      await executeDomainOperation(activeCaseId, 'continue_trunk_segment_sn', payload);
       closeForm();
     },
     [activeCaseId, executeDomainOperation, closeForm, trunkId, terminalId],
@@ -54,6 +63,9 @@ export function ContinueTrunkForm() {
 
   return (
     <div className="h-full overflow-y-auto" data-testid="continue-trunk-form">
+      {catalogError && (
+        <p className="px-4 py-2 text-xs text-red-600 bg-red-50 border-b border-red-200">{catalogError}</p>
+      )}
       <TrunkContinueModal
         isOpen={true}
         mode="create"

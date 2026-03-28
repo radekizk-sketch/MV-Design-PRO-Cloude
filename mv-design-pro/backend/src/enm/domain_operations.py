@@ -35,6 +35,8 @@ CANONICAL_OPS = frozenset({
     "add_grid_source_sn",
     "continue_trunk_segment_sn",
     "insert_station_on_segment_sn",
+    "insert_branch_pole_on_segment_sn",
+    "insert_zksn_on_segment_sn",
     "start_branch_segment_sn",
     "insert_section_switch_sn",
     "connect_secondary_ring_sn",
@@ -53,10 +55,16 @@ CANONICAL_OPS = frozenset({
 
 ALIAS_MAP: dict[str, str] = {
     "add_trunk_segment_sn": "continue_trunk_segment_sn",
+    "continue_trunk_segment_sn_from_catalog": "continue_trunk_segment_sn",
     "add_branch_segment_sn": "start_branch_segment_sn",
+    "add_branch_segment_sn_from_catalog": "start_branch_segment_sn",
     "start_branch_from_port": "start_branch_segment_sn",
     "insert_station_on_trunk_segment_sn": "insert_station_on_segment_sn",
     "insert_station_on_trunk_segment": "insert_station_on_segment_sn",
+    "insert_branch_pole": "insert_branch_pole_on_segment_sn",
+    "insert_zksn": "insert_zksn_on_segment_sn",
+    "add_transformer_sn_nn_from_catalog": "add_transformer_sn_nn",
+    "add_switch_from_catalog": "insert_section_switch_sn",
     "connect_ring_sn": "connect_secondary_ring_sn",
     "connect_secondary_ring": "connect_secondary_ring_sn",
     "connect_ring": "connect_secondary_ring_sn",
@@ -98,7 +106,7 @@ def _find_element(enm: dict[str, Any], ref_id: str) -> tuple[str, int] | None:
     """Znajdź element po ref_id, zwróć (kolekcja, indeks)."""
     for key in ("buses", "branches", "transformers", "sources", "loads",
                 "generators", "substations", "bays", "junctions",
-                "corridors", "measurements", "protection_assignments"):
+                "corridors", "measurements", "protection_assignments", "branch_points"):
         for i, elem in enumerate(enm.get(key, [])):
             if elem.get("ref_id") == ref_id:
                 return (key, i)
@@ -217,6 +225,80 @@ def _build_readiness(enm: dict[str, Any]) -> dict[str, Any]:
                         "message_pl": "Dodaj transformator dla generatora OZE.",
                     })
 
+        # Domain-level check: branch points (slup rozgałęźny / ZKSN)
+        for bp in enm.get("branch_points", []):
+            bp_ref = bp.get("ref_id")
+            bp_type = bp.get("branch_point_type")
+            parent_segment_id = bp.get("parent_segment_id")
+            main_in = bp.get("ports", {}).get("MAIN_IN")
+            main_out = bp.get("ports", {}).get("MAIN_OUT")
+            branch_ports = bp.get("ports", {}).get("BRANCH", [])
+
+            parent = _find_branch(enm, parent_segment_id) if parent_segment_id else None
+            if not parent:
+                blockers.append({
+                    "code": "branch_point.invalid_parent_medium",
+                    "message_pl": f"Punkt rozgałęzienia '{bp_ref}' nie ma poprawnego segmentu nadrzędnego.",
+                    "element_ref": bp_ref,
+                    "severity": "BLOKUJACE",
+                })
+            else:
+                if bp_type == "branch_pole" and parent.get("type") != "line_overhead":
+                    blockers.append({
+                        "code": "branch_point.invalid_parent_medium",
+                        "message_pl": f"Słup rozgałęźny '{bp_ref}' może być osadzony tylko na linii napowietrznej.",
+                        "element_ref": bp_ref,
+                        "severity": "BLOKUJACE",
+                    })
+                if bp_type == "zksn" and parent.get("type") != "cable":
+                    blockers.append({
+                        "code": "branch_point.invalid_parent_medium",
+                        "message_pl": f"ZKSN '{bp_ref}' może być osadzony tylko na kablu.",
+                        "element_ref": bp_ref,
+                        "severity": "BLOKUJACE",
+                    })
+
+            if not main_in or not main_out:
+                blockers.append({
+                    "code": "branch_point.required_port_missing",
+                    "message_pl": f"Punkt '{bp_ref}' nie ma wymaganych portów MAIN_IN/MAIN_OUT.",
+                    "element_ref": bp_ref,
+                    "severity": "BLOKUJACE",
+                })
+
+            if not bp.get("catalog_ref"):
+                blockers.append({
+                    "code": "branch_point.catalog_ref_missing",
+                    "message_pl": f"Punkt '{bp_ref}' nie ma przypisanej referencji katalogowej.",
+                    "element_ref": bp_ref,
+                    "severity": "BLOKUJACE",
+                })
+                fix_actions.append({
+                    "code": "branch_point.catalog_ref_missing",
+                    "action_type": "SELECT_CATALOG",
+                    "element_ref": bp_ref,
+                    "panel": "catalog",
+                    "step": "branch_point",
+                    "focus": bp_ref,
+                    "message_pl": "Wybierz pozycję katalogową dla punktu rozgałęzienia.",
+                })
+
+            if bp_type == "zksn" and len(branch_ports) not in (1, 2):
+                blockers.append({
+                    "code": "zksn.branch_count_invalid",
+                    "message_pl": f"ZKSN '{bp_ref}' ma niepoprawną liczbę portów odgałęźnych.",
+                    "element_ref": bp_ref,
+                    "severity": "BLOKUJACE",
+                })
+
+            if bp_type == "zksn" and not bp.get("switch_state"):
+                blockers.append({
+                    "code": "branch_point.switch_state_missing",
+                    "message_pl": f"ZKSN '{bp_ref}' nie ma stanu łącznika (switch_state).",
+                    "element_ref": bp_ref,
+                    "severity": "BLOKUJACE",
+                })
+
         has_any_blocker = len(blockers) > 0
         return {
             "ready": readiness.ready and not has_any_blocker,
@@ -245,6 +327,8 @@ def _compute_logical_views(enm: dict[str, Any]) -> dict[str, Any]:
     for c in corridors:
         for seg in c.get("ordered_segment_refs", []):
             corridor_segment_refs.add(seg)
+
+    branch_points = {bp.get("bus_ref"): bp for bp in enm.get("branch_points", [])}
 
     # Build trunks with terminals
     trunks = []
@@ -280,12 +364,30 @@ def _compute_logical_views(enm: dict[str, Any]) -> dict[str, Any]:
                     "status": end_status,
                 })
 
+        embedded_objects: list[dict[str, Any]] = []
+        for seg_ref in segments:
+            seg = branch_idx.get(seg_ref)
+            if not seg:
+                continue
+            for side in ("from_bus_ref", "to_bus_ref"):
+                bp = branch_points.get(seg.get(side, ""))
+                if not bp:
+                    continue
+                embedded_objects.append({
+                    "object_id": bp.get("ref_id"),
+                    "object_type": bp.get("branch_point_type"),
+                    "segment_id": seg_ref,
+                    "parent_segment_id": bp.get("parent_segment_id"),
+                    "ports": bp.get("ports", {}),
+                })
+
         trunks.append({
             "corridor_ref": c.get("ref_id"),
             "corridor_type": c.get("corridor_type", "radial"),
             "segments": segments,
             "no_point_ref": c.get("no_point_ref"),
             "terminals": terminals,
+            "embedded_objects": sorted(embedded_objects, key=lambda x: x.get("object_id", "")),
         })
 
     # Collect all corridor bus refs for ring detection (needed before branch classification)
@@ -375,6 +477,65 @@ def _terminal_status(
     if cable_count >= 2:
         return "ZAJETY"
     return "OTWARTY"
+
+
+def _resolve_branch_from_ref(enm: dict[str, Any], from_ref: str) -> tuple[str | None, str | None]:
+    """Rozwiąż from_ref (station/branch_pole/zksn) na szynę źródłową.
+
+    Obsługiwane:
+    - station.BRANCH (przez pole FEEDER)
+    - branch_pole.BRANCH
+    - zksn.BRANCH_1, zksn.BRANCH_2
+    """
+    if "." not in from_ref:
+        return None, "branch_connection.invalid_source_port"
+    element_ref, port_id = from_ref.split(".", 1)
+
+    if element_ref.startswith("stn/"):
+        sub = next((s for s in enm.get("substations", []) if s.get("ref_id") == element_ref), None)
+        if not sub:
+            return None, "branch.from_bus_not_found"
+        if port_id != "BRANCH":
+            return None, "branch_connection.invalid_source_port"
+        feeder_bay = next(
+            (
+                bay for bay in enm.get("bays", [])
+                if bay.get("substation_ref") == element_ref and bay.get("bay_role") == "FEEDER"
+            ),
+            None,
+        )
+        if not feeder_bay:
+            return None, "branch_connection.source_not_branch_capable"
+        return feeder_bay.get("bus_ref"), None
+
+    bp = next((b for b in enm.get("branch_points", []) if b.get("ref_id") == element_ref), None)
+    if not bp:
+        return None, "branch_connection.source_not_branch_capable"
+
+    ports = bp.get("ports", {})
+    if bp.get("branch_point_type") == "branch_pole":
+        if port_id != "BRANCH":
+            return None, "branch_connection.invalid_source_port"
+        bus_ref = ports.get("BRANCH", [None])[0] if isinstance(ports.get("BRANCH"), list) else None
+        if not bus_ref:
+            return None, "branch_point.required_port_missing"
+        return bus_ref, None
+
+    if bp.get("branch_point_type") == "zksn":
+        if not port_id.startswith("BRANCH_"):
+            return None, "branch_connection.invalid_source_port"
+        try:
+            idx = int(port_id.split("_", 1)[1]) - 1
+        except Exception:
+            return None, "branch_connection.invalid_source_port"
+        branch_ports = ports.get("BRANCH", [])
+        if idx < 0 or idx >= len(branch_ports):
+            return None, "branch_connection.invalid_source_port"
+        if bp.get("branch_occupied", {}).get(port_id):
+            return None, "branch_point.branch_port_occupied"
+        return branch_ports[idx], None
+
+    return None, "branch_connection.source_not_branch_capable"
 
 
 def _get_catalog_safe():
@@ -786,6 +947,8 @@ def continue_trunk_segment_sn(enm: dict[str, Any], payload: dict[str, Any]) -> d
         "r_ohm_per_km": 0.0,
         "x_ohm_per_km": 0.0,
         "status": "closed",
+        "source_mode": "KATALOG",
+        "catalog_namespace": "KABEL_SN" if branch_type == "cable" else "LINIA_SN",
     }
     if catalog_ref:
         branch_data["catalog_ref"] = catalog_ref
@@ -1243,7 +1406,169 @@ def insert_station_on_segment_sn(enm: dict[str, Any], payload: dict[str, Any]) -
 
 
 # ---------------------------------------------------------------------------
-# 4. start_branch_segment_sn
+# 4. insert_branch_point_on_segment_sn
+# ---------------------------------------------------------------------------
+
+
+def _insert_branch_point_on_segment_sn(
+    enm: dict[str, Any],
+    payload: dict[str, Any],
+    *,
+    branch_point_type: str,
+) -> dict[str, Any]:
+    segment_id = payload.get("segment_id") or payload.get("segment_ref")
+    if not segment_id:
+        return _error_response("Brak identyfikatora odcinka.", "branch_point.segment_missing")
+
+    segment = _find_branch(enm, segment_id)
+    if not segment:
+        return _error_response(f"Odcinek '{segment_id}' nie istnieje.", "branch_point.segment_not_found")
+
+    seg_type = segment.get("type")
+    if branch_point_type == "branch_pole" and seg_type != "line_overhead":
+        return _error_response(
+            "Słup rozgałęźny można osadzić wyłącznie na linii napowietrznej.",
+            "branch_point.invalid_parent_medium",
+        )
+    if branch_point_type == "zksn" and seg_type != "cable":
+        return _error_response(
+            "ZKSN można osadzić wyłącznie na odcinku kablowym.",
+            "branch_point.invalid_parent_medium",
+        )
+
+    insert_at = payload.get("insert_at", {"mode": "RATIO", "value": 0.5})
+    length_km = float(segment.get("length_km", 0.0))
+    ratio = float(insert_at.get("value", 0.5))
+    if insert_at.get("mode") == "ODLEGLOSC_OD_POCZATKU_M":
+        ratio = float(insert_at.get("value", 0.0)) / (length_km * 1000.0) if length_km > 0 else 0.5
+    ratio = _quantize_ratio(max(0.0, min(1.0, ratio)))
+
+    seed = _compute_seed({
+        "op": f"insert_{branch_point_type}",
+        "segment_id": segment_id,
+        "ratio": ratio,
+        "branch_ports_count": payload.get("branch_ports_count", 2 if branch_point_type == "zksn" else 1),
+    })
+    bp_ref = _make_id("bp", seed, branch_point_type)
+    bp_bus_ref = _make_id("bp", seed, "bus")
+    seg_left_id = f"{segment_id}_L_{branch_point_type}"
+    seg_right_id = f"{segment_id}_R_{branch_point_type}"
+
+    new_enm = copy.deepcopy(enm)
+    created: list[str] = []
+    deleted: list[str] = []
+
+    from_bus_ref = segment.get("from_bus_ref")
+    to_bus_ref = segment.get("to_bus_ref")
+    left_length = length_km * ratio
+    right_length = length_km * (1.0 - ratio)
+
+    del_result = delete_branch(new_enm, segment_id)
+    if not del_result.success:
+        return _error_response("Nie udało się podzielić odcinka.", "branch_point.segment_split_failed")
+    new_enm = del_result.enm
+    deleted.append(segment_id)
+
+    bus_voltage = None
+    for b in enm.get("buses", []):
+        if b.get("ref_id") == from_bus_ref:
+            bus_voltage = b.get("voltage_kv")
+            break
+    if not bus_voltage:
+        return _error_response("Nie można ustalić napięcia punktu rozgałęzienia.", "branch_point.voltage_missing")
+
+    node_res = create_node(new_enm, {
+        "ref_id": bp_bus_ref,
+        "name": payload.get("name") or ("Słup rozgałęźny" if branch_point_type == "branch_pole" else "ZKSN"),
+        "voltage_kv": bus_voltage,
+    })
+    if not node_res.success:
+        return _error_response("Nie udało się utworzyć punktu rozgałęzienia.", "branch_point.bus_creation_failed")
+    new_enm = node_res.enm
+    created.append(bp_bus_ref)
+
+    for seg_id, seg_from, seg_to, seg_len in (
+        (seg_left_id, from_bus_ref, bp_bus_ref, left_length),
+        (seg_right_id, bp_bus_ref, to_bus_ref, right_length),
+    ):
+        seg_data: dict[str, Any] = {
+            "ref_id": seg_id,
+            "name": f"Odcinek {seg_id}",
+            "type": seg_type,
+            "from_bus_ref": seg_from,
+            "to_bus_ref": seg_to,
+            "length_km": seg_len,
+            "r_ohm_per_km": segment.get("r_ohm_per_km", 0.0),
+            "x_ohm_per_km": segment.get("x_ohm_per_km", 0.0),
+            "status": "closed",
+            "catalog_ref": segment.get("catalog_ref"),
+        }
+        branch_res = create_branch(new_enm, seg_data)
+        if not branch_res.success:
+            return _error_response("Nie udało się odtworzyć geometrii segmentu.", "branch_point.segment_rebuild_failed")
+        new_enm = branch_res.enm
+        created.append(seg_id)
+
+    branch_ports_count = int(payload.get("branch_ports_count", 2 if branch_point_type == "zksn" else 1))
+    branch_port_bus_refs: list[str] = []
+    for idx in range(branch_ports_count):
+        port_bus = _make_id("bp", seed, f"branch_bus_{idx+1}")
+        port_res = create_node(new_enm, {
+            "ref_id": port_bus,
+            "name": f"Port odgałęźny {idx+1}",
+            "voltage_kv": bus_voltage,
+        })
+        if not port_res.success:
+            return _error_response("Nie udało się utworzyć portu BRANCH.", "branch_point.required_port_missing")
+        new_enm = port_res.enm
+        created.append(port_bus)
+        branch_port_bus_refs.append(port_bus)
+
+    new_enm.setdefault("branch_points", []).append({
+        "ref_id": bp_ref,
+        "name": payload.get("name") or ("Słup rozgałęźny SN" if branch_point_type == "branch_pole" else "ZKSN SN"),
+        "branch_point_type": branch_point_type,
+        "parent_segment_id": segment_id,
+        "bus_ref": bp_bus_ref,
+        "catalog_ref": payload.get("catalog_ref"),
+        "source_mode": payload.get("source_mode") or "KATALOG",
+        "ports": {
+            "MAIN_IN": from_bus_ref,
+            "MAIN_OUT": to_bus_ref,
+            "BRANCH": branch_port_bus_refs,
+        },
+        "branch_occupied": {},
+        "switch_state": payload.get("switch_state"),
+    })
+    created.append(bp_ref)
+
+    for c in new_enm.get("corridors", []):
+        refs = c.get("ordered_segment_refs", [])
+        if segment_id in refs:
+            idx = refs.index(segment_id)
+            c["ordered_segment_refs"] = refs[:idx] + [seg_left_id, seg_right_id] + refs[idx + 1:]
+            break
+
+    return _response(
+        new_enm,
+        created=created,
+        deleted=deleted,
+        selection_id=bp_ref,
+        selection_type=branch_point_type,
+        events=[{"event_seq": 1, "event_type": "BRANCH_POINT_CREATED", "element_id": bp_ref}],
+    )
+
+
+def insert_branch_pole_on_segment_sn(enm: dict[str, Any], payload: dict[str, Any]) -> dict[str, Any]:
+    return _insert_branch_point_on_segment_sn(enm, payload, branch_point_type="branch_pole")
+
+
+def insert_zksn_on_segment_sn(enm: dict[str, Any], payload: dict[str, Any]) -> dict[str, Any]:
+    return _insert_branch_point_on_segment_sn(enm, payload, branch_point_type="zksn")
+
+
+# ---------------------------------------------------------------------------
+# 5. start_branch_segment_sn
 # ---------------------------------------------------------------------------
 
 
@@ -1253,12 +1578,18 @@ def start_branch_segment_sn(enm: dict[str, Any], payload: dict[str, Any]) -> dic
     Wymaga jawnego from_bus_ref — brak auto-detekcji.
     """
     from_bus_ref = payload.get("from_bus_ref")
+    from_ref = payload.get("from_ref")
     segment = payload.get("segment", {})
 
+    if not from_bus_ref and from_ref:
+        resolved_bus_ref, err_code = _resolve_branch_from_ref(enm, from_ref)
+        if err_code:
+            return _error_response("Nieprawidłowe źródło odgałęzienia.", err_code)
+        from_bus_ref = resolved_bus_ref
     if not from_bus_ref:
         return _error_response(
-            "Brak identyfikatora szyny źródłowej (from_bus_ref). "
-            "Kliknij port BRANCH na stacji w SLD.",
+            "Brak identyfikatora szyny źródłowej (from_bus_ref/from_ref). "
+            "Kliknij port BRANCH na stacji, słupie lub ZKSN w SLD.",
             "branch.from_bus_missing",
         )
 
@@ -1337,6 +1668,8 @@ def start_branch_segment_sn(enm: dict[str, Any], payload: dict[str, Any]) -> dic
         "r_ohm_per_km": 0.0,
         "x_ohm_per_km": 0.0,
         "status": "closed",
+        "source_mode": "KATALOG",
+        "catalog_namespace": "KABEL_SN" if branch_type == "cable" else "LINIA_SN",
     }
     if branch_catalog_ref:
         branch_data["catalog_ref"] = branch_catalog_ref
@@ -1345,6 +1678,14 @@ def start_branch_segment_sn(enm: dict[str, Any], payload: dict[str, Any]) -> dic
         return _error_response("Nie udało się utworzyć odgałęzienia.", "branch.creation_failed")
     new_enm = result.enm
     created.append(branch_ref)
+
+    if from_ref and from_ref.startswith("bp/"):
+        element_ref, port_id = from_ref.split(".", 1)
+        for bp in new_enm.get("branch_points", []):
+            if bp.get("ref_id") == element_ref:
+                bp.setdefault("branch_occupied", {})[port_id] = branch_ref
+                break
+
     ev_seq += 1
     events.append({"event_seq": ev_seq, "event_type": "BRANCH_CREATED", "element_id": branch_ref})
 
@@ -1715,6 +2056,8 @@ def add_transformer_sn_nn(enm: dict[str, Any], payload: dict[str, Any]) -> dict[
         "ulv_kv": payload.get("ulv_kv") or lv_voltage or 0.0,
         "uk_percent": payload.get("uk_percent") or 0.0,
         "pk_kw": payload.get("pk_kw") or 0.0,
+        "source_mode": "KATALOG",
+        "catalog_namespace": "TRAFO_SN_NN",
     }
     if standalone_catalog:
         tr_data["catalog_ref"] = standalone_catalog
@@ -1762,6 +2105,9 @@ def assign_catalog_to_element(enm: dict[str, Any], payload: dict[str, Any]) -> d
     coll, idx = loc
     new_enm[coll][idx]["catalog_ref"] = catalog_item_id
     new_enm[coll][idx]["parameter_source"] = "CATALOG"
+    new_enm[coll][idx]["source_mode"] = payload.get("source_mode") or "MIGRACJA"
+    if payload.get("catalog_namespace"):
+        new_enm[coll][idx]["catalog_namespace"] = payload["catalog_namespace"]
     if payload.get("catalog_item_version"):
         new_enm[coll][idx].setdefault("meta", {})["catalog_item_version"] = payload["catalog_item_version"]
 
@@ -1829,6 +2175,8 @@ _HANDLERS: dict[str, Any] = {
     "add_grid_source_sn": add_grid_source_sn,
     "continue_trunk_segment_sn": continue_trunk_segment_sn,
     "insert_station_on_segment_sn": insert_station_on_segment_sn,
+    "insert_branch_pole_on_segment_sn": insert_branch_pole_on_segment_sn,
+    "insert_zksn_on_segment_sn": insert_zksn_on_segment_sn,
     "start_branch_segment_sn": start_branch_segment_sn,
     "insert_section_switch_sn": insert_section_switch_sn,
     "connect_secondary_ring_sn": connect_secondary_ring_sn,

@@ -7,11 +7,12 @@
  * BINDING: 100% PL etykiety.
  */
 
-import { useCallback, useMemo } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { BranchModal, type BranchFormData } from '../../topology/modals/BranchModal';
 import { useSnapshotStore, selectBusOptions } from '../../topology/snapshotStore';
 import { useNetworkBuildStore } from '../networkBuildStore';
 import { useAppStateStore } from '../../app-state';
+import { validateCatalogFirst } from './catalogFirstRules';
 
 export function StartBranchForm() {
   const context = useNetworkBuildStore((s) => s.activeOperationForm?.context);
@@ -19,6 +20,7 @@ export function StartBranchForm() {
   const executeDomainOperation = useSnapshotStore((s) => s.executeDomainOperation);
   const snapshot = useSnapshotStore((s) => s.snapshot);
   const activeCaseId = useAppStateStore((s) => s.activeCaseId);
+  const [catalogError, setCatalogError] = useState<string | null>(null);
 
   const busOptions = useMemo(() => selectBusOptions(snapshot), [snapshot]);
 
@@ -35,7 +37,7 @@ export function StartBranchForm() {
   const handleSubmit = useCallback(
     async (data: BranchFormData) => {
       if (!activeCaseId) return;
-      await executeDomainOperation(activeCaseId, 'start_branch_segment_sn', {
+      const payload = {
         ref_id: data.ref_id,
         name: data.name,
         type: data.type,
@@ -46,7 +48,14 @@ export function StartBranchForm() {
         catalog_ref: data.catalog_ref,
         parameter_source: data.parameter_source,
         overrides: data.overrides,
-      });
+      };
+      const validationError = validateCatalogFirst('start_branch_segment_sn', payload);
+      if (validationError) {
+        setCatalogError(validationError);
+        return;
+      }
+      setCatalogError(null);
+      await executeDomainOperation(activeCaseId, 'start_branch_segment_sn', payload);
       closeForm();
     },
     [activeCaseId, executeDomainOperation, closeForm],
@@ -54,6 +63,9 @@ export function StartBranchForm() {
 
   return (
     <div className="h-full overflow-y-auto" data-testid="start-branch-form">
+      {catalogError && (
+        <p className="px-4 py-2 text-xs text-red-600 bg-red-50 border-b border-red-200">{catalogError}</p>
+      )}
       <BranchModal
         isOpen={true}
         mode="create"

@@ -19,6 +19,8 @@ export type CanonicalOpName =
   | 'add_grid_source_sn'
   | 'continue_trunk_segment_sn'
   | 'insert_station_on_segment_sn'
+  | 'insert_branch_pole_on_segment_sn'
+  | 'insert_zksn_on_segment_sn'
   | 'start_branch_segment_sn'
   | 'insert_section_switch_sn'
   | 'connect_secondary_ring_sn'
@@ -37,6 +39,8 @@ export type CanonicalOpName =
 export const ALIAS_MAP: Record<string, CanonicalOpName> = {
   add_trunk_segment_sn: 'continue_trunk_segment_sn',
   add_branch_segment_sn: 'start_branch_segment_sn',
+  insert_branch_pole: 'insert_branch_pole_on_segment_sn',
+  insert_zksn: 'insert_zksn_on_segment_sn',
   start_branch_from_port: 'start_branch_segment_sn',
   insert_station_on_trunk_segment_sn: 'insert_station_on_segment_sn',
   connect_ring_sn: 'connect_secondary_ring_sn',

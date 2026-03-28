@@ -7,7 +7,7 @@
  * BINDING: 100% PL etykiety.
  */
 
-import { useCallback, useMemo } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import {
   TransformerStationModal,
   type TransformerStationFormData,
@@ -15,6 +15,7 @@ import {
 import { useSnapshotStore, selectBusOptions } from '../../topology/snapshotStore';
 import { useNetworkBuildStore } from '../networkBuildStore';
 import { useAppStateStore } from '../../app-state';
+import { validateCatalogFirst } from './catalogFirstRules';
 
 export function InsertStationForm() {
   const context = useNetworkBuildStore((s) => s.activeOperationForm?.context);
@@ -22,6 +23,7 @@ export function InsertStationForm() {
   const executeDomainOperation = useSnapshotStore((s) => s.executeDomainOperation);
   const snapshot = useSnapshotStore((s) => s.snapshot);
   const activeCaseId = useAppStateStore((s) => s.activeCaseId);
+  const [catalogError, setCatalogError] = useState<string | null>(null);
 
   const busOptions = useMemo(() => selectBusOptions(snapshot), [snapshot]);
 
@@ -39,7 +41,7 @@ export function InsertStationForm() {
   const handleSubmit = useCallback(
     async (data: TransformerStationFormData) => {
       if (!activeCaseId) return;
-      await executeDomainOperation(activeCaseId, 'insert_station_on_segment_sn', {
+      const payload = {
         ref_id: data.ref_id,
         name: data.name,
         hv_bus_ref: data.hv_bus_ref,
@@ -50,7 +52,14 @@ export function InsertStationForm() {
         overrides: data.overrides,
         segment_ref: (context?.segment_ref as string) ?? undefined,
         position_on_segment: (context?.position_on_segment as number) ?? 0.5,
-      });
+      };
+      const validationError = validateCatalogFirst('insert_station_on_segment_sn', payload);
+      if (validationError) {
+        setCatalogError(validationError);
+        return;
+      }
+      setCatalogError(null);
+      await executeDomainOperation(activeCaseId, 'insert_station_on_segment_sn', payload);
       closeForm();
     },
     [activeCaseId, executeDomainOperation, closeForm, context],
@@ -58,6 +67,9 @@ export function InsertStationForm() {
 
   return (
     <div className="h-full overflow-y-auto" data-testid="insert-station-form">
+      {catalogError && (
+        <p className="px-4 py-2 text-xs text-red-600 bg-red-50 border-b border-red-200">{catalogError}</p>
+      )}
       <TransformerStationModal
         isOpen={true}
         mode="create"
