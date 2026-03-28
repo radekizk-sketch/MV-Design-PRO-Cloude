@@ -5,11 +5,9 @@ import {
   NodeTypeV1,
   type VisualGraphV1,
   createLayoutEngine,
-  computeLegacyLayout,
   DEFAULT_LAYOUT_CONFIG,
   buildSldSemanticGraphFromVisualGraph,
   buildLayoutInputGraph,
-  buildLegacyVisualGraphFromLayoutInput,
 } from '../index';
 
 function makeGraph(): VisualGraphV1 {
@@ -143,16 +141,29 @@ describe('LayoutEngine', () => {
   it('delegates to legacy strategy for backward compatibility', () => {
     const graph = makeGraph();
     const layoutInput = buildLayoutInputGraph(buildSldSemanticGraphFromVisualGraph(graph));
-    const legacy = computeLegacyLayout(
-      buildLegacyVisualGraphFromLayoutInput(layoutInput),
-      DEFAULT_LAYOUT_CONFIG,
-    );
+    const legacy = {
+      version: 'V1',
+      nodePlacements: [],
+      edgeRoutes: [],
+      switchgearBlocks: [],
+      catalogRefs: [],
+      relayBindings: [],
+      validationErrors: [],
+      bounds: { x: 0, y: 0, width: 0, height: 0 },
+      hash: 'legacy-hash',
+      canonicalAnnotations: {
+        trunkNodes: [],
+        trunkSegments: [],
+        branchPoints: [],
+        stationChains: [],
+        inlineBranchObjects: [],
+      },
+    } as const;
 
     const engine = createLayoutEngine(
       { strategy: 'legacy' },
       {
-        legacyLayout: (legacyInput, cfg) =>
-          computeLegacyLayout(buildLegacyVisualGraphFromLayoutInput(legacyInput), cfg),
+        legacyLayout: () => legacy,
       },
     );
     const out = engine.compute(layoutInput, DEFAULT_LAYOUT_CONFIG);
@@ -166,8 +177,7 @@ describe('LayoutEngine', () => {
     const engine = createLayoutEngine(
       { strategy: 'greedy', minSpacing: 140, routingStyle: 'orthogonal' },
       {
-        legacyLayout: (legacyInput, cfg) =>
-          computeLegacyLayout(buildLegacyVisualGraphFromLayoutInput(legacyInput), cfg),
+        legacyLayout: () => { throw new Error('legacy callback should not be called'); },
       },
     );
 
@@ -185,8 +195,7 @@ describe('LayoutEngine', () => {
     const engine = createLayoutEngine(
       { strategy: 'force-directed', minSpacing: 120, maxSpacing: 280 },
       {
-        legacyLayout: (legacyInput, cfg) =>
-          computeLegacyLayout(buildLegacyVisualGraphFromLayoutInput(legacyInput), cfg),
+        legacyLayout: () => { throw new Error('legacy callback should not be called'); },
       },
     );
 
@@ -202,8 +211,7 @@ describe('LayoutEngine', () => {
     const engine = createLayoutEngine(
       { strategy: 'greedy', routingStyle: 'orthogonal' },
       {
-        legacyLayout: (legacyInput, cfg) =>
-          computeLegacyLayout(buildLegacyVisualGraphFromLayoutInput(legacyInput), cfg),
+        legacyLayout: () => { throw new Error('legacy callback should not be called'); },
       },
     );
 
@@ -220,8 +228,7 @@ describe('LayoutEngine', () => {
     const engine = createLayoutEngine(
       { strategy: 'greedy', routingStyle: 'diagonal' },
       {
-        legacyLayout: (legacyInput, cfg) =>
-          computeLegacyLayout(buildLegacyVisualGraphFromLayoutInput(legacyInput), cfg),
+        legacyLayout: () => { throw new Error('legacy callback should not be called'); },
       },
     );
 

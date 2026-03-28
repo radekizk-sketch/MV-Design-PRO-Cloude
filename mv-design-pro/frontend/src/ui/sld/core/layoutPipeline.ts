@@ -1714,7 +1714,7 @@ function phase7_generate_canonical_annotations(
  * @param stationBlockDetails Opcjonalne szczegóły pól/urządzeń (RUN #3D)
  * @returns LayoutResultV1 — zamrożony wynik layoutu
  */
-export function computeLegacyLayout(
+function legacyPipelineInternal(
   graph: VisualGraphV1,
   config: LayoutGeometryConfigV1 = DEFAULT_LAYOUT_CONFIG,
   stationBlockDetails?: StationBlockBuildResult,
@@ -1862,7 +1862,7 @@ export function computeLayout(
 
   const engine = createLayoutEngine(options, {
     legacyLayout: (legacyInput, legacyConfig, legacyStationBlockDetails) =>
-      computeLegacyLayout(
+      legacyPipelineInternal(
         buildLegacyVisualGraphFromLayoutInput(legacyInput),
         legacyConfig,
         legacyStationBlockDetails,

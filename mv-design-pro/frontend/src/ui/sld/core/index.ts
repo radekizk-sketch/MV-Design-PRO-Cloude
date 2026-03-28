@@ -114,7 +114,7 @@ export type {
 } from './layoutResult';
 
 // Layout Pipeline
-export { computeLayout, computeLegacyLayout, DEFAULT_LAYOUT_CONFIG } from './layoutPipeline';
+export { computeLayout, DEFAULT_LAYOUT_CONFIG } from './layoutPipeline';
 export type { LayoutGeometryConfigV1 } from './layoutPipeline';
 
 // LayoutEngine V2 (placement + routing decoupled from rendering)
