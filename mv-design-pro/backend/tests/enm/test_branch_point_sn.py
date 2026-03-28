@@ -263,22 +263,21 @@ class TestDomainOperationsBranchPointSchemaValid:
         assert bp.ports is not None
         assert len(bp.ports.BRANCH) == 2
 
-    def test_missing_catalog_gives_brak_katalogu_completeness(self) -> None:
+    def test_missing_catalog_is_rejected(self) -> None:
+        """Brak catalog_ref zwraca blad — obiekt NIE jest tworzony (catalog-first enforcement)."""
         snapshot, seg_id = _seed_with_cable_segment()
         result = execute_domain_operation(
             snapshot,
             "insert_zksn_on_segment_sn",
             {
                 "segment_id": seg_id,
-                # no catalog_ref
+                # no catalog_ref — must be rejected
                 "branch_ports_count": 1,
             },
         )
-        snap = result["snapshot"]
-        enm = EnergyNetworkModel.model_validate(snap)
-        assert len(enm.branch_points) == 1
-        bp = enm.branch_points[0]
-        assert bp.completeness_status == "BRAK_KATALOGU"
+        assert result.get("error") is not None, "Operacja powinna zwrócić błąd przy braku katalogu"
+        assert result.get("error_code") == "catalog.ref_required"
+        assert result.get("snapshot") is None
 
     def test_branch_points_preserved_after_model_validate_roundtrip(self) -> None:
         snapshot, seg_id = _seed_with_overhead_segment()

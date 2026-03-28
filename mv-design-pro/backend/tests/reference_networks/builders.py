@@ -224,6 +224,7 @@ def build_gn03_sn_pierscien() -> dict[str, Any]:
         result = execute_domain_operation(enm, "insert_section_switch_sn", {
             "segment_id": branches[1]["ref_id"],
             "insert_at": {"mode": "RATIO", "value": 0.5},
+            "catalog_ref": "APARAT_SN_ROZLACZNIK",
         })
         assert result.get("error") is None, f"insert_switch failed: {result.get('error')}"
         enm = result["snapshot"]

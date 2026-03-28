@@ -31,6 +31,8 @@ OPERATIONS_REQUIRING_GATE = [
     "connect_secondary_ring_sn",
     "insert_station_on_segment_sn",
     "add_transformer_sn_nn",
+    "_insert_branch_point_on_segment_sn",  # obsluguje insert_branch_pole + insert_zksn
+    "insert_section_switch_sn",
 ]
 
 # Wzorzec bramy katalogowej (musi byc w kazdej operacji)

@@ -16,6 +16,7 @@ import { NOPModal, type NOPFormData, type NOPCandidate } from '../../topology/mo
 import { useSnapshotStore } from '../../topology/snapshotStore';
 import { useNetworkBuildStore } from '../networkBuildStore';
 import { useAppStateStore } from '../../app-state';
+import { validateCatalogFirst } from './catalogFirstRules';
 
 type FormStage = 'ring' | 'nop';
 
@@ -27,6 +28,7 @@ export function ConnectRingForm() {
 
   const [stage, setStage] = useState<FormStage>('ring');
   const [ringData, setRingData] = useState<RingCloseFormData | null>(null);
+  const [catalogError, setCatalogError] = useState<string | null>(null);
 
   const terminalA = useMemo(
     () => ({
@@ -53,6 +55,19 @@ export function ConnectRingForm() {
   const handleRingSubmit = useCallback(
     async (data: RingCloseFormData) => {
       if (!activeCaseId) return;
+      const payload = {
+        terminal_a_id: terminalA.id,
+        terminal_b_id: terminalB.id,
+        segment_kind: data.segment_kind,
+        length_m: data.length_m,
+        catalog_binding: data.catalog_binding,
+      };
+      const validationError = validateCatalogFirst('connect_secondary_ring_sn', payload);
+      if (validationError) {
+        setCatalogError(validationError);
+        return;
+      }
+      setCatalogError(null);
       await executeDomainOperation(activeCaseId, 'connect_secondary_ring_sn', {
         terminal_a_id: terminalA.id,
         terminal_b_id: terminalB.id,
@@ -101,6 +116,9 @@ export function ConnectRingForm() {
 
   return (
     <div className="h-full overflow-y-auto" data-testid="connect-ring-form">
+      {catalogError && (
+        <p className="px-4 py-2 text-xs text-red-600 bg-red-50 border-b border-red-200">{catalogError}</p>
+      )}
       <RingCloseModal
         isOpen={true}
         terminalA={terminalA}
