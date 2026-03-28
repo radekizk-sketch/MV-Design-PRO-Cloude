@@ -1,23 +1,13 @@
 /**
- * VisualGraphV1 — Zamrozony kontrakt miedzy Topology Adapter a Layout Engine.
+ * VisualGraphV1 — kontrakt LEGACY / przejściowy.
  *
- * CANONICAL CONTRACT (BINDING):
- * - Wersja: V1
- * - Ten plik jest JEDYNYM zrodlem prawdy dla typow VisualGraph.
- * - Layout Engine MUSI przyjmowac VisualGraphV1 jako wejscie.
- * - Topology Adapter MUSI produkowac VisualGraphV1 jako wyjscie.
- * - Zmiany kontraktu wymagaja bump wersji (V2).
+ * UWAGA ARCHITEKTONICZNA:
+ * - kanoniczny publiczny model semantyczny to teraz `SldSemanticGraphV1`
+ * - kanoniczny model wejściowy layoutu to `LayoutInputGraphV1`
+ * - `VisualGraphV1` utrzymujemy wyłącznie dla kompatybilności i adapterów migracyjnych
  *
- * DETERMINIZM:
- * - nodes i edges MUSZĄ byc sortowane leksykograficznie po id w canonical serializer.
- * - attributes maja jawne klucze (brak map z nieustalonym porzadkiem).
- * - Adapter MUSI dostarczac stabilne id (element_id ze Snapshota lub deterministyczna kompozycja).
- *
- * REGULY:
- * - PV i BESS sa GENERATOR_PV / GENERATOR_BESS (zrodla), NIGDY jako LOAD.
- * - Stacje A/B/C/D sa SWITCHGEAR_BLOCK (podgraf) z portami IN/OUT/BRANCH.
- * - Segmentacja trunk/branch/secondary jest jawna w EdgeTypeV1.
- * - Kierunek przeplywu mocy NIE jest uzywany do segmentacji.
+ * Zmiany funkcjonalne rozwijamy w nowych kontraktach warstwowych:
+ * Snapshot -> SldSemanticGraphV1 -> LayoutInputGraphV1 -> LayoutResultV1.
  */
 
 // =============================================================================

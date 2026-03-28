@@ -187,6 +187,26 @@ Zakres zakończony:
 - [x] Dodano regresyjny test w `layoutPipeline.test.ts` potwierdzający poziomą szynę GPZ i pionowy start odejść trunk.
 - [x] Zaktualizowano test orientacji `topologicalLayout.test.ts` do kanonicznego mapowania `left-right -> top-down` dla SN.
 
+### 3.0.7 SLD: wydzielenie LayoutEngine V2 + routing A* (completed)
+
+Zakres zakończony:
+- [x] Dodano nowy moduł `frontend/src/ui/sld/core/layoutEngine.ts` (strategie `legacy/greedy/force-directed`, routing `orthogonal/diagonal`, A* obstacle routing, auto-reflow kolizji, plan warstw i etykiet).
+- [x] `layoutPipeline.ts` refactor: poprzedni pipeline dostępny jako `computeLegacyLayout()`, a publiczny `computeLayout()` deleguje do `LayoutEngine` z domyślną strategią `legacy` (kompatybilność wsteczna).
+- [x] Rozszerzono API eksportów core (`index.ts`) o `LayoutEngine`, typy opcji i helper `createLayoutEngine`.
+- [x] Dodano testy jednostkowe `layoutEngine.test.ts` (delegacja legacy, greedy spacing, deterministyczny force-directed, orthogonal/diagonal routing).
+- [x] Dodano dokumentację modułu: `docs/sld/SLD_LAYOUT_ENGINE_REFACTOR_V2.md`.
+
+### 3.0.8 SLD: domknięcie kontraktów semantyka→layout (completed)
+
+Zakres zakończony:
+- [x] Dodano kanoniczny kontrakt semantyczny `SldSemanticGraphV1` (normalizacja stationKind/generatorKind, jawne kontenery, brak geometrii portów).
+- [x] Dodano kanoniczny kontrakt wejścia layoutu `LayoutInputGraphV1` (symbolProfile/portGeometry i constraints tylko w warstwie layoutu).
+- [x] `computeLayout()` przepięto na pipeline: `VisualGraph(legacy) -> SldSemanticGraphV1 -> LayoutInputGraphV1 -> LayoutEngine`.
+- [x] `LayoutEngine` konsumuje `LayoutInputGraphV1`; `computeLegacyLayout()` utrzymane jako cienka warstwa zgodności przez bridge `LayoutInputGraphV1 -> VisualGraphV1`.
+- [x] `VisualGraphV1` zdegradowano do statusu legacy (usunięto fałszywy komentarz o jedynym źródle prawdy).
+- [x] Dodano testy kontraktu semantycznego i transformacji semantyka→layout (deterministyczność 100x).
+- [x] Uzupełniono dokumentację: `SLD_SEMANTIC_MODEL_CANONICAL_V1.md` + `SLD_CONTRACT_FLOW_V1.md`.
+
 
 ### 3.0.5 Hotfix CI TypeScript — referenceTopologies (completed)
 
