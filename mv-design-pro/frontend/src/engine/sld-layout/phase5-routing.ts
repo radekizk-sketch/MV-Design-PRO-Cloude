@@ -28,6 +28,8 @@ import type {
   Rectangle,
   RoutedEdge,
 } from './types';
+import { routeWithAstar } from './algorithms/astar-router';
+import { placeLabelsNonOverlapping } from './algorithms/label-placer';
 
 // =============================================================================
 // AESTHETICS CONFIG — PHASE 5 LABEL PLACEMENT PARAMETERS
@@ -57,6 +59,9 @@ export function routeEdgesAndPlaceLabels(context: PipelineContext): PipelineCont
     };
   }
 
+  // Zbuduj listę przeszkód z pozycji elementów (dla A* routingu)
+  const obstacles: Rectangle[] = buildObstaclesFromPositions(positions);
+
   // Krok 1: Generuj trasy dla wszystkich połączeń
   const routedEdges = generateEdgeRoutes(
     symbols,
@@ -64,17 +69,37 @@ export function routeEdgesAndPlaceLabels(context: PipelineContext): PipelineCont
     elementToSymbol,
     positions,
     busbarGeometries ?? new Map(),
-    config
+    config,
+    obstacles
   );
 
-  // Krok 2: Rozmieść etykiety
-  const labelPositions = placeLabels(symbols, positions, routedEdges, config);
+  // Krok 2: Rozmieść etykiety (smart 8-kierunkowe)
+  const labelPositions = placeLabelsSmart(symbols, positions, routedEdges, config);
 
   return {
     ...context,
     routedEdges,
     labelPositions,
   };
+}
+
+/**
+ * Zbuduj listę przeszkód z pozycji elementów.
+ * Używane przez A* router do omijania elementów na schemacie.
+ */
+function buildObstaclesFromPositions(positions: Map<string, ElementPosition>): Rectangle[] {
+  const obstacles: Rectangle[] = [];
+  for (const pos of positions.values()) {
+    // Dodaj margines wokół bounds dla routingu
+    const margin = 8;
+    obstacles.push({
+      x:      pos.bounds.x      - margin,
+      y:      pos.bounds.y      - margin,
+      width:  pos.bounds.width  + 2 * margin,
+      height: pos.bounds.height + 2 * margin,
+    });
+  }
+  return obstacles;
 }
 
 // =============================================================================
@@ -90,7 +115,8 @@ function generateEdgeRoutes(
   elementToSymbol: Map<string, string>,
   positions: Map<string, ElementPosition>,
   busbarGeometries: Map<string, BusbarGeometry>,
-  config: LayoutConfig
+  config: LayoutConfig,
+  obstacles?: Rectangle[]
 ): Map<string, RoutedEdge> {
   const edges = new Map<string, RoutedEdge>();
 
@@ -113,7 +139,8 @@ function generateEdgeRoutes(
           'branch',
           positions,
           busbarGeometries,
-          config
+          config,
+          obstacles
         );
         if (edge) {
           edges.set(edge.id, edge);
@@ -134,7 +161,8 @@ function generateEdgeRoutes(
           'switch',
           positions,
           busbarGeometries,
-          config
+          config,
+          obstacles
         );
         if (edge) {
           edges.set(edge.id, edge);
@@ -154,7 +182,8 @@ function generateEdgeRoutes(
           'source',
           positions,
           busbarGeometries,
-          config
+          config,
+          obstacles
         );
         if (edge) {
           edges.set(edge.id, edge);
@@ -174,7 +203,8 @@ function generateEdgeRoutes(
           'load',
           positions,
           busbarGeometries,
-          config
+          config,
+          obstacles
         );
         if (edge) {
           edges.set(edge.id, edge);
@@ -196,7 +226,8 @@ function routeEdge(
   connectionType: 'branch' | 'switch' | 'source' | 'load' | 'busbar',
   positions: Map<string, ElementPosition>,
   _busbarGeometries: Map<string, BusbarGeometry>,
-  config: LayoutConfig
+  config: LayoutConfig,
+  obstacles?: Rectangle[]
 ): RoutedEdge | null {
   const fromPos = positions.get(fromSymbolId);
   const toPos = positions.get(toSymbolId);
@@ -210,9 +241,29 @@ function routeEdge(
   const startPoint = getPortPosition(fromPos, fromPort);
   const endPoint = getPortPosition(toPos, toPort);
 
-  // Wytrasuj ścieżkę
-  const path = routeOrthogonalPath(startPoint, endPoint, fromPos, toPos, config);
-  const segments = pathToSegments(path);
+  // Wybierz strategię routingu:
+  // - Cross-band (różne pasma napięciowe) z przeszkodami → A*
+  // - Pozostałe → trivial L-path
+  const isCrossBand = fromPos.voltageBandId !== toPos.voltageBandId;
+  let path: Point[];
+  let segments: ReturnType<typeof pathToSegments>;
+
+  if (isCrossBand && obstacles && obstacles.length > 0) {
+    // A* routing z omijaniem przeszkód
+    const astarResult = routeWithAstar(startPoint, endPoint, {
+      gridSize:     config.gridSize,
+      obstacles,
+      channelWidth: config.gridSize * 2,
+      maxIterations: 10_000,
+    });
+    segments = astarResult.segments;
+    path = segments.length > 0
+      ? [segments[0].from, ...segments.map((s) => s.to)]
+      : [startPoint, endPoint];
+  } else {
+    path = routeOrthogonalPath(startPoint, endPoint, fromPos, toPos, config);
+    segments = pathToSegments(path);
+  }
 
   return {
     id: `edge_${symbolId}`,
@@ -346,253 +397,39 @@ function pathToSegments(path: Point[]): PathSegment[] {
 // =============================================================================
 
 /**
- * Rozmieść etykiety.
+ * Rozmieść etykiety używając 8-kierunkowego smart label placer.
+ * Zastępuje placeLabels() dla wywołań z routeEdgesAndPlaceLabels().
  */
-function placeLabels(
-  symbols: LayoutSymbol[],
+function placeLabelsSmart(
+  symbols:   LayoutSymbol[],
   positions: Map<string, ElementPosition>,
-  edges: Map<string, RoutedEdge>,
-  config: LayoutConfig
+  edges:     Map<string, RoutedEdge>,
+  config:    LayoutConfig
 ): Map<string, LabelPosition> {
-  const labelPositions = new Map<string, LabelPosition>();
-  const occupiedAreas: Rectangle[] = [];
-
   // Zbierz zajęte obszary (symbole)
+  const occupiedAreas: Rectangle[] = [];
   for (const pos of positions.values()) {
     occupiedAreas.push(pos.bounds);
   }
-
-  // Zbierz zajęte obszary (krawędzie) — uproszczony bounding box
+  // Dodaj bounding boxy krawędzi
   for (const edge of edges.values()) {
     for (const segment of edge.segments) {
-      const minX = Math.min(segment.from.x, segment.to.x) - 5;
-      const minY = Math.min(segment.from.y, segment.to.y) - 5;
-      const maxX = Math.max(segment.from.x, segment.to.x) + 5;
-      const maxY = Math.max(segment.from.y, segment.to.y) + 5;
-
+      const margin = 5;
       occupiedAreas.push({
-        x: minX,
-        y: minY,
-        width: maxX - minX,
-        height: maxY - minY,
+        x:      Math.min(segment.from.x, segment.to.x) - margin,
+        y:      Math.min(segment.from.y, segment.to.y) - margin,
+        width:  Math.abs(segment.to.x - segment.from.x) + 2 * margin,
+        height: Math.abs(segment.to.y - segment.from.y) + 2 * margin,
       });
     }
   }
 
-  // Umieść etykietę dla każdego symbolu
-  for (const symbol of symbols) {
-    const pos = positions.get(symbol.id);
-    if (!pos) continue;
-
-    // Pomiń symbole bez nazwy
-    if (!symbol.elementName || symbol.elementName.trim() === '') continue;
-
-    const labelPos = findBestLabelPosition(symbol, pos, occupiedAreas, config);
-    labelPositions.set(symbol.id, labelPos);
-
-    // Dodaj obszar etykiety do zajętych
-    const labelWidth = Math.max(30, symbol.elementName.length * 7);
-    const labelHeight = 14;
-    occupiedAreas.push({
-      x: labelPos.position.x - (labelPos.anchor === 'start' ? 0 : labelPos.anchor === 'middle' ? labelWidth / 2 : labelWidth),
-      y: labelPos.position.y - labelHeight / 2,
-      width: labelWidth,
-      height: labelHeight,
-    });
-  }
-
-  return labelPositions;
-}
-
-/**
- * Znajdź najlepszą pozycję dla etykiety.
- *
- * ESTETYKA PRZEMYSLOWA — LABEL PLACEMENT:
- * - Kolejnosc deterministyczna: right → left → top → bottom
- * - Unikaj kolizji label-symbol (twarde)
- * - Clamp dystansu do LABEL_MAX_DISTANCE_PX
- * - Deterministic tiebreak (sort kandydatów po placement order + id)
- * - Jesli konflikt: etykieta schodzi na drugi poziom (stack) w osi Y
- *   w ramach kanalu, NIGDY losowo
- */
-function findBestLabelPosition(
-  symbol: LayoutSymbol,
-  elementPos: ElementPosition,
-  occupiedAreas: Rectangle[],
-  config: LayoutConfig
-): LabelPosition {
-  // Kolejność prób: prawo, lewo, góra, dół (deterministic order)
-  const placements: Array<'right' | 'left' | 'top' | 'bottom'> = ['right', 'left', 'top', 'bottom'];
-
-  for (const placement of placements) {
-    const labelPos = calculateLabelPosition(elementPos, placement, config);
-    const labelBounds = estimateLabelBounds(symbol.elementName, labelPos);
-
-    // Sprawdź kolizje z symbolami (twarde)
-    const hasCollision = occupiedAreas.some((area) => rectanglesOverlap(labelBounds, area));
-
-    if (!hasCollision) {
-      // Verify distance is within LABEL_MAX_DISTANCE_PX
-      const distance = Math.sqrt(
-        Math.pow(labelPos.position.x - elementPos.position.x, 2) +
-          Math.pow(labelPos.position.y - elementPos.position.y, 2)
-      );
-
-      if (distance <= LABEL_MAX_DISTANCE_PX) {
-        return {
-          symbolId: symbol.id,
-          position: labelPos.position,
-          anchor: labelPos.anchor,
-          placement,
-          offset: labelPos.offset,
-          adjusted: false,
-        };
-      }
-    }
-  }
-
-  // Y-stack fallback: try stacking label below in Y-axis (deterministic)
-  // Grid step = 14px (label height), try up to 3 stack levels
-  const LABEL_STACK_STEP_Y = 16;
-  for (let stackLevel = 1; stackLevel <= 3; stackLevel++) {
-    for (const placement of placements) {
-      const labelPos = calculateLabelPosition(elementPos, placement, config);
-      const stackedPos = {
-        ...labelPos,
-        position: {
-          x: labelPos.position.x,
-          y: labelPos.position.y + stackLevel * LABEL_STACK_STEP_Y,
-        },
-      };
-      const labelBounds = estimateLabelBounds(symbol.elementName, stackedPos);
-
-      const distance = Math.sqrt(
-        Math.pow(stackedPos.position.x - elementPos.position.x, 2) +
-          Math.pow(stackedPos.position.y - elementPos.position.y, 2)
-      );
-
-      if (distance > LABEL_MAX_DISTANCE_PX) continue;
-
-      const hasCollision = occupiedAreas.some((area) => rectanglesOverlap(labelBounds, area));
-
-      if (!hasCollision) {
-        return {
-          symbolId: symbol.id,
-          position: stackedPos.position,
-          anchor: stackedPos.anchor,
-          placement,
-          offset: { x: labelPos.offset.x, y: labelPos.offset.y + stackLevel * LABEL_STACK_STEP_Y },
-          adjusted: true,
-        };
-      }
-    }
-  }
-
-  // Ultimate fallback: right with clamped distance
-  const clampedOffset = Math.min(config.labelOffsetX, LABEL_MAX_DISTANCE_PX - elementPos.size.width / 2);
-  const fallbackX = elementPos.position.x + elementPos.size.width / 2 + Math.max(10, clampedOffset);
-
-  return {
-    symbolId: symbol.id,
-    position: { x: fallbackX, y: elementPos.position.y },
-    anchor: 'start',
-    placement: 'right',
-    offset: { x: Math.max(10, clampedOffset), y: 0 },
-    adjusted: true,
-  };
-}
-
-/**
- * Oblicz pozycję etykiety dla danego placement.
- */
-function calculateLabelPosition(
-  elementPos: ElementPosition,
-  placement: 'right' | 'left' | 'top' | 'bottom',
-  config: LayoutConfig,
-  multiplier: number = 1
-): { position: Point; anchor: 'start' | 'middle' | 'end'; offset: Point } {
-  const { position, size } = elementPos;
-
-  switch (placement) {
-    case 'right':
-      return {
-        position: {
-          x: position.x + size.width / 2 + config.labelOffsetX * multiplier,
-          y: position.y,
-        },
-        anchor: 'start',
-        offset: { x: config.labelOffsetX * multiplier, y: 0 },
-      };
-    case 'left':
-      return {
-        position: {
-          x: position.x - size.width / 2 - config.labelOffsetX * multiplier,
-          y: position.y,
-        },
-        anchor: 'end',
-        offset: { x: -config.labelOffsetX * multiplier, y: 0 },
-      };
-    case 'top':
-      return {
-        position: {
-          x: position.x,
-          y: position.y - size.height / 2 + config.labelOffsetY * multiplier,
-        },
-        anchor: 'middle',
-        offset: { x: 0, y: config.labelOffsetY * multiplier },
-      };
-    case 'bottom':
-      return {
-        position: {
-          x: position.x,
-          y: position.y + size.height / 2 - config.labelOffsetY * multiplier + 15,
-        },
-        anchor: 'middle',
-        offset: { x: 0, y: -config.labelOffsetY * multiplier + 15 },
-      };
-  }
-}
-
-/**
- * Oszacuj bounding box etykiety.
- */
-function estimateLabelBounds(text: string, labelPos: { position: Point; anchor: 'start' | 'middle' | 'end' }): Rectangle {
-  const charWidth = 7;
-  const lineHeight = 14;
-  const width = Math.max(30, text.length * charWidth);
-  const height = lineHeight;
-
-  let x: number;
-  switch (labelPos.anchor) {
-    case 'start':
-      x = labelPos.position.x;
-      break;
-    case 'middle':
-      x = labelPos.position.x - width / 2;
-      break;
-    case 'end':
-      x = labelPos.position.x - width;
-      break;
-  }
-
-  return {
-    x,
-    y: labelPos.position.y - height / 2,
-    width,
-    height,
-  };
-}
-
-/**
- * Sprawdź czy dwa prostokąty się nakładają.
- */
-function rectanglesOverlap(a: Rectangle, b: Rectangle): boolean {
-  return !(
-    a.x + a.width < b.x ||
-    b.x + b.width < a.x ||
-    a.y + a.height < b.y ||
-    b.y + b.height < a.y
-  );
+  return placeLabelsNonOverlapping(symbols, positions, occupiedAreas, {
+    maxDistance: LABEL_MAX_DISTANCE_PX,
+    labelWidth:  config.labelMaxWidth,
+    labelHeight: 24,
+    margin:      config.labelOffsetX,
+  });
 }
 
 // =============================================================================
