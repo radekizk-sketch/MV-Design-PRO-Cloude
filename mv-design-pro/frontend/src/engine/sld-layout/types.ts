@@ -523,6 +523,9 @@ export interface RoutedEdge {
 
   /** ID pasma napięciowego (dla koloru) */
   voltageBandId: string;
+
+  /** Kolor fazy (R/W/B) — opcjonalny, nakładany przez applyPhaseColors() */
+  phaseColor?: string;
 }
 
 /**
@@ -732,4 +735,39 @@ export interface PipelineContext {
   // --- Debug info ---
   /** Debug info zbierana przez fazy */
   debug: Partial<LayoutDebugInfo>;
+
+  // --- LayoutEngine extensions ---
+  /** Włącz wykrywanie kolizji po fazie 4 (używane przez LayoutEngine) */
+  enableCollisionDetection?: boolean;
+}
+
+// =============================================================================
+// LAYOUT ENGINE — typy opcji (używane przez LayoutEngine.ts)
+// =============================================================================
+
+/**
+ * Algorytm rozmieszczania stacji.
+ * - 'pipeline': domyślny 5-fazowy pipeline (Sugiyama)
+ * - 'force-directed': algorytm Fruchtermana-Reingolda
+ * - 'greedy': BFS-greedy od GPZ
+ */
+export type PlacementAlgorithm = 'pipeline' | 'force-directed' | 'greedy';
+
+/**
+ * Styl połączeń krawędzi.
+ * - 'orthogonal': segmenty H/V (domyślny, ETAP-grade)
+ * - 'diagonal': bezpośrednie linie skośne
+ */
+export type ConnectionStyle = 'orthogonal' | 'diagonal';
+
+/**
+ * Konfiguracja kolorów faz R/W/B.
+ */
+export interface PhaseColorConfig {
+  /** Kolor fazy R (czerwona, L1). */
+  phaseR: string;
+  /** Kolor fazy W (biała/neutralna, L2). */
+  phaseW: string;
+  /** Kolor fazy B (niebieska, L3). */
+  phaseB: string;
 }

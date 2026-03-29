@@ -239,6 +239,31 @@ export interface LayoutValidationErrorV1 {
 }
 
 // =============================================================================
+// PHASE COLORS & COLLISION STATS (opcjonalne rozszerzenia LayoutResultV1)
+// =============================================================================
+
+/**
+ * Konfiguracja kolorów faz R/W/B.
+ * Opcjonalne pole LayoutResultV1.phaseColors.
+ */
+export interface PhaseColorConfigV1 {
+  readonly phaseR: string;
+  readonly phaseW: string;
+  readonly phaseB: string;
+}
+
+/**
+ * Statystyki kolizji — wynik wykrywania i rozwiązywania.
+ * Opcjonalne pole LayoutResultV1.collisionStats.
+ */
+export interface CollisionStatsV1 {
+  /** Liczba wykrytych kolizji BoundingBox */
+  readonly detected: number;
+  /** Liczba rozwiązanych kolizji */
+  readonly resolved: number;
+}
+
+// =============================================================================
 // LAYOUT RESULT (top-level)
 // =============================================================================
 
@@ -276,6 +301,10 @@ export interface LayoutResultV1 {
   readonly hash: string;
   /** Canonical SLD annotations (Phase 7, nullable for backwards compatibility) */
   readonly canonicalAnnotations: CanonicalAnnotationsV1 | null;
+  /** Kolory faz R/W/B (opcjonalne, null = kolory domyślne napięciowe) */
+  readonly phaseColors?: PhaseColorConfigV1 | null;
+  /** Statystyki wykrytych i rozwiązanych kolizji (opcjonalne) */
+  readonly collisionStats?: CollisionStatsV1 | null;
 }
 
 // =============================================================================

@@ -29,6 +29,7 @@ import { detectBays } from './phase2-bay-detection';
 import { minimizeCrossings } from './phase3-crossing-min';
 import { assignCoordinates, calculateSchemaBounds } from './phase4-coordinates';
 import { routeEdgesAndPlaceLabels, validateOrthogonalPaths, countEdgeCrossings } from './phase5-routing';
+import { detectCollisions, resolveCollisionsAstar, buildObstacleList } from './algorithms/collision-detector';
 
 // =============================================================================
 // MAIN PIPELINE FUNCTION
@@ -86,6 +87,28 @@ export function computeFullLayout(input: LayoutInput): LayoutResult {
 
   // === FAZA 4: Coordinate Assignment ===
   context = assignCoordinates(context);
+
+  // === FAZA 4b: Collision Detection + Resolution (opcjonalne) ===
+  if (context.enableCollisionDetection && context.positions && context.positions.size > 0) {
+    const colResult = detectCollisions(context.positions);
+    if (colResult.hasCollision) {
+      const obstacles = buildObstacleList(context.positions);
+      const resolvedPositions = resolveCollisionsAstar(
+        context.positions,
+        colResult,
+        obstacles,
+        config
+      );
+      context = {
+        ...context,
+        positions: resolvedPositions,
+        debug: {
+          ...context.debug,
+          collisionsResolved: colResult.collisions.length,
+        },
+      };
+    }
+  }
 
   // === FAZA 5: Edge Routing + Label Placement ===
   context = routeEdgesAndPlaceLabels(context);

@@ -596,6 +596,46 @@ export const ANNOTATION_FONT_SIZE_SEGMENT = 10 as const;
 export const ANNOTATION_FONT_SIZE_PARAMS = 9 as const;
 
 // =============================================================================
+// § 5.1 GPZ HIGHLIGHT — wyróżnienie stacji GPZ
+// =============================================================================
+
+/**
+ * Rozmiar wyróżnienia GPZ — grubość obramowania [px].
+ *
+ * GPZ (Główny Punkt Zasilania) wyróżniany grubszym obramowaniem
+ * i większą ramką w stosunku do stacji SN/nn.
+ *
+ * GPZ_HIGHLIGHT_SIZE = GRID_BASE / 2 × 2 = 20 px (STATION_BOUNDING_BOX_PADDING)
+ */
+export const GPZ_HIGHLIGHT_SIZE = STATION_BOUNDING_BOX_PADDING as const;
+
+/**
+ * Minimalny promieniowy rozmiar GPZ (premia do STATION_BLOCK_WIDTH) [px].
+ * GPZ musi być wizualnie większy od stacji SN/nn.
+ *
+ * GPZ_MIN_BLOCK_SIZE = STATION_BLOCK_WIDTH + 2 * GRID_BASE = 160 px
+ */
+export const GPZ_MIN_BLOCK_SIZE = (STATION_BLOCK_WIDTH + 2 * GRID_BASE) as const;
+
+// =============================================================================
+// § 5.2 MINIMALNE ODLEGŁOŚCI — dla algorytmów rozmieszczania
+// =============================================================================
+
+/**
+ * Minimalna odległość centrum-centrum między stacjami [px].
+ * Równa GRID_SPACING_MAIN (280 px) — stały rozstaw stacji na magistrali.
+ *
+ * Używana przez: force-directed, greedy placement jako dolne ograniczenie.
+ */
+export const MIN_STATION_DISTANCE = GRID_SPACING_MAIN as const;
+
+/**
+ * Minimalna odległość centrum-centrum między stacją a krawędzią schematu [px].
+ * = 2 × GRID_BASE = 40 px
+ */
+export const MIN_DIAGRAM_MARGIN = (2 * GRID_BASE) as const;
+
+// =============================================================================
 // STAŁA WERYFIKACYJNA (dla testów)
 // =============================================================================
 

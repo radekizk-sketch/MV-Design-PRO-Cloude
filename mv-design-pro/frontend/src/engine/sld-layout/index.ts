@@ -187,3 +187,35 @@ export function computeLayout(input: LayoutInput): LayoutResult {
 
 // Alias dla kompatybilności
 export const generateLayout = computeLayout;
+
+// =============================================================================
+// NEW API — LayoutEngine + Algorithms (RUN #3B)
+// =============================================================================
+
+export { LayoutEngine, DEFAULT_ENGINE_OPTIONS } from './LayoutEngine';
+export type { LayoutEngineOptions } from './LayoutEngine';
+export type { PlacementAlgorithm, ConnectionStyle, PhaseColorConfig } from './types';
+
+export { computeForceDirectedLayout, DEFAULT_FORCE_CONFIG } from './algorithms/force-directed';
+export type { FDNode, FDEdge, ForceDirectedConfig } from './algorithms/force-directed';
+
+export { computeGreedyPlacement, DEFAULT_GREEDY_CONFIG } from './algorithms/greedy-placement';
+export type { GreedyConfig } from './algorithms/greedy-placement';
+
+export { routeWithAstar, buildObstacleList, DEFAULT_ASTAR_CONFIG } from './algorithms/astar-router';
+export type { AStarConfig, AStarPath } from './algorithms/astar-router';
+
+export { detectCollisions, resolveCollisionsAstar } from './algorithms/collision-detector';
+export type { CollisionPair, CollisionResult } from './algorithms/collision-detector';
+
+export {
+  applyPhaseColors,
+  parsePhaseLabel,
+  PHASE_COLORS_DEFAULT,
+  PHASE_COLORS_IEC,
+  PHASE_COLORS_MONO,
+} from './algorithms/phase-colors';
+export type { PhaseColorConfig as PhaseColorConfigAlg } from './algorithms/phase-colors';
+
+export { placeLabelsNonOverlapping, DEFAULT_SMART_LABEL_CONFIG } from './algorithms/label-placer';
+export type { LabelAnchor, SmartLabelConfig } from './algorithms/label-placer';
