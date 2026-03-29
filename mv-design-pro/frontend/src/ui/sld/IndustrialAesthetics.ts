@@ -607,7 +607,7 @@ export const ANNOTATION_FONT_SIZE_PARAMS = 9 as const;
  *
  * GPZ_HIGHLIGHT_SIZE = GRID_BASE / 2 × 2 = 20 px (STATION_BOUNDING_BOX_PADDING)
  */
-export const GPZ_HIGHLIGHT_SIZE = STATION_BOUNDING_BOX_PADDING as const;
+export const GPZ_HIGHLIGHT_SIZE = STATION_BOUNDING_BOX_PADDING;
 
 /**
  * Minimalny promieniowy rozmiar GPZ (premia do STATION_BLOCK_WIDTH) [px].
@@ -615,7 +615,7 @@ export const GPZ_HIGHLIGHT_SIZE = STATION_BOUNDING_BOX_PADDING as const;
  *
  * GPZ_MIN_BLOCK_SIZE = STATION_BLOCK_WIDTH + 2 * GRID_BASE = 160 px
  */
-export const GPZ_MIN_BLOCK_SIZE = (STATION_BLOCK_WIDTH + 2 * GRID_BASE) as const;
+export const GPZ_MIN_BLOCK_SIZE = STATION_BLOCK_WIDTH + 2 * GRID_BASE;
 
 // =============================================================================
 // § 5.2 MINIMALNE ODLEGŁOŚCI — dla algorytmów rozmieszczania
@@ -627,13 +627,13 @@ export const GPZ_MIN_BLOCK_SIZE = (STATION_BLOCK_WIDTH + 2 * GRID_BASE) as const
  *
  * Używana przez: force-directed, greedy placement jako dolne ograniczenie.
  */
-export const MIN_STATION_DISTANCE = GRID_SPACING_MAIN as const;
+export const MIN_STATION_DISTANCE = GRID_SPACING_MAIN;
 
 /**
  * Minimalna odległość centrum-centrum między stacją a krawędzią schematu [px].
  * = 2 × GRID_BASE = 40 px
  */
-export const MIN_DIAGRAM_MARGIN = (2 * GRID_BASE) as const;
+export const MIN_DIAGRAM_MARGIN = 2 * GRID_BASE;
 
 // =============================================================================
 // STAŁA WERYFIKACYJNA (dla testów)

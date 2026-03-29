@@ -196,7 +196,7 @@ export { LayoutEngine, DEFAULT_ENGINE_OPTIONS } from './LayoutEngine';
 export type { LayoutEngineOptions } from './LayoutEngine';
 export type { PlacementAlgorithm, ConnectionStyle, PhaseColorConfig } from './types';
 
-export { computeForceDirectedLayout, DEFAULT_FORCE_CONFIG } from './algorithms/force-directed';
+export { computeForceDirectedPositions, DEFAULT_FORCE_CONFIG } from './algorithms/force-directed';
 export type { FDNode, FDEdge, ForceDirectedConfig } from './algorithms/force-directed';
 
 export { computeGreedyPlacement, DEFAULT_GREEDY_CONFIG } from './algorithms/greedy-placement';

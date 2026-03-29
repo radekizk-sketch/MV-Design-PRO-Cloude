@@ -84,7 +84,7 @@ const GPZ_Y = 60;  // Y_GPZ
  * @param config - konfiguracja (opcjonalna)
  * @returns mapa nodeId → {x, y} snapnięta do GRID_BASE
  */
-export function computeForceDirectedLayout(
+export function computeForceDirectedPositions(
   nodes:  readonly FDNode[],
   edges:  readonly FDEdge[],
   config?: Partial<ForceDirectedConfig>

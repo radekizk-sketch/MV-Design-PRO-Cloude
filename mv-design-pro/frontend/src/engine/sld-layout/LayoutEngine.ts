@@ -35,7 +35,7 @@ import type {
   ConnectionStyle,
 } from './types';
 import { computeFullLayout, computeIncrementalLayout, verifyDeterminism as pipelineDeterminism } from './pipeline';
-import { computeForceDirectedLayout } from './algorithms/force-directed';
+import { computeForceDirectedPositions } from './algorithms/force-directed';
 import { computeGreedyPlacement } from './algorithms/greedy-placement';
 import { detectCollisions, resolveCollisionsAstar, buildObstacleList } from './algorithms/collision-detector';
 import { applyPhaseColors } from './algorithms/phase-colors';
@@ -229,7 +229,7 @@ export class LayoutEngine {
       }))
       .filter((e) => e.fromId && e.toId) as Array<{ fromId: string; toId: string }>;
 
-    const positions = computeForceDirectedLayout(nodes, edges, { minDistance, maxDistance });
+    const positions = computeForceDirectedPositions(nodes, edges, { minDistance, maxDistance });
 
     // Nadpisz pozycje w inputcie i uruchom pipeline do wygenerowania pełnego LayoutResult
     const enrichedSymbols = input.symbols.map((s) => {
