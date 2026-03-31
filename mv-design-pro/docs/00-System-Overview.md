@@ -32,6 +32,6 @@ mv-design-pro/
 ## 5. Linki pomocnicze
 - [GO-LIVE-CHECKLIST.md](./GO-LIVE-CHECKLIST.md)
 - [REPOSITORY-HYGIENE.md](./REPOSITORY-HYGIENE.md)
-- [ROADMAP.md](./ROADMAP.md)
+- [PLANS.md](../PLANS.md)
 - [INDEX.md](./INDEX.md) — spis treści dokumentacji
 - [docs/audit/](./audit/) — raporty audytowe i archiwalne ExecPlany (non-canonical)

@@ -34,7 +34,8 @@ export type CanonicalOpName =
   | 'add_bess_inverter_nn'
   | 'add_genset_nn'
   | 'add_ups_nn'
-  | 'add_nn_load';
+  | 'add_nn_load'
+  | 'delete_element';
 
 export const ALIAS_MAP: Record<string, CanonicalOpName> = {
   add_trunk_segment_sn: 'continue_trunk_segment_sn',

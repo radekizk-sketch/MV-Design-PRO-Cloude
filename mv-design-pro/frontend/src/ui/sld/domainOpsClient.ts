@@ -31,6 +31,46 @@ export function buildIdempotencyKey(
   return `op:${opName}:${seed}`;
 }
 
+function canonicalStringify(value: unknown): string {
+  if (value === null) return 'null';
+  if (value === undefined) return 'null';
+  if (typeof value === 'number' || typeof value === 'boolean') return String(value);
+  if (typeof value === 'string') return JSON.stringify(value);
+  if (Array.isArray(value)) return `[${value.map((item) => canonicalStringify(item)).join(',')}]`;
+  if (typeof value === 'object') {
+    const obj = value as Record<string, unknown>;
+    const keys = Object.keys(obj)
+      .filter((key) => obj[key] !== undefined)
+      .sort();
+    return `{${keys.map((key) => `${JSON.stringify(key)}:${canonicalStringify(obj[key])}`).join(',')}}`;
+  }
+  return JSON.stringify(String(value));
+}
+
+function hashFNV1a32(input: string): string {
+  let hash = 0x811c9dc5;
+  for (let i = 0; i < input.length; i += 1) {
+    hash ^= input.charCodeAt(i);
+    hash = Math.imul(hash, 0x01000193);
+  }
+  return (hash >>> 0).toString(16).padStart(8, '0');
+}
+
+/**
+ * Deterministyczny klucz idempotencji ENM_OP.
+ * Ten sam opName + snapshotBaseHash + payload daje ten sam klucz.
+ */
+export function buildDeterministicIdempotencyKey(
+  opName: CanonicalOpName,
+  payload: Record<string, unknown>,
+  snapshotBaseHash: string = '',
+): string {
+  const canonicalPayload = canonicalStringify(payload);
+  const payloadHash = hashFNV1a32(canonicalPayload);
+  const snapshotToken = snapshotBaseHash.trim() === '' ? 'root' : snapshotBaseHash;
+  return buildIdempotencyKey(opName, `${snapshotToken}:${payloadHash}`);
+}
+
 /**
  * Wykonaj operację domenową.
  *
@@ -52,7 +92,7 @@ export async function executeDomainOp(
     operation: {
       name: canonicalName,
       idempotency_key:
-        idempotencyKey ?? buildIdempotencyKey(canonicalName, `${Date.now()}`),
+        idempotencyKey ?? buildDeterministicIdempotencyKey(canonicalName, payload, snapshotBaseHash),
       payload,
     },
   };

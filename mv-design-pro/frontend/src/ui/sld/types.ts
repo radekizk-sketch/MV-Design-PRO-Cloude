@@ -14,6 +14,24 @@ import type { AnySldSymbol, Position } from '../sld-editor/types';
 import type { CanonicalAnnotationsV1 } from './core/layoutResult';
 import { ETAP_GEOMETRY } from './sldEtapStyle';
 
+export type InteractionPortRole = 'TRUNK_IN' | 'TRUNK_OUT' | 'BRANCH_OUT' | 'RING' | 'NN_SOURCE';
+
+export interface SegmentInteractionTarget {
+  segment_ref: string;
+  edge_id: string;
+  from_ref: string;
+  to_ref: string;
+  segment_kind: 'TRUNK' | 'BRANCH' | 'RING' | 'SECONDARY';
+}
+
+export interface InteractionPreviewState {
+  target_kind: 'canvas' | 'element' | 'segment' | 'port';
+  target_id: string;
+  valid: boolean;
+  message_pl: string;
+  port_role?: InteractionPortRole;
+}
+
 /**
  * Viewport state for pan/zoom.
  */
@@ -38,6 +56,22 @@ export interface SLDViewProps {
 
   /** Callback when element is clicked */
   onElementClick?: (element: SelectedElement) => void;
+
+  /** Callback when kliknięto tło canvasu */
+  onCanvasClick?: () => void;
+
+  /** Callback when najechano na element */
+  onElementHover?: (element: SelectedElement | null) => void;
+
+  /** Callback when kliknięto port semantyczny elementu */
+  onPortClick?: (target: SelectedElement, role: InteractionPortRole) => void;
+  onPortHover?: (target: SelectedElement | null, role: InteractionPortRole | null) => void;
+
+  /** Callback when kliknięto segment/połączenie */
+  onSegmentClick?: (segment: SegmentInteractionTarget) => void;
+
+  /** Callback when hover na segmencie */
+  onSegmentHover?: (segment: SegmentInteractionTarget | null) => void;
 
   /** Show grid background */
   showGrid?: boolean;
@@ -65,6 +99,9 @@ export interface SLDViewProps {
 
   /** Kanoniczne adnotacje geometrii (GPZ/trunk/branch/stacje). */
   canonicalAnnotations?: CanonicalAnnotationsV1 | null;
+
+  /** Podgląd walidacyjny aktywnego narzędzia na płótnie */
+  interactionPreview?: InteractionPreviewState | null;
 }
 
 /**
@@ -79,6 +116,28 @@ export interface SLDViewCanvasProps {
 
   /** Callback when symbol is clicked */
   onSymbolClick: (symbolId: string, elementType: ElementType, elementName: string) => void;
+
+  /** Callback when symbol is hovered */
+  onSymbolHover?: (symbolId: string | null, elementType?: ElementType, elementName?: string) => void;
+
+  /** Callback when kliknięto tło */
+  onCanvasClick?: () => void;
+
+  /** Callback when kliknięto port symbolu */
+  onPortClick?: (symbolId: string, elementType: ElementType, elementName: string, role: InteractionPortRole) => void;
+  onPortHover?: (symbolId: string | null, elementType?: ElementType, elementName?: string, role?: InteractionPortRole) => void;
+
+  /** Callback when kliknięto segment połączenia */
+  onSegmentClick?: (segment: SegmentInteractionTarget) => void;
+
+  /** Callback when hover na segmencie */
+  onSegmentHover?: (segment: SegmentInteractionTarget | null) => void;
+
+  /** Aktualnie zaznaczony segment */
+  selectedConnectionId?: string | null;
+
+  /** Podgląd walidacyjny aktywnego narzędzia */
+  interactionPreview?: InteractionPreviewState | null;
 
   /** Viewport state */
   viewport: ViewportState;

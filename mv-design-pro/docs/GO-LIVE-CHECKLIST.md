@@ -368,7 +368,7 @@ cd mv-design-pro/backend && poetry run pytest -q
 
 ## Powiązane Dokumenty
 
-- [ROADMAP.md](./ROADMAP.md) - mapa drogowa
+- [PLANS.md](../PLANS.md) - mapa drogowa
 - [00-System-Overview.md](./00-System-Overview.md) - architektura
 - [ADR-006](./adr/ADR-006-solver-layer-separation.md) - separacja solverów
 - [ADR-007](./adr/ADR-007-iec60909-frozen-reference.md) - zamrożenie IEC 60909
