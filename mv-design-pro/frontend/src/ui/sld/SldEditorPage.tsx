@@ -721,7 +721,7 @@ export const SldEditorPage: React.FC<SldEditorPageProps> = ({
           </div>
         )}
 
-        {/* UX 10/10: ReadinessLivePanel + DataGapPanel — floating bottom-left, above FixActions */}
+        {/* UX 10/10: panel gotowości + panel braków danych — lewy dolny róg, nad panelem szybkich napraw */}
         {activeCaseId && (
           <div
             className="absolute bottom-28 left-4 z-20 flex flex-col gap-2"
@@ -838,7 +838,7 @@ export const SldEditorPage: React.FC<SldEditorPageProps> = ({
           </div>
 
           <div className="mt-3 rounded border border-gray-200 p-2">
-            <div className="text-xs font-semibold text-gray-700">Readiness i fix_actions</div>
+            <div className="text-xs font-semibold text-gray-700">Gotowość obliczeń i Szybkie naprawy</div>
             <div className="mt-1 text-[11px] text-gray-600" data-testid="sld-segment-readiness-status">
               Gotowy: {enmReadiness?.ready ? 'TAK' : 'NIE'} | Blockery: {enmReadiness?.blockers.length ?? 0} | Ostrzeżenia: {enmReadiness?.warnings.length ?? 0}
             </div>
