@@ -228,7 +228,7 @@ export const ReadinessLivePanel: React.FC<ReadinessLivePanelProps> = ({
   if (!loading && issues.length === 0) {
     return (
       <div
-        className="flex flex-col items-center justify-center p-6 text-center"
+        className="pointer-events-auto flex w-full flex-col items-center justify-center rounded-lg border border-slate-200 bg-white p-6 text-center shadow-sm"
         data-testid="readiness-live-panel-empty"
       >
         <div className="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center mb-2">
@@ -246,7 +246,7 @@ export const ReadinessLivePanel: React.FC<ReadinessLivePanelProps> = ({
 
   return (
     <div
-      className="flex flex-col h-full bg-white"
+      className="pointer-events-auto flex h-full max-h-80 w-full flex-col overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm"
       data-testid="readiness-live-panel"
     >
       {/* Compact header */}

@@ -24,6 +24,9 @@ const resolvedExecutablePath = process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH ?
 
 const useRealBackend = process.env.PLAYWRIGHT_REAL_BACKEND === '1';
 const backendUrl = process.env.PLAYWRIGHT_BACKEND_URL ?? 'http://127.0.0.1:8000';
+const backendServerCommand = process.platform === 'win32'
+  ? 'powershell -NoProfile -Command "Set-Location ..\\backend; poetry run uvicorn src.api.main:app --host 0.0.0.0 --port 8000"'
+  : 'bash -lc "cd ../backend && poetry run uvicorn src.api.main:app --host 0.0.0.0 --port 8000"';
 
 export default defineConfig({
   testDir: './e2e',
@@ -100,7 +103,7 @@ export default defineConfig({
   webServer: useRealBackend
     ? [
       {
-        command: 'bash -lc "cd ../backend && poetry run uvicorn src.api.main:app --host 0.0.0.0 --port 8000"',
+        command: backendServerCommand,
         url: backendUrl,
         reuseExistingServer: true,
         timeout: 120000,

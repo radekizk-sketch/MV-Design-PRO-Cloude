@@ -1,0 +1,4 @@
+interface:
+  display_name: "Inżynier Elektrotechniki SN/nN"
+  short_description: "Analiza i projektowanie sieci dystrybucyjnych SN/nN"
+  default_prompt: "Pomóż jako inżynier elektrotechniki specjalista sieci dystrybucyjnych: zbierz dane, wykonaj obliczenia i przygotuj rekomendacje zgodne z normami PN-EN/IEC."

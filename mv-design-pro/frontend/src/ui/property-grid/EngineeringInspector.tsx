@@ -66,6 +66,7 @@ export interface EngineeringInspectorProps {
   onRefreshFromCatalog?: () => void;
   onNavigateToResults?: () => void;
   onEditProtection?: () => void;
+  onDeleteElement?: () => void;
 }
 
 interface FieldEditState {
@@ -501,14 +502,17 @@ const CatalogSectionContent: React.FC<CatalogSectionContentProps> = ({
 
       {/* Action buttons */}
       <div className="flex items-center gap-2 pt-1">
-        {(!isMaterialized || hasDrift) && onChangeCatalogType && (
+        {onChangeCatalogType && (
           <button
             onClick={onChangeCatalogType}
+            data-testid="engineering-catalog-change-button"
             className={clsx(
               'px-3 py-1 text-xs rounded transition-colors',
               !isMaterialized
                 ? 'bg-blue-500 text-white hover:bg-blue-600'
-                : 'bg-gray-200 text-gray-700 hover:bg-gray-300',
+                : hasDrift
+                  ? 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                  : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50',
             )}
           >
             Zmień typ z katalogu
@@ -517,6 +521,7 @@ const CatalogSectionContent: React.FC<CatalogSectionContentProps> = ({
         {isMaterialized && hasDrift && onRefreshFromCatalog && (
           <button
             onClick={onRefreshFromCatalog}
+            data-testid="engineering-catalog-refresh-button"
             className="px-3 py-1 text-xs bg-amber-500 text-white rounded hover:bg-amber-600 transition-colors"
           >
             Odśwież parametry z katalogu
@@ -550,6 +555,7 @@ const NoCatalogPlaceholder: React.FC<NoCatalogPlaceholderProps> = ({
       <div className="pt-1">
         <button
           onClick={onChangeCatalogType}
+          data-testid="engineering-catalog-change-button"
           className="px-3 py-1 text-xs bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors"
         >
           Zmień typ z katalogu
@@ -737,6 +743,7 @@ export const EngineeringInspector: React.FC<EngineeringInspectorProps> = ({
   onRefreshFromCatalog,
   onNavigateToResults,
   onEditProtection,
+  onDeleteElement,
 }) => {
   const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set());
   const [editState, setEditState] = useState<FieldEditState | null>(null);
@@ -1159,6 +1166,19 @@ export const EngineeringInspector: React.FC<EngineeringInspectorProps> = ({
                 onEditProtection={onEditProtection}
               />
             )}
+          </div>
+        )}
+
+        {onDeleteElement && elementId && (
+          <div className="border-t border-gray-200 p-3 bg-gray-50" data-testid="engineering-delete-action">
+            <button
+              type="button"
+              onClick={onDeleteElement}
+              className="w-full px-3 py-2 text-sm font-semibold text-red-700 bg-red-50 border border-red-200 rounded hover:bg-red-100 transition-colors"
+              data-testid="engineering-delete-button"
+            >
+              Usuń element z modelu
+            </button>
           </div>
         )}
       </div>

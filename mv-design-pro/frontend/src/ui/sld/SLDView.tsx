@@ -330,6 +330,13 @@ export const SLDView: React.FC<SLDViewProps> = ({
   symbols,
   selectedElement: externalSelectedElement,
   onElementClick,
+  onCanvasClick,
+  onElementHover,
+  onPortClick,
+  onPortHover,
+  onSegmentClick,
+  onSegmentHover,
+  interactionPreview = null,
   showGrid = true,
   width = DEFAULT_WIDTH,
   height = DEFAULT_HEIGHT,
@@ -349,6 +356,7 @@ export const SLDView: React.FC<SLDViewProps> = ({
   // Focus pulse state (for marker click visual feedback)
   // Cleared via CSS animationend event (no setTimeout for deterministic E2E)
   const [focusPulseElementId, setFocusPulseElementId] = useState<string | null>(null);
+  const [selectedConnectionId, setSelectedConnectionId] = useState<string | null>(null);
 
   // BLOK 7 — etykiety techniczne (load%, NOP, napięcie)
   const [techLabelsVisible, setTechLabelsVisible] = useState(false);
@@ -649,6 +657,7 @@ export const SLDView: React.FC<SLDViewProps> = ({
       };
 
       // Update selection store
+      setSelectedConnectionId(null);
       selectElement(element);
 
       // Sync to URL
@@ -661,6 +670,59 @@ export const SLDView: React.FC<SLDViewProps> = ({
     },
     [symbols, selectElement, onElementClick, operationalMode]
   );
+
+  const handleSymbolHover = useCallback(
+    (symbolId: string | null, elementType?: ElementType, elementName?: string) => {
+      if (!onElementHover) return;
+      if (!symbolId || !elementType || !elementName) {
+        onElementHover(null);
+        return;
+      }
+      onElementHover({
+        id: symbolId,
+        type: elementType,
+        name: elementName,
+      });
+    },
+    [onElementHover],
+  );
+
+  const handleCanvasBackgroundClick = useCallback(() => {
+    onCanvasClick?.();
+  }, [onCanvasClick]);
+
+  const handlePortClick = useCallback(
+    (symbolId: string, elementType: ElementType, elementName: string, role: 'TRUNK_IN' | 'TRUNK_OUT' | 'BRANCH_OUT' | 'RING' | 'NN_SOURCE') => {
+      const target: SelectedElement = {
+        id: symbolId,
+        type: elementType,
+        name: elementName,
+      };
+      onPortClick?.(target, role);
+    },
+    [onPortClick],
+  );
+
+  const handlePortHover = useCallback(
+    (symbolId: string | null, elementType?: ElementType, elementName?: string, role?: 'TRUNK_IN' | 'TRUNK_OUT' | 'BRANCH_OUT' | 'RING' | 'NN_SOURCE') => {
+      if (!onPortHover) return;
+      if (!symbolId || !elementType || !elementName || !role) {
+        onPortHover(null, null);
+        return;
+      }
+      onPortHover({ id: symbolId, type: elementType, name: elementName }, role);
+    },
+    [onPortHover],
+  );
+
+  const handleSegmentClick = useCallback((segment: { edge_id: string; segment_ref: string; from_ref: string; to_ref: string; segment_kind: 'TRUNK' | 'BRANCH' | 'RING' | 'SECONDARY' }) => {
+    setSelectedConnectionId(segment.edge_id);
+    onSegmentClick?.(segment);
+  }, [onSegmentClick]);
+
+  const handleSegmentHover = useCallback((segment: { edge_id: string; segment_ref: string; from_ref: string; to_ref: string; segment_kind: 'TRUNK' | 'BRANCH' | 'RING' | 'SECONDARY' } | null) => {
+    onSegmentHover?.(segment);
+  }, [onSegmentHover]);
 
   /**
    * Handle zoom in.
@@ -1469,6 +1531,14 @@ export const SLDView: React.FC<SLDViewProps> = ({
           symbols={symbols}
           selectedId={selectedElement?.id ?? null}
           onSymbolClick={handleSymbolClick}
+          onSymbolHover={handleSymbolHover}
+          onCanvasClick={handleCanvasBackgroundClick}
+          onPortClick={handlePortClick}
+          onPortHover={handlePortHover}
+          onSegmentClick={handleSegmentClick}
+          onSegmentHover={handleSegmentHover}
+          selectedConnectionId={selectedConnectionId}
+          interactionPreview={interactionPreview}
           viewport={viewport}
           showGrid={showGrid}
           width={width}

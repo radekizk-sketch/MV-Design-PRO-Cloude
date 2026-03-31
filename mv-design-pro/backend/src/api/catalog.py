@@ -21,9 +21,10 @@ from api.dependencies import get_uow_factory
 from application.catalog_governance import CatalogGovernanceService
 from application.network_wizard import NetworkWizardService
 from application.network_wizard.service import NotFound
+from network_model.catalog.repository import get_default_mv_catalog
 from network_model.catalog.governance import ImportMode
 
-router = APIRouter(prefix="/catalog", tags=["Type Catalog"])
+router = APIRouter(prefix="/api/catalog", tags=["Type Catalog"])
 
 
 def _build_service(uow_factory: Any) -> NetworkWizardService:
@@ -146,39 +147,27 @@ def import_type_library(
 
 
 @router.get("/line-types")
-def list_line_types(
-    uow_factory=Depends(get_uow_factory),
-) -> list[dict[str, Any]]:
-    """List all line types from catalog"""
-    service = _build_service(uow_factory)
-    return service.list_line_types()
+def list_line_types() -> list[dict[str, Any]]:
+    """List all line types from the canonical MV catalog."""
+    return [item.to_dict() for item in get_default_mv_catalog().list_line_types()]
 
 
 @router.get("/cable-types")
-def list_cable_types(
-    uow_factory=Depends(get_uow_factory),
-) -> list[dict[str, Any]]:
-    """List all cable types from catalog"""
-    service = _build_service(uow_factory)
-    return service.list_cable_types()
+def list_cable_types() -> list[dict[str, Any]]:
+    """List all cable types from the canonical MV catalog."""
+    return [item.to_dict() for item in get_default_mv_catalog().list_cable_types()]
 
 
 @router.get("/transformer-types")
-def list_transformer_types(
-    uow_factory=Depends(get_uow_factory),
-) -> list[dict[str, Any]]:
-    """List all transformer types from catalog"""
-    service = _build_service(uow_factory)
-    return service.list_transformer_types()
+def list_transformer_types() -> list[dict[str, Any]]:
+    """List all transformer types from the canonical MV catalog."""
+    return [item.to_dict() for item in get_default_mv_catalog().list_transformer_types()]
 
 
 @router.get("/switch-equipment-types")
-def list_switch_equipment_types(
-    uow_factory=Depends(get_uow_factory),
-) -> list[dict[str, Any]]:
-    """List all switch equipment types from catalog"""
-    service = _build_service(uow_factory)
-    return service.list_switch_equipment_types()
+def list_switch_equipment_types() -> list[dict[str, Any]]:
+    """List all switch equipment types from the canonical MV catalog."""
+    return [item.to_dict() for item in get_default_mv_catalog().list_switch_equipment_types()]
 
 
 @router.get("/protection/device-types")

@@ -1,36 +1,15 @@
 /**
- * CreatorToolbar V1 — pasek narzędzi kreatora sieci SN.
+ * CreatorToolbar V2 — kanoniczny pasek narzędzi edytora SLD/CAD.
  *
- * Mapuje kliknięcia SLD na operacje domenowe V1:
- *   - "Dodaj GPZ"         → add_grid_source_sn
- *   - "Kontynuuj magistralę" → continue_trunk_segment_sn
- *   - "Wstaw stację"      → insert_station_on_segment_sn
- *   - "Odgałęzienie"      → start_branch_segment_sn
- *   - "Zamknij pierścień"  → connect_secondary_ring_sn
- *   - "Punkt NOP"          → set_normal_open_point
- *   - "Transformator"      → add_transformer_sn_nn
- *   - "Katalog"            → assign_catalog_to_element
- *
- * CLICK-DRIVEN: Toolbar ustawia aktywne narzędzie → SLD obsługuje kliknięcie.
- * BINDING: PL labels, no codenames.
+ * Zawiera:
+ * - Narzędzia interakcji (wybór/przesuwanie/edycja/usuwanie)
+ * - Narzędzia budowy sieci SN przez ENM_OP
+ * - Paletę typów obiektów z jawnymi portami semantycznymi
  */
 
-import { useCallback, useState } from 'react';
-
-// ---------------------------------------------------------------------------
-// Types
-// ---------------------------------------------------------------------------
-
-export type CreatorTool =
-  | 'add_gpz'
-  | 'continue_trunk'
-  | 'insert_station'
-  | 'start_branch'
-  | 'connect_ring'
-  | 'set_nop'
-  | 'add_transformer'
-  | 'assign_catalog'
-  | null;
+import { useCallback, useMemo, useState } from 'react';
+import { CREATOR_TOOLS, EDITOR_OBJECT_TYPES } from './editorPalette';
+import type { CreatorTool } from './editorPalette';
 
 interface CreatorToolbarProps {
   activeTool: CreatorTool;
@@ -42,91 +21,6 @@ interface CreatorToolbarProps {
   /** Loading state — disable all tools during operation. */
   disabled?: boolean;
 }
-
-// ---------------------------------------------------------------------------
-// Tool definitions
-// ---------------------------------------------------------------------------
-
-interface ToolDef {
-  id: CreatorTool;
-  label: string;
-  shortcut?: string;
-  icon: string;
-  description: string;
-  /** Only show when condition is true. */
-  showWhen?: (props: Pick<CreatorToolbarProps, 'hasSource' | 'hasRing'>) => boolean;
-}
-
-const TOOLS: ToolDef[] = [
-  {
-    id: 'add_gpz',
-    label: 'GPZ',
-    shortcut: 'G',
-    icon: '⚡',
-    description: 'Dodaj źródło zasilania (GPZ) — punkt startowy sieci SN',
-    showWhen: ({ hasSource }) => !hasSource,
-  },
-  {
-    id: 'continue_trunk',
-    label: 'Magistrala',
-    shortcut: 'M',
-    icon: '━',
-    description: 'Kontynuuj magistralę — kliknij koniec magistrali w SLD',
-    showWhen: ({ hasSource }) => hasSource,
-  },
-  {
-    id: 'insert_station',
-    label: 'Stacja',
-    shortcut: 'S',
-    icon: '◻',
-    description: 'Wstaw stację na segmencie — kliknij segment w SLD',
-    showWhen: ({ hasSource }) => hasSource,
-  },
-  {
-    id: 'start_branch',
-    label: 'Odgałęzienie',
-    shortcut: 'O',
-    icon: '┣',
-    description: 'Dodaj odgałęzienie — kliknij port BRANCH stacji w SLD',
-    showWhen: ({ hasSource }) => hasSource,
-  },
-  {
-    id: 'connect_ring',
-    label: 'Pierścień',
-    shortcut: 'P',
-    icon: '○',
-    description: 'Zamknij pierścień — kliknij dwa końce magistrali w SLD',
-    showWhen: ({ hasSource }) => hasSource,
-  },
-  {
-    id: 'set_nop',
-    label: 'NOP',
-    shortcut: 'N',
-    icon: '⊘',
-    description: 'Ustaw punkt normalnie otwarty — kliknij segment pierścienia',
-    showWhen: ({ hasRing }) => hasRing,
-  },
-  {
-    id: 'add_transformer',
-    label: 'Transformator',
-    shortcut: 'T',
-    icon: '⊗',
-    description: 'Dodaj transformator SN/nN — kliknij stację w SLD',
-    showWhen: ({ hasSource }) => hasSource,
-  },
-  {
-    id: 'assign_catalog',
-    label: 'Katalog',
-    shortcut: 'K',
-    icon: '📋',
-    description: 'Przypisz typ katalogowy — kliknij element w SLD',
-    showWhen: ({ hasSource }) => hasSource,
-  },
-];
-
-// ---------------------------------------------------------------------------
-// Component
-// ---------------------------------------------------------------------------
 
 export function CreatorToolbar({
   activeTool,
@@ -145,18 +39,37 @@ export function CreatorToolbar({
     [activeTool, onToolChange, disabled],
   );
 
-  const visibleTools = TOOLS.filter(
-    (t) => !t.showWhen || t.showWhen({ hasSource, hasRing }),
+  const visibleTools = useMemo(
+    () =>
+      CREATOR_TOOLS.filter((tool) => {
+        if (tool.requiresSource && !hasSource) return false;
+        if (tool.requiresRing && !hasRing) return false;
+        if (tool.id === 'add_gpz' && hasSource) return false;
+        return true;
+      }),
+    [hasRing, hasSource],
   );
 
+  const groupedTools = useMemo(
+    () => ({
+      tools: visibleTools.filter((tool) => tool.group === 'NARZEDZIA'),
+      build: visibleTools.filter((tool) => tool.group === 'BUDOWA_SIECI'),
+    }),
+    [visibleTools],
+  );
+
+  const activeDescription = CREATOR_TOOLS.find((t) => t.id === (activeTool ?? hoveredTool))?.description;
+
   return (
-    <div className="flex flex-col border-b border-gray-200 bg-gray-50">
-      {/* Tools row */}
-      <div className="flex items-center gap-1 px-3 py-2">
-        <span className="text-xs font-medium text-gray-500 mr-2">KREATOR:</span>
-        {visibleTools.map((tool) => (
+    <div className="flex flex-col border-b border-gray-200 bg-gray-50" data-testid="creator-toolbar">
+      <div className="px-3 pt-2 pb-1 text-[10px] uppercase tracking-wide font-semibold text-gray-500">
+        Narzędzia edytora
+      </div>
+      <div className="flex flex-wrap items-center gap-1 px-3 pb-2">
+        {groupedTools.tools.map((tool) => (
           <button
             key={tool.id}
+            data-testid={`creator-tool-${tool.id}`}
             className={`
               flex items-center gap-1 px-2 py-1 text-xs font-medium rounded
               border transition-colors
@@ -175,31 +88,67 @@ export function CreatorToolbar({
           >
             <span className="text-sm">{tool.icon}</span>
             <span>{tool.label}</span>
-            {tool.shortcut && (
-              <kbd className="ml-1 px-1 bg-gray-100 text-gray-400 text-[9px] rounded border border-gray-200">
-                {tool.shortcut}
-              </kbd>
-            )}
           </button>
         ))}
-
-        {/* Cancel active tool */}
-        {activeTool && (
-          <button
-            className="ml-2 px-2 py-1 text-xs text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded"
-            onClick={() => onToolChange(null)}
-          >
-            Anuluj
-          </button>
-        )}
       </div>
 
-      {/* Active tool description */}
-      {(activeTool || hoveredTool) && (
+      <div className="px-3 pt-1 pb-1 text-[10px] uppercase tracking-wide font-semibold text-gray-500 border-t border-gray-200">
+        Budowa sieci SN
+      </div>
+      <div className="flex flex-wrap items-center gap-1 px-3 pb-2">
+        {groupedTools.build.map((tool) => (
+          <button
+            key={tool.id}
+            data-testid={`creator-tool-${tool.id}`}
+            className={`
+              flex items-center gap-1 px-2 py-1 text-xs font-medium rounded
+              border transition-colors
+              ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}
+              ${
+                activeTool === tool.id
+                  ? 'bg-blue-100 border-blue-400 text-blue-800 shadow-sm'
+                  : 'bg-white border-gray-300 text-gray-600 hover:bg-gray-100'
+              }
+            `}
+            onClick={() => handleToolClick(tool.id)}
+            onMouseEnter={() => setHoveredTool(tool.id)}
+            onMouseLeave={() => setHoveredTool(null)}
+            disabled={disabled}
+            title={tool.description}
+          >
+            <span className="text-sm">{tool.icon}</span>
+            <span>{tool.label}</span>
+          </button>
+        ))}
+      </div>
+
+      <div className="px-3 py-2 border-t border-gray-200 bg-white">
+        <div className="text-[10px] uppercase tracking-wide font-semibold text-gray-500 mb-1">
+          Paleta typów obiektów
+        </div>
+        <div className="grid grid-cols-1 gap-1 max-h-40 overflow-auto">
+          {EDITOR_OBJECT_TYPES.map((item) => (
+            <div
+              key={item.id}
+              data-testid={`palette-object-${item.id}`}
+              className="rounded border border-gray-200 px-2 py-1 text-[11px] text-gray-700 bg-gray-50"
+            >
+              <div className="font-medium">{item.label}</div>
+              <div className="text-[10px] text-gray-500">
+                Porty: {item.ports.map((port) => port.label).join(', ')}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {activeDescription && (
         <div className="px-3 py-1 bg-blue-50/50 border-t border-gray-100 text-xs text-gray-600">
-          {TOOLS.find((t) => t.id === (activeTool ?? hoveredTool))?.description}
+          {activeDescription}
         </div>
       )}
     </div>
   );
 }
+
+export type { CreatorTool } from './editorPalette';

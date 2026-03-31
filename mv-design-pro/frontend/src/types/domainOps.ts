@@ -34,7 +34,29 @@ export type CanonicalOpName =
   | 'add_bess_inverter_nn'
   | 'add_genset_nn'
   | 'add_ups_nn'
-  | 'add_nn_load';
+  | 'add_nn_load'
+<<<<<<< ours
+<<<<<<< ours
+<<<<<<< ours
+<<<<<<< ours
+<<<<<<< ours
+  | 'delete_element'
+  | 'refresh_snapshot';
+=======
+  | 'delete_element';
+>>>>>>> theirs
+=======
+  | 'delete_element';
+>>>>>>> theirs
+=======
+  | 'delete_element';
+>>>>>>> theirs
+=======
+  | 'delete_element';
+>>>>>>> theirs
+=======
+  | 'delete_element';
+>>>>>>> theirs
 
 export const ALIAS_MAP: Record<string, CanonicalOpName> = {
   add_trunk_segment_sn: 'continue_trunk_segment_sn',
@@ -56,6 +78,22 @@ export interface DomainOpResponse {
   selection_hint: SelectionHint | null;
   audit_trail: AuditEntry[];
   domain_events: DomainEvent[];
+  materialized_params?: MaterializedParamsEnvelope;
+  layout?: {
+    layout_hash: string;
+    layout_version: string;
+  };
+}
+
+export interface MaterializedCatalogParams {
+  catalog_item_id: string;
+  catalog_item_version: string | null;
+  [key: string]: unknown;
+}
+
+export interface MaterializedParamsEnvelope {
+  lines_sn: Record<string, MaterializedCatalogParams>;
+  transformers_sn_nn: Record<string, MaterializedCatalogParams>;
 }
 
 export interface ReadinessInfo {
@@ -147,6 +185,15 @@ export interface SegmentSpec {
   dlugosc_m: number;
   catalog_ref: string | null;
   name: string | null;
+  catalog_binding?: CatalogBindingPayload;
+}
+
+export interface CatalogBindingPayload {
+  catalog_namespace: string;
+  catalog_item_id: string;
+  catalog_item_version: string;
+  materialize?: boolean;
+  snapshot_mapping_version?: string;
 }
 
 // --- Station ---

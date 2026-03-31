@@ -152,7 +152,7 @@ export function SldFixActionsPanel({
   return (
     <div
       data-testid="sld-fix-actions-panel"
-      className="bg-white border border-slate-200 rounded-lg shadow-sm overflow-hidden"
+      className="pointer-events-auto bg-white border border-slate-200 rounded-lg shadow-sm overflow-hidden"
       style={{ width: 320 }}
     >
       {/* Nagłówek panelu */}

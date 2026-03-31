@@ -1,6 +1,9 @@
 import { test, expect, type APIRequestContext, type Page } from '@playwright/test';
 
 const BACKEND_BASE = process.env.PLAYWRIGHT_BACKEND_URL ?? 'http://127.0.0.1:8000';
+const CABLE_ID = 'cable-tfk-yakxs-3x120';
+const TRAFO_ID = 'tr-sn-nn-15-04-630kva-dyn11';
+let opCounter = 0;
 
 type DomainOpResponse = {
   error?: string | null;
@@ -25,7 +28,7 @@ async function executeDomainOp(
       snapshot_base_hash: '',
       operation: {
         name,
-        idempotency_key: `e2e-${name}-${Date.now()}`,
+        idempotency_key: `e2e-${name}-${String(++opCounter).padStart(4, '0')}`,
         payload,
       },
     },
@@ -80,7 +83,17 @@ test('krytyczny flow V1 na realnym backendzie: case -> GPZ -> trunk -> station -
         rodzaj: 'KABEL',
         dlugosc_m: length,
         name: `Odcinek ${idx + 1}`,
-        catalog_ref: 'YAKXS_3x120',
+        catalog_ref: CABLE_ID,
+        catalog_binding: {
+          catalog_namespace: 'KABEL_SN',
+          catalog_item_id: CABLE_ID,
+          catalog_item_version: '2024.1',
+        },
+      },
+      catalog_binding: {
+        catalog_namespace: 'KABEL_SN',
+        catalog_item_id: CABLE_ID,
+        catalog_item_version: '2024.1',
       },
     });
   }
@@ -95,7 +108,12 @@ test('krytyczny flow V1 na realnym backendzie: case -> GPZ -> trunk -> station -
     insert_at: { value: 0.5 },
     station: { sn_voltage_kv: 15.0, nn_voltage_kv: 0.4 },
     sn_fields: ['IN', 'OUT'],
-    transformer: { create: true, transformer_catalog_ref: 'ONAN_630' },
+    transformer: { create: true, transformer_catalog_ref: TRAFO_ID },
+    catalog_binding: {
+      catalog_namespace: 'TRAFO_SN_NN',
+      catalog_item_id: TRAFO_ID,
+      catalog_item_version: '2024.1',
+    },
   });
 
   const snBus = (op.snapshot?.buses ?? []).find((bus) => bus.ref_id.includes('sn_bus'));
@@ -107,7 +125,17 @@ test('krytyczny flow V1 na realnym backendzie: case -> GPZ -> trunk -> station -
     segment: {
       rodzaj: 'KABEL',
       dlugosc_m: 180,
-      catalog_ref: 'YAKXS_3x120',
+      catalog_ref: CABLE_ID,
+      catalog_binding: {
+        catalog_namespace: 'KABEL_SN',
+        catalog_item_id: CABLE_ID,
+        catalog_item_version: '2024.1',
+      },
+    },
+    catalog_binding: {
+      catalog_namespace: 'KABEL_SN',
+      catalog_item_id: CABLE_ID,
+      catalog_item_version: '2024.1',
     },
   });
 
@@ -115,14 +143,14 @@ test('krytyczny flow V1 na realnym backendzie: case -> GPZ -> trunk -> station -
   for (const branch of op.snapshot?.branches ?? []) {
     await executeDomainOp(request, caseId, 'assign_catalog_to_element', {
       element_ref: branch.ref_id,
-      catalog_item_id: 'YAKXS_3x120',
+      catalog_item_id: CABLE_ID,
     });
   }
 
   for (const transformer of op.snapshot?.transformers ?? []) {
     await executeDomainOp(request, caseId, 'assign_catalog_to_element', {
       element_ref: transformer.ref_id,
-      catalog_item_id: 'ONAN_630',
+      catalog_item_id: TRAFO_ID,
     });
     await executeDomainOp(request, caseId, 'update_element_parameters', {
       element_ref: transformer.ref_id,
@@ -157,7 +185,7 @@ test('krytyczny flow V1 na realnym backendzie: case -> GPZ -> trunk -> station -
     );
 
     for (const issue of catalogIssues) {
-      const catalogId = issue.code.includes('transformer') ? 'ONAN_630' : 'YAKXS_3x120';
+      const catalogId = issue.code.includes('transformer') ? TRAFO_ID : CABLE_ID;
       await executeDomainOp(request, caseId, 'assign_catalog_to_element', {
         element_ref: issue.element_ref,
         catalog_item_id: catalogId,

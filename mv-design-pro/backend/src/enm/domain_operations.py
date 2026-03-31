@@ -50,6 +50,7 @@ CANONICAL_OPS = frozenset({
     "add_genset_nn",
     "add_ups_nn",
     "add_nn_load",
+    "delete_element",
     "refresh_snapshot",
 })
 
@@ -97,8 +98,91 @@ def _quantize_ratio(value: float, quantum: float = 1e-6) -> float:
     return round(value / quantum) * quantum
 
 
+def _extract_catalog_binding_item_id(catalog_binding: Any) -> str | None:
+    """Odczytaj kanoniczne catalog_item_id z compat fallback do item_id."""
+    if not isinstance(catalog_binding, dict):
+        return None
+
+    for key in ("catalog_item_id", "item_id"):
+        binding_item = catalog_binding.get(key)
+        if isinstance(binding_item, str):
+            normalized = binding_item.strip()
+            if normalized:
+                return normalized
+
+    return None
+
+
+def _extract_catalog_binding_namespace(catalog_binding: Any) -> str | None:
+    """Odczytaj namespace z kanonicznego payloadu lub legacy fallback."""
+    if not isinstance(catalog_binding, dict):
+        return None
+
+    for key in ("catalog_namespace", "namespace"):
+        binding_namespace = catalog_binding.get(key)
+        if isinstance(binding_namespace, str):
+            normalized = binding_namespace.strip()
+            if normalized:
+                return normalized
+
+    return None
+
+
+def _extract_catalog_binding_version(catalog_binding: Any) -> str | None:
+    """Odczytaj wersję katalogu z payloadu binding."""
+    if not isinstance(catalog_binding, dict):
+        return None
+
+    binding_version = catalog_binding.get("catalog_item_version")
+    if isinstance(binding_version, str):
+        normalized = binding_version.strip()
+        if normalized:
+            return normalized
+
+    return None
+
+
+def _apply_catalog_metadata(
+    target: dict[str, Any],
+    catalog_binding: Any,
+    *,
+    default_namespace: str | None = None,
+    default_source_mode: str = "KATALOG",
+) -> None:
+    """Uzupełnij snapshot elementu o kanoniczne metadane katalogowe."""
+    namespace = _extract_catalog_binding_namespace(catalog_binding) or default_namespace
+    if namespace:
+        target["catalog_namespace"] = namespace
+
+    if default_source_mode:
+        target["source_mode"] = default_source_mode
+        target["parameter_source"] = "CATALOG"
+
+    version = _extract_catalog_binding_version(catalog_binding)
+    if version:
+        target.setdefault("meta", {})["catalog_item_version"] = version
+
+
+def _infer_catalog_namespace_for_element(element: dict[str, Any]) -> str | None:
+    """Wyznacz namespace katalogu na podstawie typu elementu snapshotu."""
+    explicit = element.get("catalog_namespace")
+    if isinstance(explicit, str):
+        normalized = explicit.strip()
+        if normalized:
+            return normalized
+
+    element_type = element.get("type")
+    if element_type == "cable":
+        return "KABEL_SN"
+    if element_type == "line_overhead":
+        return "LINIA_SN"
+    if element_type == "transformer":
+        return "TRAFO_SN_NN"
+    return None
+
+
 def _resolve_catalog_ref(catalog_ref: Any, catalog_binding: Any) -> str | None:
-    """Rozwiąż catalog_ref z jawnego pola albo z catalog_binding.item_id.
+    """Rozwiąż catalog_ref z jawnego pola albo z catalog_binding.catalog_item_id.
 
     Zwraca None, gdy referencja jest pusta/niepoprawna.
     """
@@ -107,12 +191,9 @@ def _resolve_catalog_ref(catalog_ref: Any, catalog_binding: Any) -> str | None:
         if normalized:
             return normalized
 
-    if isinstance(catalog_binding, dict):
-        binding_item = catalog_binding.get("item_id")
-        if isinstance(binding_item, str):
-            normalized = binding_item.strip()
-            if normalized:
-                return normalized
+    binding_item = _extract_catalog_binding_item_id(catalog_binding)
+    if binding_item:
+        return binding_item
 
     return None
 
@@ -846,7 +927,7 @@ def _require_catalog_ref(
     """Zwróć kanoniczny catalog_ref albo odpowiedź błędu catalog.ref_required."""
     error_message = (
         f"{context_code}: wymagane powiązanie z katalogiem "
-        "(catalog_ref lub poprawne catalog_binding.item_id)."
+        "(catalog_ref lub poprawne catalog_binding.catalog_item_id)."
     )
     if isinstance(payload_ref, str):
         normalized_ref = payload_ref.strip()
@@ -856,11 +937,9 @@ def _require_catalog_ref(
     if payload_binding is not None:
         if not isinstance(payload_binding, dict):
             return _error_response(error_message, "catalog.ref_required")
-        binding_item_id = payload_binding.get("item_id")
-        if isinstance(binding_item_id, str):
-            normalized_item_id = binding_item_id.strip()
-            if normalized_item_id:
-                return normalized_item_id
+        binding_item_id = _extract_catalog_binding_item_id(payload_binding)
+        if binding_item_id:
+            return binding_item_id
         return _error_response(error_message, "catalog.ref_required")
 
     return _error_response(error_message, "catalog.ref_required")
@@ -1026,9 +1105,10 @@ def continue_trunk_segment_sn(enm: dict[str, Any], payload: dict[str, Any]) -> d
             "trunk.dlugosc_missing",
         )
 
+    segment_catalog_binding = segment.get("catalog_binding") or payload.get("catalog_binding")
     catalog_ref = _require_catalog_ref(
         payload_ref=segment.get("catalog_ref"),
-        payload_binding=segment.get("catalog_binding") or payload.get("catalog_binding"),
+        payload_binding=segment_catalog_binding,
         context_code="continue_trunk_segment_sn",
     )
     if isinstance(catalog_ref, dict):
@@ -1085,11 +1165,14 @@ def continue_trunk_segment_sn(enm: dict[str, Any], payload: dict[str, Any]) -> d
         "r_ohm_per_km": 0.0,
         "x_ohm_per_km": 0.0,
         "status": "closed",
-        "source_mode": "KATALOG",
-        "catalog_namespace": "KABEL_SN" if branch_type == "cable" else "LINIA_SN",
     }
     if catalog_ref:
         branch_data["catalog_ref"] = catalog_ref
+    _apply_catalog_metadata(
+        branch_data,
+        segment_catalog_binding,
+        default_namespace="KABEL_SN" if branch_type == "cable" else "LINIA_SN",
+    )
 
     result = create_branch(new_enm, branch_data)
     if not result.success:
@@ -1259,7 +1342,8 @@ def insert_station_on_segment_sn(enm: dict[str, Any], payload: dict[str, Any]) -
     from_bus_ref = segment.get("from_bus_ref")
     to_bus_ref = segment.get("to_bus_ref")
     length_km = segment.get("length_km", 1.0)
-    catalog_ref = segment.get("catalog_ref")
+    segment_catalog_binding = segment.get("catalog_binding")
+    catalog_ref = _resolve_catalog_ref(segment.get("catalog_ref"), segment_catalog_binding)
 
     # --- Compute deterministic seed ---
     station_seed = _compute_seed({
@@ -1339,6 +1423,11 @@ def insert_station_on_segment_sn(enm: dict[str, Any], payload: dict[str, Any]) -
     }
     if catalog_ref:
         left_data["catalog_ref"] = catalog_ref
+    _apply_catalog_metadata(
+        left_data,
+        segment_catalog_binding,
+        default_namespace="KABEL_SN" if seg_type == "cable" else "LINIA_SN",
+    )
     result = create_branch(new_enm, left_data)
     if not result.success:
         return _error_response(
@@ -1360,6 +1449,11 @@ def insert_station_on_segment_sn(enm: dict[str, Any], payload: dict[str, Any]) -
     }
     if catalog_ref:
         right_data["catalog_ref"] = catalog_ref
+    _apply_catalog_metadata(
+        right_data,
+        segment_catalog_binding,
+        default_namespace="KABEL_SN" if seg_type == "cable" else "LINIA_SN",
+    )
     result = create_branch(new_enm, right_data)
     if not result.success:
         return _error_response(
@@ -1442,9 +1536,10 @@ def insert_station_on_segment_sn(enm: dict[str, Any], payload: dict[str, Any]) -
 
     # --- Create Transformer ---
     if transformer.get("create", True):
+        transformer_catalog_binding = transformer.get("catalog_binding") or payload.get("catalog_binding")
         tr_catalog = _require_catalog_ref(
             payload_ref=transformer.get("transformer_catalog_ref"),
-            payload_binding=transformer.get("catalog_binding") or payload.get("catalog_binding"),
+            payload_binding=transformer_catalog_binding,
             context_code="insert_station_on_segment_sn.transformer",
         )
         if isinstance(tr_catalog, dict):
@@ -1463,6 +1558,11 @@ def insert_station_on_segment_sn(enm: dict[str, Any], payload: dict[str, Any]) -
         }
         if tr_catalog:
             tr_data["catalog_ref"] = tr_catalog
+        _apply_catalog_metadata(
+            tr_data,
+            transformer_catalog_binding,
+            default_namespace="TRAFO_SN_NN",
+        )
 
         result = create_device(new_enm, tr_data)
         if not result.success:
@@ -1799,9 +1899,10 @@ def start_branch_segment_sn(enm: dict[str, Any], payload: dict[str, Any]) -> dic
             "branch.dlugosc_missing",
         )
 
+    branch_catalog_binding = segment.get("catalog_binding") or payload.get("catalog_binding")
     branch_catalog_ref = _require_catalog_ref(
         payload_ref=segment.get("catalog_ref"),
-        payload_binding=segment.get("catalog_binding") or payload.get("catalog_binding"),
+        payload_binding=branch_catalog_binding,
         context_code="start_branch_segment_sn",
     )
     if isinstance(branch_catalog_ref, dict):
@@ -1850,11 +1951,14 @@ def start_branch_segment_sn(enm: dict[str, Any], payload: dict[str, Any]) -> dic
         "r_ohm_per_km": 0.0,
         "x_ohm_per_km": 0.0,
         "status": "closed",
-        "source_mode": "KATALOG",
-        "catalog_namespace": "KABEL_SN" if branch_type == "cable" else "LINIA_SN",
     }
     if branch_catalog_ref:
         branch_data["catalog_ref"] = branch_catalog_ref
+    _apply_catalog_metadata(
+        branch_data,
+        branch_catalog_binding,
+        default_namespace="KABEL_SN" if branch_type == "cable" else "LINIA_SN",
+    )
     result = create_branch(new_enm, branch_data)
     if not result.success:
         return _error_response("Nie udało się utworzyć odgałęzienia.", "branch.creation_failed")
@@ -2242,6 +2346,11 @@ def add_transformer_sn_nn(enm: dict[str, Any], payload: dict[str, Any]) -> dict[
     }
     if standalone_catalog:
         tr_data["catalog_ref"] = standalone_catalog
+    _apply_catalog_metadata(
+        tr_data,
+        payload.get("catalog_binding"),
+        default_namespace="TRAFO_SN_NN",
+    )
     if payload.get("station_ref"):
         for sub in new_enm.get("substations", []):
             if sub.get("ref_id") == payload["station_ref"]:
@@ -2271,11 +2380,13 @@ def add_transformer_sn_nn(enm: dict[str, Any], payload: dict[str, Any]) -> dict[
 def assign_catalog_to_element(enm: dict[str, Any], payload: dict[str, Any]) -> dict[str, Any]:
     """Przypisz katalog do elementu."""
     element_ref = payload.get("element_ref")
-    catalog_item_id = payload.get("catalog_item_id") or payload.get("catalog_ref")
+    clear_catalog = "catalog_item_id" in payload and payload.get("catalog_item_id") is None
+    catalog_item_id_raw = payload.get("catalog_item_id")
+    catalog_item_id = catalog_item_id_raw or payload.get("catalog_ref")
 
     if not element_ref:
         return _error_response("Brak identyfikatora elementu.", "catalog.element_missing")
-    if not catalog_item_id:
+    if not clear_catalog and not catalog_item_id:
         return _error_response("Brak identyfikatora katalogu.", "catalog.item_missing")
 
     loc = _find_element(enm, element_ref)
@@ -2284,19 +2395,45 @@ def assign_catalog_to_element(enm: dict[str, Any], payload: dict[str, Any]) -> d
 
     new_enm = copy.deepcopy(enm)
     coll, idx = loc
-    new_enm[coll][idx]["catalog_ref"] = catalog_item_id
-    new_enm[coll][idx]["parameter_source"] = "CATALOG"
-    new_enm[coll][idx]["source_mode"] = payload.get("source_mode") or "MIGRACJA"
-    if payload.get("catalog_namespace"):
-        new_enm[coll][idx]["catalog_namespace"] = payload["catalog_namespace"]
-    if payload.get("catalog_item_version"):
-        new_enm[coll][idx].setdefault("meta", {})["catalog_item_version"] = payload["catalog_item_version"]
+    target_element = new_enm[coll][idx]
+
+    if clear_catalog:
+        target_element["catalog_ref"] = None
+        if "parameter_source" in target_element:
+            target_element["parameter_source"] = None
+        target_element.pop("catalog_namespace", None)
+        target_element.pop("catalog_version", None)
+        if coll == "branch_points":
+            target_element["source_mode"] = "EKSPERCKI_RECZNY"
+            target_element["materialized_params"] = None
+            target_element["completeness_status"] = "BRAK_KATALOGU"
+        else:
+            target_element.pop("source_mode", None)
+        meta = target_element.get("meta")
+        if isinstance(meta, dict):
+            meta.pop("catalog_item_version", None)
+    else:
+        target_element["catalog_ref"] = catalog_item_id
+        target_element["parameter_source"] = "CATALOG"
+        target_element["source_mode"] = payload.get("source_mode") or "KATALOG"
+
+        catalog_namespace = payload.get("catalog_namespace") or _infer_catalog_namespace_for_element(target_element)
+        if catalog_namespace:
+            target_element["catalog_namespace"] = catalog_namespace
+
+        catalog_item_version = payload.get("catalog_item_version")
+        if isinstance(catalog_item_version, str) and catalog_item_version.strip():
+            target_element.setdefault("meta", {})["catalog_item_version"] = catalog_item_version.strip()
 
     return _response(
         new_enm,
         updated=[element_ref],
         selection_id=element_ref,
-        events=[{"event_seq": 1, "event_type": "CATALOG_ASSIGNED", "element_id": element_ref}],
+        events=[{
+            "event_seq": 1,
+            "event_type": "CATALOG_CLEARED" if clear_catalog else "CATALOG_ASSIGNED",
+            "element_id": element_ref,
+        }],
     )
 
 
@@ -2414,6 +2551,142 @@ def update_element_parameters(enm: dict[str, Any], payload: dict[str, Any]) -> d
 
 
 # ---------------------------------------------------------------------------
+# 11. delete_element
+# ---------------------------------------------------------------------------
+
+
+def delete_element(enm: dict[str, Any], payload: dict[str, Any]) -> dict[str, Any]:
+    """Usuń element z modelu ENM wraz z deterministycznym cleanupem zależności."""
+    element_ref = payload.get("element_ref")
+    if not element_ref:
+        return _error_response("Brak identyfikatora elementu.", "delete.element_missing")
+
+    loc = _find_element(enm, element_ref)
+    if not loc:
+        return _error_response(f"Element '{element_ref}' nie znaleziony.", "delete.element_not_found")
+
+    new_enm = copy.deepcopy(enm)
+    coll, idx = loc
+    deleted_ids: list[str] = [element_ref]
+    events: list[dict[str, Any]] = []
+
+    def _delete_in_collection(collection: str, ref_id: str) -> bool:
+        items = new_enm.get(collection, [])
+        for item_idx, item in enumerate(items):
+            if item.get("ref_id") == ref_id:
+                del items[item_idx]
+                return True
+        return False
+
+    # Cascade for bus deletion: remove dependent branches/transformers/sources/loads/generators.
+    if coll == "buses":
+        dependent_collections = [
+            ("branches", ("from_bus_ref", "to_bus_ref")),
+            ("transformers", ("hv_bus_ref", "lv_bus_ref")),
+            ("sources", ("bus_ref",)),
+            ("loads", ("bus_ref",)),
+            ("generators", ("bus_ref",)),
+        ]
+        for dep_collection, dep_fields in dependent_collections:
+            refs_to_delete: list[str] = []
+            for item in new_enm.get(dep_collection, []):
+                if any(item.get(field) == element_ref for field in dep_fields):
+                    ref_id = item.get("ref_id")
+                    if isinstance(ref_id, str):
+                        refs_to_delete.append(ref_id)
+            for dep_ref in sorted(refs_to_delete):
+                if _delete_in_collection(dep_collection, dep_ref):
+                    deleted_ids.append(dep_ref)
+
+    # Delete requested element last (or immediately for non-bus collections).
+    del new_enm[coll][idx]
+
+    deleted_set = set(deleted_ids)
+    deleted_branch_refs = {
+        ref for ref in deleted_set
+        if ref in {b.get("ref_id") for b in enm.get("branches", [])}
+    }
+    deleted_bus_refs = {
+        ref for ref in deleted_set
+        if ref in {b.get("ref_id") for b in enm.get("buses", [])}
+    }
+    deleted_transformer_refs = {
+        ref for ref in deleted_set
+        if ref in {t.get("ref_id") for t in enm.get("transformers", [])}
+    }
+
+    # Corridor cleanup for removed branches.
+    if deleted_branch_refs:
+        for corridor in new_enm.get("corridors", []):
+            ordered = corridor.get("ordered_segment_refs")
+            if isinstance(ordered, list):
+                corridor["ordered_segment_refs"] = [seg for seg in ordered if seg not in deleted_branch_refs]
+            no_point_ref = corridor.get("no_point_ref")
+            if isinstance(no_point_ref, str) and no_point_ref in deleted_branch_refs:
+                corridor["no_point_ref"] = None
+
+    # Cleanup references in station and branch-point structures.
+    if deleted_bus_refs or deleted_transformer_refs:
+        substations_to_delete: set[str] = set()
+        for sub in new_enm.get("substations", []):
+            sub_ref = sub.get("ref_id")
+            sub_bus_ref = sub.get("bus_ref")
+            sub_tr_refs = sub.get("transformer_refs") or []
+            has_deleted_transformer = any(ref in deleted_transformer_refs for ref in sub_tr_refs)
+            if sub_bus_ref in deleted_bus_refs or has_deleted_transformer:
+                if isinstance(sub_ref, str):
+                    substations_to_delete.add(sub_ref)
+
+        if substations_to_delete:
+            new_enm["substations"] = [
+                sub for sub in new_enm.get("substations", [])
+                if sub.get("ref_id") not in substations_to_delete
+            ]
+            new_enm["bays"] = [
+                bay for bay in new_enm.get("bays", [])
+                if bay.get("substation_ref") not in substations_to_delete
+            ]
+            deleted_set.update(substations_to_delete)
+
+    if deleted_branch_refs or deleted_bus_refs:
+        branch_points_to_delete: set[str] = set()
+        for bp in new_enm.get("branch_points", []):
+            bp_ref = bp.get("ref_id")
+            if (
+                bp.get("parent_segment_id") in deleted_branch_refs
+                or bp.get("bus_ref") in deleted_bus_refs
+            ):
+                if isinstance(bp_ref, str):
+                    branch_points_to_delete.add(bp_ref)
+                continue
+
+            branch_occupied = bp.get("branch_occupied")
+            if isinstance(branch_occupied, dict):
+                bp["branch_occupied"] = {
+                    key: value for key, value in branch_occupied.items()
+                    if value not in deleted_branch_refs
+                }
+
+        if branch_points_to_delete:
+            new_enm["branch_points"] = [
+                bp for bp in new_enm.get("branch_points", [])
+                if bp.get("ref_id") not in branch_points_to_delete
+            ]
+            deleted_set.update(branch_points_to_delete)
+
+    deleted_ids = sorted(deleted_set)
+    for event_seq, ref in enumerate(deleted_ids, start=1):
+        events.append({"event_seq": event_seq, "event_type": "ELEMENT_DELETED", "element_id": ref})
+
+    return _response(
+        new_enm,
+        deleted=deleted_ids,
+        selection_id=None,
+        events=events,
+    )
+
+
+# ---------------------------------------------------------------------------
 # refresh_snapshot — odczyt bez modyfikacji
 # ---------------------------------------------------------------------------
 
@@ -2445,6 +2718,7 @@ _HANDLERS: dict[str, Any] = {
     "add_transformer_sn_nn": add_transformer_sn_nn,
     "assign_catalog_to_element": assign_catalog_to_element,
     "update_element_parameters": update_element_parameters,
+    "delete_element": delete_element,
     "refresh_snapshot": refresh_snapshot,
 }
 

@@ -138,11 +138,14 @@ Status ogniw:
 Wdrożone domknięcia:
 - [x] `useCanCalculate()` (app-state) blokuje obliczenia przy `readiness.ready=false` z komunikatem backendowym.
 - [x] `App.tsx` uruchamia realny flow `createAndExecuteRun(...)` zamiast TODO/no-op.
+- [x] ENM `delete_element` domknięto o kasowanie osieroconych `branch_points` oraz kaskadę `substations/bays` dla skasowanego `bus/transformer` (spójność z kontraktami modeli Pydantic i deterministyczny `deleted_element_ids`).
 - [x] Po uruchomieniu run ustawiany jest `activeRunId` i nawigacja do widoku wyników.
 - [x] Dokumentacja uruchomienia backendu rozszerzona o powtarzalny bootstrap środowiska (poetry + test importów).
 - [x] Usunięcie duplikatów bramki `useCanCalculate` (study-cases/* nie eksportuje już historycznych wrapperów).
 - [x] Dodany skrypt `npm run test:e2e:setup` + CI smoke rozszerzone o `critical-run-flow.spec.ts` (detekcja lokalnej przeglądarki + fallback APT + wsparcie `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH`).
 - [x] Browser E2E krytycznej ścieżki przepięte na realny backend (`e2e/critical-run-flow.spec.ts`) — bez `page.route` i bez atrap API.
+- [x] Dodano twardy scenariusz E2E real-backend dla elastycznej kolejności (`e2e/sld-editor-real-backend-flex.spec.ts`) oraz domknięto inspektor segmentu (readiness, fix_actions, katalog, write-path ENM_OP).
+- [x] Ujednolicono real-backend E2E z kanonicznym katalogiem (`cable-tfk-yakxs-3x120`, `tr-sn-nn-15-04-630kva-dyn11`) oraz usunięto `Date.now()` z kluczy idempotencji w `e2e/critical-run-flow.spec.ts`.
 
 ### 3.0.4 SLD industrial readability tuning (completed)
 
@@ -232,6 +235,23 @@ Tasks:
 - [x] Clean remaining duplicate docs in docs/ outside docs/spec/
 - [x] Mark/move deprecated notes and operational files
 - [x] Add reusable Polish master prompt for full-repo architecture audit (`docs/prompts/FULL_REPO_AUDIT_PROMPT_PL.md`)
+
+### 3.2 SLD/CAD Canonical Rebuild — Recon + Docs Cleanup + Deterministic ENM_OP keys (current)
+
+Objective: Domknięcie fazy RECON/AUDYT dokumentacji oraz usunięcie niedeterministycznych fallbacków `Date.now()` z kluczy idempotencji ENM_OP w ścieżce SLD.
+
+Progress:
+- [x] Full RECON obszaru SLD/CAD/UI/domena/layout/routing/inspector + klasyfikacja dokumentów.
+- [x] Dodane dokumenty kanoniczne etapu:
+  - `docs/AUDYT_DOKUMENTACJI_I_PLANOW_REPO.md`
+  - `docs/MAPA_MIGRACJI_DOKUMENTOW_I_PLANOW.md`
+  - `docs/INDEX_KANONICZNY.md`
+- [x] Usunięte równoległe roadmapy (`docs/ROADMAP.md`, `docs/audit/ROADMAP.md`) na rzecz jednego planu `PLANS.md`.
+- [x] Wzmocniono deterministyczność ENM_OP:
+  - `frontend/src/ui/sld/domainOpsClient.ts` używa deterministycznego `buildDeterministicIdempotencyKey(...)`.
+  - `frontend/src/ui/sld/useEnmStore.ts` korzysta z tego samego generatora.
+- [x] Dodane testy regresyjne klucza idempotencji (`frontend/src/ui/sld/__tests__/domainOpsClient.test.ts`).
+- [x] Korekta mapowania narzędzia `delete_element` w palecie SLD: `canonicalOp` ustawione na `delete_element` + test regresyjny kontrolera interakcji.
 
 ---
 
