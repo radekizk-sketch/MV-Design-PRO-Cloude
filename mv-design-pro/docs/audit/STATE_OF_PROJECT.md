@@ -100,7 +100,7 @@ Poniższe obszary spełniają kryteria: implementacja + testy + dokumentacja kon
 
 ## F. Rekomendacje PR-owe
 
-Zob. `docs/audit/ROADMAP.md` — lista małych PR-ów zgodnie z zasadą **JEDEN PROBLEM = JEDEN PR**.
+Zob. `PLANS.md` — lista małych PR-ów zgodnie z zasadą **JEDEN PROBLEM = JEDEN PR**.
 
 ---
 

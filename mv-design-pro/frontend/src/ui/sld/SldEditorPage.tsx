@@ -40,6 +40,10 @@ import type { ElementResultsSummary } from './SldResultsAccess';
 import { useResultsInspectorStore } from '../results-inspector/store';
 import { OperationalModeToolbar } from './OperationalModeToolbar';
 import { LabelModeToolbar } from './LabelModeToolbar';
+import { CreatorToolbar } from '../topology/CreatorToolbar';
+import type { CreatorTool } from '../topology/editorPalette';
+import { getToolStatusTable, resolveToolAction } from './interactionController';
+import { useEnmStore } from './useEnmStore';
 
 /**
  * Demo symbols for development/testing.
@@ -233,6 +237,31 @@ export const SldEditorPage: React.FC<SldEditorPageProps> = ({
   // Inspector panel state
   const [inspectorPanelVisible, setInspectorPanelVisible] = useState(true);
   const [isCreatingFirstCase, setIsCreatingFirstCase] = useState(false);
+  const [activeTool, setActiveTool] = useState<CreatorTool>('select');
+  const [interactionMessage, setInteractionMessage] = useState<string | null>(null);
+  const [hoveredElementName, setHoveredElementName] = useState<string | null>(null);
+  const [selectedSegment, setSelectedSegment] = useState<{
+    segment_ref: string;
+    edge_id: string;
+    from_ref: string;
+    to_ref: string;
+    segment_kind: 'TRUNK' | 'BRANCH' | 'RING' | 'SECONDARY';
+  } | null>(null);
+  const [hoveredSegmentRef, setHoveredSegmentRef] = useState<string | null>(null);
+  const [interactionPreview, setInteractionPreview] = useState<{
+    target_kind: 'canvas' | 'element' | 'segment' | 'port';
+    target_id: string;
+    valid: boolean;
+    message_pl: string;
+    port_role?: 'TRUNK_IN' | 'TRUNK_OUT' | 'BRANCH_OUT' | 'RING' | 'NN_SOURCE';
+  } | null>(null);
+  const executeEnmOperation = useEnmStore((state) => state.executeOperation);
+  const enmSnapshot = useEnmStore((state) => state.snapshot);
+  const enmReadiness = useEnmStore((state) => state.readiness);
+  const enmFixActions = useEnmStore((state) => state.fixActions);
+  const [segmentLengthKmDraft, setSegmentLengthKmDraft] = useState<string>('');
+  const [segmentStatusDraft, setSegmentStatusDraft] = useState<string>('closed');
+  const [segmentCatalogDraft, setSegmentCatalogDraft] = useState<string>('');
 
   // UX 10/10: Results mode flag — true when RESULT_VIEW mode and results available
   const isResultsMode = activeMode === 'RESULT_VIEW';
@@ -253,6 +282,34 @@ export const SldEditorPage: React.FC<SldEditorPageProps> = ({
     }
     return data;
   }, [selectedSymbol]);
+
+  const selectedSegmentBranch = useMemo<Record<string, unknown> | null>(() => {
+    if (!selectedSegment || !enmSnapshot) return null;
+    const branches = (enmSnapshot.branches as Array<Record<string, unknown>> | undefined) ?? [];
+    return branches.find((branch) => branch.ref_id === selectedSegment.segment_ref) ?? null;
+  }, [selectedSegment, enmSnapshot]);
+
+  const selectedSegmentBusVoltageKv = useMemo<number | null>(() => {
+    if (!selectedSegment || !enmSnapshot) return null;
+    const buses = (enmSnapshot.buses as Array<Record<string, unknown>> | undefined) ?? [];
+    const fromBus = buses.find((bus) => bus.ref_id === selectedSegment.from_ref);
+    const voltage = fromBus?.voltage_kv;
+    return typeof voltage === 'number' ? voltage : null;
+  }, [selectedSegment, enmSnapshot]);
+
+  const selectedSegmentFixActions = useMemo(
+    () => enmFixActions.filter((action) => action.element_ref === selectedSegment?.segment_ref),
+    [enmFixActions, selectedSegment],
+  );
+
+  useEffect(() => {
+    const length = selectedSegmentBranch?.length_km;
+    const status = selectedSegmentBranch?.status;
+    const catalogRef = selectedSegmentBranch?.catalog_ref;
+    setSegmentLengthKmDraft(typeof length === 'number' ? String(length) : '');
+    setSegmentStatusDraft(typeof status === 'string' ? status : 'closed');
+    setSegmentCatalogDraft(typeof catalogRef === 'string' ? catalogRef : '');
+  }, [selectedSegmentBranch]);
 
   // Resolve results summary for SldResultsAccess
   const resultsSummary = useMemo<ElementResultsSummary | null>(() => {
@@ -314,6 +371,19 @@ export const SldEditorPage: React.FC<SldEditorPageProps> = ({
 
   // Determine symbols to display from canonical store only
   const symbols = useMemo(() => storeSymbols, [storeSymbols]);
+  const hasSource = useMemo(
+    () => symbols.some((symbol) => symbol.elementType === 'Source'),
+    [symbols],
+  );
+  const hasRing = useMemo(
+    () =>
+      symbols.some((symbol) => {
+        const normalizedName = (symbol.elementName ?? '').toLowerCase();
+        return normalizedName.includes('ring') || normalizedName.includes('nop');
+      }),
+    [symbols],
+  );
+  const toolStatusTable = useMemo(() => getToolStatusTable(), []);
 
   // Refresh readiness data when active case changes
   useEffect(() => {
@@ -441,11 +511,118 @@ export const SldEditorPage: React.FC<SldEditorPageProps> = ({
     }
   }, [selectedElement]);
 
+  const runResolvedAction = useCallback(async (
+    tool: CreatorTool,
+    target: { id: string; type: any; name: string },
+    interaction: { kind: 'canvas' | 'element' | 'port'; portRole?: 'TRUNK_IN' | 'TRUNK_OUT' | 'BRANCH_OUT' | 'RING' | 'NN_SOURCE' },
+  ) => {
+    const resolved = resolveToolAction(tool, target as any, {
+      hasSource,
+      hasRing,
+      activeCaseId,
+    }, interaction);
+
+    if (resolved.mode !== 'DOMAIN_OP' || !resolved.canonicalOp) {
+      const reason = resolved.reasonPl ?? 'Narzędzie chwilowo niedostępne.';
+      setInteractionMessage(reason);
+      notify(reason, 'warning');
+      return;
+    }
+
+    const result = await executeEnmOperation(activeCaseId!, resolved.canonicalOp, resolved.payload);
+    if (result) {
+      const msg = interaction.kind === 'port'
+        ? `Wykonano ${resolved.canonicalOp} przez port ${interaction.portRole}.`
+        : `Wykonano ${resolved.canonicalOp} dla ${target.name}.`;
+      setInteractionMessage(msg);
+      notify(msg, 'success');
+      setActiveTool('select');
+    } else {
+      const err = `Operacja ${resolved.canonicalOp} nie powiodła się.`;
+      setInteractionMessage(err);
+      notify(err, 'error');
+    }
+  }, [hasSource, hasRing, activeCaseId, executeEnmOperation]);
+
+  const buildPreview = useCallback((
+    tool: CreatorTool,
+    target: { id: string; type: any; name: string },
+    interaction: { kind: 'canvas' | 'element' | 'port'; portRole?: 'TRUNK_IN' | 'TRUNK_OUT' | 'BRANCH_OUT' | 'RING' | 'NN_SOURCE' },
+  ) => {
+    if (!tool || tool === 'select' || tool === 'move') {
+      setInteractionPreview(null);
+      return;
+    }
+    const resolved = resolveToolAction(tool, target as any, {
+      hasSource,
+      hasRing,
+      activeCaseId,
+    }, interaction);
+    setInteractionPreview({
+      target_kind: interaction.kind === 'port' ? 'port' : interaction.kind,
+      target_id: target.id,
+      valid: resolved.mode === 'DOMAIN_OP',
+      message_pl: resolved.reasonPl ?? `Gotowe: ${resolved.canonicalOp}`,
+      port_role: interaction.portRole,
+    });
+  }, [hasSource, hasRing, activeCaseId]);
+
   return (
     <div
       data-testid="sld-editor-page"
       className="h-full w-full flex relative"
     >
+      <aside className="w-80 border-r border-gray-200 bg-gray-50 flex flex-col">
+        <CreatorToolbar
+          activeTool={activeTool}
+          onToolChange={setActiveTool}
+          hasSource={hasSource}
+          hasRing={hasRing}
+          disabled={!activeCaseId}
+        />
+        <div className="p-3 text-xs border-t border-gray-200 bg-white overflow-auto">
+          <div className="font-semibold text-gray-700 mb-2">Status narzędzi ENM_OP</div>
+          <div className="space-y-1" data-testid="interaction-tool-status-table">
+            {toolStatusTable.map((row) => (
+              <div key={row.tool} className="flex items-start justify-between gap-2">
+                <span className="text-gray-600">{row.tool}</span>
+                <span
+                  className={`rounded px-1.5 py-0.5 text-[10px] font-semibold ${
+                    row.status === 'DZIALA'
+                      ? 'bg-emerald-100 text-emerald-700'
+                      : row.status === 'MAPOWANIE'
+                      ? 'bg-amber-100 text-amber-700'
+                      : 'bg-red-100 text-red-700'
+                  }`}
+                >
+                  {row.status}
+                </span>
+              </div>
+            ))}
+          </div>
+          {interactionMessage && (
+            <div className="mt-3 rounded border border-blue-200 bg-blue-50 px-2 py-1 text-blue-700">
+              {interactionMessage}
+            </div>
+          )}
+          {activeTool && activeTool !== 'select' && activeTool !== 'move' && (
+            <div
+              className="mt-2 rounded border border-amber-200 bg-amber-50 px-2 py-1 text-[11px] text-amber-700"
+              data-testid="sld-tool-preview-hint"
+            >
+              {hoveredElementName
+                ? `Podgląd operacji ${activeTool} na: ${hoveredElementName}`
+                : `Tryb ${activeTool}: wskaż poprawny element, segment lub port.`}
+            </div>
+          )}
+          {hoveredSegmentRef && (
+            <div className="mt-2 rounded border border-indigo-200 bg-indigo-50 px-2 py-1 text-[11px] text-indigo-700">
+              Segment pod kursorem: {hoveredSegmentRef}
+            </div>
+          )}
+        </div>
+      </aside>
+
       {/* SLD View (main area) - ALWAYS rendered */}
       <div className="flex-1 min-w-0 relative">
         <SLDView
@@ -454,6 +631,72 @@ export const SldEditorPage: React.FC<SldEditorPageProps> = ({
           showGrid={true}
           fitOnMount={symbols.length > 0}
           onCalculateClick={handleCalculate}
+          onCanvasClick={() => {
+            setHoveredElementName(null);
+            setInteractionPreview(null);
+            if (activeTool === 'add_gpz') {
+              void runResolvedAction(
+                'add_gpz',
+                { id: 'canvas', type: 'Bus', name: 'płótna' } as any,
+                { kind: 'canvas' },
+              );
+              return;
+            }
+            setInteractionMessage('Kliknięto tło płótna.');
+          }}
+          onElementHover={(element) => {
+            setHoveredElementName(element?.name ?? null);
+            if (element) {
+              buildPreview(activeTool, element, { kind: 'element' });
+            } else {
+              setInteractionPreview(null);
+            }
+          }}
+          onSegmentHover={(segment) => {
+            setHoveredSegmentRef(segment?.segment_ref ?? null);
+            if (segment) {
+              buildPreview(activeTool, {
+                id: segment.segment_ref,
+                type: 'LineBranch',
+                name: segment.segment_ref,
+              } as any, { kind: 'element' });
+            }
+          }}
+          onPortHover={(target, role) => {
+            if (!target || !role) {
+              setInteractionPreview(null);
+              return;
+            }
+            buildPreview(activeTool, target, { kind: 'port', portRole: role });
+          }}
+          interactionPreview={interactionPreview}
+          onSegmentClick={async (segment) => {
+            setSelectedSegment(segment);
+            if (activeTool === 'insert_station') {
+              await runResolvedAction(activeTool, {
+                id: segment.segment_ref,
+                type: 'LineBranch',
+                name: segment.segment_ref,
+              } as any, { kind: 'element' });
+              return;
+            }
+            setInteractionMessage(`Wybrano segment ${segment.segment_ref} (${segment.segment_kind}).`);
+          }}
+          onPortClick={async (target, role) => {
+            if (!activeTool || activeTool === 'select' || activeTool === 'move') {
+              return;
+            }
+            await runResolvedAction(activeTool, target, { kind: 'port', portRole: role });
+          }}
+          onElementClick={async (element) => {
+            setSelectedSegment(null);
+            selectElement(element);
+            if (!activeTool || activeTool === 'select' || activeTool === 'move') {
+              setInteractionMessage(`Wybrano element: ${element.name}`);
+              return;
+            }
+            await runResolvedAction(activeTool, element, { kind: 'element' });
+          }}
         />
 
         {/* Empty state overlay - rendered ON TOP of canvas */}
@@ -478,7 +721,7 @@ export const SldEditorPage: React.FC<SldEditorPageProps> = ({
           </div>
         )}
 
-        {/* UX 10/10: ReadinessLivePanel + DataGapPanel — floating bottom-left, above FixActions */}
+        {/* UX 10/10: panel gotowości + panel braków danych — lewy dolny róg, nad panelem szybkich napraw */}
         {activeCaseId && (
           <div
             className="absolute bottom-28 left-4 z-20 flex flex-col gap-2"
@@ -526,8 +769,17 @@ export const SldEditorPage: React.FC<SldEditorPageProps> = ({
             elementType={selectedElement.type}
             elementData={elementData}
             onFieldChange={(field, value) => {
+              if (!activeCaseId || !selectedElement) {
+                notify('Brak aktywnego przypadku lub elementu do zapisu.', 'warning');
+                return;
+              }
+              void executeEnmOperation(activeCaseId, 'update_element_parameters', {
+                element_ref: selectedElement.id,
+                parameters: {
+                  [field]: value,
+                },
+              });
               notify(`Zmieniono pole: ${field}`, 'info');
-              console.debug('[SldEditorPage] Field change:', field, value);
             }}
             onChangeCatalogType={() => {
               notify('Otwarcie katalogu typów...', 'info');
@@ -541,8 +793,162 @@ export const SldEditorPage: React.FC<SldEditorPageProps> = ({
             onEditProtection={() => {
               notify('Edycja zabezpieczeń elementu...', 'info');
             }}
+            onDeleteElement={async () => {
+              if (!activeCaseId || !selectedElement) {
+                notify('Brak aktywnego przypadku lub elementu do usunięcia.', 'warning');
+                return;
+              }
+              const result = await executeEnmOperation(activeCaseId, 'delete_element', {
+                element_ref: selectedElement.id,
+              });
+              if (result) {
+                notify(`Usunięto element: ${selectedElement.name ?? selectedElement.id}.`, 'success');
+              } else {
+                notify('Nie udało się usunąć elementu z modelu.', 'error');
+              }
+            }}
           />
         </div>
+      )}
+
+      {inspectorPanelVisible && !selectedElement && selectedSegment && activeMode === 'MODEL_EDIT' && (
+        <aside className="w-80 border-l border-gray-200 bg-white p-3 text-sm" data-testid="sld-segment-inspector">
+          <h3 className="font-semibold text-gray-800">Inspektor segmentu</h3>
+          <div className="mt-2 space-y-1 text-xs text-gray-700">
+            <div><span className="font-medium">segment_ref:</span> {selectedSegment.segment_ref}</div>
+            <div><span className="font-medium">edge_id:</span> {selectedSegment.edge_id}</div>
+            <div><span className="font-medium">typ logiczny:</span> {selectedSegment.segment_kind}</div>
+            <div><span className="font-medium">from:</span> {selectedSegment.from_ref}</div>
+            <div><span className="font-medium">to:</span> {selectedSegment.to_ref}</div>
+            <div data-testid="sld-segment-inspector-status">
+              <span className="font-medium">status:</span> {String(selectedSegmentBranch?.status ?? '—')}
+            </div>
+            <div data-testid="sld-segment-inspector-voltage">
+              <span className="font-medium">napięcie:</span> {selectedSegmentBusVoltageKv ?? '—'} kV
+            </div>
+            <div data-testid="sld-segment-inspector-length">
+              <span className="font-medium">długość:</span> {String(selectedSegmentBranch?.length_km ?? '—')} km
+            </div>
+            <div data-testid="sld-segment-inspector-type">
+              <span className="font-medium">typ linii/kabla:</span> {String(selectedSegmentBranch?.type ?? '—')}
+            </div>
+            <div data-testid="sld-segment-inspector-catalog">
+              <span className="font-medium">katalog:</span> {String(selectedSegmentBranch?.catalog_ref ?? 'BRAK')}
+            </div>
+          </div>
+
+          <div className="mt-3 rounded border border-gray-200 p-2">
+            <div className="text-xs font-semibold text-gray-700">Gotowość obliczeń i Szybkie naprawy</div>
+            <div className="mt-1 text-[11px] text-gray-600" data-testid="sld-segment-readiness-status">
+              Gotowy: {enmReadiness?.ready ? 'TAK' : 'NIE'} | Blockery: {enmReadiness?.blockers.length ?? 0} | Ostrzeżenia: {enmReadiness?.warnings.length ?? 0}
+            </div>
+            <ul className="mt-1 list-disc pl-4 text-[11px] text-gray-700" data-testid="sld-segment-fix-actions">
+              {selectedSegmentFixActions.length === 0 ? (
+                <li>Brak akcji naprawczych dla segmentu.</li>
+              ) : (
+                selectedSegmentFixActions.map((action) => (
+                  <li key={`${action.code}-${action.element_ref ?? 'global'}`}>
+                    {action.message_pl}
+                  </li>
+                ))
+              )}
+            </ul>
+          </div>
+
+          <div className="mt-3 rounded border border-gray-200 p-2">
+            <div className="text-xs font-semibold text-gray-700">Edycja segmentu (ENM_OP)</div>
+            <label className="mt-2 block text-[11px] text-gray-600">
+              Długość [km]
+              <input
+                data-testid="sld-segment-input-length"
+                type="number"
+                step="0.001"
+                value={segmentLengthKmDraft}
+                onChange={(event) => setSegmentLengthKmDraft(event.target.value)}
+                className="mt-1 w-full rounded border border-gray-300 px-2 py-1 text-xs"
+              />
+            </label>
+            <label className="mt-2 block text-[11px] text-gray-600">
+              Status
+              <select
+                data-testid="sld-segment-input-status"
+                value={segmentStatusDraft}
+                onChange={(event) => setSegmentStatusDraft(event.target.value)}
+                className="mt-1 w-full rounded border border-gray-300 px-2 py-1 text-xs"
+              >
+                <option value="closed">closed</option>
+                <option value="open">open</option>
+              </select>
+            </label>
+            <button
+              data-testid="sld-segment-save-button"
+              type="button"
+              className="mt-2 w-full rounded border border-blue-300 px-2 py-1 text-xs text-blue-700 hover:bg-blue-50"
+              onClick={() => {
+                if (!activeCaseId) {
+                  notify('Brak aktywnego przypadku do zapisu segmentu.', 'warning');
+                  return;
+                }
+                const length = Number(segmentLengthKmDraft);
+                if (!Number.isFinite(length) || length <= 0) {
+                  notify('Podaj poprawną dodatnią długość segmentu.', 'warning');
+                  return;
+                }
+                void executeEnmOperation(activeCaseId, 'update_element_parameters', {
+                  element_ref: selectedSegment.segment_ref,
+                  parameters: {
+                    length_km: length,
+                    status: segmentStatusDraft,
+                  },
+                });
+                notify('Zapisano parametry segmentu.', 'success');
+              }}
+            >
+              Zapisz parametry segmentu
+            </button>
+          </div>
+
+          <div className="mt-3 rounded border border-gray-200 p-2">
+            <div className="text-xs font-semibold text-gray-700">Katalog segmentu</div>
+            <input
+              data-testid="sld-segment-input-catalog"
+              type="text"
+              value={segmentCatalogDraft}
+              onChange={(event) => setSegmentCatalogDraft(event.target.value)}
+              placeholder="np. YAKXS_3x120"
+              className="mt-1 w-full rounded border border-gray-300 px-2 py-1 text-xs"
+            />
+            <button
+              data-testid="sld-segment-assign-catalog-button"
+              type="button"
+              className="mt-2 w-full rounded border border-emerald-300 px-2 py-1 text-xs text-emerald-700 hover:bg-emerald-50"
+              onClick={() => {
+                if (!activeCaseId) {
+                  notify('Brak aktywnego przypadku do przypisania katalogu.', 'warning');
+                  return;
+                }
+                if (!segmentCatalogDraft.trim()) {
+                  notify('Podaj identyfikator katalogu segmentu.', 'warning');
+                  return;
+                }
+                void executeEnmOperation(activeCaseId, 'assign_catalog_to_element', {
+                  element_ref: selectedSegment.segment_ref,
+                  catalog_item_id: segmentCatalogDraft.trim(),
+                });
+                notify('Przypisano katalog segmentu.', 'success');
+              }}
+            >
+              Przypisz katalog
+            </button>
+          </div>
+          <button
+            type="button"
+            className="mt-3 w-full rounded border border-gray-300 px-2 py-1 text-xs hover:bg-gray-50"
+            onClick={() => setSelectedSegment(null)}
+          >
+            Zamknij inspektor segmentu
+          </button>
+        </aside>
       )}
 
       {/* UX 10/10: SldResultsAccess — floating right panel in results mode */}

@@ -61,7 +61,9 @@ The detailed specification (18 chapters) is the authoritative source of truth fo
 - [architecture/STUDY_SCENARIO_WORKFLOW_ETAP_PLUS.md](./architecture/STUDY_SCENARIO_WORKFLOW_ETAP_PLUS.md) — Study/Scenario/Run workflow
 - [GO-LIVE-CHECKLIST.md](./GO-LIVE-CHECKLIST.md)
 - [REPOSITORY-HYGIENE.md](./REPOSITORY-HYGIENE.md)
-- [ROADMAP.md](./ROADMAP.md)
+- [INDEX_KANONICZNY.md](./INDEX_KANONICZNY.md)
+- [AUDYT_DOKUMENTACJI_I_PLANOW_REPO.md](./AUDYT_DOKUMENTACJI_I_PLANOW_REPO.md)
+- [MAPA_MIGRACJI_DOKUMENTOW_I_PLANOW.md](./MAPA_MIGRACJI_DOKUMENTOW_I_PLANOW.md)
 
 ---
 

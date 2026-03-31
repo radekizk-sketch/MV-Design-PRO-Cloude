@@ -32,7 +32,7 @@
 import React, { useCallback, useMemo } from 'react';
 import type { AnySldSymbol } from '../sld-editor/types';
 import type { ElementType } from '../types';
-import type { SLDViewCanvasProps, ViewportState } from './types';
+import type { InteractionPortRole, SLDViewCanvasProps, ViewportState } from './types';
 import { calculateEnergization } from './energization';
 import { ConnectionsLayer } from './ConnectionRenderer';
 import { generateConnections } from '../sld-editor/utils/connectionRouting';
@@ -56,6 +56,7 @@ interface SymbolProps {
   symbol: AnySldSymbol;
   selected: boolean;
   onClick: (symbolId: string, elementType: ElementType, elementName: string) => void;
+  onHover?: (symbolId: string | null, elementType?: ElementType, elementName?: string) => void;
   energized: boolean;
   /** Severity z readiness blockers — podświetla symbol kolorową obwódką */
   readinessSeverity?: IssueSeverity | null;
@@ -64,7 +65,7 @@ interface SymbolProps {
 /**
  * Main symbol component using unified ETAP symbols.
  */
-const Symbol: React.FC<SymbolProps> = ({ symbol, selected, onClick, energized, readinessSeverity }) => {
+const Symbol: React.FC<SymbolProps> = ({ symbol, selected, onClick, onHover, energized, readinessSeverity }) => {
   // Handle click - adapts the unified renderer's interface to viewer's onClick
   const handleClick = useCallback(
     (symbolId: string) => {
@@ -88,14 +89,52 @@ const Symbol: React.FC<SymbolProps> = ({ symbol, selected, onClick, energized, r
   };
 
   return (
-    <UnifiedSymbolRenderer
-      symbol={symbol}
-      visualState={visualState}
-      handlers={handlers}
-      showLabel={true}
-    />
+    <g
+      onMouseEnter={() => onHover?.(symbol.id, symbol.elementType, symbol.elementName)}
+      onMouseLeave={() => onHover?.(null)}
+    >
+      <UnifiedSymbolRenderer
+        symbol={symbol}
+        visualState={visualState}
+        handlers={handlers}
+        showLabel={true}
+      />
+    </g>
   );
 };
+
+function getPortsForSymbol(symbol: AnySldSymbol): InteractionPortRole[] {
+  switch (symbol.elementType) {
+    case 'Source':
+      return ['TRUNK_OUT'];
+    case 'Bus':
+      return ['TRUNK_IN', 'TRUNK_OUT', 'BRANCH_OUT', 'RING'];
+    case 'LineBranch':
+      return ['TRUNK_IN', 'TRUNK_OUT'];
+    case 'TransformerBranch':
+      return ['TRUNK_IN', 'NN_SOURCE'];
+    case 'Generator':
+      return ['NN_SOURCE'];
+    default:
+      return [];
+  }
+}
+
+function getPortPosition(symbol: AnySldSymbol, role: InteractionPortRole): { x: number; y: number } {
+  const { x, y } = symbol.position;
+  switch (role) {
+    case 'TRUNK_IN':
+      return { x, y: y - 18 };
+    case 'TRUNK_OUT':
+      return { x, y: y + 18 };
+    case 'BRANCH_OUT':
+      return { x: x + 18, y };
+    case 'RING':
+      return { x: x - 18, y };
+    case 'NN_SOURCE':
+      return { x: x + 18, y: y + 18 };
+  }
+}
 
 /**
  * Grid background for canvas.
@@ -182,6 +221,14 @@ export const SLDViewCanvas: React.FC<SLDViewCanvasProps> = ({
   symbols: inputSymbols,
   selectedId,
   onSymbolClick,
+  onSymbolHover,
+  onCanvasClick,
+  onPortClick,
+  onPortHover,
+  onSegmentClick,
+  onSegmentHover,
+  selectedConnectionId,
+  interactionPreview,
   viewport,
   showGrid,
   width,
@@ -218,6 +265,40 @@ export const SLDViewCanvas: React.FC<SLDViewCanvasProps> = ({
     return map;
   }, [connections, energizationState]);
 
+  const toSegmentKind = useCallback((connection: (typeof connections)[number]): 'TRUNK' | 'BRANCH' | 'RING' | 'SECONDARY' => {
+    if (connection.connectionType === 'branch') return 'BRANCH';
+    if (connection.connectionType === 'source' || connection.connectionType === 'load' || connection.connectionType === 'switch') {
+      return 'SECONDARY';
+    }
+    return 'TRUNK';
+  }, []);
+
+  const buildSegmentTarget = useCallback((connectionId: string) => {
+    const connection = connections.find((item) => item.id === connectionId);
+    if (!connection) return null;
+    return {
+      segment_ref: connection.elementId ?? connection.id,
+      edge_id: connection.id,
+      from_ref: connection.fromSymbolId,
+      to_ref: connection.toSymbolId,
+      segment_kind: toSegmentKind(connection),
+    };
+  }, [connections, toSegmentKind]);
+
+  const previewConnection = useMemo(
+    () => interactionPreview?.target_kind === 'segment'
+      ? connections.find((conn) => conn.id === interactionPreview.target_id || conn.elementId === interactionPreview.target_id) ?? null
+      : null,
+    [interactionPreview, connections],
+  );
+
+  const previewSymbol = useMemo(
+    () => interactionPreview?.target_kind === 'element'
+      ? sortedSymbols.find((symbol) => symbol.id === interactionPreview.target_id || symbol.elementId === interactionPreview.target_id) ?? null
+      : null,
+    [interactionPreview, sortedSymbols],
+  );
+
   return (
     <svg
       data-testid="sld-view-canvas"
@@ -246,6 +327,7 @@ export const SLDViewCanvas: React.FC<SLDViewCanvasProps> = ({
         height={height}
         fill="url(#etap-canvas-bg)"
         data-testid="sld-canvas-background"
+        onClick={onCanvasClick}
       />
 
       {/* Grid background — ETAP subdued grid */}
@@ -259,9 +341,51 @@ export const SLDViewCanvas: React.FC<SLDViewCanvasProps> = ({
         {/* Connections layer (rendered UNDER symbols) */}
         <ConnectionsLayer
           connections={connections}
-          selectedConnectionId={null}
+          selectedConnectionId={selectedConnectionId ?? null}
           energizationMap={connectionEnergizationMap}
+          onConnectionClick={(connectionId) => {
+            const target = buildSegmentTarget(connectionId);
+            if (target) onSegmentClick?.(target);
+          }}
+          onConnectionHover={(connectionId) => {
+            if (!connectionId) {
+              onSegmentHover?.(null);
+              return;
+            }
+            const target = buildSegmentTarget(connectionId);
+            onSegmentHover?.(target);
+          }}
         />
+
+        {previewConnection && (
+          <polyline
+            points={previewConnection.path.map((p) => `${p.x},${p.y}`).join(' ')}
+            fill="none"
+            stroke={interactionPreview?.valid ? '#16a34a' : '#dc2626'}
+            strokeWidth={8}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            opacity={0.25}
+            data-testid="sld-preview-segment-overlay"
+            style={{ pointerEvents: 'none' }}
+          />
+        )}
+
+        {previewSymbol && (
+          <rect
+            x={previewSymbol.position.x - 18}
+            y={previewSymbol.position.y - 18}
+            width={36}
+            height={36}
+            rx={6}
+            ry={6}
+            fill={interactionPreview?.valid ? 'rgba(22,163,74,0.15)' : 'rgba(220,38,38,0.15)'}
+            stroke={interactionPreview?.valid ? '#16a34a' : '#dc2626'}
+            strokeWidth={1}
+            data-testid="sld-preview-element-overlay"
+            style={{ pointerEvents: 'none' }}
+          />
+        )}
 
         {/* Render symbols with energization + readiness state */}
         {sortedSymbols.map((symbol) => {
@@ -275,11 +399,38 @@ export const SLDViewCanvas: React.FC<SLDViewCanvasProps> = ({
               symbol={symbol}
               selected={symbol.id === selectedId || symbol.elementId === selectedId}
               onClick={onSymbolClick}
+              onHover={onSymbolHover}
               energized={energizationState.energizedElements.get(symbol.id) ?? true}
               readinessSeverity={severity}
             />
           );
         })}
+
+        {sortedSymbols
+          .filter((symbol) => symbol.id === selectedId || symbol.elementId === selectedId)
+          .flatMap((symbol) => getPortsForSymbol(symbol).map((role) => ({ symbol, role })))
+          .map(({ symbol, role }) => {
+            const portPos = getPortPosition(symbol, role);
+            return (
+              <g key={`${symbol.id}-${role}`} data-testid={`sld-port-${symbol.id}-${role}`}>
+                <circle
+                  cx={portPos.x}
+                  cy={portPos.y}
+                  r={10}
+                  fill="rgba(37, 99, 235, 0.16)"
+                  stroke="#2563eb"
+                  strokeWidth={1}
+                  style={{ cursor: 'pointer' }}
+                  onClick={() => onPortClick?.(symbol.id, symbol.elementType, symbol.elementName, role)}
+                  onMouseEnter={() => onPortHover?.(symbol.id, symbol.elementType, symbol.elementName, role)}
+                  onMouseLeave={() => onPortHover?.(null)}
+                />
+                <text x={portPos.x + 12} y={portPos.y + 3} fontSize={9} fill="#1d4ed8">
+                  {role}
+                </text>
+              </g>
+            );
+          })}
 
         {/* Canonical SLD layers (Phase 7) — pointerEvents: none to avoid blocking interaction */}
         {canonicalAnnotations && (
@@ -334,6 +485,15 @@ export const SLDViewCanvas: React.FC<SLDViewCanvasProps> = ({
         >
           Brak elementow do wyswietlenia
         </text>
+      )}
+
+      {interactionPreview && (
+        <g data-testid="sld-preview-status-overlay">
+          <rect x={12} y={12} width={360} height={24} rx={6} ry={6} fill={interactionPreview.valid ? 'rgba(22,163,74,0.18)' : 'rgba(220,38,38,0.18)'} />
+          <text x={20} y={28} fontSize={12} fill={interactionPreview.valid ? '#166534' : '#991b1b'}>
+            {interactionPreview.message_pl}
+          </text>
+        </g>
       )}
     </svg>
   );

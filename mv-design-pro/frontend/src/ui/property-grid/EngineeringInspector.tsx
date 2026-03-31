@@ -66,6 +66,7 @@ export interface EngineeringInspectorProps {
   onRefreshFromCatalog?: () => void;
   onNavigateToResults?: () => void;
   onEditProtection?: () => void;
+  onDeleteElement?: () => void;
 }
 
 interface FieldEditState {
@@ -737,6 +738,7 @@ export const EngineeringInspector: React.FC<EngineeringInspectorProps> = ({
   onRefreshFromCatalog,
   onNavigateToResults,
   onEditProtection,
+  onDeleteElement,
 }) => {
   const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set());
   const [editState, setEditState] = useState<FieldEditState | null>(null);
@@ -1159,6 +1161,19 @@ export const EngineeringInspector: React.FC<EngineeringInspectorProps> = ({
                 onEditProtection={onEditProtection}
               />
             )}
+          </div>
+        )}
+
+        {onDeleteElement && elementId && (
+          <div className="border-t border-gray-200 p-3 bg-gray-50" data-testid="engineering-delete-action">
+            <button
+              type="button"
+              onClick={onDeleteElement}
+              className="w-full px-3 py-2 text-sm font-semibold text-red-700 bg-red-50 border border-red-200 rounded hover:bg-red-100 transition-colors"
+              data-testid="engineering-delete-button"
+            >
+              Usuń element z modelu
+            </button>
           </div>
         )}
       </div>

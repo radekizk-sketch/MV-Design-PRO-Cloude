@@ -50,6 +50,7 @@ CANONICAL_OPS = frozenset({
     "add_genset_nn",
     "add_ups_nn",
     "add_nn_load",
+    "delete_element",
     "refresh_snapshot",
 })
 
@@ -2414,6 +2415,142 @@ def update_element_parameters(enm: dict[str, Any], payload: dict[str, Any]) -> d
 
 
 # ---------------------------------------------------------------------------
+# 11. delete_element
+# ---------------------------------------------------------------------------
+
+
+def delete_element(enm: dict[str, Any], payload: dict[str, Any]) -> dict[str, Any]:
+    """Usuń element z modelu ENM wraz z deterministycznym cleanupem zależności."""
+    element_ref = payload.get("element_ref")
+    if not element_ref:
+        return _error_response("Brak identyfikatora elementu.", "delete.element_missing")
+
+    loc = _find_element(enm, element_ref)
+    if not loc:
+        return _error_response(f"Element '{element_ref}' nie znaleziony.", "delete.element_not_found")
+
+    new_enm = copy.deepcopy(enm)
+    coll, idx = loc
+    deleted_ids: list[str] = [element_ref]
+    events: list[dict[str, Any]] = []
+
+    def _delete_in_collection(collection: str, ref_id: str) -> bool:
+        items = new_enm.get(collection, [])
+        for item_idx, item in enumerate(items):
+            if item.get("ref_id") == ref_id:
+                del items[item_idx]
+                return True
+        return False
+
+    # Cascade for bus deletion: remove dependent branches/transformers/sources/loads/generators.
+    if coll == "buses":
+        dependent_collections = [
+            ("branches", ("from_bus_ref", "to_bus_ref")),
+            ("transformers", ("hv_bus_ref", "lv_bus_ref")),
+            ("sources", ("bus_ref",)),
+            ("loads", ("bus_ref",)),
+            ("generators", ("bus_ref",)),
+        ]
+        for dep_collection, dep_fields in dependent_collections:
+            refs_to_delete: list[str] = []
+            for item in new_enm.get(dep_collection, []):
+                if any(item.get(field) == element_ref for field in dep_fields):
+                    ref_id = item.get("ref_id")
+                    if isinstance(ref_id, str):
+                        refs_to_delete.append(ref_id)
+            for dep_ref in sorted(refs_to_delete):
+                if _delete_in_collection(dep_collection, dep_ref):
+                    deleted_ids.append(dep_ref)
+
+    # Delete requested element last (or immediately for non-bus collections).
+    del new_enm[coll][idx]
+
+    deleted_set = set(deleted_ids)
+    deleted_branch_refs = {
+        ref for ref in deleted_set
+        if ref in {b.get("ref_id") for b in enm.get("branches", [])}
+    }
+    deleted_bus_refs = {
+        ref for ref in deleted_set
+        if ref in {b.get("ref_id") for b in enm.get("buses", [])}
+    }
+    deleted_transformer_refs = {
+        ref for ref in deleted_set
+        if ref in {t.get("ref_id") for t in enm.get("transformers", [])}
+    }
+
+    # Corridor cleanup for removed branches.
+    if deleted_branch_refs:
+        for corridor in new_enm.get("corridors", []):
+            ordered = corridor.get("ordered_segment_refs")
+            if isinstance(ordered, list):
+                corridor["ordered_segment_refs"] = [seg for seg in ordered if seg not in deleted_branch_refs]
+            no_point_ref = corridor.get("no_point_ref")
+            if isinstance(no_point_ref, str) and no_point_ref in deleted_branch_refs:
+                corridor["no_point_ref"] = None
+
+    # Cleanup references in station and branch-point structures.
+    if deleted_bus_refs or deleted_transformer_refs:
+        substations_to_delete: set[str] = set()
+        for sub in new_enm.get("substations", []):
+            sub_ref = sub.get("ref_id")
+            sub_bus_ref = sub.get("bus_ref")
+            sub_tr_refs = sub.get("transformer_refs") or []
+            has_deleted_transformer = any(ref in deleted_transformer_refs for ref in sub_tr_refs)
+            if sub_bus_ref in deleted_bus_refs or has_deleted_transformer:
+                if isinstance(sub_ref, str):
+                    substations_to_delete.add(sub_ref)
+
+        if substations_to_delete:
+            new_enm["substations"] = [
+                sub for sub in new_enm.get("substations", [])
+                if sub.get("ref_id") not in substations_to_delete
+            ]
+            new_enm["bays"] = [
+                bay for bay in new_enm.get("bays", [])
+                if bay.get("substation_ref") not in substations_to_delete
+            ]
+            deleted_set.update(substations_to_delete)
+
+    if deleted_branch_refs or deleted_bus_refs:
+        branch_points_to_delete: set[str] = set()
+        for bp in new_enm.get("branch_points", []):
+            bp_ref = bp.get("ref_id")
+            if (
+                bp.get("parent_segment_id") in deleted_branch_refs
+                or bp.get("bus_ref") in deleted_bus_refs
+            ):
+                if isinstance(bp_ref, str):
+                    branch_points_to_delete.add(bp_ref)
+                continue
+
+            branch_occupied = bp.get("branch_occupied")
+            if isinstance(branch_occupied, dict):
+                bp["branch_occupied"] = {
+                    key: value for key, value in branch_occupied.items()
+                    if value not in deleted_branch_refs
+                }
+
+        if branch_points_to_delete:
+            new_enm["branch_points"] = [
+                bp for bp in new_enm.get("branch_points", [])
+                if bp.get("ref_id") not in branch_points_to_delete
+            ]
+            deleted_set.update(branch_points_to_delete)
+
+    deleted_ids = sorted(deleted_set)
+    for event_seq, ref in enumerate(deleted_ids, start=1):
+        events.append({"event_seq": event_seq, "event_type": "ELEMENT_DELETED", "element_id": ref})
+
+    return _response(
+        new_enm,
+        deleted=deleted_ids,
+        selection_id=None,
+        events=events,
+    )
+
+
+# ---------------------------------------------------------------------------
 # refresh_snapshot — odczyt bez modyfikacji
 # ---------------------------------------------------------------------------
 
@@ -2445,6 +2582,7 @@ _HANDLERS: dict[str, Any] = {
     "add_transformer_sn_nn": add_transformer_sn_nn,
     "assign_catalog_to_element": assign_catalog_to_element,
     "update_element_parameters": update_element_parameters,
+    "delete_element": delete_element,
     "refresh_snapshot": refresh_snapshot,
 }
 

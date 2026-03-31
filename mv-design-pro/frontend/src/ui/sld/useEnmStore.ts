@@ -11,9 +11,8 @@ import type {
   FixActionItem,
   ChangeSet,
   SelectionHint,
-  CanonicalOpName,
 } from '../../types/domainOps';
-import { ALIAS_MAP } from '../../types/domainOps';
+import { executeDomainOp } from './domainOpsClient';
 
 interface EnmStoreState {
   // Snapshot (jedyna prawda)
@@ -46,8 +45,6 @@ interface EnmStoreState {
   reset: () => void;
 }
 
-const API_BASE = '/api/cases';
-
 export const useEnmStore = create<EnmStoreState>((set, get) => ({
   // Initial state
   snapshot: null,
@@ -62,36 +59,24 @@ export const useEnmStore = create<EnmStoreState>((set, get) => ({
   lastChanges: null,
 
   executeOperation: async (caseId, opName, payload) => {
-    // Resolve alias to canonical name
-    const canonicalName = (ALIAS_MAP[opName] ?? opName) as CanonicalOpName;
-
     const { snapshotHash } = get();
     set({ isLoading: true, lastError: null });
 
     try {
-      const response = await fetch(`${API_BASE}/${caseId}/enm/domain-ops`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          project_id: caseId,
-          snapshot_base_hash: snapshotHash ?? '',
-          operation: {
-            name: canonicalName,
-            idempotency_key: `op:${canonicalName}:${Date.now()}`,
-            payload,
-          },
-        }),
-      });
-
-      if (!response.ok) {
-        const error = await response.text();
-        set({ isLoading: false, lastError: error });
-        return null;
-      }
-
-      const result: DomainOpResponse = await response.json();
+      const result = await executeDomainOp(caseId, opName, payload, snapshotHash ?? '');
 
       set({
+        selectedElementId: (() => {
+          const currentSelectedId = get().selectedElementId;
+          const deletedIds = result.changes?.deleted_element_ids ?? [];
+          if (result.selection_hint?.element_id) {
+            return result.selection_hint.element_id;
+          }
+          if (currentSelectedId && deletedIds.includes(currentSelectedId)) {
+            return null;
+          }
+          return currentSelectedId;
+        })(),
         snapshot: result.snapshot,
         snapshotHash: (result.snapshot as Record<string, unknown>)?.header
           ? ((result.snapshot as Record<string, Record<string, string>>).header?.hash_sha256 ?? null)
@@ -100,7 +85,6 @@ export const useEnmStore = create<EnmStoreState>((set, get) => ({
         fixActions: result.fix_actions,
         lastChanges: result.changes,
         selectionHint: result.selection_hint,
-        selectedElementId: result.selection_hint?.element_id ?? get().selectedElementId,
         isLoading: false,
         lastError: null,
         revision: get().revision + 1,
