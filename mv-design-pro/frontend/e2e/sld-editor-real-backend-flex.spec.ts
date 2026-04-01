@@ -14,11 +14,6 @@ type DomainOpResponse = {
     transformers?: Array<{ ref_id: string; name?: string }>;
   };
   readiness?: { ready: boolean; status?: string; blockers?: Array<{ code: string; element_ref?: string | null }> };
-    branches?: Array<{ ref_id: string; from_bus_ref?: string; to_bus_ref?: string }>;
-    buses?: Array<{ ref_id: string }>;
-    corridors?: Array<{ ordered_segment_refs?: string[] }>;
-  };
-  readiness?: { ready: boolean; status: string };
   fix_actions?: Array<{ code: string; message_pl: string; element_ref?: string | null }>;
 };
 
@@ -115,7 +110,6 @@ async function activateEngineeringFieldEditor(page: Page, fieldKey: string): Pro
   await expect(fieldRow.locator('input')).toBeVisible();
 }
 
-test('real backend SLD editor flow: source -> trunk -> station -> branch -> update -> delete -> continue', async ({ page, request }, testInfo) => {
 test('real backend SLD editor flow: source -> trunk -> station -> branch -> update -> delete -> continue', async ({ page, request }, testInfo) => {
   await page.addInitScript(() => {
     localStorage.clear();

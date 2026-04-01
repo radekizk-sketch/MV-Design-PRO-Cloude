@@ -1017,15 +1017,11 @@ export const SldEditorPage: React.FC<SldEditorPageProps> = ({
               <span className="font-medium">katalog:</span> {String(selectedSegmentBranch?.catalog_ref ?? 'BRAK')}
             </div>
             <div data-testid="sld-segment-inspector-namespace">
-              <span className="font-medium">namespace:</span> {String(selectedSegmentCatalogInfo?.namespace ?? 'BRAK')}
+              <span className="font-medium">kategoria katalogu:</span> {String(selectedSegmentCatalogInfo?.namespace ?? 'BRAK')}
             </div>
             <div data-testid="sld-segment-inspector-version">
               <span className="font-medium">wersja:</span> {String(selectedSegmentCatalogInfo?.version ?? 'BRAK')}
             </div>
-          </div>
-
-          <div className="mt-3 rounded border border-gray-200 p-2">
-            <div className="text-xs font-semibold text-gray-700">Readiness i fix_actions</div>
           </div>
 
           <div className="mt-3 rounded border border-gray-200 p-2">
