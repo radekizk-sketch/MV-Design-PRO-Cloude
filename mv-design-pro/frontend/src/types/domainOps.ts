@@ -35,28 +35,8 @@ export type CanonicalOpName =
   | 'add_genset_nn'
   | 'add_ups_nn'
   | 'add_nn_load'
-<<<<<<< ours
-<<<<<<< ours
-<<<<<<< ours
-<<<<<<< ours
-<<<<<<< ours
   | 'delete_element'
   | 'refresh_snapshot';
-=======
-  | 'delete_element';
->>>>>>> theirs
-=======
-  | 'delete_element';
->>>>>>> theirs
-=======
-  | 'delete_element';
->>>>>>> theirs
-=======
-  | 'delete_element';
->>>>>>> theirs
-=======
-  | 'delete_element';
->>>>>>> theirs
 
 export const ALIAS_MAP: Record<string, CanonicalOpName> = {
   add_trunk_segment_sn: 'continue_trunk_segment_sn',

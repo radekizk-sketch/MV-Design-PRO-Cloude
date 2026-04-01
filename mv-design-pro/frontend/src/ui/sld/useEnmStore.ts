@@ -11,22 +11,7 @@ import type {
   FixActionItem,
   ChangeSet,
   SelectionHint,
-<<<<<<< ours
-<<<<<<< ours
-<<<<<<< ours
-<<<<<<< ours
-<<<<<<< ours
   MaterializedParamsEnvelope,
-=======
->>>>>>> theirs
-=======
->>>>>>> theirs
-=======
->>>>>>> theirs
-=======
->>>>>>> theirs
-=======
->>>>>>> theirs
 } from '../../types/domainOps';
 import { executeDomainOp } from './domainOpsClient';
 

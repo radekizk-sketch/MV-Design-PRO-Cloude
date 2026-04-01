@@ -31,11 +31,6 @@ describe('EngineeringInspector delete flow', () => {
 
     expect(screen.queryByTestId('engineering-delete-button')).toBeNull();
   });
-<<<<<<< ours
-<<<<<<< ours
-<<<<<<< ours
-<<<<<<< ours
-<<<<<<< ours
 
   it('pokazuje akcję zmiany typu katalogowego dla elementu z katalogiem', () => {
     const onChangeCatalogType = vi.fn();
@@ -59,14 +54,4 @@ describe('EngineeringInspector delete flow', () => {
     fireEvent.click(screen.getByTestId('engineering-catalog-change-button'));
     expect(onChangeCatalogType).toHaveBeenCalledTimes(1);
   });
-=======
->>>>>>> theirs
-=======
->>>>>>> theirs
-=======
->>>>>>> theirs
-=======
->>>>>>> theirs
-=======
->>>>>>> theirs
 });

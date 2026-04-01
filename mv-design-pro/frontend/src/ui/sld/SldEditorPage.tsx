@@ -44,11 +44,6 @@ import { CreatorToolbar } from '../topology/CreatorToolbar';
 import type { CreatorTool } from '../topology/editorPalette';
 import { getToolStatusTable, resolveToolAction } from './interactionController';
 import { useEnmStore } from './useEnmStore';
-<<<<<<< ours
-<<<<<<< ours
-<<<<<<< ours
-<<<<<<< ours
-<<<<<<< ours
 import { TypePicker } from '../catalog/TypePicker';
 import { useCatalogAssignment } from '../catalog/useCatalogAssignment';
 import {
@@ -57,16 +52,6 @@ import {
   inferCatalogVersionFromElement,
 } from './catalogDefaults';
 import { enmSnapshotToSldSymbols } from './enmSnapshotToSldSymbols';
-=======
->>>>>>> theirs
-=======
->>>>>>> theirs
-=======
->>>>>>> theirs
-=======
->>>>>>> theirs
-=======
->>>>>>> theirs
 
 /**
  * Demo symbols for development/testing.
@@ -281,11 +266,6 @@ export const SldEditorPage: React.FC<SldEditorPageProps> = ({
     port_role?: 'TRUNK_IN' | 'TRUNK_OUT' | 'BRANCH_OUT' | 'RING' | 'NN_SOURCE';
   } | null>(null);
   const executeEnmOperation = useEnmStore((state) => state.executeOperation);
-<<<<<<< ours
-<<<<<<< ours
-<<<<<<< ours
-<<<<<<< ours
-<<<<<<< ours
   const resetEnmStore = useEnmStore((state) => state.reset);
   const enmSnapshot = useEnmStore((state) => state.snapshot);
   const enmReadiness = useEnmStore((state) => state.readiness);
@@ -294,34 +274,7 @@ export const SldEditorPage: React.FC<SldEditorPageProps> = ({
   const [segmentLengthKmDraft, setSegmentLengthKmDraft] = useState<string>('');
   const [segmentStatusDraft, setSegmentStatusDraft] = useState<string>('closed');
   const [catalogAssignmentState, catalogAssignmentActions] = useCatalogAssignment();
-=======
-=======
->>>>>>> theirs
-=======
->>>>>>> theirs
-=======
->>>>>>> theirs
-=======
->>>>>>> theirs
-  const enmSnapshot = useEnmStore((state) => state.snapshot);
-  const enmReadiness = useEnmStore((state) => state.readiness);
-  const enmFixActions = useEnmStore((state) => state.fixActions);
-  const [segmentLengthKmDraft, setSegmentLengthKmDraft] = useState<string>('');
-  const [segmentStatusDraft, setSegmentStatusDraft] = useState<string>('closed');
   const [segmentCatalogDraft, setSegmentCatalogDraft] = useState<string>('');
-<<<<<<< ours
-<<<<<<< ours
-<<<<<<< ours
-<<<<<<< ours
->>>>>>> theirs
-=======
->>>>>>> theirs
-=======
->>>>>>> theirs
-=======
->>>>>>> theirs
-=======
->>>>>>> theirs
 
   // UX 10/10: Results mode flag — true when RESULT_VIEW mode and results available
   const isResultsMode = activeMode === 'RESULT_VIEW';
@@ -458,8 +411,10 @@ export const SldEditorPage: React.FC<SldEditorPageProps> = ({
   useEffect(() => {
     const length = selectedSegmentBranch?.length_km;
     const status = selectedSegmentBranch?.status;
+    const catalogRef = selectedSegmentBranch?.catalog_ref;
     setSegmentLengthKmDraft(typeof length === 'number' ? String(length) : '');
     setSegmentStatusDraft(typeof status === 'string' ? status : 'closed');
+    setSegmentCatalogDraft(typeof catalogRef === 'string' ? catalogRef : '');
   }, [selectedSegmentBranch]);
 
   const openCatalogPickerForSelectedElement = useCallback(() => {
@@ -531,146 +486,6 @@ export const SldEditorPage: React.FC<SldEditorPageProps> = ({
       result ? 'success' : 'error',
     );
   }, [activeCaseId, executeEnmOperation, selectedSegment, selectedSegmentBranch]);
-
-  const selectedSegmentBranch = useMemo<Record<string, unknown> | null>(() => {
-    if (!selectedSegment || !enmSnapshot) return null;
-    const branches = (enmSnapshot.branches as Array<Record<string, unknown>> | undefined) ?? [];
-    return branches.find((branch) => branch.ref_id === selectedSegment.segment_ref) ?? null;
-  }, [selectedSegment, enmSnapshot]);
-
-  const selectedSegmentBusVoltageKv = useMemo<number | null>(() => {
-    if (!selectedSegment || !enmSnapshot) return null;
-    const buses = (enmSnapshot.buses as Array<Record<string, unknown>> | undefined) ?? [];
-    const fromBus = buses.find((bus) => bus.ref_id === selectedSegment.from_ref);
-    const voltage = fromBus?.voltage_kv;
-    return typeof voltage === 'number' ? voltage : null;
-  }, [selectedSegment, enmSnapshot]);
-
-  const selectedSegmentFixActions = useMemo(
-    () => enmFixActions.filter((action) => action.element_ref === selectedSegment?.segment_ref),
-    [enmFixActions, selectedSegment],
-  );
-
-  useEffect(() => {
-    const length = selectedSegmentBranch?.length_km;
-    const status = selectedSegmentBranch?.status;
-    const catalogRef = selectedSegmentBranch?.catalog_ref;
-    setSegmentLengthKmDraft(typeof length === 'number' ? String(length) : '');
-    setSegmentStatusDraft(typeof status === 'string' ? status : 'closed');
-    setSegmentCatalogDraft(typeof catalogRef === 'string' ? catalogRef : '');
-  }, [selectedSegmentBranch]);
-
-  const selectedSegmentBranch = useMemo<Record<string, unknown> | null>(() => {
-    if (!selectedSegment || !enmSnapshot) return null;
-    const branches = (enmSnapshot.branches as Array<Record<string, unknown>> | undefined) ?? [];
-    return branches.find((branch) => branch.ref_id === selectedSegment.segment_ref) ?? null;
-  }, [selectedSegment, enmSnapshot]);
-
-  const selectedSegmentBusVoltageKv = useMemo<number | null>(() => {
-    if (!selectedSegment || !enmSnapshot) return null;
-    const buses = (enmSnapshot.buses as Array<Record<string, unknown>> | undefined) ?? [];
-    const fromBus = buses.find((bus) => bus.ref_id === selectedSegment.from_ref);
-    const voltage = fromBus?.voltage_kv;
-    return typeof voltage === 'number' ? voltage : null;
-  }, [selectedSegment, enmSnapshot]);
-
-  const selectedSegmentFixActions = useMemo(
-    () => enmFixActions.filter((action) => action.element_ref === selectedSegment?.segment_ref),
-    [enmFixActions, selectedSegment],
-  );
-
-  useEffect(() => {
-    const length = selectedSegmentBranch?.length_km;
-    const status = selectedSegmentBranch?.status;
-    const catalogRef = selectedSegmentBranch?.catalog_ref;
-    setSegmentLengthKmDraft(typeof length === 'number' ? String(length) : '');
-    setSegmentStatusDraft(typeof status === 'string' ? status : 'closed');
-    setSegmentCatalogDraft(typeof catalogRef === 'string' ? catalogRef : '');
-  }, [selectedSegmentBranch]);
-
-  const selectedSegmentBranch = useMemo<Record<string, unknown> | null>(() => {
-    if (!selectedSegment || !enmSnapshot) return null;
-    const branches = (enmSnapshot.branches as Array<Record<string, unknown>> | undefined) ?? [];
-    return branches.find((branch) => branch.ref_id === selectedSegment.segment_ref) ?? null;
-  }, [selectedSegment, enmSnapshot]);
-
-  const selectedSegmentBusVoltageKv = useMemo<number | null>(() => {
-    if (!selectedSegment || !enmSnapshot) return null;
-    const buses = (enmSnapshot.buses as Array<Record<string, unknown>> | undefined) ?? [];
-    const fromBus = buses.find((bus) => bus.ref_id === selectedSegment.from_ref);
-    const voltage = fromBus?.voltage_kv;
-    return typeof voltage === 'number' ? voltage : null;
-  }, [selectedSegment, enmSnapshot]);
-
-  const selectedSegmentFixActions = useMemo(
-    () => enmFixActions.filter((action) => action.element_ref === selectedSegment?.segment_ref),
-    [enmFixActions, selectedSegment],
-  );
-
-  useEffect(() => {
-    const length = selectedSegmentBranch?.length_km;
-    const status = selectedSegmentBranch?.status;
-    const catalogRef = selectedSegmentBranch?.catalog_ref;
-    setSegmentLengthKmDraft(typeof length === 'number' ? String(length) : '');
-    setSegmentStatusDraft(typeof status === 'string' ? status : 'closed');
-    setSegmentCatalogDraft(typeof catalogRef === 'string' ? catalogRef : '');
-  }, [selectedSegmentBranch]);
-
-  const selectedSegmentBranch = useMemo<Record<string, unknown> | null>(() => {
-    if (!selectedSegment || !enmSnapshot) return null;
-    const branches = (enmSnapshot.branches as Array<Record<string, unknown>> | undefined) ?? [];
-    return branches.find((branch) => branch.ref_id === selectedSegment.segment_ref) ?? null;
-  }, [selectedSegment, enmSnapshot]);
-
-  const selectedSegmentBusVoltageKv = useMemo<number | null>(() => {
-    if (!selectedSegment || !enmSnapshot) return null;
-    const buses = (enmSnapshot.buses as Array<Record<string, unknown>> | undefined) ?? [];
-    const fromBus = buses.find((bus) => bus.ref_id === selectedSegment.from_ref);
-    const voltage = fromBus?.voltage_kv;
-    return typeof voltage === 'number' ? voltage : null;
-  }, [selectedSegment, enmSnapshot]);
-
-  const selectedSegmentFixActions = useMemo(
-    () => enmFixActions.filter((action) => action.element_ref === selectedSegment?.segment_ref),
-    [enmFixActions, selectedSegment],
-  );
-
-  useEffect(() => {
-    const length = selectedSegmentBranch?.length_km;
-    const status = selectedSegmentBranch?.status;
-    const catalogRef = selectedSegmentBranch?.catalog_ref;
-    setSegmentLengthKmDraft(typeof length === 'number' ? String(length) : '');
-    setSegmentStatusDraft(typeof status === 'string' ? status : 'closed');
-    setSegmentCatalogDraft(typeof catalogRef === 'string' ? catalogRef : '');
-  }, [selectedSegmentBranch]);
-
-  const selectedSegmentBranch = useMemo<Record<string, unknown> | null>(() => {
-    if (!selectedSegment || !enmSnapshot) return null;
-    const branches = (enmSnapshot.branches as Array<Record<string, unknown>> | undefined) ?? [];
-    return branches.find((branch) => branch.ref_id === selectedSegment.segment_ref) ?? null;
-  }, [selectedSegment, enmSnapshot]);
-
-  const selectedSegmentBusVoltageKv = useMemo<number | null>(() => {
-    if (!selectedSegment || !enmSnapshot) return null;
-    const buses = (enmSnapshot.buses as Array<Record<string, unknown>> | undefined) ?? [];
-    const fromBus = buses.find((bus) => bus.ref_id === selectedSegment.from_ref);
-    const voltage = fromBus?.voltage_kv;
-    return typeof voltage === 'number' ? voltage : null;
-  }, [selectedSegment, enmSnapshot]);
-
-  const selectedSegmentFixActions = useMemo(
-    () => enmFixActions.filter((action) => action.element_ref === selectedSegment?.segment_ref),
-    [enmFixActions, selectedSegment],
-  );
-
-  useEffect(() => {
-    const length = selectedSegmentBranch?.length_km;
-    const status = selectedSegmentBranch?.status;
-    const catalogRef = selectedSegmentBranch?.catalog_ref;
-    setSegmentLengthKmDraft(typeof length === 'number' ? String(length) : '');
-    setSegmentStatusDraft(typeof status === 'string' ? status : 'closed');
-    setSegmentCatalogDraft(typeof catalogRef === 'string' ? catalogRef : '');
-  }, [selectedSegmentBranch]);
 
   // Resolve results summary for SldResultsAccess
   const resultsSummary = useMemo<ElementResultsSummary | null>(() => {
@@ -1039,22 +854,7 @@ export const SldEditorPage: React.FC<SldEditorPageProps> = ({
           interactionPreview={interactionPreview}
           onSegmentClick={async (segment) => {
             setSelectedSegment(segment);
-<<<<<<< ours
-<<<<<<< ours
-<<<<<<< ours
-<<<<<<< ours
-<<<<<<< ours
             clearSelection();
-=======
->>>>>>> theirs
-=======
->>>>>>> theirs
-=======
->>>>>>> theirs
-=======
->>>>>>> theirs
-=======
->>>>>>> theirs
             if (activeTool === 'insert_station') {
               await runResolvedAction(activeTool, {
                 id: segment.segment_ref,
@@ -1069,22 +869,7 @@ export const SldEditorPage: React.FC<SldEditorPageProps> = ({
             if (!activeTool || activeTool === 'select' || activeTool === 'move') {
               return;
             }
-<<<<<<< ours
-<<<<<<< ours
-<<<<<<< ours
-<<<<<<< ours
-<<<<<<< ours
             setSelectedSegment(null);
-=======
->>>>>>> theirs
-=======
->>>>>>> theirs
-=======
->>>>>>> theirs
-=======
->>>>>>> theirs
-=======
->>>>>>> theirs
             await runResolvedAction(activeTool, target, { kind: 'port', portRole: role });
           }}
           onElementClick={async (element) => {
@@ -1180,27 +965,6 @@ export const SldEditorPage: React.FC<SldEditorPageProps> = ({
                 },
               });
               notify(`Zmieniono pole: ${field}`, 'info');
-<<<<<<< ours
-<<<<<<< ours
-<<<<<<< ours
-<<<<<<< ours
-<<<<<<< ours
-=======
-=======
->>>>>>> theirs
-=======
->>>>>>> theirs
-=======
->>>>>>> theirs
-=======
->>>>>>> theirs
-            }}
-            onChangeCatalogType={() => {
-              notify('Otwarcie katalogu typów...', 'info');
-            }}
-            onRefreshFromCatalog={() => {
-              notify('Odświeżanie z katalogu...', 'info');
->>>>>>> theirs
             }}
             onChangeCatalogType={openCatalogPickerForSelectedElement}
             onRefreshFromCatalog={refreshCatalogForSelectedElement}
@@ -1252,11 +1016,6 @@ export const SldEditorPage: React.FC<SldEditorPageProps> = ({
             <div data-testid="sld-segment-inspector-catalog">
               <span className="font-medium">katalog:</span> {String(selectedSegmentBranch?.catalog_ref ?? 'BRAK')}
             </div>
-<<<<<<< ours
-<<<<<<< ours
-<<<<<<< ours
-<<<<<<< ours
-<<<<<<< ours
             <div data-testid="sld-segment-inspector-namespace">
               <span className="font-medium">namespace:</span> {String(selectedSegmentCatalogInfo?.namespace ?? 'BRAK')}
             </div>
@@ -1267,32 +1026,10 @@ export const SldEditorPage: React.FC<SldEditorPageProps> = ({
 
           <div className="mt-3 rounded border border-gray-200 p-2">
             <div className="text-xs font-semibold text-gray-700">Readiness i fix_actions</div>
-=======
-=======
->>>>>>> theirs
-=======
->>>>>>> theirs
-=======
->>>>>>> theirs
-=======
->>>>>>> theirs
           </div>
 
           <div className="mt-3 rounded border border-gray-200 p-2">
             <div className="text-xs font-semibold text-gray-700">Gotowość obliczeń i Szybkie naprawy</div>
-<<<<<<< ours
-<<<<<<< ours
-<<<<<<< ours
-<<<<<<< ours
->>>>>>> theirs
-=======
->>>>>>> theirs
-=======
->>>>>>> theirs
-=======
->>>>>>> theirs
-=======
->>>>>>> theirs
             <div className="mt-1 text-[11px] text-gray-600" data-testid="sld-segment-readiness-status">
               Gotowy: {enmReadiness?.ready ? 'TAK' : 'NIE'} | Blockery: {enmReadiness?.blockers.length ?? 0} | Ostrzeżenia: {enmReadiness?.warnings.length ?? 0}
             </div>
@@ -1364,11 +1101,6 @@ export const SldEditorPage: React.FC<SldEditorPageProps> = ({
 
           <div className="mt-3 rounded border border-gray-200 p-2">
             <div className="text-xs font-semibold text-gray-700">Katalog segmentu</div>
-<<<<<<< ours
-<<<<<<< ours
-<<<<<<< ours
-<<<<<<< ours
-<<<<<<< ours
             <div className="mt-1 text-[11px] text-gray-600" data-testid="sld-segment-catalog-status">
               {selectedSegmentCatalogInfo
                 ? `Przypisano ${selectedSegmentCatalogInfo.catalogRef} (${selectedSegmentCatalogInfo.version})`
@@ -1392,15 +1124,7 @@ export const SldEditorPage: React.FC<SldEditorPageProps> = ({
               }}
             >
               Usuń przypisanie katalogu
-=======
-=======
->>>>>>> theirs
-=======
->>>>>>> theirs
-=======
->>>>>>> theirs
-=======
->>>>>>> theirs
+            </button>
             <input
               data-testid="sld-segment-input-catalog"
               type="text"
@@ -1430,19 +1154,6 @@ export const SldEditorPage: React.FC<SldEditorPageProps> = ({
               }}
             >
               Przypisz katalog
-<<<<<<< ours
-<<<<<<< ours
-<<<<<<< ours
-<<<<<<< ours
->>>>>>> theirs
-=======
->>>>>>> theirs
-=======
->>>>>>> theirs
-=======
->>>>>>> theirs
-=======
->>>>>>> theirs
             </button>
           </div>
           <button

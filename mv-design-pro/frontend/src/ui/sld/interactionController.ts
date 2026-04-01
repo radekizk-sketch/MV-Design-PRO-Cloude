@@ -2,27 +2,12 @@ import type { SelectedElement } from '../types';
 import type { CreatorTool } from '../topology/editorPalette';
 import { CREATOR_TOOLS } from '../topology/editorPalette';
 import type { CanonicalOpName } from '../../types/domainOps';
-<<<<<<< ours
-<<<<<<< ours
-<<<<<<< ours
-<<<<<<< ours
-<<<<<<< ours
 import {
   DEFAULT_CABLE_BINDING,
   DEFAULT_CABLE_CATALOG_ID,
   DEFAULT_TRANSFORMER_BINDING,
   DEFAULT_TRANSFORMER_CATALOG_ID,
 } from './catalogDefaults';
-=======
->>>>>>> theirs
-=======
->>>>>>> theirs
-=======
->>>>>>> theirs
-=======
->>>>>>> theirs
-=======
->>>>>>> theirs
 
 export type ToolRuntimeStatus = 'DZIALA' | 'ZABLOKOWANE' | 'MAPOWANIE';
 
@@ -71,11 +56,6 @@ function inferTargetRef(target: SelectedElement): string {
   return target.id;
 }
 
-<<<<<<< ours
-<<<<<<< ours
-<<<<<<< ours
-<<<<<<< ours
-<<<<<<< ours
 function buildContinueTrunkPayload(
   ref: string,
   target: SelectedElement,
@@ -157,16 +137,6 @@ function buildAssignCatalogPayload(ref: string, target: SelectedElement): Record
   };
 }
 
-=======
->>>>>>> theirs
-=======
->>>>>>> theirs
-=======
->>>>>>> theirs
-=======
->>>>>>> theirs
-=======
->>>>>>> theirs
 export function getToolStatusTable(): ToolStatusRow[] {
   return CREATOR_TOOLS.map((tool) => {
     const status = TOOL_STATUS[tool.id];
@@ -310,41 +280,20 @@ export function resolveToolAction(
     return {
       mode: 'DOMAIN_OP',
       canonicalOp: def.canonicalOp,
-<<<<<<< ours
-<<<<<<< ours
-<<<<<<< ours
-<<<<<<< ours
-<<<<<<< ours
       payload: tool === 'add_gpz' ? { voltage_kv: 15, sk3_mva: 250, rx_ratio: 0.1 } : {},
-=======
-      payload: tool === 'add_gpz' ? { voltage_kv: 15, sn_mva: 250 } : {},
->>>>>>> theirs
-=======
-      payload: tool === 'add_gpz' ? { voltage_kv: 15, sn_mva: 250 } : {},
->>>>>>> theirs
-=======
-      payload: tool === 'add_gpz' ? { voltage_kv: 15, sn_mva: 250 } : {},
->>>>>>> theirs
-=======
-      payload: tool === 'add_gpz' ? { voltage_kv: 15, sn_mva: 250 } : {},
->>>>>>> theirs
-=======
-      payload: tool === 'add_gpz' ? { voltage_kv: 15, sn_mva: 250 } : {},
->>>>>>> theirs
       reasonPl: null,
     };
   }
 
   const targetRef = inferTargetRef(target);
 
-<<<<<<< ours
-<<<<<<< ours
-<<<<<<< ours
-<<<<<<< ours
-<<<<<<< ours
   const payloadBuilders: Record<
     Exclude<CreatorTool, null>,
-    (ref: string, currentTarget: SelectedElement, currentInteraction: InteractionTargetContext) => Record<string, unknown>
+    (
+      ref: string,
+      currentTarget: SelectedElement,
+      currentInteraction: InteractionTargetContext,
+    ) => Record<string, unknown>
   > = {
     select: () => ({}),
     move: () => ({}),
@@ -356,44 +305,10 @@ export function resolveToolAction(
     start_branch: (ref, _currentTarget, currentInteraction) => (
       buildStartBranchPayload(ref, currentInteraction)
     ),
-=======
-=======
->>>>>>> theirs
-=======
->>>>>>> theirs
-=======
->>>>>>> theirs
-=======
->>>>>>> theirs
-  const payloadBuilders: Record<Exclude<CreatorTool, null>, (ref: string) => Record<string, unknown>> = {
-    select: () => ({}),
-    move: () => ({}),
-    add_gpz: () => ({ voltage_kv: 15, sn_mva: 250 }),
-    continue_trunk: (ref) => ({ terminal_ref: ref, dlugosc_m: 120, rodzaj: 'KABEL' }),
-    insert_station: (ref) => ({ segment_ref: ref, station_name: `Stacja ${ref}` }),
-    start_branch: (ref) => ({ from_port_ref: ref, dlugosc_m: 80, rodzaj: 'KABEL' }),
-<<<<<<< ours
-<<<<<<< ours
-<<<<<<< ours
-<<<<<<< ours
->>>>>>> theirs
-=======
->>>>>>> theirs
-=======
->>>>>>> theirs
-=======
->>>>>>> theirs
-=======
->>>>>>> theirs
     connect_ring: (ref) => ({ from_terminal_ref: ref, to_terminal_ref: ref }),
     set_nop: (ref) => ({ segment_ref: ref }),
     add_pv: (ref) => ({ node_ref: ref, p_kw: 50 }),
     add_bess: (ref) => ({ node_ref: ref, p_kw: 100, e_kwh: 200 }),
-<<<<<<< ours
-<<<<<<< ours
-<<<<<<< ours
-<<<<<<< ours
-<<<<<<< ours
     edit_properties: (ref, currentTarget) => ({
       element_ref: ref,
       parameters: {
@@ -401,62 +316,13 @@ export function resolveToolAction(
       },
     }),
     assign_catalog: (ref, currentTarget) => buildAssignCatalogPayload(ref, currentTarget),
-=======
-=======
->>>>>>> theirs
-=======
->>>>>>> theirs
-=======
->>>>>>> theirs
-=======
->>>>>>> theirs
-    edit_properties: (ref) => ({ element_ref: ref, patch: {} }),
-    assign_catalog: (ref) => ({
-      element_ref: ref,
-      catalog_item_id: `AUTO/${ref}`,
-      catalog_namespace: 'AUTO',
-      source_mode: 'MIGRACJA',
-    }),
-<<<<<<< ours
-<<<<<<< ours
-<<<<<<< ours
-<<<<<<< ours
->>>>>>> theirs
-=======
->>>>>>> theirs
-=======
->>>>>>> theirs
-=======
->>>>>>> theirs
-=======
->>>>>>> theirs
     delete_element: (ref) => ({ element_ref: ref }),
   };
 
   return {
     mode: 'DOMAIN_OP',
     canonicalOp: def.canonicalOp,
-<<<<<<< ours
-<<<<<<< ours
-<<<<<<< ours
-<<<<<<< ours
-<<<<<<< ours
     payload: payloadBuilders[tool](targetRef, target, interaction),
-=======
-    payload: payloadBuilders[tool](targetRef),
->>>>>>> theirs
-=======
-    payload: payloadBuilders[tool](targetRef),
->>>>>>> theirs
-=======
-    payload: payloadBuilders[tool](targetRef),
->>>>>>> theirs
-=======
-    payload: payloadBuilders[tool](targetRef),
->>>>>>> theirs
-=======
-    payload: payloadBuilders[tool](targetRef),
->>>>>>> theirs
     reasonPl: null,
   };
 }

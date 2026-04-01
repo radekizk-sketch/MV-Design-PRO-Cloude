@@ -3,64 +3,22 @@ import { expect, test, type APIRequestContext, type Page, type TestInfo } from '
 const BACKEND_BASE = process.env.PLAYWRIGHT_BACKEND_URL ?? 'http://127.0.0.1:8000';
 const CABLE_ID = 'cable-tfk-yakxs-3x120';
 const TRAFO_ID = 'tr-sn-nn-15-04-630kva-dyn11';
-<<<<<<< ours
-<<<<<<< ours
-<<<<<<< ours
-<<<<<<< ours
-<<<<<<< ours
 const UPDATED_TRANSFORMER_NAME = 'Transformator terenowy';
-=======
->>>>>>> theirs
-=======
->>>>>>> theirs
-=======
->>>>>>> theirs
-=======
->>>>>>> theirs
-=======
->>>>>>> theirs
 
 type DomainOpResponse = {
   error?: string | null;
   snapshot?: {
-<<<<<<< ours
-<<<<<<< ours
-<<<<<<< ours
-<<<<<<< ours
-<<<<<<< ours
     branches?: Array<{ ref_id: string; from_bus_ref?: string; to_bus_ref?: string; catalog_ref?: string | null }>;
     buses?: Array<{ ref_id: string }>;
     corridors?: Array<{ ordered_segment_refs?: string[] }>;
     transformers?: Array<{ ref_id: string; name?: string }>;
   };
   readiness?: { ready: boolean; status?: string; blockers?: Array<{ code: string; element_ref?: string | null }> };
-=======
-=======
->>>>>>> theirs
-=======
->>>>>>> theirs
-=======
->>>>>>> theirs
-=======
->>>>>>> theirs
     branches?: Array<{ ref_id: string; from_bus_ref?: string; to_bus_ref?: string }>;
     buses?: Array<{ ref_id: string }>;
     corridors?: Array<{ ordered_segment_refs?: string[] }>;
   };
   readiness?: { ready: boolean; status: string };
-<<<<<<< ours
-<<<<<<< ours
-<<<<<<< ours
-<<<<<<< ours
->>>>>>> theirs
-=======
->>>>>>> theirs
-=======
->>>>>>> theirs
-=======
->>>>>>> theirs
-=======
->>>>>>> theirs
   fix_actions?: Array<{ code: string; message_pl: string; element_ref?: string | null }>;
 };
 
@@ -98,26 +56,11 @@ async function executeDomainOp(
 
 async function createCaseFromUi(page: Page): Promise<string> {
   await page.goto('/');
-<<<<<<< ours
-<<<<<<< ours
-<<<<<<< ours
-<<<<<<< ours
-<<<<<<< ours
   await page.evaluate(() => {
     localStorage.clear();
     sessionStorage.clear();
   });
   await page.reload();
-=======
->>>>>>> theirs
-=======
->>>>>>> theirs
-=======
->>>>>>> theirs
-=======
->>>>>>> theirs
-=======
->>>>>>> theirs
   await page.waitForSelector('[data-testid="app-ready"]', { state: 'attached' });
   const createCaseBtn = page.getByTestId('sld-empty-overlay-create-case');
   await expect(createCaseBtn).toBeVisible();
@@ -135,11 +78,6 @@ async function capture(page: Page, testInfo: TestInfo, name: string): Promise<vo
   await page.screenshot({ path: testInfo.outputPath(`${name}.png`), fullPage: true });
 }
 
-<<<<<<< ours
-<<<<<<< ours
-<<<<<<< ours
-<<<<<<< ours
-<<<<<<< ours
 async function openSegmentInspector(page: Page, segmentRef: string): Promise<void> {
   const connection = page.getByTestId(`sld-connection-${segmentRef}`);
   await expect(connection).toHaveCount(1);
@@ -178,34 +116,12 @@ async function activateEngineeringFieldEditor(page: Page, fieldKey: string): Pro
 }
 
 test('real backend SLD editor flow: source -> trunk -> station -> branch -> update -> delete -> continue', async ({ page, request }, testInfo) => {
-=======
-=======
->>>>>>> theirs
-=======
->>>>>>> theirs
-=======
->>>>>>> theirs
-=======
->>>>>>> theirs
 test('real backend SLD editor flow: source -> trunk -> station -> branch -> update -> delete -> continue', async ({ page, request }, testInfo) => {
   await page.addInitScript(() => {
     localStorage.clear();
     sessionStorage.clear();
   });
 
-<<<<<<< ours
-<<<<<<< ours
-<<<<<<< ours
-<<<<<<< ours
->>>>>>> theirs
-=======
->>>>>>> theirs
-=======
->>>>>>> theirs
-=======
->>>>>>> theirs
-=======
->>>>>>> theirs
   const caseId = await createCaseFromUi(page);
 
   await executeDomainOp(request, caseId, 'add_grid_source_sn', {
@@ -276,11 +192,6 @@ test('real backend SLD editor flow: source -> trunk -> station -> branch -> upda
   await expect(page.getByTestId('sld-connections-layer')).toBeAttached();
   await capture(page, testInfo, '02-after-trunk');
 
-<<<<<<< ours
-<<<<<<< ours
-<<<<<<< ours
-<<<<<<< ours
-<<<<<<< ours
   await openSegmentInspector(page, segmentRefs[0]);
   await expect(page.getByTestId('sld-segment-inspector-catalog')).toContainText(CABLE_ID);
   await expect(page.getByTestId('sld-segment-inspector-namespace')).toContainText('KABEL_SN');
@@ -305,16 +216,6 @@ test('real backend SLD editor flow: source -> trunk -> station -> branch -> upda
   await expect(page.getByTestId('sld-segment-catalog-status')).toContainText(CABLE_ID);
   await capture(page, testInfo, '02c-segment-catalog-restored');
 
-=======
->>>>>>> theirs
-=======
->>>>>>> theirs
-=======
->>>>>>> theirs
-=======
->>>>>>> theirs
-=======
->>>>>>> theirs
   op = await executeDomainOp(request, caseId, 'insert_station_on_segment_sn', {
     segment_ref: segmentRefs[1],
     station_type: 'B',
@@ -329,11 +230,6 @@ test('real backend SLD editor flow: source -> trunk -> station -> branch -> upda
   });
   const stationBus = (op.snapshot?.buses ?? []).find((bus) => bus.ref_id.includes('sn_bus'));
   expect(stationBus).toBeDefined();
-<<<<<<< ours
-<<<<<<< ours
-<<<<<<< ours
-<<<<<<< ours
-<<<<<<< ours
   const transformerRef = op.snapshot?.transformers?.[0]?.ref_id;
   expect(transformerRef).toBeTruthy();
   await page.reload();
@@ -349,31 +245,6 @@ test('real backend SLD editor flow: source -> trunk -> station -> branch -> upda
   await nameEditor.press('Tab');
   await expect(page.getByTestId('engineering-field-name')).toContainText(UPDATED_TRANSFORMER_NAME);
 
-=======
-  await page.reload();
-  await capture(page, testInfo, '03-after-station');
-
->>>>>>> theirs
-=======
-  await page.reload();
-  await capture(page, testInfo, '03-after-station');
-
->>>>>>> theirs
-=======
-  await page.reload();
-  await capture(page, testInfo, '03-after-station');
-
->>>>>>> theirs
-=======
-  await page.reload();
-  await capture(page, testInfo, '03-after-station');
-
->>>>>>> theirs
-=======
-  await page.reload();
-  await capture(page, testInfo, '03-after-station');
-
->>>>>>> theirs
   op = await executeDomainOp(request, caseId, 'start_branch_segment_sn', {
     from_bus_ref: stationBus!.ref_id,
     segment: {
@@ -395,23 +266,8 @@ test('real backend SLD editor flow: source -> trunk -> station -> branch -> upda
   });
   const branchRef = op.snapshot?.branches?.[op.snapshot.branches.length - 1]?.ref_id;
   expect(branchRef).toBeTruthy();
-<<<<<<< ours
-<<<<<<< ours
-<<<<<<< ours
-<<<<<<< ours
-<<<<<<< ours
   await page.reload();
   await capture(page, testInfo, '03b-after-branch');
-=======
->>>>>>> theirs
-=======
->>>>>>> theirs
-=======
->>>>>>> theirs
-=======
->>>>>>> theirs
-=======
->>>>>>> theirs
 
   await executeDomainOp(request, caseId, 'update_element_parameters', {
     element_ref: branchRef,
@@ -448,37 +304,10 @@ test('real backend SLD editor flow: source -> trunk -> station -> branch -> upda
 });
 
 test('real backend supports flexible operation order combinations', async ({ page, request }) => {
-<<<<<<< ours
-<<<<<<< ours
-<<<<<<< ours
-<<<<<<< ours
-<<<<<<< ours
-=======
-=======
->>>>>>> theirs
-=======
->>>>>>> theirs
-=======
->>>>>>> theirs
-=======
->>>>>>> theirs
   await page.addInitScript(() => {
     localStorage.clear();
     sessionStorage.clear();
   });
-<<<<<<< ours
-<<<<<<< ours
-<<<<<<< ours
-<<<<<<< ours
->>>>>>> theirs
-=======
->>>>>>> theirs
-=======
->>>>>>> theirs
-=======
->>>>>>> theirs
-=======
->>>>>>> theirs
   const caseId = await createCaseFromUi(page);
 
   let snapshot = await executeDomainOp(request, caseId, 'add_grid_source_sn', {
@@ -565,11 +394,6 @@ test('real backend supports flexible operation order combinations', async ({ pag
       catalog_item_version: '2024.1',
     },
   });
-<<<<<<< ours
-<<<<<<< ours
-<<<<<<< ours
-<<<<<<< ours
-<<<<<<< ours
   const segmentAfterInsert = snapshot.snapshot?.corridors?.[0]?.ordered_segment_refs?.[0];
   expect(segmentAfterInsert).toBeTruthy();
 
@@ -577,29 +401,4 @@ test('real backend supports flexible operation order combinations', async ({ pag
   await expect(page.getByTestId('sld-connections-layer')).toBeAttached();
   await openSegmentInspector(page, segmentAfterInsert!);
   await expect(page.getByTestId('sld-segment-inspector')).toBeVisible();
-=======
-
-  await page.reload();
-  await expect(page.getByTestId('sld-connections-layer')).toBeAttached();
->>>>>>> theirs
-=======
-
-  await page.reload();
-  await expect(page.getByTestId('sld-connections-layer')).toBeAttached();
->>>>>>> theirs
-=======
-
-  await page.reload();
-  await expect(page.getByTestId('sld-connections-layer')).toBeAttached();
->>>>>>> theirs
-=======
-
-  await page.reload();
-  await expect(page.getByTestId('sld-connections-layer')).toBeAttached();
->>>>>>> theirs
-=======
-
-  await page.reload();
-  await expect(page.getByTestId('sld-connections-layer')).toBeAttached();
->>>>>>> theirs
 });

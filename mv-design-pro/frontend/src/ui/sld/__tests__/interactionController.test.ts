@@ -39,11 +39,6 @@ describe('interactionController', () => {
     expect(resolved.mode).toBe('DOMAIN_OP');
     expect(resolved.canonicalOp).toBe('insert_station_on_segment_sn');
     expect(resolved.payload.segment_ref).toBe('seg-001');
-<<<<<<< ours
-<<<<<<< ours
-<<<<<<< ours
-<<<<<<< ours
-<<<<<<< ours
     expect(resolved.payload.catalog_binding).toMatchObject({
       catalog_namespace: 'TRAFO_SN_NN',
       catalog_item_id: 'tr-sn-nn-15-04-630kva-dyn11',
@@ -51,31 +46,6 @@ describe('interactionController', () => {
   });
 
   it('buduje payload assign_catalog z kanonicznym bindingiem katalogowym', () => {
-=======
-  });
-
-  it('buduje payload assign_catalog z automatycznym catalog_item_id', () => {
->>>>>>> theirs
-=======
-  });
-
-  it('buduje payload assign_catalog z automatycznym catalog_item_id', () => {
->>>>>>> theirs
-=======
-  });
-
-  it('buduje payload assign_catalog z automatycznym catalog_item_id', () => {
->>>>>>> theirs
-=======
-  });
-
-  it('buduje payload assign_catalog z automatycznym catalog_item_id', () => {
->>>>>>> theirs
-=======
-  });
-
-  it('buduje payload assign_catalog z automatycznym catalog_item_id', () => {
->>>>>>> theirs
     const resolved = resolveToolAction('assign_catalog', TARGET, {
       hasSource: true,
       hasRing: false,
@@ -84,11 +54,6 @@ describe('interactionController', () => {
 
     expect(resolved.mode).toBe('DOMAIN_OP');
     expect(resolved.canonicalOp).toBe('assign_catalog_to_element');
-<<<<<<< ours
-<<<<<<< ours
-<<<<<<< ours
-<<<<<<< ours
-<<<<<<< ours
     expect(resolved.payload).toMatchObject({
       element_ref: 'seg-001',
       catalog_namespace: 'KABEL_SN',
@@ -96,21 +61,6 @@ describe('interactionController', () => {
       catalog_item_version: '2024.1',
       source_mode: 'KATALOG',
     });
-=======
-    expect(resolved.payload.catalog_item_id).toBe('AUTO/seg-001');
->>>>>>> theirs
-=======
-    expect(resolved.payload.catalog_item_id).toBe('AUTO/seg-001');
->>>>>>> theirs
-=======
-    expect(resolved.payload.catalog_item_id).toBe('AUTO/seg-001');
->>>>>>> theirs
-=======
-    expect(resolved.payload.catalog_item_id).toBe('AUTO/seg-001');
->>>>>>> theirs
-=======
-    expect(resolved.payload.catalog_item_id).toBe('AUTO/seg-001');
->>>>>>> theirs
   });
 
   it('mapuje delete_element na canonical delete_element i payload element_ref', () => {
@@ -134,27 +84,7 @@ describe('interactionController', () => {
 
     expect(resolved.mode).toBe('DOMAIN_OP');
     expect(resolved.canonicalOp).toBe('add_grid_source_sn');
-<<<<<<< ours
-<<<<<<< ours
-<<<<<<< ours
-<<<<<<< ours
-<<<<<<< ours
     expect(resolved.payload).toEqual({ voltage_kv: 15, sk3_mva: 250, rx_ratio: 0.1 });
-=======
-    expect(resolved.payload).toEqual({ voltage_kv: 15, sn_mva: 250 });
->>>>>>> theirs
-=======
-    expect(resolved.payload).toEqual({ voltage_kv: 15, sn_mva: 250 });
->>>>>>> theirs
-=======
-    expect(resolved.payload).toEqual({ voltage_kv: 15, sn_mva: 250 });
->>>>>>> theirs
-=======
-    expect(resolved.payload).toEqual({ voltage_kv: 15, sn_mva: 250 });
->>>>>>> theirs
-=======
-    expect(resolved.payload).toEqual({ voltage_kv: 15, sn_mva: 250 });
->>>>>>> theirs
   });
 
   it('blokuje start_branch na porcie innym niż BRANCH_OUT', () => {
@@ -197,11 +127,6 @@ describe('interactionController', () => {
     }, { kind: 'element' });
 
     expect(edit.mode).toBe('DOMAIN_OP');
-<<<<<<< ours
-<<<<<<< ours
-<<<<<<< ours
-<<<<<<< ours
-<<<<<<< ours
     expect(edit.payload).toEqual({
       element_ref: 'seg-001',
       parameters: {
@@ -216,25 +141,5 @@ describe('interactionController', () => {
         catalog_item_id: 'cable-tfk-yakxs-3x120',
       },
     });
-=======
-    expect(del.mode).toBe('DOMAIN_OP');
-    expect(trunk.mode).toBe('DOMAIN_OP');
->>>>>>> theirs
-=======
-    expect(del.mode).toBe('DOMAIN_OP');
-    expect(trunk.mode).toBe('DOMAIN_OP');
->>>>>>> theirs
-=======
-    expect(del.mode).toBe('DOMAIN_OP');
-    expect(trunk.mode).toBe('DOMAIN_OP');
->>>>>>> theirs
-=======
-    expect(del.mode).toBe('DOMAIN_OP');
-    expect(trunk.mode).toBe('DOMAIN_OP');
->>>>>>> theirs
-=======
-    expect(del.mode).toBe('DOMAIN_OP');
-    expect(trunk.mode).toBe('DOMAIN_OP');
->>>>>>> theirs
   });
 });

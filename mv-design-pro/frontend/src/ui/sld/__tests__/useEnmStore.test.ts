@@ -13,11 +13,6 @@ const mockExecuteDomainOp = vi.mocked(executeDomainOp);
 const MOCK_RESPONSE: DomainOpResponse = {
   snapshot: { header: { hash_sha256: 'hash_2' } },
   logical_views: {},
-<<<<<<< ours
-<<<<<<< ours
-<<<<<<< ours
-<<<<<<< ours
-<<<<<<< ours
   materialized_params: {
     lines_sn: {
       'seg-001': {
@@ -31,16 +26,6 @@ const MOCK_RESPONSE: DomainOpResponse = {
     layout_hash: 'sha256:test-layout',
     layout_version: '1.0',
   },
-=======
->>>>>>> theirs
-=======
->>>>>>> theirs
-=======
->>>>>>> theirs
-=======
->>>>>>> theirs
-=======
->>>>>>> theirs
   readiness: {
     ready: true,
     blockers: [],
@@ -87,23 +72,8 @@ describe('useEnmStore.executeOperation', () => {
     expect(state.snapshotHash).toBe('hash_2');
     expect(state.selectedElementId).toBe('el-1');
     expect(state.readiness?.ready).toBe(true);
-<<<<<<< ours
-<<<<<<< ours
-<<<<<<< ours
-<<<<<<< ours
-<<<<<<< ours
     expect(state.materializedParams?.lines_sn['seg-001']?.catalog_item_id).toBe('cable-tfk-yakxs-3x120');
     expect(state.layout?.layout_hash).toBe('sha256:test-layout');
-=======
->>>>>>> theirs
-=======
->>>>>>> theirs
-=======
->>>>>>> theirs
-=======
->>>>>>> theirs
-=======
->>>>>>> theirs
     expect(state.lastError).toBeNull();
   });
 
