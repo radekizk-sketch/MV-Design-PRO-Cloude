@@ -393,8 +393,8 @@ export const DataGapPanel: React.FC<DataGapPanelProps> = ({
     return (
       <div
         className={clsx(
-          'flex flex-col bg-white',
-          compact ? 'h-auto' : 'h-full',
+          'pointer-events-auto flex w-full flex-col overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm',
+          compact ? 'max-h-80' : 'h-full',
         )}
         data-testid="data-gap-panel"
       >
@@ -441,8 +441,8 @@ export const DataGapPanel: React.FC<DataGapPanelProps> = ({
   return (
     <div
       className={clsx(
-        'flex flex-col bg-white',
-        compact ? 'h-auto' : 'h-full',
+        'pointer-events-auto flex w-full flex-col overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm',
+        compact ? 'max-h-80' : 'h-full',
       )}
       data-testid="data-gap-panel"
     >

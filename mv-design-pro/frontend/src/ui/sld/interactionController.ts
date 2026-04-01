@@ -2,6 +2,12 @@ import type { SelectedElement } from '../types';
 import type { CreatorTool } from '../topology/editorPalette';
 import { CREATOR_TOOLS } from '../topology/editorPalette';
 import type { CanonicalOpName } from '../../types/domainOps';
+import {
+  DEFAULT_CABLE_BINDING,
+  DEFAULT_CABLE_CATALOG_ID,
+  DEFAULT_TRANSFORMER_BINDING,
+  DEFAULT_TRANSFORMER_CATALOG_ID,
+} from './catalogDefaults';
 
 export type ToolRuntimeStatus = 'DZIALA' | 'ZABLOKOWANE' | 'MAPOWANIE';
 
@@ -48,6 +54,87 @@ const TOOL_STATUS: Record<Exclude<CreatorTool, null>, ToolRuntimeStatus> = {
 
 function inferTargetRef(target: SelectedElement): string {
   return target.id;
+}
+
+function buildContinueTrunkPayload(
+  ref: string,
+  target: SelectedElement,
+  interaction: InteractionTargetContext,
+): Record<string, unknown> {
+  const payload: Record<string, unknown> = {
+    segment: {
+      rodzaj: 'KABEL',
+      dlugosc_m: 120,
+      name: `Odcinek ${target.name ?? ref}`,
+      catalog_ref: DEFAULT_CABLE_CATALOG_ID,
+      catalog_binding: DEFAULT_CABLE_BINDING,
+    },
+    catalog_binding: DEFAULT_CABLE_BINDING,
+  };
+
+  if (interaction.kind === 'port' || target.type === 'Bus' || target.type === 'Source') {
+    payload.from_terminal_id = ref;
+  }
+
+  return payload;
+}
+
+function buildInsertStationPayload(ref: string): Record<string, unknown> {
+  return {
+    segment_ref: ref,
+    station_type: 'B',
+    insert_at: {
+      mode: 'RATIO',
+      value: 0.5,
+    },
+    station: {
+      station_type: 'B',
+      station_role: 'STACJA_SN_NN',
+      station_name: `Stacja ${ref}`,
+      sn_voltage_kv: 15,
+      nn_voltage_kv: 0.4,
+    },
+    transformer: {
+      create: true,
+      transformer_catalog_ref: DEFAULT_TRANSFORMER_CATALOG_ID,
+      model_type: 'DWU_UZWOJENIOWY',
+      tap_changer_present: false,
+      catalog_binding: DEFAULT_TRANSFORMER_BINDING,
+    },
+    catalog_binding: DEFAULT_TRANSFORMER_BINDING,
+  };
+}
+
+function buildStartBranchPayload(
+  ref: string,
+  interaction: InteractionTargetContext,
+): Record<string, unknown> {
+  return {
+    ...(interaction.kind === 'port'
+      ? { from_ref: `${ref}.BRANCH` }
+      : { from_bus_ref: ref }),
+    segment: {
+      rodzaj: 'KABEL',
+      dlugosc_m: 80,
+      name: `Odgałęzienie ${ref}`,
+      catalog_ref: DEFAULT_CABLE_CATALOG_ID,
+      catalog_binding: DEFAULT_CABLE_BINDING,
+    },
+    catalog_binding: DEFAULT_CABLE_BINDING,
+  };
+}
+
+function buildAssignCatalogPayload(ref: string, target: SelectedElement): Record<string, unknown> {
+  const isTransformer = target.type === 'TransformerBranch';
+  const binding = isTransformer ? DEFAULT_TRANSFORMER_BINDING : DEFAULT_CABLE_BINDING;
+
+  return {
+    element_ref: ref,
+    catalog_item_id: binding.catalog_item_id,
+    catalog_namespace: binding.catalog_namespace,
+    catalog_item_version: binding.catalog_item_version,
+    source_mode: 'KATALOG',
+  };
 }
 
 export function getToolStatusTable(): ToolStatusRow[] {
@@ -193,38 +280,49 @@ export function resolveToolAction(
     return {
       mode: 'DOMAIN_OP',
       canonicalOp: def.canonicalOp,
-      payload: tool === 'add_gpz' ? { voltage_kv: 15, sn_mva: 250 } : {},
+      payload: tool === 'add_gpz' ? { voltage_kv: 15, sk3_mva: 250, rx_ratio: 0.1 } : {},
       reasonPl: null,
     };
   }
 
   const targetRef = inferTargetRef(target);
 
-  const payloadBuilders: Record<Exclude<CreatorTool, null>, (ref: string) => Record<string, unknown>> = {
+  const payloadBuilders: Record<
+    Exclude<CreatorTool, null>,
+    (
+      ref: string,
+      currentTarget: SelectedElement,
+      currentInteraction: InteractionTargetContext,
+    ) => Record<string, unknown>
+  > = {
     select: () => ({}),
     move: () => ({}),
-    add_gpz: () => ({ voltage_kv: 15, sn_mva: 250 }),
-    continue_trunk: (ref) => ({ terminal_ref: ref, dlugosc_m: 120, rodzaj: 'KABEL' }),
-    insert_station: (ref) => ({ segment_ref: ref, station_name: `Stacja ${ref}` }),
-    start_branch: (ref) => ({ from_port_ref: ref, dlugosc_m: 80, rodzaj: 'KABEL' }),
+    add_gpz: () => ({ voltage_kv: 15, sk3_mva: 250, rx_ratio: 0.1 }),
+    continue_trunk: (ref, currentTarget, currentInteraction) => (
+      buildContinueTrunkPayload(ref, currentTarget, currentInteraction)
+    ),
+    insert_station: (ref) => buildInsertStationPayload(ref),
+    start_branch: (ref, _currentTarget, currentInteraction) => (
+      buildStartBranchPayload(ref, currentInteraction)
+    ),
     connect_ring: (ref) => ({ from_terminal_ref: ref, to_terminal_ref: ref }),
     set_nop: (ref) => ({ segment_ref: ref }),
     add_pv: (ref) => ({ node_ref: ref, p_kw: 50 }),
     add_bess: (ref) => ({ node_ref: ref, p_kw: 100, e_kwh: 200 }),
-    edit_properties: (ref) => ({ element_ref: ref, patch: {} }),
-    assign_catalog: (ref) => ({
+    edit_properties: (ref, currentTarget) => ({
       element_ref: ref,
-      catalog_item_id: `AUTO/${ref}`,
-      catalog_namespace: 'AUTO',
-      source_mode: 'MIGRACJA',
+      parameters: {
+        name: currentTarget.name ?? ref,
+      },
     }),
+    assign_catalog: (ref, currentTarget) => buildAssignCatalogPayload(ref, currentTarget),
     delete_element: (ref) => ({ element_ref: ref }),
   };
 
   return {
     mode: 'DOMAIN_OP',
     canonicalOp: def.canonicalOp,
-    payload: payloadBuilders[tool](targetRef),
+    payload: payloadBuilders[tool](targetRef, target, interaction),
     reasonPl: null,
   };
 }

@@ -294,6 +294,10 @@ def create_branch(enm: dict[str, Any], data: dict[str, Any]) -> TopologyOpResult
         "to_bus_ref": to_ref,
         "status": data.get("status", "closed"),
         "catalog_ref": data.get("catalog_ref"),
+        "catalog_namespace": data.get("catalog_namespace"),
+        "source_mode": data.get("source_mode"),
+        "parameter_source": data.get("parameter_source"),
+        "overrides": data.get("overrides", []),
         "tags": data.get("tags", []),
         "meta": data.get("meta", {}),
     }
@@ -426,7 +430,8 @@ def create_device(enm: dict[str, Any], data: dict[str, Any]) -> TopologyOpResult
         }
         for opt in ("p0_kw", "i0_percent", "vector_group",
                      "hv_neutral", "lv_neutral", "tap_position",
-                     "tap_min", "tap_max", "tap_step_percent", "catalog_ref"):
+                     "tap_min", "tap_max", "tap_step_percent", "catalog_ref",
+                     "catalog_namespace", "source_mode", "parameter_source", "overrides"):
             if opt in data:
                 trafo_data[opt] = data[opt]
         new_enm.setdefault("transformers", []).append(trafo_data)

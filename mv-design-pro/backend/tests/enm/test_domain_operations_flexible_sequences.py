@@ -5,6 +5,16 @@ from enm.models import ENMDefaults, ENMHeader, EnergyNetworkModel
 
 CABLE_ID = "cable-tfk-yakxs-3x120"
 TRAFO_ID = "tr-sn-nn-15-04-630kva-dyn11"
+CABLE_BINDING = {
+    "catalog_namespace": "KABEL_SN",
+    "catalog_item_id": CABLE_ID,
+    "catalog_item_version": "2024.1",
+}
+TRAFO_BINDING = {
+    "catalog_namespace": "TRAFO_SN_NN",
+    "catalog_item_id": TRAFO_ID,
+    "catalog_item_version": "2024.1",
+}
 
 
 def _empty_enm() -> dict:
@@ -30,7 +40,9 @@ def _build_source_plus_segments(segment_lengths_m: list[int]) -> dict:
                 "dlugosc_m": length,
                 "name": f"Odcinek {idx + 1}",
                 "catalog_ref": CABLE_ID,
+                "catalog_binding": CABLE_BINDING,
             },
+            "catalog_binding": CABLE_BINDING,
         })
     return snapshot
 
@@ -39,7 +51,7 @@ def _last_trunk_segment(snapshot: dict) -> str:
     corridors = snapshot.get("corridors", [])
     assert corridors, "Brak korytarza trunk"
     ordered = corridors[0].get("ordered_segment_refs", [])
-    assert ordered, "Brak segmentów trunk"
+    assert ordered, "Brak segmentow trunk"
     return ordered[-1]
 
 
@@ -52,8 +64,22 @@ def test_sequence_continue_continue_insert_station_then_branch():
         "station_type": "B",
         "insert_at": {"ratio": 0.5},
         "station": {"sn_voltage_kv": 15.0, "nn_voltage_kv": 0.4},
-        "transformer": {"create": True, "transformer_catalog_ref": TRAFO_ID},
+        "transformer": {
+            "create": True,
+            "transformer_catalog_ref": TRAFO_ID,
+            "catalog_binding": TRAFO_BINDING,
+        },
+        "catalog_binding": TRAFO_BINDING,
     })
+
+    created_transformer = next(
+        transformer for transformer in snapshot.get("transformers", [])
+        if transformer.get("catalog_ref") == TRAFO_ID
+    )
+    assert created_transformer["catalog_namespace"] == "TRAFO_SN_NN"
+    assert created_transformer["source_mode"] == "KATALOG"
+    assert created_transformer["parameter_source"] == "CATALOG"
+    assert created_transformer["meta"]["catalog_item_version"] == "2024.1"
 
     station_bus_ref = next(
         bus["ref_id"] for bus in snapshot.get("buses", [])
@@ -66,10 +92,16 @@ def test_sequence_continue_continue_insert_station_then_branch():
             "rodzaj": "KABEL",
             "dlugosc_m": 150,
             "catalog_ref": CABLE_ID,
+            "catalog_binding": CABLE_BINDING,
         },
+        "catalog_binding": CABLE_BINDING,
     })
 
     assert len(snapshot.get("branches", [])) >= 3
+    created_branch = snapshot["branches"][-1]
+    assert created_branch["catalog_ref"] == CABLE_ID
+    assert created_branch["catalog_namespace"] == "KABEL_SN"
+    assert created_branch["meta"]["catalog_item_version"] == "2024.1"
 
 
 def test_sequence_edit_delete_continue_trunk():
@@ -93,7 +125,49 @@ def test_sequence_edit_delete_continue_trunk():
             "rodzaj": "KABEL",
             "dlugosc_m": 190,
             "catalog_ref": CABLE_ID,
+            "catalog_binding": CABLE_BINDING,
         },
+        "catalog_binding": CABLE_BINDING,
     })
 
     assert len(snapshot.get("branches", [])) >= 2
+    assert snapshot["branches"][-1]["meta"]["catalog_item_version"] == "2024.1"
+
+
+def test_sequence_clear_and_reassign_catalog_keeps_snapshot_contract_valid():
+    snapshot = _build_source_plus_segments([200, 210])
+    target_segment_ref = snapshot["corridors"][0]["ordered_segment_refs"][0]
+
+    snapshot = _apply(snapshot, "assign_catalog_to_element", {
+        "element_ref": target_segment_ref,
+        "catalog_item_id": None,
+        "catalog_namespace": "KABEL_SN",
+    })
+
+    cleared_segment = next(
+        branch for branch in snapshot.get("branches", [])
+        if branch.get("ref_id") == target_segment_ref
+    )
+    assert cleared_segment["catalog_ref"] is None
+    assert cleared_segment.get("parameter_source") is None
+    assert cleared_segment.get("catalog_namespace") is None
+    assert cleared_segment.get("source_mode") is None
+    assert cleared_segment.get("meta", {}).get("catalog_item_version") is None
+
+    snapshot = _apply(snapshot, "assign_catalog_to_element", {
+        "element_ref": target_segment_ref,
+        "catalog_item_id": CABLE_ID,
+        "catalog_namespace": "KABEL_SN",
+        "catalog_item_version": "2024.1",
+        "source_mode": "KATALOG",
+    })
+
+    rebound_segment = next(
+        branch for branch in snapshot.get("branches", [])
+        if branch.get("ref_id") == target_segment_ref
+    )
+    assert rebound_segment["catalog_ref"] == CABLE_ID
+    assert rebound_segment.get("parameter_source") == "CATALOG"
+    assert rebound_segment.get("catalog_namespace") == "KABEL_SN"
+    assert rebound_segment.get("source_mode") == "KATALOG"
+    assert rebound_segment.get("meta", {}).get("catalog_item_version") == "2024.1"

@@ -11,12 +11,19 @@ import type {
   FixActionItem,
   ChangeSet,
   SelectionHint,
+  MaterializedParamsEnvelope,
 } from '../../types/domainOps';
 import { executeDomainOp } from './domainOpsClient';
 
 interface EnmStoreState {
   // Snapshot (jedyna prawda)
   snapshot: Record<string, unknown> | null;
+  logicalViews: Record<string, unknown> | null;
+  materializedParams: MaterializedParamsEnvelope | null;
+  layout: {
+    layout_hash: string;
+    layout_version: string;
+  } | null;
   snapshotHash: string | null;
   revision: number;
 
@@ -48,6 +55,9 @@ interface EnmStoreState {
 export const useEnmStore = create<EnmStoreState>((set, get) => ({
   // Initial state
   snapshot: null,
+  logicalViews: null,
+  materializedParams: null,
+  layout: null,
   snapshotHash: null,
   revision: 0,
   readiness: null,
@@ -78,6 +88,9 @@ export const useEnmStore = create<EnmStoreState>((set, get) => ({
           return currentSelectedId;
         })(),
         snapshot: result.snapshot,
+        logicalViews: result.logical_views,
+        materializedParams: result.materialized_params ?? null,
+        layout: result.layout ?? null,
         snapshotHash: (result.snapshot as Record<string, unknown>)?.header
           ? ((result.snapshot as Record<string, Record<string, string>>).header?.hash_sha256 ?? null)
           : null,
@@ -112,6 +125,9 @@ export const useEnmStore = create<EnmStoreState>((set, get) => ({
   reset: () =>
     set({
       snapshot: null,
+      logicalViews: null,
+      materializedParams: null,
+      layout: null,
       snapshotHash: null,
       revision: 0,
       readiness: null,

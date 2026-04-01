@@ -502,14 +502,17 @@ const CatalogSectionContent: React.FC<CatalogSectionContentProps> = ({
 
       {/* Action buttons */}
       <div className="flex items-center gap-2 pt-1">
-        {(!isMaterialized || hasDrift) && onChangeCatalogType && (
+        {onChangeCatalogType && (
           <button
             onClick={onChangeCatalogType}
+            data-testid="engineering-catalog-change-button"
             className={clsx(
               'px-3 py-1 text-xs rounded transition-colors',
               !isMaterialized
                 ? 'bg-blue-500 text-white hover:bg-blue-600'
-                : 'bg-gray-200 text-gray-700 hover:bg-gray-300',
+                : hasDrift
+                  ? 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                  : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50',
             )}
           >
             Zmień typ z katalogu
@@ -518,6 +521,7 @@ const CatalogSectionContent: React.FC<CatalogSectionContentProps> = ({
         {isMaterialized && hasDrift && onRefreshFromCatalog && (
           <button
             onClick={onRefreshFromCatalog}
+            data-testid="engineering-catalog-refresh-button"
             className="px-3 py-1 text-xs bg-amber-500 text-white rounded hover:bg-amber-600 transition-colors"
           >
             Odśwież parametry z katalogu
@@ -551,6 +555,7 @@ const NoCatalogPlaceholder: React.FC<NoCatalogPlaceholderProps> = ({
       <div className="pt-1">
         <button
           onClick={onChangeCatalogType}
+          data-testid="engineering-catalog-change-button"
           className="px-3 py-1 text-xs bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors"
         >
           Zmień typ z katalogu

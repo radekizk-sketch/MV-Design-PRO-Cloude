@@ -18,6 +18,7 @@ import {
   requiresCatalogBinding,
 } from './elementCatalogRegistry';
 import type { CatalogNamespace, TypeCategory } from './types';
+import { DEFAULT_CATALOG_VERSION } from '../sld/catalogDefaults';
 
 // =============================================================================
 // Types
@@ -163,6 +164,9 @@ export function useCatalogAssignment(): [CatalogAssignmentState, CatalogAssignme
         await executeDomainOp(caseId, 'assign_catalog_to_element', {
           element_ref: state.target.elementRef,
           catalog_item_id: typeId,
+          catalog_namespace: state.namespace,
+          catalog_item_version: DEFAULT_CATALOG_VERSION,
+          source_mode: 'KATALOG',
         });
 
         setState((prev) => ({
@@ -199,6 +203,7 @@ export function useCatalogAssignment(): [CatalogAssignmentState, CatalogAssignme
         await executeDomainOp(caseId, 'assign_catalog_to_element', {
           element_ref: state.target.elementRef,
           catalog_item_id: null,
+          catalog_namespace: state.namespace,
         });
 
         setState((prev) => ({

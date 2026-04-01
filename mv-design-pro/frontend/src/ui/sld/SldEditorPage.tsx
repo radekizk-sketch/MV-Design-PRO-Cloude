@@ -44,6 +44,14 @@ import { CreatorToolbar } from '../topology/CreatorToolbar';
 import type { CreatorTool } from '../topology/editorPalette';
 import { getToolStatusTable, resolveToolAction } from './interactionController';
 import { useEnmStore } from './useEnmStore';
+import { TypePicker } from '../catalog/TypePicker';
+import { useCatalogAssignment } from '../catalog/useCatalogAssignment';
+import {
+  getDefaultBindingForElement,
+  inferCatalogNamespaceFromElement,
+  inferCatalogVersionFromElement,
+} from './catalogDefaults';
+import { enmSnapshotToSldSymbols } from './enmSnapshotToSldSymbols';
 
 /**
  * Demo symbols for development/testing.
@@ -201,6 +209,7 @@ export const SldEditorPage: React.FC<SldEditorPageProps> = ({
   void useDemo;
   // Get symbols from store
   const storeSymbols = useSldEditorStore((state) => Array.from(state.symbols.values()));
+  const setSldSymbols = useSldEditorStore((state) => state.setSymbols);
     // App state
   const hasActiveCase = useHasActiveCase();
   const activeMode = useActiveMode();
@@ -216,6 +225,7 @@ export const SldEditorPage: React.FC<SldEditorPageProps> = ({
 
   // Selection store actions for navigation
   const selectElement = useSelectionStore((state) => state.selectElement);
+  const clearSelection = useSelectionStore((state) => state.clearSelection);
   const centerSldOnElement = useSelectionStore((state) => state.centerSldOnElement);
 
   // Readiness live store — real data from API
@@ -256,11 +266,14 @@ export const SldEditorPage: React.FC<SldEditorPageProps> = ({
     port_role?: 'TRUNK_IN' | 'TRUNK_OUT' | 'BRANCH_OUT' | 'RING' | 'NN_SOURCE';
   } | null>(null);
   const executeEnmOperation = useEnmStore((state) => state.executeOperation);
+  const resetEnmStore = useEnmStore((state) => state.reset);
   const enmSnapshot = useEnmStore((state) => state.snapshot);
   const enmReadiness = useEnmStore((state) => state.readiness);
   const enmFixActions = useEnmStore((state) => state.fixActions);
+  const enmMaterializedParams = useEnmStore((state) => state.materializedParams);
   const [segmentLengthKmDraft, setSegmentLengthKmDraft] = useState<string>('');
   const [segmentStatusDraft, setSegmentStatusDraft] = useState<string>('closed');
+  const [catalogAssignmentState, catalogAssignmentActions] = useCatalogAssignment();
   const [segmentCatalogDraft, setSegmentCatalogDraft] = useState<string>('');
 
   // UX 10/10: Results mode flag — true when RESULT_VIEW mode and results available
@@ -271,17 +284,85 @@ export const SldEditorPage: React.FC<SldEditorPageProps> = ({
     selectedElement ? state.symbols.get(selectedElement.id) ?? null : null,
   );
 
+  const selectedEnmElement = useMemo<Record<string, unknown> | null>(() => {
+    if (!selectedElement || !enmSnapshot) {
+      return null;
+    }
+
+    const collections = [
+      'buses',
+      'branches',
+      'transformers',
+      'sources',
+      'loads',
+      'generators',
+      'substations',
+      'bays',
+      'junctions',
+      'corridors',
+      'measurements',
+      'protection_assignments',
+      'branch_points',
+    ];
+
+    for (const collection of collections) {
+      const entries = (enmSnapshot[collection] as Array<Record<string, unknown>> | undefined) ?? [];
+      const found = entries.find((entry) => entry.ref_id === selectedElement.id);
+      if (found) {
+        return found;
+      }
+    }
+
+    return null;
+  }, [selectedElement, enmSnapshot]);
+
   const elementData = useMemo<Record<string, unknown>>(() => {
-    if (!selectedSymbol) return {};
+    if (!selectedSymbol && !selectedEnmElement) return {};
     const data: Record<string, unknown> = {};
-    // Extract all known fields from the symbol
-    for (const [key, value] of Object.entries(selectedSymbol)) {
-      if (key !== 'id' && key !== 'position' && value !== undefined) {
-        data[key] = value;
+    for (const source of [selectedSymbol, selectedEnmElement]) {
+      if (!source) {
+        continue;
+      }
+      for (const [key, value] of Object.entries(source)) {
+        if (key !== 'id' && key !== 'position' && value !== undefined) {
+          data[key] = value;
+        }
       }
     }
     return data;
-  }, [selectedSymbol]);
+  }, [selectedSymbol, selectedEnmElement]);
+
+  const selectedElementCatalogInfo = useMemo(() => {
+    if (!selectedEnmElement) {
+      return null;
+    }
+
+    const catalogRef = selectedEnmElement.catalog_ref;
+    if (typeof catalogRef !== 'string' || !catalogRef.trim()) {
+      return null;
+    }
+
+    const namespace = inferCatalogNamespaceFromElement(selectedEnmElement);
+    if (!namespace) {
+      return null;
+    }
+
+    const refId = selectedEnmElement.ref_id;
+    const materializedEntry = (
+      typeof refId === 'string' && enmMaterializedParams
+        ? enmMaterializedParams.lines_sn?.[refId] ?? enmMaterializedParams.transformers_sn_nn?.[refId] ?? null
+        : null
+    );
+
+    return {
+      namespace,
+      typeId: catalogRef,
+      typeName: catalogRef,
+      version: inferCatalogVersionFromElement(selectedEnmElement),
+      isMaterialized: materializedEntry !== null,
+      hasDrift: false,
+    };
+  }, [selectedEnmElement, enmMaterializedParams]);
 
   const selectedSegmentBranch = useMemo<Record<string, unknown> | null>(() => {
     if (!selectedSegment || !enmSnapshot) return null;
@@ -302,6 +383,31 @@ export const SldEditorPage: React.FC<SldEditorPageProps> = ({
     [enmFixActions, selectedSegment],
   );
 
+  const selectedSegmentCatalogInfo = useMemo(() => {
+    if (!selectedSegmentBranch) {
+      return null;
+    }
+
+    const catalogRef = selectedSegmentBranch.catalog_ref;
+    if (typeof catalogRef !== 'string' || !catalogRef.trim()) {
+      return null;
+    }
+
+    const refId = selectedSegmentBranch.ref_id;
+    const materializedEntry = (
+      typeof refId === 'string' && enmMaterializedParams
+        ? enmMaterializedParams.lines_sn?.[refId] ?? null
+        : null
+    );
+
+    return {
+      namespace: inferCatalogNamespaceFromElement(selectedSegmentBranch),
+      catalogRef,
+      version: inferCatalogVersionFromElement(selectedSegmentBranch),
+      isMaterialized: materializedEntry !== null,
+    };
+  }, [selectedSegmentBranch, enmMaterializedParams]);
+
   useEffect(() => {
     const length = selectedSegmentBranch?.length_km;
     const status = selectedSegmentBranch?.status;
@@ -310,6 +416,76 @@ export const SldEditorPage: React.FC<SldEditorPageProps> = ({
     setSegmentStatusDraft(typeof status === 'string' ? status : 'closed');
     setSegmentCatalogDraft(typeof catalogRef === 'string' ? catalogRef : '');
   }, [selectedSegmentBranch]);
+
+  const openCatalogPickerForSelectedElement = useCallback(() => {
+    if (!selectedEnmElement || !selectedElement) {
+      notify('Brak elementu do przypisania katalogu.', 'warning');
+      return;
+    }
+
+    catalogAssignmentActions.openPicker({
+      elementRef: selectedElement.id,
+      enmElementType: String(selectedEnmElement.type ?? selectedElement.type),
+      currentCatalogRef:
+        typeof selectedEnmElement.catalog_ref === 'string' ? selectedEnmElement.catalog_ref : null,
+    });
+  }, [catalogAssignmentActions, selectedElement, selectedEnmElement]);
+
+  const openCatalogPickerForSelectedSegment = useCallback(() => {
+    if (!selectedSegment || !selectedSegmentBranch) {
+      notify('Brak segmentu do przypisania katalogu.', 'warning');
+      return;
+    }
+
+    catalogAssignmentActions.openPicker({
+      elementRef: selectedSegment.segment_ref,
+      enmElementType: String(selectedSegmentBranch.type ?? 'cable'),
+      currentCatalogRef:
+        typeof selectedSegmentBranch.catalog_ref === 'string' ? selectedSegmentBranch.catalog_ref : null,
+    });
+  }, [catalogAssignmentActions, selectedSegment, selectedSegmentBranch]);
+
+  const refreshCatalogForSelectedElement = useCallback(async () => {
+    if (!activeCaseId || !selectedElement || !selectedEnmElement) {
+      notify('Brak aktywnego przypadku lub elementu do odświeżenia katalogu.', 'warning');
+      return;
+    }
+
+    const binding = getDefaultBindingForElement(selectedEnmElement);
+    if (!binding) {
+      notify('Nie można odtworzyć bindingu katalogowego dla elementu.', 'warning');
+      return;
+    }
+
+    const result = await executeEnmOperation(activeCaseId, 'assign_catalog_to_element', {
+      element_ref: selectedElement.id,
+      catalog_item_id: binding.catalog_item_id,
+      catalog_namespace: binding.catalog_namespace,
+      catalog_item_version: binding.catalog_item_version,
+      source_mode: 'KATALOG',
+    });
+    notify(
+      result ? 'Odświeżono parametry elementu z katalogu.' : 'Nie udało się odświeżyć parametrów z katalogu.',
+      result ? 'success' : 'error',
+    );
+  }, [activeCaseId, executeEnmOperation, selectedElement, selectedEnmElement]);
+
+  const clearCatalogForSelectedSegment = useCallback(async () => {
+    if (!activeCaseId || !selectedSegment || !selectedSegmentBranch) {
+      notify('Brak aktywnego przypadku lub segmentu do wyczyszczenia katalogu.', 'warning');
+      return;
+    }
+
+    const result = await executeEnmOperation(activeCaseId, 'assign_catalog_to_element', {
+      element_ref: selectedSegment.segment_ref,
+      catalog_item_id: null,
+      catalog_namespace: inferCatalogNamespaceFromElement(selectedSegmentBranch),
+    });
+    notify(
+      result ? 'Usunięto przypisanie katalogu segmentu.' : 'Nie udało się usunąć katalogu segmentu.',
+      result ? 'success' : 'error',
+    );
+  }, [activeCaseId, executeEnmOperation, selectedSegment, selectedSegmentBranch]);
 
   // Resolve results summary for SldResultsAccess
   const resultsSummary = useMemo<ElementResultsSummary | null>(() => {
@@ -388,9 +564,15 @@ export const SldEditorPage: React.FC<SldEditorPageProps> = ({
   // Refresh readiness data when active case changes
   useEffect(() => {
     if (activeCaseId) {
+      resetEnmStore();
+      void executeEnmOperation(activeCaseId, 'refresh_snapshot', {});
       readinessRefresh(activeCaseId);
     }
-  }, [activeCaseId, readinessRefresh]);
+  }, [activeCaseId, executeEnmOperation, readinessRefresh, resetEnmStore]);
+
+  useEffect(() => {
+    setSldSymbols(enmSnapshotToSldSymbols(enmSnapshot as Record<string, unknown> | null));
+  }, [enmSnapshot, setSldSymbols]);
 
   // Determine empty state
   const emptyState: SldEmptyState | null = useMemo(() => {
@@ -672,6 +854,7 @@ export const SldEditorPage: React.FC<SldEditorPageProps> = ({
           interactionPreview={interactionPreview}
           onSegmentClick={async (segment) => {
             setSelectedSegment(segment);
+            clearSelection();
             if (activeTool === 'insert_station') {
               await runResolvedAction(activeTool, {
                 id: segment.segment_ref,
@@ -686,6 +869,7 @@ export const SldEditorPage: React.FC<SldEditorPageProps> = ({
             if (!activeTool || activeTool === 'select' || activeTool === 'move') {
               return;
             }
+            setSelectedSegment(null);
             await runResolvedAction(activeTool, target, { kind: 'port', portRole: role });
           }}
           onElementClick={async (element) => {
@@ -712,7 +896,7 @@ export const SldEditorPage: React.FC<SldEditorPageProps> = ({
 
         {/* BLOK 2: Panel naprawczy — floating bottom-left */}
         {activeCaseId && (
-          <div className="absolute bottom-12 left-4 z-20">
+          <div className="pointer-events-none absolute bottom-12 left-4 z-20">
             <SldFixActionsPanel
               caseId={activeCaseId}
               onGoToElement={handleGoToElement}
@@ -724,7 +908,7 @@ export const SldEditorPage: React.FC<SldEditorPageProps> = ({
         {/* UX 10/10: panel gotowości + panel braków danych — lewy dolny róg, nad panelem szybkich napraw */}
         {activeCaseId && (
           <div
-            className="absolute bottom-28 left-4 z-20 flex flex-col gap-2"
+            className="pointer-events-none absolute bottom-28 left-4 z-20 flex w-80 flex-col gap-2 xl:w-96"
             data-testid="sld-readiness-stack"
           >
             <ReadinessLivePanel
@@ -768,6 +952,7 @@ export const SldEditorPage: React.FC<SldEditorPageProps> = ({
             elementId={selectedElement.id}
             elementType={selectedElement.type}
             elementData={elementData}
+            catalogInfo={selectedElementCatalogInfo}
             onFieldChange={(field, value) => {
               if (!activeCaseId || !selectedElement) {
                 notify('Brak aktywnego przypadku lub elementu do zapisu.', 'warning');
@@ -781,12 +966,8 @@ export const SldEditorPage: React.FC<SldEditorPageProps> = ({
               });
               notify(`Zmieniono pole: ${field}`, 'info');
             }}
-            onChangeCatalogType={() => {
-              notify('Otwarcie katalogu typów...', 'info');
-            }}
-            onRefreshFromCatalog={() => {
-              notify('Odświeżanie z katalogu...', 'info');
-            }}
+            onChangeCatalogType={openCatalogPickerForSelectedElement}
+            onRefreshFromCatalog={refreshCatalogForSelectedElement}
             onNavigateToResults={() => {
               notify('Przejście do wyników elementu...', 'info');
             }}
@@ -834,6 +1015,12 @@ export const SldEditorPage: React.FC<SldEditorPageProps> = ({
             </div>
             <div data-testid="sld-segment-inspector-catalog">
               <span className="font-medium">katalog:</span> {String(selectedSegmentBranch?.catalog_ref ?? 'BRAK')}
+            </div>
+            <div data-testid="sld-segment-inspector-namespace">
+              <span className="font-medium">kategoria katalogu:</span> {String(selectedSegmentCatalogInfo?.namespace ?? 'BRAK')}
+            </div>
+            <div data-testid="sld-segment-inspector-version">
+              <span className="font-medium">wersja:</span> {String(selectedSegmentCatalogInfo?.version ?? 'BRAK')}
             </div>
           </div>
 
@@ -910,6 +1097,30 @@ export const SldEditorPage: React.FC<SldEditorPageProps> = ({
 
           <div className="mt-3 rounded border border-gray-200 p-2">
             <div className="text-xs font-semibold text-gray-700">Katalog segmentu</div>
+            <div className="mt-1 text-[11px] text-gray-600" data-testid="sld-segment-catalog-status">
+              {selectedSegmentCatalogInfo
+                ? `Przypisano ${selectedSegmentCatalogInfo.catalogRef} (${selectedSegmentCatalogInfo.version})`
+                : 'Brak przypisanego katalogu segmentu.'}
+            </div>
+            <button
+              data-testid="sld-segment-open-catalog-picker"
+              type="button"
+              className="mt-2 w-full rounded border border-emerald-300 px-2 py-1 text-xs text-emerald-700 hover:bg-emerald-50"
+              onClick={openCatalogPickerForSelectedSegment}
+            >
+              Zmień typ z katalogu
+            </button>
+            <button
+              data-testid="sld-segment-clear-catalog-button"
+              type="button"
+              className="mt-2 w-full rounded border border-amber-300 px-2 py-1 text-xs text-amber-700 hover:bg-amber-50 disabled:cursor-not-allowed disabled:opacity-50"
+              disabled={!selectedSegmentCatalogInfo}
+              onClick={() => {
+                void clearCatalogForSelectedSegment();
+              }}
+            >
+              Usuń przypisanie katalogu
+            </button>
             <input
               data-testid="sld-segment-input-catalog"
               type="text"
@@ -972,6 +1183,31 @@ export const SldEditorPage: React.FC<SldEditorPageProps> = ({
           />
         </div>
       )}
+
+      {catalogAssignmentState.isPickerOpen
+        && catalogAssignmentState.pickerCategory
+        && activeCaseId && (
+          <TypePicker
+            isOpen={catalogAssignmentState.isPickerOpen}
+            category={catalogAssignmentState.pickerCategory}
+            currentTypeId={catalogAssignmentState.target?.currentCatalogRef ?? null}
+            onClose={catalogAssignmentActions.closePicker}
+            onSelectType={(typeId, typeName) => {
+              void (async () => {
+                const success = await catalogAssignmentActions.confirmAssignment(
+                  typeId,
+                  typeName,
+                  executeEnmOperation,
+                  activeCaseId,
+                );
+                notify(
+                  success ? `Przypisano typ katalogowy: ${typeName}.` : 'Nie udało się przypisać typu katalogowego.',
+                  success ? 'success' : 'error',
+                );
+              })();
+            }}
+          />
+        )}
     </div>
   );
 };

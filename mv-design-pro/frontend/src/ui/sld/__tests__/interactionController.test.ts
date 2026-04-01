@@ -39,9 +39,13 @@ describe('interactionController', () => {
     expect(resolved.mode).toBe('DOMAIN_OP');
     expect(resolved.canonicalOp).toBe('insert_station_on_segment_sn');
     expect(resolved.payload.segment_ref).toBe('seg-001');
+    expect(resolved.payload.catalog_binding).toMatchObject({
+      catalog_namespace: 'TRAFO_SN_NN',
+      catalog_item_id: 'tr-sn-nn-15-04-630kva-dyn11',
+    });
   });
 
-  it('buduje payload assign_catalog z automatycznym catalog_item_id', () => {
+  it('buduje payload assign_catalog z kanonicznym bindingiem katalogowym', () => {
     const resolved = resolveToolAction('assign_catalog', TARGET, {
       hasSource: true,
       hasRing: false,
@@ -50,7 +54,13 @@ describe('interactionController', () => {
 
     expect(resolved.mode).toBe('DOMAIN_OP');
     expect(resolved.canonicalOp).toBe('assign_catalog_to_element');
-    expect(resolved.payload.catalog_item_id).toBe('AUTO/seg-001');
+    expect(resolved.payload).toMatchObject({
+      element_ref: 'seg-001',
+      catalog_namespace: 'KABEL_SN',
+      catalog_item_id: 'cable-tfk-yakxs-3x120',
+      catalog_item_version: '2024.1',
+      source_mode: 'KATALOG',
+    });
   });
 
   it('mapuje delete_element na canonical delete_element i payload element_ref', () => {
@@ -74,7 +84,7 @@ describe('interactionController', () => {
 
     expect(resolved.mode).toBe('DOMAIN_OP');
     expect(resolved.canonicalOp).toBe('add_grid_source_sn');
-    expect(resolved.payload).toEqual({ voltage_kv: 15, sn_mva: 250 });
+    expect(resolved.payload).toEqual({ voltage_kv: 15, sk3_mva: 250, rx_ratio: 0.1 });
   });
 
   it('blokuje start_branch na porcie innym niż BRANCH_OUT', () => {
@@ -117,7 +127,19 @@ describe('interactionController', () => {
     }, { kind: 'element' });
 
     expect(edit.mode).toBe('DOMAIN_OP');
+    expect(edit.payload).toEqual({
+      element_ref: 'seg-001',
+      parameters: {
+        name: 'Segment 001',
+      },
+    });
     expect(del.mode).toBe('DOMAIN_OP');
     expect(trunk.mode).toBe('DOMAIN_OP');
+    expect(trunk.payload).toMatchObject({
+      catalog_binding: {
+        catalog_namespace: 'KABEL_SN',
+        catalog_item_id: 'cable-tfk-yakxs-3x120',
+      },
+    });
   });
 });
