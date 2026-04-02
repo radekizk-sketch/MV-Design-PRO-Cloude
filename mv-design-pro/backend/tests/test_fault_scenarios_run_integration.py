@@ -1,14 +1,15 @@
 """
-Test Fault Scenario Run Integration — PR-24
+Test Fault Scenario Run Integration - PR-24.
 
 Integration tests for scenario -> run creation flow.
 Golden fixture with SC_3F/SC_1F/SC_2F scenarios.
 """
 
-import pytest
 from uuid import uuid4
 
+import pytest
 from fastapi.testclient import TestClient
+
 from api.main import app
 
 client = TestClient(app)
@@ -19,9 +20,11 @@ BASE_URL = "/api/execution"
 
 @pytest.fixture(autouse=True)
 def _reset_services():
-    """Reset services between tests."""
-    from api.fault_scenarios import get_fault_scenario_service
+    """Reset legacy and canonical in-memory services between tests."""
     from api.execution_runs import get_engine
+    from api.fault_scenarios import get_fault_scenario_service
+    from enm.canonical_analysis import reset_canonical_runs
+    from enm.store import reset_enm_store
 
     service = get_fault_scenario_service()
     service._scenarios.clear()
@@ -33,7 +36,94 @@ def _reset_services():
     engine._result_sets.clear()
     engine._study_cases.clear()
     engine._case_runs.clear()
+
+    reset_canonical_runs()
+    reset_enm_store()
     yield
+
+
+def _seed_valid_enm(case_id: str) -> None:
+    from enm.models import EnergyNetworkModel
+    from enm.store import set_enm
+
+    set_enm(
+        case_id,
+        EnergyNetworkModel.model_validate(
+            {
+                "header": {
+                    "name": "Scenariusze zwarciowe",
+                    "enm_version": "1.0",
+                    "defaults": {"frequency_hz": 50, "unit_system": "SI"},
+                    "created_at": "2024-01-01T00:00:00Z",
+                    "updated_at": "2024-01-01T00:00:00Z",
+                    "revision": 1,
+                    "hash_sha256": "",
+                },
+                "buses": [
+                    {
+                        "id": "00000000-0000-0000-0000-000000000101",
+                        "ref_id": "bus-main",
+                        "name": "Szyna glowna",
+                        "tags": [],
+                        "meta": {},
+                        "voltage_kv": 15.0,
+                        "phase_system": "3ph",
+                    },
+                    {
+                        "id": "00000000-0000-0000-0000-000000000102",
+                        "ref_id": "bus-1",
+                        "name": "Szyna odplywu",
+                        "tags": [],
+                        "meta": {},
+                        "voltage_kv": 15.0,
+                        "phase_system": "3ph",
+                    },
+                ],
+                "branches": [
+                    {
+                        "id": "00000000-0000-0000-0000-000000000103",
+                        "ref_id": "branch-1",
+                        "name": "Odcinek SN",
+                        "tags": [],
+                        "meta": {},
+                        "type": "cable",
+                        "from_bus_ref": "bus-main",
+                        "to_bus_ref": "bus-1",
+                        "status": "closed",
+                        "catalog_ref": "KABEL_SN_TEST",
+                        "parameter_source": "CATALOG",
+                        "length_km": 0.2,
+                        "r_ohm_per_km": 0.253,
+                        "x_ohm_per_km": 0.073,
+                        "b_siemens_per_km": 2.6e-07,
+                    }
+                ],
+                "sources": [
+                    {
+                        "id": "00000000-0000-0000-0000-000000000104",
+                        "ref_id": "src-grid",
+                        "name": "Zasilanie GPZ",
+                        "tags": [],
+                        "meta": {},
+                        "bus_ref": "bus-main",
+                        "model": "short_circuit_power",
+                        "sk3_mva": 250.0,
+                        "rx_ratio": 0.1,
+                    }
+                ],
+                "transformers": [],
+                "loads": [],
+                "generators": [],
+                "substations": [],
+                "bays": [],
+                "junctions": [],
+                "corridors": [],
+                "measurements": [],
+                "protection_assignments": [],
+                "branch_points": [],
+            }
+        ),
+    )
 
 
 def _create_scenario(
@@ -41,7 +131,7 @@ def _create_scenario(
     fault_type: str = "SC_3F",
     element_ref: str = "bus-1",
 ) -> dict:
-    resp = client.post(
+    response = client.post(
         f"{BASE_URL}/study-cases/{CASE_ID}/fault-scenarios",
         json={
             "name": name,
@@ -53,22 +143,20 @@ def _create_scenario(
             },
         },
     )
-    assert resp.status_code == 201
-    return resp.json()
+    assert response.status_code == 201
+    return response.json()
 
 
 class TestCreateRunFromScenario:
     def test_create_run_from_scenario(self):
-        """Create a run from a SC_3F scenario — should succeed."""
+        """Create a run from a SC_3F scenario after seeding canonical ENM."""
+        _seed_valid_enm(CASE_ID)
         scenario = _create_scenario(name="Run test 3F", fault_type="SC_3F")
         sid = scenario["scenario_id"]
 
-        resp = client.post(
-            f"{BASE_URL}/fault-scenarios/{sid}/runs",
-            json={},
-        )
-        assert resp.status_code == 201
-        data = resp.json()
+        response = client.post(f"{BASE_URL}/fault-scenarios/{sid}/runs", json={})
+        assert response.status_code == 201
+        data = response.json()
         assert data["status"] == "PENDING"
         assert data["scenario_id"] == sid
         assert data["analysis_type"] == "SC_3F"
@@ -78,68 +166,71 @@ class TestCreateRunFromScenario:
         scenario = _create_scenario(name="Run test 2F", fault_type="SC_2F")
         sid = scenario["scenario_id"]
 
-        resp = client.post(
-            f"{BASE_URL}/fault-scenarios/{sid}/runs",
-            json={},
-        )
-        assert resp.status_code == 409
-        assert "zablokowana" in resp.json()["detail"].lower()
+        response = client.post(f"{BASE_URL}/fault-scenarios/{sid}/runs", json={})
+        assert response.status_code == 409
+        assert "zablokowana" in response.json()["detail"].lower()
 
     def test_create_run_not_found(self):
         """Run creation for unknown scenario should fail."""
         fake_id = str(uuid4())
-        resp = client.post(
-            f"{BASE_URL}/fault-scenarios/{fake_id}/runs",
-            json={},
-        )
-        assert resp.status_code == 404
+        response = client.post(f"{BASE_URL}/fault-scenarios/{fake_id}/runs", json={})
+        assert response.status_code == 404
 
 
 class TestGoldenFixture:
     """Golden fixture: minimal network with SC_3F, SC_1F, SC_2F scenarios."""
 
     def test_golden_sc3f_eligible(self):
+        _seed_valid_enm(CASE_ID)
         scenario = _create_scenario(name="Golden 3F", fault_type="SC_3F", element_ref="bus-main")
         sid = scenario["scenario_id"]
-        elig = client.get(f"{BASE_URL}/fault-scenarios/{sid}/eligibility").json()
-        assert elig["status"] == "ELIGIBLE"
+        eligibility = client.get(f"{BASE_URL}/fault-scenarios/{sid}/eligibility").json()
+        assert eligibility["status"] == "ELIGIBLE"
 
     def test_golden_sc2f_ineligible(self):
+        _seed_valid_enm(CASE_ID)
         scenario = _create_scenario(name="Golden 2F", fault_type="SC_2F", element_ref="bus-main")
         sid = scenario["scenario_id"]
-        elig = client.get(f"{BASE_URL}/fault-scenarios/{sid}/eligibility").json()
-        assert elig["status"] == "INELIGIBLE"
-        assert any("Z2" in b["message_pl"] for b in elig["blockers"])
+        eligibility = client.get(f"{BASE_URL}/fault-scenarios/{sid}/eligibility").json()
+        assert eligibility["status"] == "INELIGIBLE"
+        assert any("Z2" in blocker["message_pl"] for blocker in eligibility["blockers"])
 
     def test_golden_sc3f_run_creates(self):
+        _seed_valid_enm(CASE_ID)
         scenario = _create_scenario(name="Golden run 3F", fault_type="SC_3F", element_ref="bus-main")
         sid = scenario["scenario_id"]
-        resp = client.post(f"{BASE_URL}/fault-scenarios/{sid}/runs", json={})
-        assert resp.status_code == 201
-        assert resp.json()["analysis_type"] == "SC_3F"
+        response = client.post(f"{BASE_URL}/fault-scenarios/{sid}/runs", json={})
+        assert response.status_code == 201
+        assert response.json()["analysis_type"] == "SC_3F"
 
     def test_golden_overlay_determinism(self):
         """Same scenario produces identical SLD overlay payload."""
         scenario = _create_scenario(name="Overlay det", fault_type="SC_3F", element_ref="bus-1")
         sid = scenario["scenario_id"]
-        ov1 = client.get(f"{BASE_URL}/fault-scenarios/{sid}/sld-overlay").json()
-        ov2 = client.get(f"{BASE_URL}/fault-scenarios/{sid}/sld-overlay").json()
-        assert ov1 == ov2
+        overlay_first = client.get(f"{BASE_URL}/fault-scenarios/{sid}/sld-overlay").json()
+        overlay_second = client.get(f"{BASE_URL}/fault-scenarios/{sid}/sld-overlay").json()
+        assert overlay_first == overlay_second
 
     def test_golden_hash_determinism(self):
         """Two scenarios with same content have same content_hash."""
-        # Duplicate creation via API returns 409, so test via domain directly
         from domain.fault_scenario import (
-            FaultLocation, FaultType, compute_scenario_content_hash, new_fault_scenario
+            FaultLocation,
+            FaultType,
+            compute_scenario_content_hash,
+            new_fault_scenario,
         )
-        from uuid import uuid4
-        cid = uuid4()
-        a = new_fault_scenario(
-            study_case_id=cid, name="Det", fault_type=FaultType.SC_3F,
+
+        case_uuid = uuid4()
+        first = new_fault_scenario(
+            study_case_id=case_uuid,
+            name="Det",
+            fault_type=FaultType.SC_3F,
             location=FaultLocation(element_ref="bus-x", location_type="BUS"),
         )
-        b = new_fault_scenario(
-            study_case_id=cid, name="Det", fault_type=FaultType.SC_3F,
+        second = new_fault_scenario(
+            study_case_id=case_uuid,
+            name="Det",
+            fault_type=FaultType.SC_3F,
             location=FaultLocation(element_ref="bus-x", location_type="BUS"),
         )
-        assert compute_scenario_content_hash(a) == compute_scenario_content_hash(b)
+        assert compute_scenario_content_hash(first) == compute_scenario_content_hash(second)

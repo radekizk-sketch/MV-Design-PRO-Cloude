@@ -3,68 +3,40 @@ from __future__ import annotations
 from typing import Any
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 
-from api.dependencies import get_uow_factory
-from application.analyses.run_reader import read_run_envelope
-from application.analysis_run import (
-    AnalysisRunDetailDTO,
-    AnalysisRunExportService,
-    AnalysisRunService,
-    AnalysisRunSummaryDTO,
-    OverlayDTO,
-    ResultItemDTO,
-    ResultListDTO,
-    TraceDTO,
-    TraceSummaryDTO,
-    # P11a — Results Inspector
-    ResultsInspectorService,
-    build_deterministic_id,
-    build_input_metadata,
-    build_trace_summary,
-    canonicalize_json,
-    get_run_trace,
-    minimize_summary,
+from api.canonical_run_views import (
+    build_analysis_run_detail,
+    build_analysis_run_summary,
+    build_branch_results_response,
+    build_bus_results_response,
+    build_extended_trace_response,
+    build_result_items,
+    build_results_index_response,
+    build_run_trace_payload,
+    build_short_circuit_results_response,
+    build_sld_overlay,
 )
-from infrastructure.persistence.unit_of_work import UnitOfWork
+from api.dependencies import get_uow_factory
+from application.analysis_run.read_model import canonicalize_json, build_trace_summary
+from enm.canonical_analysis import (
+    CanonicalRun,
+    get_run as get_canonical_run,
+    list_runs_for_project as list_canonical_runs_for_project,
+)
 
 
 router = APIRouter()
 
 
-def _build_service(uow_factory: Any) -> AnalysisRunService:
-    return AnalysisRunService(uow_factory)
-
-
-def _build_export_service(uow_factory: Any) -> AnalysisRunExportService:
-    return AnalysisRunExportService(uow_factory)
-
-
-def _build_inspector_service(uow_factory: Any) -> ResultsInspectorService:
-    return ResultsInspectorService(uow_factory)
-
-
-def _guard_stale_results(run_id: UUID, uow_factory: Any) -> None:
-    """
-    PR-4: Guard against accessing stale/outdated results.
-
-    Raises HTTP 409 Conflict if the run's results are outdated.
-    This ensures that UI/API cannot use results after model/config changes.
-    """
-    service = _build_service(uow_factory)
-    try:
-        run = service.get_run(run_id)
-    except ValueError:
-        return  # Let the downstream handler raise 404
-    if not run.results_valid:
+def _require_canonical_run(run_id: UUID) -> CanonicalRun:
+    run = get_canonical_run(run_id)
+    if run is None:
         raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail=(
-                f"Wyniki przebiegu {run_id} są nieaktualne "
-                f"(result_status: {run.result_status}). "
-                "Wymagane ponowne obliczenie."
-            ),
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Run {run_id} not found",
         )
+    return run
 
 
 @router.get("/projects/{project_id}/analysis-runs")
@@ -74,111 +46,40 @@ def list_analysis_runs(
     status_filter: str | None = Query(default=None, alias="status"),
     limit: int = Query(default=100, ge=1, le=500),
     offset: int = Query(default=0, ge=0),
-    uow_factory=Depends(get_uow_factory),
 ) -> dict[str, Any]:
-    service = _build_service(uow_factory)
-    filters = {}
-    if analysis_type:
-        filters["analysis_type"] = analysis_type
-    if status_filter:
-        filters["status"] = status_filter
-    runs = service.list_runs(project_id, filters)
-    sliced = runs[offset : offset + limit]
-    items = []
-    for run in sliced:
-        trace_payload = get_run_trace(run)
-        trace_summary = (
-            build_trace_summary(trace_payload) if trace_payload is not None else None
+    items = [
+        build_analysis_run_summary(run)
+        for run in list_canonical_runs_for_project(
+            str(project_id),
+            analysis_type=analysis_type,
         )
-        items.append(
-                AnalysisRunSummaryDTO(
-                    id=run.id,
-                    deterministic_id=build_deterministic_id(run),
-                    analysis_type=run.analysis_type,
-                    status=run.status,
-                    result_status=run.result_status,
-                    created_at=run.created_at,
-                    finished_at=run.finished_at,
-                    input_hash=run.input_hash,
-                    summary_json=minimize_summary(run.result_summary),
-                    trace_summary=trace_summary,
-                    results_valid=run.results_valid,
-            ).to_dict()
-        )
-    return canonicalize_json({"items": items, "count": len(runs)})
+        if status_filter is None or run.status == status_filter
+    ]
+    sliced_items = items[offset : offset + limit]
+    return canonicalize_json({"items": sliced_items, "count": len(items)})
 
 
 @router.get("/analysis-runs/{run_id}")
-def get_analysis_run(
-    run_id: str,
-    uow_factory=Depends(get_uow_factory),
-) -> dict[str, Any]:
-    index_entry = _get_run_index_entry(run_id, uow_factory=uow_factory)
-    if index_entry is not None:
-        try:
-            envelope = read_run_envelope(
-                index_entry.analysis_type, run_id, uow_factory=uow_factory
-            )
-        except ValueError as exc:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)
-            ) from exc
-        return envelope.to_dict()
-
+def get_analysis_run(run_id: str) -> dict[str, Any]:
     try:
         parsed_run_id = UUID(run_id)
     except ValueError as exc:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
-    service = _build_service(uow_factory)
-    try:
-        run = service.get_run(parsed_run_id)
-    except ValueError as exc:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
-    trace_payload = get_run_trace(run)
-    trace_summary = build_trace_summary(trace_payload) if trace_payload is not None else None
-    dto = AnalysisRunDetailDTO(
-        id=run.id,
-        deterministic_id=build_deterministic_id(run),
-        analysis_type=run.analysis_type,
-        status=run.status,
-        result_status=run.result_status,
-        created_at=run.created_at,
-        finished_at=run.finished_at,
-        input_hash=run.input_hash,
-        summary_json=run.result_summary,
-        trace_summary=trace_summary,
-        results_valid=run.results_valid,
-        input_metadata=build_input_metadata(run.input_snapshot),
-    )
-    return canonicalize_json(dto.to_dict())
-
-
-def _get_run_index_entry(run_id: str, *, uow_factory) -> Any | None:
-    with uow_factory() as uow:
-        return uow.analysis_runs_index.get(run_id)
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Run {run_id} not found",
+        ) from exc
+    return canonicalize_json(build_analysis_run_detail(_require_canonical_run(parsed_run_id)))
 
 
 @router.get("/analysis-runs/{run_id}/results")
-def get_analysis_run_results(
-    run_id: UUID,
-    uow_factory=Depends(get_uow_factory),
-) -> dict[str, Any]:
-    _guard_stale_results(run_id, uow_factory)
-    service = _build_service(uow_factory)
-    results = service.get_results(run_id)
-    items = []
-    for result in results:
-        payload = result.get("payload") or {}
-        items.append(
-            ResultItemDTO(
-                id=result["id"],
-                result_type=result["result_type"],
-                created_at=result["created_at"],
-                payload_summary=minimize_summary(payload),
-            )
+def get_analysis_run_results(run_id: UUID) -> dict[str, Any]:
+    canonical_run = _require_canonical_run(run_id)
+    if canonical_run.status != "FINISHED":
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Wyniki przebiegu {run_id} są niedostępne (status={canonical_run.status})",
         )
-    dto = ResultListDTO(results=tuple(items))
-    return canonicalize_json(dto.to_dict())
+    return canonicalize_json(build_result_items(canonical_run))
 
 
 @router.get("/analysis-runs/{run_id}/overlay")
@@ -187,238 +88,116 @@ def get_analysis_run_overlay(
     diagram_id: UUID = Query(...),
     uow_factory=Depends(get_uow_factory),
 ) -> dict[str, Any]:
-    service = _build_service(uow_factory)
-    try:
-        run = service.get_run(run_id)
-    except ValueError as exc:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
-    try:
-        overlay_payload = service.get_sld_overlay_for_run(run.project_id, diagram_id, run.id)
-    except ValueError as exc:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
-    dto = OverlayDTO(
-        bus_overlays=overlay_payload.get("nodes", []),
-        branch_overlays=overlay_payload.get("branches", []),
+    canonical_run = _require_canonical_run(run_id)
+    with uow_factory() as uow:
+        diagram = uow.sld.get(diagram_id)
+    if diagram is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="SLD diagram not found",
+        )
+    diagram_project_id = (
+        str(diagram.get("project_id")) if diagram.get("project_id") is not None else None
     )
-    return canonicalize_json(dto.to_dict())
+    if canonical_run.project_id is not None and diagram_project_id not in {
+        None,
+        str(canonical_run.project_id),
+    }:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Run does not belong to this project",
+        )
+    overlay = build_sld_overlay(
+        canonical_run,
+        diagram_id=diagram_id,
+        sld_payload=diagram.get("payload", {}),
+    )
+    return canonicalize_json(
+        {
+            "bus_overlays": overlay.get("nodes", []),
+            "branch_overlays": overlay.get("branches", []),
+        }
+    )
 
 
 @router.get("/analysis-runs/{run_id}/trace")
-def get_analysis_run_trace(
-    run_id: UUID,
-    uow_factory=Depends(get_uow_factory),
-) -> dict[str, Any]:
-    service = _build_service(uow_factory)
-    try:
-        run = service.get_run(run_id)
-    except ValueError as exc:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
-    trace_payload = get_run_trace(run)
+def get_analysis_run_trace(run_id: UUID) -> dict[str, Any]:
+    trace_payload = build_run_trace_payload(_require_canonical_run(run_id))
     if trace_payload is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Ślad obliczeniowy niedostępny dla tego przebiegu analizy",
         )
-    return canonicalize_json(TraceDTO(trace=trace_payload).to_dict())
+    return canonicalize_json({"trace": trace_payload})
 
 
 @router.get("/analysis-runs/{run_id}/trace/summary")
-def get_analysis_run_trace_summary(
-    run_id: UUID,
-    uow_factory=Depends(get_uow_factory),
-) -> dict[str, Any]:
-    service = _build_service(uow_factory)
-    try:
-        run = service.get_run(run_id)
-    except ValueError as exc:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
-    trace_payload = get_run_trace(run)
+def get_analysis_run_trace_summary(run_id: UUID) -> dict[str, Any]:
+    trace_payload = build_run_trace_payload(_require_canonical_run(run_id))
     if trace_payload is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Ślad obliczeniowy niedostępny dla tego przebiegu analizy",
         )
     summary = build_trace_summary(trace_payload)
-    dto = TraceSummaryDTO(
-        count=summary.get("count", 0),
-        first_step=summary.get("first_step"),
-        last_step=summary.get("last_step"),
-        phases=summary.get("phases", []),
-        duration_ms=summary.get("duration_ms"),
-        warnings=summary.get("warnings", []),
+    return canonicalize_json(
+        {
+            "count": summary.get("count", 0),
+            "first_step": summary.get("first_step"),
+            "last_step": summary.get("last_step"),
+            "phases": summary.get("phases", []),
+            "duration_ms": summary.get("duration_ms"),
+            "warnings": summary.get("warnings", []),
+        }
     )
-    return canonicalize_json(dto.to_dict())
 
 
 @router.get("/projects/{project_id}/analysis-runs/{run_id}/export/docx")
-def export_analysis_run_docx(
-    project_id: UUID,
-    run_id: UUID,
-    uow_factory=Depends(get_uow_factory),
-) -> Response:
-    _guard_stale_results(run_id, uow_factory)
-    service = _build_export_service(uow_factory)
-    try:
-        bundle = service.export_run_bundle(run_id)
-    except ValueError as exc:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
-    if bundle.get("project", {}).get("id") != str(project_id):
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Przebieg analizy nie znaleziony w projekcie",
-        )
-    try:
-        payload = service._render_docx(bundle)
-    except ImportError as exc:
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(exc)) from exc
-    headers = {
-        "Content-Disposition": f'attachment; filename="analysis_run_{run_id}.docx"'
-    }
-    return Response(
-        content=payload,
-        media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-        headers=headers,
+def export_analysis_run_docx(project_id: UUID, run_id: UUID) -> dict[str, Any]:
+    _ = project_id, run_id
+    raise HTTPException(
+        status_code=status.HTTP_410_GONE,
+        detail=(
+            "Eksport DOCX dla ogólnego endpointu /analysis-runs został wycofany z toru "
+            "produkcyjnego. Użyj kanonicznych endpointów execution/power-flow."
+        ),
     )
 
 
 @router.get("/projects/{project_id}/analysis-runs/{run_id}/export/pdf")
-def export_analysis_run_pdf(
-    project_id: UUID,
-    run_id: UUID,
-    uow_factory=Depends(get_uow_factory),
-) -> Response:
-    _guard_stale_results(run_id, uow_factory)
-    service = _build_export_service(uow_factory)
-    try:
-        bundle = service.export_run_bundle(run_id)
-    except ValueError as exc:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
-    if bundle.get("project", {}).get("id") != str(project_id):
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Przebieg analizy nie znaleziony w projekcie",
-        )
-    try:
-        payload = service._render_pdf(bundle)
-    except ImportError as exc:
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(exc)) from exc
-    headers = {"Content-Disposition": f'attachment; filename="analysis_run_{run_id}.pdf"'}
-    return Response(content=payload, media_type="application/pdf", headers=headers)
-
-
-# =============================================================================
-# P11a — Results Inspector (READ-ONLY) Endpoints
-#
-# CANONICAL ALIGNMENT:
-# - SYSTEM_SPEC.md: NOT-A-SOLVER, WHITE BOX, layer boundaries
-# - AGENTS.md: READ-ONLY, no physics, no mutations
-# - wizard_screens.md: RESULT_VIEW mode
-#
-# DETERMINISM: All endpoints return deterministically sorted results.
-# =============================================================================
+def export_analysis_run_pdf(project_id: UUID, run_id: UUID) -> dict[str, Any]:
+    _ = project_id, run_id
+    raise HTTPException(
+        status_code=status.HTTP_410_GONE,
+        detail=(
+            "Eksport PDF dla ogólnego endpointu /analysis-runs został wycofany z toru "
+            "produkcyjnego. Użyj kanonicznych endpointów execution/power-flow."
+        ),
+    )
 
 
 @router.get("/analysis-runs/{run_id}/results/index")
-def get_results_index(
-    run_id: UUID,
-    uow_factory=Depends(get_uow_factory),
-) -> dict[str, Any]:
-    """
-    P11a: Get results index for a run.
-
-    Returns available result tables with column metadata and units.
-    """
-    _guard_stale_results(run_id, uow_factory)
-    service = _build_inspector_service(uow_factory)
-    try:
-        dto = service.get_results_index(run_id)
-    except ValueError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)
-        ) from exc
-    return canonicalize_json(dto.to_dict())
+def get_results_index(run_id: UUID) -> dict[str, Any]:
+    return canonicalize_json(build_results_index_response(_require_canonical_run(run_id)))
 
 
 @router.get("/analysis-runs/{run_id}/results/buses")
-def get_bus_results(
-    run_id: UUID,
-    uow_factory=Depends(get_uow_factory),
-) -> dict[str, Any]:
-    """
-    P11a: Get bus/node results for a run.
-
-    Returns deterministically sorted bus results (by name, then id).
-    """
-    _guard_stale_results(run_id, uow_factory)
-    service = _build_inspector_service(uow_factory)
-    try:
-        dto = service.get_bus_results(run_id)
-    except ValueError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)
-        ) from exc
-    return canonicalize_json(dto.to_dict())
+def get_bus_results(run_id: UUID) -> dict[str, Any]:
+    return canonicalize_json(build_bus_results_response(_require_canonical_run(run_id)))
 
 
 @router.get("/analysis-runs/{run_id}/results/branches")
-def get_branch_results(
-    run_id: UUID,
-    uow_factory=Depends(get_uow_factory),
-) -> dict[str, Any]:
-    """
-    P11a: Get branch results for a run.
-
-    Returns deterministically sorted branch results (by name, then id).
-    """
-    _guard_stale_results(run_id, uow_factory)
-    service = _build_inspector_service(uow_factory)
-    try:
-        dto = service.get_branch_results(run_id)
-    except ValueError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)
-        ) from exc
-    return canonicalize_json(dto.to_dict())
+def get_branch_results(run_id: UUID) -> dict[str, Any]:
+    return canonicalize_json(build_branch_results_response(_require_canonical_run(run_id)))
 
 
 @router.get("/analysis-runs/{run_id}/results/short-circuit")
-def get_short_circuit_results(
-    run_id: UUID,
-    uow_factory=Depends(get_uow_factory),
-) -> dict[str, Any]:
-    """
-    P11a: Get short-circuit results for a run.
-
-    Only available for short_circuit_sn analysis type.
-    Returns deterministically sorted results (by target_id).
-    """
-    _guard_stale_results(run_id, uow_factory)
-    service = _build_inspector_service(uow_factory)
-    try:
-        dto = service.get_short_circuit_results(run_id)
-    except ValueError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)
-        ) from exc
-    return canonicalize_json(dto.to_dict())
+def get_short_circuit_results(run_id: UUID) -> dict[str, Any]:
+    return canonicalize_json(
+        build_short_circuit_results_response(_require_canonical_run(run_id))
+    )
 
 
 @router.get("/analysis-runs/{run_id}/results/trace")
-def get_extended_trace(
-    run_id: UUID,
-    uow_factory=Depends(get_uow_factory),
-) -> dict[str, Any]:
-    """
-    P11a: Get extended trace with run context for audit.
-
-    Returns white_box_trace + run metadata (snapshot_id, input_hash).
-    """
-    _guard_stale_results(run_id, uow_factory)
-    service = _build_inspector_service(uow_factory)
-    try:
-        dto = service.get_extended_trace(run_id)
-    except ValueError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)
-        ) from exc
-    return canonicalize_json(dto.to_dict())
+def get_extended_trace(run_id: UUID) -> dict[str, Any]:
+    return canonicalize_json(build_extended_trace_response(_require_canonical_run(run_id)))

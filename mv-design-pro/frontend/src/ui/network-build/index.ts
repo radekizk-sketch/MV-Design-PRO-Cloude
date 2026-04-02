@@ -5,7 +5,6 @@
  */
 
 export { ProcessPanel } from './ProcessPanel';
-export { ProcessBuildPage } from './ProcessBuildPage';
 export { OperationFormRouter } from './OperationFormRouter';
 export { ReadinessBar } from './ReadinessBar';
 export { InspectorEngineeringView } from './InspectorEngineeringView';

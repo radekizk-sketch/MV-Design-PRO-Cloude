@@ -15,19 +15,20 @@ Routes:
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
 from typing import Any
+from uuid import UUID
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 
 from pydantic import BaseModel, Field
 
 from api.domain_ops_policy import validate_and_materialize_catalog_binding
+from enm.canonical_analysis import run_power_flow_now, run_short_circuit_now
 from enm.hash import compute_enm_hash
-from enm.mapping import map_enm_to_network_graph
-from enm.models import EnergyNetworkModel, ENMDefaults, ENMHeader
+from enm.models import EnergyNetworkModel
+from enm.store import get_enm as _get_enm
+from enm.store import set_enm as _set_enm
 from enm.topology_ops import (
-    TopologySummary,
     attach_protection,
     compute_topology_summary,
     create_branch,
@@ -44,7 +45,7 @@ from enm.topology_ops import (
     update_node,
     update_protection,
 )
-from enm.validator import ENMValidator, ValidationResult
+from enm.validator import ENMValidator
 
 from application.eligibility_service import EligibilityService
 from domain.canonical_operations import resolve_operation_name
@@ -52,7 +53,6 @@ from domain.canonical_operations import resolve_operation_name
 from application.network_wizard.schema import (
     ApplyStepResponse,
     CanProceedResponse,
-    WizardStateResponse,
     WizardStepRequest,
 )
 from application.network_wizard.step_controller import (
@@ -63,42 +63,23 @@ from application.network_wizard.validator import validate_wizard_state
 
 router = APIRouter(prefix="/api/cases", tags=["enm"])
 
-# ---------------------------------------------------------------------------
-# In-memory storage (production DB is future scope)
-# ---------------------------------------------------------------------------
-_enm_store: dict[str, EnergyNetworkModel] = {}
 
-
-def _get_enm(case_id: str) -> EnergyNetworkModel:
-    """Get ENM for case, or create empty default."""
-    if case_id not in _enm_store:
-        enm = EnergyNetworkModel(
-            header=ENMHeader(
-                name=f"Model sieci — {case_id[:8]}",
-                defaults=ENMDefaults(),
-            ),
-        )
-        enm.header.hash_sha256 = compute_enm_hash(enm)
-        _enm_store[case_id] = enm
-    return _enm_store[case_id]
-
-
-def _set_enm(case_id: str, enm: EnergyNetworkModel) -> EnergyNetworkModel:
-    """Store ENM with revision bump and hash recomputation."""
-    new_hash = compute_enm_hash(enm)
-
-    existing = _enm_store.get(case_id)
-    if existing and existing.header.hash_sha256 == new_hash:
-        # No-op: identical content
-        return existing
-
-    old_rev = existing.header.revision if existing else 0
-    enm.header.revision = old_rev + 1
-    enm.header.updated_at = datetime.now(timezone.utc)
-    enm.header.hash_sha256 = new_hash
-
-    _enm_store[case_id] = enm
-    return enm
+def _resolve_project_id(case_id: str, request: Request) -> str | None:
+    uow_factory = getattr(request.app.state, "uow_factory", None)
+    if uow_factory is None:
+        return None
+    try:
+        parsed_case_id = UUID(case_id)
+    except ValueError:
+        return None
+    with uow_factory() as uow:
+        operating_case = uow.cases.get_operating_case(parsed_case_id)
+        if operating_case is not None:
+            return str(operating_case.project_id)
+        study_case = uow.cases.get_study_case(parsed_case_id)
+        if study_case is not None:
+            return str(study_case.project_id)
+    return None
 
 
 # ---------------------------------------------------------------------------
@@ -484,11 +465,10 @@ async def topology_ops_batch(case_id: str, req: BatchOpsRequest) -> dict[str, An
 # ---------------------------------------------------------------------------
 
 # Cache: (case_id, enm_hash) → result
-_run_cache: dict[tuple[str, str], dict] = {}
 
 
 @router.post("/{case_id}/runs/short-circuit")
-async def run_short_circuit(case_id: str) -> dict[str, Any]:
+async def run_short_circuit(case_id: str, request: Request) -> dict[str, Any]:
     """
     Dispatch short-circuit 3F run:
     1. Load ENM
@@ -508,49 +488,52 @@ async def run_short_circuit(case_id: str) -> dict[str, Any]:
             detail=[i.model_dump(mode="json") for i in validation.issues],
         )
 
-    # Check cache
-    enm_hash = compute_enm_hash(enm)
-    cache_key = (case_id, enm_hash)
-    if cache_key in _run_cache:
-        return _run_cache[cache_key]
-
-    # Map ENM → NetworkGraph
-    graph = map_enm_to_network_graph(enm)
-
-    # Find fault nodes (all buses)
-    from network_model.solvers.short_circuit_iec60909 import (
-        ShortCircuitIEC60909Solver,
-        ShortCircuitType,
+    run = run_short_circuit_now(
+        case_id=case_id,
+        project_id=_resolve_project_id(case_id, request),
     )
 
-    results_per_bus: list[dict] = []
-
-    c_max = 1.10
-    tk_s = 1.0
-
-    for node_id in sorted(graph.nodes.keys()):
-        try:
-            result = ShortCircuitIEC60909Solver.compute_3ph_short_circuit(
-                graph=graph,
-                fault_node_id=node_id,
-                c_factor=c_max,
-                tk_s=tk_s,
-            )
-            results_per_bus.append(result.to_dict())
-        except Exception:
-            # Skip nodes where SC calculation fails
-            pass
-
-    response = {
+    # Map ENM → NetworkGraph
+    return {
         "case_id": case_id,
         "enm_revision": enm.header.revision,
-        "enm_hash": enm_hash,
+        "enm_hash": compute_enm_hash(enm),
         "analysis_type": "short_circuit_3f",
-        "results": results_per_bus,
+        "run_id": str(run.id),
+        "input_hash": run.input_hash,
+        "readiness": run.readiness,
+        "results": (run.raw_result or {}).get("results", []),
     }
 
-    _run_cache[cache_key] = response
-    return response
+
+@router.post("/{case_id}/runs/power-flow")
+async def run_power_flow(case_id: str, request: Request) -> dict[str, Any]:
+    """Dispatch power-flow run from the canonical ENM snapshot."""
+    enm = _get_enm(case_id)
+
+    validator = ENMValidator()
+    validation = validator.validate(enm)
+    if validation.status == "FAIL":
+        raise HTTPException(
+            status_code=422,
+            detail=[i.model_dump(mode="json") for i in validation.issues],
+        )
+
+    run = run_power_flow_now(
+        case_id=case_id,
+        project_id=_resolve_project_id(case_id, request),
+    )
+    return {
+        "case_id": case_id,
+        "enm_revision": enm.header.revision,
+        "enm_hash": compute_enm_hash(enm),
+        "analysis_type": "power_flow",
+        "run_id": str(run.id),
+        "input_hash": run.input_hash,
+        "readiness": run.readiness,
+        "result": ((run.raw_result or {}).get("result_v1") or {}),
+        "trace": run.power_flow_trace or {},
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -720,3 +703,25 @@ async def domain_ops(case_id: str, req: DomainOpEnvelopeModel) -> dict[str, Any]
             result["snapshot"] = None
 
     return result
+
+
+_PRODUCTION_DISABLED_ROUTE_KEYS = {
+    ("/api/cases/{case_id}/enm", "PUT"),
+    ("/api/cases/{case_id}/enm/ops", "POST"),
+    ("/api/cases/{case_id}/enm/ops/batch", "POST"),
+    ("/api/cases/{case_id}/wizard/apply-step", "POST"),
+}
+
+
+def _build_production_router() -> APIRouter:
+    production = APIRouter()
+    for route in router.routes:
+        path = getattr(route, "path", "")
+        methods = set(getattr(route, "methods", set()))
+        if any((path, method) in _PRODUCTION_DISABLED_ROUTE_KEYS for method in methods):
+            continue
+        production.routes.append(route)
+    return production
+
+
+production_router = _build_production_router()

@@ -50,7 +50,7 @@ function realActions(items: { separator?: boolean; label: string }[]) {
 
 /**
  * Forbidden English words that must NOT appear in any label.
- * Technical abbreviations (PV, BESS, UPS, CT, VT, SN, nN, SOC, NOP, White Box) are
+ * Technical abbreviations (PV, BESS, UPS, CT, VT, SN, nN, SOC, NOP) are
  * acceptable as domain terms used internationally.
  */
 const FORBIDDEN_ENGLISH_WORDS = [
@@ -91,7 +91,6 @@ function assertPolishLabels(
     for (const eng of FORBIDDEN_ENGLISH_WORDS) {
       // Case-sensitive match for standalone words — skip domain acronyms
       const regex = new RegExp(`\\b${eng}\\b`, 'i');
-      // Allow 'White Box' as a domain term
       if (eng.toLowerCase() === 'open' || eng.toLowerCase() === 'close') {
         // 'OPEN' / 'CLOSED' can appear as switch state in labels like 'Otwórz' but not standalone English
         // We check that the label does not START with the English word
@@ -102,7 +101,7 @@ function assertPolishLabels(
         }
         continue;
       }
-      if (regex.test(item.label) && !item.label.includes('White Box')) {
+      if (regex.test(item.label)) {
         throw new Error(
           `[${contextName}] Label "${item.label}" contains forbidden English word "${eng}"`,
         );
@@ -478,12 +477,12 @@ describe('buildPVInverterContextMenu — specific', () => {
     expect(ids).toContain('clear_catalog');
   });
 
-  it('should include White Box action', () => {
+  it('should include trace action', () => {
     const items = buildPVInverterContextMenu('RESULT_VIEW');
     const wb = items.find((a) => a.id === 'show_whitebox');
     expect(wb).toBeDefined();
     expect(wb!.enabled).toBe(true);
-    expect(wb!.label).toContain('White Box');
+    expect(wb!.label).toContain('ślad obliczeń');
   });
 });
 

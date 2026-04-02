@@ -36,7 +36,7 @@ export const VIEW_MODE_LABELS: Record<ResultsViewMode, string> = {
   losses: 'Straty',
   violations: 'Naruszenia',
   convergence: 'Zbieżność',
-  white_box: 'Ślad obliczeń (White-Box)',
+  white_box: 'Ślad obliczeń',
 };
 
 /**

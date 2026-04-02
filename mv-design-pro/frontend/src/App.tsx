@@ -20,10 +20,10 @@
  * - "" / "#sld" → Schemat jednokreskowy (SLD Editor)
  * - "#sld-view" → Podglad schematu (SLD Read-Only Viewer)
  * - "#results" → Przegląd wyników (Results Browser)
- * - "#proof" → Ślad obliczeń (Proof)
+ * - "#proof" → Ślad obliczeń
  * - "#protection-results" → Wyniki zabezpieczeń
  * - "#power-flow-results" → Wyniki rozpływu
- * - "#network-build" → Budowa sieci (panel procesowy)
+ * - "#network-build" → Budowa sieci (ten sam ekran modelowania co SLD)
  * - "#protection-settings" → Nastawy zabezpieczeń
  * - "#catalog" → Biblioteka typów (Type Library Browser)
  * - "#case-config" → Konfiguracja przypadku obliczeniowego
@@ -31,14 +31,13 @@
 
 import { useEffect, useState, useCallback, useMemo } from 'react';
 
-import { ProofInspectorPage } from './proof-inspector';
 import { ProtectionResultsInspectorPage } from './ui/protection-results';
 import { PowerFlowResultsInspectorPage } from './ui/power-flow-results';
 import { ReferencePatternsPage } from './ui/reference-patterns';
 import { ResultsInspectorPage } from './ui/results-inspector';
+import { resolveResultsRunId } from './ui/results-inspector/viewState';
 import { ResultsWorkspacePage } from './ui/results-workspace';
 import { SLDViewPage, SldEditorPage } from './ui/sld';
-import { ProcessBuildPage } from './ui/network-build';
 import { EnmInspectorPage } from './ui/enm-inspector';
 import { FaultScenariosPanel, FaultScenarioModal } from './ui/fault-scenarios';
 import { PowerFactoryLayout } from './ui/layout';
@@ -46,7 +45,7 @@ import { useAppStateStore } from './ui/app-state';
 import { useSnapshotStore } from './ui/topology/snapshotStore';
 import { useExecutionRunsStore } from './ui/study-cases/runStore';
 import type { ExecutionAnalysisType } from './ui/study-cases/types';
-import { ROUTES, useUrlSelectionSync, getCurrentHashRoute } from './ui/navigation';
+import { ROUTES, useUrlSelectionSync, getCurrentHashRoute, getCurrentSearchParams } from './ui/navigation';
 import { useSelectionStore } from './ui/selection';
 import { NotificationToast } from './ui/notifications/NotificationToast';
 import { notify } from './ui/notifications/store';
@@ -114,9 +113,11 @@ function isResultsRoute(route: string): boolean {
 function App() {
   // NAVIGATION_SELECTOR_UI: Use getCurrentHashRoute to strip query params from hash
   const [route, setRoute] = useState(() => getCurrentHashRoute());
+  const [hashVersion, setHashVersion] = useState(0);
   const setActiveMode = useAppStateStore((state) => state.setActiveMode);
   const activeCaseId = useAppStateStore((state) => state.activeCaseId);
   const activeAnalysisType = useAppStateStore((state) => state.activeAnalysisType);
+  const activeRunId = useAppStateStore((state) => state.activeRunId);
   const setActiveRun = useAppStateStore((state) => state.setActiveRun);
   const readiness = useSnapshotStore((state) => state.readiness);
   const createAndExecuteRun = useExecutionRunsStore((state) => state.createAndExecuteRun);
@@ -130,7 +131,10 @@ function App() {
 
   useEffect(() => {
     // NAVIGATION_SELECTOR_UI: Strip query params when handling hash changes
-    const handler = () => setRoute(getCurrentHashRoute());
+    const handler = () => {
+      setRoute(getCurrentHashRoute());
+      setHashVersion((current) => current + 1);
+    };
     window.addEventListener('hashchange', handler);
     return () => window.removeEventListener('hashchange', handler);
   }, []);
@@ -230,6 +234,9 @@ function App() {
     return 'valid' as const;
   }, [readiness]);
 
+  const routeSearchParams = useMemo(() => getCurrentSearchParams(), [hashVersion]);
+  const effectiveRunId = resolveResultsRunId(routeSearchParams.get('run'), activeRunId) ?? undefined;
+
   // Menu action handler — routes navigation from MainMenuBar
   const handleMenuAction = useCallback((actionId: string) => {
     switch (actionId) {
@@ -301,16 +308,16 @@ function App() {
   if (route === '#results') {
     return wrapWithReadyIndicator(
       <PowerFactoryLayout {...layoutProps}>
-        <ResultsInspectorPage />
+        <ResultsInspectorPage runId={effectiveRunId} />
       </PowerFactoryLayout>
     );
   }
 
-  // Ślad obliczeń (Proof Inspector)
+  // Ślad obliczeń (pełny widok przebiegu analizy)
   if (route === '#proof') {
     return wrapWithReadyIndicator(
       <PowerFactoryLayout {...layoutProps} hideInspector={true}>
-        <ProofInspectorPage />
+        <ResultsInspectorPage runId={effectiveRunId} forcedTab="TRACE" />
       </PowerFactoryLayout>
     );
   }
@@ -342,11 +349,11 @@ function App() {
     );
   }
 
-  // Budowa sieci (ProcessPanel — panel procesowy)
+  // Budowa sieci (ten sam kanoniczny ekran modelowania co #sld)
   if (route === '#network-build') {
     return wrapWithReadyIndicator(
       <PowerFactoryLayout {...layoutProps}>
-        <ProcessBuildPage />
+        <SldEditorPage useDemo={false} />
       </PowerFactoryLayout>
     );
   }

@@ -17,8 +17,6 @@ from api.enm import router as enm_router
 from application.eligibility_service import EligibilityService
 from domain.eligibility_models import (
     AnalysisEligibilityIssue,
-    AnalysisEligibilityMatrix,
-    AnalysisEligibilityResult,
     AnalysisType,
     EligibilityStatus,
     IssueSeverity,
@@ -27,7 +25,6 @@ from domain.eligibility_models import (
 )
 from enm.models import (
     Bus,
-    Cable,
     EnergyNetworkModel,
     ENMDefaults,
     ENMHeader,
@@ -36,6 +33,7 @@ from enm.models import (
     Source,
     Transformer,
 )
+from enm.store import reset_enm_store, set_enm
 from enm.validator import ENMValidator, ReadinessResult
 
 
@@ -568,6 +566,13 @@ def client():
     return TestClient(test_app)
 
 
+@pytest.fixture(autouse=True)
+def reset_enm_runtime_state():
+    reset_enm_store()
+    yield
+    reset_enm_store()
+
+
 class TestEligibilityAPI:
     def test_endpoint_returns_200(self, client):
         # Ensure ENM exists
@@ -640,7 +645,7 @@ class TestEligibilityAPI:
             "loads": [],
             "generators": [],
         }
-        client.put("/api/cases/elig-test-4/enm", json=enm)
+        set_enm("elig-test-4", EnergyNetworkModel.model_validate(enm))
         resp = client.get("/api/cases/elig-test-4/analysis-eligibility")
         data = resp.json()
 

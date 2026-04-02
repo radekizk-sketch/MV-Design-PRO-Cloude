@@ -10,41 +10,28 @@ from fastapi.middleware.cors import CORSMiddleware
 from api.exception_handlers import register_exception_handlers
 from api.middleware import RequestIdMiddleware
 from api.analysis_runs import router as analysis_runs_router
-from api.analysis_runs_index import router as analysis_runs_index_router
-from api.analysis_runs_read import router as analysis_runs_read_router
-from api.cases import router as cases_router
 from api.catalog import router as catalog_router
 from api.comparison import router as comparison_router
-from api.design_synth import router as design_synth_router
 from api.diagnostics import router as diagnostics_router
 from api.equipment_proof_pack import router as equipment_proof_pack_router
 from api.health import router as health_router
-from api.issues import router as issues_router
 from api.power_flow_comparisons import router as power_flow_comparisons_router
 from api.power_flow_runs import router as power_flow_runs_router
 from api.project_archive import router as project_archive_router
 from api.projects import router as projects_router
 from api.proof_pack import router as proof_pack_router
 from api.protection_comparisons import router as protection_comparisons_router
-from api.protection_runs import router as protection_runs_router
 from api.reference_patterns import router as reference_patterns_router
 from api.sld import router as sld_router
-from api.snapshots import router as snapshots_router
 from api.study_cases import router as study_cases_router
-from api.case_runs import router as case_runs_router
-from api.unified_runs import router as unified_runs_router
 from api.xlsx_import import router as xlsx_import_router
-from api.enm import router as enm_router
+from api.enm import production_router as enm_router
 from api.execution_runs import router as execution_runs_router
 from api.result_contract_v1 import router as result_contract_v1_router
-from api.solver_input import router as solver_input_router
-from api.batch_execution import router as batch_execution_router
 from api.fault_scenarios import router as fault_scenarios_router
-from api.results_workspace import router as results_workspace_router
 from api.protection_engine_v1 import router as protection_engine_v1_router
 from api.sld_overrides import router as sld_overrides_router
 from api.switchgear_config import router as switchgear_config_router
-from api.domain_operations import router as domain_operations_router
 from infrastructure.persistence.db import (
     create_engine_from_url,
     create_session_factory,
@@ -105,41 +92,28 @@ register_exception_handlers(app)
 
 # Routers
 app.include_router(analysis_runs_router)
-app.include_router(analysis_runs_index_router)
-app.include_router(analysis_runs_read_router)
-app.include_router(cases_router)
 app.include_router(catalog_router)
 app.include_router(comparison_router)
-app.include_router(design_synth_router)
 app.include_router(diagnostics_router)
 app.include_router(equipment_proof_pack_router)
 app.include_router(health_router)
-app.include_router(issues_router)
 app.include_router(power_flow_comparisons_router)
 app.include_router(power_flow_runs_router)
 app.include_router(project_archive_router)
 app.include_router(projects_router)
 app.include_router(proof_pack_router)
 app.include_router(protection_comparisons_router)
-app.include_router(protection_runs_router)
 app.include_router(reference_patterns_router)
 app.include_router(sld_router)
-app.include_router(snapshots_router)
 app.include_router(study_cases_router)
-app.include_router(case_runs_router)
-app.include_router(unified_runs_router)
 app.include_router(xlsx_import_router)
 app.include_router(enm_router)
 app.include_router(execution_runs_router)
 app.include_router(result_contract_v1_router)
-app.include_router(solver_input_router)
-app.include_router(batch_execution_router)
 app.include_router(fault_scenarios_router)
-app.include_router(results_workspace_router)
 app.include_router(protection_engine_v1_router)
 app.include_router(sld_overrides_router)
 app.include_router(switchgear_config_router)
-app.include_router(domain_operations_router)
 
 
 @app.get("/")

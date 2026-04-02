@@ -124,8 +124,7 @@ const MENU_GROUPS: MenuGroup[] = [
       { id: 'protection', label: 'Zabezpieczenia' },
       { id: 'tcc', label: 'Krzywe czasowo-prądowe' },
       { id: 'sep-1', label: '', separator: true },
-      { id: 'whitebox', label: 'Ślad obliczeń (WhiteBox)' },
-      { id: 'proof', label: 'Pakiet dowodowy' },
+      { id: 'whitebox', label: 'Ślad obliczeń' },
     ],
   },
   {

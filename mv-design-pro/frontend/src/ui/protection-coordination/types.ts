@@ -367,7 +367,7 @@ export const LABELS = {
   },
 
   trace: {
-    title: 'Ślad obliczeń (WHITE BOX)',
+    title: 'Ślad obliczeń',
     subtitle: 'Wszystkie kroki obliczeń do audytu',
     step: 'Krok',
     description: 'Opis',

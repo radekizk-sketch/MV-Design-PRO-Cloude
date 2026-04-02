@@ -1,16 +1,10 @@
 """
-P11a — SLD (Single Line Diagram) API Endpoints
+P11a - SLD (Single Line Diagram) API Endpoints.
 
-CANONICAL ALIGNMENT:
-- SYSTEM_SPEC.md: SLD is visualization layer, not model
-- sld_rules.md: Results as overlay only, never written to model
-- powerfactory_ui_parity.md: Result overlay in RESULT_VIEW mode
-
-RULES (BINDING):
-- SLD overlay is READ-ONLY
-- Overlay provides mapping of results to SLD symbols
-- Zero mutations to NetworkModel or SLD diagram
-- Deterministic sorting of overlay data
+Production contract:
+- overlay is read-only,
+- overlay is built only from canonical run data,
+- no fallback to legacy result readers.
 """
 
 from __future__ import annotations
@@ -20,15 +14,13 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 
+from api.canonical_run_views import build_sld_overlay
 from api.dependencies import get_uow_factory
-from application.analysis_run import ResultsInspectorService, canonicalize_json
+from application.analysis_run.read_model import canonicalize_json
+from enm.canonical_analysis import get_run as get_canonical_run
 
 
 router = APIRouter()
-
-
-def _build_inspector_service(uow_factory: Any) -> ResultsInspectorService:
-    return ResultsInspectorService(uow_factory)
 
 
 @router.get("/projects/{project_id}/sld/{diagram_id}/overlay")
@@ -38,30 +30,28 @@ def get_sld_result_overlay(
     run_id: UUID = Query(..., description="Analysis run ID for result overlay"),
     uow_factory=Depends(get_uow_factory),
 ) -> dict[str, Any]:
-    """
-    P11a: Get SLD result overlay for a diagram.
-
-    Maps analysis results to SLD symbols for visualization.
-    This is READ-ONLY - does not mutate model or diagram.
-
-    Args:
-        project_id: Project UUID
-        diagram_id: SLD diagram UUID
-        run_id: Analysis run UUID to get results from
-
-    Returns:
-        SldResultOverlayDTO with node and branch overlays.
-
-    Overlay contains:
-    - nodes: Voltage data (U_pu, U_kV) + SC data (Ikss, Sk) mapped to node symbols
-    - branches: Power flow data (P, Q, I, loading%) mapped to branch symbols
-    - result_status: FRESH/OUTDATED/NONE to indicate result validity
-    """
-    service = _build_inspector_service(uow_factory)
-    try:
-        dto = service.get_sld_result_overlay(project_id, diagram_id, run_id)
-    except ValueError as exc:
+    canonical_run = get_canonical_run(run_id)
+    if canonical_run is None:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)
-        ) from exc
-    return canonicalize_json(dto.to_dict())
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Run {run_id} not found",
+        )
+    if canonical_run.project_id is not None and str(canonical_run.project_id) != str(project_id):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Przebieg analizy nie należy do tego projektu",
+        )
+    with uow_factory() as uow:
+        diagram = uow.sld.get(diagram_id)
+    if diagram is None or str(diagram.get("project_id")) != str(project_id):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="SLD diagram not found",
+        )
+    return canonicalize_json(
+        build_sld_overlay(
+            canonical_run,
+            diagram_id=diagram_id,
+            sld_payload=diagram.get("payload", {}),
+        )
+    )
