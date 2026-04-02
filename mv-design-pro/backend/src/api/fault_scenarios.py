@@ -526,13 +526,15 @@ def create_run_from_scenario(
             detail="Analiza zablokowana: " + "; ".join(blocker_msgs),
         )
 
-    # Create run via execution engine
-    from api.execution_runs import get_engine
-    from domain.execution import ExecutionAnalysisType
+    if scenario.fault_type.value != "SC_3F":
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                "Scenariusz może uruchomić tylko kanoniczną analizę SC_3F. "
+                "Typy SC_1F i SC_2F pozostają poza torem produkcyjnym po migracji."
+            ),
+        )
 
-    engine = get_engine()
-
-    # Build solver input from scenario
     solver_input: dict[str, Any] = {
         "scenario_id": str(scenario.scenario_id),
         "fault_type": scenario.fault_type.value,
@@ -542,35 +544,38 @@ def create_run_from_scenario(
     if request and request.solver_input:
         solver_input.update(request.solver_input)
 
-    analysis_type = ExecutionAnalysisType(scenario.fault_type.value)
+    from enm.canonical_analysis import create_run as create_canonical_run
+    from enm.store import get_enm
 
     try:
-        # Register study case if not registered
-        from domain.study_case import StudyCase as DomainStudyCase
-
-        try:
-            engine.get_study_case(scenario.study_case_id)
-        except Exception:
-            case = DomainStudyCase(
-                id=scenario.study_case_id,
-                project_id=scenario.study_case_id,
-                name="Przypadek scenariuszowy",
-            )
-            engine.register_study_case(case)
-
-        run = engine.create_run(
-            study_case_id=scenario.study_case_id,
-            analysis_type=analysis_type,
-            solver_input=solver_input,
+        get_enm(str(scenario.study_case_id))
+        run = create_canonical_run(
+            case_id=str(scenario.study_case_id),
+            project_id=None,
+            analysis_type="short_circuit_sn",
+            options=solver_input,
         )
 
         # Register run association
         service.register_run(parsed_id, run.id)
 
-        result = run.to_dict()
-        result["scenario_id"] = str(scenario.scenario_id)
-        return result
+        return {
+            "id": str(run.id),
+            "study_case_id": str(scenario.study_case_id),
+            "analysis_type": scenario.fault_type.value,
+            "solver_input_hash": run.input_hash,
+            "status": "PENDING",
+            "started_at": None,
+            "finished_at": None,
+            "error_message": None,
+            "scenario_id": str(scenario.scenario_id),
+        }
 
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=str(exc),
+        ) from exc
     except Exception as exc:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,

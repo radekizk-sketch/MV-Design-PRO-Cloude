@@ -1,13 +1,15 @@
 /**
  * Domain API V1 — klient operacji domenowych ENM.
  *
- * Kanoniczny endpoint: POST /api/cases/{caseId}/enm/ops
+ * Kanoniczny endpoint: POST /api/cases/{caseId}/enm/domain-ops
  * Zwraca DomainOpResponseV1 z pełnym snapshotem + logical_views + readiness.
  *
  * SLD odświeża się z odpowiedzi — brak konieczności osobnego reload.
  */
 
 import type { DomainOpResponseV1 } from '../../types/enm';
+import type { DomainOpResponse } from '../../types/domainOps';
+import { ALIAS_MAP } from '../../types/domainOps';
 
 const API_BASE = '/api/cases';
 
@@ -20,6 +22,136 @@ class DomainApiError extends Error {
   ) {
     super(`API ${status} ${statusText}: ${endpoint}`);
   }
+}
+
+function resolveCanonicalName(name: string): string {
+  return ALIAS_MAP[name] ?? name;
+}
+
+function canonicalStringify(value: unknown): string {
+  if (value === null || value === undefined) return 'null';
+  if (typeof value === 'number' || typeof value === 'boolean') return String(value);
+  if (typeof value === 'string') return JSON.stringify(value);
+  if (Array.isArray(value)) {
+    return `[${value.map((item) => canonicalStringify(item)).join(',')}]`;
+  }
+  if (typeof value === 'object') {
+    const obj = value as Record<string, unknown>;
+    const keys = Object.keys(obj)
+      .filter((key) => obj[key] !== undefined)
+      .sort();
+    return `{${keys
+      .map((key) => `${JSON.stringify(key)}:${canonicalStringify(obj[key])}`)
+      .join(',')}}`;
+  }
+  return JSON.stringify(String(value));
+}
+
+function hashFNV1a32(input: string): string {
+  let hash = 0x811c9dc5;
+  for (let i = 0; i < input.length; i += 1) {
+    hash ^= input.charCodeAt(i);
+    hash = Math.imul(hash, 0x01000193);
+  }
+  return (hash >>> 0).toString(16).padStart(8, '0');
+}
+
+function buildIdempotencyKey(opName: string, payload: Record<string, unknown>): string {
+  const payloadHash = hashFNV1a32(canonicalStringify(payload));
+  return `op:${opName}:root:${payloadHash}`;
+}
+
+function getNullableNumber(value: unknown): number | null {
+  return typeof value === 'number' ? value : null;
+}
+
+function getNullableString(value: unknown): string | null {
+  return typeof value === 'string' ? value : null;
+}
+
+function normalizeSelectionHint(
+  selectionHint: DomainOpResponse['selection_hint'],
+): DomainOpResponseV1['selection_hint'] {
+  if (!selectionHint?.element_id || !selectionHint.element_type) {
+    return null;
+  }
+
+  return {
+    element_id: selectionHint.element_id,
+    element_type: selectionHint.element_type,
+    zoom_to: Boolean(selectionHint.zoom_to),
+  };
+}
+
+function normalizeMaterializedParams(
+  materializedParams: DomainOpResponse['materialized_params'],
+): DomainOpResponseV1['materialized_params'] {
+  const linesSource = materializedParams?.lines_sn ?? {};
+  const transformersSource = materializedParams?.transformers_sn_nn ?? {};
+
+  return {
+    lines_sn: Object.fromEntries(
+      Object.entries(linesSource).map(([refId, params]) => [
+        refId,
+        {
+          catalog_item_id:
+            typeof params.catalog_item_id === 'string' ? params.catalog_item_id : '',
+          catalog_item_version: getNullableString(params.catalog_item_version),
+          r_ohm_per_km: getNullableNumber(params.r_ohm_per_km),
+          x_ohm_per_km: getNullableNumber(params.x_ohm_per_km),
+          i_max_a: getNullableNumber(params.i_max_a),
+        },
+      ]),
+    ),
+    transformers_sn_nn: Object.fromEntries(
+      Object.entries(transformersSource).map(([refId, params]) => [
+        refId,
+        {
+          catalog_item_id:
+            typeof params.catalog_item_id === 'string' ? params.catalog_item_id : '',
+          catalog_item_version: getNullableString(params.catalog_item_version),
+          u_k_percent: getNullableNumber(params.u_k_percent),
+          p0_kw: getNullableNumber(params.p0_kw),
+          pk_kw: getNullableNumber(params.pk_kw),
+          s_n_kva: getNullableNumber(params.s_n_kva),
+        },
+      ]),
+    ),
+  };
+}
+
+function normalizeResponse(
+  response: DomainOpResponse & { error?: string; error_code?: string },
+): DomainOpResponseV1 {
+  return {
+    snapshot: (response.snapshot as unknown as DomainOpResponseV1['snapshot']) ?? null,
+    logical_views: (response.logical_views as unknown as DomainOpResponseV1['logical_views']) ?? {
+      trunks: [],
+      branches: [],
+      secondary_connectors: [],
+      terminals: [],
+    },
+    readiness: response.readiness ?? { ready: false, blockers: [], warnings: [] },
+    fix_actions: (response.fix_actions ?? []).map((action) => ({
+      ...action,
+      modal_type: action.panel ?? null,
+    })),
+    changes: response.changes ?? {
+      created_element_ids: [],
+      updated_element_ids: [],
+      deleted_element_ids: [],
+    },
+    selection_hint: normalizeSelectionHint(response.selection_hint),
+    audit_trail: response.audit_trail ?? [],
+    domain_events: (response.domain_events as unknown as DomainOpResponseV1['domain_events']) ?? [],
+    materialized_params: normalizeMaterializedParams(response.materialized_params),
+    layout: (response.layout as DomainOpResponseV1['layout']) ?? {
+      layout_hash: '',
+      layout_version: 'unknown',
+    },
+    error: response.error,
+    error_code: response.error_code,
+  };
 }
 
 /**
@@ -35,11 +167,20 @@ export async function executeDomainOp(
   opName: string,
   payload: Record<string, unknown>,
 ): Promise<DomainOpResponseV1> {
-  const endpoint = `${API_BASE}/${caseId}/enm/ops`;
+  const canonicalName = resolveCanonicalName(opName);
+  const endpoint = `${API_BASE}/${caseId}/enm/domain-ops`;
   const res = await fetch(endpoint, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ op: opName, data: payload }),
+    body: JSON.stringify({
+      project_id: caseId,
+      snapshot_base_hash: '',
+      operation: {
+        name: canonicalName,
+        idempotency_key: buildIdempotencyKey(canonicalName, payload),
+        payload,
+      },
+    }),
   });
 
   if (!res.ok) {
@@ -47,5 +188,9 @@ export async function executeDomainOp(
     throw new DomainApiError(res.status, res.statusText, detail, endpoint);
   }
 
-  return res.json();
+  const response = (await res.json()) as DomainOpResponse & {
+    error?: string;
+    error_code?: string;
+  };
+  return normalizeResponse(response);
 }

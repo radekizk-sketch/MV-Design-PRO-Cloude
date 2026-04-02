@@ -58,7 +58,7 @@ const FORBIDDEN_ENGLISH = [
 
 // Technical terms allowed
 const ALLOWED_TECHNICAL = [
-  'PV', 'BESS', 'UPS', 'CT', 'VT', 'SN', 'nN', 'SOC', 'NOP', 'White Box',
+  'PV', 'BESS', 'UPS', 'CT', 'VT', 'SN', 'nN', 'SOC', 'NOP',
   'JSON', 'PDF', 'DOCX', 'LaTeX', 'TR', 'OLTC', 'TCC',
 ];
 

@@ -58,7 +58,7 @@ export const ROUTES: Record<string, RouteDefinition> = {
   PROOF: {
     hash: '#proof',
     label: 'Slad obliczen',
-    description: 'Szczegolowy slad obliczen dla wybranego elementu',
+    description: 'Przebieg obliczen dla aktywnego uruchomienia analizy',
     icon: 'TRACE',
     requiredMode: 'RESULT_VIEW',
   },
@@ -100,7 +100,7 @@ export const ROUTES: Record<string, RouteDefinition> = {
   NETWORK_BUILD: {
     hash: '#network-build',
     label: 'Budowa sieci',
-    description: 'Panel procesowy budowy sieci SN od GPZ krok po kroku',
+    description: 'Kanoniczny ekran modelowania sieci SN od GPZ w widoku SLD',
     icon: 'BLD',
     requiredMode: 'MODEL_EDIT',
   },

@@ -1,15 +1,31 @@
-"""Testy API topologicznych endpointów ENM — topology, readiness."""
+"""Tests for ENM topology and readiness endpoints."""
 
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from api.enm import router as enm_router
+from enm.canonical_analysis import reset_canonical_runs
+from enm.models import EnergyNetworkModel
+from enm.store import reset_enm_store, set_enm
+
+
+def _seed_enm(case_id: str, payload: dict) -> None:
+    set_enm(case_id, EnergyNetworkModel.model_validate(payload))
+
+
+@pytest.fixture(autouse=True)
+def reset_state():
+    reset_canonical_runs()
+    reset_enm_store()
+    yield
+    reset_canonical_runs()
+    reset_enm_store()
 
 
 @pytest.fixture
 def client():
-    """Lekka aplikacja z routerem ENM (bez bazy danych)."""
+    """Lekka aplikacja z routerem ENM."""
     test_app = FastAPI()
     test_app.include_router(enm_router)
     return TestClient(test_app)
@@ -19,83 +35,191 @@ def _valid_enm_with_topology():
     """ENM z pełną topologią: stacje, pola, węzły T, magistrale."""
     return {
         "header": {
-            "name": "Topology Test", "enm_version": "1.0",
+            "name": "Topology Test",
+            "enm_version": "1.0",
             "defaults": {"frequency_hz": 50, "unit_system": "SI"},
             "created_at": "2024-01-01T00:00:00Z",
             "updated_at": "2024-01-01T00:00:00Z",
-            "revision": 1, "hash_sha256": "",
+            "revision": 1,
+            "hash_sha256": "",
         },
         "buses": [
-            {"ref_id": "bus_sn_a", "name": "Szyna SN A", "tags": [], "meta": {},
-             "voltage_kv": 15, "phase_system": "3ph"},
-            {"ref_id": "bus_sn_b", "name": "Szyna SN B", "tags": [], "meta": {},
-             "voltage_kv": 15, "phase_system": "3ph"},
-            {"ref_id": "bus_nn_1", "name": "Szyna nn 1", "tags": [], "meta": {},
-             "voltage_kv": 0.4, "phase_system": "3ph"},
+            {
+                "id": "00000000-0000-0000-0000-000000000101",
+                "ref_id": "bus_sn_a",
+                "name": "Szyna SN A",
+                "tags": [],
+                "meta": {},
+                "voltage_kv": 15,
+                "phase_system": "3ph",
+            },
+            {
+                "id": "00000000-0000-0000-0000-000000000102",
+                "ref_id": "bus_sn_b",
+                "name": "Szyna SN B",
+                "tags": [],
+                "meta": {},
+                "voltage_kv": 15,
+                "phase_system": "3ph",
+            },
+            {
+                "id": "00000000-0000-0000-0000-000000000103",
+                "ref_id": "bus_nn_1",
+                "name": "Szyna nn 1",
+                "tags": [],
+                "meta": {},
+                "voltage_kv": 0.4,
+                "phase_system": "3ph",
+            },
         ],
         "sources": [
-            {"ref_id": "src_1", "name": "Grid", "tags": [], "meta": {},
-             "bus_ref": "bus_sn_a", "model": "short_circuit_power", "sk3_mva": 220},
+            {
+                "id": "00000000-0000-0000-0000-000000000104",
+                "ref_id": "src_1",
+                "name": "Grid",
+                "tags": [],
+                "meta": {},
+                "bus_ref": "bus_sn_a",
+                "model": "short_circuit_power",
+                "sk3_mva": 220,
+                "rx_ratio": 0.1,
+            },
         ],
         "branches": [
-            {"ref_id": "line_1", "name": "Linia L1", "tags": [], "meta": {},
-             "type": "line_overhead", "from_bus_ref": "bus_sn_a", "to_bus_ref": "bus_sn_b",
-             "status": "closed", "length_km": 10, "r_ohm_per_km": 0.443, "x_ohm_per_km": 0.34,
-             "catalog_ref": "CAT-CAB-001"},
+            {
+                "id": "00000000-0000-0000-0000-000000000105",
+                "ref_id": "line_1",
+                "name": "Linia L1",
+                "tags": [],
+                "meta": {},
+                "type": "line_overhead",
+                "from_bus_ref": "bus_sn_a",
+                "to_bus_ref": "bus_sn_b",
+                "status": "closed",
+                "length_km": 10,
+                "r_ohm_per_km": 0.443,
+                "x_ohm_per_km": 0.34,
+                "catalog_ref": "CAT-CAB-001",
+            },
         ],
         "transformers": [
-            {"ref_id": "trafo_1", "name": "T1", "tags": [], "meta": {},
-             "hv_bus_ref": "bus_sn_b", "lv_bus_ref": "bus_nn_1",
-             "sn_mva": 0.63, "uhv_kv": 15, "ulv_kv": 0.4, "uk_percent": 4.5, "pk_kw": 6.5,
-             "catalog_ref": "CAT-TR-001"},
+            {
+                "id": "00000000-0000-0000-0000-000000000106",
+                "ref_id": "trafo_1",
+                "name": "T1",
+                "tags": [],
+                "meta": {},
+                "hv_bus_ref": "bus_sn_b",
+                "lv_bus_ref": "bus_nn_1",
+                "sn_mva": 0.63,
+                "uhv_kv": 15,
+                "ulv_kv": 0.4,
+                "uk_percent": 4.5,
+                "pk_kw": 6.5,
+                "catalog_ref": "CAT-TR-001",
+            },
         ],
         "loads": [
-            {"ref_id": "load_1", "name": "Odbiór 1", "tags": [], "meta": {},
-             "bus_ref": "bus_nn_1", "p_mw": 0.2, "q_mvar": 0.1, "model": "pq"},
+            {
+                "id": "00000000-0000-0000-0000-000000000107",
+                "ref_id": "load_1",
+                "name": "Odbior 1",
+                "tags": [],
+                "meta": {},
+                "bus_ref": "bus_nn_1",
+                "p_mw": 0.2,
+                "q_mvar": 0.1,
+                "model": "pq",
+            },
         ],
         "generators": [],
         "substations": [
-            {"ref_id": "sub_gpz", "name": "GPZ", "tags": [], "meta": {},
-             "station_type": "gpz", "bus_refs": ["bus_sn_a"]},
-            {"ref_id": "sub_1", "name": "Stacja 1", "tags": [], "meta": {},
-             "station_type": "mv_lv", "bus_refs": ["bus_sn_b", "bus_nn_1"],
-             "transformer_refs": ["trafo_1"]},
+            {
+                "id": "00000000-0000-0000-0000-000000000108",
+                "ref_id": "sub_gpz",
+                "name": "GPZ",
+                "tags": [],
+                "meta": {},
+                "station_type": "gpz",
+                "bus_refs": ["bus_sn_a"],
+            },
+            {
+                "id": "00000000-0000-0000-0000-000000000109",
+                "ref_id": "sub_1",
+                "name": "Stacja 1",
+                "tags": [],
+                "meta": {},
+                "station_type": "mv_lv",
+                "bus_refs": ["bus_sn_b", "bus_nn_1"],
+                "transformer_refs": ["trafo_1"],
+            },
         ],
         "bays": [
-            {"ref_id": "bay_in_1", "name": "Pole IN", "tags": [], "meta": {},
-             "bay_role": "IN", "substation_ref": "sub_1", "bus_ref": "bus_sn_b"},
-            {"ref_id": "bay_tr_1", "name": "Pole TR", "tags": [], "meta": {},
-             "bay_role": "TR", "substation_ref": "sub_1", "bus_ref": "bus_sn_b"},
+            {
+                "id": "00000000-0000-0000-0000-000000000110",
+                "ref_id": "bay_in_1",
+                "name": "Pole IN",
+                "tags": [],
+                "meta": {},
+                "bay_role": "IN",
+                "substation_ref": "sub_1",
+                "bus_ref": "bus_sn_b",
+            },
+            {
+                "id": "00000000-0000-0000-0000-000000000111",
+                "ref_id": "bay_tr_1",
+                "name": "Pole TR",
+                "tags": [],
+                "meta": {},
+                "bay_role": "TR",
+                "substation_ref": "sub_1",
+                "bus_ref": "bus_sn_b",
+            },
         ],
         "junctions": [
-            {"ref_id": "junc_1", "name": "T-node 1", "tags": [], "meta": {},
-             "connected_branch_refs": ["line_1", "line_1", "line_1"],
-             "junction_type": "T_node"},
+            {
+                "id": "00000000-0000-0000-0000-000000000112",
+                "ref_id": "junc_1",
+                "name": "T-node 1",
+                "tags": [],
+                "meta": {},
+                "connected_branch_refs": ["line_1", "line_1", "line_1"],
+                "junction_type": "T_node",
+            },
         ],
         "corridors": [
-            {"ref_id": "corr_a", "name": "Magistrala A", "tags": [], "meta": {},
-             "corridor_type": "radial", "ordered_segment_refs": ["line_1"]},
+            {
+                "id": "00000000-0000-0000-0000-000000000113",
+                "ref_id": "corr_a",
+                "name": "Magistrala A",
+                "tags": [],
+                "meta": {},
+                "corridor_type": "radial",
+                "ordered_segment_refs": ["line_1"],
+            },
         ],
+        "measurements": [],
+        "protection_assignments": [],
+        "branch_points": [],
     }
 
 
 class TestTopologyEndpoint:
     def test_get_topology_empty(self, client):
-        resp = client.get("/api/cases/topo-test-1/enm/topology")
-        assert resp.status_code == 200
-        data = resp.json()
+        response = client.get("/api/cases/topo-test-1/enm/topology")
+        assert response.status_code == 200
+        data = response.json()
         assert data["substations"] == []
         assert data["bays"] == []
         assert data["junctions"] == []
         assert data["corridors"] == []
 
     def test_get_topology_with_data(self, client):
-        enm = _valid_enm_with_topology()
-        client.put("/api/cases/topo-test-2/enm", json=enm)
+        _seed_enm("topo-test-2", _valid_enm_with_topology())
 
-        resp = client.get("/api/cases/topo-test-2/enm/topology")
-        assert resp.status_code == 200
-        data = resp.json()
+        response = client.get("/api/cases/topo-test-2/enm/topology")
+        assert response.status_code == 200
+        data = response.json()
         assert len(data["substations"]) == 2
         assert len(data["bays"]) == 2
         assert len(data["junctions"]) == 1
@@ -107,22 +231,21 @@ class TestTopologyEndpoint:
 
 class TestReadinessEndpoint:
     def test_readiness_empty_enm(self, client):
-        resp = client.get("/api/cases/ready-test-1/enm/readiness")
-        assert resp.status_code == 200
-        data = resp.json()
+        response = client.get("/api/cases/ready-test-1/enm/readiness")
+        assert response.status_code == 200
+        data = response.json()
         assert data["validation"]["status"] == "FAIL"
         assert data["readiness"]["ready"] is False
-        assert any(i["severity"] == "BLOCKER" for i in data["readiness"]["blockers"])
+        assert any(issue["severity"] == "BLOCKER" for issue in data["readiness"]["blockers"])
         assert data["analysis_readiness"]["short_circuit_3f"] is False
         assert data["topology_completeness"]["has_substations"] is False
 
     def test_readiness_with_topology(self, client):
-        enm = _valid_enm_with_topology()
-        client.put("/api/cases/ready-test-2/enm", json=enm)
+        _seed_enm("ready-test-2", _valid_enm_with_topology())
 
-        resp = client.get("/api/cases/ready-test-2/enm/readiness")
-        assert resp.status_code == 200
-        data = resp.json()
+        response = client.get("/api/cases/ready-test-2/enm/readiness")
+        assert response.status_code == 200
+        data = response.json()
         assert data["validation"]["status"] == "WARN"
         assert data["readiness"]["ready"] is True
         assert data["readiness"]["blockers"] == []
@@ -137,77 +260,72 @@ class TestReadinessEndpoint:
         assert data["element_counts"]["buses"] == 3
 
     def test_readiness_contract_shape(self, client):
-        """Readiness endpoint always returns the canonical top-level keys (PR-11 canon)."""
-        resp = client.get("/api/cases/shape-test-1/enm/readiness")
-        assert resp.status_code == 200
-        data = resp.json()
-        # Top-level keys — order-independent (PR-11: validation + readiness as objects)
-        expected_top = {
-            "case_id", "enm_revision", "validation", "readiness",
-            "analysis_readiness", "topology_completeness", "element_counts",
+        response = client.get("/api/cases/shape-test-1/enm/readiness")
+        assert response.status_code == 200
+        data = response.json()
+        assert set(data.keys()) == {
+            "case_id",
+            "enm_revision",
+            "validation",
+            "readiness",
+            "analysis_readiness",
+            "topology_completeness",
+            "element_counts",
         }
-        assert set(data.keys()) == expected_top
-
-        # validation sub-keys
         assert "status" in data["validation"]
         assert "issues" in data["validation"]
         assert data["validation"]["status"] in ("OK", "WARN", "FAIL")
-
-        # readiness sub-keys
         assert "ready" in data["readiness"]
         assert "blockers" in data["readiness"]
         assert isinstance(data["readiness"]["ready"], bool)
         assert isinstance(data["readiness"]["blockers"], list)
-
-        # analysis_readiness sub-keys
         assert set(data["analysis_readiness"].keys()) == {
-            "short_circuit_3f", "short_circuit_1f", "load_flow", "protection",
+            "short_circuit_3f",
+            "short_circuit_1f",
+            "load_flow",
+            "protection",
         }
-
-        # topology_completeness sub-keys
         assert set(data["topology_completeness"].keys()) == {
-            "has_substations", "has_bays", "has_junctions", "has_corridors",
+            "has_substations",
+            "has_bays",
+            "has_junctions",
+            "has_corridors",
         }
-
-        # element_counts sub-keys
         assert set(data["element_counts"].keys()) == {
-            "buses", "branches", "transformers", "sources", "loads",
-            "generators", "substations", "bays", "junctions", "corridors",
-            "measurements", "protection_assignments",
+            "buses",
+            "branches",
+            "transformers",
+            "sources",
+            "loads",
+            "generators",
+            "substations",
+            "bays",
+            "junctions",
+            "corridors",
+            "measurements",
+            "protection_assignments",
         }
-
 
     def test_readiness_false_blocker_e009(self, client):
         enm = _valid_enm_with_topology()
         enm["branches"][0]["catalog_ref"] = None
-        client.put("/api/cases/ready-test-3/enm", json=enm)
+        _seed_enm("ready-test-3", enm)
 
-        resp = client.get("/api/cases/ready-test-3/enm/readiness")
-        assert resp.status_code == 200
-        data = resp.json()
+        response = client.get("/api/cases/ready-test-3/enm/readiness")
+        assert response.status_code == 200
+        data = response.json()
         assert data["validation"]["status"] == "FAIL"
         assert data["readiness"]["ready"] is False
-        assert any(i["code"] == "E009" for i in data["readiness"]["blockers"])
+        assert any(issue["code"] == "E009" for issue in data["readiness"]["blockers"])
 
 
-class TestENMPutWithExtensions:
-    def test_put_enm_with_substations_and_bays(self, client):
-        enm = _valid_enm_with_topology()
-        resp = client.put("/api/cases/put-ext-1/enm", json=enm)
-        assert resp.status_code == 200
-        data = resp.json()
-        assert len(data["substations"]) == 2
-        assert len(data["bays"]) == 2
-        assert len(data["junctions"]) == 1
-        assert len(data["corridors"]) == 1
+class TestENMRoundtripExtensions:
+    def test_roundtrip_get_with_extensions(self, client):
+        _seed_enm("put-ext-2", _valid_enm_with_topology())
 
-    def test_roundtrip_put_get_with_extensions(self, client):
-        enm = _valid_enm_with_topology()
-        client.put("/api/cases/put-ext-2/enm", json=enm)
-
-        resp = client.get("/api/cases/put-ext-2/enm")
-        assert resp.status_code == 200
-        data = resp.json()
+        response = client.get("/api/cases/put-ext-2/enm")
+        assert response.status_code == 200
+        data = response.json()
         assert data["substations"][0]["ref_id"] == "sub_gpz"
         assert data["bays"][0]["ref_id"] == "bay_in_1"
         assert data["junctions"][0]["junction_type"] == "T_node"

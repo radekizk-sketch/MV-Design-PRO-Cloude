@@ -1016,7 +1016,7 @@ export const SLDView: React.FC<SLDViewProps> = ({
         selectElement({ id: elementId, type: elementType, name: elementId });
         const labels: Record<string, string> = {
           show_results: 'Przejście do wyników',
-          show_whitebox: 'Otwarcie śladu obliczeń WhiteBox',
+          show_whitebox: 'Otwarcie śladu obliczeń',
           show_readiness: 'Gotowość elementu',
           show_tree: 'Zaznaczono w drzewie projektu',
           show_diagram: 'Wycentrowano na schemacie',
@@ -1043,7 +1043,7 @@ export const SLDView: React.FC<SLDViewProps> = ({
           export_pdf: 'Eksport PDF',
           export_docx: 'Eksport DOCX',
           export_results: 'Eksport wyników',
-          export_whitebox: 'Eksport White Box',
+          export_whitebox: 'Eksport śladu obliczeń',
           history: 'Historia zdarzeń elementu',
           fix_issues: 'Otwieranie działań naprawczych',
           check_ring: 'Sprawdzanie możliwości ring',

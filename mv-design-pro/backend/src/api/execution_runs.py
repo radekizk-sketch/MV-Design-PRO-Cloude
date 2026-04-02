@@ -1,17 +1,8 @@
 """
-Execution Runs API — PR-14: StudyCase → Run → ResultSet
+Execution Runs API.
 
-REST API endpoints for the canonical execution layer.
-
-Endpoints:
-    POST   /api/execution/study-cases/{case_id}/runs — Create a new run
-    GET    /api/execution/study-cases/{case_id}/runs — List runs for a case
-    POST   /api/execution/runs/{run_id}/execute      — Execute a pending run
-    GET    /api/execution/runs/{run_id}              — Get run details
-    GET    /api/execution/runs/{run_id}/results      — Get result set
-
-Prefixed with /api/execution/ to avoid conflicts with existing case_runs routes.
-All responses use Polish error messages for UI consistency.
+Production path:
+    domain-ops -> ENM snapshot -> canonical analysis run -> result set
 """
 
 from __future__ import annotations
@@ -19,59 +10,37 @@ from __future__ import annotations
 from typing import Any
 from uuid import UUID
 
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, HTTPException, Request, status
 from pydantic import BaseModel, Field
 
-from application.execution_engine import (
-    ExecutionEngineService,
-    RunNotFoundError,
-    RunNotReadyError,
-    RunBlockedError,
-    ResultSetNotFoundError,
+from application.execution_engine import ExecutionEngineService
+from domain.execution import ExecutionAnalysisType
+from enm.canonical_analysis import (
+    build_execution_result_set,
+    create_run as create_canonical_run,
+    execute_run as execute_canonical_run,
+    get_run as get_canonical_run,
+    list_runs_for_case as list_canonical_runs_for_case,
 )
-from application.execution_engine.errors import StudyCaseNotFoundError
-from domain.execution import ExecutionAnalysisType, RunStatus
 
 router = APIRouter(tags=["execution-runs"])
 
-# Singleton service (in-memory for PR-14)
+# Retained only for compatibility with modules/tests importing get_engine().
 _engine = ExecutionEngineService()
 
 
 def get_engine() -> ExecutionEngineService:
-    """Get the execution engine singleton."""
     return _engine
 
 
-# =============================================================================
-# Request/Response Models
-# =============================================================================
-
-
 class CreateRunRequest(BaseModel):
-    """Request to create a new execution run."""
-
-    analysis_type: str = Field(
-        ...,
-        description="Typ analizy: SC_3F, SC_1F, LOAD_FLOW",
-    )
-    solver_input: dict[str, Any] = Field(
-        default_factory=dict,
-        description="Wejście solvera (zamrożone podczas tworzenia)",
-    )
-    readiness: dict[str, Any] | None = Field(
-        None,
-        description="Wynik sprawdzenia gotowości (opcjonalny)",
-    )
-    eligibility: dict[str, Any] | None = Field(
-        None,
-        description="Wynik sprawdzenia uprawnień (opcjonalny)",
-    )
+    analysis_type: str = Field(..., description="Typ analizy: SC_3F, SC_1F, LOAD_FLOW")
+    solver_input: dict[str, Any] = Field(default_factory=dict, description="Opcje solvera")
+    readiness: dict[str, Any] | None = Field(None, description="Legacy - ignorowane")
+    eligibility: dict[str, Any] | None = Field(None, description="Legacy - ignorowane")
 
 
 class RunResponse(BaseModel):
-    """Run response model."""
-
     id: str
     study_case_id: str
     analysis_type: str
@@ -83,23 +52,17 @@ class RunResponse(BaseModel):
 
 
 class RunListResponse(BaseModel):
-    """List of runs response."""
-
     runs: list[RunResponse]
     count: int
 
 
 class ElementResultResponse(BaseModel):
-    """Per-element result in a result set."""
-
     element_ref: str
     element_type: str
     values: dict[str, Any]
 
 
 class ResultSetResponse(BaseModel):
-    """Result set response model."""
-
     run_id: str
     analysis_type: str
     validation_snapshot: dict[str, Any]
@@ -109,44 +72,44 @@ class ResultSetResponse(BaseModel):
     deterministic_signature: str
 
 
-class ErrorResponse(BaseModel):
-    """Error response model."""
-
-    detail: str
-    code: str | None = None
-
-
-# =============================================================================
-# Helper Functions
-# =============================================================================
-
-
 def _parse_uuid(value: str, field_name: str = "id") -> UUID:
-    """Parse and validate a UUID string."""
     try:
         return UUID(value)
     except ValueError as exc:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"{field_name} musi być poprawnym UUID",
+            detail=f"{field_name} musi byc poprawnym UUID",
         ) from exc
 
 
 def _parse_analysis_type(value: str) -> ExecutionAnalysisType:
-    """Parse and validate an analysis type string."""
     try:
         return ExecutionAnalysisType(value)
     except ValueError as exc:
         valid = ", ".join(t.value for t in ExecutionAnalysisType)
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Nieprawidłowy typ analizy: {value}. Dozwolone: {valid}",
+            detail=f"Nieprawidlowy typ analizy: {value}. Dozwolone: {valid}",
         ) from exc
 
 
-# =============================================================================
-# Endpoints
-# =============================================================================
+def _canonical_analysis_type(value: ExecutionAnalysisType) -> str:
+    return "PF" if value == ExecutionAnalysisType.LOAD_FLOW else "short_circuit_sn"
+
+
+def _resolve_project_id(case_id: str, request: Request) -> str | None:
+    uow_factory = getattr(request.app.state, "uow_factory", None)
+    if uow_factory is None:
+        return None
+    parsed_case_id = _parse_uuid(case_id, "case_id")
+    with uow_factory() as uow:
+        operating_case = uow.cases.get_operating_case(parsed_case_id)
+        if operating_case is not None:
+            return str(operating_case.project_id)
+        study_case = uow.cases.get_study_case(parsed_case_id)
+        if study_case is not None:
+            return str(study_case.project_id)
+    return None
 
 
 @router.post(
@@ -154,42 +117,19 @@ def _parse_analysis_type(value: str) -> ExecutionAnalysisType:
     response_model=RunResponse,
     status_code=status.HTTP_201_CREATED,
 )
-def create_run(
-    case_id: str,
-    request: CreateRunRequest,
-) -> dict[str, Any]:
-    """
-    Utwórz nowy przebieg obliczeniowy.
-
-    Sprawdza gotowość i uprawnienia przed utworzeniem.
-    Solver input jest zamrażany i hashowany deterministycznie.
-
-    POST /api/study-cases/{case_id}/runs
-    """
-    parsed_case_id = _parse_uuid(case_id, "case_id")
+def create_run(case_id: str, request: CreateRunRequest, http_request: Request) -> dict[str, Any]:
+    _parse_uuid(case_id, "case_id")
     analysis_type = _parse_analysis_type(request.analysis_type)
-    engine = get_engine()
 
     try:
-        run = engine.create_run(
-            study_case_id=parsed_case_id,
-            analysis_type=analysis_type,
-            solver_input=request.solver_input,
-            readiness=request.readiness,
-            eligibility=request.eligibility,
+        run = create_canonical_run(
+            case_id=case_id,
+            project_id=_resolve_project_id(case_id, http_request),
+            analysis_type=_canonical_analysis_type(analysis_type),
+            options=dict(request.solver_input or {}),
         )
-        return run.to_dict()
-    except StudyCaseNotFoundError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=str(exc),
-        ) from exc
-    except RunNotReadyError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail=str(exc),
-        ) from exc
-    except RunBlockedError as exc:
+        return run.to_execution_dict()
+    except ValueError as exc:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail=str(exc),
@@ -201,19 +141,10 @@ def create_run(
     response_model=RunListResponse,
 )
 def list_runs(case_id: str) -> dict[str, Any]:
-    """
-    Lista przebiegów obliczeniowych dla przypadku.
-
-    Wyniki posortowane od najnowszego.
-
-    GET /api/study-cases/{case_id}/runs
-    """
-    parsed_case_id = _parse_uuid(case_id, "case_id")
-    engine = get_engine()
-
-    runs = engine.list_runs_for_case(parsed_case_id)
+    _parse_uuid(case_id, "case_id")
+    runs = list_canonical_runs_for_case(case_id)
     return {
-        "runs": [r.to_dict() for r in runs],
+        "runs": [run.to_execution_dict() for run in runs],
         "count": len(runs),
     }
 
@@ -223,22 +154,12 @@ def list_runs(case_id: str) -> dict[str, Any]:
     response_model=RunResponse,
 )
 def execute_run(run_id: str) -> dict[str, Any]:
-    """
-    Wykonaj oczekujący przebieg obliczeniowy.
-
-    Zmienia status z PENDING na RUNNING.
-    Faktyczne obliczenia wykonywane są asynchronicznie
-    (w PR-14 synchronicznie dla uproszczenia).
-
-    POST /api/runs/{run_id}/execute
-    """
     parsed_run_id = _parse_uuid(run_id, "run_id")
-    engine = get_engine()
 
     try:
-        run = engine.start_run(parsed_run_id)
-        return run.to_dict()
-    except RunNotFoundError as exc:
+        run = execute_canonical_run(parsed_run_id)
+        return run.to_execution_dict()
+    except ValueError as exc:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=str(exc),
@@ -250,22 +171,14 @@ def execute_run(run_id: str) -> dict[str, Any]:
     response_model=RunResponse,
 )
 def get_run(run_id: str) -> dict[str, Any]:
-    """
-    Pobierz szczegóły przebiegu obliczeniowego.
-
-    GET /api/runs/{run_id}
-    """
     parsed_run_id = _parse_uuid(run_id, "run_id")
-    engine = get_engine()
-
-    try:
-        run = engine.get_run(parsed_run_id)
-        return run.to_dict()
-    except RunNotFoundError as exc:
+    run = get_canonical_run(parsed_run_id)
+    if run is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=str(exc),
-        ) from exc
+            detail=f"Run {run_id} not found",
+        )
+    return run.to_execution_dict()
 
 
 @router.get(
@@ -273,33 +186,16 @@ def get_run(run_id: str) -> dict[str, Any]:
     response_model=ResultSetResponse,
 )
 def get_run_results(run_id: str) -> dict[str, Any]:
-    """
-    Pobierz wyniki przebiegu obliczeniowego.
-
-    Dostępne tylko dla przebiegów ze statusem DONE.
-
-    GET /api/runs/{run_id}/results
-    """
     parsed_run_id = _parse_uuid(run_id, "run_id")
-    engine = get_engine()
-
-    try:
-        # First verify run exists and is DONE
-        run = engine.get_run(parsed_run_id)
-        if run.status != RunStatus.DONE:
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail=f"Wyniki niedostępne — status przebiegu: {run.status.value}",
-            )
-        result_set = engine.get_result_set(parsed_run_id)
-        return result_set.to_dict()
-    except RunNotFoundError as exc:
+    run = get_canonical_run(parsed_run_id)
+    if run is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=str(exc),
-        ) from exc
-    except ResultSetNotFoundError as exc:
+            detail=f"Run {run_id} not found",
+        )
+    if run.status != "FINISHED":
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=str(exc),
-        ) from exc
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Wyniki niedostepne - status przebiegu: {run.status}",
+        )
+    return build_execution_result_set(run)

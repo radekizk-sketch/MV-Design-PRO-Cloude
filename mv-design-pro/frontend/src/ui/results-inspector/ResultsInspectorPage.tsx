@@ -39,6 +39,7 @@ import { useSelectionStore } from '../selection';
 import type { ElementType } from '../types';
 import { InspectorPanel } from '../inspector';
 import { ResultsExport } from './ResultsExport';
+import { resolveAvailableResultsTabs } from './viewState';
 import { TraceViewerContainer } from '../proof';
 
 // =============================================================================
@@ -498,10 +499,11 @@ function mapResultRowToInspectorData(row: SelectedResultRow) {
 
 interface ResultsInspectorPageProps {
   runId?: string;
+  forcedTab?: ResultsInspectorTab;
   onClose?: () => void;
 }
 
-export function ResultsInspectorPage({ runId, onClose }: ResultsInspectorPageProps) {
+export function ResultsInspectorPage({ runId, forcedTab, onClose }: ResultsInspectorPageProps) {
   const {
     selectedRunId,
     resultsIndex,
@@ -531,6 +533,12 @@ export function ResultsInspectorPage({ runId, onClose }: ResultsInspectorPagePro
       selectRun(runId);
     }
   }, [runId, selectedRunId, selectRun]);
+
+  useEffect(() => {
+    if (forcedTab && activeTab !== forcedTab) {
+      setActiveTab(forcedTab);
+    }
+  }, [forcedTab, activeTab, setActiveTab, resultsIndex]);
 
   // Clear selection when switching tabs
   useEffect(() => {
@@ -638,13 +646,8 @@ export function ResultsInspectorPage({ runId, onClose }: ResultsInspectorPagePro
 
   // Available tabs based on analysis type
   const availableTabs: ResultsInspectorTab[] = useMemo(() => {
-    const tabs: ResultsInspectorTab[] = ['BUSES', 'BRANCHES'];
-    if (hasShortCircuit) {
-      tabs.push('SHORT_CIRCUIT');
-    }
-    tabs.push('TRACE');
-    return tabs;
-  }, [hasShortCircuit]);
+    return resolveAvailableResultsTabs(forcedTab, hasShortCircuit);
+  }, [forcedTab, hasShortCircuit]);
 
   // Error display
   if (error) {
@@ -654,6 +657,27 @@ export function ResultsInspectorPage({ runId, onClose }: ResultsInspectorPagePro
           <div className="rounded border border-rose-200 bg-rose-50 p-4 text-rose-700">
             <p className="font-semibold">Błąd</p>
             <p className="text-sm">{error}</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!runId && !selectedRunId) {
+    return (
+      <div className="min-h-screen bg-slate-100 p-6">
+        <div className="mx-auto max-w-4xl">
+          <div className="rounded border border-slate-200 bg-white p-6 text-slate-700">
+            <p className="text-xs uppercase tracking-wide text-slate-400">
+              Wyniki i ślad obliczeń
+            </p>
+            <h1 className="mt-2 text-xl font-semibold text-slate-900">
+              Brak wybranego uruchomienia
+            </h1>
+            <p className="mt-2 text-sm text-slate-600">
+              Wybierz wykonane obliczenie w widoku wyników albo uruchom analizę dla aktywnego
+              przypadku, aby otworzyć dane tabelaryczne i ślad obliczeń.
+            </p>
           </div>
         </div>
       </div>
@@ -679,9 +703,11 @@ export function ResultsInspectorPage({ runId, onClose }: ResultsInspectorPagePro
           <div className="flex items-center justify-between">
             <div>
               <p className="text-xs uppercase tracking-wide text-slate-400">
-                Przeglądarka wyników
+                {forcedTab === 'TRACE' ? 'Ślad obliczeń' : 'Przeglądarka wyników'}
               </p>
-              <h1 className="text-2xl font-semibold text-slate-900">Wyniki analizy</h1>
+              <h1 className="text-2xl font-semibold text-slate-900">
+                {forcedTab === 'TRACE' ? 'Przebieg obliczeń analizy' : 'Wyniki analizy'}
+              </h1>
             </div>
             <div className="flex items-center gap-3">
               <ResultsExport

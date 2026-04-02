@@ -82,7 +82,7 @@ export const KEYBOARD_SHORTCUTS: readonly KeyboardShortcutDef[] = [
 
   // --- Analiza ---
   { keys: 'Ctrl+R', description_pl: 'Uruchom obliczenia...', category: 'ANALIZA', action_id: 'run_calculation', required_mode: 'RESULT_VIEW' },
-  { keys: 'Ctrl+W', description_pl: 'Otwórz White Box...', category: 'ANALIZA', action_id: 'open_whitebox', required_mode: 'RESULT_VIEW' },
+  { keys: 'Ctrl+W', description_pl: 'Otwórz ślad obliczeń...', category: 'ANALIZA', action_id: 'open_whitebox', required_mode: 'RESULT_VIEW' },
   { keys: 'Ctrl+E', description_pl: 'Eksportuj wyniki...', category: 'ANALIZA', action_id: 'export_results', required_mode: 'RESULT_VIEW' },
 
   // --- Narzędzia ---

@@ -29,7 +29,6 @@ from domain.result_contract_v1 import (
     OverlayBadgeV1,
     OverlayElementKind,
     OverlayElementV1,
-    OverlayLegendV1,
     OverlayMetricSource,
     OverlayMetricV1,
     OverlayPayloadV1,
@@ -44,7 +43,6 @@ from domain.result_contract_v1_schema import (
     generate_schema,
     get_locked_schema_path,
     verify_schema_lock,
-    write_locked_schema,
 )
 
 
@@ -125,6 +123,105 @@ def sample_global_results() -> dict:
         "total_ikss_max_ka": 15.2,
         "total_buses_computed": 2,
     }
+
+
+def _reset_canonical_backend_state() -> None:
+    from api.execution_runs import get_engine
+    from enm.canonical_analysis import reset_canonical_runs
+    from enm.store import reset_enm_store
+
+    engine = get_engine()
+    engine._runs.clear()
+    engine._result_sets.clear()
+    engine._study_cases.clear()
+    engine._case_runs.clear()
+    reset_canonical_runs()
+    reset_enm_store()
+
+
+def _seed_valid_sc_enm(client, case_id: str) -> None:
+    from enm.models import EnergyNetworkModel
+    from enm.store import set_enm
+
+    _ = client
+    set_enm(
+        case_id,
+        EnergyNetworkModel.model_validate(
+            {
+                "header": {
+                    "name": "Result Contract V1",
+                    "enm_version": "1.0",
+                    "defaults": {"frequency_hz": 50, "unit_system": "SI"},
+                    "created_at": "2024-01-01T00:00:00Z",
+                    "updated_at": "2024-01-01T00:00:00Z",
+                    "revision": 1,
+                    "hash_sha256": "",
+                },
+                "buses": [
+                    {
+                        "id": "00000000-0000-0000-0000-000000000201",
+                        "ref_id": "bus-main",
+                        "name": "Szyna glowna",
+                        "tags": [],
+                        "meta": {},
+                        "voltage_kv": 15.0,
+                        "phase_system": "3ph",
+                    },
+                    {
+                        "id": "00000000-0000-0000-0000-000000000202",
+                        "ref_id": "bus-1",
+                        "name": "Szyna odplywu",
+                        "tags": [],
+                        "meta": {},
+                        "voltage_kv": 15.0,
+                        "phase_system": "3ph",
+                    },
+                ],
+                "branches": [
+                    {
+                        "id": "00000000-0000-0000-0000-000000000203",
+                        "ref_id": "branch-1",
+                        "name": "Odcinek SN",
+                        "tags": [],
+                        "meta": {},
+                        "type": "cable",
+                        "from_bus_ref": "bus-main",
+                        "to_bus_ref": "bus-1",
+                        "status": "closed",
+                        "catalog_ref": "KABEL_SN_TEST",
+                        "parameter_source": "CATALOG",
+                        "length_km": 0.2,
+                        "r_ohm_per_km": 0.253,
+                        "x_ohm_per_km": 0.073,
+                        "b_siemens_per_km": 2.6e-07,
+                    }
+                ],
+                "sources": [
+                    {
+                        "id": "00000000-0000-0000-0000-000000000204",
+                        "ref_id": "src-grid",
+                        "name": "Zasilanie GPZ",
+                        "tags": [],
+                        "meta": {},
+                        "bus_ref": "bus-main",
+                        "model": "short_circuit_power",
+                        "sk3_mva": 250.0,
+                        "rx_ratio": 0.1,
+                    }
+                ],
+                "transformers": [],
+                "loads": [],
+                "generators": [],
+                "substations": [],
+                "bays": [],
+                "junctions": [],
+                "corridors": [],
+                "measurements": [],
+                "protection_assignments": [],
+                "branch_points": [],
+            }
+        ),
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -547,51 +644,26 @@ class TestResultContractV1Api:
     def client(self):
         from fastapi.testclient import TestClient
         from api.main import app
+        _reset_canonical_backend_state()
         return TestClient(app)
 
     @pytest.fixture
-    def engine(self):
-        from api.execution_runs import get_engine
-        eng = get_engine()
-        eng._runs.clear()
-        eng._result_sets.clear()
-        eng._study_cases.clear()
-        eng._case_runs.clear()
-        return eng
+    def case_id(self) -> str:
+        return str(uuid4())
 
-    @pytest.fixture
-    def registered_case(self, engine):
-        from domain.study_case import new_study_case, StudyCaseConfig
-        case = new_study_case(
-            project_id=uuid4(),
-            name="Test Case V1 API",
-            config=StudyCaseConfig(),
-        )
-        engine.register_study_case(case)
-        return case
-
-    def test_get_resultset_v1_success(self, client, registered_case, engine):
+    def test_get_resultset_v1_success(self, client, case_id):
         """GET /api/execution/runs/{id}/results/v1 returns ResultSetV1."""
-        from uuid import UUID
-        from domain.execution import ElementResult
-
-        # Create and complete run
+        _seed_valid_sc_enm(client, case_id)
         create_resp = client.post(
-            f"/api/execution/study-cases/{registered_case.id}/runs",
+            f"/api/execution/study-cases/{case_id}/runs",
             json={"analysis_type": "SC_3F", "solver_input": {}},
         )
+        assert create_resp.status_code == 201
         run_id = create_resp.json()["id"]
 
-        engine.start_run(UUID(run_id))
-        engine.complete_run(
-            UUID(run_id),
-            validation_snapshot={"is_valid": True, "issues": []},
-            readiness_snapshot={"ready": True, "issues": []},
-            element_results=[
-                ElementResult("bus-1", "Bus", {"ikss_ka": 12.5}),
-            ],
-            global_results={"total": 12.5},
-        )
+        execute_resp = client.post(f"/api/execution/runs/{run_id}/execute")
+        assert execute_resp.status_code == 200
+        assert execute_resp.json()["status"] == "DONE"
 
         response = client.get(f"/api/execution/runs/{run_id}/results/v1")
         assert response.status_code == 200
@@ -605,18 +677,20 @@ class TestResultContractV1Api:
         assert "warnings" in data["overlay_payload"]
         assert len(data["deterministic_signature"]) == 64
 
-    def test_get_resultset_v1_run_not_done(self, client, registered_case):
+    def test_get_resultset_v1_run_not_done(self, client, case_id):
         """GET /api/execution/runs/{id}/results/v1 returns 409 for PENDING run."""
+        _seed_valid_sc_enm(client, case_id)
         create_resp = client.post(
-            f"/api/execution/study-cases/{registered_case.id}/runs",
+            f"/api/execution/study-cases/{case_id}/runs",
             json={"analysis_type": "SC_3F", "solver_input": {}},
         )
+        assert create_resp.status_code == 201
         run_id = create_resp.json()["id"]
 
         response = client.get(f"/api/execution/runs/{run_id}/results/v1")
         assert response.status_code == 409
 
-    def test_get_resultset_v1_run_not_found(self, client, engine):
+    def test_get_resultset_v1_run_not_found(self, client):
         """GET /api/execution/runs/{id}/results/v1 returns 404 for unknown run."""
         response = client.get(f"/api/execution/runs/{uuid4()}/results/v1")
         assert response.status_code == 404

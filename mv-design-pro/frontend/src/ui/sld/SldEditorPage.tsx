@@ -42,8 +42,9 @@ import { OperationalModeToolbar } from './OperationalModeToolbar';
 import { LabelModeToolbar } from './LabelModeToolbar';
 import { CreatorToolbar } from '../topology/CreatorToolbar';
 import type { CreatorTool } from '../topology/editorPalette';
+import { useSnapshotStore } from '../topology/snapshotStore';
+import type { EnergyNetworkModel } from '../../types/enm';
 import { getToolStatusTable, resolveToolAction } from './interactionController';
-import { useEnmStore } from './useEnmStore';
 import { TypePicker } from '../catalog/TypePicker';
 import { useCatalogAssignment } from '../catalog/useCatalogAssignment';
 import {
@@ -172,6 +173,49 @@ const DEMO_SYMBOLS: AnySldSymbol[] = [
     connectedToNodeId: 'bus_dist',
   } as any,
 ];
+
+type EnmLookupCollection = keyof Pick<
+  EnergyNetworkModel,
+  | 'buses'
+  | 'branches'
+  | 'transformers'
+  | 'sources'
+  | 'loads'
+  | 'generators'
+  | 'substations'
+  | 'bays'
+  | 'junctions'
+  | 'corridors'
+  | 'measurements'
+  | 'protection_assignments'
+  | 'branch_points'
+>;
+
+type EnmLookupEntry = Record<string, unknown> & {
+  ref_id?: string;
+  catalog_ref?: string | null;
+  voltage_kv?: number | null;
+};
+
+const ENM_LOOKUP_COLLECTIONS: readonly EnmLookupCollection[] = [
+  'buses',
+  'branches',
+  'transformers',
+  'sources',
+  'loads',
+  'generators',
+  'substations',
+  'bays',
+  'junctions',
+  'corridors',
+  'measurements',
+  'protection_assignments',
+  'branch_points',
+];
+
+function asEnmLookupEntries(value: unknown): EnmLookupEntry[] {
+  return Array.isArray(value) ? (value as unknown as EnmLookupEntry[]) : [];
+}
 void DEMO_SYMBOLS;
 
 /**
@@ -265,12 +309,12 @@ export const SldEditorPage: React.FC<SldEditorPageProps> = ({
     message_pl: string;
     port_role?: 'TRUNK_IN' | 'TRUNK_OUT' | 'BRANCH_OUT' | 'RING' | 'NN_SOURCE';
   } | null>(null);
-  const executeEnmOperation = useEnmStore((state) => state.executeOperation);
-  const resetEnmStore = useEnmStore((state) => state.reset);
-  const enmSnapshot = useEnmStore((state) => state.snapshot);
-  const enmReadiness = useEnmStore((state) => state.readiness);
-  const enmFixActions = useEnmStore((state) => state.fixActions);
-  const enmMaterializedParams = useEnmStore((state) => state.materializedParams);
+  const executeEnmOperation = useSnapshotStore((state) => state.executeDomainOperation);
+  const resetEnmStore = useSnapshotStore((state) => state.reset);
+  const enmSnapshot = useSnapshotStore((state) => state.snapshot);
+  const enmReadiness = useSnapshotStore((state) => state.readiness);
+  const enmFixActions = useSnapshotStore((state) => state.fixActions);
+  const enmMaterializedParams = useSnapshotStore((state) => state.materializedParams);
   const [segmentLengthKmDraft, setSegmentLengthKmDraft] = useState<string>('');
   const [segmentStatusDraft, setSegmentStatusDraft] = useState<string>('closed');
   const [catalogAssignmentState, catalogAssignmentActions] = useCatalogAssignment();
@@ -284,29 +328,13 @@ export const SldEditorPage: React.FC<SldEditorPageProps> = ({
     selectedElement ? state.symbols.get(selectedElement.id) ?? null : null,
   );
 
-  const selectedEnmElement = useMemo<Record<string, unknown> | null>(() => {
+  const selectedEnmElement = useMemo<EnmLookupEntry | null>(() => {
     if (!selectedElement || !enmSnapshot) {
       return null;
     }
 
-    const collections = [
-      'buses',
-      'branches',
-      'transformers',
-      'sources',
-      'loads',
-      'generators',
-      'substations',
-      'bays',
-      'junctions',
-      'corridors',
-      'measurements',
-      'protection_assignments',
-      'branch_points',
-    ];
-
-    for (const collection of collections) {
-      const entries = (enmSnapshot[collection] as Array<Record<string, unknown>> | undefined) ?? [];
+    for (const collection of ENM_LOOKUP_COLLECTIONS) {
+      const entries = asEnmLookupEntries(enmSnapshot[collection]);
       const found = entries.find((entry) => entry.ref_id === selectedElement.id);
       if (found) {
         return found;
@@ -366,13 +394,13 @@ export const SldEditorPage: React.FC<SldEditorPageProps> = ({
 
   const selectedSegmentBranch = useMemo<Record<string, unknown> | null>(() => {
     if (!selectedSegment || !enmSnapshot) return null;
-    const branches = (enmSnapshot.branches as Array<Record<string, unknown>> | undefined) ?? [];
+    const branches = asEnmLookupEntries(enmSnapshot.branches);
     return branches.find((branch) => branch.ref_id === selectedSegment.segment_ref) ?? null;
   }, [selectedSegment, enmSnapshot]);
 
   const selectedSegmentBusVoltageKv = useMemo<number | null>(() => {
     if (!selectedSegment || !enmSnapshot) return null;
-    const buses = (enmSnapshot.buses as Array<Record<string, unknown>> | undefined) ?? [];
+    const buses = asEnmLookupEntries(enmSnapshot.buses);
     const fromBus = buses.find((bus) => bus.ref_id === selectedSegment.from_ref);
     const voltage = fromBus?.voltage_kv;
     return typeof voltage === 'number' ? voltage : null;
@@ -1169,7 +1197,7 @@ export const SldEditorPage: React.FC<SldEditorPageProps> = ({
             selectedElementId={selectedElement.id}
             resultsSummary={resultsSummary}
             onShowWhiteBox={(elId) => {
-              notify(`Otwarcie śladu WhiteBox dla: ${elId}`, 'info');
+              notify(`Otwarcie śladu obliczeń dla: ${elId}`, 'info');
             }}
             onShowFullResults={(elId) => {
               notify(`Pełne wyniki dla: ${elId}`, 'info');

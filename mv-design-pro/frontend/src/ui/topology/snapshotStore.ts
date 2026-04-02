@@ -1,7 +1,7 @@
 /**
  * Snapshot Store V1 — Zustand store for V1 domain operation state.
  *
- * Holds the full canonical response envelope from POST /enm/ops:
+ * Holds the full canonical response envelope from POST /enm/domain-ops:
  * - snapshot (EnergyNetworkModel)
  * - logical_views (trunks, branches, secondary_connectors, terminals)
  * - readiness + fix_actions
