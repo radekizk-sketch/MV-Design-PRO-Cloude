@@ -21,7 +21,6 @@ INVARIANTS UNDER TEST:
 
 from __future__ import annotations
 
-import copy
 from uuid import UUID, uuid4
 
 import pytest
@@ -35,10 +34,8 @@ from domain.batch_job import (
 from domain.execution import (
     ElementResult,
     ExecutionAnalysisType,
-    ResultSet,
     RunStatus,
     build_result_set,
-    compute_solver_input_hash,
 )
 from domain.sc_comparison import (
     NumericDelta,
@@ -55,7 +52,6 @@ from application.batch_execution_service import (
 from application.sc_comparison_service import (
     ScComparisonService,
     AnalysisTypeMismatchError,
-    ComparisonNotFoundError,
     RunNotDoneError,
     StudyCaseMismatchError,
 )
@@ -1062,14 +1058,13 @@ class TestBatchJobDomain:
 
 
 class TestBatchExecutionAPI:
-    """Test batch execution API endpoints."""
+    """Test that removed batch/comparison endpoints stay unavailable in production."""
 
     @pytest.fixture
     def client(self):
         """Fresh TestClient with clean state."""
         from fastapi.testclient import TestClient
         from api.main import app
-        from api.batch_execution import _batch_service, _comparison_service
         import api.batch_execution as batch_mod
 
         # Reset singletons
@@ -1102,11 +1097,7 @@ class TestBatchExecutionAPI:
         return case.id
 
     def test_create_batch_api(self, client, engine, registered_case):
-        """POST /api/execution/study-cases/{id}/batches creates a batch."""
-        import api.batch_execution as batch_mod
-
-        batch_mod._batch_service = None
-
+        """Batch creation endpoint is no longer mounted in the production app."""
         resp = client.post(
             f"/api/execution/study-cases/{registered_case}/batches",
             json={
@@ -1120,17 +1111,10 @@ class TestBatchExecutionAPI:
                 ],
             },
         )
-        assert resp.status_code == 201
-        data = resp.json()
-        assert data["status"] == "PENDING"
-        assert len(data["scenario_ids"]) == 1
+        assert resp.status_code == 404
 
     def test_create_batch_invalid_case(self, client, engine):
-        """POST with nonexistent case_id returns 404."""
-        import api.batch_execution as batch_mod
-
-        batch_mod._batch_service = None
-
+        """Removed batch creation endpoint stays unavailable for any case_id."""
         resp = client.post(
             f"/api/execution/study-cases/{uuid4()}/batches",
             json={
@@ -1147,151 +1131,36 @@ class TestBatchExecutionAPI:
         assert resp.status_code == 404
 
     def test_execute_batch_api(self, client, engine, registered_case):
-        """POST /api/execution/batches/{id}/execute executes the batch."""
-        import api.batch_execution as batch_mod
-
-        batch_mod._batch_service = None
-
-        # Create
-        create_resp = client.post(
-            f"/api/execution/study-cases/{registered_case}/batches",
-            json={
-                "analysis_type": "SC_3F",
-                "scenarios": [
-                    {
-                        "scenario_id": str(uuid4()),
-                        "content_hash": "ch1",
-                        "solver_input": {"expected_results": {"ikss_a": 1000}},
-                    },
-                ],
-            },
-        )
-        batch_id = create_resp.json()["batch_id"]
-
-        # Execute
-        exec_resp = client.post(
-            f"/api/execution/batches/{batch_id}/execute"
-        )
-        assert exec_resp.status_code == 200
-        data = exec_resp.json()
-        assert data["status"] == "DONE"
-        assert len(data["run_ids"]) == 1
+        """Batch execute endpoint is no longer mounted in the production app."""
+        exec_resp = client.post(f"/api/execution/batches/{uuid4()}/execute")
+        assert exec_resp.status_code == 404
 
     def test_list_batches_api(self, client, engine, registered_case):
-        """GET /api/execution/study-cases/{id}/batches lists batches."""
-        import api.batch_execution as batch_mod
-
-        batch_mod._batch_service = None
-
-        # Create two batches
-        for i in range(2):
-            client.post(
-                f"/api/execution/study-cases/{registered_case}/batches",
-                json={
-                    "analysis_type": "SC_3F",
-                    "scenarios": [
-                        {
-                            "scenario_id": str(uuid4()),
-                            "content_hash": f"ch{i}",
-                            "solver_input": {},
-                        },
-                    ],
-                },
-            )
-
-        resp = client.get(
-            f"/api/execution/study-cases/{registered_case}/batches"
-        )
-        assert resp.status_code == 200
-        data = resp.json()
-        assert data["count"] == 2
+        """Batch listing endpoint is no longer mounted in the production app."""
+        resp = client.get(f"/api/execution/study-cases/{registered_case}/batches")
+        assert resp.status_code == 404
 
     def test_get_batch_api(self, client, engine, registered_case):
-        """GET /api/execution/batches/{id} returns batch details."""
-        import api.batch_execution as batch_mod
-
-        batch_mod._batch_service = None
-
-        create_resp = client.post(
-            f"/api/execution/study-cases/{registered_case}/batches",
-            json={
-                "analysis_type": "SC_3F",
-                "scenarios": [
-                    {
-                        "scenario_id": str(uuid4()),
-                        "content_hash": "ch1",
-                        "solver_input": {},
-                    },
-                ],
-            },
-        )
-        batch_id = create_resp.json()["batch_id"]
-
-        resp = client.get(f"/api/execution/batches/{batch_id}")
-        assert resp.status_code == 200
-        assert resp.json()["batch_id"] == batch_id
+        """Batch read endpoint is no longer mounted in the production app."""
+        resp = client.get(f"/api/execution/batches/{uuid4()}")
+        assert resp.status_code == 404
 
     def test_get_batch_not_found(self, client, engine):
-        """GET nonexistent batch returns 404."""
-        import api.batch_execution as batch_mod
-
-        batch_mod._batch_service = None
-
+        """Removed batch read endpoint still returns 404."""
         resp = client.get(f"/api/execution/batches/{uuid4()}")
         assert resp.status_code == 404
 
     def test_comparison_api_workflow(self, client, engine, registered_case):
-        """POST comparison + GET comparison full workflow."""
-        import api.batch_execution as batch_mod
-
-        batch_mod._batch_service = None
-        batch_mod._comparison_service = None
-
-        # Create two runs and complete them
-        for i in range(2):
-            run = engine.create_run(
-                study_case_id=registered_case,
-                analysis_type=ExecutionAnalysisType.SC_3F,
-                solver_input=_sample_solver_input(i),
-            )
-            engine.start_run(run.id)
-            engine.complete_run(
-                run.id,
-                validation_snapshot={},
-                readiness_snapshot={},
-                element_results=[],
-                global_results={
-                    "ikss_a": 1000.0 + i * 100,
-                    "ip_a": 2000.0 + i * 200,
-                },
-            )
-
-        runs = engine.list_runs_for_case(registered_case)
-        assert len(runs) == 2
-
-        run_a = runs[1]  # Oldest
-        run_b = runs[0]  # Newest
-
-        # Create comparison
+        """Removed comparison endpoints stay unavailable in the production app."""
         resp = client.post(
             f"/api/execution/study-cases/{registered_case}/comparisons",
             json={
-                "base_run_id": str(run_a.id),
-                "other_run_id": str(run_b.id),
+                "base_run_id": str(uuid4()),
+                "other_run_id": str(uuid4()),
                 "base_scenario_id": str(uuid4()),
                 "other_scenario_id": str(uuid4()),
             },
         )
-        assert resp.status_code == 201
-        data = resp.json()
-        assert "comparison_id" in data
-        assert data["analysis_type"] == "SC_3F"
-        assert "ikss_a" in data["deltas_global"]
-
-        # Get comparison
-        comp_id = data["comparison_id"]
-        get_resp = client.get(
-            f"/api/execution/comparisons/{comp_id}"
-        )
-        assert get_resp.status_code == 200
-        assert get_resp.json()["comparison_id"] == comp_id
+        assert resp.status_code == 404
+        get_resp = client.get(f"/api/execution/comparisons/{uuid4()}")
+        assert get_resp.status_code == 404
