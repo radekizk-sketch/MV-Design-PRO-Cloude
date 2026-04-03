@@ -337,7 +337,60 @@ def get_all_load_types() -> list[dict]:
 
 
 def get_all_lv_apparatus_types() -> list[dict]:
+    """Zwraca aparature laczeniowa nN — 14 rekordow.
+
+    Zrodla:
+    - WYLACZNIK_GLOWNY (ABB SACE Emax2): ABB SACE Emax2 katalog 1SDA073513R1
+    - WYLACZNIK_ODPLYWOWY (ABB SACE Tmax XT): ABB Tmax XT katalog 1SDA066835R1
+    - ROZLACZNIK_BEZPIECZNIKOWY (Jean Muller): Jean Muller NHR katalog
+    """
     return [
+        # --- WYLACZNIK_GLOWNY: ABB SACE Emax2 ---
+        {
+            "id": "cb_nn_400a",
+            "name": "Wylacznik glowny nN 400 A",
+            "params": {
+                "device_kind": "WYLACZNIK_GLOWNY",
+                "u_n_kv": 0.4,
+                "i_n_a": 400.0,
+                "breaking_capacity_ka": 50.0,
+                "manufacturer": "ABB",
+                "verification_status": "ZWERYFIKOWANY",
+                "catalog_status": "PRODUKCYJNY_V1",
+                "source_reference": "ABB SACE Emax2 katalog 1SDA073513R1",
+                "contract_version": "2.0",
+            },
+        },
+        {
+            "id": "cb_nn_630a",
+            "name": "Wylacznik glowny nN 630 A",
+            "params": {
+                "device_kind": "WYLACZNIK_GLOWNY",
+                "u_n_kv": 0.4,
+                "i_n_a": 630.0,
+                "breaking_capacity_ka": 50.0,
+                "manufacturer": "ABB",
+                "verification_status": "ZWERYFIKOWANY",
+                "catalog_status": "PRODUKCYJNY_V1",
+                "source_reference": "ABB SACE Emax2 katalog 1SDA073513R1",
+                "contract_version": "2.0",
+            },
+        },
+        {
+            "id": "cb_nn_800a",
+            "name": "Wylacznik glowny nN 800 A",
+            "params": {
+                "device_kind": "WYLACZNIK_GLOWNY",
+                "u_n_kv": 0.4,
+                "i_n_a": 800.0,
+                "breaking_capacity_ka": 50.0,
+                "manufacturer": "ABB",
+                "verification_status": "ZWERYFIKOWANY",
+                "catalog_status": "PRODUKCYJNY_V1",
+                "source_reference": "ABB SACE Emax2 katalog 1SDA073513R1",
+                "contract_version": "2.0",
+            },
+        },
         {
             "id": "cb_nn_1000a",
             "name": "Wylacznik glowny nN 1000 A",
@@ -347,6 +400,71 @@ def get_all_lv_apparatus_types() -> list[dict]:
                 "i_n_a": 1000.0,
                 "breaking_capacity_ka": 50.0,
                 "manufacturer": "ABB",
+                "verification_status": "ZWERYFIKOWANY",
+                "catalog_status": "PRODUKCYJNY_V1",
+                "source_reference": "ABB SACE Emax2 katalog 1SDA073513R1",
+                "contract_version": "2.0",
+            },
+        },
+        {
+            "id": "cb_nn_1250a",
+            "name": "Wylacznik glowny nN 1250 A",
+            "params": {
+                "device_kind": "WYLACZNIK_GLOWNY",
+                "u_n_kv": 0.4,
+                "i_n_a": 1250.0,
+                "breaking_capacity_ka": 50.0,
+                "manufacturer": "ABB",
+                "verification_status": "ZWERYFIKOWANY",
+                "catalog_status": "PRODUKCYJNY_V1",
+                "source_reference": "ABB SACE Emax2 katalog 1SDA073513R1",
+                "contract_version": "2.0",
+            },
+        },
+        {
+            "id": "cb_nn_1600a",
+            "name": "Wylacznik glowny nN 1600 A",
+            "params": {
+                "device_kind": "WYLACZNIK_GLOWNY",
+                "u_n_kv": 0.4,
+                "i_n_a": 1600.0,
+                "breaking_capacity_ka": 50.0,
+                "manufacturer": "ABB",
+                "verification_status": "ZWERYFIKOWANY",
+                "catalog_status": "PRODUKCYJNY_V1",
+                "source_reference": "ABB SACE Emax2 katalog 1SDA073513R1",
+                "contract_version": "2.0",
+            },
+        },
+        # --- WYLACZNIK_ODPLYWOWY: ABB SACE Tmax XT ---
+        {
+            "id": "cb_nn_100a",
+            "name": "Wylacznik odplywowy nN 100 A",
+            "params": {
+                "device_kind": "WYLACZNIK_ODPLYWOWY",
+                "u_n_kv": 0.4,
+                "i_n_a": 100.0,
+                "breaking_capacity_ka": 25.0,
+                "manufacturer": "ABB",
+                "verification_status": "ZWERYFIKOWANY",
+                "catalog_status": "PRODUKCYJNY_V1",
+                "source_reference": "ABB Tmax XT katalog 1SDA066835R1",
+                "contract_version": "2.0",
+            },
+        },
+        {
+            "id": "cb_nn_160a",
+            "name": "Wylacznik odplywowy nN 160 A",
+            "params": {
+                "device_kind": "WYLACZNIK_ODPLYWOWY",
+                "u_n_kv": 0.4,
+                "i_n_a": 160.0,
+                "breaking_capacity_ka": 25.0,
+                "manufacturer": "ABB",
+                "verification_status": "ZWERYFIKOWANY",
+                "catalog_status": "PRODUKCYJNY_V1",
+                "source_reference": "ABB Tmax XT katalog 1SDA066835R1",
+                "contract_version": "2.0",
             },
         },
         {
@@ -358,6 +476,56 @@ def get_all_lv_apparatus_types() -> list[dict]:
                 "i_n_a": 250.0,
                 "breaking_capacity_ka": 25.0,
                 "manufacturer": "ABB",
+                "verification_status": "ZWERYFIKOWANY",
+                "catalog_status": "PRODUKCYJNY_V1",
+                "source_reference": "ABB Tmax XT katalog 1SDA066835R1",
+                "contract_version": "2.0",
+            },
+        },
+        {
+            "id": "cb_nn_400a_odp",
+            "name": "Wylacznik odplywowy nN 400 A",
+            "params": {
+                "device_kind": "WYLACZNIK_ODPLYWOWY",
+                "u_n_kv": 0.4,
+                "i_n_a": 400.0,
+                "breaking_capacity_ka": 36.0,
+                "manufacturer": "ABB",
+                "verification_status": "ZWERYFIKOWANY",
+                "catalog_status": "PRODUKCYJNY_V1",
+                "source_reference": "ABB Tmax XT katalog 1SDA066835R1",
+                "contract_version": "2.0",
+            },
+        },
+        {
+            "id": "cb_nn_630a_odp",
+            "name": "Wylacznik odplywowy nN 630 A",
+            "params": {
+                "device_kind": "WYLACZNIK_ODPLYWOWY",
+                "u_n_kv": 0.4,
+                "i_n_a": 630.0,
+                "breaking_capacity_ka": 50.0,
+                "manufacturer": "ABB",
+                "verification_status": "ZWERYFIKOWANY",
+                "catalog_status": "PRODUKCYJNY_V1",
+                "source_reference": "ABB Tmax XT katalog 1SDA066835R1",
+                "contract_version": "2.0",
+            },
+        },
+        # --- ROZLACZNIK_BEZPIECZNIKOWY: Jean Muller NHR ---
+        {
+            "id": "rb_nn_100a",
+            "name": "Rozlacznik bezpiecznikowy nN 100 A",
+            "params": {
+                "device_kind": "ROZLACZNIK_BEZPIECZNIKOWY",
+                "u_n_kv": 0.4,
+                "i_n_a": 100.0,
+                "breaking_capacity_ka": 16.0,
+                "manufacturer": "Jean Muller",
+                "verification_status": "ZWERYFIKOWANY",
+                "catalog_status": "PRODUKCYJNY_V1",
+                "source_reference": "Jean Muller NHR katalog",
+                "contract_version": "2.0",
             },
         },
         {
@@ -369,6 +537,25 @@ def get_all_lv_apparatus_types() -> list[dict]:
                 "i_n_a": 160.0,
                 "breaking_capacity_ka": 16.0,
                 "manufacturer": "Jean Muller",
+                "verification_status": "ZWERYFIKOWANY",
+                "catalog_status": "PRODUKCYJNY_V1",
+                "source_reference": "Jean Muller NHR katalog",
+                "contract_version": "2.0",
+            },
+        },
+        {
+            "id": "rb_nn_250a",
+            "name": "Rozlacznik bezpiecznikowy nN 250 A",
+            "params": {
+                "device_kind": "ROZLACZNIK_BEZPIECZNIKOWY",
+                "u_n_kv": 0.4,
+                "i_n_a": 250.0,
+                "breaking_capacity_ka": 16.0,
+                "manufacturer": "Jean Muller",
+                "verification_status": "ZWERYFIKOWANY",
+                "catalog_status": "PRODUKCYJNY_V1",
+                "source_reference": "Jean Muller NHR katalog",
+                "contract_version": "2.0",
             },
         },
     ]

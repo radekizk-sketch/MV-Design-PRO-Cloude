@@ -66,15 +66,15 @@ def test_root_python_workflow_runs_catalog_first_backend_guards():
     workflow = (PROJECT_ROOT.parent / ".github" / "workflows" / "python-tests.yml").read_text(encoding="utf-8")
     for command in (
         "python scripts/catalog_binding_guard.py",
-        "python scripts/catalog_enforcement_guard.py",
+        "poetry run python ../scripts/catalog_enforcement_guard.py",
         "python scripts/catalog_gate_guard.py",
-        "python scripts/transformer_catalog_voltage_guard.py",
-        "python scripts/fix_action_completeness_guard.py",
+        "poetry run python ../scripts/transformer_catalog_voltage_guard.py",
+        "poetry run python ../scripts/fix_action_completeness_guard.py",
         "python scripts/audit_contract_guard.py",
         "python scripts/domain_no_guessing_guard.py",
         "python scripts/pcc_zero_guard.py",
         "python scripts/repo_hygiene_guard.py",
-        "python scripts/catalog_metadata_guard.py",
+        "poetry run python ../scripts/catalog_metadata_guard.py",
     ):
         assert command in workflow
 
@@ -239,6 +239,7 @@ def test_docs_guard_detects_missing_repo_reference_in_stage_doc(tmp_path: Path):
     violations = docs_guard.check_stage_doc_file_references(tmp_path)
 
     assert len(violations) == 1
-    assert violations[0].endswith(
-        "docs\\qa\\MACIERZ_TESTOW_GLOBALNYCH.md:2: missing repo reference -> frontend/src/ui/sld/__tests__/ghost.test.ts"
+    assert (
+        "docs/qa/MACIERZ_TESTOW_GLOBALNYCH.md:2: missing repo reference -> frontend/src/ui/sld/__tests__/ghost.test.ts"
+        in violations[0].replace("\\", "/")
     )
