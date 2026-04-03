@@ -239,6 +239,7 @@ def test_docs_guard_detects_missing_repo_reference_in_stage_doc(tmp_path: Path):
     violations = docs_guard.check_stage_doc_file_references(tmp_path)
 
     assert len(violations) == 1
-    assert violations[0].endswith(
-        "docs\\qa\\MACIERZ_TESTOW_GLOBALNYCH.md:2: missing repo reference -> frontend/src/ui/sld/__tests__/ghost.test.ts"
+    assert (
+        "docs/qa/MACIERZ_TESTOW_GLOBALNYCH.md:2: missing repo reference -> frontend/src/ui/sld/__tests__/ghost.test.ts"
+        in violations[0].replace("\\", "/")
     )

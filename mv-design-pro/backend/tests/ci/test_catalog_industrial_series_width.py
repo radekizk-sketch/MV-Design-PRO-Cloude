@@ -55,6 +55,26 @@ def test_source_and_converter_records_expose_quality_metadata(catalog):
         assert data["contract_version"]
 
 
+def test_switch_equipment_catalog_has_industrial_series_width(catalog):
+    switches = catalog.list_switch_equipment_types()
+    assert len(switches) >= 32, f"APARAT_SN: {len(switches)} rekordow < 32"
+    kinds = {item.equipment_kind for item in switches}
+    assert "CIRCUIT_BREAKER" in kinds
+    assert "LOAD_SWITCH" in kinds
+    assert "DISCONNECTOR" in kinds
+    assert "RECLOSER" in kinds
+    assert "FUSE" in kinds
+
+
+def test_lv_apparatus_catalog_has_industrial_series_width(catalog):
+    apparatus = catalog.list_lv_apparatus_types()
+    assert len(apparatus) >= 12, f"APARAT_NN: {len(apparatus)} rekordow < 12"
+    kinds = {item.to_dict().get("device_kind") for item in apparatus}
+    assert "WYLACZNIK_GLOWNY" in kinds
+    assert "WYLACZNIK_ODPLYWOWY" in kinds
+    assert "ROZLACZNIK_BEZPIECZNIKOWY" in kinds
+
+
 def test_pv_and_bess_derived_namespaces_preserve_metadata(catalog):
     for item in catalog.list_pv_inverter_types():
         data = item.to_dict()
