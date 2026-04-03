@@ -57,8 +57,8 @@ jobs:
         working-directory: mv-design-pro
         run: python scripts/catalog_gate_guard.py
       - name: Transformer Catalog Voltage Guard
-        working-directory: mv-design-pro
-        run: python scripts/transformer_catalog_voltage_guard.py
+        working-directory: mv-design-pro/backend
+        run: poetry run python ../scripts/transformer_catalog_voltage_guard.py
       - name: Fix Action Completeness Guard
         working-directory: mv-design-pro
         run: python scripts/fix_action_completeness_guard.py
@@ -69,5 +69,5 @@ jobs:
         working-directory: mv-design-pro
         run: python scripts/repo_hygiene_guard.py
       - name: Catalog Metadata Guard
-        working-directory: mv-design-pro
-        run: python scripts/catalog_metadata_guard.py
+        working-directory: mv-design-pro/backend
+        run: poetry run python ../scripts/catalog_metadata_guard.py

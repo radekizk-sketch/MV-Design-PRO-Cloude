@@ -68,13 +68,13 @@ def test_root_python_workflow_runs_catalog_first_backend_guards():
         "python scripts/catalog_binding_guard.py",
         "poetry run python ../scripts/catalog_enforcement_guard.py",
         "python scripts/catalog_gate_guard.py",
-        "python scripts/transformer_catalog_voltage_guard.py",
+        "poetry run python ../scripts/transformer_catalog_voltage_guard.py",
         "python scripts/fix_action_completeness_guard.py",
         "python scripts/audit_contract_guard.py",
         "python scripts/domain_no_guessing_guard.py",
         "python scripts/pcc_zero_guard.py",
         "python scripts/repo_hygiene_guard.py",
-        "python scripts/catalog_metadata_guard.py",
+        "poetry run python ../scripts/catalog_metadata_guard.py",
     ):
         assert command in workflow
 
