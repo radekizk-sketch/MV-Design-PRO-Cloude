@@ -13,6 +13,12 @@ import { useSnapshotStore, selectBusOptions } from '../../topology/snapshotStore
 import { useNetworkBuildStore } from '../networkBuildStore';
 import { useAppStateStore } from '../../app-state';
 import { validateCatalogFirst } from './catalogFirstRules';
+import {
+  catalogRefFromInput,
+  normalizeCatalogBinding,
+  normalizeSegmentKind,
+  normalizeSegmentNamespace,
+} from './catalogPayload';
 
 export function StartBranchForm() {
   const context = useNetworkBuildStore((s) => s.activeOperationForm?.context);
@@ -26,28 +32,40 @@ export function StartBranchForm() {
 
   const initialData = useMemo<Partial<BranchFormData>>(() => {
     if (!context) return {};
+    const segmentContext = context.segment as Record<string, unknown> | undefined;
     return {
-      from_bus_ref: (context.from_bus_ref as string) ?? '',
+      from_bus_ref: ((context.from_ref as string) ?? (context.from_bus_ref as string) ?? ''),
       to_bus_ref: (context.to_bus_ref as string) ?? '',
       type: (context.branch_type as BranchFormData['type']) ?? 'cable',
-      catalog_ref: (context.catalog_ref as string) ?? '',
+      catalog_ref: (
+        catalogRefFromInput(segmentContext?.catalog_binding)
+        ?? catalogRefFromInput(context.catalog_binding)
+      ) ?? '',
     };
   }, [context]);
 
   const handleSubmit = useCallback(
     async (data: BranchFormData) => {
       if (!activeCaseId) return;
+      if (data.type !== 'line_overhead' && data.type !== 'cable') {
+        setCatalogError('Odgałęzienie SN można rozpocząć wyłącznie jako kabel albo linię napowietrzną.');
+        return;
+      }
+      const fromRef = typeof context?.from_ref === 'string' ? context.from_ref.trim() : '';
+      if (!fromRef) {
+        setCatalogError('Brak jawnego miejsca odgałęzienia. Wybierz port odgałęźny w modelu technicznym.');
+        return;
+      }
+      const catalogNamespace = normalizeSegmentNamespace(data.type);
+      const catalogBinding = normalizeCatalogBinding(data.catalog_ref, catalogNamespace);
       const payload = {
-        ref_id: data.ref_id,
-        name: data.name,
-        type: data.type,
-        from_bus_ref: data.from_bus_ref,
-        to_bus_ref: data.to_bus_ref,
-        status: data.status,
-        length_km: data.length_km,
-        catalog_ref: data.catalog_ref,
-        parameter_source: data.parameter_source,
-        overrides: data.overrides,
+        from_ref: fromRef,
+        segment: {
+          rodzaj: normalizeSegmentKind(data.type),
+          dlugosc_m: Math.round(data.length_km * 1000),
+          name: data.name.trim() || data.ref_id.trim() || undefined,
+          catalog_binding: catalogBinding ?? undefined,
+        },
       };
       const validationError = validateCatalogFirst('start_branch_segment_sn', payload);
       if (validationError) {
@@ -58,7 +76,7 @@ export function StartBranchForm() {
       await executeDomainOperation(activeCaseId, 'start_branch_segment_sn', payload);
       closeForm();
     },
-    [activeCaseId, executeDomainOperation, closeForm],
+    [activeCaseId, executeDomainOperation, closeForm, context],
   );
 
   return (

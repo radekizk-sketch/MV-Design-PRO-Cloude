@@ -27,7 +27,7 @@ export interface SectionSwitchFormData {
   switch_state: SwitchState;
   segment_ref: string;
   position_on_segment: number;
-  catalog_binding: string | null;
+  catalog_ref: string | null;
 }
 
 interface SectionSwitchModalProps {
@@ -101,7 +101,7 @@ export function SectionSwitchModal({
     switch_state: 'CLOSED',
     segment_ref: segmentRef,
     position_on_segment: 0.5,
-    catalog_binding: null,
+    catalog_ref: null,
   });
   const [errors, setErrors] = useState<FieldError[]>([]);
   const [touched, setTouched] = useState<Set<string>>(new Set());
@@ -115,7 +115,7 @@ export function SectionSwitchModal({
         switch_state: 'CLOSED',
         segment_ref: segmentRef,
         position_on_segment: 0.5,
-        catalog_binding: null,
+        catalog_ref: null,
       });
       setErrors([]);
       setTouched(new Set());
@@ -314,12 +314,12 @@ export function SectionSwitchModal({
               </label>
               <input
                 type="text"
-                value={formData.catalog_binding ?? ''}
+                value={formData.catalog_ref ?? ''}
                 onChange={(e) =>
-                  handleChange('catalog_binding', e.target.value.trim() || null)
+                  handleChange('catalog_ref', e.target.value.trim() || null)
                 }
                 className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
-                placeholder="opcjonalnie"
+                placeholder="Wskaż pozycję katalogową"
               />
             </div>
           </div>

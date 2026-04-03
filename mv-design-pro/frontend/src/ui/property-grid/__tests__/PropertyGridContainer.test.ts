@@ -7,7 +7,7 @@
  *
  * Tests:
  * - Type assignment for LineBranch, TransformerBranch, Switch
- * - Type clearing
+ * - Odkatalogowanie zablokowane w trybie katalog-first
  * - Callback invocation
  * - Error handling
  */
@@ -61,41 +61,23 @@ describe('PropertyGridContainer', () => {
     });
   });
 
-  describe('Type Clearing', () => {
-    it('should clear type from LineBranch', async () => {
-      const clearSpy = vi.spyOn(catalogApi, 'clearTypeFromBranch').mockResolvedValue(undefined);
-
-      const projectId = 'project-1';
-      const branchId = 'branch-1';
-
-      await catalogApi.clearTypeFromBranch(projectId, branchId);
-
-      expect(clearSpy).toHaveBeenCalledWith(projectId, branchId);
-      expect(clearSpy).toHaveBeenCalledTimes(1);
+  describe('Catalog Clearing Guards', () => {
+    it('should reject clearing type from LineBranch', async () => {
+      await expect(catalogApi.clearTypeFromBranch('project-1', 'branch-1')).rejects.toThrow(
+        'Odkatalogowanie elementów technicznych jest niedostępne w trybie katalog-first.',
+      );
     });
 
-    it('should clear type from TransformerBranch', async () => {
-      const clearSpy = vi.spyOn(catalogApi, 'clearTypeFromTransformer').mockResolvedValue(undefined);
-
-      const projectId = 'project-1';
-      const transformerId = 'trafo-1';
-
-      await catalogApi.clearTypeFromTransformer(projectId, transformerId);
-
-      expect(clearSpy).toHaveBeenCalledWith(projectId, transformerId);
-      expect(clearSpy).toHaveBeenCalledTimes(1);
+    it('should reject clearing type from TransformerBranch', async () => {
+      await expect(catalogApi.clearTypeFromTransformer('project-1', 'trafo-1')).rejects.toThrow(
+        'Odkatalogowanie elementów technicznych jest niedostępne w trybie katalog-first.',
+      );
     });
 
-    it('should clear equipment type from Switch', async () => {
-      const clearSpy = vi.spyOn(catalogApi, 'clearEquipmentTypeFromSwitch').mockResolvedValue(undefined);
-
-      const projectId = 'project-1';
-      const switchId = 'switch-1';
-
-      await catalogApi.clearEquipmentTypeFromSwitch(projectId, switchId);
-
-      expect(clearSpy).toHaveBeenCalledWith(projectId, switchId);
-      expect(clearSpy).toHaveBeenCalledTimes(1);
+    it('should reject clearing equipment type from Switch', async () => {
+      await expect(catalogApi.clearEquipmentTypeFromSwitch('project-1', 'switch-1')).rejects.toThrow(
+        'Odkatalogowanie elementów technicznych jest niedostępne w trybie katalog-first.',
+      );
     });
   });
 

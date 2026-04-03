@@ -10,7 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from api.exception_handlers import register_exception_handlers
 from api.middleware import RequestIdMiddleware
 from api.analysis_runs import router as analysis_runs_router
-from api.catalog import router as catalog_router
+from api.catalog import production_router as catalog_router
 from api.comparison import router as comparison_router
 from api.diagnostics import router as diagnostics_router
 from api.equipment_proof_pack import router as equipment_proof_pack_router

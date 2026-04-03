@@ -18,6 +18,12 @@ from enm.domain_operations import execute_domain_operation
 # Helpers
 # ---------------------------------------------------------------------------
 
+CATALOG_KABEL_SN = "cable-tfk-yakxs-3x120"
+CATALOG_LINIA_SN = "line-base-al-st-50"
+CATALOG_TRAFO_SN_NN = "tr-sn-nn-15-04-630kva-dyn11"
+CATALOG_APARAT_SN = "sw-ls-schneider-rm6-17kv-400a"
+CATALOG_ZRODLO_SN = "src-gpz-15kv-250mva-rx010"
+
 
 def _empty_enm() -> dict:
     """Pusty ENM z jawnymi ustawieniami projektu."""
@@ -32,7 +38,7 @@ def _add_gpz(enm_dict: dict) -> dict:
     result = execute_domain_operation(
         enm_dict=enm_dict,
         op_name="add_grid_source_sn",
-        payload={"voltage_kv": 15.0, "sk3_mva": 250.0},
+        payload={"voltage_kv": 15.0, "sk3_mva": 250.0, "catalog_ref": CATALOG_ZRODLO_SN},
     )
     assert result.get("snapshot") is not None
     return result["snapshot"]
@@ -47,7 +53,7 @@ def _add_segment_with_catalog(enm_dict: dict) -> dict:
             "segment": {
                 "rodzaj": "KABEL",
                 "dlugosc_m": 500,
-                "catalog_ref": "YAKXS_3x120",
+                "catalog_ref": CATALOG_KABEL_SN,
             },
         },
     )
@@ -109,7 +115,7 @@ class TestCatalogGateContinueTrunk:
                 "segment": {
                     "rodzaj": "KABEL",
                     "dlugosc_m": 500,
-                    "catalog_ref": "YAKXS_3x120",
+                    "catalog_ref": CATALOG_KABEL_SN,
                 },
             },
         )
@@ -129,9 +135,9 @@ class TestCatalogGateContinueTrunk:
                     "rodzaj": "KABEL",
                     "dlugosc_m": 500,
                     "catalog_binding": {
-                        "namespace": "KABEL_SN",
-                        "item_id": "YAKXS_3x120",
-                        "version": "2024.1",
+                        "catalog_namespace": "KABEL_SN",
+                        "catalog_item_id": CATALOG_KABEL_SN,
+                        "catalog_item_version": "2024.1",
                     },
                 },
             },
@@ -185,7 +191,7 @@ class TestCatalogGateStartBranch:
                 "segment": {
                     "rodzaj": "KABEL",
                     "dlugosc_m": 200,
-                    "catalog_ref": "YAKXS_3x120",
+                    "catalog_ref": CATALOG_KABEL_SN,
                 },
             },
         )
@@ -243,7 +249,7 @@ class TestCatalogGateInsertStation:
                 "sn_fields": ["IN", "OUT"],
                 "transformer": {
                     "create": True,
-                    "transformer_catalog_ref": "ONAN_630",
+                    "transformer_catalog_ref": CATALOG_TRAFO_SN_NN,
                 },
             },
         )
@@ -361,7 +367,7 @@ class TestCatalogGateDeterminism:
             "segment": {
                 "rodzaj": "KABEL",
                 "dlugosc_m": 500,
-                "catalog_ref": "YAKXS_3x120",
+                "catalog_ref": CATALOG_KABEL_SN,
             },
         }
 
@@ -438,7 +444,7 @@ def _add_overhead_line_with_catalog(enm_dict: dict) -> dict:
             "segment": {
                 "rodzaj": "LINIA",
                 "dlugosc_m": 800,
-                "catalog_ref": "AFL_3x50",
+                "catalog_ref": CATALOG_LINIA_SN,
             },
         },
     )
@@ -511,7 +517,10 @@ class TestCatalogGateInsertBranchPole:
             op_name="insert_branch_pole_on_segment_sn",
             payload={
                 "segment_id": seg_ref,
-                "catalog_binding": {"item_id": "SLUP_BP_001", "namespace": "mv_branch_points"},
+                "catalog_binding": {
+                    "catalog_item_id": "SLUP_BP_001",
+                    "catalog_namespace": "mv_branch_points",
+                },
                 "insert_at": {"mode": "RATIO", "value": 0.5},
             },
         )
@@ -581,7 +590,7 @@ class TestCatalogGateInsertZKSN:
             op_name="insert_zksn_on_segment_sn",
             payload={
                 "segment_id": seg_ref,
-                "catalog_ref": "ZKSN_TYPE_001",
+                "catalog_ref": CATALOG_APARAT_SN,
                 "insert_at": {"mode": "RATIO", "value": 0.5},
                 "switch_state": "CLOSED",
             },
@@ -632,7 +641,7 @@ class TestCatalogGateInsertSectionSwitch:
             payload={
                 "segment_id": seg_ref,
                 "switch_type": "ROZLACZNIK",
-                "catalog_ref": "APARAT_SN_ROZLACZNIK_001",
+                "catalog_ref": CATALOG_APARAT_SN,
             },
         )
         assert result.get("snapshot") is not None, f"Błąd: {result.get('error')}"
@@ -652,8 +661,8 @@ class TestCatalogGateInsertSectionSwitch:
             payload={
                 "segment_id": seg_ref,
                 "catalog_binding": {
-                    "item_id": "APARAT_SN_ROZLACZNIK_001",
-                    "namespace": "APARAT_SN",
+                    "catalog_item_id": CATALOG_APARAT_SN,
+                    "catalog_namespace": "APARAT_SN",
                 },
             },
         )
@@ -711,7 +720,7 @@ class TestCatalogGateInsertSectionSwitch:
 
 @pytest.mark.parametrize(
     "malformed_binding",
-    [None, {}, {"item_id": ""}, {"item_id": "   "}, "not-a-dict", 123, []],
+    [None, {}, {"catalog_item_id": ""}, {"catalog_item_id": "   "}, "not-a-dict", 123, []],
 )
 def test_catalog_gate_rejects_malformed_bindings(malformed_binding):
     """Wszystkie operacje z shared helperem odrzucają błędne catalog_binding."""
@@ -734,7 +743,6 @@ def test_catalog_gate_rejects_malformed_bindings(malformed_binding):
     )
     assert result.get("error_code") == "catalog.ref_required"
     assert result.get("changes", {}).get("created_element_ids", []) == []
-
     # 2) insert_station_on_segment_sn (transformer branch)
     result = execute_domain_operation(
         enm_dict=snapshot,
@@ -753,7 +761,6 @@ def test_catalog_gate_rejects_malformed_bindings(malformed_binding):
     )
     assert result.get("error_code") == "catalog.ref_required"
     assert result.get("changes", {}).get("created_element_ids", []) == []
-
     # 3) _insert_branch_point_on_segment_sn (via insert_zksn_on_segment_sn)
     result = execute_domain_operation(
         enm_dict=snapshot,
@@ -766,6 +773,7 @@ def test_catalog_gate_rejects_malformed_bindings(malformed_binding):
     )
     assert result.get("error_code") == "catalog.ref_required"
     assert result.get("changes", {}).get("created_element_ids", []) == []
+
 
     # 4) start_branch_segment_sn
     bus_ref = _get_sn_bus_ref(snapshot)

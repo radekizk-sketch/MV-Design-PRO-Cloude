@@ -5,6 +5,12 @@ from datetime import datetime
 from typing import Any, Callable
 from uuid import UUID
 
+from application.analysis_run.catalog_context import (
+    build_catalog_context,
+    build_catalog_context_index,
+    build_catalog_context_summary,
+    enrich_trace_steps_with_catalog_context,
+)
 from application.analysis_run.read_model import (
     build_deterministic_id,
     canonicalize_json,
@@ -15,7 +21,6 @@ from application.sld.overlay import ResultSldOverlayBuilder
 from infrastructure.persistence.unit_of_work import UnitOfWork
 from network_model.reporting.analysis_run_report_docx import export_analysis_run_to_docx
 from network_model.reporting.analysis_run_report_pdf import export_analysis_run_to_pdf
-
 
 class AnalysisRunExportService:
     def __init__(self, uow_factory: Callable[[], UnitOfWork]) -> None:
@@ -38,7 +43,8 @@ class AnalysisRunExportService:
 
         result_items = self._build_result_items(results)
         overlay_bundle = self._build_overlay_bundle(diagrams, results)
-        trace_steps = self._build_trace_steps(get_run_trace(run))
+        catalog_context = build_catalog_context(run.input_snapshot or {})
+        trace_steps = self._build_trace_steps(get_run_trace(run), catalog_context=catalog_context)
 
         bundle = {
             "report_type": "analysis_run",
@@ -64,6 +70,9 @@ class AnalysisRunExportService:
                 "input_hash": run.input_hash,
             },
             "input_snapshot": canonicalize_json(run.input_snapshot),
+            "catalog_context": catalog_context,
+            "catalog_context_by_element": build_catalog_context_index(catalog_context),
+            "catalog_context_summary": build_catalog_context_summary(catalog_context),
             "result_summary": canonicalize_json(run.result_summary),
             "white_box_trace": trace_steps,
             "results": result_items,
@@ -137,12 +146,16 @@ class AnalysisRunExportService:
         }
 
     def _build_trace_steps(
-        self, trace_payload: dict[str, Any] | list[dict[str, Any]] | None
+        self,
+        trace_payload: dict[str, Any] | list[dict[str, Any]] | None,
+        *,
+        catalog_context: list[dict[str, Any]],
     ) -> list[dict[str, Any]]:
         if trace_payload is None:
             return []
         if isinstance(trace_payload, list):
-            return [self._normalize_trace_step(step, index=i) for i, step in enumerate(trace_payload)]
+            enriched_steps = enrich_trace_steps_with_catalog_context(trace_payload, catalog_context)
+            return [self._normalize_trace_step(step, index=i) for i, step in enumerate(enriched_steps)]
         steps = []
         for key in sorted(trace_payload.keys()):
             value = trace_payload[key]
@@ -162,13 +175,42 @@ class AnalysisRunExportService:
 
     @staticmethod
     def _normalize_trace_fields(step: dict[str, Any]) -> dict[str, Any]:
-        normalized: dict[str, Any] = {
-            "title": step.get("title"),
-            "notes": step.get("notes"),
-            "severity": step.get("severity"),
-        }
+        normalized: dict[str, Any] = {}
+        for field_name in (
+            "key",
+            "step",
+            "step_id",
+            "title",
+            "phase",
+            "description",
+            "severity",
+            "formula_latex",
+            "substitution",
+            "notes",
+            "element_id",
+            "target_id",
+            "solver_ref",
+            "catalog_binding",
+            "source_catalog",
+            "source_catalog_label",
+            "parameter_origin",
+            "parameter_source",
+            "source_mode",
+            "materialized_params",
+            "manual_overrides",
+            "overrides",
+            "manual_override_count",
+            "has_manual_overrides",
+            "catalog_context_entry",
+        ):
+            if field_name in step and step.get(field_name) is not None:
+                normalized[field_name] = step.get(field_name)
         if "metrics" in step:
             normalized["metrics"] = step.get("metrics")
+        if "inputs" in step:
+            normalized["inputs"] = step.get("inputs")
+        if "result" in step:
+            normalized["result"] = step.get("result")
         if "data" in step:
             normalized["data"] = step.get("data")
         return {key: value for key, value in normalized.items() if value is not None}

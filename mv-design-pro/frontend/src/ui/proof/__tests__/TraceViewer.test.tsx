@@ -41,6 +41,28 @@ const mockExtendedTrace: ExtendedTrace = {
   run_id: 'test-run-001',
   snapshot_id: 'test-snapshot-001',
   input_hash: 'abc123def456789012345678901234567890',
+  catalog_context: [
+    {
+      element_id: 'branch/main/001',
+      element_type: 'ODCINEK_SN',
+      catalog_binding: {
+        catalog_namespace: 'KABEL_SN',
+        catalog_item_id: 'NA2XS2Y-1x240',
+        catalog_item_version: '2024.1',
+      },
+      materialized_params: {
+        r_ohm_per_km: 0.125,
+      },
+      parameter_origin: 'OVERRIDE',
+      manual_overrides: [
+        {
+          key: 'length_km',
+          value: 1.25,
+          reason: 'pomiar powykonawczy',
+        },
+      ],
+    },
+  ],
   white_box_trace: [
     mockTraceStep,
     {
@@ -85,6 +107,16 @@ describe('TraceViewer', () => {
 
     // Check empty state initially (no step selected)
     expect(screen.getByTestId('trace-step-view-empty')).toBeInTheDocument();
+  });
+
+  it('shows catalog context details in metadata panel', () => {
+    render(<TraceViewer trace={mockExtendedTrace} />);
+
+    expect(screen.getByText('Kontekst katalogowy')).toBeInTheDocument();
+    expect(screen.getByText('branch/main/001')).toBeInTheDocument();
+    expect(
+      screen.getAllByText((_, node) => node?.textContent?.includes('Pochodzenie parametrów:') ?? false).length,
+    ).toBeGreaterThan(0);
   });
 
   it('displays Polish header "Ślad obliczeń"', () => {
@@ -141,6 +173,7 @@ describe('TraceViewerContainer', () => {
       run_id: 'test-run-001',
       snapshot_id: 'test-snapshot-001',
       input_hash: 'abc123',
+      catalog_context: [],
       white_box_trace: [],
     };
 
@@ -325,6 +358,9 @@ describe('Export JSONL', () => {
     expect(header.type).toBe('header');
     expect(header.data.run_id).toBe('test-run-001');
     expect(header.data.total_steps).toBe(3);
+    expect(header.data.catalog_context_count).toBe(1);
+    expect(header.data.catalog_context[0].element_id).toBe('branch/main/001');
+    expect(header.data.catalog_context[0].manual_overrides).toHaveLength(1);
   });
 
   it('generates deterministic filename', () => {

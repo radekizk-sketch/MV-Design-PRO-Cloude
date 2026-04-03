@@ -22,6 +22,7 @@ import json
 from uuid import uuid4
 
 import pytest
+from tests.catalog_test_helpers import gpz_source_record
 
 from domain.result_contract_v1 import (
     RESULT_CONTRACT_VERSION,
@@ -199,14 +200,16 @@ def _seed_valid_sc_enm(client, case_id: str) -> None:
                 "sources": [
                     {
                         "id": "00000000-0000-0000-0000-000000000204",
-                        "ref_id": "src-grid",
-                        "name": "Zasilanie GPZ",
                         "tags": [],
                         "meta": {},
-                        "bus_ref": "bus-main",
-                        "model": "short_circuit_power",
-                        "sk3_mva": 250.0,
-                        "rx_ratio": 0.1,
+                        **gpz_source_record(
+                            ref_id="src-grid",
+                            name="Zasilanie GPZ",
+                            bus_ref="bus-main",
+                            voltage_kv=15.0,
+                            sk3_mva=250.0,
+                            rx_ratio=0.10,
+                        ),
                     }
                 ],
                 "transformers": [],

@@ -28,6 +28,7 @@ class TestGN01SNProsta:
         # 1. Add GPZ source
         r = execute_domain_operation(enm, "add_grid_source_sn", {
             "voltage_kv": 15.0, "source_name": "GPZ Główne", "sk3_mva": 500.0, "rx_ratio": 0.1,
+            "catalog_ref": "src-gpz-15kv-500mva-rx010",
         })
         assert r.get("error") is None, f"GPZ failed: {r.get('error')}"
         enm = r["snapshot"]
@@ -35,7 +36,12 @@ class TestGN01SNProsta:
         # 2-4. Add 3 trunk segments
         for i, length in enumerate([250, 180, 320], 1):
             r = execute_domain_operation(enm, "continue_trunk_segment_sn", {
-                "segment": {"rodzaj": "KABEL", "dlugosc_m": length, "name": f"Odcinek {i}", "catalog_ref": "YAKXS_3x120"},
+                "segment": {
+                    "rodzaj": "KABEL",
+                    "dlugosc_m": length,
+                    "name": f"Odcinek {i}",
+                    "catalog_ref": "cable-tfk-yakxs-3x120",
+                },
             })
             assert r.get("error") is None, f"Trunk {i} failed: {r.get('error')}"
             enm = r["snapshot"]
@@ -49,7 +55,10 @@ class TestGN01SNProsta:
                 "insert_at": {"mode": "RATIO", "value": 0.5},
                 "station": {"station_type": "B", "sn_voltage_kv": 15.0, "nn_voltage_kv": 0.4},
                 "sn_fields": [{"field_role": "LINIA_IN"}, {"field_role": "LINIA_OUT"}, {"field_role": "TRANSFORMATOROWE"}],
-                "transformer": {"create": True, "transformer_catalog_ref": "ONAN_630"},
+                "transformer": {
+                    "create": True,
+                    "transformer_catalog_ref": "tr-sn-nn-15-04-630kva-dyn11",
+                },
                 "nn_block": {"outgoing_feeders_nn_count": 2},
             })
             assert r.get("error") is None, f"Station failed: {r.get('error')}"
@@ -76,12 +85,20 @@ class TestGN02SNODG:
 
     def test_build(self):
         enm = _empty_enm()
-        r = execute_domain_operation(enm, "add_grid_source_sn", {"voltage_kv": 15.0})
+        r = execute_domain_operation(
+            enm,
+            "add_grid_source_sn",
+            {"voltage_kv": 15.0, "catalog_ref": "src-gpz-15kv-250mva-rx010"},
+        )
         enm = r["snapshot"]
 
         for length in [200, 300]:
             r = execute_domain_operation(enm, "continue_trunk_segment_sn", {
-                "segment": {"rodzaj": "KABEL", "dlugosc_m": length, "catalog_ref": "YAKXS_3x120"},
+                "segment": {
+                    "rodzaj": "KABEL",
+                    "dlugosc_m": length,
+                    "catalog_ref": "cable-tfk-yakxs-3x120",
+                },
             })
             enm = r["snapshot"]
 
@@ -92,7 +109,10 @@ class TestGN02SNODG:
                 "insert_at": {"mode": "RATIO", "value": 0.5},
                 "station": {"station_type": "C", "sn_voltage_kv": 15.0, "nn_voltage_kv": 0.4},
                 "sn_fields": [{"field_role": "LINIA_IN"}, {"field_role": "LINIA_OUT"}, {"field_role": "LINIA_ODG"}, {"field_role": "TRANSFORMATOROWE"}],
-                "transformer": {"create": True, "transformer_catalog_ref": "ONAN_630"},
+                "transformer": {
+                    "create": True,
+                    "transformer_catalog_ref": "tr-sn-nn-15-04-630kva-dyn11",
+                },
                 "nn_block": {"outgoing_feeders_nn_count": 2},
             })
             enm = r["snapshot"]
@@ -102,7 +122,11 @@ class TestGN02SNODG:
         if len(sn_buses) >= 3:
             r = execute_domain_operation(enm, "start_branch_segment_sn", {
                 "from_bus_ref": sn_buses[-1]["ref_id"],
-                "segment": {"rodzaj": "KABEL", "dlugosc_m": 150, "catalog_ref": "YAKXS_3x120"},
+                "segment": {
+                    "rodzaj": "KABEL",
+                    "dlugosc_m": 150,
+                    "catalog_ref": "cable-tfk-yakxs-3x120",
+                },
             })
             assert r.get("error") is None
 
@@ -114,12 +138,20 @@ class TestGN03SNRingNOP:
 
     def test_build(self):
         enm = _empty_enm()
-        r = execute_domain_operation(enm, "add_grid_source_sn", {"voltage_kv": 15.0})
+        r = execute_domain_operation(
+            enm,
+            "add_grid_source_sn",
+            {"voltage_kv": 15.0, "catalog_ref": "src-gpz-15kv-250mva-rx010"},
+        )
         enm = r["snapshot"]
 
         for length in [200, 250, 300]:
             r = execute_domain_operation(enm, "continue_trunk_segment_sn", {
-                "segment": {"rodzaj": "KABEL", "dlugosc_m": length, "catalog_ref": "YAKXS_3x120"},
+                "segment": {
+                    "rodzaj": "KABEL",
+                    "dlugosc_m": length,
+                    "catalog_ref": "cable-tfk-yakxs-3x120",
+                },
             })
             enm = r["snapshot"]
 
@@ -139,7 +171,11 @@ class TestGN03SNRingNOP:
             r = execute_domain_operation(enm, "connect_secondary_ring_sn", {
                 "from_bus_ref": sn_buses[0]["ref_id"],
                 "to_bus_ref": sn_buses[-1]["ref_id"],
-                "segment": {"rodzaj": "KABEL", "dlugosc_m": 400, "catalog_ref": "YAKXS_3x120"},
+                "segment": {
+                    "rodzaj": "KABEL",
+                    "dlugosc_m": 400,
+                    "catalog_ref": "cable-tfk-yakxs-3x120",
+                },
             })
             assert r.get("error") is None
             enm = r["snapshot"]
@@ -160,10 +196,18 @@ class TestRepeatability:
         hashes = set()
         for _ in range(3):
             enm = _empty_enm()
-            r = execute_domain_operation(enm, "add_grid_source_sn", {"voltage_kv": 15.0, "sk3_mva": 500.0})
+            r = execute_domain_operation(
+                enm,
+                "add_grid_source_sn",
+                {"voltage_kv": 15.0, "sk3_mva": 500.0, "catalog_ref": "src-gpz-15kv-500mva-rx010"},
+            )
             enm = r["snapshot"]
             r = execute_domain_operation(enm, "continue_trunk_segment_sn", {
-                "segment": {"rodzaj": "KABEL", "dlugosc_m": 250, "catalog_ref": "YAKXS_3x120"},
+                "segment": {
+                    "rodzaj": "KABEL",
+                    "dlugosc_m": 250,
+                    "catalog_ref": "cable-tfk-yakxs-3x120",
+                },
             })
             hashes.add(r["layout"]["layout_hash"])
         assert len(hashes) == 1, f"Non-deterministic: {hashes}"

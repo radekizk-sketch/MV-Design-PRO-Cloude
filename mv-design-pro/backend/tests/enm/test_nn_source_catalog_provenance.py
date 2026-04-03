@@ -205,3 +205,47 @@ def test_successful_create_includes_provenance_fields(
     assert created.get("catalog_namespace") == expected_namespace
     assert created.get("source_mode") == "KATALOG"
     assert isinstance(created.get("materialized_params"), dict)
+
+
+def test_pv_uses_catalog_materialization_when_payload_does_not_supply_it() -> None:
+    result = execute_domain_operation(
+        _base_enm(),
+        "add_pv_inverter_nn",
+        _pv_payload({"catalog_item_id": "conv-pv-0.5mw-15kv"}),
+    )
+
+    assert not result.get("error")
+    snapshot = result.get("snapshot")
+    assert snapshot is not None
+    created_ref = result["changes"]["created_element_ids"][0]
+    created = next(g for g in snapshot.get("generators", []) if g.get("ref_id") == created_ref)
+
+    assert created.get("catalog_ref") == "conv-pv-0.5mw-15kv"
+    assert created.get("materialized_params", {}).get("rated_power_ac_kw") == 550.0
+    assert created.get("materialized_params", {}).get("max_power_kw") == 500.0
+    assert created.get("materialized_params", {}).get("control_mode") == "STALY_COS_PHI"
+
+
+def test_bess_uses_catalog_materialization_when_payload_supplies_only_operation_mode() -> None:
+    result = execute_domain_operation(
+        _base_enm(),
+        "add_bess_inverter_nn",
+        _bess_payload(
+            {
+                "inverter_catalog_id": "conv-bess-0.5mw-1mwh-15kv",
+                "operation_mode": "DWUKIERUNKOWY",
+            }
+        ),
+    )
+
+    assert not result.get("error")
+    snapshot = result.get("snapshot")
+    assert snapshot is not None
+    created_ref = result["changes"]["created_element_ids"][0]
+    created = next(g for g in snapshot.get("generators", []) if g.get("ref_id") == created_ref)
+
+    assert created.get("catalog_ref") == "conv-bess-0.5mw-1mwh-15kv"
+    assert created.get("materialized_params", {}).get("usable_capacity_kwh") == 1000.0
+    assert created.get("materialized_params", {}).get("charge_power_kw") == 500.0
+    assert created.get("materialized_params", {}).get("discharge_power_kw") == 500.0
+    assert created.get("materialized_params", {}).get("operation_mode") == "DWUKIERUNKOWY"

@@ -19,6 +19,12 @@ from __future__ import annotations
 from typing import Any, Callable
 from uuid import UUID
 
+from application.analysis_run.catalog_context import (
+    build_catalog_context,
+    build_catalog_context_index,
+    build_catalog_context_summary,
+    enrich_trace_steps_with_catalog_context,
+)
 from application.analysis_run.dtos import (
     BranchResultsDTO,
     BranchResultsRowDTO,
@@ -385,7 +391,11 @@ class ResultsInspectorService:
         if run is None:
             raise ValueError(f"AnalysisRun {run_id} not found")
 
-        white_box_trace = run.white_box_trace or []
+        catalog_context = build_catalog_context(run.input_snapshot or {})
+        white_box_trace = enrich_trace_steps_with_catalog_context(
+            list(run.white_box_trace or []),
+            catalog_context,
+        )
         snapshot_id = run.input_snapshot.get("snapshot_id")
 
         return ExtendedTraceDTO(
@@ -393,6 +403,9 @@ class ResultsInspectorService:
             snapshot_id=str(snapshot_id) if snapshot_id else None,
             input_hash=run.input_hash,
             white_box_trace=white_box_trace,
+            catalog_context=catalog_context,
+            catalog_context_by_element=build_catalog_context_index(catalog_context),
+            catalog_context_summary=build_catalog_context_summary(catalog_context),
         )
 
     # -------------------------------------------------------------------------

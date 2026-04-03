@@ -109,6 +109,7 @@ def _build_v1_network() -> dict:
         "voltage_kv": 15.0,
         "sk3_mva": 250.0,
         "rx_ratio": 0.1,
+        "catalog_ref": "src-gpz-15kv-250mva-rx010",
     })
     assert r.get("error") is None, f"GPZ: {r.get('error')}"
     enm = r["snapshot"]
@@ -120,7 +121,7 @@ def _build_v1_network() -> dict:
                 "rodzaj": "KABEL",
                 "dlugosc_m": length,
                 "name": f"Odcinek {i}",
-                "catalog_ref": "YAKXS_3x120",
+                "catalog_ref": "cable-tfk-yakxs-3x120",
             },
         })
         assert r.get("error") is None, f"Trunk {i}: {r.get('error')}"
@@ -139,7 +140,10 @@ def _build_v1_network() -> dict:
         "insert_at": {"value": 0.5},
         "station": {"sn_voltage_kv": 15.0, "nn_voltage_kv": 0.4},
         "sn_fields": ["IN", "OUT"],
-        "transformer": {"create": True, "transformer_catalog_ref": "ONAN_630"},
+        "transformer": {
+            "create": True,
+            "transformer_catalog_ref": "tr-sn-nn-15-04-630kva-dyn11",
+        },
     })
     assert r.get("error") is None, f"Station B: {r.get('error')}"
     enm = r["snapshot"]
@@ -154,7 +158,7 @@ def _build_v1_network() -> dict:
         "segment": {
             "rodzaj": "KABEL",
             "dlugosc_m": 180,
-            "catalog_ref": "YAKXS_3x120",
+                "catalog_ref": "cable-tfk-yakxs-3x120",
         },
     })
     assert r.get("error") is None, f"Branch: {r.get('error')}"
@@ -394,7 +398,11 @@ class TestV1ReadinessPipeline:
         enm = r["snapshot"]
 
         r = execute_domain_operation(enm, "continue_trunk_segment_sn", {
-            "segment": {"rodzaj": "KABEL", "dlugosc_m": 300, "catalog_ref": "YAKXS_3x120"},
+            "segment": {
+                "rodzaj": "KABEL",
+                "dlugosc_m": 300,
+                "catalog_ref": "cable-tfk-yakxs-3x120",
+            },
         })
         enm = r["snapshot"]
         readiness = r.get("readiness", {})

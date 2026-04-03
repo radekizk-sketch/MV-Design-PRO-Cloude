@@ -71,6 +71,10 @@ def build_golden_network() -> EnergyNetworkModel:
         ref_id="src_grid", name="Sieć 110 kV", bus_ref="bus_gpz_110",
         model="short_circuit_power", sk3_mva=3000.0, rx_ratio=0.1,
         r0_ohm=0.1, x0_ohm=1.0,
+        catalog_ref="SRC_GOLDEN_110KV",
+        catalog_namespace="ZRODLO_SN",
+        parameter_source="CATALOG",
+        source_mode="KATALOG",
     ))
 
     # Transformatory WN/SN w GPZ

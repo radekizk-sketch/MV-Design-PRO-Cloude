@@ -289,6 +289,26 @@ class ENMValidator:
                     ),
                 ))
 
+        for source in enm.sources:
+            if not source.catalog_ref:
+                issues.append(ValidationIssue(
+                    code="E009",
+                    severity="BLOCKER",
+                    message_pl=(
+                        f"Źródło '{source.ref_id}' nie ma referencji katalogowej "
+                        f"(catalog_ref)."
+                    ),
+                    element_refs=[source.ref_id],
+                    wizard_step_hint="K2",
+                    suggested_fix="Wybierz źródło systemowe z katalogu i zapisz catalog_ref.",
+                    fix_action=FixAction(
+                        action_type="SELECT_CATALOG",
+                        element_ref=source.ref_id,
+                        modal_type="SourceModal",
+                        payload_hint={"required": "catalog_ref"},
+                    ),
+                ))
+
     # ------------------------------------------------------------------
     # WARNINGS (W001-W004)
     # ------------------------------------------------------------------

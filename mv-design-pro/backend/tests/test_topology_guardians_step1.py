@@ -54,7 +54,13 @@ def _build_radial_with_segments(segment_count: int) -> dict:
         execute_domain_operation(
             enm,
             "add_grid_source_sn",
-            {"voltage_kv": 15.0, "source_name": "GPZ-A", "sk3_mva": 500.0, "rx_ratio": 0.1},
+            {
+                "voltage_kv": 15.0,
+                "source_name": "GPZ-A",
+                "sk3_mva": 500.0,
+                "rx_ratio": 0.1,
+                "catalog_ref": "src-gpz-15kv-500mva-rx010",
+            },
         ),
         "add_grid_source_sn",
     )
@@ -69,7 +75,7 @@ def _build_radial_with_segments(segment_count: int) -> dict:
                         "rodzaj": "KABEL",
                         "dlugosc_m": 100 + i,
                         "name": f"Segment {i+1}",
-                        "catalog_ref": "YAKXS_3x120",
+                "catalog_ref": "cable-tfk-yakxs-3x120",
                     }
                 },
             ),
@@ -105,7 +111,11 @@ def test_topology_ring_8_stations_with_nop() -> None:
             {
                 "from_bus_ref": bus_refs[0],
                 "to_bus_ref": bus_refs[-1],
-                "segment": {"rodzaj": "KABEL", "dlugosc_m": 250, "catalog_ref": "YAKXS_3x120"},
+                "segment": {
+                    "rodzaj": "KABEL",
+                    "dlugosc_m": 250,
+                    "catalog_ref": "cable-tfk-yakxs-3x120",
+                },
             },
         ),
         "connect_secondary_ring_sn",
@@ -155,7 +165,11 @@ def test_topology_two_rings_two_sources() -> None:
             {
                 "from_bus_ref": bus_refs[0],
                 "to_bus_ref": bus_refs[-1],
-                "segment": {"rodzaj": "KABEL", "dlugosc_m": 280, "catalog_ref": "YAKXS_3x120"},
+                "segment": {
+                    "rodzaj": "KABEL",
+                    "dlugosc_m": 280,
+                    "catalog_ref": "cable-tfk-yakxs-3x120",
+                },
             },
         ),
         "connect_secondary_ring_sn#1",
@@ -169,7 +183,11 @@ def test_topology_two_rings_two_sources() -> None:
             {
                 "from_bus_ref": bus_refs[2],
                 "to_bus_ref": bus_refs[6],
-                "segment": {"rodzaj": "KABEL", "dlugosc_m": 190, "catalog_ref": "YAKXS_3x120"},
+                "segment": {
+                    "rodzaj": "KABEL",
+                    "dlugosc_m": 190,
+                    "catalog_ref": "cable-tfk-yakxs-3x120",
+                },
             },
         ),
         "connect_secondary_ring_sn#2",
@@ -215,7 +233,10 @@ def test_topology_split_insert_idempotent() -> None:
             {"field_role": "LINIA_OUT"},
             {"field_role": "TRANSFORMATOROWE"},
         ],
-        "transformer": {"create": True, "transformer_catalog_ref": "ONAN_630"},
+        "transformer": {
+            "create": True,
+            "transformer_catalog_ref": "tr-sn-nn-15-04-630kva-dyn11",
+        },
         "nn_block": {"outgoing_feeders_nn_count": 2},
     }
 

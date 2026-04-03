@@ -139,6 +139,14 @@ const SWITCH_BUILDERS: Partial<
   SwitchNN: (m, s, h) => buildSwitchNNContextMenu(m, s, h),
 };
 
+export function handlerNameToActionId(handlerName: string): string {
+  return handlerName
+    .replace(/^on/, '')
+    .replace(/([A-Z]+)([A-Z][a-z])/g, '$1_$2')
+    .replace(/([a-z0-9])([A-Z])/g, '$1_$2')
+    .toLowerCase();
+}
+
 // =============================================================================
 // Component
 // =============================================================================
@@ -168,7 +176,7 @@ export function EngineeringContextMenu({
       if (gate.required && gate.namespace && gate.label && onCatalogRequired) {
         // Operacja wymaga katalogu — deleguj do CatalogPicker
         onCatalogRequired({
-          operationId,
+          operationId: gate.canonicalOperation,
           elementId,
           elementType,
           namespace: gate.namespace,
@@ -188,14 +196,11 @@ export function EngineeringContextMenu({
       {},
       {
         get(_target, prop: string) {
-          // Convert handler name to operation ID
+          // Convert handler name to action ID without breaking acronyms:
           // e.g., "onInsertStationA" → "insert_station_a"
-          // e.g., "onProperties" → "properties"
-          const opId = prop
-            .replace(/^on/, '')
-            .replace(/([A-Z])/g, '_$1')
-            .toLowerCase()
-            .replace(/^_/, '');
+          // e.g., "onAddNNFeeder" → "add_nn_feeder"
+          // e.g., "onAddPV" → "add_pv"
+          const opId = handlerNameToActionId(prop);
           return makeHandler(opId);
         },
       },

@@ -132,7 +132,7 @@ export function selectBlockerCount(readiness: ReadinessInfo | null): number {
 // Store
 // ---------------------------------------------------------------------------
 
-export const useSnapshotStore = create<SnapshotState>((set) => ({
+export const useSnapshotStore = create<SnapshotState>((set, get) => ({
   snapshot: null,
   logicalViews: null,
   readiness: null,
@@ -149,11 +149,16 @@ export const useSnapshotStore = create<SnapshotState>((set) => ({
   executeDomainOperation: async (
     caseId: string,
     opName: string,
-    payload: Record<string, unknown>,
+      payload: Record<string, unknown>,
   ) => {
     set({ loading: true, error: null, errorCode: null });
     try {
-      const response = await executeDomainOp(caseId, opName, payload);
+      const response = await executeDomainOp(
+        caseId,
+        opName,
+        payload,
+        get().snapshot?.header.hash_sha256 ?? '',
+      );
 
       if (response.error) {
         set({
@@ -190,7 +195,12 @@ export const useSnapshotStore = create<SnapshotState>((set) => ({
   refreshFromBackend: async (caseId: string) => {
     set({ loading: true, error: null, errorCode: null });
     try {
-      const response = await executeDomainOp(caseId, 'refresh_snapshot', {});
+      const response = await executeDomainOp(
+        caseId,
+        'refresh_snapshot',
+        {},
+        get().snapshot?.header.hash_sha256 ?? '',
+      );
 
       if (response.error) {
         set({ loading: false, error: response.error, errorCode: response.error_code ?? null });

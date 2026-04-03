@@ -109,7 +109,20 @@
         },
         "required": ["event_seq", "event_type"]
       }
+    },
+    "materialized_params": {
+      "type": "object",
+      "description": "Zmaterializowane parametry katalogowe zwracane razem ze snapshotem."
+    },
+    "layout": {
+      "type": "object",
+      "description": "Deterministyczny identyfikator układu topologicznego.",
+      "properties": {
+        "layout_hash": { "type": "string" },
+        "layout_version": { "type": "string" }
+      },
+      "required": ["layout_hash", "layout_version"]
     }
   },
-  "required": ["snapshot", "readiness", "changes"]
+  "required": ["snapshot", "logical_views", "readiness", "fix_actions", "changes", "audit_trail", "domain_events", "materialized_params", "layout"]
 }

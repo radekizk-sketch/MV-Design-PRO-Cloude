@@ -35,6 +35,7 @@ from enm.models import (
 )
 from enm.store import reset_enm_store, set_enm
 from enm.validator import ENMValidator, ReadinessResult
+from tests.catalog_test_helpers import gpz_materialized_params, gpz_source_record
 
 
 # ===========================================================================
@@ -58,25 +59,40 @@ def _valid_bus(ref_id: str = "bus_sn") -> Bus:
 
 def _valid_source(bus_ref: str = "bus_sn") -> Source:
     return Source(
-        ref_id="src_grid",
-        name="Zasilanie sieciowe",
-        bus_ref=bus_ref,
-        model="short_circuit_power",
-        sk3_mva=220.0,
-        rx_ratio=0.1,
+        **gpz_source_record(
+            ref_id="src_grid",
+            name="Zasilanie sieciowe",
+            bus_ref=bus_ref,
+            voltage_kv=15.0,
+            sk3_mva=200.0,
+            rx_ratio=0.10,
+        )
     )
 
 
 def _valid_source_with_z0(bus_ref: str = "bus_sn") -> Source:
     return Source(
-        ref_id="src_grid",
-        name="Zasilanie sieciowe",
-        bus_ref=bus_ref,
-        model="short_circuit_power",
-        sk3_mva=220.0,
-        rx_ratio=0.1,
-        r0_ohm=0.5,
-        x0_ohm=1.5,
+        **gpz_source_record(
+            ref_id="src_grid",
+            name="Zasilanie sieciowe",
+            bus_ref=bus_ref,
+            voltage_kv=15.0,
+            sk3_mva=200.0,
+            rx_ratio=0.10,
+            extra={
+                "r0_ohm": 0.5,
+                "x0_ohm": 1.5,
+                "materialized_params": {
+                    **gpz_materialized_params(
+                        voltage_kv=15.0,
+                        sk3_mva=200.0,
+                        rx_ratio=0.10,
+                    ),
+                    "r0_ohm": 0.5,
+                    "x0_ohm": 1.5,
+                },
+            },
+        )
     )
 
 
@@ -637,10 +653,15 @@ class TestEligibilityAPI:
             "transformers": [],
             "sources": [{
                 "id": "00000000-0000-0000-0000-000000000002",
-                "ref_id": "s1", "name": "S1",
                 "tags": [], "meta": {},
-                "bus_ref": "b1", "model": "short_circuit_power",
-                "sk3_mva": 220, "rx_ratio": 0.1,
+                **gpz_source_record(
+                    ref_id="s1",
+                    name="S1",
+                    bus_ref="b1",
+                    voltage_kv=15.0,
+                    sk3_mva=200.0,
+                    rx_ratio=0.10,
+                ),
             }],
             "loads": [],
             "generators": [],

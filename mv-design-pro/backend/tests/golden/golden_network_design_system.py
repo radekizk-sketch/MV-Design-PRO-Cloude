@@ -263,7 +263,7 @@ STEP_9_PV_BINDING = CatalogBinding(
 
 STEP_10_RELAY_BINDING = CatalogBinding(
     catalog_namespace=CatalogNamespace.ZABEZPIECZENIE.value,
-    catalog_item_id="relay_relion_615",
+    catalog_item_id="ACME_REX500_v1",
     catalog_item_version="2026.01",
 )
 

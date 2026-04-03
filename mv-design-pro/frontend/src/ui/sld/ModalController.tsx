@@ -15,6 +15,7 @@ import React, { useState, useCallback } from 'react';
 import { getModalByOp } from '../topology/modals/modalRegistry';
 import { notify } from '../notifications/store';
 import type { ElementType } from '../types';
+import { requiresCatalog } from '../context-menu/catalogGate';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -147,6 +148,12 @@ export function useModalController(
       // Merge initialFormData (np. catalog_binding z bramki katalogowej)
       // z danymi formularza — formData nadpisuje initialFormData
       const mergedData = { ...state.initialFormData, ...formData };
+      const missingCatalogBinding = requiresCatalog(state.canonicalOp) && !mergedData.catalog_binding;
+
+      if (missingCatalogBinding) {
+        notify('Ta operacja wymaga jawnego wyboru typu z katalogu przed zapisem.', 'warning');
+        return;
+      }
 
       if (!onDomainOpComplete) {
         notify(label, 'success');
@@ -193,14 +200,14 @@ interface ModalFormField {
  */
 const OPERATION_FORMS: Record<string, ModalFormField[]> = {
   continue_trunk_segment_sn: [
-    { key: 'dlugosc_m', label: 'Długość', type: 'number', unit: 'm', defaultValue: 100, min: 1, step: 1 },
+    { key: 'dlugosc_m', label: 'Długość', type: 'number', unit: 'm', defaultValue: null, min: 1, step: 1 },
     { key: 'rodzaj', label: 'Rodzaj', type: 'select', defaultValue: 'KABEL', options: [
       { value: 'KABEL', label: 'Kabel' },
       { value: 'LINIA', label: 'Linia napowietrzna' },
     ]},
   ],
   start_branch_segment_sn: [
-    { key: 'dlugosc_m', label: 'Długość', type: 'number', unit: 'm', defaultValue: 100, min: 1, step: 1 },
+    { key: 'dlugosc_m', label: 'Długość', type: 'number', unit: 'm', defaultValue: null, min: 1, step: 1 },
     { key: 'rodzaj', label: 'Rodzaj', type: 'select', defaultValue: 'KABEL', options: [
       { value: 'KABEL', label: 'Kabel' },
       { value: 'LINIA', label: 'Linia napowietrzna' },
@@ -220,19 +227,19 @@ const OPERATION_FORMS: Record<string, ModalFormField[]> = {
     ]},
   ],
   add_grid_source_sn: [
-    { key: 'sn_mva', label: 'Moc zwarciowa', type: 'number', unit: 'MVA', defaultValue: 500, min: 1, step: 10 },
-    { key: 'rx_ratio', label: 'R/X', type: 'number', defaultValue: 0.1, min: 0.01, step: 0.01 },
+    { key: 'sn_mva', label: 'Moc zwarciowa', type: 'number', unit: 'MVA', defaultValue: null, min: 1, step: 10 },
+    { key: 'rx_ratio', label: 'R/X', type: 'number', defaultValue: null, min: 0.01, step: 0.01 },
   ],
   add_nn_load: [
-    { key: 'p_kw', label: 'Moc czynna', type: 'number', unit: 'kW', defaultValue: 50, min: 0, step: 1 },
-    { key: 'cos_phi', label: 'cos φ', type: 'number', defaultValue: 0.9, min: 0.1, step: 0.01 },
+    { key: 'p_kw', label: 'Moc czynna', type: 'number', unit: 'kW', defaultValue: null, min: 0, step: 1 },
+    { key: 'cos_phi', label: 'cos φ', type: 'number', defaultValue: null, min: 0.1, step: 0.01 },
   ],
   add_pv_inverter_nn: [
-    { key: 'p_kw', label: 'Moc szczytowa', type: 'number', unit: 'kWp', defaultValue: 50, min: 0, step: 1 },
+    { key: 'p_kw', label: 'Moc szczytowa', type: 'number', unit: 'kWp', defaultValue: null, min: 0, step: 1 },
   ],
   add_bess_inverter_nn: [
-    { key: 'p_kw', label: 'Moc', type: 'number', unit: 'kW', defaultValue: 100, min: 0, step: 1 },
-    { key: 'e_kwh', label: 'Pojemność', type: 'number', unit: 'kWh', defaultValue: 200, min: 0, step: 10 },
+    { key: 'p_kw', label: 'Moc', type: 'number', unit: 'kW', defaultValue: null, min: 0, step: 1 },
+    { key: 'e_kwh', label: 'Pojemność', type: 'number', unit: 'kWh', defaultValue: null, min: 0, step: 10 },
   ],
 };
 
@@ -269,6 +276,8 @@ export const ModalOverlay: React.FC<{
   const catalogBinding = state.initialFormData.catalog_binding as
     | { name?: string; namespace?: string }
     | undefined;
+  const catalogBindingMissing =
+    Boolean(state.canonicalOp) && requiresCatalog(state.canonicalOp ?? '') && !catalogBinding;
 
   const handleFieldChange = (key: string, value: unknown) => {
     setFormValues((prev) => ({ ...prev, [key]: value }));
@@ -322,6 +331,15 @@ export const ModalOverlay: React.FC<{
               </div>
             </div>
           )}
+          {catalogBindingMissing && (
+            <div
+              className="bg-rose-50 border border-rose-200 rounded-md px-4 py-3 text-sm text-rose-700"
+              data-testid="modal-catalog-required-warning"
+            >
+              Ta operacja wymaga wcześniejszego wyboru typu z katalogu. Zamknij formularz i wybierz katalog
+              w bramce katalog-first.
+            </div>
+          )}
 
           {/* Element info */}
           <div className="text-xs text-gray-500 flex gap-4">
@@ -358,8 +376,11 @@ export const ModalOverlay: React.FC<{
                   ) : field.type === 'number' ? (
                     <input
                       type="number"
-                      value={Number(formValues[field.key] ?? field.defaultValue)}
-                      onChange={(e) => handleFieldChange(field.key, parseFloat(e.target.value) || 0)}
+                      value={(formValues[field.key] ?? field.defaultValue ?? '') as string | number}
+                      onChange={(e) => {
+                        const raw = e.target.value;
+                        handleFieldChange(field.key, raw.trim() ? parseFloat(raw) : null);
+                      }}
                       min={field.min}
                       step={field.step}
                       className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 font-mono"
@@ -397,7 +418,8 @@ export const ModalOverlay: React.FC<{
           <button
             type="button"
             onClick={handleFormSubmit}
-            className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700"
+            disabled={catalogBindingMissing}
+            className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-400"
             data-testid="modal-submit-btn"
           >
             Zastosuj

@@ -92,6 +92,47 @@ def _build_export_bundle(run_id: UUID) -> dict[str, Any]:
     return build_power_flow_export_bundle(_require_canonical_run(run_id))
 
 
+def _format_catalog_binding(entry: dict[str, Any]) -> str:
+    binding = entry.get("catalog_binding") or {}
+    namespace = binding.get("catalog_namespace") or "-"
+    item_id = binding.get("catalog_item_id") or "-"
+    version = binding.get("catalog_item_version")
+    if version:
+        return f"{namespace}:{item_id} ({version})"
+    return f"{namespace}:{item_id}"
+
+
+def _truncate_catalog_params(value: Any, max_chars: int = 220) -> str:
+    if value is None:
+        return "—"
+    payload = canonicalize_json(value)
+    text = str(payload)
+    if isinstance(payload, (dict, list)):
+        import json
+
+        text = json.dumps(payload, ensure_ascii=False, sort_keys=True)
+    if len(text) <= max_chars:
+        return text
+    return f"{text[:max_chars]}..."
+
+
+def _catalog_context_lines(bundle: dict[str, Any], *, max_items: int = 20) -> list[str]:
+    lines: list[str] = []
+    for entry in (bundle.get("catalog_context") or [])[:max_items]:
+        lines.append(
+            " | ".join(
+                [
+                    str(entry.get("element_id") or "-"),
+                    str(entry.get("element_type") or "-"),
+                    _format_catalog_binding(entry),
+                    str(entry.get("parameter_source") or entry.get("parameter_origin") or "-"),
+                    _truncate_catalog_params(entry.get("materialized_params")),
+                ]
+            )
+        )
+    return lines
+
+
 @router.get("/projects/{project_id}/power-flow-runs")
 def list_power_flow_runs(
     project_id: UUID,
@@ -223,9 +264,14 @@ def export_power_flow_run_json(run_id: UUID):
 
     export_payload = {
         "report_type": "power_flow_result",
-        "report_version": "1.0.0",
+        "report_version": "1.1.0",
         "metadata": bundle["metadata"],
         "result": bundle["result"],
+        "bus_results": bundle.get("bus_results", {}),
+        "branch_results": bundle.get("branch_results", {}),
+        "results_index": bundle.get("results_index", {}),
+        "catalog_context": bundle.get("catalog_context", []),
+        "white_box_trace": bundle.get("white_box_trace", []),
         "trace_summary": {
             "solver_version": bundle["trace"].get("solver_version"),
             "input_hash": bundle["trace"].get("input_hash"),
@@ -244,6 +290,7 @@ def export_power_flow_run_json(run_id: UUID):
 @router.get("/power-flow-runs/{run_id}/export/docx")
 def export_power_flow_run_docx(run_id: UUID):
     from fastapi.responses import Response
+    import json
     import io
 
     try:
@@ -259,6 +306,8 @@ def export_power_flow_run_docx(run_id: UUID):
     bundle = _build_export_bundle(run_id)
     result = bundle["result"]
     metadata = bundle["metadata"]
+    catalog_context_lines = _catalog_context_lines(bundle)
+    white_box_trace = bundle.get("white_box_trace") or []
 
     doc = Document()
     style = doc.styles["Normal"]
@@ -301,6 +350,29 @@ def export_power_flow_run_docx(run_id: UUID):
     add_row("Calkowite straty Q [Mvar]", f"{summary.get('total_losses_q_mvar', 0):.4g}")
     add_row("Min. napiecie [pu]", f"{summary.get('min_v_pu', 0):.4g}")
     add_row("Max. napiecie [pu]", f"{summary.get('max_v_pu', 0):.4g}")
+    add_row("Elementy z katalogiem", metadata.get("catalog_context_count"))
+
+    doc.add_paragraph()
+    doc.add_heading("Kontekst katalogowy", level=1)
+    if catalog_context_lines:
+        doc.add_paragraph(
+            "Format: element_id | typ | katalog | pochodzenie parametrow | materialized_params"
+        )
+        for line in catalog_context_lines:
+            doc.add_paragraph(line)
+    else:
+        doc.add_paragraph("Brak jawnego kontekstu katalogowego.")
+
+    doc.add_paragraph()
+    doc.add_heading("White Box", level=1)
+    if white_box_trace:
+        for step in white_box_trace[:12]:
+            title = step.get("title") or step.get("key") or "Krok"
+            doc.add_paragraph(f"{title}: {json.dumps(step, ensure_ascii=False, sort_keys=True)}")
+        if len(white_box_trace) > 12:
+            doc.add_paragraph(f"... oraz {len(white_box_trace) - 12} kolejnych krokow")
+    else:
+        doc.add_paragraph("Brak jawnego sladu White Box.")
 
     doc.add_paragraph()
     doc.add_heading("Wyniki wezlowe (szyny)", level=1)
@@ -343,6 +415,7 @@ def export_power_flow_run_docx(run_id: UUID):
 @router.get("/power-flow-runs/{run_id}/export/pdf")
 def export_power_flow_run_pdf(run_id: UUID):
     from fastapi.responses import Response
+    import json
     import io
 
     try:
@@ -358,6 +431,8 @@ def export_power_flow_run_pdf(run_id: UUID):
     bundle = _build_export_bundle(run_id)
     result = bundle["result"]
     metadata = bundle["metadata"]
+    catalog_context_lines = _catalog_context_lines(bundle)
+    white_box_trace = bundle.get("white_box_trace") or []
 
     buffer = io.BytesIO()
     canvas_obj = canvas.Canvas(buffer, pagesize=A4)
@@ -397,9 +472,62 @@ def export_power_flow_run_pdf(run_id: UUID):
         f"Calkowite straty Q: {summary.get('total_losses_q_mvar', 0):.4g} Mvar",
         f"Min. napiecie: {summary.get('min_v_pu', 0):.4g} pu",
         f"Max. napiecie: {summary.get('max_v_pu', 0):.4g} pu",
+        f"Elementy z katalogiem: {metadata.get('catalog_context_count', 0)}",
     ]
     for line in summary_lines:
         canvas_obj.drawString(left_margin, y, line)
+        y -= line_height
+
+    y -= 5 * mm
+    canvas_obj.setFont("Helvetica-Bold", 12)
+    canvas_obj.drawString(left_margin, y, "Kontekst katalogowy")
+    y -= 5 * mm
+    canvas_obj.setFont("Helvetica", 8)
+    if catalog_context_lines:
+        canvas_obj.drawString(
+            left_margin,
+            y,
+            "Format: element_id | typ | katalog | pochodzenie | materialized_params",
+        )
+        y -= line_height
+        for line in catalog_context_lines:
+            canvas_obj.drawString(left_margin, y, line[:160])
+            y -= line_height
+            if y < 30 * mm:
+                canvas_obj.showPage()
+                y = top_margin
+                canvas_obj.setFont("Helvetica", 8)
+    else:
+        canvas_obj.drawString(left_margin, y, "Brak jawnego kontekstu katalogowego.")
+        y -= line_height
+
+    y -= 5 * mm
+    canvas_obj.setFont("Helvetica-Bold", 12)
+    canvas_obj.drawString(left_margin, y, "White Box")
+    y -= 5 * mm
+    canvas_obj.setFont("Helvetica", 8)
+    if white_box_trace:
+        for step in white_box_trace[:10]:
+            title = step.get("title") or step.get("key") or "Krok"
+            canvas_obj.drawString(
+                left_margin,
+                y,
+                f"{title}: {json.dumps(step, ensure_ascii=False, sort_keys=True)[:150]}",
+            )
+            y -= line_height
+            if y < 30 * mm:
+                canvas_obj.showPage()
+                y = top_margin
+                canvas_obj.setFont("Helvetica", 8)
+        if len(white_box_trace) > 10:
+            canvas_obj.drawString(
+                left_margin,
+                y,
+                f"... oraz {len(white_box_trace) - 10} kolejnych krokow",
+            )
+            y -= line_height
+    else:
+        canvas_obj.drawString(left_margin, y, "Brak jawnego sladu White Box.")
         y -= line_height
 
     y -= 5 * mm

@@ -1,5 +1,5 @@
-/**
- * Typy operacji domenowych — budowa sieci SN od GPZ.
+﻿/**
+ * Typy operacji domenowych â€” budowa sieci SN od GPZ.
  * Lustrzane odbicie backend domain_ops_models.py.
  */
 
@@ -28,7 +28,7 @@ export type CanonicalOpName =
   | 'add_transformer_sn_nn'
   | 'assign_catalog_to_element'
   | 'update_element_parameters'
-  // Operacje nN / źródła
+  // Operacje nN / ĹşrĂłdĹ‚a
   | 'add_nn_source_field'
   | 'add_pv_inverter_nn'
   | 'add_bess_inverter_nn'
@@ -74,6 +74,7 @@ export interface MaterializedCatalogParams {
 export interface MaterializedParamsEnvelope {
   lines_sn: Record<string, MaterializedCatalogParams>;
   transformers_sn_nn: Record<string, MaterializedCatalogParams>;
+  [namespace: string]: Record<string, MaterializedCatalogParams>;
 }
 
 export interface ReadinessInfo {
@@ -163,9 +164,10 @@ export function mapUILabelToInsertAt(label: string, value?: number): InsertAt {
 export interface SegmentSpec {
   rodzaj: 'KABEL' | 'LINIA_NAPOWIETRZNA';
   dlugosc_m: number;
-  catalog_ref: string | null;
   name: string | null;
-  catalog_binding?: CatalogBindingPayload;
+  catalog_binding?: CatalogBindingPayload | null;
+  /** @deprecated Pole kompatybilnoĹ›ci; kanonicznie uĹĽywaj catalog_binding. */
+  catalog_ref?: string | null;
 }
 
 export interface CatalogBindingPayload {
@@ -206,7 +208,9 @@ export interface CatalogBindings {
 // --- Transformer ---
 export interface TransformerSpec {
   create: true;
-  transformer_catalog_ref: string | null;
+  catalog_binding?: CatalogBindingPayload | null;
+  /** @deprecated Pole kompatybilnoĹ›ci; kanonicznie uĹĽywaj catalog_binding. */
+  transformer_catalog_ref?: string | null;
   model_type: 'DWU_UZWOJENIOWY';
   tap_changer_present: boolean;
 }
@@ -226,7 +230,7 @@ export interface NNBlockSpec {
   outgoing_feeders_nn: NNFeederSpec[];
 }
 
-// --- SourceNN Types (FAZA 5: model danych źródeł nN) ---
+// --- SourceNN Types (FAZA 5: model danych ĹşrĂłdeĹ‚ nN) ---
 
 export type NNSourceType = 'PV_INVERTER' | 'BESS_INVERTER' | 'GENSET' | 'UPS';
 
@@ -236,8 +240,7 @@ export type NNSwitchState = 'OTWARTY' | 'ZAMKNIETY';
 export interface NNSwitchSpec {
   switch_kind: NNSwitchKind;
   normal_state: NNSwitchState;
-  catalog_ref: string | null;
-  catalog_version: string | null;
+  catalog_binding: CatalogBindingPayload | null;
 }
 
 export type SourceFieldKind = 'PV' | 'BESS' | 'AGREGAT' | 'UPS';
@@ -417,6 +420,9 @@ export interface AddGridSourceSNPayload {
   sk3_mva?: number;
   ik3_ka?: number;
   rx_ratio?: number;
+  catalog_binding?: CatalogBindingPayload | null;
+  /** @deprecated Pole kompatybilnoĹ›ci; kanonicznie uĹĽywaj catalog_binding. */
+  catalog_ref?: string | null;
 }
 
 export interface ContinueTrunkSegmentSNPayload {
@@ -441,7 +447,7 @@ export interface InsertStationOnSegmentSNPayload {
 }
 
 export interface StartBranchSegmentSNPayload {
-  from_bus_ref: string;
+  from_ref: string;
   from_port?: string;
   segment: SegmentSpec;
 }
@@ -456,3 +462,4 @@ export interface SetNormalOpenPointPayload {
   switch_ref: string;
   corridor_ref?: string;
 }
+

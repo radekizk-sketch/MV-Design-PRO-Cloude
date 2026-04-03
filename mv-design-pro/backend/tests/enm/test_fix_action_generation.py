@@ -41,6 +41,8 @@ def _golden_enm() -> EnergyNetworkModel:
                 ref_id="src_1", name="Sieć", bus_ref="bus_1",
                 model="short_circuit_power", sk3_mva=250,
                 r0_ohm=0.01, x0_ohm=0.1, z0_z1_ratio=1.0,
+                catalog_ref="SRC_TEST", catalog_namespace="ZRODLO_SN",
+                parameter_source="CATALOG", source_mode="KATALOG",
             ),
         ],
         branches=[
@@ -107,7 +109,7 @@ class TestFixActionOnBlockers:
                 Bus(ref_id="b1", name="B1", voltage_kv=110),
                 Bus(ref_id="b2", name="B2", voltage_kv=15),
             ],
-            sources=[Source(ref_id="s1", name="S1", bus_ref="b1", model="short_circuit_power", sk3_mva=1000)],
+            sources=[Source(ref_id="s1", name="S1", bus_ref="b1", model="short_circuit_power", sk3_mva=1000, catalog_ref="SRC_TEST", catalog_namespace="ZRODLO_SN", parameter_source="CATALOG", source_mode="KATALOG")],
             transformers=[
                 Transformer(
                     ref_id="trafo_1", name="T1",
@@ -135,7 +137,7 @@ class TestFixActionOnBlockers:
                 Bus(ref_id="b1", name="B1", voltage_kv=15),
                 Bus(ref_id="b2", name="B2", voltage_kv=15),
             ],
-            sources=[Source(ref_id="s1", name="S1", bus_ref="b1", model="short_circuit_power", sk3_mva=220)],
+            sources=[Source(ref_id="s1", name="S1", bus_ref="b1", model="short_circuit_power", sk3_mva=220, catalog_ref="SRC_TEST", catalog_namespace="ZRODLO_SN", parameter_source="CATALOG", source_mode="KATALOG")],
             branches=[
                 Cable(
                     ref_id="cab_1", name="C1",
@@ -168,7 +170,7 @@ class TestFixActionOnBlockers:
         """Szyna z voltage_kv=0 → BLOCKER + fix_action OPEN_MODAL."""
         result = ENMValidator().validate(_enm(
             buses=[Bus(ref_id="b1", name="B1", voltage_kv=0)],
-            sources=[Source(ref_id="s1", name="S1", bus_ref="b1", model="short_circuit_power", sk3_mva=100)],
+            sources=[Source(ref_id="s1", name="S1", bus_ref="b1", model="short_circuit_power", sk3_mva=100, catalog_ref="SRC_TEST", catalog_namespace="ZRODLO_SN", parameter_source="CATALOG", source_mode="KATALOG")],
         ))
         e004_issues = [i for i in result.issues if i.code == "E004"]
         assert len(e004_issues) == 1
@@ -185,7 +187,7 @@ class TestFixActionOnBlockers:
                 Bus(ref_id="b1", name="B1", voltage_kv=15),
                 Bus(ref_id="b2", name="B2", voltage_kv=15),
             ],
-            sources=[Source(ref_id="s1", name="S1", bus_ref="b1", model="short_circuit_power", sk3_mva=100)],
+            sources=[Source(ref_id="s1", name="S1", bus_ref="b1", model="short_circuit_power", sk3_mva=100, catalog_ref="SRC_TEST", catalog_namespace="ZRODLO_SN", parameter_source="CATALOG", source_mode="KATALOG")],
             branches=[
                 OverheadLine(
                     ref_id="ln_1", name="L1",
@@ -207,7 +209,7 @@ class TestFixActionOnBlockers:
                 Bus(ref_id="b1", name="B1", voltage_kv=110),
                 Bus(ref_id="b2", name="B2", voltage_kv=15),
             ],
-            sources=[Source(ref_id="s1", name="S1", bus_ref="b1", model="short_circuit_power", sk3_mva=1000)],
+            sources=[Source(ref_id="s1", name="S1", bus_ref="b1", model="short_circuit_power", sk3_mva=1000, catalog_ref="SRC_TEST", catalog_namespace="ZRODLO_SN", parameter_source="CATALOG", source_mode="KATALOG")],
             transformers=[
                 Transformer(
                     ref_id="t1", name="T1",
@@ -228,7 +230,7 @@ class TestFixActionOnBlockers:
         """Źródło bez parametrów zwarciowych → BLOCKER + fix_action OPEN_MODAL."""
         result = ENMValidator().validate(_enm(
             buses=[Bus(ref_id="b1", name="B1", voltage_kv=15)],
-            sources=[Source(ref_id="s1", name="S1", bus_ref="b1", model="short_circuit_power")],
+            sources=[Source(ref_id="s1", name="S1", bus_ref="b1", model="short_circuit_power", catalog_ref="SRC_TEST", catalog_namespace="ZRODLO_SN", parameter_source="CATALOG", source_mode="KATALOG")],
         ))
         e008_issues = [i for i in result.issues if i.code == "sources.no_short_circuit_params"]
         assert len(e008_issues) == 1
@@ -248,7 +250,7 @@ class TestFixActionOnWarnings:
                 Bus(ref_id="b1", name="B1", voltage_kv=15),
                 Bus(ref_id="b2", name="B2", voltage_kv=15),
             ],
-            sources=[Source(ref_id="s1", name="S1", bus_ref="b1", model="short_circuit_power", sk3_mva=220)],
+            sources=[Source(ref_id="s1", name="S1", bus_ref="b1", model="short_circuit_power", sk3_mva=220, catalog_ref="SRC_TEST", catalog_namespace="ZRODLO_SN", parameter_source="CATALOG", source_mode="KATALOG")],
             branches=[
                 OverheadLine(
                     ref_id="ln_1", name="L1",
@@ -276,6 +278,8 @@ class TestFixActionOnWarnings:
                 ref_id="s1", name="S1", bus_ref="b1",
                 model="short_circuit_power", sk3_mva=1000,
                 r0_ohm=0.01, x0_ohm=0.1, z0_z1_ratio=1.0,
+                catalog_ref="SRC_TEST", catalog_namespace="ZRODLO_SN",
+                parameter_source="CATALOG", source_mode="KATALOG",
             )],
             transformers=[
                 Transformer(
@@ -307,7 +311,7 @@ class TestNoFixActionForStructuralErrors:
                 Bus(ref_id="b2", name="B2", voltage_kv=15),
                 Bus(ref_id="b3", name="B3", voltage_kv=15),
             ],
-            sources=[Source(ref_id="s1", name="S1", bus_ref="b1", model="short_circuit_power", sk3_mva=220)],
+            sources=[Source(ref_id="s1", name="S1", bus_ref="b1", model="short_circuit_power", sk3_mva=220, catalog_ref="SRC_TEST", catalog_namespace="ZRODLO_SN", parameter_source="CATALOG", source_mode="KATALOG")],
             branches=[
                 OverheadLine(
                     ref_id="ln_1", name="L1",
@@ -352,7 +356,7 @@ class TestDeterminism:
                 Bus(ref_id="b1", name="B1", voltage_kv=15),
                 Bus(ref_id="b2", name="B2", voltage_kv=15),
             ],
-            sources=[Source(ref_id="s1", name="S1", bus_ref="b1", model="short_circuit_power", sk3_mva=100)],
+            sources=[Source(ref_id="s1", name="S1", bus_ref="b1", model="short_circuit_power", sk3_mva=100, catalog_ref="SRC_TEST", catalog_namespace="ZRODLO_SN", parameter_source="CATALOG", source_mode="KATALOG")],
             branches=[
                 Cable(
                     ref_id="cab_1", name="C1",
@@ -376,7 +380,7 @@ class TestDeterminism:
                 Bus(ref_id="b1", name="B1", voltage_kv=0),
                 Bus(ref_id="b2", name="B2", voltage_kv=15),
             ],
-            sources=[Source(ref_id="s1", name="S1", bus_ref="b1", model="short_circuit_power")],
+            sources=[Source(ref_id="s1", name="S1", bus_ref="b1", model="short_circuit_power", catalog_ref="SRC_TEST", catalog_namespace="ZRODLO_SN", parameter_source="CATALOG", source_mode="KATALOG")],
             branches=[
                 Cable(
                     ref_id="cab_1", name="C1",

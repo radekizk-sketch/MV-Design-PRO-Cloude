@@ -398,6 +398,9 @@ class ExtendedTraceDTO:
     snapshot_id: str | None
     input_hash: str
     white_box_trace: list[dict[str, Any]]
+    catalog_context: list[dict[str, Any]] = field(default_factory=list)
+    catalog_context_by_element: dict[str, dict[str, Any]] = field(default_factory=dict)
+    catalog_context_summary: dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -405,6 +408,9 @@ class ExtendedTraceDTO:
             "snapshot_id": self.snapshot_id,
             "input_hash": self.input_hash,
             "white_box_trace": self.white_box_trace,
+            "catalog_context": self.catalog_context,
+            "catalog_context_by_element": self.catalog_context_by_element,
+            "catalog_context_summary": self.catalog_context_summary,
         }
 
 

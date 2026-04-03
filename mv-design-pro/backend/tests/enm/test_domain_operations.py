@@ -54,7 +54,11 @@ def _add_grid_source(enm_dict: dict) -> dict:
     return execute_domain_operation(
         enm_dict=enm_dict,
         op_name="add_grid_source_sn",
-        payload={"voltage_kv": 15.0, "sk3_mva": 250.0},
+        payload={
+            "voltage_kv": 15.0,
+            "sk3_mva": 250.0,
+            "catalog_ref": "src-gpz-15kv-250mva-rx010",
+        },
     )
 
 
@@ -69,7 +73,7 @@ def _continue_trunk(enm_dict: dict, **extra_payload) -> dict:
         "segment": {
             "rodzaj": "KABEL",
             "dlugosc_m": 500,
-            "catalog_ref": "YAKXS_3x120",
+            "catalog_ref": "cable-tfk-yakxs-3x120",
         },
     }
     payload.update(extra_payload)
@@ -282,7 +286,7 @@ class TestFullV1Sequence:
                 "sn_fields": ["IN", "OUT"],
                 "transformer": {
                     "create": True,
-                    "transformer_catalog_ref": "ONAN_630",
+                    "transformer_catalog_ref": "tr-sn-nn-15-04-630kva-dyn11",
                 },
             },
         )
@@ -302,7 +306,7 @@ class TestFullV1Sequence:
             op_name="start_branch_segment_sn",
             payload={
                 "from_bus_ref": branch_bus_ref,
-                "segment": {"rodzaj": "KABEL", "dlugosc_m": 200, "catalog_ref": "YAKXS_3x120"},
+                "segment": {"rodzaj": "KABEL", "dlugosc_m": 200, "catalog_ref": "cable-tfk-yakxs-3x120"},
             },
         )
         assert r5.get("snapshot") is not None, f"start_branch error: {r5.get('error')}"
@@ -343,7 +347,7 @@ class TestInsertStationCreatesStructure:
                 "insert_at": {"value": 0.5},
                 "station": {"sn_voltage_kv": 15.0, "nn_voltage_kv": 0.4},
                 "sn_fields": ["IN", "OUT"],
-                "transformer": {"create": True, "transformer_catalog_ref": "ONAN_630"},
+                "transformer": {"create": True, "transformer_catalog_ref": "tr-sn-nn-15-04-630kva-dyn11"},
             },
         )
 
@@ -420,7 +424,7 @@ class TestDeterministicIds100x:
             "insert_at": {"value": 0.5},
             "station": {"sn_voltage_kv": 15.0, "nn_voltage_kv": 0.4},
             "sn_fields": ["IN", "OUT"],
-            "transformer": {"create": True, "transformer_catalog_ref": "ONAN_630"},
+            "transformer": {"create": True, "transformer_catalog_ref": "tr-sn-nn-15-04-630kva-dyn11"},
         }
 
         # Collect results from 100 runs
@@ -498,7 +502,7 @@ class TestPermutationInvarianceSNFields:
                         "insert_at": {"value": 0.5},
                         "station": {"sn_voltage_kv": 15.0, "nn_voltage_kv": 0.4},
                         "sn_fields": list(perm),
-                        "transformer": {"create": True, "transformer_catalog_ref": "ONAN_630"},
+                        "transformer": {"create": True, "transformer_catalog_ref": "tr-sn-nn-15-04-630kva-dyn11"},
                     },
                 )
                 assert result.get("snapshot") is not None, f"Error: {result.get('error')}"
@@ -536,7 +540,7 @@ class TestPVBESSTransformerGate:
                 "insert_at": {"value": 0.5},
                 "station": {"sn_voltage_kv": 15.0, "nn_voltage_kv": 0.4},
                 "sn_fields": ["IN", "OUT"],
-                "transformer": {"create": True, "transformer_catalog_ref": "ONAN_630"},
+                "transformer": {"create": True, "transformer_catalog_ref": "tr-sn-nn-15-04-630kva-dyn11"},
             },
         )
         assert result_station.get("snapshot") is not None, f"Error: {result_station.get('error')}"
@@ -633,7 +637,7 @@ class TestSetNormalOpenPoint:
             payload={
                 "from_bus_ref": last_bus,
                 "to_bus_ref": first_bus,
-                "segment": {"rodzaj": "KABEL", "dlugosc_m": 200, "catalog_ref": "YAKXS_3x120"},
+                "segment": {"rodzaj": "KABEL", "dlugosc_m": 200, "catalog_ref": "cable-tfk-yakxs-3x120"},
             },
         )
 
@@ -723,7 +727,7 @@ class TestAssignCatalog:
             op_name="assign_catalog_to_element",
             payload={
                 "element_ref": target_branch["ref_id"],
-                "catalog_ref": "CAT-YAKY-240-SN",
+                "catalog_ref": "cable-base-xlpe-al-3c-240",
             },
         )
 
@@ -733,7 +737,7 @@ class TestAssignCatalog:
         # Verify catalog_ref is set
         updated_branch = _find_by_ref(s, "branches", target_branch["ref_id"])
         assert updated_branch is not None, f"Branch {target_branch['ref_id']} not found"
-        assert updated_branch.get("catalog_ref") == "CAT-YAKY-240-SN"
+        assert updated_branch.get("catalog_ref") == "cable-base-xlpe-al-3c-240"
         assert updated_branch.get("parameter_source") == "CATALOG"
 
 
@@ -801,7 +805,7 @@ class TestStationTypeBPassthrough:
                 "insert_at": {"value": 0.5},
                 "station": {"sn_voltage_kv": 15.0, "nn_voltage_kv": 0.4},
                 "sn_fields": ["IN", "OUT"],
-                "transformer": {"create": True, "transformer_catalog_ref": "ONAN_630"},
+                "transformer": {"create": True, "transformer_catalog_ref": "tr-sn-nn-15-04-630kva-dyn11"},
             },
         )
 
@@ -877,7 +881,7 @@ class TestStationTypeCBranch:
                 "insert_at": {"value": 0.5},
                 "station": {"sn_voltage_kv": 15.0, "nn_voltage_kv": 0.4},
                 "sn_fields": ["IN", "OUT", "FEEDER"],
-                "transformer": {"create": True, "transformer_catalog_ref": "ONAN_630"},
+                "transformer": {"create": True, "transformer_catalog_ref": "tr-sn-nn-15-04-630kva-dyn11"},
             },
         )
 
@@ -924,7 +928,7 @@ class TestStationTypeDSectional:
                 "insert_at": {"value": 0.5},
                 "station": {"sn_voltage_kv": 15.0, "nn_voltage_kv": 0.4},
                 "sn_fields": ["IN", "OUT", "COUPLER"],
-                "transformer": {"create": True, "transformer_catalog_ref": "ONAN_630"},
+                "transformer": {"create": True, "transformer_catalog_ref": "tr-sn-nn-15-04-630kva-dyn11"},
             },
         )
 
@@ -1063,7 +1067,7 @@ class TestAliasResolution:
             enm_dict=s1,
             op_name="add_trunk_segment_sn",
             payload={
-                "segment": {"rodzaj": "KABEL", "dlugosc_m": 500, "catalog_ref": "YAKXS_3x120"},
+                "segment": {"rodzaj": "KABEL", "dlugosc_m": 500, "catalog_ref": "cable-tfk-yakxs-3x120"},
             },
         )
 
@@ -1104,7 +1108,7 @@ class TestDomainEventsOrder:
                 "insert_at": {"value": 0.5},
                 "station": {"sn_voltage_kv": 15.0, "nn_voltage_kv": 0.4},
                 "sn_fields": ["IN", "OUT"],
-                "transformer": {"create": True, "transformer_catalog_ref": "ONAN_630"},
+                "transformer": {"create": True, "transformer_catalog_ref": "tr-sn-nn-15-04-630kva-dyn11"},
             },
         )
 
@@ -1169,7 +1173,7 @@ class TestConnectRing:
             payload={
                 "from_bus_ref": last_bus,
                 "to_bus_ref": first_bus,
-                "segment": {"rodzaj": "KABEL", "dlugosc_m": 200, "catalog_ref": "YAKXS_3x120"},
+                "segment": {"rodzaj": "KABEL", "dlugosc_m": 200, "catalog_ref": "cable-tfk-yakxs-3x120"},
             },
         )
 

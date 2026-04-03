@@ -1,33 +1,12 @@
-/**
- * CatalogBrowser — Profesjonalna przeglądarka katalogów typów.
- *
- * Lewe drzewo kategorii (namespace), prawy panel z listą typów i podglądem.
- * Integruje się z API katalogowym (brak mocków).
- *
- * BINDING: 100% PL etykiety.
- */
-
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { clsx } from 'clsx';
-import { fetchTypesByCategory, type TypeCategory } from '../catalog';
-
-// =============================================================================
-// Types
-// =============================================================================
-
-export type CatalogNamespace =
-  | 'LINIA_SN'
-  | 'KABEL_SN'
-  | 'TRAFO_SN_NN'
-  | 'APARAT_SN'
-  | 'APARAT_NN'
-  | 'KABEL_NN'
-  | 'OBCIAZENIE'
-  | 'ZRODLO_NN_PV'
-  | 'ZRODLO_NN_BESS'
-  | 'ZABEZPIECZENIE'
-  | 'CT'
-  | 'VT';
+import { fetchTypesByCategory } from '../catalog';
+import type { CatalogListItem } from '../catalog/api';
+import {
+  getNamespaceLabelPl,
+  NAMESPACE_TO_PICKER_CATEGORY,
+} from '../catalog/elementCatalogRegistry';
+import type { CatalogNamespace } from '../catalog/types';
 
 interface CatalogTypeEntry {
   id: string;
@@ -36,64 +15,127 @@ interface CatalogTypeEntry {
   parameters: Record<string, string | number>;
 }
 
-// =============================================================================
-// Constants
-// =============================================================================
-
-const NAMESPACE_LABELS: Record<CatalogNamespace, string> = {
-  LINIA_SN: 'Linie napowietrzne SN',
-  KABEL_SN: 'Kable SN',
-  TRAFO_SN_NN: 'Transformatory SN/nN',
-  APARAT_SN: 'Aparatura łączeniowa SN',
-  APARAT_NN: 'Aparatura łączeniowa nN',
-  KABEL_NN: 'Kable nN',
-  OBCIAZENIE: 'Obciążenia',
-  ZRODLO_NN_PV: 'Falowniki PV',
-  ZRODLO_NN_BESS: 'Falowniki BESS',
-  ZABEZPIECZENIE: 'Zabezpieczenia',
-  CT: 'Przekładniki prądowe',
-  VT: 'Przekładniki napięciowe',
-};
+const BROWSER_NAMESPACES: readonly CatalogNamespace[] = [
+  'LINIA_SN',
+  'KABEL_SN',
+  'TRAFO_SN_NN',
+  'ZRODLO_SN',
+  'APARAT_SN',
+  'APARAT_NN',
+  'KABEL_NN',
+  'OBCIAZENIE',
+  'ZRODLO_NN_PV',
+  'ZRODLO_NN_BESS',
+  'ZABEZPIECZENIE',
+  'CT',
+  'VT',
+];
 
 const NAMESPACE_ICONS: Record<CatalogNamespace, string> = {
-  LINIA_SN: '⚡',
-  KABEL_SN: '📦',
-  TRAFO_SN_NN: '🔄',
-  APARAT_SN: '🔌',
-  APARAT_NN: '🔧',
-  KABEL_NN: '📦',
-  OBCIAZENIE: '💡',
-  ZRODLO_NN_PV: '☀',
-  ZRODLO_NN_BESS: '🔋',
-  ZABEZPIECZENIE: '🛡',
-  CT: '📊',
-  VT: '📊',
+  LINIA_SN: 'LN',
+  KABEL_SN: 'CB',
+  ZRODLO_SN: 'GPZ',
+  TRAFO_SN_NN: 'TR',
+  APARAT_SN: 'SN',
+  APARAT_NN: 'nN',
+  KABEL_NN: 'nn',
+  CT: 'CT',
+  VT: 'VT',
+  OBCIAZENIE: 'LD',
+  ZRODLO_NN_PV: 'PV',
+  ZRODLO_NN_BESS: 'BESS',
+  ZABEZPIECZENIE: 'ZAB',
+  NASTAWY_ZABEZPIECZEN: 'NST',
+  CONVERTER: 'CNV',
+  INVERTER: 'INV',
 };
 
 const NAMESPACE_PARAM_LABELS: Partial<Record<CatalogNamespace, Record<string, string>>> = {
-  LINIA_SN: { r_ohm_per_km: "R' [Ω/km]", x_ohm_per_km: "X' [Ω/km]", rated_current_a: 'In [A]' },
-  KABEL_SN: { r_ohm_per_km: "R' [Ω/km]", x_ohm_per_km: "X' [Ω/km]", rated_current_a: 'In [A]', insulation_type: 'Izolacja' },
-  TRAFO_SN_NN: { rated_power_mva: 'Sn [MVA]', uk_percent: 'uk [%]', pk_kw: 'Pk [kW]', vector_group: 'Grupa' },
-  APARAT_SN: { in_a: 'In [A]', un_kv: 'Un [kV]', ik_ka: 'Ics [kA]' },
-  APARAT_NN: { in_a: 'In [A]', un_kv: 'Un [kV]', ik_ka: 'Ics [kA]' },
+  LINIA_SN: {
+    r_ohm_per_km: "R' [Ohm/km]",
+    x_ohm_per_km: "X' [Ohm/km]",
+    rated_current_a: 'In [A]',
+  },
+  KABEL_SN: {
+    r_ohm_per_km: "R' [Ohm/km]",
+    x_ohm_per_km: "X' [Ohm/km]",
+    rated_current_a: 'In [A]',
+    insulation_type: 'Izolacja',
+  },
+  TRAFO_SN_NN: {
+    rated_power_mva: 'Sn [MVA]',
+    uk_percent: 'uk [%]',
+    pk_kw: 'Pk [kW]',
+    vector_group: 'Grupa',
+  },
+  ZRODLO_SN: {
+    voltage_rating_kv: 'Un [kV]',
+    sk3_mva: 'Sk3 [MVA]',
+    rx_ratio: 'R/X',
+  },
+  APARAT_SN: {
+    u_n_kv: 'Un [kV]',
+    i_n_a: 'In [A]',
+    breaking_capacity_ka: 'Iwyl [kA]',
+  },
+  APARAT_NN: {
+    u_n_kv: 'Un [kV]',
+    i_n_a: 'In [A]',
+    breaking_capacity_ka: 'Iwyl [kA]',
+  },
+  KABEL_NN: {
+    u_n_kv: 'Un [kV]',
+    cross_section_mm2: 'S [mm2]',
+    i_max_a: 'Imax [A]',
+  },
+  OBCIAZENIE: {
+    model: 'Model',
+    p_kw: 'P [kW]',
+    cos_phi: 'cos fi',
+  },
+  ZRODLO_NN_PV: {
+    s_n_kva: 'Sn [kVA]',
+    p_max_kw: 'Pmax [kW]',
+    control_mode: 'Sterowanie',
+  },
+  ZRODLO_NN_BESS: {
+    p_charge_kw: 'P ladow. [kW]',
+    p_discharge_kw: 'P rozlad. [kW]',
+    e_kwh: 'E [kWh]',
+  },
+  ZABEZPIECZENIE: {
+    vendor: 'Producent',
+    series: 'Seria',
+    rated_current_a: 'In [A]',
+  },
+  CT: {
+    ratio_primary_a: 'Iprim [A]',
+    ratio_secondary_a: 'Iwt [A]',
+    accuracy_class: 'Klasa',
+  },
+  VT: {
+    ratio_primary_v: 'Uprim [V]',
+    ratio_secondary_v: 'Uwt [V]',
+    accuracy_class: 'Klasa',
+  },
 };
 
-const NAMESPACE_TO_CATEGORY: Partial<Record<CatalogNamespace, TypeCategory>> = {
-  LINIA_SN: 'LINE',
-  KABEL_SN: 'CABLE',
-  TRAFO_SN_NN: 'TRANSFORMER',
-  APARAT_SN: 'SWITCH_EQUIPMENT',
-  APARAT_NN: 'SWITCH_EQUIPMENT',
-};
-
-function mapCatalogTypeEntry(raw: Record<string, unknown>): CatalogTypeEntry {
-  const id = String(raw.id ?? '');
-  const name = String(raw.name ?? id);
-  const manufacturer = raw.manufacturer ? String(raw.manufacturer) : undefined;
+function normalizeCatalogTypeEntry(raw: CatalogListItem): CatalogTypeEntry {
+  const source = raw as unknown as Record<string, unknown>;
+  const id = String(source.id ?? '');
+  const name = String(source.name ?? source.name_pl ?? id);
+  const manufacturer =
+    typeof source.manufacturer === 'string'
+      ? source.manufacturer
+      : typeof source.vendor === 'string'
+        ? source.vendor
+        : undefined;
   const parameters: Record<string, string | number> = {};
 
-  for (const [key, value] of Object.entries(raw)) {
-    if (['id', 'name', 'manufacturer'].includes(key)) continue;
+  for (const [key, value] of Object.entries(source)) {
+    if (['id', 'name', 'name_pl', 'manufacturer'].includes(key)) {
+      continue;
+    }
     if (typeof value === 'string' || typeof value === 'number') {
       parameters[key] = value;
     }
@@ -101,10 +143,6 @@ function mapCatalogTypeEntry(raw: Record<string, unknown>): CatalogTypeEntry {
 
   return { id, name, manufacturer, parameters };
 }
-
-// =============================================================================
-// Component
-// =============================================================================
 
 export interface CatalogBrowserProps {
   className?: string;
@@ -120,36 +158,28 @@ export function CatalogBrowser({ className, onSelectType, onClose }: CatalogBrow
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const allNamespaces = useMemo(() => Object.keys(NAMESPACE_LABELS) as CatalogNamespace[], []);
-
   useEffect(() => {
-    const category = NAMESPACE_TO_CATEGORY[activeNamespace] ?? null;
+    const category = NAMESPACE_TO_PICKER_CATEGORY[activeNamespace];
     setSelectedTypeId(null);
-
-    if (!category) {
-      setTypes([]);
-      setError('Dla tej przestrzeni katalogowej brak obsługi API w tym widoku.');
-      setLoading(false);
-      return;
-    }
-
-    let cancelled = false;
     setLoading(true);
     setError(null);
+
+    let cancelled = false;
 
     fetchTypesByCategory(category)
       .then((items) => {
         if (cancelled) return;
-        setTypes(items.map((item) => mapCatalogTypeEntry(item as unknown as Record<string, unknown>)));
+        setTypes(items.map(normalizeCatalogTypeEntry));
       })
       .catch((err: unknown) => {
         if (cancelled) return;
-        const message = err instanceof Error ? err.message : 'Błąd pobierania katalogu';
-        setError(message);
         setTypes([]);
+        setError(err instanceof Error ? err.message : 'Blad pobierania katalogu.');
       })
       .finally(() => {
-        if (!cancelled) setLoading(false);
+        if (!cancelled) {
+          setLoading(false);
+        }
       });
 
     return () => {
@@ -158,18 +188,21 @@ export function CatalogBrowser({ className, onSelectType, onClose }: CatalogBrow
   }, [activeNamespace]);
 
   const filteredTypes = useMemo(() => {
-    if (!searchQuery.trim()) return types;
-    const q = searchQuery.toLowerCase();
-    return types.filter(
-      (t) =>
-        t.name.toLowerCase().includes(q) ||
-        t.id.toLowerCase().includes(q) ||
-        (t.manufacturer && t.manufacturer.toLowerCase().includes(q)),
-    );
-  }, [types, searchQuery]);
+    if (!searchQuery.trim()) {
+      return types;
+    }
+    const query = searchQuery.toLowerCase();
+    return types.filter((item) => {
+      return (
+        item.name.toLowerCase().includes(query)
+        || item.id.toLowerCase().includes(query)
+        || item.manufacturer?.toLowerCase().includes(query)
+      );
+    });
+  }, [searchQuery, types]);
 
   const selectedType = useMemo(
-    () => filteredTypes.find((t) => t.id === selectedTypeId) ?? null,
+    () => filteredTypes.find((item) => item.id === selectedTypeId) ?? null,
     [filteredTypes, selectedTypeId],
   );
 
@@ -178,88 +211,86 @@ export function CatalogBrowser({ className, onSelectType, onClose }: CatalogBrow
     [activeNamespace],
   );
 
-  const handleSelectNamespace = useCallback((ns: CatalogNamespace) => {
-    setActiveNamespace(ns);
-    setSearchQuery('');
-  }, []);
-
   const handleAssign = useCallback(() => {
     if (selectedTypeId && onSelectType) {
       onSelectType(selectedTypeId, activeNamespace);
     }
-  }, [selectedTypeId, activeNamespace, onSelectType]);
+  }, [activeNamespace, onSelectType, selectedTypeId]);
 
   return (
-    <div className={clsx('flex flex-col h-full bg-white', className)} data-testid="catalog-browser">
-      <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 bg-gray-50">
+    <div className={clsx('flex h-full flex-col bg-white', className)} data-testid="catalog-browser">
+      <div className="flex items-center justify-between border-b border-gray-200 bg-gray-50 px-4 py-3">
         <div>
-          <h3 className="text-sm font-semibold text-gray-800">Przeglądarka katalogów</h3>
-          <p className="text-[10px] text-gray-500 mt-0.5">Wybierz kategorię i typ elementu</p>
+          <h3 className="text-sm font-semibold text-gray-800">Przegladarka katalogow</h3>
+          <p className="mt-0.5 text-[10px] text-gray-500">Wybierz kategorie i typ elementu</p>
         </div>
-        {onClose && (
+        {onClose ? (
           <button
             type="button"
             onClick={onClose}
             className="flex h-6 w-6 items-center justify-center rounded text-gray-400 hover:bg-gray-200"
-            aria-label="Zamknij przeglądarkę"
+            aria-label="Zamknij przegladarke"
           >
-            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-            </svg>
+            x
           </button>
-        )}
+        ) : null}
       </div>
 
       <div className="flex flex-1 overflow-hidden">
-        <div className="w-48 border-r border-gray-200 overflow-y-auto flex-shrink-0">
+        <div className="w-52 flex-shrink-0 overflow-y-auto border-r border-gray-200">
           <div className="py-1">
-            {allNamespaces.map((ns) => (
+            {BROWSER_NAMESPACES.map((namespace) => (
               <button
-                key={ns}
+                key={namespace}
                 type="button"
-                onClick={() => handleSelectNamespace(ns)}
+                onClick={() => {
+                  setActiveNamespace(namespace);
+                  setSearchQuery('');
+                }}
                 className={clsx(
-                  'w-full text-left px-3 py-1.5 text-[11px] flex items-center gap-2 transition-colors',
-                  activeNamespace === ns
-                    ? 'bg-blue-50 text-blue-800 font-medium'
+                  'flex w-full items-center gap-2 px-3 py-1.5 text-left text-[11px] transition-colors',
+                  activeNamespace === namespace
+                    ? 'bg-blue-50 font-medium text-blue-800'
                     : 'text-gray-600 hover:bg-gray-50',
                 )}
               >
-                <span className="text-xs">{NAMESPACE_ICONS[ns]}</span>
-                <span className="truncate">{NAMESPACE_LABELS[ns]}</span>
+                <span className="min-w-8 text-[10px] font-semibold uppercase text-gray-400">
+                  {NAMESPACE_ICONS[namespace]}
+                </span>
+                <span className="truncate">{getNamespaceLabelPl(namespace)}</span>
               </button>
             ))}
           </div>
         </div>
 
-        <div className="flex-1 flex flex-col overflow-hidden">
-          <div className="px-3 py-2 border-b border-gray-100">
+        <div className="flex flex-1 flex-col overflow-hidden">
+          <div className="border-b border-gray-100 px-3 py-2">
             <input
               type="text"
               value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
+              onChange={(event) => setSearchQuery(event.target.value)}
               placeholder="Szukaj po nazwie, ID lub producencie..."
-              className="w-full px-2.5 py-1.5 text-[11px] border border-gray-300 rounded"
+              className="w-full rounded border border-gray-300 px-2.5 py-1.5 text-[11px]"
             />
           </div>
 
           <div className="flex-1 overflow-y-auto">
             {loading ? (
-              <div className="flex items-center justify-center h-full">
-                <p className="text-[11px] text-gray-500">Ładowanie katalogu…</p>
+              <div className="flex h-full items-center justify-center">
+                <p className="text-[11px] text-gray-500">Ladowanie katalogu...</p>
               </div>
             ) : error ? (
-              <div className="flex items-center justify-center h-full px-4">
-                <p className="text-[11px] text-red-600 text-center">{error}</p>
+              <div className="flex h-full items-center justify-center px-4">
+                <p className="text-center text-[11px] text-red-600">{error}</p>
               </div>
             ) : filteredTypes.length === 0 ? (
-              <div className="flex items-center justify-center h-full">
-                <p className="text-[11px] text-gray-400">Brak typów w tej kategorii</p>
+              <div className="flex h-full items-center justify-center">
+                <p className="text-[11px] text-gray-400">Brak typow w tej kategorii.</p>
               </div>
             ) : (
               <table className="w-full text-[11px]">
                 <thead>
-                  <tr className="bg-gray-50 sticky top-0">
+                  <tr className="sticky top-0 bg-gray-50">
                     <th className="px-3 py-1.5 text-left font-medium text-gray-500">Nazwa</th>
                     <th className="px-3 py-1.5 text-left font-medium text-gray-500">Producent</th>
                     {Object.values(paramLabels).map((label) => (
@@ -270,20 +301,20 @@ export function CatalogBrowser({ className, onSelectType, onClose }: CatalogBrow
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredTypes.map((t) => (
+                  {filteredTypes.map((item) => (
                     <tr
-                      key={t.id}
-                      onClick={() => setSelectedTypeId(t.id)}
+                      key={item.id}
+                      onClick={() => setSelectedTypeId(item.id)}
                       className={clsx(
                         'cursor-pointer border-b border-gray-50 transition-colors',
-                        selectedTypeId === t.id ? 'bg-blue-50' : 'hover:bg-gray-50',
+                        selectedTypeId === item.id ? 'bg-blue-50' : 'hover:bg-gray-50',
                       )}
                     >
-                      <td className="px-3 py-1.5 font-medium text-gray-800">{t.name}</td>
-                      <td className="px-3 py-1.5 text-gray-500">{t.manufacturer ?? '—'}</td>
-                      {Object.keys(paramLabels).map((k) => (
-                        <td key={k} className="px-3 py-1.5 text-right text-gray-600">
-                          {String(t.parameters[k] ?? '—')}
+                      <td className="px-3 py-1.5 font-medium text-gray-800">{item.name}</td>
+                      <td className="px-3 py-1.5 text-gray-500">{item.manufacturer ?? '-'}</td>
+                      {Object.keys(paramLabels).map((key) => (
+                        <td key={key} className="px-3 py-1.5 text-right text-gray-600">
+                          {String(item.parameters[key] ?? '-')}
                         </td>
                       ))}
                     </tr>
@@ -293,26 +324,26 @@ export function CatalogBrowser({ className, onSelectType, onClose }: CatalogBrow
             )}
           </div>
 
-          {selectedType && (
-            <div className="border-t border-gray-200 px-3 py-2 bg-gray-50">
+          {selectedType ? (
+            <div className="border-t border-gray-200 bg-gray-50 px-3 py-2">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-[11px] font-medium text-gray-800">{selectedType.name}</p>
                   <p className="text-[10px] text-gray-500">
                     ID: {selectedType.id}
-                    {selectedType.manufacturer && ` • ${selectedType.manufacturer}`}
+                    {selectedType.manufacturer ? ` • ${selectedType.manufacturer}` : ''}
                   </p>
                 </div>
                 <button
                   type="button"
                   onClick={handleAssign}
-                  className="px-3 py-1 text-[10px] font-medium bg-blue-600 text-white rounded hover:bg-blue-700"
+                  className="rounded bg-blue-600 px-3 py-1 text-[10px] font-medium text-white hover:bg-blue-700"
                 >
                   Przypisz do elementu
                 </button>
               </div>
             </div>
-          )}
+          ) : null}
         </div>
       </div>
     </div>

@@ -39,6 +39,7 @@ function makeHandlers(): ContextMenuHandlers {
     onSelectElement: vi.fn(),
     onCenterOnElement: vi.fn(),
     onDeleteElement: vi.fn(),
+    onCatalogRequired: vi.fn(),
   };
 }
 
@@ -96,6 +97,52 @@ describe('buildContextMenuForElement', () => {
     expect(propsAction).toBeDefined();
     propsAction!.handler?.();
     expect(handlers.onOpenObjectCard).toHaveBeenCalledWith('source', 'test-id-001');
+  });
+
+  it('kieruje add_line do bramki katalogowej z kanonicznym from_ref', () => {
+    const req = makeRequest('Bus', 'MODEL_EDIT');
+    const handlers = makeHandlers();
+    const result = buildContextMenuForElement(req, handlers)!;
+
+    const addLineAction = result.find((action) => action.id === 'add_line');
+    expect(addLineAction).toBeDefined();
+
+    addLineAction!.handler?.();
+    expect(handlers.onCatalogRequired).toHaveBeenCalledWith({
+      operationId: 'start_branch_segment_sn',
+      elementId: 'test-id-001',
+      elementType: 'Bus',
+      namespace: 'KABEL_SN',
+      label: 'Kabel/linia SN',
+      initialFormData: {
+        from_ref: 'test-id-001',
+      },
+    });
+  });
+
+  it('kieruje add_ct do bramki katalogowej bez zgadywania assign_catalog', () => {
+    const req = makeRequest('Bus', 'MODEL_EDIT');
+    const handlers = makeHandlers();
+    const result = buildContextMenuForElement(req, handlers)!;
+
+    const addCtAction = result.find((action) => action.id === 'add_ct');
+    expect(addCtAction).toBeDefined();
+
+    addCtAction!.handler?.();
+    expect(handlers.onCatalogRequired).toHaveBeenCalledWith({
+      operationId: 'add_ct',
+      elementId: 'test-id-001',
+      elementType: 'Bus',
+      namespace: 'CT',
+      label: 'Przekladnik pradowy',
+      initialFormData: {
+        element_ref: 'test-id-001',
+      },
+    });
+    expect(handlers.onOpenOperationForm).not.toHaveBeenCalledWith(
+      'assign_catalog_to_element',
+      expect.anything(),
+    );
   });
 });
 

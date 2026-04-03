@@ -415,6 +415,68 @@ class NetworkWizardRepository:
         if commit:
             self._session.commit()
 
+    def upsert_protection_device_type(self, payload: dict, *, commit: bool = True) -> None:
+        stmt = select(ProtectionDeviceTypeORM).where(
+            ProtectionDeviceTypeORM.id == payload["id"]
+        )
+        row = self._session.execute(stmt).scalar_one_or_none()
+        if row is None:
+            self._session.add(
+                ProtectionDeviceTypeORM(
+                    id=payload["id"],
+                    name_pl=payload["name_pl"],
+                    params_jsonb=payload["params"],
+                )
+            )
+        else:
+            row.name_pl = payload["name_pl"]
+            row.params_jsonb = payload["params"]
+        if commit:
+            self._session.commit()
+
+    def upsert_protection_curve(self, payload: dict, *, commit: bool = True) -> None:
+        stmt = select(ProtectionCurveORM).where(ProtectionCurveORM.id == payload["id"])
+        row = self._session.execute(stmt).scalar_one_or_none()
+        if row is None:
+            self._session.add(
+                ProtectionCurveORM(
+                    id=payload["id"],
+                    name_pl=payload["name_pl"],
+                    params_jsonb=payload["params"],
+                )
+            )
+        else:
+            row.name_pl = payload["name_pl"]
+            row.params_jsonb = payload["params"]
+        if commit:
+            self._session.commit()
+
+    def upsert_protection_setting_template(self, payload: dict, *, commit: bool = True) -> None:
+        stmt = select(ProtectionSettingTemplateORM).where(
+            ProtectionSettingTemplateORM.id == payload["id"]
+        )
+        row = self._session.execute(stmt).scalar_one_or_none()
+        if row is None:
+            self._session.add(
+                ProtectionSettingTemplateORM(
+                    id=payload["id"],
+                    name_pl=payload["name_pl"],
+                    params_jsonb=payload["params"],
+                )
+            )
+        else:
+            row.name_pl = payload["name_pl"]
+            row.params_jsonb = payload["params"]
+        if commit:
+            self._session.commit()
+
+    def clear_all_protection_types(self, *, commit: bool = True) -> None:
+        self._session.query(ProtectionSettingTemplateORM).delete()
+        self._session.query(ProtectionCurveORM).delete()
+        self._session.query(ProtectionDeviceTypeORM).delete()
+        if commit:
+            self._session.commit()
+
     def assign_switch_equipment_type(
         self,
         project_id: UUID,

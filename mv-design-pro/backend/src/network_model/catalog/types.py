@@ -50,12 +50,122 @@ class CatalogNamespace(Enum):
     CT = "CT"
     VT = "VT"
     OBCIAZENIE = "OBCIAZENIE"
+    ZRODLO_SN = "ZRODLO_SN"
     ZRODLO_NN_PV = "ZRODLO_NN_PV"
     ZRODLO_NN_BESS = "ZRODLO_NN_BESS"
     ZABEZPIECZENIE = "ZABEZPIECZENIE"
     NASTAWY_ZABEZPIECZEN = "NASTAWY_ZABEZPIECZEN"
     CONVERTER = "CONVERTER"
     INVERTER = "INVERTER"
+
+
+# =============================================================================
+# CATALOG QUALITY META - zamrozone statusy i kontrakt danych katalogowych
+# =============================================================================
+
+
+CATALOG_CONTRACT_VERSION = "2.0"
+
+
+class CatalogVerificationStatus(Enum):
+    ZWERYFIKOWANY = "ZWERYFIKOWANY"
+    NIEWERYFIKOWANY = "NIEWERYFIKOWANY"
+    CZESCIOWO_ZWERYFIKOWANY = "CZESCIOWO_ZWERYFIKOWANY"
+    REFERENCYJNY = "REFERENCYJNY"
+
+
+class CatalogStatus(Enum):
+    PRODUKCYJNY_V1 = "PRODUKCYJNY_V1"
+    REFERENCYJNY_V1 = "REFERENCYJNY_V1"
+    ANALITYCZNY_V1 = "ANALITYCZNY_V1"
+    TESTOWY = "TESTOWY"
+
+
+def _normalize_verification_status(
+    value: Any,
+    *,
+    default: CatalogVerificationStatus = CatalogVerificationStatus.REFERENCYJNY,
+) -> str:
+    if isinstance(value, CatalogVerificationStatus):
+        return value.value
+    text = str(value or "").strip().upper()
+    if not text:
+        return default.value
+    try:
+        return CatalogVerificationStatus(text).value
+    except ValueError:
+        return default.value
+
+
+def _normalize_catalog_status(
+    value: Any,
+    *,
+    default: CatalogStatus = CatalogStatus.REFERENCYJNY_V1,
+) -> str:
+    if isinstance(value, CatalogStatus):
+        return value.value
+    text = str(value or "").strip().upper()
+    if not text:
+        return default.value
+    try:
+        return CatalogStatus(text).value
+    except ValueError:
+        return default.value
+
+
+def _normalize_source_reference(value: Any, *, default: str) -> str:
+    text = str(value or "").strip()
+    return text or default
+
+
+def _catalog_metadata_kwargs(
+    data: Dict[str, Any],
+    *,
+    default_source_reference: str,
+    default_verification_status: CatalogVerificationStatus,
+    default_catalog_status: CatalogStatus,
+) -> Dict[str, Any]:
+    return {
+        "verification_status": _normalize_verification_status(
+            data.get("verification_status"),
+            default=default_verification_status,
+        ),
+        "source_reference": _normalize_source_reference(
+            data.get("source_reference") or data.get("data_source"),
+            default=default_source_reference,
+        ),
+        "catalog_status": _normalize_catalog_status(
+            data.get("catalog_status"),
+            default=default_catalog_status,
+        ),
+        "contract_version": str(
+            data.get("contract_version") or CATALOG_CONTRACT_VERSION
+        ),
+        "verification_note": (
+            str(data.get("verification_note"))
+            if data.get("verification_note") is not None
+            else None
+        ),
+    }
+
+
+def _catalog_metadata_to_dict(
+    *,
+    verification_status: str,
+    source_reference: str,
+    catalog_status: str,
+    contract_version: str,
+    verification_note: Optional[str],
+) -> Dict[str, Any]:
+    payload: Dict[str, Any] = {
+        "verification_status": verification_status,
+        "source_reference": source_reference,
+        "catalog_status": catalog_status,
+        "contract_version": contract_version,
+    }
+    if verification_note:
+        payload["verification_note"] = verification_note
+    return payload
 
 
 # =============================================================================
@@ -167,6 +277,11 @@ class LineType:
     # Manufacturer type linking
     base_type_id: Optional[str] = None
     trade_name: Optional[str] = None
+    verification_status: str = CatalogVerificationStatus.CZESCIOWO_ZWERYFIKOWANY.value
+    source_reference: str = "Katalog linii i kabli MV-DESIGN-PRO"
+    catalog_status: str = CatalogStatus.PRODUKCYJNY_V1.value
+    contract_version: str = CATALOG_CONTRACT_VERSION
+    verification_note: Optional[str] = None
 
     @property
     def dane_cieplne_kompletne(self) -> bool:
@@ -225,6 +340,13 @@ class LineType:
             "base_type_id": self.base_type_id,
             "trade_name": self.trade_name,
             "dane_cieplne_kompletne": self.dane_cieplne_kompletne,
+            **_catalog_metadata_to_dict(
+                verification_status=self.verification_status,
+                source_reference=self.source_reference,
+                catalog_status=self.catalog_status,
+                contract_version=self.contract_version,
+                verification_note=self.verification_note,
+            ),
         }
 
     @classmethod
@@ -253,6 +375,12 @@ class LineType:
             ),
             base_type_id=data.get("base_type_id"),
             trade_name=data.get("trade_name"),
+            **_catalog_metadata_kwargs(
+                data,
+                default_source_reference="Katalog linii i kabli MV-DESIGN-PRO / IEC 60287 / IEC 60949",
+                default_verification_status=CatalogVerificationStatus.CZESCIOWO_ZWERYFIKOWANY,
+                default_catalog_status=CatalogStatus.PRODUKCYJNY_V1,
+            ),
         )
 
 
@@ -303,6 +431,11 @@ class CableType:
     # Manufacturer type linking
     base_type_id: Optional[str] = None
     trade_name: Optional[str] = None
+    verification_status: str = CatalogVerificationStatus.CZESCIOWO_ZWERYFIKOWANY.value
+    source_reference: str = "Katalog linii i kabli MV-DESIGN-PRO"
+    catalog_status: str = CatalogStatus.PRODUKCYJNY_V1.value
+    contract_version: str = CATALOG_CONTRACT_VERSION
+    verification_note: Optional[str] = None
 
     @property
     def b_us_per_km(self) -> float:
@@ -374,6 +507,13 @@ class CableType:
             "base_type_id": self.base_type_id,
             "trade_name": self.trade_name,
             "dane_cieplne_kompletne": self.dane_cieplne_kompletne,
+            **_catalog_metadata_to_dict(
+                verification_status=self.verification_status,
+                source_reference=self.source_reference,
+                catalog_status=self.catalog_status,
+                contract_version=self.contract_version,
+                verification_note=self.verification_note,
+            ),
         }
 
     @classmethod
@@ -404,6 +544,12 @@ class CableType:
             ),
             base_type_id=data.get("base_type_id"),
             trade_name=data.get("trade_name"),
+            **_catalog_metadata_kwargs(
+                data,
+                default_source_reference="Katalog linii i kabli MV-DESIGN-PRO / IEC 60502-2 / IEC 60287 / IEC 60949",
+                default_verification_status=CatalogVerificationStatus.CZESCIOWO_ZWERYFIKOWANY,
+                default_catalog_status=CatalogStatus.PRODUKCYJNY_V1,
+            ),
         )
 
 
@@ -446,6 +592,11 @@ class TransformerType:
     tap_min: int = -5
     tap_max: int = 5
     tap_step_percent: float = 2.5
+    verification_status: str = CatalogVerificationStatus.CZESCIOWO_ZWERYFIKOWANY.value
+    source_reference: str = "Katalog transformatorow MV-DESIGN-PRO"
+    catalog_status: str = CatalogStatus.PRODUKCYJNY_V1.value
+    contract_version: str = CATALOG_CONTRACT_VERSION
+    verification_note: Optional[str] = None
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary."""
@@ -465,6 +616,13 @@ class TransformerType:
             "tap_min": self.tap_min,
             "tap_max": self.tap_max,
             "tap_step_percent": self.tap_step_percent,
+            **_catalog_metadata_to_dict(
+                verification_status=self.verification_status,
+                source_reference=self.source_reference,
+                catalog_status=self.catalog_status,
+                contract_version=self.contract_version,
+                verification_note=self.verification_note,
+            ),
         }
 
     @classmethod
@@ -486,6 +644,12 @@ class TransformerType:
             tap_min=int(data.get("tap_min", -5)),
             tap_max=int(data.get("tap_max", 5)),
             tap_step_percent=float(data.get("tap_step_percent", 2.5)),
+            **_catalog_metadata_kwargs(
+                data,
+                default_source_reference="Katalog transformatorow MV-DESIGN-PRO / PN-EN 60076",
+                default_verification_status=CatalogVerificationStatus.CZESCIOWO_ZWERYFIKOWANY,
+                default_catalog_status=CatalogStatus.PRODUKCYJNY_V1,
+            ),
         )
 
 
@@ -517,6 +681,11 @@ class SwitchEquipmentType:
     ik_ka: float = 0.0
     icw_ka: float = 0.0
     medium: Optional[str] = None
+    verification_status: str = CatalogVerificationStatus.CZESCIOWO_ZWERYFIKOWANY.value
+    source_reference: str = "Katalog aparatury MV-DESIGN-PRO"
+    catalog_status: str = CatalogStatus.PRODUKCYJNY_V1.value
+    contract_version: str = CATALOG_CONTRACT_VERSION
+    verification_note: Optional[str] = None
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary."""
@@ -530,6 +699,13 @@ class SwitchEquipmentType:
             "ik_ka": self.ik_ka,
             "icw_ka": self.icw_ka,
             "medium": self.medium,
+            **_catalog_metadata_to_dict(
+                verification_status=self.verification_status,
+                source_reference=self.source_reference,
+                catalog_status=self.catalog_status,
+                contract_version=self.contract_version,
+                verification_note=self.verification_note,
+            ),
         }
 
     @classmethod
@@ -545,6 +721,12 @@ class SwitchEquipmentType:
             ik_ka=float(data.get("ik_ka", 0.0)),
             icw_ka=float(data.get("icw_ka", 0.0)),
             medium=data.get("medium"),
+            **_catalog_metadata_kwargs(
+                data,
+                default_source_reference="Katalog aparatury MV-DESIGN-PRO / karty katalogowe producentow",
+                default_verification_status=CatalogVerificationStatus.CZESCIOWO_ZWERYFIKOWANY,
+                default_catalog_status=CatalogStatus.PRODUKCYJNY_V1,
+            ),
         )
 
 
@@ -588,6 +770,11 @@ class ConverterType:
     e_kwh: Optional[float] = None
     manufacturer: Optional[str] = None
     model: Optional[str] = None
+    verification_status: str = CatalogVerificationStatus.REFERENCYJNY.value
+    source_reference: str = "Katalog przeksztaltnikow MV-DESIGN-PRO"
+    catalog_status: str = CatalogStatus.REFERENCYJNY_V1.value
+    contract_version: str = CATALOG_CONTRACT_VERSION
+    verification_note: Optional[str] = None
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary."""
@@ -605,6 +792,13 @@ class ConverterType:
             "e_kwh": self.e_kwh,
             "manufacturer": self.manufacturer,
             "model": self.model,
+            **_catalog_metadata_to_dict(
+                verification_status=self.verification_status,
+                source_reference=self.source_reference,
+                catalog_status=self.catalog_status,
+                contract_version=self.contract_version,
+                verification_note=self.verification_note,
+            ),
         }
 
     @classmethod
@@ -649,6 +843,12 @@ class ConverterType:
             ),
             manufacturer=data.get("manufacturer"),
             model=data.get("model"),
+            **_catalog_metadata_kwargs(
+                data,
+                default_source_reference="Katalog przeksztaltnikow MV-DESIGN-PRO / profile typowe OZE i BESS",
+                default_verification_status=CatalogVerificationStatus.REFERENCYJNY,
+                default_catalog_status=CatalogStatus.REFERENCYJNY_V1,
+            ),
         )
 
 
@@ -682,6 +882,11 @@ class InverterType:
     cosphi_max: Optional[float] = None
     manufacturer: Optional[str] = None
     model: Optional[str] = None
+    verification_status: str = CatalogVerificationStatus.REFERENCYJNY.value
+    source_reference: str = "Katalog falownikow MV-DESIGN-PRO"
+    catalog_status: str = CatalogStatus.REFERENCYJNY_V1.value
+    contract_version: str = CATALOG_CONTRACT_VERSION
+    verification_note: Optional[str] = None
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary."""
@@ -697,6 +902,13 @@ class InverterType:
             "cosphi_max": self.cosphi_max,
             "manufacturer": self.manufacturer,
             "model": self.model,
+            **_catalog_metadata_to_dict(
+                verification_status=self.verification_status,
+                source_reference=self.source_reference,
+                catalog_status=self.catalog_status,
+                contract_version=self.contract_version,
+                verification_note=self.verification_note,
+            ),
         }
 
     @classmethod
@@ -730,6 +942,12 @@ class InverterType:
             ),
             manufacturer=data.get("manufacturer"),
             model=data.get("model"),
+            **_catalog_metadata_kwargs(
+                data,
+                default_source_reference="Katalog falownikow MV-DESIGN-PRO / dane referencyjne",
+                default_verification_status=CatalogVerificationStatus.REFERENCYJNY,
+                default_catalog_status=CatalogStatus.REFERENCYJNY_V1,
+            ),
         )
 
 
@@ -763,6 +981,11 @@ class ProtectionDeviceType:
     revision: Optional[str] = None
     rated_current_a: Optional[float] = None
     notes_pl: Optional[str] = None
+    verification_status: str = CatalogVerificationStatus.REFERENCYJNY.value
+    source_reference: str = "Katalog ochrony MV-DESIGN-PRO"
+    catalog_status: str = CatalogStatus.ANALITYCZNY_V1.value
+    contract_version: str = CATALOG_CONTRACT_VERSION
+    verification_note: Optional[str] = None
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary."""
@@ -774,6 +997,13 @@ class ProtectionDeviceType:
             "revision": self.revision,
             "rated_current_a": self.rated_current_a,
             "notes_pl": self.notes_pl,
+            **_catalog_metadata_to_dict(
+                verification_status=self.verification_status,
+                source_reference=self.source_reference,
+                catalog_status=self.catalog_status,
+                contract_version=self.contract_version,
+                verification_note=self.verification_note,
+            ),
         }
 
     @classmethod
@@ -791,6 +1021,12 @@ class ProtectionDeviceType:
                 else None
             ),
             notes_pl=data.get("notes_pl"),
+            **_catalog_metadata_kwargs(
+                data,
+                default_source_reference="Katalog ochrony MV-DESIGN-PRO / dane referencyjne lub analityczne",
+                default_verification_status=CatalogVerificationStatus.REFERENCYJNY,
+                default_catalog_status=CatalogStatus.ANALITYCZNY_V1,
+            ),
         )
 
 
@@ -815,6 +1051,11 @@ class ProtectionCurve:
     standard: Optional[str] = None
     curve_kind: Optional[str] = None
     parameters: Dict[str, Any] = None
+    verification_status: str = CatalogVerificationStatus.REFERENCYJNY.value
+    source_reference: str = "Katalog krzywych MV-DESIGN-PRO"
+    catalog_status: str = CatalogStatus.ANALITYCZNY_V1.value
+    contract_version: str = CATALOG_CONTRACT_VERSION
+    verification_note: Optional[str] = None
 
     def __post_init__(self):
         """Ensure parameters is a dict (frozen dataclass workaround)."""
@@ -829,6 +1070,13 @@ class ProtectionCurve:
             "standard": self.standard,
             "curve_kind": self.curve_kind,
             "parameters": self.parameters or {},
+            **_catalog_metadata_to_dict(
+                verification_status=self.verification_status,
+                source_reference=self.source_reference,
+                catalog_status=self.catalog_status,
+                contract_version=self.contract_version,
+                verification_note=self.verification_note,
+            ),
         }
 
     @classmethod
@@ -840,6 +1088,12 @@ class ProtectionCurve:
             standard=data.get("standard"),
             curve_kind=data.get("curve_kind"),
             parameters=data.get("parameters") or {},
+            **_catalog_metadata_kwargs(
+                data,
+                default_source_reference="Katalog krzywych MV-DESIGN-PRO / IEC lub dane referencyjne",
+                default_verification_status=CatalogVerificationStatus.REFERENCYJNY,
+                default_catalog_status=CatalogStatus.ANALITYCZNY_V1,
+            ),
         )
 
 
@@ -865,6 +1119,11 @@ class ProtectionSettingTemplate:
     device_type_ref: Optional[str] = None
     curve_ref: Optional[str] = None
     setting_fields: list[Dict[str, Any]] = None
+    verification_status: str = CatalogVerificationStatus.REFERENCYJNY.value
+    source_reference: str = "Szablony nastaw MV-DESIGN-PRO"
+    catalog_status: str = CatalogStatus.ANALITYCZNY_V1.value
+    contract_version: str = CATALOG_CONTRACT_VERSION
+    verification_note: Optional[str] = None
 
     def __post_init__(self):
         """Ensure setting_fields is a list (frozen dataclass workaround)."""
@@ -879,6 +1138,13 @@ class ProtectionSettingTemplate:
             "device_type_ref": self.device_type_ref,
             "curve_ref": self.curve_ref,
             "setting_fields": self.setting_fields or [],
+            **_catalog_metadata_to_dict(
+                verification_status=self.verification_status,
+                source_reference=self.source_reference,
+                catalog_status=self.catalog_status,
+                contract_version=self.contract_version,
+                verification_note=self.verification_note,
+            ),
         }
 
     @classmethod
@@ -890,6 +1156,12 @@ class ProtectionSettingTemplate:
             device_type_ref=data.get("device_type_ref"),
             curve_ref=data.get("curve_ref"),
             setting_fields=data.get("setting_fields") or [],
+            **_catalog_metadata_kwargs(
+                data,
+                default_source_reference="Szablony nastaw MV-DESIGN-PRO / dane referencyjne",
+                default_verification_status=CatalogVerificationStatus.REFERENCYJNY,
+                default_catalog_status=CatalogStatus.ANALITYCZNY_V1,
+            ),
         )
 
 
@@ -927,6 +1199,11 @@ class LVCableType:
     insulation_type: Optional[str] = None
     cross_section_mm2: float = 0.0
     number_of_cores: int = 4
+    verification_status: str = CatalogVerificationStatus.REFERENCYJNY.value
+    source_reference: str = "Katalog kabli nN MV-DESIGN-PRO"
+    catalog_status: str = CatalogStatus.REFERENCYJNY_V1.value
+    contract_version: str = CATALOG_CONTRACT_VERSION
+    verification_note: Optional[str] = None
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -941,6 +1218,13 @@ class LVCableType:
             "insulation_type": self.insulation_type,
             "cross_section_mm2": self.cross_section_mm2,
             "number_of_cores": self.number_of_cores,
+            **_catalog_metadata_to_dict(
+                verification_status=self.verification_status,
+                source_reference=self.source_reference,
+                catalog_status=self.catalog_status,
+                contract_version=self.contract_version,
+                verification_note=self.verification_note,
+            ),
         }
 
     @classmethod
@@ -957,6 +1241,12 @@ class LVCableType:
             insulation_type=data.get("insulation_type"),
             cross_section_mm2=float(data.get("cross_section_mm2", 0.0)),
             number_of_cores=int(data.get("number_of_cores", 4)),
+            **_catalog_metadata_kwargs(
+                data,
+                default_source_reference="Katalog kabli nN MV-DESIGN-PRO / dane referencyjne",
+                default_verification_status=CatalogVerificationStatus.REFERENCYJNY,
+                default_catalog_status=CatalogStatus.REFERENCYJNY_V1,
+            ),
         )
 
 
@@ -990,6 +1280,11 @@ class LoadType:
     cos_phi_mode: str = "IND"
     profile_id: Optional[str] = None
     manufacturer: Optional[str] = None
+    verification_status: str = CatalogVerificationStatus.REFERENCYJNY.value
+    source_reference: str = "Katalog obciazen MV-DESIGN-PRO"
+    catalog_status: str = CatalogStatus.REFERENCYJNY_V1.value
+    contract_version: str = CATALOG_CONTRACT_VERSION
+    verification_note: Optional[str] = None
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -1002,6 +1297,13 @@ class LoadType:
             "cos_phi_mode": self.cos_phi_mode,
             "profile_id": self.profile_id,
             "manufacturer": self.manufacturer,
+            **_catalog_metadata_to_dict(
+                verification_status=self.verification_status,
+                source_reference=self.source_reference,
+                catalog_status=self.catalog_status,
+                contract_version=self.contract_version,
+                verification_note=self.verification_note,
+            ),
         }
 
     @classmethod
@@ -1020,6 +1322,12 @@ class LoadType:
             cos_phi_mode=str(data.get("cos_phi_mode", "IND")),
             profile_id=data.get("profile_id"),
             manufacturer=data.get("manufacturer"),
+            **_catalog_metadata_kwargs(
+                data,
+                default_source_reference="Katalog obciazen MV-DESIGN-PRO / profile referencyjne",
+                default_verification_status=CatalogVerificationStatus.REFERENCYJNY,
+                default_catalog_status=CatalogStatus.REFERENCYJNY_V1,
+            ),
         )
 
 
@@ -1051,6 +1359,11 @@ class MVApparatusType:
     breaking_capacity_ka: Optional[float] = None
     making_capacity_ka: Optional[float] = None
     manufacturer: Optional[str] = None
+    verification_status: str = CatalogVerificationStatus.CZESCIOWO_ZWERYFIKOWANY.value
+    source_reference: str = "Katalog aparatury SN MV-DESIGN-PRO"
+    catalog_status: str = CatalogStatus.PRODUKCYJNY_V1.value
+    contract_version: str = CATALOG_CONTRACT_VERSION
+    verification_note: Optional[str] = None
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -1062,6 +1375,13 @@ class MVApparatusType:
             "breaking_capacity_ka": self.breaking_capacity_ka,
             "making_capacity_ka": self.making_capacity_ka,
             "manufacturer": self.manufacturer,
+            **_catalog_metadata_to_dict(
+                verification_status=self.verification_status,
+                source_reference=self.source_reference,
+                catalog_status=self.catalog_status,
+                contract_version=self.contract_version,
+                verification_note=self.verification_note,
+            ),
         }
 
     @classmethod
@@ -1070,8 +1390,8 @@ class MVApparatusType:
             id=str(data.get("id", str(uuid4()))),
             name=str(data.get("name", "")),
             device_kind=str(data.get("device_kind", "WYLACZNIK")),
-            u_n_kv=float(data.get("u_n_kv", 0.0)),
-            i_n_a=float(data.get("i_n_a", 0.0)),
+            u_n_kv=float(data["u_n_kv"]) if data.get("u_n_kv") is not None else 0.0,
+            i_n_a=float(data["i_n_a"]) if data.get("i_n_a") is not None else 0.0,
             breaking_capacity_ka=(
                 float(data["breaking_capacity_ka"])
                 if data.get("breaking_capacity_ka") is not None
@@ -1083,6 +1403,12 @@ class MVApparatusType:
                 else None
             ),
             manufacturer=data.get("manufacturer"),
+            **_catalog_metadata_kwargs(
+                data,
+                default_source_reference="Katalog aparatury SN MV-DESIGN-PRO / karty katalogowe producentow",
+                default_verification_status=CatalogVerificationStatus.CZESCIOWO_ZWERYFIKOWANY,
+                default_catalog_status=CatalogStatus.PRODUKCYJNY_V1,
+            ),
         )
 
 
@@ -1113,6 +1439,11 @@ class LVApparatusType:
     i_n_a: float = 0.0
     breaking_capacity_ka: Optional[float] = None
     manufacturer: Optional[str] = None
+    verification_status: str = CatalogVerificationStatus.REFERENCYJNY.value
+    source_reference: str = "Katalog aparatury nN MV-DESIGN-PRO"
+    catalog_status: str = CatalogStatus.REFERENCYJNY_V1.value
+    contract_version: str = CATALOG_CONTRACT_VERSION
+    verification_note: Optional[str] = None
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -1123,6 +1454,13 @@ class LVApparatusType:
             "i_n_a": self.i_n_a,
             "breaking_capacity_ka": self.breaking_capacity_ka,
             "manufacturer": self.manufacturer,
+            **_catalog_metadata_to_dict(
+                verification_status=self.verification_status,
+                source_reference=self.source_reference,
+                catalog_status=self.catalog_status,
+                contract_version=self.contract_version,
+                verification_note=self.verification_note,
+            ),
         }
 
     @classmethod
@@ -1139,6 +1477,12 @@ class LVApparatusType:
                 else None
             ),
             manufacturer=data.get("manufacturer"),
+            **_catalog_metadata_kwargs(
+                data,
+                default_source_reference="Katalog aparatury nN MV-DESIGN-PRO / dane referencyjne",
+                default_verification_status=CatalogVerificationStatus.REFERENCYJNY,
+                default_catalog_status=CatalogStatus.REFERENCYJNY_V1,
+            ),
         )
 
 
@@ -1168,6 +1512,11 @@ class CTType:
     accuracy_class: Optional[str] = None
     burden_va: Optional[float] = None
     manufacturer: Optional[str] = None
+    verification_status: str = CatalogVerificationStatus.REFERENCYJNY.value
+    source_reference: str = "Katalog CT MV-DESIGN-PRO"
+    catalog_status: str = CatalogStatus.REFERENCYJNY_V1.value
+    contract_version: str = CATALOG_CONTRACT_VERSION
+    verification_note: Optional[str] = None
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -1178,6 +1527,13 @@ class CTType:
             "accuracy_class": self.accuracy_class,
             "burden_va": self.burden_va,
             "manufacturer": self.manufacturer,
+            **_catalog_metadata_to_dict(
+                verification_status=self.verification_status,
+                source_reference=self.source_reference,
+                catalog_status=self.catalog_status,
+                contract_version=self.contract_version,
+                verification_note=self.verification_note,
+            ),
         }
 
     @classmethod
@@ -1192,6 +1548,12 @@ class CTType:
                 float(data["burden_va"]) if data.get("burden_va") is not None else None
             ),
             manufacturer=data.get("manufacturer"),
+            **_catalog_metadata_kwargs(
+                data,
+                default_source_reference="Katalog CT MV-DESIGN-PRO / dane referencyjne",
+                default_verification_status=CatalogVerificationStatus.REFERENCYJNY,
+                default_catalog_status=CatalogStatus.REFERENCYJNY_V1,
+            ),
         )
 
 
@@ -1219,6 +1581,11 @@ class VTType:
     ratio_secondary_v: float = 100.0
     accuracy_class: Optional[str] = None
     manufacturer: Optional[str] = None
+    verification_status: str = CatalogVerificationStatus.REFERENCYJNY.value
+    source_reference: str = "Katalog VT MV-DESIGN-PRO"
+    catalog_status: str = CatalogStatus.REFERENCYJNY_V1.value
+    contract_version: str = CATALOG_CONTRACT_VERSION
+    verification_note: Optional[str] = None
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -1228,6 +1595,13 @@ class VTType:
             "ratio_secondary_v": self.ratio_secondary_v,
             "accuracy_class": self.accuracy_class,
             "manufacturer": self.manufacturer,
+            **_catalog_metadata_to_dict(
+                verification_status=self.verification_status,
+                source_reference=self.source_reference,
+                catalog_status=self.catalog_status,
+                contract_version=self.contract_version,
+                verification_note=self.verification_note,
+            ),
         }
 
     @classmethod
@@ -1239,6 +1613,98 @@ class VTType:
             ratio_secondary_v=float(data.get("ratio_secondary_v", 100.0)),
             accuracy_class=data.get("accuracy_class"),
             manufacturer=data.get("manufacturer"),
+            **_catalog_metadata_kwargs(
+                data,
+                default_source_reference="Katalog VT MV-DESIGN-PRO / dane referencyjne",
+                default_verification_status=CatalogVerificationStatus.REFERENCYJNY,
+                default_catalog_status=CatalogStatus.REFERENCYJNY_V1,
+            ),
+        )
+
+
+# =============================================================================
+# SOURCE SYSTEM TYPE (ZRODLO_SN) — zasilanie systemowe GPZ
+# =============================================================================
+
+
+@dataclass(frozen=True)
+class SourceSystemType:
+    """Immutable MV system source type for GPZ / zasilanie systemowe."""
+
+    id: str
+    name: str
+    voltage_rating_kv: float
+    sk3_mva: Optional[float] = None
+    ik3_ka: Optional[float] = None
+    rx_ratio: Optional[float] = None
+    earthing_system: Optional[str] = None
+    short_circuit_model: str = "short_circuit_power"
+    operator_name: Optional[str] = None
+    supply_role: Optional[str] = None
+    manufacturer: Optional[str] = None
+    series: Optional[str] = None
+    catalog_number: Optional[str] = None
+    data_source: Optional[str] = None
+    verification_status: str = CatalogVerificationStatus.CZESCIOWO_ZWERYFIKOWANY.value
+    source_reference: str = "Warunki przylaczenia / standard OSD"
+    catalog_status: str = CatalogStatus.PRODUKCYJNY_V1.value
+    contract_version: str = CATALOG_CONTRACT_VERSION
+    verification_note: Optional[str] = None
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "id": self.id,
+            "name": self.name,
+            "voltage_rating_kv": self.voltage_rating_kv,
+            "sk3_mva": self.sk3_mva,
+            "ik3_ka": self.ik3_ka,
+            "rx_ratio": self.rx_ratio,
+            "earthing_system": self.earthing_system,
+            "short_circuit_model": self.short_circuit_model,
+            "operator_name": self.operator_name,
+            "supply_role": self.supply_role,
+            "manufacturer": self.manufacturer,
+            "series": self.series,
+            "catalog_number": self.catalog_number,
+            "data_source": self.data_source,
+            **_catalog_metadata_to_dict(
+                verification_status=self.verification_status,
+                source_reference=self.source_reference,
+                catalog_status=self.catalog_status,
+                contract_version=self.contract_version,
+                verification_note=self.verification_note,
+            ),
+        }
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "SourceSystemType":
+        return cls(
+            id=str(data.get("id", str(uuid4()))),
+            name=str(data.get("name", "")),
+            voltage_rating_kv=float(data.get("voltage_rating_kv", 0.0)),
+            sk3_mva=(
+                float(data["sk3_mva"]) if data.get("sk3_mva") is not None else None
+            ),
+            ik3_ka=(
+                float(data["ik3_ka"]) if data.get("ik3_ka") is not None else None
+            ),
+            rx_ratio=(
+                float(data["rx_ratio"]) if data.get("rx_ratio") is not None else None
+            ),
+            earthing_system=data.get("earthing_system"),
+            short_circuit_model=str(data.get("short_circuit_model", "short_circuit_power")),
+            operator_name=data.get("operator_name"),
+            supply_role=data.get("supply_role"),
+            manufacturer=data.get("manufacturer"),
+            series=data.get("series"),
+            catalog_number=data.get("catalog_number"),
+            data_source=data.get("data_source"),
+            **_catalog_metadata_kwargs(
+                data,
+                default_source_reference="Warunki przylaczenia / standard OSD",
+                default_verification_status=CatalogVerificationStatus.CZESCIOWO_ZWERYFIKOWANY,
+                default_catalog_status=CatalogStatus.PRODUKCYJNY_V1,
+            ),
         )
 
 
@@ -1272,6 +1738,11 @@ class PVInverterType:
     control_mode: Optional[str] = None
     grid_code: Optional[str] = None
     manufacturer: Optional[str] = None
+    verification_status: str = CatalogVerificationStatus.REFERENCYJNY.value
+    source_reference: str = "Katalog falownikow PV MV-DESIGN-PRO"
+    catalog_status: str = CatalogStatus.REFERENCYJNY_V1.value
+    contract_version: str = CATALOG_CONTRACT_VERSION
+    verification_note: Optional[str] = None
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -1284,6 +1755,13 @@ class PVInverterType:
             "control_mode": self.control_mode,
             "grid_code": self.grid_code,
             "manufacturer": self.manufacturer,
+            **_catalog_metadata_to_dict(
+                verification_status=self.verification_status,
+                source_reference=self.source_reference,
+                catalog_status=self.catalog_status,
+                contract_version=self.contract_version,
+                verification_note=self.verification_note,
+            ),
         }
 
     @classmethod
@@ -1302,6 +1780,12 @@ class PVInverterType:
             control_mode=data.get("control_mode"),
             grid_code=data.get("grid_code"),
             manufacturer=data.get("manufacturer"),
+            **_catalog_metadata_kwargs(
+                data,
+                default_source_reference="Katalog falownikow PV MV-DESIGN-PRO / dane referencyjne",
+                default_verification_status=CatalogVerificationStatus.REFERENCYJNY,
+                default_catalog_status=CatalogStatus.REFERENCYJNY_V1,
+            ),
         )
 
 
@@ -1331,6 +1815,11 @@ class BESSInverterType:
     e_kwh: float
     s_n_kva: Optional[float] = None
     manufacturer: Optional[str] = None
+    verification_status: str = CatalogVerificationStatus.REFERENCYJNY.value
+    source_reference: str = "Katalog przeksztaltnikow BESS MV-DESIGN-PRO"
+    catalog_status: str = CatalogStatus.REFERENCYJNY_V1.value
+    contract_version: str = CATALOG_CONTRACT_VERSION
+    verification_note: Optional[str] = None
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -1341,6 +1830,13 @@ class BESSInverterType:
             "e_kwh": self.e_kwh,
             "s_n_kva": self.s_n_kva,
             "manufacturer": self.manufacturer,
+            **_catalog_metadata_to_dict(
+                verification_status=self.verification_status,
+                source_reference=self.source_reference,
+                catalog_status=self.catalog_status,
+                contract_version=self.contract_version,
+                verification_note=self.verification_note,
+            ),
         }
 
     @classmethod
@@ -1355,6 +1851,12 @@ class BESSInverterType:
                 float(data["s_n_kva"]) if data.get("s_n_kva") is not None else None
             ),
             manufacturer=data.get("manufacturer"),
+            **_catalog_metadata_kwargs(
+                data,
+                default_source_reference="Katalog przeksztaltnikow BESS MV-DESIGN-PRO / dane referencyjne",
+                default_verification_status=CatalogVerificationStatus.REFERENCYJNY,
+                default_catalog_status=CatalogStatus.REFERENCYJNY_V1,
+            ),
         )
 
 
@@ -1458,12 +1960,23 @@ MATERIALIZATION_CONTRACTS: Dict[str, MaterializationContract] = {
             ("cos_phi", "cos φ", ""),
         ),
     ),
+    CatalogNamespace.ZRODLO_SN.value: MaterializationContract(
+        namespace=CatalogNamespace.ZRODLO_SN.value,
+        solver_fields=("voltage_rating_kv", "sk3_mva", "ik3_ka", "rx_ratio"),
+        ui_fields=(
+            ("voltage_rating_kv", "Un [kV]", "kV"),
+            ("sk3_mva", "Sk3 [MVA]", "MVA"),
+            ("ik3_ka", "Ik3 [kA]", "kA"),
+            ("rx_ratio", "R/X", ""),
+        ),
+    ),
     CatalogNamespace.ZRODLO_NN_PV.value: MaterializationContract(
         namespace=CatalogNamespace.ZRODLO_NN_PV.value,
-        solver_fields=("s_n_kva", "p_max_kw"),
+        solver_fields=("s_n_kva", "p_max_kw", "control_mode"),
         ui_fields=(
             ("s_n_kva", "Sn [kVA]", "kVA"),
             ("p_max_kw", "Pmax [kW]", "kW"),
+            ("control_mode", "Tryb sterowania", ""),
             ("cos_phi_min", "cos φ min", ""),
             ("cos_phi_max", "cos φ max", ""),
         ),

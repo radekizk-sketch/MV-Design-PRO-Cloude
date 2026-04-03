@@ -371,8 +371,6 @@ function ShortCircuitResultsTable({ selectedRowId, onRowSelect }: ShortCircuitRe
         </thead>
         <tbody data-testid="results-table-body">
           {shortCircuitResults.rows.map((row) => {
-            // UI-03: Oblicz werdykt porównania Ik vs Icu
-            // TODO: icu_ka powinno pochodzić z katalogu urządzeń - obecnie stub
             const icu_ka = (row as ShortCircuitRow & { icu_ka?: number | null }).icu_ka ?? null;
             const verdictResult = calculateShortCircuitVerdict(row.ikss_ka, icu_ka);
 
@@ -644,6 +642,41 @@ export function ResultsInspectorPage({ runId, forcedTab, onClose }: ResultsInspe
     }
   };
 
+  const traceSelectionId = useMemo(() => {
+    if (!selectedResultRow) return null;
+    switch (selectedResultRow.type) {
+      case 'bus':
+        return selectedResultRow.data.element_id ?? selectedResultRow.data.bus_id;
+      case 'branch':
+        return selectedResultRow.data.element_id ?? selectedResultRow.data.branch_id;
+      case 'short_circuit':
+        return selectedResultRow.data.element_id ?? selectedResultRow.data.target_id;
+    }
+  }, [selectedResultRow]);
+
+  const traceSelectionToStepMap = useMemo(() => {
+    const mapping = new Map<string, number>();
+    if (!extendedTrace) {
+      return mapping;
+    }
+    extendedTrace.white_box_trace.forEach((step, index) => {
+      const candidateIds = [
+        typeof step.element_id === 'string' ? step.element_id : null,
+        typeof step.target_id === 'string' ? step.target_id : null,
+        typeof step.solver_ref === 'string' ? step.solver_ref : null,
+        typeof step.catalog_context_entry?.element_id === 'string'
+          ? step.catalog_context_entry.element_id
+          : null,
+      ].filter((value): value is string => Boolean(value));
+      candidateIds.forEach((candidateId) => {
+        if (!mapping.has(candidateId)) {
+          mapping.set(candidateId, index);
+        }
+      });
+    });
+    return mapping;
+  }, [extendedTrace]);
+
   // Available tabs based on analysis type
   const availableTabs: ResultsInspectorTab[] = useMemo(() => {
     return resolveAvailableResultsTabs(forcedTab, hasShortCircuit);
@@ -805,6 +838,8 @@ export function ResultsInspectorPage({ runId, forcedTab, onClose }: ResultsInspe
               <TraceViewerContainer
                 trace={extendedTrace}
                 isLoading={isLoadingTrace}
+                selectionId={traceSelectionId}
+                selectionToTraceMap={traceSelectionToStepMap}
               />
             )}
           </div>

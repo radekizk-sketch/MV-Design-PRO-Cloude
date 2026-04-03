@@ -6,6 +6,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from api.main import app
+from tests.catalog_test_helpers import gpz_payload, gpz_source_record
 
 
 def _reset_backend_state() -> None:
@@ -84,14 +85,16 @@ def _seed_power_flow_enm(client: TestClient, case_id: str) -> None:
                 "sources": [
                     {
                         "id": "00000000-0000-0000-0000-000000000304",
-                        "ref_id": "src-grid",
-                        "name": "Zasilanie GPZ",
                         "tags": [],
                         "meta": {},
-                        "bus_ref": "bus-main",
-                        "model": "short_circuit_power",
-                        "sk3_mva": 250.0,
-                        "rx_ratio": 0.1,
+                        **gpz_source_record(
+                            ref_id="src-grid",
+                            name="Zasilanie GPZ",
+                            bus_ref="bus-main",
+                            voltage_kv=15.0,
+                            sk3_mva=250.0,
+                            rx_ratio=0.10,
+                        ),
                     }
                 ],
                 "loads": [
@@ -137,7 +140,7 @@ def test_domain_operation_snapshot_feeds_analysis_result_and_trace(client: TestC
         json={
             "operation": {
                 "name": "add_grid_source_sn",
-                "payload": {"voltage_kv": 15.0, "sk3_mva": 250.0, "rx_ratio": 0.1},
+                "payload": gpz_payload(voltage_kv=15.0, sk3_mva=250.0, rx_ratio=0.10),
             }
         },
     )
@@ -181,6 +184,7 @@ def test_domain_operation_snapshot_feeds_analysis_result_and_trace(client: TestC
     short_circuit_payload = short_circuit.json()
     assert short_circuit_payload["run_id"] == run_id
     assert short_circuit_payload["rows"]
+    assert all("element_id" in row for row in short_circuit_payload["rows"])
 
     trace_details = client.get(f"/analysis-runs/{run_id}/results/trace")
     assert trace_details.status_code == 200
@@ -189,6 +193,9 @@ def test_domain_operation_snapshot_feeds_analysis_result_and_trace(client: TestC
     assert trace_payload["snapshot_id"] == snapshot_hash
     assert trace_payload["input_hash"] == input_hash
     assert trace_payload["white_box_trace"]
+    assert "catalog_context" in trace_payload
+    assert isinstance(trace_payload["catalog_context"], list)
+    assert any("element_id" in step for step in trace_payload["white_box_trace"])
 
     trace_view = client.get(f"/analysis-runs/{run_id}/trace")
     assert trace_view.status_code == 200
@@ -236,6 +243,20 @@ def test_power_flow_read_and_export_endpoints_use_canonical_run(client: TestClie
     assert trace_payload["iterations"]
     assert trace_payload["run_id"] == run_id
     assert trace_payload["snapshot_id"] == run_payload["enm_hash"]
+    assert "catalog_context" in trace_payload
+    assert any(entry["element_id"] == "branch-load" for entry in trace_payload["catalog_context"])
+
+    bus_results_response = client.get(f"/analysis-runs/{run_id}/results/buses")
+    assert bus_results_response.status_code == 200
+    bus_results_payload = bus_results_response.json()
+    assert {"bus-load", "bus-main"}.issubset(
+        {row["element_id"] for row in bus_results_payload["rows"]}
+    )
+
+    branch_results_response = client.get(f"/analysis-runs/{run_id}/results/branches")
+    assert branch_results_response.status_code == 200
+    branch_results_payload = branch_results_response.json()
+    assert "branch-load" in {row["element_id"] for row in branch_results_payload["rows"]}
 
     export_response = client.get(f"/power-flow-runs/{run_id}/export/json")
     assert export_response.status_code == 200
@@ -244,6 +265,14 @@ def test_power_flow_read_and_export_endpoints_use_canonical_run(client: TestClie
     assert export_payload["metadata"]["snapshot_hash"] == run_payload["enm_hash"]
     assert export_payload["trace_summary"]["input_hash"] == run_payload["input_hash"]
     assert export_payload["trace_summary"]["converged"] is True
+    assert export_payload["metadata"]["catalog_context_count"] >= 2
+    assert any(entry["element_id"] == "branch-load" for entry in export_payload["catalog_context"])
+    assert any(entry["element_id"] == "src-grid" for entry in export_payload["catalog_context"])
+    assert {"bus-load", "bus-main"}.issubset(
+        {row["element_id"] for row in export_payload["bus_results"]["rows"]}
+    )
+    assert "branch-load" in {row["element_id"] for row in export_payload["branch_results"]["rows"]}
+    assert export_payload["white_box_trace"]
 
 
 def test_legacy_snapshot_and_analysis_index_routes_are_disabled_in_main_app(client: TestClient) -> None:

@@ -1,189 +1,329 @@
-/**
- * TypeLibraryBrowser Tests (P13a)
- *
- * CANONICAL ALIGNMENT:
- * - CATALOG_BROWSER_CONTRACT.md § 3: Structure and behavior
- * - Deterministic ordering (manufacturer → name → id)
- * - 4 tabs: Line, Cable, Transformer, Switch Equipment
- * - Polish labels per wizard_screens.md
- */
-
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { TypeLibraryBrowser } from '../TypeLibraryBrowser';
 import * as catalogApi from '../api';
+import type { CatalogListItem } from '../api';
+import type { TypeCategory } from '../types';
 
-// Mock catalog API
 vi.mock('../api');
 
-const mockLineTypes = [
-  {
-    id: 'line-001',
-    name: 'ACSR 240',
-    manufacturer: 'ABC Cables',
-    r_ohm_per_km: 0.12,
-    x_ohm_per_km: 0.39,
-    b_us_per_km: 2.82,
-    rated_current_a: 645,
-    standard: 'IEC 61089',
-    max_temperature_c: 70,
-    voltage_rating_kv: 110,
-    conductor_material: 'ACSR',
-    cross_section_mm2: 240,
-  },
-  {
-    id: 'line-002',
-    name: 'ACSR 120',
-    manufacturer: 'ABC Cables',
-    r_ohm_per_km: 0.24,
-    x_ohm_per_km: 0.41,
-    b_us_per_km: 2.65,
-    rated_current_a: 400,
-    standard: 'IEC 61089',
-    max_temperature_c: 70,
-    voltage_rating_kv: 15,
-    conductor_material: 'ACSR',
-    cross_section_mm2: 120,
-  },
-];
+const TAB_LABELS = [
+  'Typy linii napowietrznych',
+  'Typy kabli SN',
+  'Typy zasilania systemowego SN',
+  'Typy transformatorow SN/nN',
+  'Typy aparatow laczeniowych SN',
+  'Typy aparatury SN',
+  'Typy aparatury nN',
+  'Typy kabli nN',
+  'Typy obciazen',
+  'Typy przekladnikow pradowych',
+  'Typy przekladnikow napieciowych',
+  'Typy przekladnikow pomiarowych',
+  'Typy falownikow PV',
+  'Typy falownikow BESS',
+  'Typy konwerterow',
+  'Typy zabezpieczen',
+] as const;
 
-const mockCableTypes = [
-  {
-    id: 'cable-001',
-    name: 'NA2XS(F)2Y 240',
-    manufacturer: 'XYZ Cables',
-    r_ohm_per_km: 0.125,
-    x_ohm_per_km: 0.11,
-    c_nf_per_km: 210,
-    rated_current_a: 355,
-    voltage_rating_kv: 15,
-    insulation_type: 'XLPE',
-    standard: 'IEC 60502',
-    conductor_material: 'Al',
-    cross_section_mm2: 240,
-    max_temperature_c: 90,
-  },
-];
-
-const mockTransformerTypes = [
-  {
-    id: 'trafo-001',
-    name: 'ONAN 40MVA 110/15kV',
-    manufacturer: 'Trafo Inc',
-    rated_power_mva: 40,
-    voltage_hv_kv: 110,
-    voltage_lv_kv: 15,
-    uk_percent: 10.5,
-    pk_kw: 150,
-    i0_percent: 0.5,
-    p0_kw: 25,
-    vector_group: 'Dyn11',
-    cooling_class: 'ONAN',
-    tap_min: -5,
-    tap_max: 5,
-    tap_step_percent: 2.5,
-  },
-];
-
-const mockSwitchTypes = [
-  {
-    id: 'switch-001',
-    name: 'VD4 12kV 630A',
-    manufacturer: 'ABB',
-    equipment_kind: 'CIRCUIT_BREAKER',
-    un_kv: 12,
-    in_a: 630,
-    ik_ka: 25,
-    icw_ka: 25,
-    medium: 'VACUUM',
-  },
-];
+const catalogByCategory: Record<TypeCategory, CatalogListItem[]> = {
+  LINE: [
+    {
+      id: 'line-001',
+      name: 'ACSR 240',
+      manufacturer: 'ABC Cables',
+      r_ohm_per_km: 0.12,
+      x_ohm_per_km: 0.39,
+      b_us_per_km: 2.82,
+      rated_current_a: 645,
+      standard: 'IEC 61089',
+      max_temperature_c: 70,
+      voltage_rating_kv: 15,
+      conductor_material: 'ACSR',
+      cross_section_mm2: 240,
+    },
+    {
+      id: 'line-002',
+      name: 'ACSR 120',
+      manufacturer: 'ABC Cables',
+      r_ohm_per_km: 0.24,
+      x_ohm_per_km: 0.41,
+      b_us_per_km: 2.65,
+      rated_current_a: 400,
+      standard: 'IEC 61089',
+      max_temperature_c: 70,
+      voltage_rating_kv: 15,
+      conductor_material: 'ACSR',
+      cross_section_mm2: 120,
+    },
+  ],
+  CABLE: [
+    {
+      id: 'cable-001',
+      name: 'NA2XS(F)2Y 240',
+      manufacturer: 'XYZ Cables',
+      r_ohm_per_km: 0.125,
+      x_ohm_per_km: 0.11,
+      c_nf_per_km: 210,
+      rated_current_a: 355,
+      voltage_rating_kv: 15,
+      insulation_type: 'XLPE',
+      standard: 'IEC 60502',
+      conductor_material: 'Al',
+      cross_section_mm2: 240,
+      max_temperature_c: 90,
+    },
+  ],
+  SYSTEM_SOURCE: [
+    {
+      id: 'source-001',
+      name: 'GPZ 110/15 kV',
+      manufacturer: 'OSD Pelnoc',
+      operator_name: 'OSD Pelnoc',
+      supply_role: 'GPZ',
+      short_circuit_model: 'THEVENIN',
+      earthing_system: 'RESISTIVE',
+      voltage_rating_kv: 15,
+      sk3_mva: 350,
+      rx_ratio: 0.15,
+      notes_pl: 'Zasilanie podstawowe',
+    },
+  ],
+  TRANSFORMER: [
+    {
+      id: 'trafo-001',
+      name: 'ONAN 40 MVA 110/15 kV',
+      manufacturer: 'Trafo Inc',
+      rated_power_mva: 40,
+      voltage_hv_kv: 110,
+      voltage_lv_kv: 15,
+      uk_percent: 10.5,
+      pk_kw: 150,
+      i0_percent: 0.5,
+      p0_kw: 25,
+      vector_group: 'Dyn11',
+      cooling_class: 'ONAN',
+      tap_min: -5,
+      tap_max: 5,
+      tap_step_percent: 2.5,
+    },
+  ],
+  SWITCH_EQUIPMENT: [
+    {
+      id: 'switch-001',
+      name: 'VD4 12 kV 630 A',
+      manufacturer: 'ABB',
+      equipment_kind: 'CIRCUIT_BREAKER',
+      un_kv: 12,
+      in_a: 630,
+      ik_ka: 25,
+      icw_ka: 25,
+      medium: 'VACUUM',
+    },
+  ],
+  MV_APPARATUS: [
+    {
+      id: 'mv-app-001',
+      name: 'Pole liniowe SN',
+      manufacturer: 'Switchgear SA',
+      equipment_kind: 'LINE_BAY',
+      voltage_rating_kv: 15,
+      rated_current_a: 630,
+    },
+  ],
+  LV_APPARATUS: [
+    {
+      id: 'lv-app-001',
+      name: 'Rozdzielnica nN 1600 A',
+      manufacturer: 'LV Systems',
+      equipment_kind: 'LV_SWITCHBOARD',
+      rated_current_a: 1600,
+      voltage_rating_kv: 0.4,
+    },
+  ],
+  LV_CABLE: [
+    {
+      id: 'lv-cable-001',
+      name: 'YAKY 4x240',
+      manufacturer: 'XYZ Cables',
+      cross_section_mm2: 240,
+      number_of_cores: 4,
+      rated_current_a: 420,
+      voltage_rating_kv: 1,
+    },
+  ],
+  LOAD: [
+    {
+      id: 'load-001',
+      name: 'Odbior przemyslowy',
+      manufacturer: 'Zaklad A',
+      p_kw: 1800,
+      q_kvar: 540,
+      cos_phi: 0.96,
+      profile_id: 'staly',
+    },
+  ],
+  CT: [
+    {
+      id: 'ct-001',
+      name: 'CT 400/1 A',
+      manufacturer: 'MeasureTech',
+      ratio_primary_a: 400,
+      ratio_secondary_a: 1,
+      accuracy_class: '5P20',
+      burden_va: 15,
+    },
+  ],
+  VT: [
+    {
+      id: 'vt-001',
+      name: 'VT 15 kV',
+      manufacturer: 'MeasureTech',
+      ratio_primary_v: 15000,
+      ratio_secondary_v: 100,
+      accuracy_class: '0.5',
+      burden_va: 30,
+    },
+  ],
+  MEASUREMENT_TRANSFORMER: [
+    {
+      id: 'mt-001',
+      name: 'Zestaw CT/VT',
+      manufacturer: 'MeasureTech',
+      measurement_kind: 'COMBINED',
+      accuracy_class: '0.5 / 5P20',
+      burden_va: 30,
+    },
+  ],
+  PV_INVERTER: [
+    {
+      id: 'pv-001',
+      name: 'Falownik PV 1.2 MW',
+      manufacturer: 'Solar Tech',
+      model: 'PV-1200',
+      p_max_kw: 1200,
+      cos_phi_mode: 'Q(U)',
+      grid_code: 'NC RfG',
+    },
+  ],
+  BESS_INVERTER: [
+    {
+      id: 'bess-001',
+      name: 'Falownik BESS 1 MW',
+      manufacturer: 'Storage Power',
+      model: 'BESS-1000',
+      p_charge_kw: 1000,
+      p_discharge_kw: 1000,
+      e_kwh: 2200,
+      control_mode: 'PQ',
+    },
+  ],
+  CONVERTER: [
+    {
+      id: 'conv-001',
+      name: 'Konwerter 800 kW',
+      manufacturer: 'Drive Systems',
+      model: 'CV-800',
+      p_max_kw: 800,
+      control_mode: 'V/f',
+    },
+  ],
+  PROTECTION_DEVICE: [
+    {
+      id: 'prot-001',
+      name: 'Przekaznik pola liniowego',
+      manufacturer: 'RelayWorks',
+      model: 'RW-615',
+      series: '615',
+      functions_supported: ['50/51', '50N/51N'],
+      curves_supported: ['IEC Normal Inverse'],
+      notes_pl: 'Dla pola liniowego SN',
+    },
+  ],
+};
 
 describe('TypeLibraryBrowser', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.mocked(catalogApi.fetchTypesByCategory).mockImplementation(async (category) => {
-      switch (category) {
-        case 'LINE':
-          return mockLineTypes;
-        case 'CABLE':
-          return mockCableTypes;
-        case 'TRANSFORMER':
-          return mockTransformerTypes;
-        case 'SWITCH_EQUIPMENT':
-          return mockSwitchTypes;
-        default:
-          return [];
-      }
+    vi.mocked(catalogApi.fetchTypesByCategory).mockImplementation(async (category) => (
+      catalogByCategory[category]
+    ));
+    vi.mocked(catalogApi.exportTypeLibrary).mockResolvedValue({ ok: true });
+    vi.mocked(catalogApi.importTypeLibrary).mockResolvedValue({
+      success: true,
+      mode: 'merge',
+      added: [],
+      skipped: [],
+      conflicts: [],
     });
   });
 
-  it('renders with 4 tabs in Polish', async () => {
-    render(<TypeLibraryBrowser />);
-
-    expect(screen.getByText('Biblioteka typów')).toBeInTheDocument();
-    expect(screen.getByText('Typy linii')).toBeInTheDocument();
-    expect(screen.getByText('Typy kabli')).toBeInTheDocument();
-    expect(screen.getByText('Typy transformatorów')).toBeInTheDocument();
-    expect(screen.getByText('Typy aparatury łączeniowej')).toBeInTheDocument();
-  });
-
-  it('loads and displays line types on mount (default tab)', async () => {
+  it('renders the full active catalog tab set', async () => {
     render(<TypeLibraryBrowser />);
 
     await waitFor(() => {
       expect(catalogApi.fetchTypesByCategory).toHaveBeenCalledWith('LINE');
     });
 
+    expect(screen.getByText('Biblioteka typow')).toBeInTheDocument();
+    expect(screen.getAllByRole('button').filter((button) => button.textContent?.includes('Typy'))).toHaveLength(16);
+    for (const label of TAB_LABELS) {
+      expect(screen.getByRole('button', { name: new RegExp(label, 'i') })).toBeInTheDocument();
+    }
+  });
+
+  it('loads line types on mount and shows key summary data', async () => {
+    render(<TypeLibraryBrowser />);
+
+    await waitFor(() => {
+      expect(catalogApi.fetchTypesByCategory).toHaveBeenCalledWith('LINE');
+    });
+
+    expect(screen.getByText('ACSR 240')).toBeInTheDocument();
+    expect(screen.getAllByText('ABC Cables')).toHaveLength(2);
+    expect(screen.getByRole('cell', { name: /R=0\.12 Ohm\/km .* In=645 A/ })).toBeInTheDocument();
+  });
+
+  it('switches to a generic category and renders generic details', async () => {
+    const user = userEvent.setup();
+    render(<TypeLibraryBrowser />);
+
+    await user.click(screen.getByRole('button', { name: /Typy zasilania systemowego SN/i }));
+
+    await waitFor(() => {
+      expect(catalogApi.fetchTypesByCategory).toHaveBeenCalledWith('SYSTEM_SOURCE');
+    });
+
+    await user.click(screen.getByText('GPZ 110/15 kV'));
+
+    expect(screen.getByText('Informacje podstawowe')).toBeInTheDocument();
+    expect(screen.getByText('Dane katalogowe')).toBeInTheDocument();
+    expect(screen.getByText('Operator')).toBeInTheDocument();
+    expect(screen.getAllByText('OSD Pelnoc').length).toBeGreaterThan(1);
+    expect(screen.getByText('Moc zwarciowa Sk3 [MVA]')).toBeInTheDocument();
+    expect(screen.getByText('350')).toBeInTheDocument();
+  });
+
+  it('filters visible types by search query', async () => {
+    const user = userEvent.setup();
+    render(<TypeLibraryBrowser />);
+
     await waitFor(() => {
       expect(screen.getByText('ACSR 240')).toBeInTheDocument();
       expect(screen.getByText('ACSR 120')).toBeInTheDocument();
     });
-  });
 
-  it('switches to cable types tab', async () => {
-    const user = userEvent.setup();
-    render(<TypeLibraryBrowser />);
-
-    // Wait for initial load
-    await waitFor(() => {
-      expect(screen.getByText('ACSR 240')).toBeInTheDocument();
-    });
-
-    // Click cable tab
-    await user.click(screen.getByText('Typy kabli'));
-
-    await waitFor(() => {
-      expect(catalogApi.fetchTypesByCategory).toHaveBeenCalledWith('CABLE');
-    });
-
-    await waitFor(() => {
-      expect(screen.getByText('NA2XS(F)2Y 240')).toBeInTheDocument();
-    });
-  });
-
-  it('filters types by search query', async () => {
-    const user = userEvent.setup();
-    render(<TypeLibraryBrowser />);
-
-    await waitFor(() => {
-      expect(screen.getByText('ACSR 240')).toBeInTheDocument();
-      expect(screen.getByText('ACSR 120')).toBeInTheDocument();
-    });
-
-    // Search for "240"
-    const searchInput = screen.getByPlaceholderText(
-      'Szukaj po nazwie, producencie lub ID...'
+    await user.type(
+      screen.getByPlaceholderText('Szukaj po nazwie, producencie lub ID...'),
+      '240',
     );
-    await user.type(searchInput, '240');
 
-    // Only ACSR 240 should be visible
     expect(screen.getByText('ACSR 240')).toBeInTheDocument();
     expect(screen.queryByText('ACSR 120')).not.toBeInTheDocument();
   });
 
-  it('shows type details when type is selected', async () => {
+  it('resets search and details when switching tabs', async () => {
     const user = userEvent.setup();
     render(<TypeLibraryBrowser />);
 
@@ -191,181 +331,60 @@ describe('TypeLibraryBrowser', () => {
       expect(screen.getByText('ACSR 240')).toBeInTheDocument();
     });
 
-    // Click on type
+    await user.type(screen.getByPlaceholderText('Szukaj po nazwie, producencie lub ID...'), '240');
     await user.click(screen.getByText('ACSR 240'));
+    expect(screen.getByText('Dane katalogowe')).toBeInTheDocument();
 
-    // Details should appear
+    await user.click(screen.getByRole('button', { name: /Typy kabli SN/i }));
+
+    expect(screen.getByPlaceholderText('Szukaj po nazwie, producencie lub ID...')).toHaveValue('');
     await waitFor(() => {
-      expect(screen.getByText('Informacje podstawowe')).toBeInTheDocument();
-      expect(screen.getByText('Parametry elektryczne')).toBeInTheDocument();
-    });
-
-    // Check parameter values
-    expect(screen.getByText('0.120')).toBeInTheDocument(); // R value
-    expect(screen.getAllByText('Ω/km').length).toBeGreaterThan(0); // Unit (R and X both have Ω/km)
-  });
-
-  it('displays loading state', async () => {
-    vi.mocked(catalogApi.fetchTypesByCategory).mockImplementation(
-      () => new Promise((resolve) => setTimeout(() => resolve(mockLineTypes), 1000))
-    );
-
-    render(<TypeLibraryBrowser />);
-
-    expect(screen.getByText('Ładowanie typów...')).toBeInTheDocument();
-  });
-
-  it('displays error state', async () => {
-    vi.mocked(catalogApi.fetchTypesByCategory).mockRejectedValue(
-      new Error('Network error')
-    );
-
-    render(<TypeLibraryBrowser />);
-
-    await waitFor(() => {
-      expect(screen.getByText('Błąd')).toBeInTheDocument();
-      expect(screen.getByText('Network error')).toBeInTheDocument();
+      expect(screen.getByText('Wybierz typ z listy, aby zobaczyc szczegoly')).toBeInTheDocument();
     });
   });
 
-  it('displays empty state when no types', async () => {
-    vi.mocked(catalogApi.fetchTypesByCategory).mockResolvedValue([]);
-
-    render(<TypeLibraryBrowser />);
-
-    await waitFor(() => {
-      expect(screen.getByText('Brak typów w katalogu.')).toBeInTheDocument();
-    });
-  });
-
-  it('resets search and selection when tab changes', async () => {
+  it('calls onSelectType with the active category', async () => {
     const user = userEvent.setup();
-    render(<TypeLibraryBrowser />);
-
-    await waitFor(() => {
-      expect(screen.getByText('ACSR 240')).toBeInTheDocument();
-    });
-
-    // Search
-    const searchInput = screen.getByPlaceholderText(
-      'Szukaj po nazwie, producencie lub ID...'
-    );
-    await user.type(searchInput, '240');
-
-    // Switch tab (without selecting a type first to avoid race condition
-    // between activeTab change and useEffect clearing selectedTypeId)
-    await user.click(screen.getByText('Typy kabli'));
-
-    // Search should be cleared
-    expect(searchInput).toHaveValue('');
-
-    // Selection should be cleared
-    await waitFor(() => {
-      expect(
-        screen.getByText('Wybierz typ z listy, aby zobaczyć szczegóły')
-      ).toBeInTheDocument();
-    });
-  });
-
-  it('calls onSelectType callback when type is selected', async () => {
     const onSelectType = vi.fn();
-    const user = userEvent.setup();
-    render(<TypeLibraryBrowser onSelectType={onSelectType} />);
+    render(<TypeLibraryBrowser initialTab="PROTECTION_DEVICE" onSelectType={onSelectType} />);
 
     await waitFor(() => {
-      expect(screen.getByText('ACSR 240')).toBeInTheDocument();
+      expect(screen.getByText('Przekaznik pola liniowego')).toBeInTheDocument();
     });
 
-    await user.click(screen.getByText('ACSR 240'));
+    await user.click(screen.getByText('Przekaznik pola liniowego'));
 
-    expect(onSelectType).toHaveBeenCalledWith('line-001', 'LINE');
+    expect(onSelectType).toHaveBeenCalledWith('prot-001', 'PROTECTION_DEVICE');
   });
 
-  it('shows all type categories with correct icons', async () => {
+  it('shows loading state', async () => {
+    vi.mocked(catalogApi.fetchTypesByCategory).mockImplementationOnce(
+      () => new Promise((resolve) => setTimeout(() => resolve(catalogByCategory.LINE), 1000)),
+    );
+
     render(<TypeLibraryBrowser />);
 
-    const tabs = screen.getAllByRole('button', { name: /Typy/ });
-    expect(tabs).toHaveLength(4);
-
-    // Check icons are present (they're rendered as text)
-    expect(screen.getByText('[LN]')).toBeInTheDocument(); // Line icon
-    expect(screen.getByText('[CB]')).toBeInTheDocument(); // Cable icon
-    expect(screen.getByText('[TR]')).toBeInTheDocument(); // Transformer icon
-    expect(screen.getByText('[SW]')).toBeInTheDocument(); // Switch icon
+    expect(screen.getByText('Ladowanie typow...')).toBeInTheDocument();
   });
 
-  it('displays manufacturer in type list', async () => {
-    render(<TypeLibraryBrowser />);
-
-    await waitFor(() => {
-      expect(screen.getAllByText('ABC Cables')).toHaveLength(2);
-    });
-  });
-
-  it('displays transformer parameters correctly', async () => {
-    const user = userEvent.setup();
-    render(<TypeLibraryBrowser initialTab="TRANSFORMER" />);
-
-    await waitFor(() => {
-      expect(screen.getByText('ONAN 40MVA 110/15kV')).toBeInTheDocument();
-    });
-
-    await user.click(screen.getByText('ONAN 40MVA 110/15kV'));
-
-    await waitFor(() => {
-      expect(screen.getByText('Moc znamionowa')).toBeInTheDocument();
-      expect(screen.getByText('40.0')).toBeInTheDocument();
-      expect(screen.getByText('MVA')).toBeInTheDocument();
-      expect(screen.getByText('Dyn11')).toBeInTheDocument();
-    });
-  });
-
-  it('displays switch equipment parameters correctly', async () => {
-    const user = userEvent.setup();
-    render(<TypeLibraryBrowser initialTab="SWITCH_EQUIPMENT" />);
-
-    await waitFor(() => {
-      expect(screen.getByText('VD4 12kV 630A')).toBeInTheDocument();
-    });
-
-    await user.click(screen.getByText('VD4 12kV 630A'));
-
-    await waitFor(() => {
-      expect(screen.getByText('Rodzaj aparatu')).toBeInTheDocument();
-      expect(screen.getByText('CIRCUIT_BREAKER')).toBeInTheDocument();
-      expect(screen.getByText('VACUUM')).toBeInTheDocument();
-    });
-  });
-});
-
-/**
- * Deterministic ordering tests (BINDING per CATALOG_BROWSER_CONTRACT.md).
- */
-describe('TypeLibraryBrowser - Deterministic Ordering', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
-  it('displays types in deterministic order: manufacturer → name → id', async () => {
-    const unorderedTypes = [
-      { id: 'c', name: 'Type C', manufacturer: 'Vendor A', r_ohm_per_km: 0.1, x_ohm_per_km: 0.1, b_us_per_km: 0, rated_current_a: 100, standard: '', max_temperature_c: 70, voltage_rating_kv: 15, conductor_material: '', cross_section_mm2: 100 },
-      { id: 'a', name: 'Type A', manufacturer: 'Vendor B', r_ohm_per_km: 0.1, x_ohm_per_km: 0.1, b_us_per_km: 0, rated_current_a: 100, standard: '', max_temperature_c: 70, voltage_rating_kv: 15, conductor_material: '', cross_section_mm2: 100 },
-      { id: 'b', name: 'Type B', manufacturer: 'Vendor A', r_ohm_per_km: 0.1, x_ohm_per_km: 0.1, b_us_per_km: 0, rated_current_a: 100, standard: '', max_temperature_c: 70, voltage_rating_kv: 15, conductor_material: '', cross_section_mm2: 100 },
-    ];
-
-    vi.mocked(catalogApi.fetchTypesByCategory).mockResolvedValue(unorderedTypes);
+  it('shows error state', async () => {
+    vi.mocked(catalogApi.fetchTypesByCategory).mockRejectedValueOnce(new Error('Blad API katalogow'));
 
     render(<TypeLibraryBrowser />);
 
     await waitFor(() => {
-      expect(screen.getByText('Type B')).toBeInTheDocument();
+      expect(screen.getByText('Blad')).toBeInTheDocument();
+      expect(screen.getByText('Blad API katalogow')).toBeInTheDocument();
     });
+  });
 
-    // API returns already sorted (sorted in api.ts fetchTypesByCategory)
-    // UI displays in the order received from the mock
-    const rows = screen.getAllByRole('row').slice(1); // Skip header row
-    expect(rows[0]).toHaveTextContent('Type C'); // Vendor A, Type C (first in mock)
-    expect(rows[1]).toHaveTextContent('Type A'); // Vendor B, Type A (second in mock)
-    expect(rows[2]).toHaveTextContent('Type B'); // Vendor A, Type B (third in mock)
+  it('shows empty state when the active category has no items', async () => {
+    vi.mocked(catalogApi.fetchTypesByCategory).mockResolvedValueOnce([]);
+
+    render(<TypeLibraryBrowser />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Brak typow w katalogu.')).toBeInTheDocument();
+    });
   });
 });

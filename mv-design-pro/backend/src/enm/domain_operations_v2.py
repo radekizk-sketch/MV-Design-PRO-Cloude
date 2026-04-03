@@ -15,6 +15,10 @@ import json
 import math
 from typing import Any
 
+from network_model.catalog.materialization import materialize_catalog_binding
+from network_model.catalog.repository import get_default_mv_catalog
+from network_model.catalog.types import CatalogBinding
+
 from .domain_operations import (
     _canonical_json,
     _compute_seed,
@@ -653,7 +657,7 @@ def _resolve_catalog_ref(
     if not isinstance(binding, dict):
         return None, "catalog.binding_invalid"
 
-    item_id = binding.get("item_id")
+    item_id = binding.get("catalog_item_id") or binding.get("item_id")
     if not isinstance(item_id, str) or not item_id.strip():
         return None, "catalog.binding_invalid"
 
@@ -676,6 +680,49 @@ def _validate_required_materialization(
         normalized[field] = value
 
     return normalized, None
+
+
+def _materialize_nn_source_params(
+    *,
+    namespace: str,
+    catalog_ref: str,
+    required_fields: list[str],
+    explicit_params: object,
+) -> tuple[dict[str, Any] | None, str | None]:
+    if explicit_params is not None:
+        return _validate_required_materialization(explicit_params, required_fields)
+
+    binding = CatalogBinding(
+        catalog_namespace=namespace,
+        catalog_item_id=catalog_ref,
+        catalog_item_version="2024.1",
+        materialize=True,
+    )
+    result = materialize_catalog_binding(binding, get_default_mv_catalog())
+    if not result.success:
+        return None, result.error_code or "catalog.materialization_incomplete"
+
+    if namespace == "ZRODLO_NN_PV":
+        return _validate_required_materialization(
+            {
+                "rated_power_ac_kw": result.solver_fields.get("s_n_kva"),
+                "max_power_kw": result.solver_fields.get("p_max_kw"),
+                "control_mode": result.solver_fields.get("control_mode"),
+            },
+            required_fields,
+        )
+
+    if namespace == "ZRODLO_NN_BESS":
+        return _validate_required_materialization(
+            {
+                "usable_capacity_kwh": result.solver_fields.get("e_kwh"),
+                "charge_power_kw": result.solver_fields.get("p_charge_kw"),
+                "discharge_power_kw": result.solver_fields.get("p_discharge_kw"),
+            },
+            required_fields,
+        )
+
+    return None, "catalog.materialization_incomplete"
 
 
 def add_nn_outgoing_field(enm: dict[str, Any], payload: dict[str, Any]) -> dict[str, Any]:
@@ -804,8 +851,10 @@ def add_pv_inverter_nn(enm: dict[str, Any], payload: dict[str, Any]) -> dict[str
             catalog_error,
         )
 
-    materialized_params, materialization_error = _validate_required_materialization(
-        pv_spec.get("materialized_params"),
+    materialized_params, materialization_error = _materialize_nn_source_params(
+        namespace="ZRODLO_NN_PV",
+        catalog_ref=catalog_ref,
+        explicit_params=pv_spec.get("materialized_params"),
         required_fields=["rated_power_ac_kw", "max_power_kw", "control_mode"],
     )
     if materialization_error:
@@ -814,7 +863,23 @@ def add_pv_inverter_nn(enm: dict[str, Any], payload: dict[str, Any]) -> dict[str
             materialization_error,
         )
 
-    seed = _compute_seed({"op": "pv_nn", "bus": bus_nn_ref, "p": pv_spec.get("rated_power_ac_kw", 0)})
+    rated_power_ac_kw = (
+        pv_spec.get("rated_power_ac_kw")
+        if pv_spec.get("rated_power_ac_kw") is not None
+        else materialized_params.get("rated_power_ac_kw")
+    )
+    max_power_kw = (
+        pv_spec.get("max_power_kw")
+        if pv_spec.get("max_power_kw") is not None
+        else materialized_params.get("max_power_kw")
+    )
+    control_mode = (
+        pv_spec.get("control_mode")
+        if pv_spec.get("control_mode") is not None
+        else materialized_params.get("control_mode")
+    )
+
+    seed = _compute_seed({"op": "pv_nn", "bus": bus_nn_ref, "p": rated_power_ac_kw or 0})
     pv_ref = _make_id("pv", seed, "inverter")
 
     new_enm = copy.deepcopy(enm)
@@ -823,7 +888,7 @@ def add_pv_inverter_nn(enm: dict[str, Any], payload: dict[str, Any]) -> dict[str
         "name": pv_spec.get("source_name") or "Falownik PV",
         "bus_ref": bus_nn_ref,
         "gen_type": "PV_INVERTER",
-        "p_mw": (pv_spec.get("rated_power_ac_kw") or 0) / 1000.0,
+        "p_mw": (rated_power_ac_kw or 0) / 1000.0,
         "q_mvar": 0.0,
         "catalog_ref": catalog_ref,
         "catalog_namespace": "ZRODLO_NN_PV",
@@ -833,8 +898,8 @@ def add_pv_inverter_nn(enm: dict[str, Any], payload: dict[str, Any]) -> dict[str
         "in_service": True,
         "tags": [],
         "meta": {
-            "control_mode": pv_spec.get("control_mode"),
-            "max_power_kw": pv_spec.get("max_power_kw"),
+            "control_mode": control_mode,
+            "max_power_kw": max_power_kw,
         },
     })
 
@@ -871,17 +936,47 @@ def add_bess_inverter_nn(enm: dict[str, Any], payload: dict[str, Any]) -> dict[s
             catalog_error,
         )
 
-    materialized_params, materialization_error = _validate_required_materialization(
-        bess_spec.get("materialized_params"),
-        required_fields=["usable_capacity_kwh", "charge_power_kw", "discharge_power_kw", "operation_mode"],
+    materialized_params, materialization_error = _materialize_nn_source_params(
+        namespace="ZRODLO_NN_BESS",
+        catalog_ref=catalog_ref,
+        explicit_params=bess_spec.get("materialized_params"),
+        required_fields=["usable_capacity_kwh", "charge_power_kw", "discharge_power_kw"],
     )
+    if materialization_error is None:
+        operation_mode = (
+            bess_spec.get("operation_mode")
+            if bess_spec.get("operation_mode") is not None
+            else (
+                materialized_params.get("operation_mode")
+                if isinstance(materialized_params, dict)
+                else None
+            )
+        )
+        if operation_mode is None:
+            materialization_error = "catalog.materialization_incomplete"
+        else:
+            materialized_params = {
+                **(materialized_params or {}),
+                "operation_mode": operation_mode,
+            }
     if materialization_error:
         return _error_response(
             "Falownik BESS wymaga pełnej materializacji parametrów katalogowych.",
             materialization_error,
         )
 
-    seed = _compute_seed({"op": "bess_nn", "bus": bus_nn_ref, "e": bess_spec.get("usable_capacity_kwh", 0)})
+    usable_capacity_kwh = (
+        bess_spec.get("usable_capacity_kwh")
+        if bess_spec.get("usable_capacity_kwh") is not None
+        else materialized_params.get("usable_capacity_kwh")
+    )
+    charge_power_kw = (
+        bess_spec.get("charge_power_kw")
+        if bess_spec.get("charge_power_kw") is not None
+        else materialized_params.get("charge_power_kw")
+    )
+
+    seed = _compute_seed({"op": "bess_nn", "bus": bus_nn_ref, "e": usable_capacity_kwh or 0})
     bess_ref = _make_id("bess", seed, "inverter")
 
     new_enm = copy.deepcopy(enm)
@@ -890,7 +985,7 @@ def add_bess_inverter_nn(enm: dict[str, Any], payload: dict[str, Any]) -> dict[s
         "name": bess_spec.get("source_name") or "Falownik BESS",
         "bus_ref": bus_nn_ref,
         "gen_type": "BESS_INVERTER",
-        "p_mw": (bess_spec.get("charge_power_kw") or 0) / 1000.0,
+        "p_mw": (charge_power_kw or 0) / 1000.0,
         "q_mvar": 0.0,
         "catalog_ref": catalog_ref,
         "catalog_namespace": "ZRODLO_NN_BESS",
@@ -900,8 +995,8 @@ def add_bess_inverter_nn(enm: dict[str, Any], payload: dict[str, Any]) -> dict[s
         "in_service": True,
         "tags": [],
         "meta": {
-            "usable_capacity_kwh": bess_spec.get("usable_capacity_kwh"),
-            "operation_mode": bess_spec.get("operation_mode"),
+            "usable_capacity_kwh": usable_capacity_kwh,
+            "operation_mode": materialized_params.get("operation_mode"),
             "control_strategy": bess_spec.get("control_strategy"),
         },
     })

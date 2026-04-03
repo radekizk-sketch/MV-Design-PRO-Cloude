@@ -17,6 +17,7 @@
  * Namespace katalogu — mapuje na backend `_infer_namespace()`.
  */
 export type CatalogNamespace =
+  | 'ZRODLO_SN'
   | 'KABEL_SN'
   | 'TRAFO_SN_NN'
   | 'APARAT_SN'
@@ -33,6 +34,7 @@ export type CatalogNamespace =
  * Mapowanie 1:1 z backend _CATALOG_REQUIRED_OPERATIONS.
  */
 const CATALOG_REQUIRED_OPERATIONS: Record<string, CatalogNamespace> = {
+  add_grid_source_sn: 'ZRODLO_SN',
   continue_trunk_segment_sn: 'KABEL_SN',
   start_branch_segment_sn: 'KABEL_SN',
   insert_station_on_segment_sn: 'TRAFO_SN_NN',
@@ -52,16 +54,21 @@ const CATALOG_REQUIRED_OPERATIONS: Record<string, CatalogNamespace> = {
  * Uzywane do przelozenia kliknietego przycisku menu na operacje domenowa.
  */
 const ACTION_TO_OPERATION: Record<string, string> = {
+  add_gpz: 'add_grid_source_sn',
+  add_source: 'add_grid_source_sn',
   // K2: Terminal
   add_trunk_segment: 'continue_trunk_segment_sn',
   // K3: Segment
+  add_station: 'insert_station_on_segment_sn',
   insert_station_a: 'insert_station_on_segment_sn',
   insert_station_b: 'insert_station_on_segment_sn',
   insert_station_c: 'insert_station_on_segment_sn',
   insert_station_d: 'insert_station_on_segment_sn',
+  insert_switch: 'insert_section_switch_sn',
   insert_section_switch: 'insert_section_switch_sn',
   insert_disconnector: 'insert_section_switch_sn',
   // K4: Branch
+  add_cable: 'start_branch_segment_sn',
   add_branch: 'start_branch_segment_sn',
   // K5: Ring
   start_secondary_link: 'connect_secondary_ring_sn',
@@ -73,11 +80,21 @@ const ACTION_TO_OPERATION: Record<string, string> = {
   add_pv: 'add_pv_inverter_nn',
   add_bess: 'add_bess_inverter_nn',
   add_relay: 'add_relay',
+  add_protection: 'add_relay',
   add_ct: 'add_ct',
   add_vt: 'add_vt',
-  add_line: 'continue_trunk_segment_sn',
+  add_line: 'start_branch_segment_sn',
+  add_source_field: 'add_nn_outgoing_field',
+  add_source_field_nn: 'add_nn_outgoing_field',
   // Direct catalog operations
   add_load: 'add_nn_load',
+  assign_catalog: 'assign_catalog_to_element',
+  assign_tr_catalog: 'assign_catalog_to_element',
+  assign_bus_catalog: 'assign_catalog_to_element',
+  assign_inverter_catalog: 'assign_catalog_to_element',
+  assign_storage_catalog: 'assign_catalog_to_element',
+  assign_switch_catalog: 'assign_catalog_to_element',
+  assign_cable_catalog: 'assign_catalog_to_element',
 };
 
 /**
@@ -102,6 +119,7 @@ export function catalogNamespace(operationId: string): CatalogNamespace | undefi
  */
 export function catalogNamespaceLabel(ns: CatalogNamespace): string {
   const labels: Record<CatalogNamespace, string> = {
+    ZRODLO_SN: 'Zasilanie systemowe SN',
     KABEL_SN: 'Kabel/linia SN',
     TRAFO_SN_NN: 'Transformator SN/nN',
     APARAT_SN: 'Aparat SN',

@@ -1,12 +1,12 @@
 /**
  * Issue Panel Container — P30d
  *
- * Container for Issue Panel with data fetching and navigation logic.
+ * Container for Issue Panel with transitional canonical behavior.
  *
  * Features:
- * - Fetch issues from API (GET /api/issues/study-cases/{case_id}/issues)
- * - Navigate to object on click (Tree + SLD highlight)
- * - Mode gating (MODEL_EDIT / RESULT_VIEW)
+ * - Stara ścieżka problemów została wygaszona po PR #428
+ * - Panel nie wykonuje już martwych wywołań sieciowych
+ * - Zachowuje spójny stan bocznego panelu bez błędów 404
  */
 
 import React, { useEffect, useState } from 'react';
@@ -15,23 +15,11 @@ import type { Issue, IssueSeverity, IssueSource } from '../types';
 import { useSldEditorStore } from '../sld-editor/SldEditorStore';
 import { useAppStateStore } from '../app-state/store';
 
-// =============================================================================
-// API Client
-// =============================================================================
-
 interface IssuesResponse {
   issues: Issue[];
   total_count: number;
   by_severity: Record<IssueSeverity, number>;
   by_source: Record<IssueSource, number>;
-}
-
-async function fetchIssues(caseId: string): Promise<IssuesResponse> {
-  const response = await fetch(`/api/issues/study-cases/${caseId}/issues`);
-  if (!response.ok) {
-    throw new Error(`Failed to fetch issues: ${response.statusText}`);
-  }
-  return response.json();
 }
 
 // =============================================================================
@@ -44,47 +32,29 @@ export interface IssuePanelContainerProps {
 
 export const IssuePanelContainer: React.FC<IssuePanelContainerProps> = ({ caseId }) => {
   const [issuesData, setIssuesData] = useState<IssuesResponse | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
   const sldStore = useSldEditorStore();
   const activeMode = useAppStateStore((state) => state.activeMode);
 
-  // Fetch issues when case changes
   useEffect(() => {
     if (!caseId) {
       setIssuesData(null);
       return;
     }
-
-    let cancelled = false;
-
-    const loadIssues = async () => {
-      setLoading(true);
-      setError(null);
-
-      try {
-        const data = await fetchIssues(caseId);
-        if (!cancelled) {
-          setIssuesData(data);
-        }
-      } catch (err) {
-        if (!cancelled) {
-          setError(err instanceof Error ? err.message : 'Unknown error');
-          setIssuesData(null);
-        }
-      } finally {
-        if (!cancelled) {
-          setLoading(false);
-        }
-      }
-    };
-
-    loadIssues();
-
-    return () => {
-      cancelled = true;
-    };
+    setIssuesData({
+      issues: [],
+      total_count: 0,
+      by_severity: {
+        INFO: 0,
+        WARN: 0,
+        HIGH: 0,
+      },
+      by_source: {
+        MODEL: 0,
+        POWER_FLOW: 0,
+        PROTECTION: 0,
+      },
+    });
   }, [caseId]);
 
   /**
@@ -98,33 +68,11 @@ export const IssuePanelContainer: React.FC<IssuePanelContainerProps> = ({ caseId
     // Highlight on SLD with severity-based color
     sldStore.highlightSymbols([id], issue.severity);
 
-    // TODO: Navigate to object in Tree
-    // This would use a ProjectTree API to expand and select the node
-    // For now, just highlight on SLD
-
     // In RESULT_VIEW, show info that editing is not allowed
     if (activeMode === 'RESULT_VIEW') {
       console.info('RESULT_VIEW: Edycja elementu niedostępna w trybie przeglądania wyników.');
     }
   };
-
-  // Loading state
-  if (loading) {
-    return (
-      <div className="h-full flex items-center justify-center bg-white">
-        <div className="text-gray-500">Ładowanie problemów...</div>
-      </div>
-    );
-  }
-
-  // Error state
-  if (error) {
-    return (
-      <div className="h-full flex items-center justify-center bg-white">
-        <div className="text-red-600">Błąd: {error}</div>
-      </div>
-    );
-  }
 
   // No case selected
   if (!caseId || !issuesData) {
@@ -132,6 +80,17 @@ export const IssuePanelContainer: React.FC<IssuePanelContainerProps> = ({ caseId
       <div className="h-full flex items-center justify-center bg-white">
         <div className="text-gray-500 text-sm text-center">
           Wybierz przypadek obliczeniowy<br />aby zobaczyć problemy.
+        </div>
+      </div>
+    );
+  }
+
+  if (issuesData.total_count === 0) {
+    return (
+      <div className="h-full flex items-center justify-center bg-white">
+        <div className="text-gray-500 text-sm text-center px-4">
+          Panel problemów korzystał ze starej ścieżki, która została wygaszona.
+          Używaj paska gotowości i komunikatów walidacji w kanonicznym przepływie ENM.
         </div>
       </div>
     );

@@ -18,6 +18,7 @@ import { CreatorToolbar } from './CreatorToolbar';
 import type { CreatorTool } from './CreatorToolbar';
 import { ReadinessPanel } from './ReadinessPanel';
 import type { FixAction, LogicalViewsV1 } from '../../types/enm';
+import { useNetworkBuildStore } from '../network-build/networkBuildStore';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -60,9 +61,9 @@ export function CreatorPanel({
     loading,
     error,
     errorCode,
-    executeDomainOperation,
     clearError,
   } = useSnapshotStore();
+  const openOperationForm = useNetworkBuildStore((state) => state.openOperationForm);
 
   const [activeTool, setActiveTool] = useState<CreatorTool>(null);
 
@@ -98,12 +99,12 @@ export function CreatorPanel({
 
   // Quick actions that don't need SLD context
   const handleAddGpz = useCallback(async () => {
-    await executeDomainOperation(caseId, 'add_grid_source_sn', {
-      voltage_kv: 15.0,
-      sk3_mva: 250.0,
+    openOperationForm('add_grid_source_sn', {
+      source: 'creator_panel',
+      case_id: caseId,
     });
     setActiveTool(null);
-  }, [caseId, executeDomainOperation]);
+  }, [caseId, openOperationForm]);
 
   // Element counts for summary
   const busCount = snapshot?.buses?.length ?? 0;

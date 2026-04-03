@@ -86,37 +86,52 @@ function normalizeSelectionHint(
 function normalizeMaterializedParams(
   materializedParams: DomainOpResponse['materialized_params'],
 ): DomainOpResponseV1['materialized_params'] {
-  const linesSource = materializedParams?.lines_sn ?? {};
-  const transformersSource = materializedParams?.transformers_sn_nn ?? {};
+  const normalizedNamespaces = Object.fromEntries(
+    Object.entries(materializedParams ?? {}).map(([namespace, namespaceEntries]) => [
+      namespace,
+      Object.fromEntries(
+        Object.entries(namespaceEntries ?? {}).map(([refId, params]) => [
+          refId,
+          {
+            ...params,
+            catalog_item_id:
+              typeof params.catalog_item_id === 'string' ? params.catalog_item_id : '',
+            catalog_item_version: getNullableString(params.catalog_item_version),
+          },
+        ]),
+      ),
+    ]),
+  ) as DomainOpResponseV1['materialized_params'];
+
+  normalizedNamespaces.lines_sn = Object.fromEntries(
+    Object.entries(normalizedNamespaces.lines_sn ?? {}).map(([refId, params]) => [
+      refId,
+      {
+        ...params,
+        r_ohm_per_km: getNullableNumber(params.r_ohm_per_km),
+        x_ohm_per_km: getNullableNumber(params.x_ohm_per_km),
+        i_max_a: getNullableNumber(params.i_max_a),
+      },
+    ]),
+  );
+
+  normalizedNamespaces.transformers_sn_nn = Object.fromEntries(
+    Object.entries(normalizedNamespaces.transformers_sn_nn ?? {}).map(([refId, params]) => [
+      refId,
+      {
+        ...params,
+        u_k_percent: getNullableNumber(params.u_k_percent),
+        p0_kw: getNullableNumber(params.p0_kw),
+        pk_kw: getNullableNumber(params.pk_kw),
+        s_n_kva: getNullableNumber(params.s_n_kva),
+      },
+    ]),
+  );
 
   return {
-    lines_sn: Object.fromEntries(
-      Object.entries(linesSource).map(([refId, params]) => [
-        refId,
-        {
-          catalog_item_id:
-            typeof params.catalog_item_id === 'string' ? params.catalog_item_id : '',
-          catalog_item_version: getNullableString(params.catalog_item_version),
-          r_ohm_per_km: getNullableNumber(params.r_ohm_per_km),
-          x_ohm_per_km: getNullableNumber(params.x_ohm_per_km),
-          i_max_a: getNullableNumber(params.i_max_a),
-        },
-      ]),
-    ),
-    transformers_sn_nn: Object.fromEntries(
-      Object.entries(transformersSource).map(([refId, params]) => [
-        refId,
-        {
-          catalog_item_id:
-            typeof params.catalog_item_id === 'string' ? params.catalog_item_id : '',
-          catalog_item_version: getNullableString(params.catalog_item_version),
-          u_k_percent: getNullableNumber(params.u_k_percent),
-          p0_kw: getNullableNumber(params.p0_kw),
-          pk_kw: getNullableNumber(params.pk_kw),
-          s_n_kva: getNullableNumber(params.s_n_kva),
-        },
-      ]),
-    ),
+    ...normalizedNamespaces,
+    lines_sn: normalizedNamespaces.lines_sn ?? {},
+    transformers_sn_nn: normalizedNamespaces.transformers_sn_nn ?? {},
   };
 }
 
@@ -166,6 +181,7 @@ export async function executeDomainOp(
   caseId: string,
   opName: string,
   payload: Record<string, unknown>,
+  snapshotBaseHash = '',
 ): Promise<DomainOpResponseV1> {
   const canonicalName = resolveCanonicalName(opName);
   const endpoint = `${API_BASE}/${caseId}/enm/domain-ops`;
@@ -174,7 +190,7 @@ export async function executeDomainOp(
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       project_id: caseId,
-      snapshot_base_hash: '',
+      snapshot_base_hash: snapshotBaseHash,
       operation: {
         name: canonicalName,
         idempotency_key: buildIdempotencyKey(canonicalName, payload),

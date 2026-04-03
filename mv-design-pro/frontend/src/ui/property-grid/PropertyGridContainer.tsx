@@ -13,7 +13,6 @@
  * - Single-select: PropertyGrid (classic)
  * - Multi-select: PropertyGridMultiEdit (P30c)
  * - Type assignment via domain operation assign_catalog_to_element
- * - Type clearing via domain operation assign_catalog_to_element (null)
  * - Element data refresh after type changes
  */
 
@@ -26,8 +25,9 @@ import { useMultiSelection } from '../selection';
 import { useSnapshotStore } from '../topology/snapshotStore';
 import { useAppStateStore } from '../app-state';
 import { notify } from '../notifications/store';
+import { NAMESPACE_TO_PICKER_CATEGORY } from '../catalog/elementCatalogRegistry';
 import type { ElementType, ValidationMessage } from '../types';
-import type { TypeCategory } from '../catalog/types';
+import type { CatalogNamespace, TypeCategory } from '../catalog/types';
 import type { ElementData } from './multi-edit-helpers';
 
 interface PropertyGridContainerProps {
@@ -76,14 +76,22 @@ export function PropertyGridContainer({
   const executeDomainOperation = useSnapshotStore((state) => state.executeDomainOperation);
   const activeCaseId = useAppStateStore((state) => state.activeCaseId);
 
-  // Determine type category and current type_ref based on element type
+  // Determine explicit catalog category and current type_ref based on element data.
   const getTypeCategoryAndRef = (): { category: TypeCategory | null; currentTypeRef: string | null } => {
+    const explicitNamespace =
+      typeof elementData.catalog_namespace === 'string'
+        ? (elementData.catalog_namespace as CatalogNamespace)
+        : typeof (elementData.catalog_binding as { namespace?: unknown } | undefined)?.namespace === 'string'
+          ? ((elementData.catalog_binding as { namespace: CatalogNamespace }).namespace)
+          : null;
+
     switch (elementType) {
       case 'LineBranch': {
-        const branchType = elementData.branch_type as string;
-        const category = branchType === 'CABLE' ? 'CABLE' : 'LINE';
         const currentTypeRef = elementData.type_ref as string | null;
-        return { category, currentTypeRef };
+        return {
+          category: explicitNamespace ? NAMESPACE_TO_PICKER_CATEGORY[explicitNamespace] ?? null : null,
+          currentTypeRef,
+        };
       }
       case 'TransformerBranch': {
         const currentTypeRef = elementData.type_ref as string | null;
@@ -102,44 +110,15 @@ export function PropertyGridContainer({
   const handleAssignType = useCallback(() => {
     const { category } = getTypeCategoryAndRef();
     if (!category) {
-      console.error('Cannot assign type: unknown element type or category');
+      const message = 'Brak jawnego kontekstu katalogowego dla wybranego elementu.';
+      setError(message);
+      notify(message, 'error');
       return;
     }
     setTypePickerCategory(category);
     setIsTypePickerOpen(true);
     setError(null);
   }, [elementType, elementData]);
-
-  // Handle "Clear Type" — via domain operation assign_catalog_to_element (null)
-  const handleClearType = useCallback(async () => {
-    if (!elementId || !activeCaseId) {
-      if (!activeCaseId) notify('Brak aktywnego Study Case', 'error');
-      return;
-    }
-
-    setIsProcessing(true);
-    setError(null);
-
-    try {
-      const response = await executeDomainOperation(activeCaseId, 'assign_catalog_to_element', {
-        element_ref: elementId,
-        catalog_item_id: null,
-        source: 'property_grid',
-      });
-
-      if (response && !response.error) {
-        notify('Typ z katalogu wyczyszczony', 'success');
-        if (onDataRefresh) onDataRefresh();
-      } else {
-        setError(response?.error ?? 'Nieznany błąd');
-      }
-    } catch (err) {
-      const errorMsg = err instanceof Error ? err.message : 'Nieznany błąd';
-      setError(`Błąd czyszczenia typu: ${errorMsg}`);
-    } finally {
-      setIsProcessing(false);
-    }
-  }, [elementId, activeCaseId, executeDomainOperation, onDataRefresh]);
 
   // Handle type selection — via domain operation assign_catalog_to_element
   const handleSelectType = useCallback(
@@ -216,7 +195,6 @@ export function PropertyGridContainer({
             validationMessages={validationMessages}
             onFieldChange={onFieldChange}
             onAssignType={handleAssignType}
-            onClearType={handleClearType}
           />
 
           {/* Diagnostics Section (reuse from #238) - shows protection sanity results */}

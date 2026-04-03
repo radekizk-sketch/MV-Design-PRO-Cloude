@@ -15,6 +15,183 @@ import type {
 
 const API_BASE = '/api/catalog/protection';
 
+const NETWORK_ERROR_MESSAGE =
+  'Nie mozna polaczyc sie z API katalogu zabezpieczen. Uruchom backend i odswiez widok.';
+
+function getParams(item: Record<string, unknown>): Record<string, unknown> {
+  return typeof item.params === 'object' && item.params !== null
+    ? (item.params as Record<string, unknown>)
+    : item;
+}
+
+function normalizeProtectionDeviceType(item: Record<string, unknown>): ProtectionDeviceType {
+  const params = getParams(item);
+  return {
+    id: String(item.id ?? ''),
+    name_pl: String(item.name_pl ?? params.name_pl ?? item.name ?? params.name ?? item.id ?? ''),
+    vendor:
+      typeof params.vendor === 'string'
+        ? params.vendor
+        : typeof item.vendor === 'string'
+          ? item.vendor
+          : undefined,
+    model:
+      typeof params.model === 'string'
+        ? params.model
+        : typeof item.model === 'string'
+          ? item.model
+          : undefined,
+    series:
+      typeof params.series === 'string'
+        ? params.series
+        : typeof item.series === 'string'
+          ? item.series
+          : undefined,
+    revision:
+      typeof params.revision === 'string'
+        ? params.revision
+        : typeof item.revision === 'string'
+          ? item.revision
+          : undefined,
+    rated_current_a:
+      typeof params.rated_current_a === 'number'
+        ? params.rated_current_a
+        : typeof item.rated_current_a === 'number'
+          ? item.rated_current_a
+          : undefined,
+    notes_pl:
+      typeof params.notes_pl === 'string'
+        ? params.notes_pl
+        : typeof item.notes_pl === 'string'
+          ? item.notes_pl
+          : undefined,
+    source_catalog:
+      typeof params.source_catalog === 'string'
+        ? params.source_catalog
+        : typeof item.source_catalog === 'string'
+          ? item.source_catalog
+          : undefined,
+    unverified:
+      typeof params.unverified === 'boolean'
+        ? params.unverified
+        : typeof item.unverified === 'boolean'
+          ? item.unverified
+          : undefined,
+    unverified_ranges:
+      typeof params.unverified_ranges === 'boolean'
+        ? params.unverified_ranges
+        : typeof item.unverified_ranges === 'boolean'
+          ? item.unverified_ranges
+          : undefined,
+    functions_supported: Array.isArray(params.functions_supported)
+      ? params.functions_supported.filter((value): value is string => typeof value === 'string')
+      : undefined,
+    curves_supported: Array.isArray(params.curves_supported)
+      ? params.curves_supported.filter((value): value is string => typeof value === 'string')
+      : undefined,
+    i_pickup_51_a_min:
+      typeof params.i_pickup_51_a_min === 'number' ? params.i_pickup_51_a_min : undefined,
+    i_pickup_51_a_max:
+      typeof params.i_pickup_51_a_max === 'number' ? params.i_pickup_51_a_max : undefined,
+    tms_51_min: typeof params.tms_51_min === 'number' ? params.tms_51_min : undefined,
+    tms_51_max: typeof params.tms_51_max === 'number' ? params.tms_51_max : undefined,
+    i_inst_50_a_min:
+      typeof params.i_inst_50_a_min === 'number' ? params.i_inst_50_a_min : undefined,
+    i_inst_50_a_max:
+      typeof params.i_inst_50_a_max === 'number' ? params.i_inst_50_a_max : undefined,
+    i_pickup_51n_a_min:
+      typeof params.i_pickup_51n_a_min === 'number' ? params.i_pickup_51n_a_min : undefined,
+    i_pickup_51n_a_max:
+      typeof params.i_pickup_51n_a_max === 'number' ? params.i_pickup_51n_a_max : undefined,
+    tms_51n_min: typeof params.tms_51n_min === 'number' ? params.tms_51n_min : undefined,
+    tms_51n_max: typeof params.tms_51n_max === 'number' ? params.tms_51n_max : undefined,
+    i_inst_50n_a_min:
+      typeof params.i_inst_50n_a_min === 'number' ? params.i_inst_50n_a_min : undefined,
+    i_inst_50n_a_max:
+      typeof params.i_inst_50n_a_max === 'number' ? params.i_inst_50n_a_max : undefined,
+  };
+}
+
+function normalizeProtectionCurve(item: Record<string, unknown>): ProtectionCurve {
+  const params = getParams(item);
+  return {
+    id: String(item.id ?? ''),
+    name_pl: String(item.name_pl ?? params.name_pl ?? item.name ?? params.name ?? item.id ?? ''),
+    standard:
+      typeof params.standard === 'string'
+        ? params.standard
+        : typeof item.standard === 'string'
+          ? item.standard
+          : undefined,
+    curve_kind:
+      typeof params.curve_kind === 'string'
+        ? params.curve_kind
+        : typeof item.curve_kind === 'string'
+          ? item.curve_kind
+          : undefined,
+    parameters:
+      typeof params.parameters === 'object' && params.parameters !== null
+        ? (params.parameters as Record<string, any>)
+        : undefined,
+  };
+}
+
+function normalizeProtectionTemplate(item: Record<string, unknown>): ProtectionSettingTemplate {
+  const params = getParams(item);
+  return {
+    id: String(item.id ?? ''),
+    name_pl: String(item.name_pl ?? params.name_pl ?? item.name ?? params.name ?? item.id ?? ''),
+    device_type_ref:
+      typeof params.device_type_ref === 'string'
+        ? params.device_type_ref
+        : typeof item.device_type_ref === 'string'
+          ? item.device_type_ref
+          : undefined,
+    curve_ref:
+      typeof params.curve_ref === 'string'
+        ? params.curve_ref
+        : typeof item.curve_ref === 'string'
+          ? item.curve_ref
+          : undefined,
+    setting_fields: Array.isArray(params.setting_fields)
+      ? params.setting_fields.map((field) => ({
+          name: String((field as Record<string, unknown>).name ?? ''),
+          unit:
+            typeof (field as Record<string, unknown>).unit === 'string'
+              ? String((field as Record<string, unknown>).unit)
+              : undefined,
+          min:
+            typeof (field as Record<string, unknown>).min === 'number'
+              ? Number((field as Record<string, unknown>).min)
+              : undefined,
+          max:
+            typeof (field as Record<string, unknown>).max === 'number'
+              ? Number((field as Record<string, unknown>).max)
+              : undefined,
+        }))
+      : undefined,
+  };
+}
+
+async function fetchProtectionJson<T>(endpoint: string): Promise<T> {
+  try {
+    const response = await fetch(endpoint);
+
+    if (!response.ok) {
+      throw new Error(
+        `Nie udalo sie pobrac danych katalogu zabezpieczen: ${response.statusText}`,
+      );
+    }
+
+    return await response.json();
+  } catch (error) {
+    if (error instanceof TypeError) {
+      throw new Error(NETWORK_ERROR_MESSAGE);
+    }
+    throw error;
+  }
+}
+
 /**
  * Fetch protection types by category
  */
@@ -34,23 +211,21 @@ export async function fetchProtectionTypesByCategory(
       endpoint = `${API_BASE}/templates`;
       break;
     default:
-      throw new Error(`Unknown category: ${category}`);
+      throw new Error(`Nieznana kategoria katalogu zabezpieczen: ${category}`);
   }
 
-  const response = await fetch(endpoint);
+  const data = await fetchProtectionJson<Array<Record<string, unknown>>>(endpoint);
 
-  if (!response.ok) {
-    throw new Error(`Failed to fetch protection types: ${response.statusText}`);
+  switch (category) {
+    case 'DEVICE':
+      return data.map(normalizeProtectionDeviceType);
+    case 'CURVE':
+      return data.map(normalizeProtectionCurve);
+    case 'TEMPLATE':
+      return data.map(normalizeProtectionTemplate);
+    default:
+      return [];
   }
-
-  const data = await response.json();
-
-  // Transform backend format {id, name_pl, params} to frontend format
-  return data.map((item: any) => ({
-    id: item.id,
-    name_pl: item.name_pl,
-    ...item.params,
-  }));
 }
 
 /**
@@ -66,15 +241,13 @@ export async function fetchProtectionDeviceType(
   }
 
   if (!response.ok) {
-    throw new Error(`Failed to fetch protection device type: ${response.statusText}`);
+    throw new Error(
+      `Nie udalo sie pobrac typu urzadzenia zabezpieczeniowego: ${response.statusText}`,
+    );
   }
 
-  const data = await response.json();
-  return {
-    id: data.id,
-    name_pl: data.name_pl,
-    ...data.params,
-  };
+  const data = (await response.json()) as Record<string, unknown>;
+  return normalizeProtectionDeviceType(data);
 }
 
 /**
@@ -88,15 +261,11 @@ export async function fetchProtectionCurve(curveId: string): Promise<ProtectionC
   }
 
   if (!response.ok) {
-    throw new Error(`Failed to fetch protection curve: ${response.statusText}`);
+    throw new Error(`Nie udalo sie pobrac krzywej zabezpieczenia: ${response.statusText}`);
   }
 
-  const data = await response.json();
-  return {
-    id: data.id,
-    name_pl: data.name_pl,
-    ...data.params,
-  };
+  const data = (await response.json()) as Record<string, unknown>;
+  return normalizeProtectionCurve(data);
 }
 
 /**
@@ -112,15 +281,11 @@ export async function fetchProtectionSettingTemplate(
   }
 
   if (!response.ok) {
-    throw new Error(`Failed to fetch protection setting template: ${response.statusText}`);
+    throw new Error(`Nie udalo sie pobrac szablonu nastaw zabezpieczenia: ${response.statusText}`);
   }
 
-  const data = await response.json();
-  return {
-    id: data.id,
-    name_pl: data.name_pl,
-    ...data.params,
-  };
+  const data = (await response.json()) as Record<string, unknown>;
+  return normalizeProtectionTemplate(data);
 }
 
 // ============================================================================
@@ -183,7 +348,7 @@ export async function exportProtectionLibrary(params?: {
   const response = await fetch(url);
 
   if (!response.ok) {
-    throw new Error(`Failed to export protection library: ${response.statusText}`);
+    throw new Error(`Nie udalo sie wyeksportowac biblioteki zabezpieczen: ${response.statusText}`);
   }
 
   return await response.json();
@@ -206,7 +371,7 @@ export async function importProtectionLibrary(
 
   if (!response.ok) {
     // Try to parse error details
-    let errorMessage = `Import failed: ${response.statusText}`;
+    let errorMessage = `Import biblioteki zabezpieczen nie udal sie: ${response.statusText}`;
     try {
       const errorData = await response.json();
       if (errorData.detail) {

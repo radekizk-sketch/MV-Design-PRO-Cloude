@@ -24,7 +24,7 @@ def build_run_trace_payload(run: CanonicalRun) -> dict[str, Any] | list[dict[str
     if run.analysis_type == "PF":
         return run.power_flow_trace
     if run.white_box_trace:
-        return list(run.white_box_trace)
+        return build_extended_trace(run).get("white_box_trace", [])
     return None
 
 
@@ -213,7 +213,12 @@ def get_power_flow_trace(run: CanonicalRun) -> dict[str, Any]:
         raise ValueError(f"Przebieg {run.id} nie jest zakończony (status={run.status})")
     if run.power_flow_trace is None:
         raise ValueError(f"Ślad obliczeniowy nie jest dostępny dla przebiegu {run.id}")
-    return run.power_flow_trace
+    trace = dict(run.power_flow_trace)
+    extended_trace = build_extended_trace(run)
+    trace.setdefault("catalog_context", extended_trace.get("catalog_context", []))
+    trace.setdefault("catalog_context_by_element", extended_trace.get("catalog_context_by_element", {}))
+    trace.setdefault("catalog_context_summary", extended_trace.get("catalog_context_summary", {}))
+    return trace
 
 
 def build_power_flow_interpretation(run: CanonicalRun) -> dict[str, Any]:
@@ -267,9 +272,17 @@ def build_power_flow_interpretation(run: CanonicalRun) -> dict[str, Any]:
 
 
 def build_power_flow_export_bundle(run: CanonicalRun) -> dict[str, Any]:
+    extended_trace = build_extended_trace(run)
     return {
         "result": get_power_flow_result(run),
         "trace": get_power_flow_trace(run),
+        "white_box_trace": extended_trace.get("white_box_trace", []),
+        "catalog_context": extended_trace.get("catalog_context", []),
+        "catalog_context_by_element": extended_trace.get("catalog_context_by_element", {}),
+        "catalog_context_summary": extended_trace.get("catalog_context_summary", {}),
+        "bus_results": build_bus_results(run),
+        "branch_results": build_branch_results(run),
+        "results_index": build_results_index(run),
         "metadata": {
             "run_id": str(run.id),
             "project_id": run.project_id,
@@ -277,6 +290,8 @@ def build_power_flow_export_bundle(run: CanonicalRun) -> dict[str, Any]:
             "created_at": run.created_at.isoformat(),
             "input_hash": run.input_hash,
             "snapshot_hash": run.snapshot_hash,
+            "catalog_context_count": len(extended_trace.get("catalog_context", [])),
+            "manual_override_count": (extended_trace.get("catalog_context_summary", {}) or {}).get("manual_override_count", 0),
         },
     }
 

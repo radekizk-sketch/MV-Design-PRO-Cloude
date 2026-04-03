@@ -329,6 +329,11 @@ export function ProtectionLibraryBrowser({
                         {(type as any).vendor}
                       </div>
                     )}
+                    {(type as any).unverified && (
+                      <div className="mt-1 text-xs font-medium text-amber-700">
+                        Dane analityczne - wymagaja weryfikacji
+                      </div>
+                    )}
                   </button>
                 ))}
               </div>
@@ -407,8 +412,15 @@ function TypeDetailsPanel({
 function DeviceTypeDetails({ type }: { type: ProtectionDeviceType }) {
   return (
     <>
+      {type.unverified && (
+        <div className="rounded border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+          Rekord analityczny. Dane urzadzenia lub zakresow nie sa jeszcze zweryfikowane
+          produkcyjnie.
+        </div>
+      )}
       <DetailField label="Nazwa (PL)" value={type.name_pl} />
       <DetailField label="Producent" value={type.vendor} />
+      <DetailField label="Model" value={type.model} />
       <DetailField label="Seria" value={type.series} />
       <DetailField label="Rewizja" value={type.revision} />
       <DetailField
@@ -416,7 +428,46 @@ function DeviceTypeDetails({ type }: { type: ProtectionDeviceType }) {
         value={type.rated_current_a}
         unit="A"
       />
+      <DetailField label="Zrodlo danych" value={type.source_catalog} />
+      <DetailField
+        label="Status weryfikacji"
+        value={type.unverified ? 'NIEZWERYFIKOWANY' : 'Zweryfikowany'}
+      />
+      <DetailField
+        label="Zakresy nastaw"
+        value={type.unverified_ranges ? 'Wymagaja weryfikacji' : 'Zweryfikowane'}
+      />
       <DetailField label="Notatki (PL)" value={type.notes_pl} multiline />
+      {type.functions_supported && type.functions_supported.length > 0 && (
+        <DetailField label="Funkcje" value={type.functions_supported.join(', ')} multiline />
+      )}
+      {type.curves_supported && type.curves_supported.length > 0 && (
+        <DetailField label="Krzywe" value={type.curves_supported.join(', ')} multiline />
+      )}
+      <SettingRangeField
+        label="51 fazowe"
+        min={type.i_pickup_51_a_min}
+        max={type.i_pickup_51_a_max}
+        unit="A"
+      />
+      <SettingRangeField
+        label="50 fazowe"
+        min={type.i_inst_50_a_min}
+        max={type.i_inst_50_a_max}
+        unit="A"
+      />
+      <SettingRangeField
+        label="51N ziemnozwarciowe"
+        min={type.i_pickup_51n_a_min}
+        max={type.i_pickup_51n_a_max}
+        unit="A"
+      />
+      <SettingRangeField
+        label="50N ziemnozwarciowe"
+        min={type.i_inst_50n_a_min}
+        max={type.i_inst_50n_a_max}
+        unit="A"
+      />
     </>
   );
 }
@@ -501,6 +552,24 @@ function DetailField({
       </span>
     </div>
   );
+}
+
+function SettingRangeField({
+  label,
+  min,
+  max,
+  unit,
+}: {
+  label: string;
+  min?: number;
+  max?: number;
+  unit: string;
+}) {
+  if (min === undefined || max === undefined) {
+    return null;
+  }
+
+  return <DetailField label={label} value={`${min} - ${max}`} unit={unit} />;
 }
 
 /**

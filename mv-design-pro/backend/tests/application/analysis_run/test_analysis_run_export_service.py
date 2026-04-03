@@ -63,11 +63,29 @@ def _build_export_service() -> tuple[AnalysisRunExportService, dict[str, UUID]]:
         input_snapshot={
             "snapshot_id": str(uuid4()),
             "fault_spec": {"node_id": node_id_str},
+            "sources": [
+                {
+                    "ref_id": node_id_str,
+                    "name": "GPZ-1",
+                    "catalog_ref": "src-gpz-15kv-250mva-rx010",
+                    "catalog_namespace": "ZRODLO_SN",
+                    "catalog_version": "2026.04",
+                    "materialized_params": {"sk3_mva": 250.0, "rx_ratio": 0.1},
+                    "parameter_source": "OVERRIDE",
+                    "overrides": [
+                        {
+                            "key": "sk3_mva",
+                            "value": 250.0,
+                            "reason": "warunki przylaczenia",
+                        }
+                    ],
+                }
+            ],
         },
         input_hash="hash-sc",
         result_summary={"status": "FINISHED", "connection_node_id": str(uuid4())},
         white_box_trace=[
-            {"key": "step_a", "title": "Step A", "notes": "ok"},
+            {"key": "step_a", "title": "Step A", "target_id": node_id_str, "notes": "ok"},
             {"key": "step_b", "title": "Step B", "notes": None, "metrics": {"k": 1}},
         ],
     )
@@ -114,3 +132,24 @@ def test_export_uses_persisted_data_only(monkeypatch: pytest.MonkeyPatch) -> Non
 
     bundle = service.export_run_bundle(data["run_id"])
     assert bundle["run"]["id"] == str(data["run_id"])
+
+
+def test_export_bundle_exposes_catalog_context_and_step_provenance() -> None:
+    service, data = _build_export_service()
+
+    bundle = service.export_run_bundle(data["run_id"])
+
+    assert bundle["catalog_context_summary"] == {
+        "element_count": 1,
+        "by_type": {"ZRODLO_SN": 1},
+        "by_parameter_origin": {"OVERRIDE": 1},
+        "manual_override_element_count": 1,
+        "manual_override_count": 1,
+    }
+    assert bundle["catalog_context_by_element"][str(bundle["catalog_context"][0]["element_id"])]["source_catalog_label"] == "ZRODLO_SN:src-gpz-15kv-250mva-rx010@2026.04"
+    assert bundle["white_box_trace"][0]["target_id"] == bundle["catalog_context"][0]["element_id"]
+    assert bundle["white_box_trace"][0]["catalog_context_entry"]["materialized_params"] == {
+        "sk3_mva": 250.0,
+        "rx_ratio": 0.1,
+    }
+    assert bundle["white_box_trace"][0]["manual_override_count"] == 1

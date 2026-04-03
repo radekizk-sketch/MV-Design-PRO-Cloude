@@ -1,0 +1,21 @@
+name: Architectural And Repo Hygiene Guard
+
+on:
+  pull_request:
+  push:
+
+jobs:
+  arch-guard:
+    name: Architecture and catalog-first repo hygiene
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+      - name: Run architectural guard
+        run: python mv-design-pro/scripts/arch_guard.py
+      - name: Run catalog-first repo hygiene guard
+        run: python mv-design-pro/scripts/repo_hygiene_guard.py

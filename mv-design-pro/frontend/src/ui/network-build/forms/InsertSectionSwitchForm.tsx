@@ -16,6 +16,7 @@ import { useSnapshotStore } from '../../topology/snapshotStore';
 import { useNetworkBuildStore } from '../networkBuildStore';
 import { useAppStateStore } from '../../app-state';
 import { validateCatalogFirst } from './catalogFirstRules';
+import { normalizeCatalogBinding, normalizeSwitchState } from './catalogPayload';
 
 export function InsertSectionSwitchForm() {
   const context = useNetworkBuildStore((s) => s.activeOperationForm?.context);
@@ -24,20 +25,23 @@ export function InsertSectionSwitchForm() {
   const activeCaseId = useAppStateStore((s) => s.activeCaseId);
   const [catalogError, setCatalogError] = useState<string | null>(null);
 
-  const segmentRef = (context?.segmentRef as string) ?? '';
+  const segmentRef = ((context?.segmentRef as string) ?? (context?.segment_id as string) ?? (context?.segment_ref as string) ?? '').trim();
   const segmentLabel = (context?.segmentLabel as string) ?? segmentRef;
 
   const handleSubmit = useCallback(
     async (data: SectionSwitchFormData) => {
       if (!activeCaseId) return;
+      const catalogBinding = normalizeCatalogBinding(data.catalog_ref, 'APARAT_SN');
       const payload = {
-        ref_id: data.ref_id,
-        name: data.name,
-        switch_kind: data.switch_kind,
-        switch_state: data.switch_state,
-        segment_ref: data.segment_ref,
-        position_on_segment: data.position_on_segment,
-        catalog_binding: data.catalog_binding,
+        segment_id: data.segment_ref,
+        switch_name: data.name,
+        switch_type: data.switch_kind,
+        normal_state: normalizeSwitchState(data.switch_state),
+        insert_at: {
+          mode: 'RATIO',
+          value: data.position_on_segment,
+        },
+        catalog_binding: catalogBinding ?? undefined,
       };
       const validationError = validateCatalogFirst('insert_section_switch_sn', payload);
       if (validationError) {

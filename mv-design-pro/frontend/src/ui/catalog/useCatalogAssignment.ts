@@ -18,7 +18,7 @@ import {
   requiresCatalogBinding,
 } from './elementCatalogRegistry';
 import type { CatalogNamespace, TypeCategory } from './types';
-import { DEFAULT_CATALOG_VERSION } from '../sld/catalogDefaults';
+import { buildCatalogBinding } from './catalogBinding';
 
 // =============================================================================
 // Types
@@ -83,9 +83,9 @@ export interface CatalogAssignmentActions {
   ) => Promise<boolean>;
 
   /**
-   * Wyczyść przypisanie katalogowe.
+   * Próba odpięcia katalogu.
    *
-   * Wywołuje backend operation 'assign_catalog_to_element' z catalog_item_id = null.
+   * W trybie katalog-first jest blokowana dla elementów technicznych.
    */
   clearAssignment: (
     executeDomainOp: (
@@ -163,9 +163,9 @@ export function useCatalogAssignment(): [CatalogAssignmentState, CatalogAssignme
       try {
         await executeDomainOp(caseId, 'assign_catalog_to_element', {
           element_ref: state.target.elementRef,
-          catalog_item_id: typeId,
-          catalog_namespace: state.namespace,
-          catalog_item_version: DEFAULT_CATALOG_VERSION,
+          catalog_binding: state.namespace
+            ? buildCatalogBinding(state.namespace, typeId)
+            : undefined,
           source_mode: 'KATALOG',
         });
 
@@ -187,38 +187,25 @@ export function useCatalogAssignment(): [CatalogAssignmentState, CatalogAssignme
 
   const clearAssignment = useCallback(
     async (
-      executeDomainOp: (
+      _executeDomainOp: (
         caseId: string,
         opName: string,
         payload: Record<string, unknown>
       ) => Promise<unknown>,
-      caseId: string
+      _caseId: string
     ): Promise<boolean> => {
       if (!state.target) {
         setState((prev) => ({ ...prev, error: 'Brak wybranego elementu' }));
         return false;
       }
 
-      try {
-        await executeDomainOp(caseId, 'assign_catalog_to_element', {
-          element_ref: state.target.elementRef,
-          catalog_item_id: null,
-          catalog_namespace: state.namespace,
-        });
-
-        setState((prev) => ({
-          ...prev,
-          error: null,
-        }));
-        return true;
-      } catch (err: unknown) {
-        const message =
-          err instanceof Error ? err.message : 'Nieznany błąd czyszczenia katalogu';
-        setState((prev) => ({ ...prev, error: message }));
-        return false;
-      }
+      setState((prev) => ({
+        ...prev,
+        error: 'Odpięcie katalogu dla elementu technicznego jest niedopuszczalne.',
+      }));
+      return false;
     },
-    [state.target]
+    [state.namespace, state.target]
   );
 
   return [state, { openPicker, closePicker, confirmAssignment, clearAssignment }];

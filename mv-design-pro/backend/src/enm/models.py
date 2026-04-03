@@ -130,7 +130,10 @@ class BranchBase(ENMElement):
     to_bus_ref: str
     status: Literal["closed", "open"] = "closed"
     catalog_ref: str | None = None
+    catalog_namespace: str | None = None
     parameter_source: Literal["CATALOG", "OVERRIDE"] | None = None
+    source_mode: Literal["KATALOG", "MIGRACJA", "EKSPERCKI_RECZNY"] | None = None
+    materialized_params: dict | None = None
     overrides: list[ParameterOverride] = []
 
 
@@ -201,7 +204,10 @@ class Transformer(ENMElement):
     tap_max: int | None = None
     tap_step_percent: float | None = None
     catalog_ref: str | None = None
+    catalog_namespace: str | None = None
     parameter_source: Literal["CATALOG", "OVERRIDE"] | None = None
+    source_mode: Literal["KATALOG", "MIGRACJA", "EKSPERCKI_RECZNY"] | None = None
+    materialized_params: dict | None = None
     overrides: list[ParameterOverride] = []
 
 
@@ -213,6 +219,12 @@ class Transformer(ENMElement):
 class Source(ENMElement):
     bus_ref: str
     model: Literal["thevenin", "short_circuit_power", "external_grid"]
+    catalog_ref: str | None = None
+    catalog_namespace: str | None = None
+    parameter_source: Literal["CATALOG", "OVERRIDE"] | None = None
+    source_mode: Literal["KATALOG", "MIGRACJA", "EKSPERCKI_RECZNY"] | None = None
+    materialized_params: dict | None = None
+    overrides: list[ParameterOverride] = []
     sk3_mva: float | None = None
     ik3_ka: float | None = None
     r_ohm: float | None = None
@@ -236,8 +248,11 @@ class Load(ENMElement):
     q_mvar: float
     model: Literal["pq", "zip"] = "pq"
     catalog_ref: str | None = None
+    catalog_namespace: str | None = None
     quantity: int | None = None
     parameter_source: Literal["CATALOG", "OVERRIDE"] | None = None
+    source_mode: Literal["KATALOG", "MIGRACJA", "EKSPERCKI_RECZNY"] | None = None
+    materialized_params: dict | None = None
     overrides: list[ParameterOverride] = []
 
 
@@ -253,9 +268,12 @@ class Generator(ENMElement):
     gen_type: Literal["synchronous", "pv_inverter", "wind_inverter", "bess"] | None = None
     limits: GenLimits | None = None
     catalog_ref: str | None = None
+    catalog_namespace: str | None = None
     quantity: int | None = None
     n_parallel: int | None = None
     parameter_source: Literal["CATALOG", "OVERRIDE"] | None = None
+    source_mode: Literal["KATALOG", "MIGRACJA", "EKSPERCKI_RECZNY"] | None = None
+    materialized_params: dict | None = None
     overrides: list[ParameterOverride] = []
 
     # PV/BESS connection variant (KROK 2: explicit, no guessing)
@@ -298,7 +316,10 @@ class Measurement(ENMElement):
     connection: Literal["star", "delta", "single_phase"] = "star"
     purpose: Literal["protection", "metering", "combined"] = "protection"
     catalog_ref: str | None = None
+    catalog_namespace: str | None = None
     parameter_source: Literal["CATALOG", "OVERRIDE"] | None = None
+    source_mode: Literal["KATALOG", "MIGRACJA", "EKSPERCKI_RECZNY"] | None = None
+    materialized_params: dict | None = None
     overrides: list[ParameterOverride] = []
 
 
@@ -318,9 +339,12 @@ class ProtectionAssignment(ENMElement):
         "distance", "differential", "custom",
     ]
     catalog_ref: str | None = None
+    catalog_namespace: str | None = None
     settings: list[ProtectionSetting] = []
     is_enabled: bool = True
     parameter_source: Literal["CATALOG", "OVERRIDE"] | None = None
+    source_mode: Literal["KATALOG", "MIGRACJA", "EKSPERCKI_RECZNY"] | None = None
+    materialized_params: dict | None = None
     overrides: list[ParameterOverride] = []
 
 

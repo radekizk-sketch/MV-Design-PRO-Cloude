@@ -8,6 +8,7 @@ from api.enm import router as enm_router
 from enm.canonical_analysis import reset_canonical_runs
 from enm.models import EnergyNetworkModel
 from enm.store import reset_enm_store, set_enm
+from tests.catalog_test_helpers import gpz_payload, gpz_source_record
 
 
 def _seed_enm(case_id: str, payload: dict) -> None:
@@ -58,14 +59,16 @@ def _valid_enm_payload(name: str) -> dict:
         "sources": [
             {
                 "id": "00000000-0000-0000-0000-000000000002",
-                "ref_id": "s1",
-                "name": "S1",
                 "tags": [],
                 "meta": {},
-                "bus_ref": "b1",
-                "model": "short_circuit_power",
-                "sk3_mva": 220,
-                "rx_ratio": 0.1,
+                **gpz_source_record(
+                    ref_id="s1",
+                    name="S1",
+                    bus_ref="b1",
+                    voltage_kv=15.0,
+                    sk3_mva=200.0,
+                    rx_ratio=0.10,
+                ),
             }
         ],
         "loads": [],
@@ -140,7 +143,7 @@ class TestDomainOpsCatalogPolicy:
             json={
                 "operation": {
                     "name": "add_grid_source_sn",
-                    "payload": {"voltage_kv": 15.0, "sk3_mva": 250.0},
+                    "payload": gpz_payload(voltage_kv=15.0, sk3_mva=250.0, rx_ratio=0.10),
                 },
             },
         )
@@ -178,7 +181,7 @@ class TestDomainOpsCatalogPolicy:
             json={
                 "operation": {
                     "name": "add_grid_source_sn",
-                    "payload": {"voltage_kv": 15.0, "sk3_mva": 250.0},
+                    "payload": gpz_payload(voltage_kv=15.0, sk3_mva=250.0, rx_ratio=0.10),
                 },
             },
         )

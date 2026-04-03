@@ -70,7 +70,7 @@ describe('SectionSwitchModal — §8 UX 10/10', () => {
         switch_state: 'CLOSED',
         segment_ref: 'seg-001',
         position_on_segment: 0.5,
-        catalog_binding: null,
+        catalog_ref: null,
       };
 
       expect(data.ref_id).toBe('SW-001');
@@ -79,10 +79,10 @@ describe('SectionSwitchModal — §8 UX 10/10', () => {
       expect(data.switch_state).toBe('CLOSED');
       expect(data.segment_ref).toBe('seg-001');
       expect(data.position_on_segment).toBe(0.5);
-      expect(data.catalog_binding).toBeNull();
+      expect(data.catalog_ref).toBeNull();
     });
 
-    it('catalog_binding can be a string', () => {
+    it('catalog_ref can be a string', () => {
       const data: SectionSwitchFormData = {
         ref_id: 'SW-002',
         name: 'Lacznik S2',
@@ -90,10 +90,10 @@ describe('SectionSwitchModal — §8 UX 10/10', () => {
         switch_state: 'OPEN',
         segment_ref: 'seg-002',
         position_on_segment: 0.3,
-        catalog_binding: 'CAT-ABC-123',
+        catalog_ref: 'CAT-ABC-123',
       };
 
-      expect(data.catalog_binding).toBe('CAT-ABC-123');
+      expect(data.catalog_ref).toBe('CAT-ABC-123');
     });
   });
 
@@ -143,13 +143,13 @@ describe('SectionSwitchModal — §8 UX 10/10', () => {
         switch_state: 'CLOSED',
         segment_ref: '',
         position_on_segment: 0.5,
-        catalog_binding: null,
+        catalog_ref: null,
       };
 
       expect(defaults.switch_kind).toBe('ROZLACZNIK');
       expect(defaults.switch_state).toBe('CLOSED');
       expect(defaults.position_on_segment).toBe(0.5);
-      expect(defaults.catalog_binding).toBeNull();
+      expect(defaults.catalog_ref).toBeNull();
       expect(defaults.ref_id).toBe('');
       expect(defaults.name).toBe('');
     });
@@ -195,7 +195,7 @@ describe('SectionSwitchModal — §8 UX 10/10', () => {
         switch_state: 'CLOSED',
         segment_ref: 'seg-001',
         position_on_segment: 0.5,
-        catalog_binding: null,
+        catalog_ref: null,
       };
 
       expect(valid.ref_id.trim().length).toBeGreaterThan(0);

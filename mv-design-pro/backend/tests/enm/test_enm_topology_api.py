@@ -8,6 +8,7 @@ from api.enm import router as enm_router
 from enm.canonical_analysis import reset_canonical_runs
 from enm.models import EnergyNetworkModel
 from enm.store import reset_enm_store, set_enm
+from tests.catalog_test_helpers import gpz_source_record
 
 
 def _seed_enm(case_id: str, payload: dict) -> None:
@@ -75,14 +76,16 @@ def _valid_enm_with_topology():
         "sources": [
             {
                 "id": "00000000-0000-0000-0000-000000000104",
-                "ref_id": "src_1",
-                "name": "Grid",
                 "tags": [],
                 "meta": {},
-                "bus_ref": "bus_sn_a",
-                "model": "short_circuit_power",
-                "sk3_mva": 220,
-                "rx_ratio": 0.1,
+                **gpz_source_record(
+                    ref_id="src_1",
+                    name="Grid",
+                    bus_ref="bus_sn_a",
+                    voltage_kv=15.0,
+                    sk3_mva=200.0,
+                    rx_ratio=0.10,
+                ),
             },
         ],
         "branches": [

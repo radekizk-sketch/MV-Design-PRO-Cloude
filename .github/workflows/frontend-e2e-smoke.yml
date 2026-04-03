@@ -1,0 +1,50 @@
+name: Frontend E2E smoke
+
+on:
+  push:
+    paths:
+      - 'mv-design-pro/frontend/**'
+      - 'mv-design-pro/backend/**'
+      - '.github/workflows/frontend-e2e-smoke.yml'
+  pull_request:
+    paths:
+      - 'mv-design-pro/frontend/**'
+      - 'mv-design-pro/backend/**'
+      - '.github/workflows/frontend-e2e-smoke.yml'
+
+jobs:
+  critical-real-backend-e2e:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: mv-design-pro/frontend/package-lock.json
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install Poetry
+        uses: abatilo/actions-poetry@v3
+        with:
+          poetry-version: '1.8.3'
+
+      - name: Install frontend dependencies
+        working-directory: mv-design-pro/frontend
+        run: npm ci
+
+      - name: Install backend and browser dependencies
+        working-directory: mv-design-pro/frontend
+        run: npm run test:e2e:setup:real
+
+      - name: Run real-backend E2E smoke
+        working-directory: mv-design-pro/frontend
+        run: npm run test:e2e:real

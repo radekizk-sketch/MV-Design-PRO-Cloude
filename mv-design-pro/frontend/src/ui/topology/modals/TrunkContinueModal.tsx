@@ -21,7 +21,7 @@ export type Direction = 'N' | 'E' | 'S' | 'W' | 'NE' | 'SE' | 'SW' | 'NW';
 export interface TrunkContinueFormData {
   segment_kind: SegmentKind;
   length_m: number;
-  catalog_binding: string | null;
+  catalog_ref: string | null;
   notes: string;
   geometry_mode: GeometryMode;
   direction: Direction;
@@ -67,7 +67,7 @@ function validateForm(data: TrunkContinueFormData): FieldError[] {
 const DEFAULT_DATA: TrunkContinueFormData = {
   segment_kind: 'KABEL_SN',
   length_m: 0,
-  catalog_binding: null,
+  catalog_ref: null,
   notes: '',
   geometry_mode: 'ODCINEK_PROSTY',
   direction: 'E',
@@ -225,12 +225,12 @@ export function TrunkContinueModal({
               </label>
               <input
                 type="text"
-                value={formData.catalog_binding ?? ''}
+                value={formData.catalog_ref ?? ''}
                 onChange={(e) =>
-                  handleChange('catalog_binding', e.target.value.trim() || null)
+                  handleChange('catalog_ref', e.target.value.trim() || null)
                 }
                 className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
-                placeholder="opcjonalnie"
+                placeholder="Wskaż pozycję katalogową"
               />
             </div>
 
@@ -238,7 +238,7 @@ export function TrunkContinueModal({
             <div className="flex items-start gap-2 rounded-md bg-blue-50 border border-blue-200 px-3 py-2">
               <span className="mt-0.5 text-blue-500 text-sm font-bold">i</span>
               <p className="text-xs text-blue-700">
-                Brak katalogu nie blokuje rysowania — blokuje tylko analizy
+                Wybór katalogu jest wymagany przed utworzeniem odcinka.
               </p>
             </div>
           </div>

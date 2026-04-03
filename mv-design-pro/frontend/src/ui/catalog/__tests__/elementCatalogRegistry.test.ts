@@ -58,8 +58,8 @@ describe('ELEMENT_TYPE_TO_NAMESPACE', () => {
     expect(ELEMENT_TYPE_TO_NAMESPACE['bus']).toBeUndefined();
   });
 
-  it('does NOT map source (external grid has no catalog)', () => {
-    expect(ELEMENT_TYPE_TO_NAMESPACE['source']).toBeUndefined();
+  it('maps source to ZRODLO_SN', () => {
+    expect(ELEMENT_TYPE_TO_NAMESPACE['source']).toBe('ZRODLO_SN');
   });
 
   // PARITY z backend readiness_checker.py BRANCH_TYPE_TO_NAMESPACE
@@ -196,7 +196,7 @@ describe('requiresCatalogBinding', () => {
 
   it('returns false for non-catalog elements', () => {
     expect(requiresCatalogBinding('bus')).toBe(false);
-    expect(requiresCatalogBinding('source')).toBe(false);
+    expect(requiresCatalogBinding('source')).toBe(true);
   });
 });
 
@@ -219,17 +219,18 @@ describe('getNamespaceForTreeNode', () => {
 // =============================================================================
 
 describe('getCatalogTreeEntries', () => {
-  it('returns exactly 4 entries (primary catalog categories)', () => {
+  it('returns exactly 5 entries (primary catalog categories z GPZ)', () => {
     const entries = getCatalogTreeEntries();
-    expect(entries).toHaveLength(4);
+    expect(entries).toHaveLength(5);
   });
 
-  it('returns entries in deterministic order: LINIA, KABEL, TRAFO, APARAT', () => {
+  it('returns entries in deterministic order: LINIA, KABEL, ZRODLO, TRAFO, APARAT', () => {
     const entries = getCatalogTreeEntries();
     expect(entries[0].namespace).toBe('LINIA_SN');
     expect(entries[1].namespace).toBe('KABEL_SN');
-    expect(entries[2].namespace).toBe('TRAFO_SN_NN');
-    expect(entries[3].namespace).toBe('APARAT_SN');
+    expect(entries[2].namespace).toBe('ZRODLO_SN');
+    expect(entries[3].namespace).toBe('TRAFO_SN_NN');
+    expect(entries[4].namespace).toBe('APARAT_SN');
   });
 
   it('each entry has all required fields', () => {
@@ -255,8 +256,8 @@ describe('getCatalogTreeEntries', () => {
 // =============================================================================
 
 describe('CATALOG_TREE_NAMESPACES', () => {
-  it('contains exactly 4 namespaces', () => {
-    expect(CATALOG_TREE_NAMESPACES).toHaveLength(4);
+  it('contains exactly 5 namespaces', () => {
+    expect(CATALOG_TREE_NAMESPACES).toHaveLength(5);
   });
 
   it('matches NAMESPACE_TO_TREE_NODE keys', () => {

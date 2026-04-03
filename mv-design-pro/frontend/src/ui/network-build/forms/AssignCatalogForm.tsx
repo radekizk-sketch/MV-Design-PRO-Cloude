@@ -2,6 +2,8 @@ import { useCallback, useMemo, useState } from 'react';
 import { useSnapshotStore } from '../../topology/snapshotStore';
 import { useNetworkBuildStore } from '../networkBuildStore';
 import { useAppStateStore } from '../../app-state';
+import { normalizeCatalogBinding } from './catalogPayload';
+import type { CatalogNamespace } from '../../catalog/types';
 
 export function AssignCatalogForm() {
   const context = useNetworkBuildStore((s) => s.activeOperationForm?.context);
@@ -11,6 +13,7 @@ export function AssignCatalogForm() {
 
   const elementRef = (context?.element_ref as string) ?? '';
   const suggestedField = (context?.field as string) ?? 'catalog_item_id';
+  const catalogNamespace = (context?.catalog_namespace as CatalogNamespace | undefined) ?? null;
 
   const [catalogItemId, setCatalogItemId] = useState((context?.catalog_item_id as string) ?? '');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -23,9 +26,15 @@ export function AssignCatalogForm() {
     setError(null);
     setIsSubmitting(true);
     try {
+      const catalogBinding = normalizeCatalogBinding(catalogItemId.trim(), catalogNamespace);
+      if (!catalogBinding) {
+        setError('Brak jawnej przestrzeni katalogowej dla przypięcia elementu.');
+        return;
+      }
       await executeDomainOperation(activeCaseId, 'assign_catalog_to_element', {
         element_ref: elementRef,
-        catalog_item_id: catalogItemId.trim(),
+        catalog_binding: catalogBinding,
+        source_mode: 'KATALOG',
       });
       closeForm();
     } catch (err) {

@@ -17,6 +17,9 @@ from datetime import datetime
 from typing import Any
 from uuid import uuid4
 
+from application.analyses.protection.catalog.catalog_store import (
+    list_devices as list_analytical_protection_devices,
+)
 from network_model.catalog.governance import (
     ImportConflict,
     ImportMode,
@@ -32,6 +35,58 @@ from network_model.catalog.governance import (
     sort_protection_types_deterministically,
     sort_types_deterministically,
 )
+
+
+def _serialize_analytical_protection_device_for_export(device: Any) -> dict[str, Any]:
+    meta = dict(device.meta or {})
+    notes: list[str] = []
+    source_ref = meta.get("source_ref")
+    if source_ref:
+        notes.append(str(source_ref))
+    if meta.get("unverified"):
+        notes.append("Rekord analityczny: dane urzadzenia nie sa jeszcze zweryfikowane produkcyjnie.")
+    if meta.get("unverified_ranges"):
+        notes.append("Zakresy nastaw pochodza z katalogu analitycznego i wymagaja weryfikacji.")
+    verification_status = (
+        "NIEWERYFIKOWANY"
+        if meta.get("unverified")
+        else "CZESCIOWO_ZWERYFIKOWANY"
+    )
+
+    return {
+        "id": device.device_id,
+        "name_pl": f"{device.vendor} {device.model}",
+        "params": {
+            "vendor": device.vendor,
+            "model": device.model,
+            "series": str(meta.get("series") or device.model),
+            "revision": "v0",
+            "rated_current_a": float(meta["rated"]) if meta.get("rated") is not None else None,
+            "notes_pl": " ".join(notes) if notes else None,
+            "source_catalog": "backend/src/application/analyses/protection/catalog/data/devices_v0.json",
+            "unverified": bool(meta.get("unverified", False)),
+            "unverified_ranges": bool(meta.get("unverified_ranges", False)),
+            "source_reference": str(source_ref or "devices_v0.json / katalog analityczny ochrony"),
+            "verification_status": verification_status,
+            "catalog_status": "ANALITYCZNY_V1",
+            "contract_version": "2.0",
+            "verification_note": "Zakres ochrony pochodzi z katalogu analitycznego; rekord nie jest promowany do katalogu produkcyjnego." if meta.get("unverified") or meta.get("unverified_ranges") else "Rekord analityczny zachowany poza torem produkcyjnym.",
+            "functions_supported": list(device.functions_supported),
+            "curves_supported": list(device.curves_supported),
+            "i_pickup_51_a_min": device.i_pickup_51_a_min,
+            "i_pickup_51_a_max": device.i_pickup_51_a_max,
+            "tms_51_min": device.tms_51_min,
+            "tms_51_max": device.tms_51_max,
+            "i_inst_50_a_min": device.i_inst_50_a_min,
+            "i_inst_50_a_max": device.i_inst_50_a_max,
+            "i_pickup_51n_a_min": device.i_pickup_51n_a_min,
+            "i_pickup_51n_a_max": device.i_pickup_51n_a_max,
+            "tms_51n_min": device.tms_51n_min,
+            "tms_51n_max": device.tms_51n_max,
+            "i_inst_50n_a_min": device.i_inst_50n_a_min,
+            "i_inst_50n_a_max": device.i_inst_50n_a_max,
+        },
+    }
 
 
 class CatalogGovernanceService:
@@ -309,14 +364,19 @@ class CatalogGovernanceService:
         """
         with self.uow_factory() as uow:
             # Fetch all protection types (already deterministically sorted by repository)
-            device_types_list = uow.catalog.list_protection_device_types()
-            curves_list = uow.catalog.list_protection_curves()
-            templates_list = uow.catalog.list_protection_setting_templates()
+            device_types_list = uow.wizard.list_protection_device_types()
+            curves_list = uow.wizard.list_protection_curves()
+            templates_list = uow.wizard.list_protection_setting_templates()
 
             # Convert to dict list
             device_types = [item.to_dict() for item in device_types_list]
             curves = [item.to_dict() for item in curves_list]
             templates = [item.to_dict() for item in templates_list]
+            if not device_types:
+                device_types = [
+                    _serialize_analytical_protection_device_for_export(device)
+                    for device in list_analytical_protection_devices()
+                ]
 
             # Sort types deterministically (name_pl → id)
             sorted_device_types = sort_protection_types_deterministically(device_types)
@@ -441,9 +501,9 @@ class CatalogGovernanceService:
 
         with self.uow_factory() as uow:
             # Fetch existing protection types
-            existing_device_types_list = uow.catalog.list_protection_device_types()
-            existing_curves_list = uow.catalog.list_protection_curves()
-            existing_templates_list = uow.catalog.list_protection_setting_templates()
+            existing_device_types_list = uow.wizard.list_protection_device_types()
+            existing_curves_list = uow.wizard.list_protection_curves()
+            existing_templates_list = uow.wizard.list_protection_setting_templates()
 
             existing_device_types = {item.id: item for item in existing_device_types_list}
             existing_curves = {item.id: item for item in existing_curves_list}
@@ -487,7 +547,7 @@ class CatalogGovernanceService:
                             )
                     else:
                         # Add new type
-                        uow.catalog.upsert_protection_device_type(type_data, commit=False)
+                        uow.wizard.upsert_protection_device_type(type_data, commit=False)
                         report.added.append(
                             ProtectionImportConflict(
                                 kind="device_type",
@@ -522,7 +582,7 @@ class CatalogGovernanceService:
                                 )
                             )
                     else:
-                        uow.catalog.upsert_protection_curve(type_data, commit=False)
+                        uow.wizard.upsert_protection_curve(type_data, commit=False)
                         report.added.append(
                             ProtectionImportConflict(
                                 kind="curve",
@@ -557,7 +617,7 @@ class CatalogGovernanceService:
                                 )
                             )
                     else:
-                        uow.catalog.upsert_protection_setting_template(type_data, commit=False)
+                        uow.wizard.upsert_protection_setting_template(type_data, commit=False)
                         report.added.append(
                             ProtectionImportConflict(
                                 kind="template",
@@ -574,11 +634,11 @@ class CatalogGovernanceService:
                 # Future: add usage check here
 
                 # Clear existing types
-                uow.catalog.clear_all_protection_types(commit=False)
+                uow.wizard.clear_all_protection_types(commit=False)
 
                 # Insert all imported types
                 for type_data in export.device_types:
-                    uow.catalog.upsert_protection_device_type(type_data, commit=False)
+                    uow.wizard.upsert_protection_device_type(type_data, commit=False)
                     report.added.append(
                         ProtectionImportConflict(
                             kind="device_type",
@@ -589,7 +649,7 @@ class CatalogGovernanceService:
                     )
 
                 for type_data in export.curves:
-                    uow.catalog.upsert_protection_curve(type_data, commit=False)
+                    uow.wizard.upsert_protection_curve(type_data, commit=False)
                     report.added.append(
                         ProtectionImportConflict(
                             kind="curve",
@@ -600,7 +660,7 @@ class CatalogGovernanceService:
                     )
 
                 for type_data in export.templates:
-                    uow.catalog.upsert_protection_setting_template(type_data, commit=False)
+                    uow.wizard.upsert_protection_setting_template(type_data, commit=False)
                     report.added.append(
                         ProtectionImportConflict(
                             kind="template",

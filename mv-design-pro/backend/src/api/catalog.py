@@ -18,6 +18,10 @@ from fastapi import APIRouter, Depends, HTTPException, Response, status
 from pydantic import BaseModel
 
 from api.dependencies import get_uow_factory
+from application.analyses.protection.catalog.catalog_store import (
+    list_devices as list_analytical_protection_devices,
+    load_device_capability,
+)
 from application.catalog_governance import CatalogGovernanceService
 from application.network_wizard import NetworkWizardService
 from application.network_wizard.service import NotFound
@@ -25,6 +29,58 @@ from network_model.catalog.repository import get_default_mv_catalog
 from network_model.catalog.governance import ImportMode
 
 router = APIRouter(prefix="/api/catalog", tags=["Type Catalog"])
+
+
+def _serialize_analytical_protection_device(device: Any) -> dict[str, Any]:
+    meta = dict(device.meta or {})
+    notes: list[str] = []
+    source_ref = meta.get("source_ref")
+    if source_ref:
+        notes.append(str(source_ref))
+    if meta.get("unverified"):
+        notes.append("Rekord analityczny: dane urzadzenia nie sa jeszcze zweryfikowane produkcyjnie.")
+    if meta.get("unverified_ranges"):
+        notes.append("Zakresy nastaw pochodza z katalogu analitycznego i wymagaja weryfikacji.")
+    verification_status = (
+        "NIEWERYFIKOWANY"
+        if meta.get("unverified")
+        else "CZESCIOWO_ZWERYFIKOWANY"
+    )
+
+    return {
+        "id": device.device_id,
+        "name_pl": f"{device.vendor} {device.model}",
+        "params": {
+            "vendor": device.vendor,
+            "model": device.model,
+            "series": str(meta.get("series") or device.model),
+            "revision": "v0",
+            "rated_current_a": float(meta["rated"]) if meta.get("rated") is not None else None,
+            "notes_pl": " ".join(notes) if notes else None,
+            "source_catalog": "backend/src/application/analyses/protection/catalog/data/devices_v0.json",
+            "unverified": bool(meta.get("unverified", False)),
+            "unverified_ranges": bool(meta.get("unverified_ranges", False)),
+            "source_reference": str(source_ref or "devices_v0.json / katalog analityczny ochrony"),
+            "verification_status": verification_status,
+            "catalog_status": "ANALITYCZNY_V1",
+            "contract_version": "2.0",
+            "verification_note": "Zakres ochrony pochodzi z katalogu analitycznego; rekord nie jest promowany do katalogu produkcyjnego." if meta.get("unverified") or meta.get("unverified_ranges") else "Rekord analityczny zachowany poza torem produkcyjnym.",
+            "functions_supported": list(device.functions_supported),
+            "curves_supported": list(device.curves_supported),
+            "i_pickup_51_a_min": device.i_pickup_51_a_min,
+            "i_pickup_51_a_max": device.i_pickup_51_a_max,
+            "tms_51_min": device.tms_51_min,
+            "tms_51_max": device.tms_51_max,
+            "i_inst_50_a_min": device.i_inst_50_a_min,
+            "i_inst_50_a_max": device.i_inst_50_a_max,
+            "i_pickup_51n_a_min": device.i_pickup_51n_a_min,
+            "i_pickup_51n_a_max": device.i_pickup_51n_a_max,
+            "tms_51n_min": device.tms_51n_min,
+            "tms_51n_max": device.tms_51n_max,
+            "i_inst_50n_a_min": device.i_inst_50n_a_min,
+            "i_inst_50n_a_max": device.i_inst_50n_a_max,
+        },
+    }
 
 
 def _build_service(uow_factory: Any) -> NetworkWizardService:
@@ -170,13 +226,73 @@ def list_switch_equipment_types() -> list[dict[str, Any]]:
     return [item.to_dict() for item in get_default_mv_catalog().list_switch_equipment_types()]
 
 
+@router.get("/mv-apparatus-types")
+def list_mv_apparatus_types() -> list[dict[str, Any]]:
+    """List all MV apparatus types from the canonical MV catalog."""
+    return [item.to_dict() for item in get_default_mv_catalog().list_mv_apparatus_types()]
+
+
+@router.get("/lv-apparatus-types")
+def list_lv_apparatus_types() -> list[dict[str, Any]]:
+    """List all LV apparatus types from the canonical MV catalog."""
+    return [item.to_dict() for item in get_default_mv_catalog().list_lv_apparatus_types()]
+
+
+@router.get("/lv-cable-types")
+def list_lv_cable_types() -> list[dict[str, Any]]:
+    """List all LV cable types from the canonical MV catalog."""
+    return [item.to_dict() for item in get_default_mv_catalog().list_lv_cable_types()]
+
+
+@router.get("/load-types")
+def list_load_types() -> list[dict[str, Any]]:
+    """List all load types from the canonical MV catalog."""
+    return [item.to_dict() for item in get_default_mv_catalog().list_load_types()]
+
+
+@router.get("/ct-types")
+def list_ct_types() -> list[dict[str, Any]]:
+    """List all CT types from the canonical MV catalog."""
+    return [item.to_dict() for item in get_default_mv_catalog().list_ct_types()]
+
+
+@router.get("/vt-types")
+def list_vt_types() -> list[dict[str, Any]]:
+    """List all VT types from the canonical MV catalog."""
+    return [item.to_dict() for item in get_default_mv_catalog().list_vt_types()]
+
+
+@router.get("/pv-inverter-types")
+def list_pv_inverter_types() -> list[dict[str, Any]]:
+    """List all PV inverter types from the canonical MV catalog."""
+    return [item.to_dict() for item in get_default_mv_catalog().list_pv_inverter_types()]
+
+
+@router.get("/bess-inverter-types")
+def list_bess_inverter_types() -> list[dict[str, Any]]:
+    """List all BESS inverter types from the canonical MV catalog."""
+    return [item.to_dict() for item in get_default_mv_catalog().list_bess_inverter_types()]
+
+
+@router.get("/source-system-types")
+def list_source_system_types() -> list[dict[str, Any]]:
+    """List all MV system source types for GPZ / zasilanie systemowe."""
+    return [item.to_dict() for item in get_default_mv_catalog().list_source_system_types()]
+
+
 @router.get("/protection/device-types")
 def list_protection_device_types(
     uow_factory=Depends(get_uow_factory),
 ) -> list[dict[str, Any]]:
-    """List all protection device types from catalog (P14a - READ-ONLY)"""
+    """List protection devices from active library or analytical device catalog."""
     service = _build_service(uow_factory)
-    return service.list_protection_device_types()
+    records = service.list_protection_device_types()
+    if records:
+        return records
+    return [
+        _serialize_analytical_protection_device(device)
+        for device in list_analytical_protection_devices()
+    ]
 
 
 @router.get("/protection/curves")
@@ -185,7 +301,10 @@ def list_protection_curves(
 ) -> list[dict[str, Any]]:
     """List all protection curves from catalog (P14a - READ-ONLY)"""
     service = _build_service(uow_factory)
-    return service.list_protection_curves()
+    records = service.list_protection_curves()
+    if records:
+        return records
+    return [item.to_dict() for item in get_default_mv_catalog().list_protection_curves()]
 
 
 @router.get("/protection/templates")
@@ -194,7 +313,10 @@ def list_protection_setting_templates(
 ) -> list[dict[str, Any]]:
     """List all protection setting templates from catalog (P14a - READ-ONLY)"""
     service = _build_service(uow_factory)
-    return service.list_protection_setting_templates()
+    records = service.list_protection_setting_templates()
+    if records:
+        return records
+    return [item.to_dict() for item in get_default_mv_catalog().list_protection_setting_templates()]
 
 
 @router.get("/protection/device-types/{device_type_id}")
@@ -202,16 +324,20 @@ def get_protection_device_type(
     device_type_id: str,
     uow_factory=Depends(get_uow_factory),
 ) -> dict[str, Any]:
-    """Get single protection device type by ID (P14a - READ-ONLY)"""
+    """Get protection device from active library or analytical device catalog."""
     service = _build_service(uow_factory)
     result = service.get_protection_device_type(device_type_id)
-    if result is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
+    if result is not None:
+        return result
+
+    analytical_device = load_device_capability(device_type_id)
+    if analytical_device is not None:
+        return _serialize_analytical_protection_device(analytical_device)
+
+    raise HTTPException(
+        status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Typ urządzenia zabezpieczającego nie znaleziony: {device_type_id}",
         )
-    return result
-
 
 @router.get("/protection/curves/{curve_id}")
 def get_protection_curve(
@@ -494,3 +620,27 @@ def clear_equipment_type_from_switch(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
 
     return Response(status_code=204)
+
+
+_PRODUCTION_DISABLED_ROUTE_KEYS = {
+    ("/api/catalog/projects/{project_id}/branches/{branch_id}/type-ref", "POST"),
+    ("/api/catalog/projects/{project_id}/transformers/{transformer_id}/type-ref", "POST"),
+    ("/api/catalog/projects/{project_id}/switches/{switch_id}/equipment-type", "POST"),
+    ("/api/catalog/projects/{project_id}/branches/{branch_id}/type-ref", "DELETE"),
+    ("/api/catalog/projects/{project_id}/transformers/{transformer_id}/type-ref", "DELETE"),
+    ("/api/catalog/projects/{project_id}/switches/{switch_id}/equipment-type", "DELETE"),
+}
+
+
+def _build_production_router() -> APIRouter:
+    production = APIRouter()
+    for route in router.routes:
+        path = getattr(route, "path", "")
+        methods = set(getattr(route, "methods", set()))
+        if any((path, method) in _PRODUCTION_DISABLED_ROUTE_KEYS for method in methods):
+            continue
+        production.routes.append(route)
+    return production
+
+
+production_router = _build_production_router()
