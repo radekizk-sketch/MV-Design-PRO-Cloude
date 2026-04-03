@@ -51,8 +51,8 @@ jobs:
         working-directory: mv-design-pro
         run: python scripts/catalog_binding_guard.py
       - name: Catalog Enforcement Guard
-        working-directory: mv-design-pro
-        run: python scripts/catalog_enforcement_guard.py
+        working-directory: mv-design-pro/backend
+        run: poetry run python ../scripts/catalog_enforcement_guard.py
       - name: Catalog Gate Guard
         working-directory: mv-design-pro
         run: python scripts/catalog_gate_guard.py
