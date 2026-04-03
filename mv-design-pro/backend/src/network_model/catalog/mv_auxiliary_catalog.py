@@ -2,25 +2,87 @@ from __future__ import annotations
 
 
 def get_all_lv_cable_types() -> list[dict]:
+    """
+    Katalog kabli niskiego napięcia (nN) 0.6/1 kV.
+
+    Rodziny:
+    - YAKY (Al, 4-żyłowy, PVC, 0.6/1 kV): przekroje 16-240 mm²
+    - YKY (Cu, 4/5-żyłowy, PVC, 0.6/1 kV): przekroje 35-120 mm²
+    - YKXS (Cu, 4-żyłowy, XLPE, 0.6/1 kV): przekroje 35-70 mm²
+
+    Źródło: Tele-Fonika Kable / NKT / norma IEC 60502-1 / dane referencyjne.
+    """
     return [
+        # -----------------------------------------------------------------------
+        # YAKY — aluminium, 4-żyłowy, izolacja PVC, 0.6/1 kV
+        # -----------------------------------------------------------------------
         {
-            "id": "kab_nn_4x120_al",
-            "name": "YAKY 4x120 mm2",
+            "id": "kab_nn_yaky_4x16_al",
+            "name": "YAKY 4x16 mm²",
             "params": {
                 "u_n_kv": 0.4,
-                "r_ohm_per_km": 0.253,
-                "x_ohm_per_km": 0.069,
-                "i_max_a": 240.0,
+                "r_ohm_per_km": 1.910,
+                "x_ohm_per_km": 0.077,
+                "i_max_a": 85.0,
                 "conductor_material": "AL",
                 "insulation_type": "PVC",
-                "cross_section_mm2": 120.0,
+                "cross_section_mm2": 16.0,
                 "number_of_cores": 4,
-                "manufacturer": "Tele-Fonika",
+                "manufacturer": "Tele-Fonika Kable",
+                "source_reference": "Tele-Fonika Kable / IEC 60502-1 / dane referencyjne",
+            },
+        },
+        {
+            "id": "kab_nn_yaky_4x25_al",
+            "name": "YAKY 4x25 mm²",
+            "params": {
+                "u_n_kv": 0.4,
+                "r_ohm_per_km": 1.200,
+                "x_ohm_per_km": 0.075,
+                "i_max_a": 110.0,
+                "conductor_material": "AL",
+                "insulation_type": "PVC",
+                "cross_section_mm2": 25.0,
+                "number_of_cores": 4,
+                "manufacturer": "Tele-Fonika Kable",
+                "source_reference": "Tele-Fonika Kable / IEC 60502-1 / dane referencyjne",
+            },
+        },
+        {
+            "id": "kab_nn_yaky_4x35_al",
+            "name": "YAKY 4x35 mm²",
+            "params": {
+                "u_n_kv": 0.4,
+                "r_ohm_per_km": 0.868,
+                "x_ohm_per_km": 0.073,
+                "i_max_a": 135.0,
+                "conductor_material": "AL",
+                "insulation_type": "PVC",
+                "cross_section_mm2": 35.0,
+                "number_of_cores": 4,
+                "manufacturer": "Tele-Fonika Kable",
+                "source_reference": "Tele-Fonika Kable / IEC 60502-1 / dane referencyjne",
+            },
+        },
+        {
+            "id": "kab_nn_yaky_4x50_al",
+            "name": "YAKY 4x50 mm²",
+            "params": {
+                "u_n_kv": 0.4,
+                "r_ohm_per_km": 0.641,
+                "x_ohm_per_km": 0.072,
+                "i_max_a": 160.0,
+                "conductor_material": "AL",
+                "insulation_type": "PVC",
+                "cross_section_mm2": 50.0,
+                "number_of_cores": 4,
+                "manufacturer": "Tele-Fonika Kable",
+                "source_reference": "Tele-Fonika Kable / IEC 60502-1 / dane referencyjne",
             },
         },
         {
             "id": "kab_nn_4x70_al",
-            "name": "YAKY 4x70 mm2",
+            "name": "YAKY 4x70 mm²",
             "params": {
                 "u_n_kv": 0.4,
                 "r_ohm_per_km": 0.443,
@@ -31,11 +93,95 @@ def get_all_lv_cable_types() -> list[dict]:
                 "cross_section_mm2": 70.0,
                 "number_of_cores": 4,
                 "manufacturer": "Tele-Fonika",
+                "source_reference": "Tele-Fonika Kable / IEC 60502-1 / dane referencyjne",
             },
         },
         {
+            "id": "kab_nn_yaky_4x95_al",
+            "name": "YAKY 4x95 mm²",
+            "params": {
+                "u_n_kv": 0.4,
+                "r_ohm_per_km": 0.320,
+                "x_ohm_per_km": 0.070,
+                "i_max_a": 215.0,
+                "conductor_material": "AL",
+                "insulation_type": "PVC",
+                "cross_section_mm2": 95.0,
+                "number_of_cores": 4,
+                "manufacturer": "Tele-Fonika Kable",
+                "source_reference": "Tele-Fonika Kable / IEC 60502-1 / dane referencyjne",
+            },
+        },
+        {
+            "id": "kab_nn_4x120_al",
+            "name": "YAKY 4x120 mm²",
+            "params": {
+                "u_n_kv": 0.4,
+                "r_ohm_per_km": 0.253,
+                "x_ohm_per_km": 0.069,
+                "i_max_a": 240.0,
+                "conductor_material": "AL",
+                "insulation_type": "PVC",
+                "cross_section_mm2": 120.0,
+                "number_of_cores": 4,
+                "manufacturer": "Tele-Fonika",
+                "source_reference": "Tele-Fonika Kable / IEC 60502-1 / dane referencyjne",
+            },
+        },
+        {
+            "id": "kab_nn_yaky_4x150_al",
+            "name": "YAKY 4x150 mm²",
+            "params": {
+                "u_n_kv": 0.4,
+                "r_ohm_per_km": 0.206,
+                "x_ohm_per_km": 0.068,
+                "i_max_a": 275.0,
+                "conductor_material": "AL",
+                "insulation_type": "PVC",
+                "cross_section_mm2": 150.0,
+                "number_of_cores": 4,
+                "manufacturer": "Tele-Fonika Kable",
+                "source_reference": "Tele-Fonika Kable / IEC 60502-1 / dane referencyjne",
+            },
+        },
+        {
+            "id": "kab_nn_yaky_4x185_al",
+            "name": "YAKY 4x185 mm²",
+            "params": {
+                "u_n_kv": 0.4,
+                "r_ohm_per_km": 0.164,
+                "x_ohm_per_km": 0.067,
+                "i_max_a": 315.0,
+                "conductor_material": "AL",
+                "insulation_type": "PVC",
+                "cross_section_mm2": 185.0,
+                "number_of_cores": 4,
+                "manufacturer": "Tele-Fonika Kable",
+                "source_reference": "Tele-Fonika Kable / IEC 60502-1 / dane referencyjne",
+            },
+        },
+        {
+            "id": "kab_nn_yaky_4x240_al",
+            "name": "YAKY 4x240 mm²",
+            "params": {
+                "u_n_kv": 0.4,
+                "r_ohm_per_km": 0.125,
+                "x_ohm_per_km": 0.066,
+                "i_max_a": 360.0,
+                "conductor_material": "AL",
+                "insulation_type": "PVC",
+                "cross_section_mm2": 240.0,
+                "number_of_cores": 4,
+                "manufacturer": "Tele-Fonika Kable",
+                "source_reference": "Tele-Fonika Kable / IEC 60502-1 / dane referencyjne",
+            },
+        },
+        # -----------------------------------------------------------------------
+        # YKY — miedź, 4/5-żyłowy, izolacja PVC, 0.6/1 kV
+        # -----------------------------------------------------------------------
+        {
             "id": "kab_nn_5x35_cu",
-            "name": "YKY 5x35 mm2",
+            "name": "YKY 5x35 mm²",
             "params": {
                 "u_n_kv": 0.4,
                 "r_ohm_per_km": 0.524,
@@ -46,6 +192,106 @@ def get_all_lv_cable_types() -> list[dict]:
                 "cross_section_mm2": 35.0,
                 "number_of_cores": 5,
                 "manufacturer": "NKT",
+                "source_reference": "NKT Cables / IEC 60502-1 / dane referencyjne",
+            },
+        },
+        {
+            "id": "kab_nn_yky_4x50_cu",
+            "name": "YKY 4x50 mm²",
+            "params": {
+                "u_n_kv": 0.4,
+                "r_ohm_per_km": 0.387,
+                "x_ohm_per_km": 0.079,
+                "i_max_a": 160.0,
+                "conductor_material": "CU",
+                "insulation_type": "PVC",
+                "cross_section_mm2": 50.0,
+                "number_of_cores": 4,
+                "manufacturer": "NKT",
+                "source_reference": "NKT Cables / IEC 60502-1 / dane referencyjne",
+            },
+        },
+        {
+            "id": "kab_nn_yky_4x70_cu",
+            "name": "YKY 4x70 mm²",
+            "params": {
+                "u_n_kv": 0.4,
+                "r_ohm_per_km": 0.268,
+                "x_ohm_per_km": 0.076,
+                "i_max_a": 200.0,
+                "conductor_material": "CU",
+                "insulation_type": "PVC",
+                "cross_section_mm2": 70.0,
+                "number_of_cores": 4,
+                "manufacturer": "NKT",
+                "source_reference": "NKT Cables / IEC 60502-1 / dane referencyjne",
+            },
+        },
+        {
+            "id": "kab_nn_yky_4x95_cu",
+            "name": "YKY 4x95 mm²",
+            "params": {
+                "u_n_kv": 0.4,
+                "r_ohm_per_km": 0.193,
+                "x_ohm_per_km": 0.074,
+                "i_max_a": 240.0,
+                "conductor_material": "CU",
+                "insulation_type": "PVC",
+                "cross_section_mm2": 95.0,
+                "number_of_cores": 4,
+                "manufacturer": "NKT",
+                "source_reference": "NKT Cables / IEC 60502-1 / dane referencyjne",
+            },
+        },
+        {
+            "id": "kab_nn_yky_4x120_cu",
+            "name": "YKY 4x120 mm²",
+            "params": {
+                "u_n_kv": 0.4,
+                "r_ohm_per_km": 0.153,
+                "x_ohm_per_km": 0.073,
+                "i_max_a": 275.0,
+                "conductor_material": "CU",
+                "insulation_type": "PVC",
+                "cross_section_mm2": 120.0,
+                "number_of_cores": 4,
+                "manufacturer": "NKT",
+                "source_reference": "NKT Cables / IEC 60502-1 / dane referencyjne",
+            },
+        },
+        # -----------------------------------------------------------------------
+        # YKXS — miedź, 4-żyłowy, izolacja XLPE, 0.6/1 kV (lepsza obciążalność)
+        # -----------------------------------------------------------------------
+        {
+            "id": "kab_nn_ykxs_4x35_cu",
+            "name": "YKXS 4x35 mm²",
+            "params": {
+                "u_n_kv": 0.4,
+                "r_ohm_per_km": 0.524,
+                "x_ohm_per_km": 0.078,
+                "i_max_a": 145.0,
+                "conductor_material": "CU",
+                "insulation_type": "XLPE",
+                "cross_section_mm2": 35.0,
+                "number_of_cores": 4,
+                "manufacturer": "Tele-Fonika Kable",
+                "source_reference": "Tele-Fonika Kable / IEC 60502-1 / dane referencyjne",
+            },
+        },
+        {
+            "id": "kab_nn_ykxs_4x70_cu",
+            "name": "YKXS 4x70 mm²",
+            "params": {
+                "u_n_kv": 0.4,
+                "r_ohm_per_km": 0.268,
+                "x_ohm_per_km": 0.072,
+                "i_max_a": 225.0,
+                "conductor_material": "CU",
+                "insulation_type": "XLPE",
+                "cross_section_mm2": 70.0,
+                "number_of_cores": 4,
+                "manufacturer": "Tele-Fonika Kable",
+                "source_reference": "Tele-Fonika Kable / IEC 60502-1 / dane referencyjne",
             },
         },
     ]

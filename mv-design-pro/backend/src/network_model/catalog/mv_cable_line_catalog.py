@@ -874,8 +874,25 @@ CABLE_EPR_AL_3C_BASE: list[dict[str, Any]] = [
 
 LINE_AL_BASE: list[dict[str, Any]] = [
     {
+        "id": "line-base-al-16",
+        "name": "Linia AAL 16 mm²",
+        "params": {
+            "conductor_material": "AL",
+            "cross_section_mm2": 16,
+            "r_ohm_per_km": 1.800,
+            "x_ohm_per_km": 0.405,
+            "b_us_per_km": 2.55,
+            "rated_current_a": 85,
+            "voltage_rating_kv": 20.0,
+            "max_temperature_c": 70,
+            "jth_1s_a_per_mm2": JTH_AL_OHL,
+            "standard": "PN-EN 50182",
+            "source_reference": "PN-EN 50182 / norma IEC 61089 / dane katalogowe AAC",
+        },
+    },
+    {
         "id": "line-base-al-25",
-        "name": "Linia Al 25 mm²",
+        "name": "Linia AAL 25 mm²",
         "params": {
             "conductor_material": "AL",
             "cross_section_mm2": 25,
@@ -971,7 +988,7 @@ LINE_AL_BASE: list[dict[str, Any]] = [
     },
     {
         "id": "line-base-al-150",
-        "name": "Linia Al 150 mm²",
+        "name": "Linia AAL 150 mm²",
         "params": {
             "conductor_material": "AL",
             "cross_section_mm2": 150,
@@ -985,6 +1002,40 @@ LINE_AL_BASE: list[dict[str, Any]] = [
             "standard": "PN-EN 50182",
         },
     },
+    {
+        "id": "line-base-al-185",
+        "name": "Linia AAL 185 mm²",
+        "params": {
+            "conductor_material": "AL",
+            "cross_section_mm2": 185,
+            "r_ohm_per_km": 0.154,
+            "x_ohm_per_km": 0.318,
+            "b_us_per_km": 3.35,
+            "rated_current_a": 420,
+            "voltage_rating_kv": 20.0,
+            "max_temperature_c": 70,
+            "jth_1s_a_per_mm2": JTH_AL_OHL,
+            "standard": "PN-EN 50182",
+            "source_reference": "PN-EN 50182 / norma IEC 61089 / dane katalogowe AAC",
+        },
+    },
+    {
+        "id": "line-base-al-240",
+        "name": "Linia AAL 240 mm²",
+        "params": {
+            "conductor_material": "AL",
+            "cross_section_mm2": 240,
+            "r_ohm_per_km": 0.119,
+            "x_ohm_per_km": 0.309,
+            "b_us_per_km": 3.45,
+            "rated_current_a": 490,
+            "voltage_rating_kv": 20.0,
+            "max_temperature_c": 70,
+            "jth_1s_a_per_mm2": JTH_AL_OHL,
+            "standard": "PN-EN 50182",
+            "source_reference": "PN-EN 50182 / norma IEC 61089 / dane katalogowe AAC",
+        },
+    },
 ]
 
 # =============================================================================
@@ -992,6 +1043,23 @@ LINE_AL_BASE: list[dict[str, Any]] = [
 # =============================================================================
 
 LINE_AL_ST_BASE: list[dict[str, Any]] = [
+    {
+        "id": "line-base-al-st-16",
+        "name": "Linia AFL 6 16/2,7 mm²",
+        "params": {
+            "conductor_material": "AL_ST",
+            "cross_section_mm2": 16,
+            "r_ohm_per_km": 1.800,
+            "x_ohm_per_km": 0.408,
+            "b_us_per_km": 2.55,
+            "rated_current_a": 90,
+            "voltage_rating_kv": 20.0,
+            "max_temperature_c": 70,
+            "jth_1s_a_per_mm2": JTH_AL_ST_OHL,
+            "standard": "PN-EN 50182",
+            "source_reference": "PN-EN 50182 / katalog linii AFL 6 / typowe dane OSD",
+        },
+    },
     {
         "id": "line-base-al-st-25",
         "name": "Linia AFL 6 25/4,2 mm²",
@@ -1102,6 +1170,133 @@ LINE_AL_ST_BASE: list[dict[str, Any]] = [
             "max_temperature_c": 70,
             "jth_1s_a_per_mm2": JTH_AL_ST_OHL,
             "standard": "PN-EN 50182",
+        },
+    },
+    {
+        "id": "line-base-al-st-185",
+        "name": "Linia AFL 8 185/30,0 mm²",
+        "params": {
+            "conductor_material": "AL_ST",
+            "cross_section_mm2": 185,
+            "r_ohm_per_km": 0.152,
+            "x_ohm_per_km": 0.319,
+            "b_us_per_km": 3.30,
+            "rated_current_a": 440,
+            "voltage_rating_kv": 20.0,
+            "max_temperature_c": 70,
+            "jth_1s_a_per_mm2": JTH_AL_ST_OHL,
+            "standard": "PN-EN 50182",
+            "source_reference": "PN-EN 50182 / katalog linii AFL 8 / typowe dane OSD",
+        },
+    },
+    {
+        "id": "line-base-al-st-240",
+        "name": "Linia AFL 8 240/40,0 mm²",
+        "params": {
+            "conductor_material": "AL_ST",
+            "cross_section_mm2": 240,
+            "r_ohm_per_km": 0.117,
+            "x_ohm_per_km": 0.310,
+            "b_us_per_km": 3.40,
+            "rated_current_a": 520,
+            "voltage_rating_kv": 20.0,
+            "max_temperature_c": 70,
+            "jth_1s_a_per_mm2": JTH_AL_ST_OHL,
+            "standard": "PN-EN 50182",
+            "source_reference": "PN-EN 50182 / katalog linii AFL 8 / typowe dane OSD",
+        },
+    },
+]
+
+# =============================================================================
+# TYPY BAZOWE — LINIE NAPOWIETRZNE AFL 2 (ACSR lekki rdzeń stalowy)
+# Stosowane w sieciach SN o mniejszych obciążeniach mechanicznych
+# =============================================================================
+
+LINE_AFL2_BASE: list[dict[str, Any]] = [
+    {
+        "id": "line-base-afl2-35",
+        "name": "Linia AFL 2 35/6,2 mm²",
+        "params": {
+            "conductor_material": "AL_ST",
+            "cross_section_mm2": 35,
+            "r_ohm_per_km": 0.822,
+            "x_ohm_per_km": 0.381,
+            "b_us_per_km": 2.72,
+            "rated_current_a": 148,
+            "voltage_rating_kv": 20.0,
+            "max_temperature_c": 70,
+            "jth_1s_a_per_mm2": JTH_AL_ST_OHL,
+            "standard": "PN-EN 50182",
+            "source_reference": "PN-EN 50182 / katalog linii AFL 2 / dane typowe",
+        },
+    },
+    {
+        "id": "line-base-afl2-50",
+        "name": "Linia AFL 2 50/8,0 mm²",
+        "params": {
+            "conductor_material": "AL_ST",
+            "cross_section_mm2": 50,
+            "r_ohm_per_km": 0.574,
+            "x_ohm_per_km": 0.369,
+            "b_us_per_km": 2.82,
+            "rated_current_a": 185,
+            "voltage_rating_kv": 20.0,
+            "max_temperature_c": 70,
+            "jth_1s_a_per_mm2": JTH_AL_ST_OHL,
+            "standard": "PN-EN 50182",
+            "source_reference": "PN-EN 50182 / katalog linii AFL 2 / dane typowe",
+        },
+    },
+    {
+        "id": "line-base-afl2-70",
+        "name": "Linia AFL 2 70/11,0 mm²",
+        "params": {
+            "conductor_material": "AL_ST",
+            "cross_section_mm2": 70,
+            "r_ohm_per_km": 0.410,
+            "x_ohm_per_km": 0.357,
+            "b_us_per_km": 2.92,
+            "rated_current_a": 232,
+            "voltage_rating_kv": 20.0,
+            "max_temperature_c": 70,
+            "jth_1s_a_per_mm2": JTH_AL_ST_OHL,
+            "standard": "PN-EN 50182",
+            "source_reference": "PN-EN 50182 / katalog linii AFL 2 / dane typowe",
+        },
+    },
+    {
+        "id": "line-base-afl2-95",
+        "name": "Linia AFL 2 95/16,0 mm²",
+        "params": {
+            "conductor_material": "AL_ST",
+            "cross_section_mm2": 95,
+            "r_ohm_per_km": 0.301,
+            "x_ohm_per_km": 0.346,
+            "b_us_per_km": 3.02,
+            "rated_current_a": 280,
+            "voltage_rating_kv": 20.0,
+            "max_temperature_c": 70,
+            "jth_1s_a_per_mm2": JTH_AL_ST_OHL,
+            "standard": "PN-EN 50182",
+            "source_reference": "PN-EN 50182 / katalog linii AFL 2 / dane typowe",
+        },
+    },
+    {
+        "id": "line-base-afl2-120",
+        "name": "Linia AFL 2 120/20,0 mm²",
+        "params": {
+            "conductor_material": "AL_ST",
+            "cross_section_mm2": 120,
+            "r_ohm_per_km": 0.238,
+            "x_ohm_per_km": 0.337,
+            "b_us_per_km": 3.12,
+            "rated_current_a": 332,
+            "voltage_rating_kv": 20.0,
+            "max_temperature_c": 70,
+            "jth_1s_a_per_mm2": JTH_AL_ST_OHL,
+            "standard": "PN-EN 50182",
+            "source_reference": "PN-EN 50182 / katalog linii AFL 2 / dane typowe",
         },
     },
 ]
@@ -1322,9 +1517,13 @@ def get_all_line_types() -> list[dict[str, Any]]:
     """
     Zwraca wszystkie typy linii napowietrznych SN w deterministycznej kolejności.
 
-    Kolejność: bazowe Al, bazowe Al/St, niekompletne.
+    Kolejność: bazowe AAL (Al), bazowe AFL 6 (Al/St), bazowe AFL 2 (Al/St lekki), niekompletne.
+    Rodziny:
+    - AAL: czyste aluminium, przekroje 16-240 mm² (10 rekordów)
+    - AFL 6: aluminium-stal 6% rdzenia, przekroje 16-240 mm² (10 rekordów)
+    - AFL 2: aluminium-stal 2% rdzenia (lekkie), przekroje 35-120 mm² (5 rekordów)
     """
-    return LINE_AL_BASE + LINE_AL_ST_BASE + LINE_INCOMPLETE_TYPES
+    return LINE_AL_BASE + LINE_AL_ST_BASE + LINE_AFL2_BASE + LINE_INCOMPLETE_TYPES
 
 
 def get_base_cable_type_ids() -> list[str]:
@@ -1344,7 +1543,7 @@ def get_base_cable_type_ids() -> list[str]:
 
 def get_base_line_type_ids() -> list[str]:
     """Zwraca ID wszystkich bazowych typów linii."""
-    return [t["id"] for t in LINE_AL_BASE + LINE_AL_ST_BASE]
+    return [t["id"] for t in LINE_AL_BASE + LINE_AL_ST_BASE + LINE_AFL2_BASE]
 
 
 def get_manufacturer_cable_type_ids() -> list[str]:

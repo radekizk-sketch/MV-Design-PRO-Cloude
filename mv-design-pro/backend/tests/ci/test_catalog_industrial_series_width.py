@@ -29,14 +29,14 @@ def catalog():
 
 # Limity minimalne per CATALOG_INDUSTRIAL_SERIES_MATRIX.md
 MIN_WIDTH = {
-    "LINIA_SN": 10,          # było 15, cel 25+ — minimum zachowawcze
+    "LINIA_SN": 25,           # AAL(8)+AFL6(8)+AFL2(5)+inne=26 — pełny typoszereg przemysłowy
     "KABEL_SN": 40,           # było 51 — minimum zachowawcze (poniżej aktualnego)
     "TRAFO_SN_NN": 18,        # było 22 — minimum zachowawcze
     "APARAT_SN": 18,          # było 22 — minimum zachowawcze
     "ZRODLO_SN": 12,          # było 14 — minimum zachowawcze
     "CT": 3,                  # docelowo 24+, teraz minimum obecne
     "VT": 2,                  # docelowo 12+, teraz minimum obecne
-    "KABEL_NN": 3,            # docelowo 15+, teraz minimum obecne
+    "KABEL_NN": 15,           # YAKY(10)+YKY(5)+YKXS(2)=17 — pełny typoszereg przemysłowy
     "APARAT_NN": 3,           # docelowo 10+, teraz minimum obecne
     "FALOWNIK_PV": 4,         # docelowo 12+, teraz minimum obecne
     "FALOWNIK_BESS": 4,       # docelowo 8+, teraz minimum obecne
