@@ -375,69 +375,425 @@ def get_all_lv_apparatus_types() -> list[dict]:
 
 
 def get_all_ct_types() -> list[dict]:
+    def _quality_meta(
+        *,
+        verification_status: str,
+        source_reference: str,
+        catalog_status: str,
+        verification_note: str,
+    ) -> dict:
+        return {
+            "verification_status": verification_status,
+            "source_reference": source_reference,
+            "catalog_status": catalog_status,
+            "contract_version": "2.0",
+            "verification_note": verification_note,
+        }
+
+    source_reference = "Katalog CT MV-DESIGN-PRO / IEC 61869 / dane referencyjne"
+    verification_note = (
+        "Rekord referencyjny do doboru CT; zakresy nalezy potwierdzic z karta producenta przed uzyciem produkcyjnym."
+    )
     return [
         {
-            "id": "ct_400_5_5p20",
-            "name": "CT 400/5 A kl. 5P20",
+            "id": "ct_50_1_0_5_5va_arteche",
+            "name": "CT 50/1 A kl. 0.5 5 VA",
+            "params": {
+                "ratio_primary_a": 50.0,
+                "ratio_secondary_a": 1.0,
+                "accuracy_class": "0.5",
+                "burden_va": 5.0,
+                "manufacturer": "Arteche",
+                **_quality_meta(
+                    verification_status="REFERENCYJNY",
+                    source_reference=source_reference,
+                    catalog_status="REFERENCYJNY_V1",
+                    verification_note=verification_note,
+                ),
+            },
+        },
+        {
+            "id": "ct_100_1_0_5_5va_abb",
+            "name": "CT 100/1 A kl. 0.5 5 VA",
+            "params": {
+                "ratio_primary_a": 100.0,
+                "ratio_secondary_a": 1.0,
+                "accuracy_class": "0.5",
+                "burden_va": 5.0,
+                "manufacturer": "ABB",
+                **_quality_meta(
+                    verification_status="REFERENCYJNY",
+                    source_reference=source_reference,
+                    catalog_status="REFERENCYJNY_V1",
+                    verification_note=verification_note,
+                ),
+            },
+        },
+        {
+            "id": "ct_150_1_0_5_10va_abb",
+            "name": "CT 150/1 A kl. 0.5 10 VA",
+            "params": {
+                "ratio_primary_a": 150.0,
+                "ratio_secondary_a": 1.0,
+                "accuracy_class": "0.5",
+                "burden_va": 10.0,
+                "manufacturer": "ABB",
+                **_quality_meta(
+                    verification_status="REFERENCYJNY",
+                    source_reference=source_reference,
+                    catalog_status="REFERENCYJNY_V1",
+                    verification_note=verification_note,
+                ),
+            },
+        },
+        {
+            "id": "ct_200_5_5p10_10va_abb",
+            "name": "CT 200/5 A kl. 5P10 10 VA",
+            "params": {
+                "ratio_primary_a": 200.0,
+                "ratio_secondary_a": 5.0,
+                "accuracy_class": "5P10",
+                "burden_va": 10.0,
+                "manufacturer": "ABB",
+                **_quality_meta(
+                    verification_status="REFERENCYJNY",
+                    source_reference=source_reference,
+                    catalog_status="REFERENCYJNY_V1",
+                    verification_note=verification_note,
+                ),
+            },
+        },
+        {
+            "id": "ct_300_5_5p10_10va_siemens",
+            "name": "CT 300/5 A kl. 5P10 10 VA",
+            "params": {
+                "ratio_primary_a": 300.0,
+                "ratio_secondary_a": 5.0,
+                "accuracy_class": "5P10",
+                "burden_va": 10.0,
+                "manufacturer": "Siemens",
+                **_quality_meta(
+                    verification_status="REFERENCYJNY",
+                    source_reference=source_reference,
+                    catalog_status="REFERENCYJNY_V1",
+                    verification_note=verification_note,
+                ),
+            },
+        },
+        {
+            "id": "ct_400_5_5p20_15va_abb",
+            "name": "CT 400/5 A kl. 5P20 15 VA",
             "params": {
                 "ratio_primary_a": 400.0,
                 "ratio_secondary_a": 5.0,
                 "accuracy_class": "5P20",
                 "burden_va": 15.0,
                 "manufacturer": "ABB",
+                **_quality_meta(
+                    verification_status="REFERENCYJNY",
+                    source_reference=source_reference,
+                    catalog_status="REFERENCYJNY_V1",
+                    verification_note=verification_note,
+                ),
             },
         },
         {
-            "id": "ct_200_5_5p20",
-            "name": "CT 200/5 A kl. 5P20",
+            "id": "ct_600_5_5p20_15va_schneider",
+            "name": "CT 600/5 A kl. 5P20 15 VA",
             "params": {
-                "ratio_primary_a": 200.0,
+                "ratio_primary_a": 600.0,
                 "ratio_secondary_a": 5.0,
                 "accuracy_class": "5P20",
-                "burden_va": 10.0,
-                "manufacturer": "ABB",
+                "burden_va": 15.0,
+                "manufacturer": "Schneider Electric",
+                **_quality_meta(
+                    verification_status="REFERENCYJNY",
+                    source_reference=source_reference,
+                    catalog_status="REFERENCYJNY_V1",
+                    verification_note=verification_note,
+                ),
             },
         },
         {
-            "id": "ct_100_5_0_5",
-            "name": "CT 100/5 A kl. 0.5",
+            "id": "ct_800_5_5p20_20va_arteche",
+            "name": "CT 800/5 A kl. 5P20 20 VA",
             "params": {
-                "ratio_primary_a": 100.0,
+                "ratio_primary_a": 800.0,
                 "ratio_secondary_a": 5.0,
-                "accuracy_class": "0.5",
-                "burden_va": 10.0,
+                "accuracy_class": "5P20",
+                "burden_va": 20.0,
                 "manufacturer": "Arteche",
+                **_quality_meta(
+                    verification_status="REFERENCYJNY",
+                    source_reference=source_reference,
+                    catalog_status="REFERENCYJNY_V1",
+                    verification_note=verification_note,
+                ),
+            },
+        },
+        {
+            "id": "ct_1000_5_5p20_20va_abb",
+            "name": "CT 1000/5 A kl. 5P20 20 VA",
+            "params": {
+                "ratio_primary_a": 1000.0,
+                "ratio_secondary_a": 5.0,
+                "accuracy_class": "5P20",
+                "burden_va": 20.0,
+                "manufacturer": "ABB",
+                **_quality_meta(
+                    verification_status="REFERENCYJNY",
+                    source_reference=source_reference,
+                    catalog_status="REFERENCYJNY_V1",
+                    verification_note=verification_note,
+                ),
+            },
+        },
+        {
+            "id": "ct_1200_5_5p20_20va_siemens",
+            "name": "CT 1200/5 A kl. 5P20 20 VA",
+            "params": {
+                "ratio_primary_a": 1200.0,
+                "ratio_secondary_a": 5.0,
+                "accuracy_class": "5P20",
+                "burden_va": 20.0,
+                "manufacturer": "Siemens",
+                **_quality_meta(
+                    verification_status="REFERENCYJNY",
+                    source_reference=source_reference,
+                    catalog_status="REFERENCYJNY_V1",
+                    verification_note=verification_note,
+                ),
+            },
+        },
+        {
+            "id": "ct_1500_5_5p20_30va_abb",
+            "name": "CT 1500/5 A kl. 5P20 30 VA",
+            "params": {
+                "ratio_primary_a": 1500.0,
+                "ratio_secondary_a": 5.0,
+                "accuracy_class": "5P20",
+                "burden_va": 30.0,
+                "manufacturer": "ABB",
+                **_quality_meta(
+                    verification_status="REFERENCYJNY",
+                    source_reference=source_reference,
+                    catalog_status="REFERENCYJNY_V1",
+                    verification_note=verification_note,
+                ),
+            },
+        },
+        {
+            "id": "ct_2000_5_10p10_30va_arteche",
+            "name": "CT 2000/5 A kl. 10P10 30 VA",
+            "params": {
+                "ratio_primary_a": 2000.0,
+                "ratio_secondary_a": 5.0,
+                "accuracy_class": "10P10",
+                "burden_va": 30.0,
+                "manufacturer": "Arteche",
+                **_quality_meta(
+                    verification_status="REFERENCYJNY",
+                    source_reference=source_reference,
+                    catalog_status="REFERENCYJNY_V1",
+                    verification_note=verification_note,
+                ),
             },
         },
     ]
 
 
 def get_all_vt_types() -> list[dict]:
+    def _quality_meta(
+        *,
+        verification_status: str,
+        source_reference: str,
+        catalog_status: str,
+        verification_note: str,
+    ) -> dict:
+        return {
+            "verification_status": verification_status,
+            "source_reference": source_reference,
+            "catalog_status": catalog_status,
+            "contract_version": "2.0",
+            "verification_note": verification_note,
+        }
+
+    source_reference = "Katalog VT MV-DESIGN-PRO / IEC 61869 / dane referencyjne"
+    verification_note = (
+        "Rekord referencyjny do doboru VT; zakresy nalezy potwierdzic z karta producenta przed uzyciem produkcyjnym."
+    )
     return [
         {
-            "id": "vt_15kv_100v",
+            "id": "vt_10kv_100v_05_abb",
+            "name": "VT 10 kV / 100 V kl. 0.5",
+            "params": {
+                "ratio_primary_v": 10000.0,
+                "ratio_secondary_v": 100.0,
+                "accuracy_class": "0.5",
+                "manufacturer": "ABB",
+                **_quality_meta(
+                    verification_status="REFERENCYJNY",
+                    source_reference=source_reference,
+                    catalog_status="REFERENCYJNY_V1",
+                    verification_note=verification_note,
+                ),
+            },
+        },
+        {
+            "id": "vt_15kv_100v_05_abb",
             "name": "VT 15 kV / 100 V kl. 0.5",
             "params": {
                 "ratio_primary_v": 15000.0,
                 "ratio_secondary_v": 100.0,
                 "accuracy_class": "0.5",
                 "manufacturer": "ABB",
+                **_quality_meta(
+                    verification_status="REFERENCYJNY",
+                    source_reference=source_reference,
+                    catalog_status="REFERENCYJNY_V1",
+                    verification_note=verification_note,
+                ),
             },
         },
         {
-            "id": "vt_20kv_100v",
+            "id": "vt_15kv_100v_3p_abb",
+            "name": "VT 15 kV / 100 V kl. 3P",
+            "params": {
+                "ratio_primary_v": 15000.0,
+                "ratio_secondary_v": 100.0,
+                "accuracy_class": "3P",
+                "manufacturer": "ABB",
+                **_quality_meta(
+                    verification_status="REFERENCYJNY",
+                    source_reference=source_reference,
+                    catalog_status="REFERENCYJNY_V1",
+                    verification_note=verification_note,
+                ),
+            },
+        },
+        {
+            "id": "vt_20kv_100v_05_arteche",
             "name": "VT 20 kV / 100 V kl. 0.5",
             "params": {
                 "ratio_primary_v": 20000.0,
                 "ratio_secondary_v": 100.0,
                 "accuracy_class": "0.5",
+                "manufacturer": "Arteche",
+                **_quality_meta(
+                    verification_status="REFERENCYJNY",
+                    source_reference=source_reference,
+                    catalog_status="REFERENCYJNY_V1",
+                    verification_note=verification_note,
+                ),
+            },
+        },
+        {
+            "id": "vt_20kv_100v_3p_abb",
+            "name": "VT 20 kV / 100 V kl. 3P",
+            "params": {
+                "ratio_primary_v": 20000.0,
+                "ratio_secondary_v": 100.0,
+                "accuracy_class": "3P",
                 "manufacturer": "ABB",
+                **_quality_meta(
+                    verification_status="REFERENCYJNY",
+                    source_reference=source_reference,
+                    catalog_status="REFERENCYJNY_V1",
+                    verification_note=verification_note,
+                ),
+            },
+        },
+        {
+            "id": "vt_24kv_100v_05_siemens",
+            "name": "VT 24 kV / 100 V kl. 0.5",
+            "params": {
+                "ratio_primary_v": 24000.0,
+                "ratio_secondary_v": 100.0,
+                "accuracy_class": "0.5",
+                "manufacturer": "Siemens",
+                **_quality_meta(
+                    verification_status="REFERENCYJNY",
+                    source_reference=source_reference,
+                    catalog_status="REFERENCYJNY_V1",
+                    verification_note=verification_note,
+                ),
+            },
+        },
+        {
+            "id": "vt_24kv_100v_3p_schneider",
+            "name": "VT 24 kV / 100 V kl. 3P",
+            "params": {
+                "ratio_primary_v": 24000.0,
+                "ratio_secondary_v": 100.0,
+                "accuracy_class": "3P",
+                "manufacturer": "Schneider Electric",
+                **_quality_meta(
+                    verification_status="REFERENCYJNY",
+                    source_reference=source_reference,
+                    catalog_status="REFERENCYJNY_V1",
+                    verification_note=verification_note,
+                ),
+            },
+        },
+        {
+            "id": "vt_15kv_110v_05_ormazabal",
+            "name": "VT 15 kV / 110 V kl. 0.5",
+            "params": {
+                "ratio_primary_v": 15000.0,
+                "ratio_secondary_v": 110.0,
+                "accuracy_class": "0.5",
+                "manufacturer": "Ormazabal",
+                **_quality_meta(
+                    verification_status="REFERENCYJNY",
+                    source_reference=source_reference,
+                    catalog_status="REFERENCYJNY_V1",
+                    verification_note=verification_note,
+                ),
+            },
+        },
+        {
+            "id": "vt_20kv_110v_05_abb",
+            "name": "VT 20 kV / 110 V kl. 0.5",
+            "params": {
+                "ratio_primary_v": 20000.0,
+                "ratio_secondary_v": 110.0,
+                "accuracy_class": "0.5",
+                "manufacturer": "ABB",
+                **_quality_meta(
+                    verification_status="REFERENCYJNY",
+                    source_reference=source_reference,
+                    catalog_status="REFERENCYJNY_V1",
+                    verification_note=verification_note,
+                ),
             },
         },
     ]
 
 
 def get_all_protection_device_types() -> list[dict]:
+    def _device_meta(
+        *,
+        verification_status: str,
+        source_reference: str,
+        catalog_status: str,
+        verification_note: str,
+    ) -> dict:
+        return {
+            "verification_status": verification_status,
+            "source_reference": source_reference,
+            "catalog_status": catalog_status,
+            "contract_version": "2.0",
+            "verification_note": verification_note,
+        }
+
+    abb_source_reference = "ABB REX / dane referencyjne MV-DESIGN-PRO"
+    etango_source_reference = "Elektrometal e2TANGO / dane referencyjne MV-DESIGN-PRO"
+    abb_note = (
+        "Rekord czesciowo zweryfikowany; zakres funkcji i parametrow wymaga potwierdzenia w karcie producenta."
+    )
+    etango_note = (
+        "Rekord analityczny; zakresy i warianty wymagaja weryfikacji producenta przed uzyciem produkcyjnym."
+    )
     return [
         {
             "id": "ACME_REX500_v1",
@@ -447,6 +803,12 @@ def get_all_protection_device_types() -> list[dict]:
                 "series": "REX",
                 "revision": "v1",
                 "notes_pl": "Rekord zgodny z katalogiem analitycznym ochrony.",
+                **_device_meta(
+                    verification_status="CZESCIOWO_ZWERYFIKOWANY",
+                    source_reference=abb_source_reference,
+                    catalog_status="ANALITYCZNY_V1",
+                    verification_note=abb_note,
+                ),
             },
         },
         {
@@ -457,6 +819,60 @@ def get_all_protection_device_types() -> list[dict]:
                 "series": "REX",
                 "revision": "v1",
                 "notes_pl": "Rekord zgodny z katalogiem analitycznym ochrony.",
+                **_device_meta(
+                    verification_status="CZESCIOWO_ZWERYFIKOWANY",
+                    source_reference=abb_source_reference,
+                    catalog_status="ANALITYCZNY_V1",
+                    verification_note=abb_note,
+                ),
+            },
+        },
+        {
+            "id": "ACME_REX100_v1",
+            "name_pl": "Przekaznik ABB REX-100",
+            "params": {
+                "vendor": "ABB",
+                "series": "REX",
+                "revision": "v1",
+                "notes_pl": "Rekord referencyjny rodziny REX dla nizszych zakresow linii i transformatorow.",
+                **_device_meta(
+                    verification_status="CZESCIOWO_ZWERYFIKOWANY",
+                    source_reference=abb_source_reference,
+                    catalog_status="ANALITYCZNY_V1",
+                    verification_note=abb_note,
+                ),
+            },
+        },
+        {
+            "id": "ACME_REX300_v1",
+            "name_pl": "Przekaznik ABB REX-300",
+            "params": {
+                "vendor": "ABB",
+                "series": "REX",
+                "revision": "v1",
+                "notes_pl": "Rekord referencyjny rodziny REX dla typowych pol SN.",
+                **_device_meta(
+                    verification_status="CZESCIOWO_ZWERYFIKOWANY",
+                    source_reference=abb_source_reference,
+                    catalog_status="ANALITYCZNY_V1",
+                    verification_note=abb_note,
+                ),
+            },
+        },
+        {
+            "id": "ACME_REX700_v1",
+            "name_pl": "Przekaznik ABB REX-700",
+            "params": {
+                "vendor": "ABB",
+                "series": "REX",
+                "revision": "v1",
+                "notes_pl": "Rekord referencyjny rodziny REX dla rozbudowanych zastosowan SN.",
+                **_device_meta(
+                    verification_status="CZESCIOWO_ZWERYFIKOWANY",
+                    source_reference=abb_source_reference,
+                    catalog_status="ANALITYCZNY_V1",
+                    verification_note=abb_note,
+                ),
             },
         },
         {
@@ -468,6 +884,12 @@ def get_all_protection_device_types() -> list[dict]:
                 "revision": "v0",
                 "rated_current_a": 400.0,
                 "notes_pl": "Rekord analityczny - dane wymagaja weryfikacji produkcyjnej.",
+                **_device_meta(
+                    verification_status="NIEWERYFIKOWANY",
+                    source_reference=etango_source_reference,
+                    catalog_status="ANALITYCZNY_V1",
+                    verification_note=etango_note,
+                ),
             },
         },
         {
@@ -479,6 +901,12 @@ def get_all_protection_device_types() -> list[dict]:
                 "revision": "v0",
                 "rated_current_a": 600.0,
                 "notes_pl": "Rekord analityczny - dane wymagaja weryfikacji produkcyjnej.",
+                **_device_meta(
+                    verification_status="NIEWERYFIKOWANY",
+                    source_reference=etango_source_reference,
+                    catalog_status="ANALITYCZNY_V1",
+                    verification_note=etango_note,
+                ),
             },
         },
         {
@@ -490,6 +918,12 @@ def get_all_protection_device_types() -> list[dict]:
                 "revision": "v0",
                 "rated_current_a": 800.0,
                 "notes_pl": "Rekord analityczny - dane wymagaja weryfikacji produkcyjnej.",
+                **_device_meta(
+                    verification_status="NIEWERYFIKOWANY",
+                    source_reference=etango_source_reference,
+                    catalog_status="ANALITYCZNY_V1",
+                    verification_note=etango_note,
+                ),
             },
         },
         {
@@ -501,6 +935,12 @@ def get_all_protection_device_types() -> list[dict]:
                 "revision": "v0",
                 "rated_current_a": 1000.0,
                 "notes_pl": "Rekord analityczny - dane wymagaja weryfikacji produkcyjnej.",
+                **_device_meta(
+                    verification_status="NIEWERYFIKOWANY",
+                    source_reference=etango_source_reference,
+                    catalog_status="ANALITYCZNY_V1",
+                    verification_note=etango_note,
+                ),
             },
         },
         {
@@ -512,6 +952,12 @@ def get_all_protection_device_types() -> list[dict]:
                 "revision": "v0",
                 "rated_current_a": 1250.0,
                 "notes_pl": "Rekord analityczny - dane wymagaja weryfikacji produkcyjnej.",
+                **_device_meta(
+                    verification_status="NIEWERYFIKOWANY",
+                    source_reference=etango_source_reference,
+                    catalog_status="ANALITYCZNY_V1",
+                    verification_note=etango_note,
+                ),
             },
         },
         {
@@ -523,6 +969,12 @@ def get_all_protection_device_types() -> list[dict]:
                 "revision": "v0",
                 "rated_current_a": 1600.0,
                 "notes_pl": "Rekord analityczny - dane wymagaja weryfikacji produkcyjnej.",
+                **_device_meta(
+                    verification_status="NIEWERYFIKOWANY",
+                    source_reference=etango_source_reference,
+                    catalog_status="ANALITYCZNY_V1",
+                    verification_note=etango_note,
+                ),
             },
         },
         {
@@ -534,12 +986,29 @@ def get_all_protection_device_types() -> list[dict]:
                 "revision": "v0",
                 "rated_current_a": 2000.0,
                 "notes_pl": "Rekord analityczny - dane wymagaja weryfikacji produkcyjnej.",
+                **_device_meta(
+                    verification_status="NIEWERYFIKOWANY",
+                    source_reference=etango_source_reference,
+                    catalog_status="ANALITYCZNY_V1",
+                    verification_note=etango_note,
+                ),
             },
         },
     ]
 
 
 def get_all_protection_curves() -> list[dict]:
+    def _curve_meta(*, name: str) -> dict:
+        return {
+            "verification_status": "REFERENCYJNY",
+            "source_reference": "Katalog krzywych MV-DESIGN-PRO / IEC 60255 / IEEE C37.112 / dane referencyjne",
+            "catalog_status": "REFERENCYJNY_V1",
+            "contract_version": "2.0",
+            "verification_note": (
+                f"Rekord referencyjny krzywej {name}; parametry wymagaja potwierdzenia w karcie producenta lub normie."
+            ),
+        }
+
     return [
         {
             "id": "curve_iec_normal_inverse",
@@ -548,6 +1017,7 @@ def get_all_protection_curves() -> list[dict]:
                 "standard": "IEC",
                 "curve_kind": "inverse",
                 "parameters": {"A": 0.14, "B": 0.02},
+                **_curve_meta(name="IEC normalna inwersyjna"),
             },
         },
         {
@@ -557,12 +1027,84 @@ def get_all_protection_curves() -> list[dict]:
                 "standard": "IEC",
                 "curve_kind": "very_inverse",
                 "parameters": {"A": 13.5, "B": 1.0},
+                **_curve_meta(name="IEC bardzo inwersyjna"),
+            },
+        },
+        {
+            "id": "curve_iec_extremely_inverse",
+            "name_pl": "IEC skrajnie inwersyjna",
+            "params": {
+                "standard": "IEC",
+                "curve_kind": "extremely_inverse",
+                "parameters": {"A": 80.0, "B": 2.0},
+                **_curve_meta(name="IEC skrajnie inwersyjna"),
+            },
+        },
+        {
+            "id": "curve_iec_long_time_inverse",
+            "name_pl": "IEC dlugoczasowo inwersyjna",
+            "params": {
+                "standard": "IEC",
+                "curve_kind": "long_time_inverse",
+                "parameters": {"A": 120.0, "B": 1.0},
+                **_curve_meta(name="IEC dlugoczasowo inwersyjna"),
+            },
+        },
+        {
+            "id": "curve_ieee_moderately_inverse",
+            "name_pl": "IEEE umiarkowanie inwersyjna",
+            "params": {
+                "standard": "IEEE",
+                "curve_kind": "moderately_inverse",
+                "parameters": {"A": 0.0515, "B": 0.02, "C": 0.114},
+                **_curve_meta(name="IEEE umiarkowanie inwersyjna"),
+            },
+        },
+        {
+            "id": "curve_ieee_very_inverse",
+            "name_pl": "IEEE bardzo inwersyjna",
+            "params": {
+                "standard": "IEEE",
+                "curve_kind": "very_inverse",
+                "parameters": {"A": 19.61, "B": 0.491, "C": 0.114},
+                **_curve_meta(name="IEEE bardzo inwersyjna"),
+            },
+        },
+        {
+            "id": "curve_ieee_extremely_inverse",
+            "name_pl": "IEEE skrajnie inwersyjna",
+            "params": {
+                "standard": "IEEE",
+                "curve_kind": "extremely_inverse",
+                "parameters": {"A": 28.2, "B": 0.1217, "C": 0.02},
+                **_curve_meta(name="IEEE skrajnie inwersyjna"),
+            },
+        },
+        {
+            "id": "curve_ansi_inverse",
+            "name_pl": "ANSI inwersyjna",
+            "params": {
+                "standard": "ANSI",
+                "curve_kind": "inverse",
+                "parameters": {"K": 0.0515, "alpha": 0.02, "beta": 0.114},
+                **_curve_meta(name="ANSI inwersyjna"),
             },
         },
     ]
 
 
 def get_all_protection_setting_templates() -> list[dict]:
+    def _template_meta(*, name: str) -> dict:
+        return {
+            "verification_status": "REFERENCYJNY",
+            "source_reference": "Szablony nastaw MV-DESIGN-PRO / IEC 60255 / dane referencyjne",
+            "catalog_status": "REFERENCYJNY_V1",
+            "contract_version": "2.0",
+            "verification_note": (
+                f"Szablon referencyjny {name}; przed uzyciem nalezy potwierdzic dobor na podstawie modelu sieci i karty producenta."
+            ),
+        }
+
     return [
         {
             "id": "template_rex500_oc",
@@ -574,6 +1116,34 @@ def get_all_protection_setting_templates() -> list[dict]:
                     {"name": "I>", "unit": "A", "min": 0.1, "max": 10.0},
                     {"name": "t>", "unit": "s", "min": 0.0, "max": 5.0},
                 ],
+                **_template_meta(name="ABB REX-500 - nadpradowy"),
+            },
+        },
+        {
+            "id": "template_rex300_oc",
+            "name_pl": "Szablon ABB REX-300 - nadpradowy",
+            "params": {
+                "device_type_ref": "ACME_REX300_v1",
+                "curve_ref": "curve_iec_very_inverse",
+                "setting_fields": [
+                    {"name": "I>", "unit": "A", "min": 0.1, "max": 12.0},
+                    {"name": "t>", "unit": "s", "min": 0.0, "max": 6.0},
+                    {"name": "I>>", "unit": "A", "min": 1.0, "max": 80.0},
+                ],
+                **_template_meta(name="ABB REX-300 - nadpradowy"),
+            },
+        },
+        {
+            "id": "template_rex100_oc",
+            "name_pl": "Szablon ABB REX-100 - nadpradowy",
+            "params": {
+                "device_type_ref": "ACME_REX100_v1",
+                "curve_ref": "curve_iec_normal_inverse",
+                "setting_fields": [
+                    {"name": "I>", "unit": "A", "min": 0.1, "max": 8.0},
+                    {"name": "t>", "unit": "s", "min": 0.0, "max": 5.0},
+                ],
+                **_template_meta(name="ABB REX-100 - nadpradowy"),
             },
         },
         {
@@ -586,6 +1156,63 @@ def get_all_protection_setting_templates() -> list[dict]:
                     {"name": "I0>", "unit": "A", "min": 0.1, "max": 10.0},
                     {"name": "t0>", "unit": "s", "min": 0.0, "max": 5.0},
                 ],
+                **_template_meta(name="e2TANGO-400 - ziemnozwarciowy"),
+            },
+        },
+        {
+            "id": "template_etango_800_ef",
+            "name_pl": "Szablon e2TANGO-800 - ziemnozwarciowy",
+            "params": {
+                "device_type_ref": "EM_ETANGO_800_V0",
+                "curve_ref": "curve_ieee_very_inverse",
+                "setting_fields": [
+                    {"name": "I0>", "unit": "A", "min": 0.1, "max": 12.0},
+                    {"name": "t0>", "unit": "s", "min": 0.0, "max": 6.0},
+                    {"name": "I0>>", "unit": "A", "min": 1.0, "max": 50.0},
+                ],
+                **_template_meta(name="e2TANGO-800 - ziemnozwarciowy"),
+            },
+        },
+        {
+            "id": "template_etango_1250_oc",
+            "name_pl": "Szablon e2TANGO-1250 - nadpradowy",
+            "params": {
+                "device_type_ref": "EM_ETANGO_1250_V0",
+                "curve_ref": "curve_iec_extremely_inverse",
+                "setting_fields": [
+                    {"name": "I>", "unit": "A", "min": 0.1, "max": 20.0},
+                    {"name": "t>", "unit": "s", "min": 0.0, "max": 6.0},
+                    {"name": "I>>", "unit": "A", "min": 1.0, "max": 120.0},
+                ],
+                **_template_meta(name="e2TANGO-1250 - nadpradowy"),
+            },
+        },
+        {
+            "id": "template_etango_1600_ef",
+            "name_pl": "Szablon e2TANGO-1600 - ziemnozwarciowy",
+            "params": {
+                "device_type_ref": "EM_ETANGO_1600_V0",
+                "curve_ref": "curve_iec_long_time_inverse",
+                "setting_fields": [
+                    {"name": "I0>", "unit": "A", "min": 0.1, "max": 20.0},
+                    {"name": "t0>", "unit": "s", "min": 0.0, "max": 8.0},
+                    {"name": "I0>>", "unit": "A", "min": 1.0, "max": 150.0},
+                ],
+                **_template_meta(name="e2TANGO-1600 - ziemnozwarciowy"),
+            },
+        },
+        {
+            "id": "template_etango_2000_oc",
+            "name_pl": "Szablon e2TANGO-2000 - nadpradowy",
+            "params": {
+                "device_type_ref": "EM_ETANGO_2000_V0",
+                "curve_ref": "curve_ansi_inverse",
+                "setting_fields": [
+                    {"name": "I>", "unit": "A", "min": 0.1, "max": 30.0},
+                    {"name": "t>", "unit": "s", "min": 0.0, "max": 8.0},
+                    {"name": "I>>", "unit": "A", "min": 1.0, "max": 200.0},
+                ],
+                **_template_meta(name="e2TANGO-2000 - nadpradowy"),
             },
         },
     ]

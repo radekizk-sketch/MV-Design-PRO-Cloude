@@ -1288,7 +1288,7 @@ export const SldEditorPage: React.FC<SldEditorPageProps> = ({
               <span className="font-medium">pochodzenie parametrów:</span> {String(selectedSegmentParameterSourceInfo?.sourceMode ?? 'BRAK')}
             </div>
             <div data-testid="sld-segment-inspector-materialized">
-              <span className="font-medium">materializacja:</span> {selectedSegmentParameterSourceInfo?.hasMaterializedParams ? 'TAK' : 'NIE'}
+              <span className="font-medium">Wczytanie parametrów z katalogu:</span> {selectedSegmentParameterSourceInfo?.hasMaterializedParams ? 'TAK' : 'NIE'}
             </div>
             <div data-testid="sld-segment-inspector-overrides">
               <span className="font-medium">nadpisania ręczne:</span> {selectedSegmentParameterSourceInfo?.manualOverrideCount ?? 0}

@@ -954,9 +954,27 @@ def get_transformer_catalog_statistics() -> dict[str, Any]:
         "liczba_transformatorow_ogolem": len(all_types),
         "liczba_wn_sn": len(wn_sn),
         "liczba_sn_nn": len(sn_nn),
+        "statusy_weryfikacji": sorted({t["params"]["verification_status"] for t in all_types}),
+        "statusy_katalogowe": sorted({t["params"]["catalog_status"] for t in all_types}),
         "grupy_polaczen": vector_groups,
         "moce_znamionowe_mva": power_ratings,
         "producenci": ["ZREW Transformatory", "ABB", "Trafo Zywiec"],
         "napiecia_wn_sn": ["110/15 kV", "110/20 kV"],
         "napiecia_sn_nn": ["15/0.4 kV", "20/0.4 kV"],
+    }
+
+
+def get_transformer_catalog_quality_summary() -> dict[str, Any]:
+    """Zwraca jawne metadane jakosci dla katalogu transformatorow."""
+    all_types = get_all_transformer_types()
+    verified = sum(1 for item in all_types if item["params"]["verification_status"] == "ZWERYFIKOWANY")
+    unverified = sum(1 for item in all_types if item["params"]["verification_status"] == "NIEWERYFIKOWANY")
+
+    return {
+        "liczba_transformatorow_ogolem": len(all_types),
+        "liczba_zweryfikowanych": verified,
+        "liczba_nieweryfikowanych": unverified,
+        "statusy_weryfikacji": sorted({t["params"]["verification_status"] for t in all_types}),
+        "statusy_katalogowe": sorted({t["params"]["catalog_status"] for t in all_types}),
+        "contract_version": "2.0",
     }

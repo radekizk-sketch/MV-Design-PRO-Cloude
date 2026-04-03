@@ -14,7 +14,13 @@ class AbbVendorAdapter(VendorAdapter):
         return VENDOR
 
     def supported_devices(self) -> tuple[str, ...]:
-        return ("ACME_REX500_v1", "ACME_REX200_v1")
+        return (
+            "ACME_REX100_v1",
+            "ACME_REX200_v1",
+            "ACME_REX300_v1",
+            "ACME_REX500_v1",
+            "ACME_REX700_v1",
+        )
 
     def validate_vendor_support(
         self, mapped_settings: dict[str, float | str], *, device: DeviceCapability

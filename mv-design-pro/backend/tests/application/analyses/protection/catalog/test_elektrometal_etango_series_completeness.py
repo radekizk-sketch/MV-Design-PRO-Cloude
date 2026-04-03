@@ -34,5 +34,10 @@ def test_elektrometal_etango_series_is_complete_and_deterministic() -> None:
     for device in devices:
         assert device.meta.get("series") == "e2TANGO"
         assert device.meta.get("source_ref")
+        assert device.meta.get("source_reference")
+        assert device.meta.get("verification_status") == "NIEWERYFIKOWANY"
+        assert device.meta.get("catalog_status") == "ANALITYCZNY_V1"
+        assert device.meta.get("contract_version") == "2.0"
+        assert device.meta.get("verification_note")
         assert device.meta.get("unverified") is True
         assert device.meta.get("unverified_ranges") is True

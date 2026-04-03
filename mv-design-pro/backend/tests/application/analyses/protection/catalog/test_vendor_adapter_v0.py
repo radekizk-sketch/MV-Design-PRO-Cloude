@@ -107,12 +107,12 @@ def test_vendor_mapping_for_supported_device_is_deterministic(uow_factory) -> No
     assert "ABB.EF.I50N_HIGHSET_A" in vendor_settings
 
 
-def test_vendor_mapping_flags_missing_neutral_functions(uow_factory) -> None:
+def test_vendor_mapping_for_rex700_is_deterministic(uow_factory) -> None:
     protection_run_id = _seed_protection_run(uow_factory)
 
     envelope = run_device_mapping_v0(
         protection_run_id=protection_run_id,
-        device_id="ACME_REX200_v1",
+        device_id="ACME_REX700_v1",
         uow_factory=uow_factory,
     )
 
@@ -122,6 +122,10 @@ def test_vendor_mapping_flags_missing_neutral_functions(uow_factory) -> None:
     report = stored.meta_json["device_mapping_report_v0"]
     vendor_mapping = report["vendor_mapping"]
 
-    assert "VENDOR_UNSUPPORTED_FUNCTION_51N" in vendor_mapping["vendor_violations"]
-    assert vendor_mapping["vendor_settings"] == {}
-    assert report["status"] == "DEGRADED"
+    assert vendor_mapping["vendor"] == "ABB"
+    assert vendor_mapping["vendor_violations"] == []
+    vendor_settings = vendor_mapping["vendor_settings"]
+    assert "ABB.OC.I51_PICKUP_A" in vendor_settings
+    assert "ABB.OC.I50_HIGHSET_A" in vendor_settings
+    assert "ABB.EF.I51N_PICKUP_A" in vendor_settings
+    assert "ABB.EF.I50N_HIGHSET_A" in vendor_settings

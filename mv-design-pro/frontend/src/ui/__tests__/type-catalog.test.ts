@@ -17,21 +17,18 @@ global.fetch = vi.fn();
 
 describe('Type Catalog API', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    vi.resetAllMocks();
+    global.fetch = vi.fn();
   });
 
-  describe('handleResponse with 204 No Content (HOTFIX)', () => {
-    it('handles 204 No Content without calling response.json()', async () => {
-      // Mock 204 response
-      (global.fetch as any).mockResolvedValueOnce({
-        ok: true,
-        status: 204,
-      });
-
+  describe('clearTypeFromBranch w trybie katalog-first', () => {
+    it('blokuje odkatalogowanie elementu technicznego', async () => {
       const { clearTypeFromBranch } = await import('../catalog/api');
 
-      // Should not throw - 204 is handled correctly
-      await expect(clearTypeFromBranch('proj-123', 'branch-456')).resolves.toBeUndefined();
+      await expect(clearTypeFromBranch('proj-123', 'branch-456')).rejects.toThrow(
+        /Odkatalogowanie.*katalog-first/i,
+      );
+      expect(global.fetch).not.toHaveBeenCalled();
     });
   });
 
@@ -259,20 +256,26 @@ describe('Deterministic Ordering', () => {
     ];
 
     types.sort((a, b) => {
-      const mfrA = a.manufacturer ?? '';
-      const mfrB = b.manufacturer ?? '';
-      if (mfrA < mfrB) return -1;
-      if (mfrA > mfrB) return 1;
+      const mfrA = a.manufacturer ?? null;
+      const mfrB = b.manufacturer ?? null;
+      if (mfrA == null && mfrB != null) return 1;
+      if (mfrA != null && mfrB == null) return -1;
+      if (mfrA != null && mfrB != null) {
+        if (mfrA < mfrB) return -1;
+        if (mfrA > mfrB) return 1;
+      }
       if (a.name < b.name) return -1;
       if (a.name > b.name) return 1;
-      return a.id < b.id ? -1 : 1;
+      if (a.id < b.id) return -1;
+      if (a.id > b.id) return 1;
+      return 0;
     });
 
-    expect(types[0].id).toBe('e'); // null manufacturer, TypeA, e
-    expect(types[1].id).toBe('d'); // null manufacturer, TypeZ, d
-    expect(types[2].id).toBe('c'); // VendorA, TypeB, c
-    expect(types[3].id).toBe('a'); // VendorB, TypeA, a
-    expect(types[4].id).toBe('b'); // VendorB, TypeA, b
+    expect(types[0].id).toBe('c'); // VendorA, TypeB, c
+    expect(types[1].id).toBe('a'); // VendorB, TypeA, a
+    expect(types[2].id).toBe('b'); // VendorB, TypeA, b
+    expect(types[3].id).toBe('e'); // null manufacturer, TypeA, e
+    expect(types[4].id).toBe('d'); // null manufacturer, TypeZ, d
   });
 
   it('is stable across multiple sorts', () => {
@@ -282,23 +285,35 @@ describe('Deterministic Ordering', () => {
     ];
 
     const sort1 = [...types].sort((a, b) => {
-      const mfrA = a.manufacturer ?? '';
-      const mfrB = b.manufacturer ?? '';
-      if (mfrA < mfrB) return -1;
-      if (mfrA > mfrB) return 1;
+      const mfrA = a.manufacturer ?? null;
+      const mfrB = b.manufacturer ?? null;
+      if (mfrA == null && mfrB != null) return 1;
+      if (mfrA != null && mfrB == null) return -1;
+      if (mfrA != null && mfrB != null) {
+        if (mfrA < mfrB) return -1;
+        if (mfrA > mfrB) return 1;
+      }
       if (a.name < b.name) return -1;
       if (a.name > b.name) return 1;
-      return a.id < b.id ? -1 : 1;
+      if (a.id < b.id) return -1;
+      if (a.id > b.id) return 1;
+      return 0;
     });
 
     const sort2 = [...types].sort((a, b) => {
-      const mfrA = a.manufacturer ?? '';
-      const mfrB = b.manufacturer ?? '';
-      if (mfrA < mfrB) return -1;
-      if (mfrA > mfrB) return 1;
+      const mfrA = a.manufacturer ?? null;
+      const mfrB = b.manufacturer ?? null;
+      if (mfrA == null && mfrB != null) return 1;
+      if (mfrA != null && mfrB == null) return -1;
+      if (mfrA != null && mfrB != null) {
+        if (mfrA < mfrB) return -1;
+        if (mfrA > mfrB) return 1;
+      }
       if (a.name < b.name) return -1;
       if (a.name > b.name) return 1;
-      return a.id < b.id ? -1 : 1;
+      if (a.id < b.id) return -1;
+      if (a.id > b.id) return 1;
+      return 0;
     });
 
     expect(sort1).toEqual(sort2); // Deterministic

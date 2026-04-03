@@ -23,6 +23,7 @@ def _load_script(module_name: str):
 docs_guard = _load_script("docs_guard")
 catalog_enforcement_guard = _load_script("catalog_enforcement_guard")
 catalog_gate_guard = _load_script("catalog_gate_guard")
+catalog_metadata_guard = _load_script("catalog_metadata_guard")
 repo_hygiene_guard = _load_script("repo_hygiene_guard")
 
 
@@ -49,6 +50,10 @@ def test_catalog_enforcement_guard_accepts_canonical_extraction_paths():
 
 def test_catalog_enforcement_guard_blocks_clear_catalog_for_technical_elements():
     assert catalog_enforcement_guard.check_clear_catalog_protection() == []
+
+
+def test_catalog_metadata_guard_preserves_frozen_metadata_and_widths():
+    assert catalog_metadata_guard.main() == 0
 
 
 def test_root_arch_guard_workflow_runs_repo_hygiene_guard():
