@@ -60,8 +60,8 @@ jobs:
         working-directory: mv-design-pro/backend
         run: poetry run python ../scripts/transformer_catalog_voltage_guard.py
       - name: Fix Action Completeness Guard
-        working-directory: mv-design-pro
-        run: python scripts/fix_action_completeness_guard.py
+        working-directory: mv-design-pro/backend
+        run: poetry run python ../scripts/fix_action_completeness_guard.py
       - name: Audit Contract Guard
         working-directory: mv-design-pro
         run: python scripts/audit_contract_guard.py

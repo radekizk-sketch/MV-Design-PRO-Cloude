@@ -69,7 +69,7 @@ def test_root_python_workflow_runs_catalog_first_backend_guards():
         "poetry run python ../scripts/catalog_enforcement_guard.py",
         "python scripts/catalog_gate_guard.py",
         "poetry run python ../scripts/transformer_catalog_voltage_guard.py",
-        "python scripts/fix_action_completeness_guard.py",
+        "poetry run python ../scripts/fix_action_completeness_guard.py",
         "python scripts/audit_contract_guard.py",
         "python scripts/domain_no_guessing_guard.py",
         "python scripts/pcc_zero_guard.py",
