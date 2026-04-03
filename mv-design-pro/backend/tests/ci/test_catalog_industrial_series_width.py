@@ -31,7 +31,7 @@ def catalog():
 MIN_WIDTH = {
     "LINIA_SN": 25,           # AAL(8)+AFL6(8)+AFL2(5)+inne=26 — pełny typoszereg przemysłowy
     "KABEL_SN": 40,           # było 51 — minimum zachowawcze (poniżej aktualnego)
-    "TRAFO_SN_NN": 18,        # było 22 — minimum zachowawcze
+    "TRAFO_SN_NN": 30,        # WN/SN(10)+SN/nN(24)=34 — pełny typoszereg przemysłowy
     "APARAT_SN": 18,          # było 22 — minimum zachowawcze
     "ZRODLO_SN": 12,          # było 14 — minimum zachowawcze
     "CT": 3,                  # docelowo 24+, teraz minimum obecne
