@@ -42,6 +42,10 @@ export interface TraceJsonlHeader {
   snapshot_id: string | null;
   input_hash: string;
   total_steps: number;
+  catalog_context_count: number;
+  catalog_context: ExtendedTrace['catalog_context'];
+  catalog_context_by_element?: ExtendedTrace['catalog_context_by_element'];
+  catalog_context_summary?: ExtendedTrace['catalog_context_summary'];
   export_version: string;
 }
 
@@ -54,10 +58,21 @@ export interface TraceJsonlStep {
   key: string | null;
   title: string | null;
   phase: string | null;
+  element_id: string | null;
+  target_id: string | null;
+  solver_ref: string | null;
+  catalog_binding: TraceStep['catalog_binding'] | null;
+  source_catalog: TraceStep['source_catalog'] | null;
+  source_catalog_label: string | null;
+  parameter_origin: string | null;
+  parameter_source: string | null;
   formula_latex: string | null;
   inputs: Record<string, unknown> | null;
   substitution: string | null;
   result: Record<string, unknown> | null;
+  materialized_params: Record<string, unknown> | null;
+  manual_overrides: Array<Record<string, unknown>> | null;
+  manual_override_count: number | null;
   notes: string | null;
 }
 
@@ -81,10 +96,24 @@ function stepToJsonlData(step: TraceStep, index: number): TraceJsonlStep {
     key: step.key ?? step.step_id ?? null,
     title: step.title ?? step.description ?? null,
     phase: step.phase ?? null,
+    element_id: step.element_id ?? step.catalog_context_entry?.element_id ?? null,
+    target_id: step.target_id ?? null,
+    solver_ref: step.solver_ref ?? null,
+    catalog_binding: step.catalog_binding ?? step.catalog_context_entry?.catalog_binding ?? null,
+    source_catalog: step.source_catalog ?? step.catalog_context_entry?.source_catalog ?? null,
+    source_catalog_label: step.source_catalog_label ?? step.catalog_context_entry?.source_catalog_label ?? null,
+    parameter_origin: step.parameter_origin ?? step.catalog_context_entry?.parameter_origin ?? null,
+    parameter_source: step.parameter_source ?? step.catalog_context_entry?.parameter_source ?? null,
     formula_latex: step.formula_latex ?? null,
     inputs: step.inputs ?? null,
     substitution: step.substitution ?? null,
     result: step.result ?? null,
+    materialized_params: step.materialized_params ?? step.catalog_context_entry?.materialized_params ?? null,
+    manual_overrides: step.manual_overrides ?? step.catalog_context_entry?.manual_overrides ?? null,
+    manual_override_count:
+      step.manual_override_count
+      ?? step.catalog_context_entry?.manual_override_count
+      ?? ((step.manual_overrides ?? step.catalog_context_entry?.manual_overrides)?.length ?? null),
     notes: step.notes ?? null,
   };
 }
@@ -110,6 +139,10 @@ export function generateTraceJsonl(trace: ExtendedTrace): string {
       snapshot_id: trace.snapshot_id,
       input_hash: trace.input_hash,
       total_steps: trace.white_box_trace.length,
+      catalog_context_count: trace.catalog_context.length,
+      catalog_context: trace.catalog_context,
+      catalog_context_by_element: trace.catalog_context_by_element,
+      catalog_context_summary: trace.catalog_context_summary,
       export_version: EXPORT_VERSION,
     },
   };

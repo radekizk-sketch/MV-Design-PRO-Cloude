@@ -88,7 +88,12 @@ class TestSnapshotDeterminism:
     def test_same_input_same_output(self):
         from enm.domain_operations import execute_domain_operation
         enm = _empty_enm()
-        payload = {"voltage_kv": 15.0, "source_name": "GPZ Test", "sk3_mva": 500.0}
+        payload = {
+            "voltage_kv": 15.0,
+            "source_name": "GPZ Test",
+            "sk3_mva": 500.0,
+            "catalog_ref": "src-gpz-15kv-500mva-rx010",
+        }
 
         result1 = execute_domain_operation(enm, "add_grid_source_sn", payload)
         result2 = execute_domain_operation(enm, "add_grid_source_sn", payload)
@@ -98,7 +103,7 @@ class TestSnapshotDeterminism:
     def test_response_schema_complete(self):
         from enm.domain_operations import execute_domain_operation
         enm = _empty_enm()
-        payload = {"voltage_kv": 15.0}
+        payload = {"voltage_kv": 15.0, "catalog_ref": "src-gpz-15kv-250mva-rx010"}
         result = execute_domain_operation(enm, "add_grid_source_sn", payload)
 
         required_keys = {"snapshot", "readiness", "fix_actions", "changes",
@@ -112,7 +117,11 @@ class TestReadinessCodes:
     def test_readiness_code_format(self):
         from enm.domain_operations import execute_domain_operation
         enm = _empty_enm()
-        result = execute_domain_operation(enm, "add_grid_source_sn", {"voltage_kv": 15.0})
+        result = execute_domain_operation(
+            enm,
+            "add_grid_source_sn",
+            {"voltage_kv": 15.0, "catalog_ref": "src-gpz-15kv-250mva-rx010"},
+        )
         readiness = result.get("readiness", {})
         for blocker in readiness.get("blockers", []):
             code = blocker.get("code", "")

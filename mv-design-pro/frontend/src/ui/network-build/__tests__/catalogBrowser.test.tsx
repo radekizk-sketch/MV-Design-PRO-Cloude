@@ -13,7 +13,7 @@ describe('CatalogBrowser', () => {
     fetchTypesByCategoryMock.mockReset();
   });
 
-  it('pobiera listę typów z API dla wspieranej przestrzeni', async () => {
+  it('pobiera liste typow z API dla wspieranej przestrzeni', async () => {
     fetchTypesByCategoryMock.mockResolvedValue([
       {
         id: 'cable-1',
@@ -35,14 +35,39 @@ describe('CatalogBrowser', () => {
     expect(screen.getByText('Tele-Fonika')).toBeInTheDocument();
   });
 
-  it('pokazuje jawny komunikat dla namespace bez mapowania API', async () => {
-    fetchTypesByCategoryMock.mockResolvedValue([]);
+  it('pobiera katalog dla przekladnikow pradowych zamiast blokowac namespace', async () => {
+    fetchTypesByCategoryMock.mockResolvedValue([
+      {
+        id: 'ct-1',
+        name: 'CT 400/5 A kl. 5P20',
+        manufacturer: 'ABB',
+        ratio_primary_a: 400,
+        ratio_secondary_a: 5,
+        accuracy_class: '5P20',
+      },
+    ]);
 
     render(<CatalogBrowser />);
 
-    fireEvent.click(screen.getByRole('button', { name: /Przekładniki prądowe/i }));
+    fireEvent.click(screen.getByRole('button', { name: /typy przekładników prądowych/i }));
 
-    expect(await screen.findByText(/brak obsługi API/i)).toBeInTheDocument();
-    expect(fetchTypesByCategoryMock).toHaveBeenCalledTimes(1);
+    await waitFor(() => {
+      expect(fetchTypesByCategoryMock).toHaveBeenLastCalledWith('CT');
+    });
+
+    expect(await screen.findByText('CT 400/5 A kl. 5P20')).toBeInTheDocument();
+    expect(screen.getByText('ABB')).toBeInTheDocument();
+  });
+
+  it('pokazuje komunikat z klienta API przy braku polaczenia', async () => {
+    fetchTypesByCategoryMock.mockRejectedValue(
+      new Error('Nie mozna polaczyc sie z API katalogow. Uruchom backend i odswiez widok.'),
+    );
+
+    render(<CatalogBrowser />);
+
+    expect(
+      await screen.findByText(/nie mozna polaczyc sie z api katalogow/i),
+    ).toBeInTheDocument();
   });
 });

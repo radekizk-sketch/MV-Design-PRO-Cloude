@@ -17,6 +17,30 @@ import pytest
 from enm.models import EnergyNetworkModel, ENMHeader, ENMDefaults
 from enm.domain_operations import execute_domain_operation
 
+CATALOG_LINE_35 = "line-base-al-st-35"
+CATALOG_LINE_70 = "line-base-al-st-70"
+CATALOG_CABLE_70 = "cable-base-xlpe-al-3c-70"
+CATALOG_CABLE_120 = "cable-tfk-yakxs-3x120"
+CATALOG_CABLE_150 = "cable-base-xlpe-al-3c-150"
+CATALOG_CABLE_240 = "cable-base-xlpe-al-3c-240"
+CATALOG_TRAFO_630 = "tr-sn-nn-15-04-630kva-dyn11"
+CATALOG_ZRODLO_200 = "src-gpz-15kv-200mva-rx010"
+CATALOG_ZRODLO_250 = "src-gpz-15kv-250mva-rx010"
+CATALOG_ZRODLO_300 = "src-gpz-15kv-300mva-rx010"
+CATALOG_ZRODLO_350 = "src-gpz-15kv-350mva-rx010"
+CATALOG_ZRODLO_400 = "src-gpz-15kv-400mva-rx010"
+
+
+def _source_catalog_ref(sk3_mva: float | None) -> str:
+    mapping = {
+        200.0: CATALOG_ZRODLO_200,
+        250.0: CATALOG_ZRODLO_250,
+        300.0: CATALOG_ZRODLO_300,
+        350.0: CATALOG_ZRODLO_350,
+        400.0: CATALOG_ZRODLO_400,
+    }
+    return mapping.get(float(sk3_mva or 250.0), CATALOG_ZRODLO_250)
+
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -32,6 +56,11 @@ def _empty_enm() -> dict:
 
 def op(snap: dict, name: str, payload: dict) -> dict:
     """Wykonaj operację domenową i zwróć nowy snapshot. Wymuś brak błędu."""
+    if name == "add_grid_source_sn" and "catalog_ref" not in payload:
+        payload = {
+            **payload,
+            "catalog_ref": _source_catalog_ref(payload.get("sk3_mva")),
+        }
     result = execute_domain_operation(snap, name, payload)
     err = result.get("error")
     assert not err, f"Operacja '{name}' zwróciła błąd: {err} (code={result.get('error_code')})"
@@ -40,7 +69,7 @@ def op(snap: dict, name: str, payload: dict) -> dict:
 
 
 _STATION_CATALOG_PAYLOAD = {
-    "transformer": {"transformer_catalog_ref": "TRAFO-0.63MVA"},
+    "transformer": {"transformer_catalog_ref": CATALOG_TRAFO_630},
     "station": {"nn_voltage_kv": 0.4},
     "nn_voltage_kv": 0.4,
 }
@@ -104,9 +133,9 @@ class TestE2E1MultiObjectFeeder:
         s = _empty_enm()
 
         # GPZ + magistrala napowietrzna
-        s = op(s, "add_grid_source_sn", {"voltage_kv": 15.0, "sk3_mva": 350.0})
+        s = op(s, "add_grid_source_sn", {"voltage_kv": 15.0, "sk3_mva": 350.0, "catalog_ref": CATALOG_ZRODLO_350})
         s = op(s, "continue_trunk_segment_sn", {
-            "segment": {"rodzaj": "LINIA_NAPOWIETRZNA", "dlugosc_m": 800, "catalog_ref": "AFL-6_70"},
+            "segment": {"rodzaj": "LINIA_NAPOWIETRZNA", "dlugosc_m": 800, "catalog_ref": CATALOG_LINE_70},
         })
 
         # Wstaw stację przelotową
@@ -116,7 +145,7 @@ class TestE2E1MultiObjectFeeder:
 
         # Kontynuuj magistralę
         s = op(s, "continue_trunk_segment_sn", {
-            "segment": {"rodzaj": "LINIA_NAPOWIETRZNA", "dlugosc_m": 600, "catalog_ref": "AFL-6_70"},
+            "segment": {"rodzaj": "LINIA_NAPOWIETRZNA", "dlugosc_m": 600, "catalog_ref": CATALOG_LINE_70},
         })
 
         # Wstaw słup rozgałęźny
@@ -137,9 +166,9 @@ class TestE2E1MultiObjectFeeder:
 
     def test_feeder_with_cable_zksn(self) -> None:
         s = _empty_enm()
-        s = op(s, "add_grid_source_sn", {"voltage_kv": 15.0, "sk3_mva": 250.0})
+        s = op(s, "add_grid_source_sn", {"voltage_kv": 15.0, "sk3_mva": 250.0, "catalog_ref": CATALOG_ZRODLO_250})
         s = op(s, "continue_trunk_segment_sn", {
-            "segment": {"rodzaj": "KABEL", "dlugosc_m": 1200, "catalog_ref": "YAKXS_3x240"},
+            "segment": {"rodzaj": "KABEL", "dlugosc_m": 1200, "catalog_ref": CATALOG_CABLE_240},
         })
 
         seg_id = _find_segment(s, "cable")
@@ -158,11 +187,11 @@ class TestE2E1MultiObjectFeeder:
     def test_mixed_feeder_overhead_then_cable(self) -> None:
         """Mieszana magistrala: napowietrzna + kablowa z różnymi obiektami."""
         s = _empty_enm()
-        s = op(s, "add_grid_source_sn", {"voltage_kv": 15.0, "sk3_mva": 300.0})
+        s = op(s, "add_grid_source_sn", {"voltage_kv": 15.0, "sk3_mva": 300.0, "catalog_ref": CATALOG_ZRODLO_300})
 
         # Odcinek napowietrzny
         s = op(s, "continue_trunk_segment_sn", {
-            "segment": {"rodzaj": "LINIA_NAPOWIETRZNA", "dlugosc_m": 500, "catalog_ref": "AFL-6_35"},
+            "segment": {"rodzaj": "LINIA_NAPOWIETRZNA", "dlugosc_m": 500, "catalog_ref": CATALOG_LINE_35},
         })
 
         # Wstaw stację przelotową (przejście do kabla)
@@ -171,7 +200,7 @@ class TestE2E1MultiObjectFeeder:
 
         # Kontynuuj magistralę kablem
         s = op(s, "continue_trunk_segment_sn", {
-            "segment": {"rodzaj": "KABEL", "dlugosc_m": 800, "catalog_ref": "YAKXS_3x120"},
+            "segment": {"rodzaj": "KABEL", "dlugosc_m": 800, "catalog_ref": "cable-tfk-yakxs-3x120"},
         })
 
         assert _count(s, "substations") >= 1
@@ -181,9 +210,9 @@ class TestE2E1MultiObjectFeeder:
     def test_multiple_branch_points_on_same_type_segment(self) -> None:
         """Wielokrotne obiekty jednego typu na długiej magistrali."""
         s = _empty_enm()
-        s = op(s, "add_grid_source_sn", {"voltage_kv": 15.0, "sk3_mva": 200.0})
+        s = op(s, "add_grid_source_sn", {"voltage_kv": 15.0, "sk3_mva": 200.0, "catalog_ref": CATALOG_ZRODLO_200})
         s = op(s, "continue_trunk_segment_sn", {
-            "segment": {"rodzaj": "LINIA_NAPOWIETRZNA", "dlugosc_m": 3000, "catalog_ref": "AFL-6_70"},
+            "segment": {"rodzaj": "LINIA_NAPOWIETRZNA", "dlugosc_m": 3000, "catalog_ref": CATALOG_LINE_70},
         })
 
         # Wstaw 2 słupy rozgałęźne (na różnych segmentach po podziale)
@@ -217,7 +246,7 @@ class TestE2E2BranchFromStation:
         s = _empty_enm()
         s = op(s, "add_grid_source_sn", {"voltage_kv": 15.0, "sk3_mva": 250.0})
         s = op(s, "continue_trunk_segment_sn", {
-            "segment": {"rodzaj": "KABEL", "dlugosc_m": 500, "catalog_ref": "YAKXS_3x120"},
+            "segment": {"rodzaj": "KABEL", "dlugosc_m": 500, "catalog_ref": "cable-tfk-yakxs-3x120"},
         })
 
         seg_id = _find_segment(s, "cable")
@@ -236,7 +265,7 @@ class TestE2E2BranchFromStation:
             "start_branch_segment_sn",
             {
                 "from_bus_ref": branch_bus,
-                "segment": {"rodzaj": "KABEL", "dlugosc_m": 200, "catalog_ref": "YAKXS_3x70"},
+                "segment": {"rodzaj": "KABEL", "dlugosc_m": 200, "catalog_ref": CATALOG_CABLE_70},
             },
         )
         assert not result.get("error"), f"Błąd: {result.get('error')}"
@@ -247,7 +276,7 @@ class TestE2E2BranchFromStation:
         s = _empty_enm()
         s = op(s, "add_grid_source_sn", {"voltage_kv": 15.0, "sk3_mva": 250.0})
         s = op(s, "continue_trunk_segment_sn", {
-            "segment": {"rodzaj": "KABEL", "dlugosc_m": 400, "catalog_ref": "YAKXS_3x95"},
+            "segment": {"rodzaj": "KABEL", "dlugosc_m": 400, "catalog_ref": CATALOG_CABLE_120},
         })
         seg_id = _find_segment(s, "cable")
         s = _insert_station(s, seg_id, "Stacja B", "branch")
@@ -261,7 +290,7 @@ class TestE2E2BranchFromStation:
             "start_branch_segment_sn",
             {
                 "from_ref": f"{sub_ref}.BRANCH",
-                "segment": {"rodzaj": "KABEL", "dlugosc_m": 150, "catalog_ref": "YAKXS_3x70"},
+                "segment": {"rodzaj": "KABEL", "dlugosc_m": 150, "catalog_ref": CATALOG_CABLE_70},
             },
         )
         assert not result.get("error"), f"Błąd: {result.get('error')}"
@@ -271,7 +300,7 @@ class TestE2E2BranchFromStation:
         s = _empty_enm()
         s = op(s, "add_grid_source_sn", {"voltage_kv": 15.0, "sk3_mva": 250.0})
         s = op(s, "continue_trunk_segment_sn", {
-            "segment": {"rodzaj": "KABEL", "dlugosc_m": 400, "catalog_ref": "YAKXS_3x95"},
+            "segment": {"rodzaj": "KABEL", "dlugosc_m": 400, "catalog_ref": CATALOG_CABLE_120},
         })
 
         baseline = copy.deepcopy(s)
@@ -282,7 +311,7 @@ class TestE2E2BranchFromStation:
             "start_branch_segment_sn",
             {
                 "from_ref": f"{invalid_bus_ref}.BRANCH",
-                "segment": {"rodzaj": "KABEL", "dlugosc_m": 150, "catalog_ref": "YAKXS_3x70"},
+                "segment": {"rodzaj": "KABEL", "dlugosc_m": 150, "catalog_ref": CATALOG_CABLE_70},
             },
         )
         assert result.get("snapshot") is None
@@ -293,7 +322,7 @@ class TestE2E2BranchFromStation:
         s = _empty_enm()
         s = op(s, "add_grid_source_sn", {"voltage_kv": 15.0, "sk3_mva": 250.0})
         s = op(s, "continue_trunk_segment_sn", {
-            "segment": {"rodzaj": "KABEL", "dlugosc_m": 400, "catalog_ref": "YAKXS_3x95"},
+            "segment": {"rodzaj": "KABEL", "dlugosc_m": 400, "catalog_ref": CATALOG_CABLE_120},
         })
 
         baseline = copy.deepcopy(s)
@@ -303,7 +332,7 @@ class TestE2E2BranchFromStation:
             "start_branch_segment_sn",
             {
                 "from_bus_ref": invalid_bus_ref,
-                "segment": {"rodzaj": "KABEL", "dlugosc_m": 150, "catalog_ref": "YAKXS_3x70"},
+                "segment": {"rodzaj": "KABEL", "dlugosc_m": 150, "catalog_ref": CATALOG_CABLE_70},
             },
         )
         assert result.get("snapshot") is None
@@ -321,7 +350,7 @@ class TestE2E3BranchFromBranchPole:
         s = _empty_enm()
         s = op(s, "add_grid_source_sn", {"voltage_kv": 15.0, "sk3_mva": 250.0})
         s = op(s, "continue_trunk_segment_sn", {
-            "segment": {"rodzaj": "LINIA_NAPOWIETRZNA", "dlugosc_m": 800, "catalog_ref": "AFL-6_70"},
+            "segment": {"rodzaj": "LINIA_NAPOWIETRZNA", "dlugosc_m": 800, "catalog_ref": CATALOG_LINE_70},
         })
 
         seg_id = _find_segment(s, "line_overhead")
@@ -340,7 +369,7 @@ class TestE2E3BranchFromBranchPole:
             "start_branch_segment_sn",
             {
                 "from_ref": f"{bp_ref}.BRANCH",
-                "segment": {"rodzaj": "LINIA_NAPOWIETRZNA", "dlugosc_m": 200, "catalog_ref": "AFL-6_35"},
+                "segment": {"rodzaj": "LINIA_NAPOWIETRZNA", "dlugosc_m": 200, "catalog_ref": CATALOG_LINE_35},
             },
         )
         assert not result.get("error"), f"Błąd: {result.get('error')}"
@@ -355,7 +384,7 @@ class TestE2E3BranchFromBranchPole:
         s = _empty_enm()
         s = op(s, "add_grid_source_sn", {"voltage_kv": 15.0, "sk3_mva": 250.0})
         s = op(s, "continue_trunk_segment_sn", {
-            "segment": {"rodzaj": "KABEL", "dlugosc_m": 500, "catalog_ref": "YAKXS_3x120"},
+            "segment": {"rodzaj": "KABEL", "dlugosc_m": 500, "catalog_ref": "cable-tfk-yakxs-3x120"},
         })
         seg_id = _find_segment(s, "cable")
 
@@ -370,7 +399,7 @@ class TestE2E3BranchFromBranchPole:
         s = _empty_enm()
         s = op(s, "add_grid_source_sn", {"voltage_kv": 15.0, "sk3_mva": 250.0})
         s = op(s, "continue_trunk_segment_sn", {
-            "segment": {"rodzaj": "LINIA_NAPOWIETRZNA", "dlugosc_m": 1000, "catalog_ref": "AFL-6_70"},
+            "segment": {"rodzaj": "LINIA_NAPOWIETRZNA", "dlugosc_m": 1000, "catalog_ref": CATALOG_LINE_70},
         })
         seg_id = _find_segment(s, "line_overhead")
         s = op(s, "insert_branch_pole_on_segment_sn", {
@@ -384,7 +413,7 @@ class TestE2E3BranchFromBranchPole:
         # Pierwsze odgałęzienie — OK
         s = op(s, "start_branch_segment_sn", {
             "from_ref": f"{bp_ref}.BRANCH",
-            "segment": {"rodzaj": "LINIA_NAPOWIETRZNA", "dlugosc_m": 100, "catalog_ref": "AFL-6_35"},
+            "segment": {"rodzaj": "LINIA_NAPOWIETRZNA", "dlugosc_m": 100, "catalog_ref": CATALOG_LINE_35},
         })
 
         # Drugie odgałęzienie z tego samego portu — musi być odrzucone
@@ -392,7 +421,7 @@ class TestE2E3BranchFromBranchPole:
             s, "start_branch_segment_sn",
             {
                 "from_ref": f"{bp_ref}.BRANCH",
-                "segment": {"rodzaj": "LINIA_NAPOWIETRZNA", "dlugosc_m": 100, "catalog_ref": "AFL-6_35"},
+                "segment": {"rodzaj": "LINIA_NAPOWIETRZNA", "dlugosc_m": 100, "catalog_ref": CATALOG_LINE_35},
             },
         )
         assert result.get("error_code") == "branch_point.branch_port_occupied"
@@ -408,7 +437,7 @@ class TestE2E4BranchFromZKSN:
         s = _empty_enm()
         s = op(s, "add_grid_source_sn", {"voltage_kv": 15.0, "sk3_mva": 250.0})
         s = op(s, "continue_trunk_segment_sn", {
-            "segment": {"rodzaj": "KABEL", "dlugosc_m": 1000, "catalog_ref": "YAKXS_3x240"},
+            "segment": {"rodzaj": "KABEL", "dlugosc_m": 1000, "catalog_ref": CATALOG_CABLE_240},
         })
 
         seg_id = _find_segment(s, "cable")
@@ -429,7 +458,7 @@ class TestE2E4BranchFromZKSN:
             "start_branch_segment_sn",
             {
                 "from_ref": f"{zksn_ref}.BRANCH_1",
-                "segment": {"rodzaj": "KABEL", "dlugosc_m": 300, "catalog_ref": "YAKXS_3x95"},
+                "segment": {"rodzaj": "KABEL", "dlugosc_m": 300, "catalog_ref": CATALOG_CABLE_120},
             },
         )
         assert not result.get("error"), f"Błąd: {result.get('error')}"
@@ -442,7 +471,7 @@ class TestE2E4BranchFromZKSN:
         s = _empty_enm()
         s = op(s, "add_grid_source_sn", {"voltage_kv": 15.0, "sk3_mva": 250.0})
         s = op(s, "continue_trunk_segment_sn", {
-            "segment": {"rodzaj": "KABEL", "dlugosc_m": 600, "catalog_ref": "YAKXS_3x120"},
+            "segment": {"rodzaj": "KABEL", "dlugosc_m": 600, "catalog_ref": "cable-tfk-yakxs-3x120"},
         })
         seg_id = _find_segment(s, "cable")
         s = op(s, "insert_zksn_on_segment_sn", {
@@ -461,7 +490,7 @@ class TestE2E4BranchFromZKSN:
             "start_branch_segment_sn",
             {
                 "from_ref": f"{zksn_ref}.BRANCH_2",
-                "segment": {"rodzaj": "KABEL", "dlugosc_m": 200, "catalog_ref": "YAKXS_3x70"},
+                "segment": {"rodzaj": "KABEL", "dlugosc_m": 200, "catalog_ref": CATALOG_CABLE_70},
             },
         )
         assert not result.get("error"), f"Błąd: {result.get('error')}"
@@ -473,7 +502,7 @@ class TestE2E4BranchFromZKSN:
         s = _empty_enm()
         s = op(s, "add_grid_source_sn", {"voltage_kv": 15.0, "sk3_mva": 250.0})
         s = op(s, "continue_trunk_segment_sn", {
-            "segment": {"rodzaj": "LINIA_NAPOWIETRZNA", "dlugosc_m": 500, "catalog_ref": "AFL-6_70"},
+            "segment": {"rodzaj": "LINIA_NAPOWIETRZNA", "dlugosc_m": 500, "catalog_ref": CATALOG_LINE_70},
         })
         seg_id = _find_segment(s, "line_overhead")
 
@@ -490,7 +519,7 @@ class TestE2E4BranchFromZKSN:
 
         # Odcinek kablowy z ZKSN
         s = op(s, "continue_trunk_segment_sn", {
-            "segment": {"rodzaj": "KABEL", "dlugosc_m": 800, "catalog_ref": "YAKXS_3x120"},
+            "segment": {"rodzaj": "KABEL", "dlugosc_m": 800, "catalog_ref": "cable-tfk-yakxs-3x120"},
         })
         seg_cable = _find_segment(s, "cable")
         s = op(s, "insert_zksn_on_segment_sn", {
@@ -502,7 +531,7 @@ class TestE2E4BranchFromZKSN:
 
         # Kontynuuj napowietrznym
         s = op(s, "continue_trunk_segment_sn", {
-            "segment": {"rodzaj": "LINIA_NAPOWIETRZNA", "dlugosc_m": 600, "catalog_ref": "AFL-6_70"},
+            "segment": {"rodzaj": "LINIA_NAPOWIETRZNA", "dlugosc_m": 600, "catalog_ref": CATALOG_LINE_70},
         })
         seg_overhead = _find_segment(s, "line_overhead")
         s = op(s, "insert_branch_pole_on_segment_sn", {
@@ -528,7 +557,7 @@ class TestE2E5ReceivingStationsAndOzeBess:
         s = _empty_enm()
         s = op(s, "add_grid_source_sn", {"voltage_kv": 15.0, "sk3_mva": 250.0})
         s = op(s, "continue_trunk_segment_sn", {
-            "segment": {"rodzaj": "KABEL", "dlugosc_m": 500, "catalog_ref": "YAKXS_3x120"},
+            "segment": {"rodzaj": "KABEL", "dlugosc_m": 500, "catalog_ref": "cable-tfk-yakxs-3x120"},
         })
 
         seg_id = _find_segment(s, "cable")
@@ -543,7 +572,7 @@ class TestE2E5ReceivingStationsAndOzeBess:
                 "pk_kw": 6.5,
                 "uhv_kv": 15.0,
                 "ulv_kv": 0.4,
-                "catalog_ref": "Trafo-0.63MVA",
+                "catalog_ref": CATALOG_TRAFO_630,
             },
         )
         # Transformer add may fail due to missing station ref, but readiness is always present
@@ -555,7 +584,7 @@ class TestE2E5ReceivingStationsAndOzeBess:
         s = _empty_enm()
         s = op(s, "add_grid_source_sn", {"voltage_kv": 15.0, "sk3_mva": 250.0})
         s = op(s, "continue_trunk_segment_sn", {
-            "segment": {"rodzaj": "KABEL", "dlugosc_m": 400, "catalog_ref": "YAKXS_3x95"},
+            "segment": {"rodzaj": "KABEL", "dlugosc_m": 400, "catalog_ref": CATALOG_CABLE_120},
         })
 
         # Próba podłączenia PV bezpośrednio na szynę SN (bez stacji nN z transformatorem)
@@ -591,7 +620,7 @@ class TestE2E5ReceivingStationsAndOzeBess:
         s = _empty_enm()
         s = op(s, "add_grid_source_sn", {"voltage_kv": 15.0, "sk3_mva": 200.0})
         s = op(s, "continue_trunk_segment_sn", {
-            "segment": {"rodzaj": "KABEL", "dlugosc_m": 1500, "catalog_ref": "YAKXS_3x150"},
+            "segment": {"rodzaj": "KABEL", "dlugosc_m": 1500, "catalog_ref": CATALOG_CABLE_150},
         })
         seg_id = _find_segment(s, "cable")
         result = execute_domain_operation(
@@ -628,7 +657,7 @@ class TestE2E5ReceivingStationsAndOzeBess:
 
         # 2. Magistrala kablowa
         s = op(s, "continue_trunk_segment_sn", {
-            "segment": {"rodzaj": "KABEL", "dlugosc_m": 2000, "catalog_ref": "YAKXS_3x240"},
+            "segment": {"rodzaj": "KABEL", "dlugosc_m": 2000, "catalog_ref": CATALOG_CABLE_240},
         })
 
         # 3. ZKSN na kablu
@@ -645,12 +674,12 @@ class TestE2E5ReceivingStationsAndOzeBess:
         # 4. Odgałęzienie kablowe z ZKSN.BRANCH_1
         s = op(s, "start_branch_segment_sn", {
             "from_ref": f"{zksn['ref_id']}.BRANCH_1",
-            "segment": {"rodzaj": "KABEL", "dlugosc_m": 400, "catalog_ref": "YAKXS_3x95"},
+            "segment": {"rodzaj": "KABEL", "dlugosc_m": 400, "catalog_ref": CATALOG_CABLE_120},
         })
 
         # 5. Kontynuuj magistralę napowietrzną po ZKSN
         s = op(s, "continue_trunk_segment_sn", {
-            "segment": {"rodzaj": "LINIA_NAPOWIETRZNA", "dlugosc_m": 1000, "catalog_ref": "AFL-6_70"},
+            "segment": {"rodzaj": "LINIA_NAPOWIETRZNA", "dlugosc_m": 1000, "catalog_ref": CATALOG_LINE_70},
         })
 
         # 6. Słup rozgałęźny na napowietrznej
@@ -665,7 +694,7 @@ class TestE2E5ReceivingStationsAndOzeBess:
         # 7. Odgałęzienie napowietrzne ze słupa
         s = op(s, "start_branch_segment_sn", {
             "from_ref": f"{pole['ref_id']}.BRANCH",
-            "segment": {"rodzaj": "LINIA_NAPOWIETRZNA", "dlugosc_m": 150, "catalog_ref": "AFL-6_35"},
+            "segment": {"rodzaj": "LINIA_NAPOWIETRZNA", "dlugosc_m": 150, "catalog_ref": CATALOG_LINE_35},
         })
 
         # FINALNE WERYFIKACJE

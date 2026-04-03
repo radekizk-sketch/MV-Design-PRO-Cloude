@@ -4,15 +4,27 @@ from enm.domain_operations import execute_domain_operation
 from enm.models import ENMDefaults, ENMHeader, EnergyNetworkModel
 
 CABLE_ID = "cable-tfk-yakxs-3x120"
+ALT_CABLE_ID = "cable-base-xlpe-al-3c-240"
 TRAFO_ID = "tr-sn-nn-15-04-630kva-dyn11"
 CABLE_BINDING = {
     "catalog_namespace": "KABEL_SN",
     "catalog_item_id": CABLE_ID,
     "catalog_item_version": "2024.1",
 }
+ALT_CABLE_BINDING = {
+    "catalog_namespace": "KABEL_SN",
+    "catalog_item_id": ALT_CABLE_ID,
+    "catalog_item_version": "2024.1",
+}
 TRAFO_BINDING = {
     "catalog_namespace": "TRAFO_SN_NN",
     "catalog_item_id": TRAFO_ID,
+    "catalog_item_version": "2024.1",
+}
+SOURCE_ID = "src-gpz-15kv-250mva-rx010"
+SOURCE_BINDING = {
+    "catalog_namespace": "ZRODLO_SN",
+    "catalog_item_id": SOURCE_ID,
     "catalog_item_version": "2024.1",
 }
 
@@ -32,7 +44,16 @@ def _apply(snapshot: dict, op_name: str, payload: dict) -> dict:
 
 def _build_source_plus_segments(segment_lengths_m: list[int]) -> dict:
     snapshot = _empty_enm()
-    snapshot = _apply(snapshot, "add_grid_source_sn", {"voltage_kv": 15.0, "sk3_mva": 250.0})
+    snapshot = _apply(
+        snapshot,
+        "add_grid_source_sn",
+        {
+            "voltage_kv": 15.0,
+            "sk3_mva": 250.0,
+            "catalog_ref": SOURCE_ID,
+            "catalog_binding": SOURCE_BINDING,
+        },
+    )
     for idx, length in enumerate(segment_lengths_m):
         snapshot = _apply(snapshot, "continue_trunk_segment_sn", {
             "segment": {
@@ -134,30 +155,31 @@ def test_sequence_edit_delete_continue_trunk():
     assert snapshot["branches"][-1]["meta"]["catalog_item_version"] == "2024.1"
 
 
-def test_sequence_clear_and_reassign_catalog_keeps_snapshot_contract_valid():
+def test_sequence_reject_clear_and_reassign_catalog_keeps_snapshot_contract_valid():
     snapshot = _build_source_plus_segments([200, 210])
     target_segment_ref = snapshot["corridors"][0]["ordered_segment_refs"][0]
 
-    snapshot = _apply(snapshot, "assign_catalog_to_element", {
+    clear_result = execute_domain_operation(snapshot, "assign_catalog_to_element", {
         "element_ref": target_segment_ref,
         "catalog_item_id": None,
         "catalog_namespace": "KABEL_SN",
     })
+    assert clear_result.get("error_code") == "catalog.clear_forbidden"
+    assert clear_result.get("snapshot") is None
 
-    cleared_segment = next(
+    preserved_segment = next(
         branch for branch in snapshot.get("branches", [])
         if branch.get("ref_id") == target_segment_ref
     )
-    assert cleared_segment["catalog_ref"] is None
-    assert cleared_segment.get("parameter_source") is None
-    assert cleared_segment.get("catalog_namespace") is None
-    assert cleared_segment.get("source_mode") is None
-    assert cleared_segment.get("meta", {}).get("catalog_item_version") is None
+    assert preserved_segment["catalog_ref"] == CABLE_ID
+    assert preserved_segment.get("catalog_namespace") == "KABEL_SN"
+    assert preserved_segment.get("source_mode") == "KATALOG"
+    assert preserved_segment.get("materialized_params", {}).get("catalog_item_id") == CABLE_ID
 
     snapshot = _apply(snapshot, "assign_catalog_to_element", {
         "element_ref": target_segment_ref,
-        "catalog_item_id": CABLE_ID,
-        "catalog_namespace": "KABEL_SN",
+        "catalog_item_id": ALT_CABLE_ID,
+        "catalog_namespace": ALT_CABLE_BINDING["catalog_namespace"],
         "catalog_item_version": "2024.1",
         "source_mode": "KATALOG",
     })
@@ -166,8 +188,29 @@ def test_sequence_clear_and_reassign_catalog_keeps_snapshot_contract_valid():
         branch for branch in snapshot.get("branches", [])
         if branch.get("ref_id") == target_segment_ref
     )
-    assert rebound_segment["catalog_ref"] == CABLE_ID
+    assert rebound_segment["catalog_ref"] == ALT_CABLE_ID
     assert rebound_segment.get("parameter_source") == "CATALOG"
     assert rebound_segment.get("catalog_namespace") == "KABEL_SN"
     assert rebound_segment.get("source_mode") == "KATALOG"
     assert rebound_segment.get("meta", {}).get("catalog_item_version") == "2024.1"
+    assert rebound_segment.get("materialized_params", {}).get("catalog_item_id") == ALT_CABLE_ID
+
+
+def test_sequence_reassign_catalog_accepts_binding_only_contract():
+    snapshot = _build_source_plus_segments([180])
+    target_segment_ref = snapshot["corridors"][0]["ordered_segment_refs"][0]
+
+    snapshot = _apply(snapshot, "assign_catalog_to_element", {
+        "element_ref": target_segment_ref,
+        "catalog_binding": ALT_CABLE_BINDING,
+        "source_mode": "KATALOG",
+    })
+
+    rebound_segment = next(
+        branch for branch in snapshot.get("branches", [])
+        if branch.get("ref_id") == target_segment_ref
+    )
+    assert rebound_segment["catalog_ref"] == ALT_CABLE_ID
+    assert rebound_segment.get("catalog_namespace") == "KABEL_SN"
+    assert rebound_segment.get("meta", {}).get("catalog_item_version") == "2024.1"
+    assert rebound_segment.get("materialized_params", {}).get("catalog_item_id") == ALT_CABLE_ID

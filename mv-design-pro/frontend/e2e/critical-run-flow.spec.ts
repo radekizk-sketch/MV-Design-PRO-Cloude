@@ -3,6 +3,8 @@ import { test, expect, type APIRequestContext, type Page } from '@playwright/tes
 const BACKEND_BASE = process.env.PLAYWRIGHT_BACKEND_URL ?? 'http://127.0.0.1:8000';
 const CABLE_ID = 'cable-tfk-yakxs-3x120';
 const TRAFO_ID = 'tr-sn-nn-15-04-630kva-dyn11';
+const SOURCE_ID = 'src-gpz-15kv-250mva-rx010';
+const CATALOG_VERSION = '2024.1';
 let opCounter = 0;
 
 type DomainOpResponse = {
@@ -15,6 +17,14 @@ type DomainOpResponse = {
     transformers?: Array<{ ref_id: string }>;
   };
 };
+
+function buildCatalogBinding(catalogNamespace: string, catalogItemId: string) {
+  return {
+    catalog_namespace: catalogNamespace,
+    catalog_item_id: catalogItemId,
+    catalog_item_version: CATALOG_VERSION,
+  };
+}
 
 async function executeDomainOp(
   request: APIRequestContext,
@@ -41,8 +51,13 @@ async function executeDomainOp(
 }
 
 async function createCaseFromUi(page: Page): Promise<string> {
-  await page.goto('/');
-  await page.waitForSelector('[data-testid="app-ready"]', { state: 'attached' });
+  await page.goto('/', { waitUntil: 'commit' });
+  await page.evaluate(() => {
+    localStorage.clear();
+    sessionStorage.clear();
+  });
+  await page.reload({ waitUntil: 'commit' });
+  await page.waitForSelector('[data-testid="app-ready"]', { state: 'attached', timeout: 30000 });
 
   const createCaseBtn = page.getByTestId('sld-empty-overlay-create-case');
   await expect(createCaseBtn).toBeVisible();
@@ -51,7 +66,7 @@ async function createCaseFromUi(page: Page): Promise<string> {
     (response) => response.url().includes('/api/study-cases') && response.request().method() === 'POST',
   );
 
-  await createCaseBtn.click();
+  await createCaseBtn.click({ force: true });
 
   const createCaseResponse = await createCaseResponsePromise;
   expect(createCaseResponse.ok()).toBeTruthy();
@@ -62,11 +77,6 @@ async function createCaseFromUi(page: Page): Promise<string> {
 }
 
 test('krytyczny flow V1 na realnym backendzie: case -> GPZ -> trunk -> station -> branch -> katalogi -> readiness -> run -> wyniki -> geometria bez zmian', async ({ page, request }) => {
-  await page.addInitScript(() => {
-    localStorage.clear();
-    sessionStorage.clear();
-  });
-
   const caseId = await createCaseFromUi(page);
 
   // Krok 1: GPZ
@@ -74,6 +84,7 @@ test('krytyczny flow V1 na realnym backendzie: case -> GPZ -> trunk -> station -
     voltage_kv: 15.0,
     sk3_mva: 250.0,
     rx_ratio: 0.1,
+    catalog_binding: buildCatalogBinding('ZRODLO_SN', SOURCE_ID),
   });
 
   // Krok 2: Magistrala SN (3 segmenty)
@@ -83,17 +94,7 @@ test('krytyczny flow V1 na realnym backendzie: case -> GPZ -> trunk -> station -
         rodzaj: 'KABEL',
         dlugosc_m: length,
         name: `Odcinek ${idx + 1}`,
-        catalog_ref: CABLE_ID,
-        catalog_binding: {
-          catalog_namespace: 'KABEL_SN',
-          catalog_item_id: CABLE_ID,
-          catalog_item_version: '2024.1',
-        },
-      },
-      catalog_binding: {
-        catalog_namespace: 'KABEL_SN',
-        catalog_item_id: CABLE_ID,
-        catalog_item_version: '2024.1',
+        catalog_binding: buildCatalogBinding('KABEL_SN', CABLE_ID),
       },
     });
   }
@@ -103,16 +104,14 @@ test('krytyczny flow V1 na realnym backendzie: case -> GPZ -> trunk -> station -
 
   // Krok 3: Wstawienie stacji SN/nN
   op = await executeDomainOp(request, caseId, 'insert_station_on_segment_sn', {
-    segment_ref: segmentRefs[segmentRefs.length - 1],
+    segment_id: segmentRefs[segmentRefs.length - 1],
     station_type: 'B',
     insert_at: { value: 0.5 },
     station: { sn_voltage_kv: 15.0, nn_voltage_kv: 0.4 },
     sn_fields: ['IN', 'OUT'],
-    transformer: { create: true, transformer_catalog_ref: TRAFO_ID },
-    catalog_binding: {
-      catalog_namespace: 'TRAFO_SN_NN',
-      catalog_item_id: TRAFO_ID,
-      catalog_item_version: '2024.1',
+    transformer: {
+      create: true,
+      catalog_binding: buildCatalogBinding('TRAFO_SN_NN', TRAFO_ID),
     },
   });
 
@@ -121,21 +120,11 @@ test('krytyczny flow V1 na realnym backendzie: case -> GPZ -> trunk -> station -
 
   // Krok 4: Odgałęzienie
   op = await executeDomainOp(request, caseId, 'start_branch_segment_sn', {
-    from_bus_ref: snBus!.ref_id,
+    from_ref: `${snBus!.ref_id}.BRANCH`,
     segment: {
       rodzaj: 'KABEL',
       dlugosc_m: 180,
-      catalog_ref: CABLE_ID,
-      catalog_binding: {
-        catalog_namespace: 'KABEL_SN',
-        catalog_item_id: CABLE_ID,
-        catalog_item_version: '2024.1',
-      },
-    },
-    catalog_binding: {
-      catalog_namespace: 'KABEL_SN',
-      catalog_item_id: CABLE_ID,
-      catalog_item_version: '2024.1',
+      catalog_binding: buildCatalogBinding('KABEL_SN', CABLE_ID),
     },
   });
 
@@ -143,14 +132,14 @@ test('krytyczny flow V1 na realnym backendzie: case -> GPZ -> trunk -> station -
   for (const branch of op.snapshot?.branches ?? []) {
     await executeDomainOp(request, caseId, 'assign_catalog_to_element', {
       element_ref: branch.ref_id,
-      catalog_item_id: CABLE_ID,
+      catalog_binding: buildCatalogBinding('KABEL_SN', CABLE_ID),
     });
   }
 
   for (const transformer of op.snapshot?.transformers ?? []) {
     await executeDomainOp(request, caseId, 'assign_catalog_to_element', {
       element_ref: transformer.ref_id,
-      catalog_item_id: TRAFO_ID,
+      catalog_binding: buildCatalogBinding('TRAFO_SN_NN', TRAFO_ID),
     });
     await executeDomainOp(request, caseId, 'update_element_parameters', {
       element_ref: transformer.ref_id,
@@ -185,10 +174,11 @@ test('krytyczny flow V1 na realnym backendzie: case -> GPZ -> trunk -> station -
     );
 
     for (const issue of catalogIssues) {
+      const catalogNamespace = issue.code.includes('transformer') ? 'TRAFO_SN_NN' : 'KABEL_SN';
       const catalogId = issue.code.includes('transformer') ? TRAFO_ID : CABLE_ID;
       await executeDomainOp(request, caseId, 'assign_catalog_to_element', {
         element_ref: issue.element_ref,
-        catalog_item_id: catalogId,
+        catalog_binding: buildCatalogBinding(catalogNamespace, catalogId),
       });
     }
 
@@ -236,7 +226,7 @@ test('krytyczny flow V1 na realnym backendzie: case -> GPZ -> trunk -> station -
     runId = `legacy-sc-${caseId}`;
   }
 
-  await page.goto('/#results');
+  await page.goto('/#results', { waitUntil: 'commit' });
   await expect(page).toHaveURL(/#results/);
 
   // Krok 8: Realne wyniki backend

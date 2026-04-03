@@ -17,6 +17,11 @@ import { useSnapshotStore } from '../../topology/snapshotStore';
 import { useNetworkBuildStore } from '../networkBuildStore';
 import { useAppStateStore } from '../../app-state';
 import { validateCatalogFirst } from './catalogFirstRules';
+import {
+  normalizeCatalogBinding,
+  normalizeSegmentKind,
+  normalizeSegmentNamespace,
+} from './catalogPayload';
 
 type FormStage = 'ring' | 'nop';
 
@@ -32,7 +37,12 @@ export function ConnectRingForm() {
 
   const terminalA = useMemo(
     () => ({
-      id: (context?.terminalA_id as string) ?? '',
+      id: (
+        (context?.terminalA_id as string)
+        ?? (context?.terminal_a_id as string)
+        ?? (context?.from_bus_ref as string)
+        ?? ''
+      ).trim(),
       label: (context?.terminalA_label as string) ?? 'Terminal A',
     }),
     [context],
@@ -40,7 +50,12 @@ export function ConnectRingForm() {
 
   const terminalB = useMemo(
     () => ({
-      id: (context?.terminalB_id as string) ?? '',
+      id: (
+        (context?.terminalB_id as string)
+        ?? (context?.terminal_b_id as string)
+        ?? (context?.to_bus_ref as string)
+        ?? ''
+      ).trim(),
       label: (context?.terminalB_label as string) ?? 'Terminal B',
     }),
     [context],
@@ -55,12 +70,16 @@ export function ConnectRingForm() {
   const handleRingSubmit = useCallback(
     async (data: RingCloseFormData) => {
       if (!activeCaseId) return;
+      const catalogNamespace = normalizeSegmentNamespace(data.segment_kind);
+      const catalogBinding = normalizeCatalogBinding(data.catalog_ref, catalogNamespace);
       const payload = {
-        terminal_a_id: terminalA.id,
-        terminal_b_id: terminalB.id,
-        segment_kind: data.segment_kind,
-        length_m: data.length_m,
-        catalog_binding: data.catalog_binding,
+        from_bus_ref: terminalA.id,
+        to_bus_ref: terminalB.id,
+        segment: {
+          rodzaj: normalizeSegmentKind(data.segment_kind),
+          dlugosc_m: data.length_m,
+          catalog_binding: catalogBinding ?? undefined,
+        },
       };
       const validationError = validateCatalogFirst('connect_secondary_ring_sn', payload);
       if (validationError) {
@@ -68,13 +87,7 @@ export function ConnectRingForm() {
         return;
       }
       setCatalogError(null);
-      await executeDomainOperation(activeCaseId, 'connect_secondary_ring_sn', {
-        terminal_a_id: terminalA.id,
-        terminal_b_id: terminalB.id,
-        segment_kind: data.segment_kind,
-        length_m: data.length_m,
-        catalog_binding: data.catalog_binding,
-      });
+      await executeDomainOperation(activeCaseId, 'connect_secondary_ring_sn', payload);
       setRingData(data);
       setStage('nop');
     },
@@ -85,9 +98,7 @@ export function ConnectRingForm() {
     async (data: NOPFormData) => {
       if (!activeCaseId) return;
       await executeDomainOperation(activeCaseId, 'set_normal_open_point', {
-        nop_element_ref: data.nop_element_ref,
-        nop_type: data.nop_type,
-        reason: data.reason,
+        switch_ref: data.nop_element_ref,
       });
       closeForm();
     },

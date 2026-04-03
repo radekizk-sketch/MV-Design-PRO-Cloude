@@ -73,6 +73,7 @@ export interface ResultsIndex {
  * Single bus result row.
  */
 export interface BusResultRow {
+  element_id?: string;
   bus_id: string;
   name: string;
   un_kv: number;
@@ -98,6 +99,7 @@ export interface BusResults {
  * Single branch result row.
  */
 export interface BranchResultRow {
+  element_id?: string;
   branch_id: string;
   name: string;
   from_bus: string;
@@ -127,6 +129,7 @@ export interface BranchResults {
  */
 export interface ShortCircuitRow {
   target_id: string;
+  element_id?: string;
   target_name: string | null;
   ikss_ka: number | null;
   ip_ka: number | null;
@@ -177,6 +180,27 @@ export interface TraceStep {
   result?: Record<string, TraceValue>;
   /** Additional notes or references */
   notes?: string;
+  /** Domain element id used for catalog context mapping */
+  element_id?: string | null;
+  /** Solver-side target id, e.g. fault node id */
+  target_id?: string | null;
+  /** Explicit solver reference for audit/export */
+  solver_ref?: string | null;
+  /** Catalog binding visible for this step */
+  catalog_binding?: CatalogContextEntry['catalog_binding'] | null;
+  /** Alias for explicit source catalog */
+  source_catalog?: CatalogContextEntry['catalog_binding'] | null;
+  source_catalog_label?: string | null;
+  /** Parameter provenance */
+  parameter_source?: string | null;
+  parameter_origin?: string | null;
+  source_mode?: string | null;
+  materialized_params?: Record<string, unknown> | null;
+  manual_overrides?: Array<Record<string, unknown>>;
+  overrides?: Array<Record<string, unknown>>;
+  manual_override_count?: number;
+  has_manual_overrides?: boolean;
+  catalog_context_entry?: CatalogContextEntry | null;
   /** Legacy fields for backward compatibility */
   step_id?: string;
   phase?: string;
@@ -194,6 +218,31 @@ export interface TraceValue {
   value: number | string | boolean | null;
   unit?: string;
   label?: string;
+}
+
+export interface CatalogContextEntry {
+  element_id: string;
+  element_type: string;
+  name?: string | null;
+  catalog_binding?: {
+    catalog_namespace?: string | null;
+    catalog_item_id?: string | null;
+      catalog_item_version?: string | null;
+  } | null;
+  source_catalog?: {
+    catalog_namespace?: string | null;
+    catalog_item_id?: string | null;
+    catalog_item_version?: string | null;
+  } | null;
+  source_catalog_label?: string | null;
+  parameter_source?: string | null;
+  parameter_origin?: string | null;
+  source_mode?: string | null;
+  materialized_params?: Record<string, unknown> | null;
+  overrides?: Array<Record<string, unknown>>;
+  manual_overrides?: Array<Record<string, unknown>>;
+  manual_override_count?: number;
+  has_manual_overrides?: boolean;
 }
 
 /**
@@ -253,6 +302,15 @@ export interface ExtendedTrace {
   snapshot_id: string | null;
   input_hash: string;
   white_box_trace: TraceStep[];
+  catalog_context: CatalogContextEntry[];
+  catalog_context_by_element?: Record<string, CatalogContextEntry>;
+  catalog_context_summary?: {
+    element_count?: number;
+    by_type?: Record<string, number>;
+    by_parameter_origin?: Record<string, number>;
+    manual_override_element_count?: number;
+    manual_override_count?: number;
+  };
 }
 
 // =============================================================================

@@ -23,6 +23,8 @@ from enm.models import (
 from enm.domain_operations import execute_domain_operation
 from domain.readiness_fix_actions import resolve_fix_action, KNOWN_BLOCKER_CODES
 
+CATALOG_ZRODLO_SN = "src-gpz-15kv-250mva-rx010"
+
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -38,11 +40,15 @@ def _empty_enm() -> dict:
 
 def _seed_with_overhead_segment() -> tuple[dict, str]:
     s0 = _empty_enm()
-    s1 = execute_domain_operation(s0, "add_grid_source_sn", {"voltage_kv": 15.0, "sk3_mva": 250.0})["snapshot"]
+    s1 = execute_domain_operation(
+        s0,
+        "add_grid_source_sn",
+        {"voltage_kv": 15.0, "sk3_mva": 250.0, "catalog_ref": CATALOG_ZRODLO_SN},
+    )["snapshot"]
     s2 = execute_domain_operation(
         s1,
         "continue_trunk_segment_sn",
-        {"segment": {"rodzaj": "LINIA_NAPOWIETRZNA", "dlugosc_m": 1000, "catalog_ref": "AFL-6_70"}},
+        {"segment": {"rodzaj": "LINIA_NAPOWIETRZNA", "dlugosc_m": 1000, "catalog_ref": "line-base-al-st-70"}},
     )["snapshot"]
     seg_id = next(b["ref_id"] for b in s2["branches"] if b["type"] == "line_overhead")
     return s2, seg_id
@@ -50,11 +56,15 @@ def _seed_with_overhead_segment() -> tuple[dict, str]:
 
 def _seed_with_cable_segment() -> tuple[dict, str]:
     s0 = _empty_enm()
-    s1 = execute_domain_operation(s0, "add_grid_source_sn", {"voltage_kv": 15.0, "sk3_mva": 250.0})["snapshot"]
+    s1 = execute_domain_operation(
+        s0,
+        "add_grid_source_sn",
+        {"voltage_kv": 15.0, "sk3_mva": 250.0, "catalog_ref": CATALOG_ZRODLO_SN},
+    )["snapshot"]
     s2 = execute_domain_operation(
         s1,
         "continue_trunk_segment_sn",
-        {"segment": {"rodzaj": "KABEL", "dlugosc_m": 500, "catalog_ref": "YAKXS_3x120"}},
+        {"segment": {"rodzaj": "KABEL", "dlugosc_m": 500, "catalog_ref": "cable-tfk-yakxs-3x120"}},
     )["snapshot"]
     seg_id = next(b["ref_id"] for b in s2["branches"] if b["type"] == "cable")
     return s2, seg_id

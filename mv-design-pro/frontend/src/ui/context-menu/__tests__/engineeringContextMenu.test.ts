@@ -44,6 +44,7 @@ import {
   buildAnalysisResultContextMenu,
   ACTION_MENU_MINIMUM_OPTIONS,
 } from '../actionMenuBuilders';
+import { handlerNameToActionId } from '../EngineeringContextMenu';
 
 // =============================================================================
 // Forbidden English words in context menu labels
@@ -88,6 +89,18 @@ function getVisibleActions(
 // =============================================================================
 
 describe('EngineeringContextMenu — §2 UX 10/10', () => {
+  describe('Handler name mapping', () => {
+    it('preserves acronyms in handler -> action ID conversion', () => {
+      expect(handlerNameToActionId('onAddNNFeeder')).toBe('add_nn_feeder');
+      expect(handlerNameToActionId('onAddPV')).toBe('add_pv');
+      expect(handlerNameToActionId('onAddBESS')).toBe('add_bess');
+      expect(handlerNameToActionId('onAddCT')).toBe('add_ct');
+      expect(handlerNameToActionId('onAddVT')).toBe('add_vt');
+      expect(handlerNameToActionId('onAssignTRCatalog')).toBe('assign_tr_catalog');
+      expect(handlerNameToActionId('onInsertSwitch')).toBe('insert_switch');
+    });
+  });
+
   describe('Builder registry coverage', () => {
     it('has builder for every element type in ACTION_MENU_MINIMUM_OPTIONS', () => {
       // Verify all expected types have builders

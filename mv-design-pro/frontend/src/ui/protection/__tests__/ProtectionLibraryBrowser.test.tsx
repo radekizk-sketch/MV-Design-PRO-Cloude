@@ -22,13 +22,20 @@ const mockDeviceTypes = [
     id: 'device-001',
     name_pl: 'Przekaźnik Sepam 20',
     vendor: 'Schneider Electric',
+    model: 'Sepam S20',
     series: 'Sepam 20',
     rated_current_a: 100,
+    source_catalog: 'devices_v0.json',
+    unverified: true,
+    unverified_ranges: true,
+    functions_supported: ['50', '51', '50N', '51N'],
+    curves_supported: ['IEC_NI'],
   },
   {
     id: 'device-002',
     name_pl: 'Przekaźnik ABB REF615',
     vendor: 'ABB',
+    model: 'REF615',
     series: 'REF615',
     rated_current_a: 200,
   },
@@ -90,6 +97,9 @@ describe('ProtectionLibraryBrowser', () => {
     expect(screen.getByText('Urządzenia')).toBeInTheDocument();
     expect(screen.getByText('Krzywe')).toBeInTheDocument();
     expect(screen.getByText('Szablony nastaw')).toBeInTheDocument();
+    await waitFor(() => {
+      expect(protectionApi.fetchProtectionTypesByCategory).toHaveBeenCalledWith('DEVICE');
+    });
   });
 
   it('loads and displays device types on mount (default tab)', async () => {
@@ -162,8 +172,50 @@ describe('ProtectionLibraryBrowser', () => {
     await waitFor(() => {
       expect(screen.getByText('Producent:')).toBeInTheDocument();
       expect(screen.getAllByText('Schneider Electric').length).toBeGreaterThanOrEqual(1);
+      expect(screen.getByText('Model:')).toBeInTheDocument();
+      expect(screen.getByText('Sepam S20')).toBeInTheDocument();
       expect(screen.getByText('Seria:')).toBeInTheDocument();
       expect(screen.getByText('Sepam 20')).toBeInTheDocument();
+    });
+  });
+
+  it.skip('shows analytical warning for unverified device entries', async () => {
+    const user = userEvent.setup();
+    render(<ProtectionLibraryBrowser />);
+
+    await waitFor(() => {
+      expect(screen.getByText('PrzekaĹşnik Sepam 20')).toBeInTheDocument();
+    });
+
+    expect(screen.getByText(/dane analityczne - wymagaja weryfikacji/i)).toBeInTheDocument();
+
+    await user.click(screen.getByText('PrzekaĹşnik Sepam 20'));
+
+    await waitFor(() => {
+      expect(screen.getByText(/rekord analityczny/i)).toBeInTheDocument();
+      expect(screen.getByText('Status weryfikacji:')).toBeInTheDocument();
+      expect(screen.getByText('NIEZWERYFIKOWANY')).toBeInTheDocument();
+      expect(screen.getByText('Zrodlo danych:')).toBeInTheDocument();
+      expect(screen.getByText(/devices_v0\.json/i)).toBeInTheDocument();
+    });
+  });
+
+  it('shows analytical warning for unverified device entries with stable matcher', async () => {
+    const user = userEvent.setup();
+    render(<ProtectionLibraryBrowser />);
+
+    const sepamEntry = await screen.findByText(/sepam 20/i);
+    expect(sepamEntry).toBeInTheDocument();
+    expect(screen.getByText(/dane analityczne - wymagaja weryfikacji/i)).toBeInTheDocument();
+
+    await user.click(sepamEntry);
+
+    await waitFor(() => {
+      expect(screen.getByText(/rekord analityczny/i)).toBeInTheDocument();
+      expect(screen.getByText('Status weryfikacji:')).toBeInTheDocument();
+      expect(screen.getByText('NIEZWERYFIKOWANY')).toBeInTheDocument();
+      expect(screen.getByText('Zrodlo danych:')).toBeInTheDocument();
+      expect(screen.getByText(/devices_v0\.json/i)).toBeInTheDocument();
     });
   });
 

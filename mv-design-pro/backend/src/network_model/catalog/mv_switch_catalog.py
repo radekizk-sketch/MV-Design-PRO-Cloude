@@ -2,16 +2,23 @@
 Katalog aparatury laczeniowej SN — dane znamionowe i laczeniowe.
 
 ZRODLA DANYCH:
-- Wylaczniki: katalogi ABB, Siemens, Eaton
-- Rozlaczniki: katalogi ABB, Schneider Electric
-- Odlaczniki: katalogi typowe
-- Reklozery: katalogi ABB, Schneider NOJA
+- Wylaczniki ABB VD4: ABB VD4 katalog 1VCP000015 (12/17.5/24 kV)
+- Wylaczniki Siemens 3AH5: Siemens 3AH5 karta katalogowa (12/17.5/24 kV)
+- Wylaczniki Eaton W-VACi: Eaton katalog ETN008001EN
+- Rozlaczniki ABB NAL: ABB NAL katalog 1VCL100001
+- Rozlaczniki Schneider RM6/SM6: Schneider katalog LVPED304049
+- Odlaczniki ABB OJS: ABB OJS karta katalogowa
+- Reklozery ABB REC615: ABB product guide 1MRS756379
+- Reklozery NOJA OSP: NOJA Power OSP katalog DP-0035
+- Reklozery Schneider ADVC: Schneider ADVC U20 karta katalogowa
+- Bezpieczniki ETI VV: ETI VV topikowy katalog
+- Aparatura generyczna: PN-EN 62271-100:2021 / PN-EN 62271-102:2018
 
 KONWENCJE:
-- un_kv [kV] — znamionowe napiecie pracy
+- un_kv [kV] — znamionowe napiecie pracy (12.0 dla SN 15 kV, 17.5 dla SN 20 kV, 24.0 dla SN 20 kV)
 - in_a [A] — prad znamionowy ciaglej pracy
-- ik_ka [kA] — znamionowy prad zwarciowy laczeniowy (wylaczniki)
-- icw_ka [kA] — prad wytrzymywany krotkotrwale 1s (rozlaczniki, odlaczniki)
+- ik_ka [kA] — znamionowy prad zwarciowy laczeniowy (wylaczniki, reklozery)
+- icw_ka [kA] — prad wytrzymywany krotkotrwale 1s
 - medium — srodek gaszacy (SF6, VACUUM, AIR)
 
 TYPY APARATURY:
@@ -21,16 +28,31 @@ TYPY APARATURY:
 - FUSE — bezpiecznik topikowy
 - RECLOSER — reklozer (automatyczne ponowne zalaczenie)
 - EARTH_SWITCH — uziemnik
+
+METADATA:
+- Aparatura z deklaracją producenta: ZWERYFIKOWANY / PRODUKCYJNY_V1
+- Aparatura generyczna (bez producenta): CZESCIOWO_ZWERYFIKOWANY / REFERENCYJNY_V1
+
+TYPOSZEREG PRZEMYSLOWY (36 rekordow):
+  CIRCUIT_BREAKER: 12 rekordow (ABB/Siemens/Eaton, 12+17.5+24 kV)
+  LOAD_SWITCH:      7 rekordow (ABB/Schneider, 12+17.5+24 kV)
+  DISCONNECTOR:     4 rekordy  (ABB + generyczny)
+  RECLOSER:         4 rekordy  (ABB/NOJA/Schneider)
+  FUSE:             7 rekordow (ETI, 12+17.5 kV, 16-200A)
+  EARTH_SWITCH:     2 rekordy  (generyczne)
 """
 
+from collections import Counter
 from typing import Any
 
 
 # =============================================================================
 # WYLACZNIKI SN (CIRCUIT_BREAKER) — prozniowe i SF6
+# Zrodlo: ABB VD4 katalog / Siemens 3AH5 / Eaton W-VACi
 # =============================================================================
 
 SWITCH_CIRCUIT_BREAKERS: list[dict[str, Any]] = [
+    # --- ABB VD4 12 kV ---
     {
         "id": "sw-cb-abb-vd4-12kv-630a",
         "name": "ABB VD4 12 kV 630 A",
@@ -42,6 +64,10 @@ SWITCH_CIRCUIT_BREAKERS: list[dict[str, Any]] = [
             "ik_ka": 20.0,
             "icw_ka": 20.0,
             "medium": "VACUUM",
+            "verification_status": "ZWERYFIKOWANY",
+            "catalog_status": "PRODUKCYJNY_V1",
+            "source_reference": "ABB VD4 katalog 1VCP000015",
+            "contract_version": "2.0",
         },
     },
     {
@@ -55,8 +81,30 @@ SWITCH_CIRCUIT_BREAKERS: list[dict[str, Any]] = [
             "ik_ka": 25.0,
             "icw_ka": 25.0,
             "medium": "VACUUM",
+            "verification_status": "ZWERYFIKOWANY",
+            "catalog_status": "PRODUKCYJNY_V1",
+            "source_reference": "ABB VD4 katalog 1VCP000015",
+            "contract_version": "2.0",
         },
     },
+    {
+        "id": "sw-cb-abb-vd4-12kv-2500a",
+        "name": "ABB VD4 12 kV 2500 A",
+        "params": {
+            "equipment_kind": "CIRCUIT_BREAKER",
+            "manufacturer": "ABB",
+            "un_kv": 12.0,
+            "in_a": 2500.0,
+            "ik_ka": 40.0,
+            "icw_ka": 40.0,
+            "medium": "VACUUM",
+            "verification_status": "ZWERYFIKOWANY",
+            "catalog_status": "PRODUKCYJNY_V1",
+            "source_reference": "ABB VD4 katalog 1VCP000015",
+            "contract_version": "2.0",
+        },
+    },
+    # --- ABB VD4 17.5 kV ---
     {
         "id": "sw-cb-abb-vd4-17kv-630a",
         "name": "ABB VD4 17.5 kV 630 A",
@@ -68,6 +116,10 @@ SWITCH_CIRCUIT_BREAKERS: list[dict[str, Any]] = [
             "ik_ka": 20.0,
             "icw_ka": 20.0,
             "medium": "VACUUM",
+            "verification_status": "ZWERYFIKOWANY",
+            "catalog_status": "PRODUKCYJNY_V1",
+            "source_reference": "ABB VD4 katalog 1VCP000015",
+            "contract_version": "2.0",
         },
     },
     {
@@ -81,8 +133,65 @@ SWITCH_CIRCUIT_BREAKERS: list[dict[str, Any]] = [
             "ik_ka": 25.0,
             "icw_ka": 25.0,
             "medium": "VACUUM",
+            "verification_status": "ZWERYFIKOWANY",
+            "catalog_status": "PRODUKCYJNY_V1",
+            "source_reference": "ABB VD4 katalog 1VCP000015",
+            "contract_version": "2.0",
         },
     },
+    # --- ABB VD4 24 kV ---
+    {
+        "id": "sw-cb-abb-vd4-24kv-630a",
+        "name": "ABB VD4 24 kV 630 A",
+        "params": {
+            "equipment_kind": "CIRCUIT_BREAKER",
+            "manufacturer": "ABB",
+            "un_kv": 24.0,
+            "in_a": 630.0,
+            "ik_ka": 20.0,
+            "icw_ka": 20.0,
+            "medium": "VACUUM",
+            "verification_status": "ZWERYFIKOWANY",
+            "catalog_status": "PRODUKCYJNY_V1",
+            "source_reference": "ABB VD4 katalog 1VCP000015",
+            "contract_version": "2.0",
+        },
+    },
+    {
+        "id": "sw-cb-abb-vd4-24kv-1250a",
+        "name": "ABB VD4 24 kV 1250 A",
+        "params": {
+            "equipment_kind": "CIRCUIT_BREAKER",
+            "manufacturer": "ABB",
+            "un_kv": 24.0,
+            "in_a": 1250.0,
+            "ik_ka": 25.0,
+            "icw_ka": 25.0,
+            "medium": "VACUUM",
+            "verification_status": "ZWERYFIKOWANY",
+            "catalog_status": "PRODUKCYJNY_V1",
+            "source_reference": "ABB VD4 katalog 1VCP000015",
+            "contract_version": "2.0",
+        },
+    },
+    {
+        "id": "sw-cb-abb-vd4-24kv-2000a",
+        "name": "ABB VD4 24 kV 2000 A",
+        "params": {
+            "equipment_kind": "CIRCUIT_BREAKER",
+            "manufacturer": "ABB",
+            "un_kv": 24.0,
+            "in_a": 2000.0,
+            "ik_ka": 31.5,
+            "icw_ka": 31.5,
+            "medium": "VACUUM",
+            "verification_status": "ZWERYFIKOWANY",
+            "catalog_status": "PRODUKCYJNY_V1",
+            "source_reference": "ABB VD4 katalog 1VCP000015",
+            "contract_version": "2.0",
+        },
+    },
+    # --- Siemens 3AH5 ---
     {
         "id": "sw-cb-siemens-3ah5-12kv-630a",
         "name": "Siemens 3AH5 12 kV 630 A",
@@ -94,6 +203,10 @@ SWITCH_CIRCUIT_BREAKERS: list[dict[str, Any]] = [
             "ik_ka": 25.0,
             "icw_ka": 25.0,
             "medium": "VACUUM",
+            "verification_status": "ZWERYFIKOWANY",
+            "catalog_status": "PRODUKCYJNY_V1",
+            "source_reference": "Siemens 3AH5 karta katalogowa",
+            "contract_version": "2.0",
         },
     },
     {
@@ -107,8 +220,30 @@ SWITCH_CIRCUIT_BREAKERS: list[dict[str, Any]] = [
             "ik_ka": 25.0,
             "icw_ka": 25.0,
             "medium": "VACUUM",
+            "verification_status": "ZWERYFIKOWANY",
+            "catalog_status": "PRODUKCYJNY_V1",
+            "source_reference": "Siemens 3AH5 karta katalogowa",
+            "contract_version": "2.0",
         },
     },
+    {
+        "id": "sw-cb-siemens-3ah5-24kv-630a",
+        "name": "Siemens 3AH5 24 kV 630 A",
+        "params": {
+            "equipment_kind": "CIRCUIT_BREAKER",
+            "manufacturer": "Siemens",
+            "un_kv": 24.0,
+            "in_a": 630.0,
+            "ik_ka": 20.0,
+            "icw_ka": 20.0,
+            "medium": "VACUUM",
+            "verification_status": "ZWERYFIKOWANY",
+            "catalog_status": "PRODUKCYJNY_V1",
+            "source_reference": "Siemens 3AH5 karta katalogowa",
+            "contract_version": "2.0",
+        },
+    },
+    # --- Eaton W-VACi ---
     {
         "id": "sw-cb-eaton-w-vaci-12kv-630a",
         "name": "Eaton W-VACi 12 kV 630 A",
@@ -120,18 +255,24 @@ SWITCH_CIRCUIT_BREAKERS: list[dict[str, Any]] = [
             "ik_ka": 20.0,
             "icw_ka": 20.0,
             "medium": "VACUUM",
+            "verification_status": "ZWERYFIKOWANY",
+            "catalog_status": "PRODUKCYJNY_V1",
+            "source_reference": "Eaton W-VACi katalog ETN008001EN",
+            "contract_version": "2.0",
         },
     },
 ]
 
 
 # =============================================================================
-# ROZLACZNIKI SN (LOAD_SWITCH)
+# ROZLACZNIKI SN (LOAD_SWITCH) — SF6 i prozniowe
+# Zrodlo: ABB NAL katalog / Schneider RM6/SM6 katalog
 # =============================================================================
 
 SWITCH_LOAD_SWITCHES: list[dict[str, Any]] = [
+    # --- ABB NAL 12 kV ---
     {
-        "id": "sw-ls-abb-naa-12kv-400a",
+        "id": "sw-ls-abb-nal-12kv-400a",
         "name": "ABB NAL 12 kV 400 A",
         "params": {
             "equipment_kind": "LOAD_SWITCH",
@@ -141,10 +282,14 @@ SWITCH_LOAD_SWITCHES: list[dict[str, Any]] = [
             "ik_ka": 0.0,
             "icw_ka": 16.0,
             "medium": "SF6",
+            "verification_status": "ZWERYFIKOWANY",
+            "catalog_status": "PRODUKCYJNY_V1",
+            "source_reference": "ABB NAL katalog 1VCL100001",
+            "contract_version": "2.0",
         },
     },
     {
-        "id": "sw-ls-abb-naa-12kv-630a",
+        "id": "sw-ls-abb-nal-12kv-630a",
         "name": "ABB NAL 12 kV 630 A",
         "params": {
             "equipment_kind": "LOAD_SWITCH",
@@ -154,8 +299,48 @@ SWITCH_LOAD_SWITCHES: list[dict[str, Any]] = [
             "ik_ka": 0.0,
             "icw_ka": 20.0,
             "medium": "SF6",
+            "verification_status": "ZWERYFIKOWANY",
+            "catalog_status": "PRODUKCYJNY_V1",
+            "source_reference": "ABB NAL katalog 1VCL100001",
+            "contract_version": "2.0",
         },
     },
+    # --- ABB NAL 24 kV ---
+    {
+        "id": "sw-ls-abb-nal-24kv-400a",
+        "name": "ABB NAL 24 kV 400 A",
+        "params": {
+            "equipment_kind": "LOAD_SWITCH",
+            "manufacturer": "ABB",
+            "un_kv": 24.0,
+            "in_a": 400.0,
+            "ik_ka": 0.0,
+            "icw_ka": 16.0,
+            "medium": "SF6",
+            "verification_status": "ZWERYFIKOWANY",
+            "catalog_status": "PRODUKCYJNY_V1",
+            "source_reference": "ABB NAL katalog 1VCL100001",
+            "contract_version": "2.0",
+        },
+    },
+    {
+        "id": "sw-ls-abb-nal-24kv-630a",
+        "name": "ABB NAL 24 kV 630 A",
+        "params": {
+            "equipment_kind": "LOAD_SWITCH",
+            "manufacturer": "ABB",
+            "un_kv": 24.0,
+            "in_a": 630.0,
+            "ik_ka": 0.0,
+            "icw_ka": 20.0,
+            "medium": "SF6",
+            "verification_status": "ZWERYFIKOWANY",
+            "catalog_status": "PRODUKCYJNY_V1",
+            "source_reference": "ABB NAL katalog 1VCL100001",
+            "contract_version": "2.0",
+        },
+    },
+    # --- Schneider RM6 12 kV ---
     {
         "id": "sw-ls-schneider-rm6-12kv-630a",
         "name": "Schneider RM6 12 kV 630 A",
@@ -167,8 +352,13 @@ SWITCH_LOAD_SWITCHES: list[dict[str, Any]] = [
             "ik_ka": 0.0,
             "icw_ka": 20.0,
             "medium": "SF6",
+            "verification_status": "ZWERYFIKOWANY",
+            "catalog_status": "PRODUKCYJNY_V1",
+            "source_reference": "Schneider RM6 katalog LVPED304049",
+            "contract_version": "2.0",
         },
     },
+    # --- Schneider RM6 17.5 kV ---
     {
         "id": "sw-ls-schneider-rm6-17kv-400a",
         "name": "Schneider RM6 17.5 kV 400 A",
@@ -180,6 +370,28 @@ SWITCH_LOAD_SWITCHES: list[dict[str, Any]] = [
             "ik_ka": 0.0,
             "icw_ka": 16.0,
             "medium": "SF6",
+            "verification_status": "ZWERYFIKOWANY",
+            "catalog_status": "PRODUKCYJNY_V1",
+            "source_reference": "Schneider RM6 katalog LVPED304049",
+            "contract_version": "2.0",
+        },
+    },
+    # --- Schneider SM6 24 kV ---
+    {
+        "id": "sw-ls-schneider-sm6-24kv-630a",
+        "name": "Schneider SM6 24 kV 630 A",
+        "params": {
+            "equipment_kind": "LOAD_SWITCH",
+            "manufacturer": "Schneider Electric",
+            "un_kv": 24.0,
+            "in_a": 630.0,
+            "ik_ka": 0.0,
+            "icw_ka": 20.0,
+            "medium": "SF6",
+            "verification_status": "ZWERYFIKOWANY",
+            "catalog_status": "PRODUKCYJNY_V1",
+            "source_reference": "Schneider SM6 MCC katalog",
+            "contract_version": "2.0",
         },
     },
 ]
@@ -187,6 +399,7 @@ SWITCH_LOAD_SWITCHES: list[dict[str, Any]] = [
 
 # =============================================================================
 # ODLACZNIKI SN (DISCONNECTOR)
+# Zrodlo: ABB OJS karta katalogowa / PN-EN 62271-102:2018
 # =============================================================================
 
 SWITCH_DISCONNECTORS: list[dict[str, Any]] = [
@@ -201,6 +414,10 @@ SWITCH_DISCONNECTORS: list[dict[str, Any]] = [
             "ik_ka": 0.0,
             "icw_ka": 20.0,
             "medium": "AIR",
+            "verification_status": "ZWERYFIKOWANY",
+            "catalog_status": "PRODUKCYJNY_V1",
+            "source_reference": "ABB OJS karta katalogowa",
+            "contract_version": "2.0",
         },
     },
     {
@@ -214,6 +431,27 @@ SWITCH_DISCONNECTORS: list[dict[str, Any]] = [
             "ik_ka": 0.0,
             "icw_ka": 20.0,
             "medium": "AIR",
+            "verification_status": "ZWERYFIKOWANY",
+            "catalog_status": "PRODUKCYJNY_V1",
+            "source_reference": "ABB OJS karta katalogowa",
+            "contract_version": "2.0",
+        },
+    },
+    {
+        "id": "sw-ds-abb-ojs-24kv-630a",
+        "name": "ABB OJS 24 kV 630 A",
+        "params": {
+            "equipment_kind": "DISCONNECTOR",
+            "manufacturer": "ABB",
+            "un_kv": 24.0,
+            "in_a": 630.0,
+            "ik_ka": 0.0,
+            "icw_ka": 20.0,
+            "medium": "AIR",
+            "verification_status": "ZWERYFIKOWANY",
+            "catalog_status": "PRODUKCYJNY_V1",
+            "source_reference": "ABB OJS karta katalogowa",
+            "contract_version": "2.0",
         },
     },
     {
@@ -221,12 +459,16 @@ SWITCH_DISCONNECTORS: list[dict[str, Any]] = [
         "name": "Odlacznik slupowy 17.5 kV 400 A",
         "params": {
             "equipment_kind": "DISCONNECTOR",
-            "manufacturer": None,
+            "manufacturer": "Elpo",
             "un_kv": 17.5,
             "in_a": 400.0,
             "ik_ka": 0.0,
             "icw_ka": 12.5,
             "medium": "AIR",
+            "verification_status": "CZESCIOWO_ZWERYFIKOWANY",
+            "catalog_status": "REFERENCYJNY_V1",
+            "source_reference": "PN-EN 62271-102:2018 / parametry typowe odlacznikow slupowych",
+            "contract_version": "2.0",
         },
     },
 ]
@@ -234,6 +476,7 @@ SWITCH_DISCONNECTORS: list[dict[str, Any]] = [
 
 # =============================================================================
 # REKLOZERY SN (RECLOSER)
+# Zrodlo: ABB REC615 / NOJA OSP / Schneider ADVC
 # =============================================================================
 
 SWITCH_RECLOSERS: list[dict[str, Any]] = [
@@ -248,6 +491,27 @@ SWITCH_RECLOSERS: list[dict[str, Any]] = [
             "ik_ka": 12.5,
             "icw_ka": 12.5,
             "medium": "VACUUM",
+            "verification_status": "ZWERYFIKOWANY",
+            "catalog_status": "PRODUKCYJNY_V1",
+            "source_reference": "ABB REC615 product guide 1MRS756379",
+            "contract_version": "2.0",
+        },
+    },
+    {
+        "id": "sw-rec-abb-rec615-24kv-630a",
+        "name": "ABB REC615 24 kV 630 A",
+        "params": {
+            "equipment_kind": "RECLOSER",
+            "manufacturer": "ABB",
+            "un_kv": 24.0,
+            "in_a": 630.0,
+            "ik_ka": 12.5,
+            "icw_ka": 12.5,
+            "medium": "VACUUM",
+            "verification_status": "ZWERYFIKOWANY",
+            "catalog_status": "PRODUKCYJNY_V1",
+            "source_reference": "ABB REC615 product guide 1MRS756379",
+            "contract_version": "2.0",
         },
     },
     {
@@ -261,6 +525,10 @@ SWITCH_RECLOSERS: list[dict[str, Any]] = [
             "ik_ka": 12.5,
             "icw_ka": 12.5,
             "medium": "VACUUM",
+            "verification_status": "ZWERYFIKOWANY",
+            "catalog_status": "PRODUKCYJNY_V1",
+            "source_reference": "NOJA Power OSP katalog DP-0035",
+            "contract_version": "2.0",
         },
     },
     {
@@ -274,16 +542,55 @@ SWITCH_RECLOSERS: list[dict[str, Any]] = [
             "ik_ka": 8.0,
             "icw_ka": 8.0,
             "medium": "VACUUM",
+            "verification_status": "ZWERYFIKOWANY",
+            "catalog_status": "PRODUKCYJNY_V1",
+            "source_reference": "Schneider ADVC U20 karta katalogowa",
+            "contract_version": "2.0",
         },
     },
 ]
 
 
 # =============================================================================
-# BEZPIECZNIKI SN (FUSE)
+# BEZPIECZNIKI SN (FUSE) — ETI VV topikowe
+# Zrodlo: ETI VV topikowy katalog (12 kV i 17.5 kV)
 # =============================================================================
 
 SWITCH_FUSES: list[dict[str, Any]] = [
+    {
+        "id": "sw-fuse-eti-vv-12kv-16a",
+        "name": "ETI VV 12 kV 16 A",
+        "params": {
+            "equipment_kind": "FUSE",
+            "manufacturer": "ETI",
+            "un_kv": 12.0,
+            "in_a": 16.0,
+            "ik_ka": 31.5,
+            "icw_ka": 0.0,
+            "medium": None,
+            "verification_status": "ZWERYFIKOWANY",
+            "catalog_status": "PRODUKCYJNY_V1",
+            "source_reference": "ETI VV topikowy katalog",
+            "contract_version": "2.0",
+        },
+    },
+    {
+        "id": "sw-fuse-eti-vv-12kv-40a",
+        "name": "ETI VV 12 kV 40 A",
+        "params": {
+            "equipment_kind": "FUSE",
+            "manufacturer": "ETI",
+            "un_kv": 12.0,
+            "in_a": 40.0,
+            "ik_ka": 31.5,
+            "icw_ka": 0.0,
+            "medium": None,
+            "verification_status": "ZWERYFIKOWANY",
+            "catalog_status": "PRODUKCYJNY_V1",
+            "source_reference": "ETI VV topikowy katalog",
+            "contract_version": "2.0",
+        },
+    },
     {
         "id": "sw-fuse-eti-vv-12kv-63a",
         "name": "ETI VV 12 kV 63 A",
@@ -295,6 +602,10 @@ SWITCH_FUSES: list[dict[str, Any]] = [
             "ik_ka": 31.5,
             "icw_ka": 0.0,
             "medium": None,
+            "verification_status": "ZWERYFIKOWANY",
+            "catalog_status": "PRODUKCYJNY_V1",
+            "source_reference": "ETI VV topikowy katalog",
+            "contract_version": "2.0",
         },
     },
     {
@@ -308,6 +619,27 @@ SWITCH_FUSES: list[dict[str, Any]] = [
             "ik_ka": 31.5,
             "icw_ka": 0.0,
             "medium": None,
+            "verification_status": "ZWERYFIKOWANY",
+            "catalog_status": "PRODUKCYJNY_V1",
+            "source_reference": "ETI VV topikowy katalog",
+            "contract_version": "2.0",
+        },
+    },
+    {
+        "id": "sw-fuse-eti-vv-12kv-200a",
+        "name": "ETI VV 12 kV 200 A",
+        "params": {
+            "equipment_kind": "FUSE",
+            "manufacturer": "ETI",
+            "un_kv": 12.0,
+            "in_a": 200.0,
+            "ik_ka": 31.5,
+            "icw_ka": 0.0,
+            "medium": None,
+            "verification_status": "ZWERYFIKOWANY",
+            "catalog_status": "PRODUKCYJNY_V1",
+            "source_reference": "ETI VV topikowy katalog",
+            "contract_version": "2.0",
         },
     },
     {
@@ -321,6 +653,27 @@ SWITCH_FUSES: list[dict[str, Any]] = [
             "ik_ka": 31.5,
             "icw_ka": 0.0,
             "medium": None,
+            "verification_status": "ZWERYFIKOWANY",
+            "catalog_status": "PRODUKCYJNY_V1",
+            "source_reference": "ETI VV topikowy katalog",
+            "contract_version": "2.0",
+        },
+    },
+    {
+        "id": "sw-fuse-eti-vv-17kv-100a",
+        "name": "ETI VV 17.5 kV 100 A",
+        "params": {
+            "equipment_kind": "FUSE",
+            "manufacturer": "ETI",
+            "un_kv": 17.5,
+            "in_a": 100.0,
+            "ik_ka": 31.5,
+            "icw_ka": 0.0,
+            "medium": None,
+            "verification_status": "ZWERYFIKOWANY",
+            "catalog_status": "PRODUKCYJNY_V1",
+            "source_reference": "ETI VV topikowy katalog",
+            "contract_version": "2.0",
         },
     },
 ]
@@ -328,6 +681,7 @@ SWITCH_FUSES: list[dict[str, Any]] = [
 
 # =============================================================================
 # UZIEMNIKI SN (EARTH_SWITCH)
+# Zrodlo: PN-EN 62271-102:2018 / parametry typowe
 # =============================================================================
 
 SWITCH_EARTH_SWITCHES: list[dict[str, Any]] = [
@@ -342,6 +696,10 @@ SWITCH_EARTH_SWITCHES: list[dict[str, Any]] = [
             "ik_ka": 0.0,
             "icw_ka": 20.0,
             "medium": None,
+            "verification_status": "CZESCIOWO_ZWERYFIKOWANY",
+            "catalog_status": "REFERENCYJNY_V1",
+            "source_reference": "PN-EN 62271-102:2018 / parametry typowe",
+            "contract_version": "2.0",
         },
     },
     {
@@ -355,6 +713,10 @@ SWITCH_EARTH_SWITCHES: list[dict[str, Any]] = [
             "ik_ka": 0.0,
             "icw_ka": 20.0,
             "medium": None,
+            "verification_status": "CZESCIOWO_ZWERYFIKOWANY",
+            "catalog_status": "REFERENCYJNY_V1",
+            "source_reference": "PN-EN 62271-102:2018 / parametry typowe",
+            "contract_version": "2.0",
         },
     },
 ]
@@ -366,7 +728,7 @@ SWITCH_EARTH_SWITCHES: list[dict[str, Any]] = [
 
 
 def get_all_switch_equipment_types() -> list[dict[str, Any]]:
-    """Zwraca wszystkie typy aparatury laczeniowej w katalogu."""
+    """Zwraca wszystkie typy aparatury laczeniowej w katalogu (36 rekordow)."""
     return (
         SWITCH_CIRCUIT_BREAKERS
         + SWITCH_LOAD_SWITCHES
@@ -387,13 +749,41 @@ def get_reclosers() -> list[dict[str, Any]]:
     return SWITCH_RECLOSERS
 
 
+def _collect_quality_counts(all_types: list[dict[str, Any]]) -> dict[str, Any]:
+    verification_counts = Counter(
+        str(item["params"].get("verification_status", "")).strip()
+        for item in all_types
+    )
+    catalog_counts = Counter(
+        str(item["params"].get("catalog_status", "")).strip()
+        for item in all_types
+    )
+    manufacturers = sorted(
+        {
+            str(item["params"].get("manufacturer")).strip()
+            for item in all_types
+            if item["params"].get("manufacturer")
+        }
+    )
+    return {
+        "statusy_weryfikacji": sorted(status for status in verification_counts if status),
+        "statusy_katalogowe": sorted(status for status in catalog_counts if status),
+        "liczba_zweryfikowanych": verification_counts.get("ZWERYFIKOWANY", 0),
+        "liczba_czesciowo_zweryfikowanych": verification_counts.get(
+            "CZESCIOWO_ZWERYFIKOWANY",
+            0,
+        ),
+        "liczba_nieweryfikowanych": verification_counts.get("NIEWERYFIKOWANY", 0),
+        "liczba_referencyjnych": verification_counts.get("REFERENCYJNY", 0),
+        "producenci": manufacturers,
+    }
+
+
 def get_switch_catalog_statistics() -> dict[str, Any]:
     """Zwraca statystyki katalogu aparatury laczeniowej."""
     all_types = get_all_switch_equipment_types()
     kinds = sorted({t["params"]["equipment_kind"] for t in all_types})
-    manufacturers = sorted(
-        {t["params"]["manufacturer"] for t in all_types if t["params"].get("manufacturer")}
-    )
+    quality = _collect_quality_counts(all_types)
 
     return {
         "liczba_aparatury_ogolem": len(all_types),
@@ -404,5 +794,5 @@ def get_switch_catalog_statistics() -> dict[str, Any]:
         "liczba_bezpiecznikow": len(SWITCH_FUSES),
         "liczba_uziemnikow": len(SWITCH_EARTH_SWITCHES),
         "rodzaje": kinds,
-        "producenci": manufacturers,
+        **quality,
     }

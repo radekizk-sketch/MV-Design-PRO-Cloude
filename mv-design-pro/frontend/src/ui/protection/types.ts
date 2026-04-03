@@ -14,10 +14,28 @@ export interface ProtectionDeviceType {
   id: string;
   name_pl: string;
   vendor?: string;
+  model?: string;
   series?: string;
   revision?: string;
   rated_current_a?: number;
   notes_pl?: string;
+  source_catalog?: string;
+  unverified?: boolean;
+  unverified_ranges?: boolean;
+  functions_supported?: string[];
+  curves_supported?: string[];
+  i_pickup_51_a_min?: number;
+  i_pickup_51_a_max?: number;
+  tms_51_min?: number;
+  tms_51_max?: number;
+  i_inst_50_a_min?: number;
+  i_inst_50_a_max?: number;
+  i_pickup_51n_a_min?: number;
+  i_pickup_51n_a_max?: number;
+  tms_51n_min?: number;
+  tms_51n_max?: number;
+  i_inst_50n_a_min?: number;
+  i_inst_50n_a_max?: number;
 }
 
 /**

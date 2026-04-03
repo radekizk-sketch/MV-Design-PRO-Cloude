@@ -21,11 +21,14 @@ import re
 import sys
 from pathlib import Path
 
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+
 # Sciezki do sprawdzenia
-ENM_OPS_FILE = Path("mv-design-pro/backend/src/enm/domain_operations.py")
+ENM_OPS_FILE = PROJECT_ROOT / "backend" / "src" / "enm" / "domain_operations.py"
 
 # Operacje ktore MUSZA miec bramke katalogowa
 OPERATIONS_REQUIRING_GATE = [
+    "add_grid_source_sn",
     "continue_trunk_segment_sn",
     "start_branch_segment_sn",
     "connect_secondary_ring_sn",
@@ -35,8 +38,12 @@ OPERATIONS_REQUIRING_GATE = [
     "insert_section_switch_sn",
 ]
 
-# Wzorzec bramy katalogowej (musi byc w kazdej operacji)
-GATE_PATTERN = re.compile(r"catalog\.ref_required")
+# Wzorce bramy katalogowej (musi byc w kazdej operacji).
+# Dopuszczamy jawny blad catalog.ref_required albo helper _require_catalog_ref(...).
+GATE_PATTERNS = [
+    re.compile(r"catalog\.ref_required"),
+    re.compile(r"_require_catalog_ref\s*\("),
+]
 
 
 def check_catalog_gates() -> list[str]:
@@ -66,10 +73,11 @@ def check_catalog_gates() -> list[str]:
         func_body = match.group(0)
 
         # Sprawdz czy jest bramka katalogowa
-        if not GATE_PATTERN.search(func_body):
+        if not any(pattern.search(func_body) for pattern in GATE_PATTERNS):
             violations.append(
                 f"BRAK BRAMKI KATALOGOWEJ: Operacja '{op_name}' nie zawiera "
-                f"walidacji 'catalog.ref_required' w {ENM_OPS_FILE}"
+                f"walidacji '_require_catalog_ref(...)' lub 'catalog.ref_required' "
+                f"w {ENM_OPS_FILE}"
             )
 
     return violations

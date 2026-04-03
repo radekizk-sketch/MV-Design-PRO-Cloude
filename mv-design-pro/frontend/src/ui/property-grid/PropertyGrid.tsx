@@ -439,7 +439,7 @@ function PropertyFieldRow({
             >
               {hasTypeRef ? 'Zmień typ...' : 'Przypisz typ...'}
             </button>
-            {hasTypeRef && (
+            {false && hasTypeRef && field.onClearType && (
               <button
                 onClick={field.onClearType}
                 className="px-3 py-1 text-xs bg-gray-200 text-gray-700 rounded hover:bg-gray-300 transition-colors"

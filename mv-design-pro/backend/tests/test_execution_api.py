@@ -8,6 +8,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from api.main import app
+from tests.catalog_test_helpers import gpz_source_record
 
 
 def _reset_backend_state() -> None:
@@ -83,14 +84,16 @@ def _seed_valid_enm(case_id: str) -> None:
                 "sources": [
                     {
                         "id": "00000000-0000-0000-0000-000000000404",
-                        "ref_id": "src-grid",
-                        "name": "Zasilanie GPZ",
                         "tags": [],
                         "meta": {},
-                        "bus_ref": "bus-main",
-                        "model": "short_circuit_power",
-                        "sk3_mva": 220.0,
-                        "rx_ratio": 0.1,
+                        **gpz_source_record(
+                            ref_id="src-grid",
+                            name="Zasilanie GPZ",
+                            bus_ref="bus-main",
+                            voltage_kv=15.0,
+                            sk3_mva=200.0,
+                            rx_ratio=0.10,
+                        ),
                     },
                 ],
                 "loads": [

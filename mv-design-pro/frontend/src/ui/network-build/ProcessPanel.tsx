@@ -598,7 +598,7 @@ export function ProcessPanel({ className }: ProcessPanelProps) {
   const trunkStatus: StatusLevel = trunkCount > 0 ? 'done' : sourceCount > 0 ? 'partial' : 'empty';
   const stationStatus: StatusLevel = stationCount > 0 ? 'done' : trunkCount > 0 ? 'partial' : 'empty';
   const branchStatus: StatusLevel = branchCount > 0 ? 'done' : 'empty';
-  const sectioningStatus: StatusLevel = 'empty'; // TODO: derive from snapshot switch/ring data
+  const sectioningStatus: StatusLevel = logicalViews?.secondary_connectors?.length ? 'done' : 'empty';
   const transformerStatus: StatusLevel = transformerCount > 0 ? 'done' : stationCount > 0 ? 'partial' : 'empty';
   const ozeStatus: StatusLevel = generatorCount > 0 ? 'done' : 'empty';
   const readinessStatus: StatusLevel = isReady ? 'done' : blockersByCategory.total > 0 ? 'error' : 'partial';

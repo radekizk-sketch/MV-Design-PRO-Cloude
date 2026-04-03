@@ -687,6 +687,21 @@ function StepK6({ enm, onChange }: StepProps) {
   const updGen = (ref: string, p: Partial<Generator>) => onChange({ ...enm, generators: enm.generators.map((g) => g.ref_id === ref ? { ...g, ...p } : g) });
   const rmGen = (ref: string) => onChange({ ...enm, generators: enm.generators.filter((g) => g.ref_id !== ref) });
 
+  const getGeneratorCatalogCategory = (generator: Generator | undefined): TypeCategory | null => {
+    switch (generator?.gen_type) {
+      case 'bess':
+        return 'BESS_INVERTER';
+      case 'wind_inverter':
+        return 'CONVERTER';
+      case 'synchronous':
+        return null;
+      case undefined:
+      case 'pv_inverter':
+      default:
+        return 'PV_INVERTER';
+    }
+  };
+
   const handleTypeSelected = (typeId: string, typeName: string) => {
     if (!pickerTargetRef) return;
     if (pickerTarget === 'load') {
@@ -704,6 +719,13 @@ function StepK6({ enm, onChange }: StepProps) {
     { value: 'bess', label: 'Magazyn energii (BESS)' },
     { value: 'synchronous', label: 'Generator synchroniczny' },
   ];
+
+  const selectedGenerator = pickerTarget === 'generator'
+    ? enm.generators.find((g) => g.ref_id === pickerTargetRef)
+    : undefined;
+  const pickerCategory: TypeCategory | null = pickerTarget === 'generator'
+    ? getGeneratorCatalogCategory(selectedGenerator)
+    : 'LOAD';
 
   return (
     <div>
@@ -767,8 +789,16 @@ function StepK6({ enm, onChange }: StepProps) {
               <div className="flex items-center gap-2">
                 <span className="text-sm text-chrome-600 flex-1 truncate">{g.catalog_ref ? g.name : 'Nie wybrano'}</span>
                 <button
-                  onClick={() => { setPickerTargetRef(g.ref_id); setPickerTarget('generator'); setPickerOpen(true); }}
-                  className="ind-btn text-ind-600 bg-ind-50 hover:bg-ind-100 border border-ind-200 text-[11px] whitespace-nowrap"
+                  onClick={() => {
+                    if (!getGeneratorCatalogCategory(g)) {
+                      return;
+                    }
+                    setPickerTargetRef(g.ref_id);
+                    setPickerTarget('generator');
+                    setPickerOpen(true);
+                  }}
+                  disabled={!getGeneratorCatalogCategory(g)}
+                  className="ind-btn text-ind-600 bg-ind-50 hover:bg-ind-100 border border-ind-200 text-[11px] whitespace-nowrap disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   {g.catalog_ref ? 'Zmień typ' : 'Wybierz z katalogu'}
                 </button>
@@ -829,17 +859,19 @@ function StepK6({ enm, onChange }: StepProps) {
       </div>
 
       {/* TypePicker modal */}
-      <TypePicker
-        category={(pickerTarget === 'generator' ? 'GENERATOR' : 'LOAD') as TypeCategory}
-        currentTypeId={
-          pickerTarget === 'generator'
-            ? (enm.generators.find((g) => g.ref_id === pickerTargetRef)?.catalog_ref ?? null)
-            : (enm.loads.find((l) => l.ref_id === pickerTargetRef)?.catalog_ref ?? null)
-        }
-        onSelectType={handleTypeSelected}
-        onClose={() => { setPickerOpen(false); setPickerTargetRef(null); }}
-        isOpen={pickerOpen}
-      />
+      {pickerCategory ? (
+        <TypePicker
+          category={pickerCategory}
+          currentTypeId={
+            pickerTarget === 'generator'
+              ? (selectedGenerator?.catalog_ref ?? null)
+              : (enm.loads.find((l) => l.ref_id === pickerTargetRef)?.catalog_ref ?? null)
+          }
+          onSelectType={handleTypeSelected}
+          onClose={() => { setPickerOpen(false); setPickerTargetRef(null); }}
+          isOpen={pickerOpen}
+        />
+      ) : null}
     </div>
   );
 }

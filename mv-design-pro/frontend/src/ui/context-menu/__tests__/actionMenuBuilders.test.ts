@@ -219,8 +219,7 @@ function describeBuilder(
             a.id.startsWith('edit_') ||
             a.id.startsWith('assign_') ||
             a.id === 'delete' ||
-            a.id === 'toggle_service' ||
-            a.id === 'clear_catalog'),
+            a.id === 'toggle_service'),
       );
       for (const editAction of editIds) {
         expect(
@@ -239,8 +238,7 @@ function describeBuilder(
             a.id.startsWith('edit_') ||
             a.id.startsWith('assign_') ||
             a.id === 'delete' ||
-            a.id === 'toggle_service' ||
-            a.id === 'clear_catalog'),
+            a.id === 'toggle_service'),
       );
       for (const editAction of editIds) {
         expect(
@@ -350,7 +348,7 @@ describe('buildBusNNContextMenu — specific', () => {
     const ids = items.map((a) => a.id);
     expect(ids).toContain('edit_voltage');
     expect(ids).toContain('assign_bus_catalog');
-    expect(ids).toContain('assign_default_catalog');
+    expect(ids).toContain('assign_catalog');
   });
 
   it('should have delete action for the bus', () => {
@@ -455,7 +453,7 @@ describeBuilder(
   'buildPVInverterContextMenu',
   (mode) => buildPVInverterContextMenu(mode),
   'PVInverter',
-  18,
+  17,
 );
 
 describe('buildPVInverterContextMenu — specific', () => {
@@ -470,11 +468,11 @@ describe('buildPVInverterContextMenu — specific', () => {
     expect(ids).toContain('set_profile');
   });
 
-  it('should include catalog assignment and clearing', () => {
+  it('should include only catalog assignment, without odkatalogowanie', () => {
     const items = buildPVInverterContextMenu('MODEL_EDIT');
     const ids = items.map((a) => a.id);
     expect(ids).toContain('assign_catalog');
-    expect(ids).toContain('clear_catalog');
+    expect(ids).not.toContain('clear_catalog');
   });
 
   it('should include trace action', () => {
@@ -509,12 +507,12 @@ describe('buildBESSInverterContextMenu — specific', () => {
     expect(ids).toContain('set_profile');
   });
 
-  it('should include dual catalog assignment (inverter + storage)', () => {
+  it('should include dual catalog assignment without odkatalogowanie', () => {
     const items = buildBESSInverterContextMenu('MODEL_EDIT');
     const ids = items.map((a) => a.id);
     expect(ids).toContain('assign_inverter_catalog');
     expect(ids).toContain('assign_storage_catalog');
-    expect(ids).toContain('clear_catalog');
+    expect(ids).not.toContain('clear_catalog');
   });
 });
 
@@ -698,7 +696,7 @@ describeBuilder(
   'buildTransformerContextMenu',
   (mode) => buildTransformerContextMenu(mode),
   'TransformerBranch',
-  14,
+  13,
 );
 
 describeBuilder(
@@ -719,7 +717,7 @@ describeBuilder(
   'buildMeasurementSNContextMenu',
   (mode) => buildMeasurementSNContextMenu(mode),
   'Measurement',
-  12,
+  11,
 );
 
 describeBuilder(

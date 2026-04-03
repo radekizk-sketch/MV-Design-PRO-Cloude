@@ -36,7 +36,6 @@ import { PowerFlowResultsInspectorPage } from './ui/power-flow-results';
 import { ReferencePatternsPage } from './ui/reference-patterns';
 import { ResultsInspectorPage } from './ui/results-inspector';
 import { resolveResultsRunId } from './ui/results-inspector/viewState';
-import { ResultsWorkspacePage } from './ui/results-workspace';
 import { SLDViewPage, SldEditorPage } from './ui/sld';
 import { EnmInspectorPage } from './ui/enm-inspector';
 import { FaultScenariosPanel, FaultScenarioModal } from './ui/fault-scenarios';
@@ -101,7 +100,6 @@ function mapAnalysisTypeToExecutionType(
 function isResultsRoute(route: string): boolean {
   return (
     route === '#results' ||
-    route === '#results-workspace' ||
     route === '#proof' ||
     route === '#protection-results' ||
     route === '#power-flow-results' ||
@@ -294,15 +292,6 @@ function App() {
     onMenuAction: handleMenuAction,
     networkStats: networkStats,
   };
-
-  // PR-22: Unified Results Workspace (Run / Batch / Compare / Overlay)
-  if (route === '#results-workspace') {
-    return wrapWithReadyIndicator(
-      <PowerFactoryLayout {...layoutProps} hideInspector={true}>
-        <ResultsWorkspacePage />
-      </PowerFactoryLayout>
-    );
-  }
 
   // UI_INTEGRATION_E2E + PROJECT_TREE_PARITY_V1: Przegląd wyników (Results Browser)
   if (route === '#results') {

@@ -26,7 +26,7 @@ def _minimal_enm() -> EnergyNetworkModel:
             Bus(ref_id="bus_1", name="Szyna", voltage_kv=15),
             Bus(ref_id="bus_2", name="Szyna 2", voltage_kv=15),
         ],
-        sources=[Source(ref_id="src_1", name="Grid", bus_ref="bus_1", model="short_circuit_power", sk3_mva=220)],
+        sources=[Source(ref_id="src_1", name="Grid", bus_ref="bus_1", model="short_circuit_power", sk3_mva=220, catalog_ref="SRC_TEST", catalog_namespace="ZRODLO_SN", parameter_source="CATALOG", source_mode="KATALOG")],
         branches=[
             OverheadLine(
                 ref_id="ln_1", name="L1", from_bus_ref="bus_1", to_bus_ref="bus_2",
@@ -43,7 +43,7 @@ class TestBlockers:
                 Bus(ref_id="b1", name="B1", voltage_kv=15),
                 Bus(ref_id="b2", name="B2", voltage_kv=15),
             ],
-            sources=[Source(ref_id="s1", name="S1", bus_ref="b1", model="short_circuit_power", sk3_mva=100)],
+            sources=[Source(ref_id="s1", name="S1", bus_ref="b1", model="short_circuit_power", sk3_mva=100, catalog_ref="SRC_TEST", catalog_namespace="ZRODLO_SN", parameter_source="CATALOG", source_mode="KATALOG")],
             branches=[
                 Cable(ref_id="cab_1", name="C1", from_bus_ref="b1", to_bus_ref="b2",
                       length_km=1, r_ohm_per_km=0.2, x_ohm_per_km=0.08),
@@ -69,7 +69,7 @@ class TestBlockers:
     def test_e004_zero_voltage(self):
         result = ENMValidator().validate(_enm(
             buses=[Bus(ref_id="b1", name="B1", voltage_kv=0)],
-            sources=[Source(ref_id="s1", name="S1", bus_ref="b1", model="short_circuit_power", sk3_mva=100)],
+            sources=[Source(ref_id="s1", name="S1", bus_ref="b1", model="short_circuit_power", sk3_mva=100, catalog_ref="SRC_TEST", catalog_namespace="ZRODLO_SN", parameter_source="CATALOG", source_mode="KATALOG")],
         ))
         assert result.status == "FAIL"
         codes = [i.code for i in result.issues]
@@ -81,7 +81,7 @@ class TestBlockers:
                 Bus(ref_id="b1", name="B1", voltage_kv=15),
                 Bus(ref_id="b2", name="B2", voltage_kv=15),
             ],
-            sources=[Source(ref_id="s1", name="S1", bus_ref="b1", model="short_circuit_power", sk3_mva=100)],
+            sources=[Source(ref_id="s1", name="S1", bus_ref="b1", model="short_circuit_power", sk3_mva=100, catalog_ref="SRC_TEST", catalog_namespace="ZRODLO_SN", parameter_source="CATALOG", source_mode="KATALOG")],
             branches=[
                 OverheadLine(ref_id="ln_1", name="L1", from_bus_ref="b1", to_bus_ref="b2",
                              length_km=5, r_ohm_per_km=0, x_ohm_per_km=0),
@@ -97,7 +97,7 @@ class TestBlockers:
                 Bus(ref_id="b1", name="B1", voltage_kv=110),
                 Bus(ref_id="b2", name="B2", voltage_kv=15),
             ],
-            sources=[Source(ref_id="s1", name="S1", bus_ref="b1", model="short_circuit_power", sk3_mva=1000)],
+            sources=[Source(ref_id="s1", name="S1", bus_ref="b1", model="short_circuit_power", sk3_mva=1000, catalog_ref="SRC_TEST", catalog_namespace="ZRODLO_SN", parameter_source="CATALOG", source_mode="KATALOG")],
             transformers=[
                 Transformer(ref_id="t1", name="T1", hv_bus_ref="b1", lv_bus_ref="b2",
                             sn_mva=25, uhv_kv=110, ulv_kv=15, uk_percent=0, pk_kw=120),
@@ -110,7 +110,7 @@ class TestBlockers:
     def test_e007_trafo_same_bus(self):
         result = ENMValidator().validate(_enm(
             buses=[Bus(ref_id="b1", name="B1", voltage_kv=15)],
-            sources=[Source(ref_id="s1", name="S1", bus_ref="b1", model="short_circuit_power", sk3_mva=200)],
+            sources=[Source(ref_id="s1", name="S1", bus_ref="b1", model="short_circuit_power", sk3_mva=200, catalog_ref="SRC_TEST", catalog_namespace="ZRODLO_SN", parameter_source="CATALOG", source_mode="KATALOG")],
             transformers=[
                 Transformer(ref_id="t1", name="T1", hv_bus_ref="b1", lv_bus_ref="b1",
                             sn_mva=25, uhv_kv=110, ulv_kv=15, uk_percent=12, pk_kw=120),
@@ -123,7 +123,7 @@ class TestBlockers:
     def test_e008_source_no_params(self):
         result = ENMValidator().validate(_enm(
             buses=[Bus(ref_id="b1", name="B1", voltage_kv=15)],
-            sources=[Source(ref_id="s1", name="S1", bus_ref="b1", model="short_circuit_power")],
+            sources=[Source(ref_id="s1", name="S1", bus_ref="b1", model="short_circuit_power", catalog_ref="SRC_TEST", catalog_namespace="ZRODLO_SN", parameter_source="CATALOG", source_mode="KATALOG")],
         ))
         assert result.status == "FAIL"
         codes = [i.code for i in result.issues]
@@ -137,7 +137,7 @@ class TestWarnings:
                 Bus(ref_id="b1", name="B1", voltage_kv=15),
                 Bus(ref_id="b2", name="B2", voltage_kv=15),
             ],
-            sources=[Source(ref_id="s1", name="S1", bus_ref="b1", model="short_circuit_power", sk3_mva=220)],
+            sources=[Source(ref_id="s1", name="S1", bus_ref="b1", model="short_circuit_power", sk3_mva=220, catalog_ref="SRC_TEST", catalog_namespace="ZRODLO_SN", parameter_source="CATALOG", source_mode="KATALOG")],
             branches=[
                 OverheadLine(ref_id="ln_1", name="L1", from_bus_ref="b1", to_bus_ref="b2",
                              length_km=5, r_ohm_per_km=0.4, x_ohm_per_km=0.3),
@@ -172,7 +172,7 @@ class TestOKStatus:
                 Bus(ref_id="b1", name="B1", voltage_kv=15),
                 Bus(ref_id="b2", name="B2", voltage_kv=15),
             ],
-            sources=[Source(ref_id="s1", name="S1", bus_ref="b1", model="short_circuit_power", sk3_mva=100)],
+            sources=[Source(ref_id="s1", name="S1", bus_ref="b1", model="short_circuit_power", sk3_mva=100, catalog_ref="SRC_TEST", catalog_namespace="ZRODLO_SN", parameter_source="CATALOG", source_mode="KATALOG")],
             branches=[
                 OverheadLine(ref_id="ln_1", name="L1", from_bus_ref="b1", to_bus_ref="b2",
                              length_km=5, r_ohm_per_km=0.4, x_ohm_per_km=0.3),

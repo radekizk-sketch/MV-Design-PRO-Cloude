@@ -54,6 +54,7 @@ export interface ProtectionSetting {
 // ---------------------------------------------------------------------------
 
 export type ParameterSource = 'CATALOG' | 'OVERRIDE';
+export type CatalogSourceMode = 'KATALOG' | 'MIGRACJA' | 'EKSPERCKI_RECZNY';
 
 export interface ParameterOverride {
   key: string;
@@ -115,7 +116,10 @@ export interface BranchBase extends ENMElement {
   to_bus_ref: string;
   status: 'closed' | 'open';
   catalog_ref?: string | null;
+  catalog_namespace?: string | null;
   parameter_source?: ParameterSource | null;
+  source_mode?: CatalogSourceMode | null;
+  materialized_params?: Record<string, unknown> | null;
   overrides?: ParameterOverride[] | null;
 }
 
@@ -180,7 +184,10 @@ export interface Transformer extends ENMElement {
   tap_max?: number | null;
   tap_step_percent?: number | null;
   catalog_ref?: string | null;
+  catalog_namespace?: string | null;
   parameter_source?: ParameterSource | null;
+  source_mode?: CatalogSourceMode | null;
+  materialized_params?: Record<string, unknown> | null;
   overrides?: ParameterOverride[] | null;
 }
 
@@ -201,6 +208,12 @@ export interface Source extends ENMElement {
   z0_z1_ratio?: number | null;
   c_max?: number | null;
   c_min?: number | null;
+  catalog_ref?: string | null;
+  catalog_namespace?: string | null;
+  parameter_source?: ParameterSource | null;
+  source_mode?: CatalogSourceMode | null;
+  materialized_params?: Record<string, unknown> | null;
+  overrides?: ParameterOverride[] | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -213,8 +226,11 @@ export interface Load extends ENMElement {
   q_mvar: number;
   model: 'pq' | 'zip';
   catalog_ref?: string | null;
+  catalog_namespace?: string | null;
   quantity?: number | null;
   parameter_source?: ParameterSource | null;
+  source_mode?: CatalogSourceMode | null;
+  materialized_params?: Record<string, unknown> | null;
   overrides?: ParameterOverride[] | null;
 }
 
@@ -229,9 +245,12 @@ export interface Generator extends ENMElement {
   gen_type?: 'synchronous' | 'pv_inverter' | 'wind_inverter' | 'bess' | null;
   limits?: GenLimits | null;
   catalog_ref?: string | null;
+  catalog_namespace?: string | null;
   quantity?: number | null;
   n_parallel?: number | null;
   parameter_source?: ParameterSource | null;
+  source_mode?: CatalogSourceMode | null;
+  materialized_params?: Record<string, unknown> | null;
   overrides?: ParameterOverride[] | null;
 
   /**
@@ -323,7 +342,10 @@ export interface Measurement extends ENMElement {
   connection: 'star' | 'delta' | 'single_phase';
   purpose: 'protection' | 'metering' | 'combined';
   catalog_ref?: string | null;
+  catalog_namespace?: string | null;
   parameter_source?: ParameterSource | null;
+  source_mode?: CatalogSourceMode | null;
+  materialized_params?: Record<string, unknown> | null;
   overrides?: ParameterOverride[] | null;
 }
 
@@ -338,9 +360,12 @@ export interface ProtectionAssignment extends ENMElement {
   device_type: 'overcurrent' | 'earth_fault' | 'directional_overcurrent'
     | 'distance' | 'differential' | 'custom';
   catalog_ref?: string | null;
+  catalog_namespace?: string | null;
   settings: ProtectionSetting[];
   is_enabled: boolean;
   parameter_source?: ParameterSource | null;
+  source_mode?: CatalogSourceMode | null;
+  materialized_params?: Record<string, unknown> | null;
   overrides?: ParameterOverride[] | null;
 }
 
@@ -563,7 +588,13 @@ export interface LogicalViewsV1 {
   terminals: TerminalRef[];
 }
 
-export interface MaterializedLineParams {
+export interface MaterializedCatalogParams {
+  catalog_item_id: string;
+  catalog_item_version: string | null;
+  [key: string]: unknown;
+}
+
+export interface MaterializedLineParams extends MaterializedCatalogParams {
   catalog_item_id: string;
   catalog_item_version: string | null;
   r_ohm_per_km: number | null;
@@ -571,7 +602,7 @@ export interface MaterializedLineParams {
   i_max_a: number | null;
 }
 
-export interface MaterializedTransformerParams {
+export interface MaterializedTransformerParams extends MaterializedCatalogParams {
   catalog_item_id: string;
   catalog_item_version: string | null;
   u_k_percent: number | null;
@@ -583,6 +614,7 @@ export interface MaterializedTransformerParams {
 export interface MaterializedParams {
   lines_sn: Record<string, MaterializedLineParams>;
   transformers_sn_nn: Record<string, MaterializedTransformerParams>;
+  [namespace: string]: Record<string, MaterializedCatalogParams>;
 }
 
 export interface LayoutInfo {

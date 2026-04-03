@@ -76,13 +76,6 @@ export const ROUTES: Record<string, RouteDefinition> = {
     icon: 'PF',
     requiredMode: 'RESULT_VIEW',
   },
-  RESULTS_WORKSPACE: {
-    hash: '#results-workspace',
-    label: 'Przestrzen robocza wynikow',
-    description: 'Zintegrowana przestrzen robocza: obliczenia, wsady, porownania, nakladka SLD',
-    icon: 'WSP',
-    requiredMode: 'RESULT_VIEW',
-  },
   COMPARE: {
     hash: '#compare',
     label: 'Porownanie przypadkow',

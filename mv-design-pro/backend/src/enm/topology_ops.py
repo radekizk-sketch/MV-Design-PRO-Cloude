@@ -297,6 +297,7 @@ def create_branch(enm: dict[str, Any], data: dict[str, Any]) -> TopologyOpResult
         "catalog_namespace": data.get("catalog_namespace"),
         "source_mode": data.get("source_mode"),
         "parameter_source": data.get("parameter_source"),
+        "materialized_params": data.get("materialized_params"),
         "overrides": data.get("overrides", []),
         "tags": data.get("tags", []),
         "meta": data.get("meta", {}),
@@ -431,7 +432,8 @@ def create_device(enm: dict[str, Any], data: dict[str, Any]) -> TopologyOpResult
         for opt in ("p0_kw", "i0_percent", "vector_group",
                      "hv_neutral", "lv_neutral", "tap_position",
                      "tap_min", "tap_max", "tap_step_percent", "catalog_ref",
-                     "catalog_namespace", "source_mode", "parameter_source", "overrides"):
+                     "catalog_namespace", "source_mode", "parameter_source",
+                     "materialized_params", "overrides"):
             if opt in data:
                 trafo_data[opt] = data[opt]
         new_enm.setdefault("transformers", []).append(trafo_data)
@@ -453,6 +455,12 @@ def create_device(enm: dict[str, Any], data: dict[str, Any]) -> TopologyOpResult
             "p_mw": data.get("p_mw", 0),
             "q_mvar": data.get("q_mvar", 0),
             "model": data.get("model", "pq"),
+            "catalog_ref": data.get("catalog_ref"),
+            "catalog_namespace": data.get("catalog_namespace"),
+            "source_mode": data.get("source_mode"),
+            "parameter_source": data.get("parameter_source"),
+            "materialized_params": data.get("materialized_params"),
+            "overrides": data.get("overrides", []),
             "tags": data.get("tags", []),
             "meta": data.get("meta", {}),
         }
@@ -475,6 +483,12 @@ def create_device(enm: dict[str, Any], data: dict[str, Any]) -> TopologyOpResult
             "p_mw": data.get("p_mw", 0),
             "q_mvar": data.get("q_mvar"),
             "gen_type": data.get("gen_type"),
+            "catalog_ref": data.get("catalog_ref"),
+            "catalog_namespace": data.get("catalog_namespace"),
+            "source_mode": data.get("source_mode"),
+            "parameter_source": data.get("parameter_source"),
+            "materialized_params": data.get("materialized_params"),
+            "overrides": data.get("overrides", []),
             "tags": data.get("tags", []),
             "meta": data.get("meta", {}),
         }
@@ -502,6 +516,12 @@ def create_device(enm: dict[str, Any], data: dict[str, Any]) -> TopologyOpResult
             "name": data.get("name", ref_id),
             "bus_ref": bus_ref,
             "model": data.get("model", "short_circuit_power"),
+            "catalog_ref": data.get("catalog_ref"),
+            "catalog_namespace": data.get("catalog_namespace"),
+            "source_mode": data.get("source_mode"),
+            "parameter_source": data.get("parameter_source"),
+            "materialized_params": data.get("materialized_params"),
+            "overrides": data.get("overrides", []),
             "tags": data.get("tags", []),
             "meta": data.get("meta", {}),
         }

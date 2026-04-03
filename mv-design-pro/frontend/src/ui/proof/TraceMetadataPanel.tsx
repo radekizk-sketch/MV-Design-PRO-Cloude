@@ -1,5 +1,5 @@
 /**
- * TraceMetadataPanel — Panel metadanych śladu obliczeń (prawy panel)
+ * TraceMetadataPanel - Panel metadanych sladu obliczen (prawy panel)
  *
  * CANONICAL ALIGNMENT:
  * - powerfactory_ui_parity.md: Metadane run/case/snapshot
@@ -7,16 +7,16 @@
  *
  * FEATURES:
  * - Informacje o przypadku/run
- * - Data obliczeń
- * - Hash danych wejściowych (dla audytu)
- * - Źródło normy (jeśli dostępne)
+ * - Data obliczen
+ * - Hash danych wejsciowych (dla audytu)
+ * - Zrodlo normy (jesli dostepne)
  * - 100% Polish UI
  *
- * NOTE: Nazwy kodowe NIGDY nie są pokazywane w UI.
+ * NOTE: Nazwy kodowe NIGDY nie sa pokazywane w UI.
  */
 
 import { useMemo } from 'react';
-import type { ExtendedTrace, TraceStep } from '../results-inspector/types';
+import type { CatalogContextEntry, ExtendedTrace, TraceStep } from '../results-inspector/types';
 
 // =============================================================================
 // Types
@@ -32,10 +32,10 @@ interface TraceMetadataPanelProps {
 // =============================================================================
 
 /**
- * Formatuj datę ISO na czytelny format polski.
+ * Formatuj date ISO na czytelny format polski.
  */
 function formatDate(isoDate: string | null | undefined): string {
-  if (!isoDate) return '—';
+  if (!isoDate) return '-';
   try {
     return new Date(isoDate).toLocaleString('pl-PL', {
       dateStyle: 'medium',
@@ -47,7 +47,7 @@ function formatDate(isoDate: string | null | undefined): string {
 }
 
 /**
- * Skróć hash do czytelnej długości.
+ * Skroc hash do czytelnej dlugosci.
  */
 function shortenHash(hash: string, length = 16): string {
   if (hash.length <= length) return hash;
@@ -55,7 +55,7 @@ function shortenHash(hash: string, length = 16): string {
 }
 
 /**
- * Policz statystyki kroków.
+ * Policz statystyki krokow.
  */
 function computeStepStats(steps: TraceStep[]): {
   total: number;
@@ -72,6 +72,10 @@ function computeStepStats(steps: TraceStep[]): {
     total: steps.length,
     byPhase,
   };
+}
+
+function formatJson(value: unknown): string {
+  return JSON.stringify(value, null, 2);
 }
 
 // =============================================================================
@@ -91,7 +95,7 @@ function MetadataRow({ label, value, mono = false }: MetadataRowProps) {
         {label}
       </dt>
       <dd className={`text-sm text-slate-800 ${mono ? 'font-mono text-xs' : ''}`}>
-        {value ?? '—'}
+        {value ?? '-'}
       </dd>
     </div>
   );
@@ -119,8 +123,27 @@ function MetadataSection({ title, children }: MetadataSectionProps) {
 
 export function TraceMetadataPanel({ trace, selectedStep }: TraceMetadataPanelProps) {
   const stats = useMemo(() => computeStepStats(trace.white_box_trace), [trace.white_box_trace]);
+  const catalogEntries = useMemo(
+    () => [...(trace.catalog_context ?? [])].sort((a, b) => a.element_id.localeCompare(b.element_id)),
+    [trace.catalog_context],
+  );
+  const catalogSummary = trace.catalog_context_summary ?? {};
+  const selectedCatalogEntry = useMemo<CatalogContextEntry | null>(() => {
+    if (selectedStep?.catalog_context_entry) {
+      return selectedStep.catalog_context_entry;
+    }
+    const candidateKeys = [
+      selectedStep?.key,
+      typeof selectedStep?.target_id === 'string' ? selectedStep.target_id : null,
+      typeof selectedStep?.element_id === 'string' ? selectedStep.element_id : null,
+    ].filter((value): value is string => Boolean(value));
+    return (
+      catalogEntries.find((entry) => candidateKeys.includes(entry.element_id))
+      ?? null
+    );
+  }, [catalogEntries, selectedStep]);
+  const detailEntries = selectedCatalogEntry ? [selectedCatalogEntry] : catalogEntries;
 
-  // Mapuj fazy na polskie etykiety
   const phaseLabels: Record<string, string> = {
     INITIALIZATION: 'Inicjalizacja',
     CALCULATION: 'Obliczenia',
@@ -140,8 +163,7 @@ export function TraceMetadataPanel({ trace, selectedStep }: TraceMetadataPanelPr
           Metadane śladu
         </h2>
 
-        {/* Sekcja: Kontekst obliczeń */}
-        <MetadataSection title="Kontekst obliczeń">
+        <MetadataSection title="Kontekst obliczen">
           <MetadataRow label="ID migawki" value={trace.snapshot_id} mono />
           <MetadataRow label="ID wykonania" value={trace.run_id} mono />
           <MetadataRow
@@ -149,9 +171,103 @@ export function TraceMetadataPanel({ trace, selectedStep }: TraceMetadataPanelPr
             value={shortenHash(trace.input_hash)}
             mono
           />
+          <MetadataRow
+            label="Elementy z katalogiem"
+            value={String(catalogEntries.length)}
+          />
+          <MetadataRow
+            label="Elementy z nadpisaniami ręcznymi"
+            value={String(catalogSummary.manual_override_element_count ?? 0)}
+          />
+          <MetadataRow
+            label="Liczba nadpisań ręcznych"
+            value={String(catalogSummary.manual_override_count ?? 0)}
+          />
         </MetadataSection>
 
-        {/* Sekcja: Statystyki kroków */}
+        <MetadataSection title="Kontekst katalogowy">
+          {catalogEntries.length === 0 ? (
+            <div className="py-2 text-sm text-slate-500">
+              Brak jawnego kontekstu katalogowego w śladzie tego przebiegu.
+            </div>
+          ) : (
+            <div className="space-y-3 py-2">
+              {detailEntries.map((entry) => {
+                const parameterOrigin = entry.parameter_origin ?? entry.parameter_source ?? null;
+                const manualOverrides = entry.manual_overrides ?? entry.overrides ?? [];
+                const sourceCatalog = entry.source_catalog ?? entry.catalog_binding ?? null;
+                return (
+                  <article
+                    key={`${entry.element_type}-${entry.element_id}`}
+                    className="rounded border border-slate-200 bg-slate-50 px-3 py-3"
+                  >
+                    <div className="text-xs font-medium text-slate-500">{entry.element_type}</div>
+                    <div className="mt-1 text-sm font-mono text-slate-800">{entry.element_id}</div>
+                    {entry.name ? (
+                      <div className="mt-1 text-sm text-slate-700">{entry.name}</div>
+                    ) : null}
+                    <div className="mt-2 grid gap-2 text-xs text-slate-600">
+                      <div>
+                        <span className="font-medium text-slate-700">Powiązanie katalogowe: </span>
+                        <span className="font-mono">
+                          {entry.catalog_binding?.catalog_namespace ?? '-'}:
+                          {entry.catalog_binding?.catalog_item_id ?? '-'}
+                        </span>
+                      </div>
+                      {entry.source_catalog_label ? (
+                        <div>
+                          <span className="font-medium text-slate-700">Źródło katalogowe: </span>
+                          <span className="font-mono">{entry.source_catalog_label}</span>
+                        </div>
+                      ) : sourceCatalog ? (
+                        <div>
+                          <span className="font-medium text-slate-700">Źródło katalogowe: </span>
+                          <span className="font-mono">
+                            {sourceCatalog.catalog_namespace ?? '-'}:
+                            {sourceCatalog.catalog_item_id ?? '-'}
+                          </span>
+                        </div>
+                      ) : null}
+                      {entry.catalog_binding?.catalog_item_version ? (
+                        <div>
+                          <span className="font-medium text-slate-700">Wersja katalogu: </span>
+                          <span className="font-mono">{entry.catalog_binding.catalog_item_version}</span>
+                        </div>
+                      ) : null}
+                      {parameterOrigin ? (
+                        <div>
+                          <span className="font-medium text-slate-700">Pochodzenie parametrów: </span>
+                          <span>{parameterOrigin}</span>
+                        </div>
+                      ) : null}
+                    </div>
+                    {entry.materialized_params ? (
+                      <details className="mt-3">
+                        <summary className="cursor-pointer text-xs font-medium text-slate-600">
+                          Zmaterializowane parametry
+                        </summary>
+                        <pre className="mt-2 overflow-x-auto rounded bg-white p-2 text-[11px] text-slate-700">
+                          {formatJson(entry.materialized_params)}
+                        </pre>
+                      </details>
+                    ) : null}
+                    {manualOverrides.length > 0 ? (
+                      <details className="mt-2">
+                        <summary className="cursor-pointer text-xs font-medium text-slate-600">
+                          Nadpisania ręczne
+                        </summary>
+                        <pre className="mt-2 overflow-x-auto rounded bg-white p-2 text-[11px] text-slate-700">
+                          {formatJson(manualOverrides)}
+                        </pre>
+                      </details>
+                    ) : null}
+                  </article>
+                );
+              })}
+            </div>
+          )}
+        </MetadataSection>
+
         <MetadataSection title="Statystyki">
           <MetadataRow label="Liczba kroków" value={String(stats.total)} />
           <div className="py-2">
@@ -176,7 +292,6 @@ export function TraceMetadataPanel({ trace, selectedStep }: TraceMetadataPanelPr
           </div>
         </MetadataSection>
 
-        {/* Sekcja: Wybrany krok (jeśli jest) */}
         {selectedStep && (
           <MetadataSection title="Wybrany krok">
             <MetadataRow
@@ -199,7 +314,6 @@ export function TraceMetadataPanel({ trace, selectedStep }: TraceMetadataPanelPr
           </MetadataSection>
         )}
 
-        {/* Sekcja: Informacje o normie (jeśli dostępne) */}
         <MetadataSection title="Źródło obliczeń">
           <div className="py-2">
             <p className="text-sm text-slate-600">
@@ -211,10 +325,9 @@ export function TraceMetadataPanel({ trace, selectedStep }: TraceMetadataPanelPr
           </div>
         </MetadataSection>
 
-        {/* Legenda statusu */}
         <div className="mt-4 rounded border border-slate-200 bg-slate-50 p-3">
           <p className="text-xs text-slate-500">
-            <strong>Uwaga:</strong> Ślad obliczeń jest dokumentem audytowym.
+            <strong>Uwaga:</strong> Slad obliczen jest dokumentem audytowym.
             Wszystkie wartości są tylko do odczytu.
           </p>
         </div>
@@ -223,9 +336,6 @@ export function TraceMetadataPanel({ trace, selectedStep }: TraceMetadataPanelPr
   );
 }
 
-/**
- * Placeholder dla pustego stanu.
- */
 export function TraceMetadataPanelEmpty() {
   return (
     <aside

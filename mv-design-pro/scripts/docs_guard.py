@@ -1,23 +1,13 @@
 #!/usr/bin/env python3
 """
-DOCS GUARD — Documentation Integrity CI Check
+DOCS GUARD
 
 Checks:
-1. No "PCC" term in entrypoint documentation files (prohibited concept).
-   Scans only entrypoint docs (SYSTEM_SPEC, ARCHITECTURE, README, AGENTS, PLANS).
-   Excludes docs/spec/ (canonical, binding — not to be modified by guard).
-2. Broken markdown links in key entrypoints (SYSTEM_SPEC, README, ARCHITECTURE,
-   INDEX files at both project and repo-root level).
-
-Note: Project codenames in frontend UI strings are checked by the separate
-no_codenames_guard.py script. This guard focuses on documentation integrity.
-
-Usage:
-  python scripts/docs_guard.py
-
-Exit codes:
-  0 — all checks pass
-  1 — violations found
+1. No "PCC" term in entrypoint documentation files.
+2. No broken relative markdown links in key indexes and entrypoints.
+3. Required catalog-first binding documents exist.
+4. Canonical index points to binding docs and does not mark docs/spec as source of truth.
+5. Explicit file inventories in binding docs do not reference non-existent repo files.
 """
 
 from __future__ import annotations
@@ -26,186 +16,301 @@ import re
 import sys
 from pathlib import Path
 
-# mv-design-pro/ directory (where the script lives under scripts/)
+
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
-# Repo root (one level above mv-design-pro/)
 REPO_ROOT = PROJECT_ROOT.parent
 
-# ---------------------------------------------------------------------------
-# CHECK 1: PCC prohibition in entrypoint docs
-# ---------------------------------------------------------------------------
-
-# Tuples of (base_dir, relative_file)
 PCC_CHECK_FILES = [
-    (PROJECT_ROOT, "SYSTEM_SPEC.md"),
-    (PROJECT_ROOT, "ARCHITECTURE.md"),
-    (PROJECT_ROOT, "README.md"),
-    (PROJECT_ROOT, "AGENTS.md"),
-    (PROJECT_ROOT, "PLANS.md"),
-    (REPO_ROOT, "README.md"),
+    PROJECT_ROOT / "SYSTEM_SPEC.md",
+    PROJECT_ROOT / "ARCHITECTURE.md",
+    PROJECT_ROOT / "README.md",
+    PROJECT_ROOT / "AGENTS.md",
+    PROJECT_ROOT / "PLANS.md",
+    PROJECT_ROOT / "docs/INDEX.md",
+    PROJECT_ROOT / "docs/INDEX_KANONICZNY.md",
+    REPO_ROOT / "README.md",
+]
+
+LINK_CHECK_FILES = [
+    PROJECT_ROOT / "SYSTEM_SPEC.md",
+    PROJECT_ROOT / "ARCHITECTURE.md",
+    PROJECT_ROOT / "README.md",
+    PROJECT_ROOT / "docs/INDEX.md",
+    PROJECT_ROOT / "docs/INDEX_KANONICZNY.md",
+    REPO_ROOT / "README.md",
+]
+
+REQUIRED_STAGE_DOCS = [
+    "docs/catalog/CATALOG_DATA_TRUTH_MATRIX_V1.md",
+    "docs/catalog/CATALOG_INDUSTRIAL_SERIES_MATRIX.md",
+    "docs/catalog/CATALOG_LINES_AND_CABLES_V1_SPEC.md",
+    "docs/catalog/AUDIT_CATALOG_DATA_COMPLETENESS_V1.md",
+    "docs/system/SPEC_KATALOGI_I_MATERIALIZACJA_PARAMETROW.md",
+    "docs/system/SPEC_MODEL_SYSTEMOWY_SN.md",
+    "docs/system/SPEC_OPERACJE_DOMENOWE_I_SNAPSHOT.md",
+    "docs/system/SPEC_GOTOWOSC_I_DZIALANIA_NAPRAWCZE.md",
+    "docs/system/SPEC_ANALIZY_WYNIKI_WHITE_BOX_RAPORTY.md",
+    "docs/system/SPEC_TYPOSZEREGI_I_KLASY_ELEMENTOW_TECHNICZNYCH.md",
+    "docs/ui/UX_KATALOG_FIRST_DLA_INZYNIERA_SIECI_SN.md",
+    "docs/ui/UX_KREATOR_SIECI_SN_OD_GPZ.md",
+    "docs/ui/UX_INSPEKTOR_ANALIZA_WHITE_BOX_RAPORT.md",
+    "docs/ui/UX_ZESTAWIENIA_MATERIALOWE_I_KOMPLETNOSC_TECHNICZNA.md",
+    "docs/sld/SLD_SYSTEM_SPEC_CANONICAL.md",
+    "docs/sld/SLD_MODEL_SEMANTYCZNY.md",
+    "docs/sld/SLD_GEOMETRIA_KANONICZNA.md",
+    "docs/sld/SLD_TYPY_STACJI_KANONICZNE.md",
+    "docs/qa/MACIERZ_TESTOW_GLOBALNYCH.md",
+    "docs/audit/AUDYT_KATALOG_FIRST_END_TO_END.md",
+    "docs/audit/REPO_HYGIENE_PO_ETAPIE_KATALOG_FIRST.md",
+]
+
+REQUIRED_BINDING_DOCS = [
+    "docs/system/SPEC_KATALOGI_I_MATERIALIZACJA_PARAMETROW.md",
+    "docs/system/SPEC_OPERACJE_DOMENOWE_I_SNAPSHOT.md",
+    "docs/system/SPEC_ANALIZY_WYNIKI_WHITE_BOX_RAPORTY.md",
+    "docs/ui/KATALOG_WIAZANIE_I_MATERIALIZACJA.md",
+    "docs/ui/UX_KREATOR_SIECI_SN_OD_GPZ.md",
+    "docs/sld/SLD_SYSTEM_SPEC_CANONICAL.md",
+    "docs/sld/SLD_GEOMETRIA_KANONICZNA.md",
+    "docs/sld/SLD_TYPY_STACJI_KANONICZNE.md",
+    "docs/qa/MACIERZ_TESTOW_GLOBALNYCH.md",
+    "docs/audit/AUDYT_KATALOG_FIRST_END_TO_END.md",
+    "docs/audit/REPO_HYGIENE_PO_ETAPIE_KATALOG_FIRST.md",
+]
+
+CANONICAL_INDEX_FILE = PROJECT_ROOT / "docs/INDEX_KANONICZNY.md"
+CANONICAL_INDEX_REQUIRED_REFERENCES = [
+    "docs/system/SPEC_KATALOGI_I_MATERIALIZACJA_PARAMETROW.md",
+    "docs/system/SPEC_OPERACJE_DOMENOWE_I_SNAPSHOT.md",
+    "docs/system/SPEC_ANALIZY_WYNIKI_WHITE_BOX_RAPORTY.md",
+    "docs/ui/UX_KATALOG_FIRST_DLA_INZYNIERA_SIECI_SN.md",
+    "docs/sld/SLD_SYSTEM_SPEC_CANONICAL.md",
+    "docs/qa/MACIERZ_TESTOW_GLOBALNYCH.md",
+]
+CANONICAL_INDEX_FORBIDDEN_PHRASES = [
+    "source of truth",
+    "docs/spec/",
 ]
 
 PCC_PATTERN = re.compile(r"\bPCC\b")
-
-# Lines that are allowed to mention PCC (prohibition rule definitions)
 PCC_ALLOWED_CONTEXTS = [
     "NOT in NetworkModel",
     "Forbidden Terms",
-    "Prohibition",
     "prohibited",
     "ZAKAZ",
     "zakaz",
     "nie wolno",
     "belongs to interpretation",
-    "belongs to Analysis",
-    "belongs ONLY",
-    "interpretation, not physics",
-    "BoundaryNode",
     "no_codenames",
     "docs_guard",
     "PCC_",
     "pcc_",
-    "PCC prohibition",
-    "PCC Prohibition",
 ]
+MD_LINK_PATTERN = re.compile(r"\[([^\]]*)\]\(([^)]+)\)")
+INLINE_CODE_PATTERN = re.compile(r"`([^`\n]+)`")
+REPO_PATH_PREFIXES = ("backend/", "frontend/", "docs/", "scripts/", ".github/")
+INVALID_REPO_REF_CHARS = set("{}|")
+FILE_INVENTORY_DOCS = {
+    "docs/qa/MACIERZ_TESTOW_GLOBALNYCH.md",
+}
+
+
+def _read_text(path: Path) -> str | None:
+    try:
+        return path.read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError):
+        return None
 
 
 def check_pcc() -> list[str]:
-    """Check for PCC term in entrypoint documentation."""
-    violations = []
-
-    for base_dir, rel_file in PCC_CHECK_FILES:
-        file_path = base_dir / rel_file
-        if not file_path.exists():
+    violations: list[str] = []
+    for path in PCC_CHECK_FILES:
+        if not path.exists():
             continue
-
-        try:
-            content = file_path.read_text(encoding="utf-8")
-        except (UnicodeDecodeError, OSError):
+        content = _read_text(path)
+        if content is None:
             continue
-
-        display_path = str(file_path.relative_to(REPO_ROOT))
-
-        for line_num, line in enumerate(content.split("\n"), start=1):
-            if PCC_PATTERN.search(line):
-                if any(ctx in line for ctx in PCC_ALLOWED_CONTEXTS):
-                    continue
-                violations.append(
-                    f"  {display_path}:{line_num}: {line.strip()[:100]}"
-                )
-
+        display = str(path.relative_to(REPO_ROOT))
+        for line_number, line in enumerate(content.splitlines(), start=1):
+            if PCC_PATTERN.search(line) and not any(ctx in line for ctx in PCC_ALLOWED_CONTEXTS):
+                violations.append(f"  {display}:{line_number}: {line.strip()[:120]}")
     return violations
-
-
-# ---------------------------------------------------------------------------
-# CHECK 2: Broken links in key entrypoints
-# ---------------------------------------------------------------------------
-
-# Tuples of (base_dir, relative_file)
-LINK_CHECK_FILES = [
-    (PROJECT_ROOT, "SYSTEM_SPEC.md"),
-    (PROJECT_ROOT, "README.md"),
-    (PROJECT_ROOT, "ARCHITECTURE.md"),
-    (PROJECT_ROOT, "docs/INDEX.md"),
-    (REPO_ROOT, "README.md"),
-    (REPO_ROOT, "docs/INDEX.md"),
-]
-
-MD_LINK_PATTERN = re.compile(r"\[([^\]]*)\]\(([^)]+)\)")
 
 
 def check_broken_links() -> list[str]:
-    """Check for broken relative links in key entrypoints."""
-    violations = []
-
-    for base_dir, rel_file in LINK_CHECK_FILES:
-        file_path = base_dir / rel_file
-        if not file_path.exists():
+    violations: list[str] = []
+    for path in LINK_CHECK_FILES:
+        if not path.exists():
             continue
-
-        try:
-            content = file_path.read_text(encoding="utf-8")
-        except (UnicodeDecodeError, OSError):
+        content = _read_text(path)
+        if content is None:
             continue
-
-        link_base_dir = file_path.parent
-        display_path = str(file_path.relative_to(REPO_ROOT))
-
-        for line_num, line in enumerate(content.split("\n"), start=1):
+        display = str(path.relative_to(REPO_ROOT))
+        base = path.parent
+        for line_number, line in enumerate(content.splitlines(), start=1):
             for match in MD_LINK_PATTERN.finditer(line):
-                link_target = match.group(2)
-
-                # Skip external URLs, anchors, mailto
-                if link_target.startswith(("http://", "https://", "#", "mailto:")):
+                target = match.group(2)
+                if target.startswith(("http://", "https://", "#", "mailto:")):
                     continue
-
-                # Strip anchor from link
-                link_path = link_target.split("#")[0]
-                if not link_path:
+                link_path = target.split("#", 1)[0]
+                if not link_path or "*" in link_path:
                     continue
+                resolved = base / link_path
+                if not resolved.exists():
+                    violations.append(f"  {display}:{line_number}: broken link -> {target}")
+    return violations
 
-                # Handle directory links (ending with /)
-                if link_path.endswith("/"):
-                    target = link_base_dir / link_path
-                    if not target.exists():
-                        violations.append(
-                            f"  {display_path}:{line_num}: broken directory link -> {link_target}"
-                        )
-                    continue
 
-                # Skip glob patterns
-                if "*" in link_path:
-                    continue
+def check_required_docs(required_paths: list[str]) -> list[str]:
+    violations: list[str] = []
+    for rel_path in required_paths:
+        if not (PROJECT_ROOT / rel_path).exists():
+            violations.append(f"  missing required doc -> {rel_path}")
+    return violations
 
-                target = link_base_dir / link_path
-                if not target.exists():
-                    violations.append(
-                        f"  {display_path}:{line_num}: broken link -> {link_target}"
-                    )
+
+def check_required_binding_docs(project_root: Path | None = None) -> list[str]:
+    """Backward-compatible API used by backend CI tests."""
+    root = project_root or PROJECT_ROOT
+    violations: list[str] = []
+    for rel_path in REQUIRED_BINDING_DOCS:
+        if not (root / rel_path).exists():
+            violations.append(f"  missing required doc -> {rel_path}")
+    return violations
+
+
+def check_required_stage_docs(project_root: Path | None = None) -> list[str]:
+    """Backward-compatible API used by scripts/tests that expect explicit helpers."""
+    root = project_root or PROJECT_ROOT
+    violations: list[str] = []
+    for rel_path in REQUIRED_STAGE_DOCS:
+        if not (root / rel_path).exists():
+            violations.append(f"  missing required doc -> {rel_path}")
+    return violations
+
+
+def check_canonical_index() -> list[str]:
+    if not CANONICAL_INDEX_FILE.exists():
+        return ["  missing canonical index -> docs/INDEX_KANONICZNY.md"]
+
+    content = _read_text(CANONICAL_INDEX_FILE) or ""
+    violations: list[str] = []
+    for rel_path in CANONICAL_INDEX_REQUIRED_REFERENCES:
+        if rel_path not in content:
+            violations.append(
+                f"  docs/INDEX_KANONICZNY.md missing binding reference -> {rel_path}"
+            )
+
+    lowered = content.lower()
+    for phrase in CANONICAL_INDEX_FORBIDDEN_PHRASES:
+        if phrase.lower() in lowered and "archiwalny / kontekstowy" not in lowered:
+            violations.append(
+                f"  docs/INDEX_KANONICZNY.md contains forbidden legacy phrase -> {phrase}"
+            )
+    if "docs/spec/" in lowered and "archiwalny / kontekstowy" not in lowered:
+        violations.append(
+            "  docs/INDEX_KANONICZNY.md must mark docs/spec/ as archiwalny / kontekstowy"
+        )
+    return violations
+
+
+def _looks_like_repo_reference(candidate: str) -> bool:
+    normalized = candidate.strip()
+    if not normalized.startswith(REPO_PATH_PREFIXES):
+        return False
+    if "*" in normalized:
+        return False
+    if any(char in normalized for char in INVALID_REPO_REF_CHARS):
+        return False
+    if " -> " in normalized or "=>" in normalized:
+        return False
+    return True
+
+
+def _check_doc_reference_target(base_dir: Path, display: str, line_number: int, target: str) -> str | None:
+    link_path = target.split("#", 1)[0].strip()
+    if not _looks_like_repo_reference(link_path):
+        return None
+    resolved = (REPO_ROOT / link_path) if link_path.startswith(".github/") else (PROJECT_ROOT / link_path)
+    if resolved.exists():
+        return None
+    return f"  {display}:{line_number}: missing repo reference -> {link_path}"
+
+
+def check_stage_doc_file_references(project_root: Path | None = None) -> list[str]:
+    root = project_root or PROJECT_ROOT
+    repo_root = root.parent
+    violations: list[str] = []
+
+    for rel_path in sorted(FILE_INVENTORY_DOCS):
+        path = root / rel_path
+        if not path.exists():
+            continue
+        content = _read_text(path)
+        if content is None:
+            continue
+        display = str(path.relative_to(repo_root))
+
+        for line_number, line in enumerate(content.splitlines(), start=1):
+            for match in INLINE_CODE_PATTERN.finditer(line):
+                violation = _check_doc_reference_target(path.parent, display, line_number, match.group(1))
+                if violation:
+                    violations.append(violation)
+            for match in MD_LINK_PATTERN.finditer(line):
+                violation = _check_doc_reference_target(path.parent, display, line_number, match.group(2))
+                if violation:
+                    violations.append(violation)
 
     return violations
 
 
-# ---------------------------------------------------------------------------
-# MAIN
-# ---------------------------------------------------------------------------
+def _print_block(title: str, violations: list[str]) -> None:
+    if not violations:
+        return
+    print("=" * 70, file=sys.stderr)
+    print(title, file=sys.stderr)
+    print("=" * 70, file=sys.stderr)
+    for violation in violations:
+        print(violation, file=sys.stderr)
+    print(file=sys.stderr)
 
 
 def main() -> int:
     all_ok = True
 
-    # Check 1: PCC
     pcc_violations = check_pcc()
     if pcc_violations:
-        print("=" * 70, file=sys.stderr)
-        print("DOCS GUARD: PCC TERM FOUND IN ENTRYPOINT DOCS", file=sys.stderr)
-        print("=" * 70, file=sys.stderr)
-        print(
-            "The term 'PCC' is prohibited in core model documentation.",
-            file=sys.stderr,
-        )
-        print(f"Found {len(pcc_violations)} violation(s):", file=sys.stderr)
-        for v in pcc_violations:
-            print(v, file=sys.stderr)
-        print(file=sys.stderr)
+        _print_block("DOCS GUARD: PCC TERM FOUND IN ENTRYPOINT DOCS", pcc_violations)
         all_ok = False
 
-    # Check 2: Broken links
-    link_violations = check_broken_links()
-    if link_violations:
-        print("=" * 70, file=sys.stderr)
-        print("DOCS GUARD: BROKEN LINKS IN ENTRYPOINTS", file=sys.stderr)
-        print("=" * 70, file=sys.stderr)
-        print(f"Found {len(link_violations)} broken link(s):", file=sys.stderr)
-        for v in link_violations:
-            print(v, file=sys.stderr)
-        print(file=sys.stderr)
+    broken_links = check_broken_links()
+    if broken_links:
+        _print_block("DOCS GUARD: BROKEN LINKS IN ENTRYPOINTS", broken_links)
+        all_ok = False
+
+    binding_doc_violations = check_required_docs(REQUIRED_BINDING_DOCS)
+    if binding_doc_violations:
+        _print_block("DOCS GUARD: REQUIRED BINDING DOCS MISSING", binding_doc_violations)
+        all_ok = False
+
+    stage_doc_violations = check_required_docs(REQUIRED_STAGE_DOCS)
+    if stage_doc_violations:
+        _print_block("DOCS GUARD: REQUIRED STAGE DOCS MISSING", stage_doc_violations)
+        all_ok = False
+
+    canonical_index_violations = check_canonical_index()
+    if canonical_index_violations:
+        _print_block("DOCS GUARD: CANONICAL INDEX OUT OF DATE", canonical_index_violations)
+        all_ok = False
+
+    stage_ref_violations = check_stage_doc_file_references()
+    if stage_ref_violations:
+        _print_block("DOCS GUARD: STAGE DOCS CONTAIN MISSING REPO REFERENCES", stage_ref_violations)
         all_ok = False
 
     if all_ok:
         print("docs-guard: OK (all checks pass)")
         return 0
-
     return 1
 
 

@@ -26,6 +26,7 @@ import pytest
 from enm.models import EnergyNetworkModel, ENMHeader, ENMDefaults
 from enm.hash import compute_enm_hash
 from enm.domain_operations import execute_domain_operation
+from tests.catalog_test_helpers import gpz_payload
 
 
 # ---------------------------------------------------------------------------
@@ -65,7 +66,7 @@ def _add_grid_source(enm_dict: dict) -> dict:
     return execute_domain_operation(
         enm_dict=enm_dict,
         op_name="add_grid_source_sn",
-        payload={"voltage_kv": 15.0, "sk3_mva": 250.0},
+        payload=gpz_payload(voltage_kv=15.0, sk3_mva=250.0, rx_ratio=0.10),
     )
 
 
@@ -78,7 +79,7 @@ def _continue_trunk(enm_dict: dict, dlugosc_m: int = 320) -> dict:
             "segment": {
                 "rodzaj": "KABEL",
                 "dlugosc_m": dlugosc_m,
-                "catalog_ref": "YAKXS_3x120",
+                "catalog_ref": "cable-tfk-yakxs-3x120",
             },
         },
     )
@@ -206,7 +207,7 @@ def _run_full_v1_sequence() -> tuple[list[dict], dict]:
             "insert_at": {"value": 0.5},
             "station": {"sn_voltage_kv": 15.0, "nn_voltage_kv": 0.4},
             "sn_fields": ["IN", "OUT"],
-            "transformer": {"create": True, "transformer_catalog_ref": "ONAN_630"},
+            "transformer": {"create": True, "transformer_catalog_ref": "tr-sn-nn-15-04-630kva-dyn11"},
         },
     )
     _assert_step_ok(r3, "Krok 3: insert_station_on_segment_sn (B)")
@@ -240,7 +241,7 @@ def _run_full_v1_sequence() -> tuple[list[dict], dict]:
         op_name="start_branch_segment_sn",
         payload={
             "from_bus_ref": branch_from_bus_ref,
-            "segment": {"rodzaj": "KABEL", "dlugosc_m": 210, "catalog_ref": "YAKXS_3x120"},
+            "segment": {"rodzaj": "KABEL", "dlugosc_m": 210, "catalog_ref": "cable-tfk-yakxs-3x120"},
         },
     )
     _assert_step_ok(r5, "Krok 5: start_branch_segment_sn")
@@ -266,7 +267,7 @@ def _run_full_v1_sequence() -> tuple[list[dict], dict]:
             "insert_at": {"value": 0.5},
             "station": {"sn_voltage_kv": 15.0, "nn_voltage_kv": 0.4},
             "sn_fields": ["IN", "OUT", "FEEDER"],
-            "transformer": {"create": True, "transformer_catalog_ref": "ONAN_630"},
+            "transformer": {"create": True, "transformer_catalog_ref": "tr-sn-nn-15-04-630kva-dyn11"},
         },
     )
     _assert_step_ok(r6, "Krok 6: insert_station_on_segment_sn (C)")
@@ -286,7 +287,7 @@ def _run_full_v1_sequence() -> tuple[list[dict], dict]:
         payload={
             "from_bus_ref": last_bus_ref,
             "to_bus_ref": first_bus_ref,
-            "segment": {"rodzaj": "KABEL", "dlugosc_m": 140, "catalog_ref": "YAKXS_3x120"},
+            "segment": {"rodzaj": "KABEL", "dlugosc_m": 140, "catalog_ref": "cable-tfk-yakxs-3x120"},
         },
     )
     _assert_step_ok(r7, "Krok 7: connect_secondary_ring_sn")

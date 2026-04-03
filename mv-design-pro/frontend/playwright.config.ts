@@ -40,8 +40,8 @@ export default defineConfig({
   // Reduced retries in CI (1 retry catches transient issues, but 2+ masks flaky)
   retries: process.env.CI ? 1 : 0,
 
-  // Single worker in CI for determinism, parallel locally for speed
-  workers: process.env.CI ? 1 : undefined,
+  // Single worker for determinism on canonical catalog-first flows.
+  workers: 1,
 
   // HTML reporter with failure details
   reporter: process.env.CI

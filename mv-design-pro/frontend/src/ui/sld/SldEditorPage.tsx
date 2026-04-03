@@ -44,14 +44,20 @@ import { CreatorToolbar } from '../topology/CreatorToolbar';
 import type { CreatorTool } from '../topology/editorPalette';
 import { useSnapshotStore } from '../topology/snapshotStore';
 import type { EnergyNetworkModel } from '../../types/enm';
+import type { CanonicalOpName } from '../../types/domainOps';
 import { getToolStatusTable, resolveToolAction } from './interactionController';
 import { TypePicker } from '../catalog/TypePicker';
 import { useCatalogAssignment } from '../catalog/useCatalogAssignment';
+import { useNetworkBuildStore } from '../network-build/networkBuildStore';
+import { buildCatalogBinding } from '../catalog/catalogBinding';
+import { NAMESPACE_TO_PICKER_CATEGORY } from '../catalog/elementCatalogRegistry';
+import type { CatalogNamespace, TypeCategory } from '../catalog/types';
+import { checkCatalogGate } from '../context-menu/catalogGate';
 import {
-  getDefaultBindingForElement,
-  inferCatalogNamespaceFromElement,
-  inferCatalogVersionFromElement,
-} from './catalogDefaults';
+  readExplicitCatalogBinding,
+  readExplicitCatalogNamespace,
+  readExplicitCatalogVersion,
+} from '../catalog/catalogSnapshot';
 import { enmSnapshotToSldSymbols } from './enmSnapshotToSldSymbols';
 
 /**
@@ -213,6 +219,10 @@ const ENM_LOOKUP_COLLECTIONS: readonly EnmLookupCollection[] = [
   'branch_points',
 ];
 
+function isCatalogNamespace(value: unknown): value is CatalogNamespace {
+  return typeof value === 'string' && value in NAMESPACE_TO_PICKER_CATEGORY;
+}
+
 function asEnmLookupEntries(value: unknown): EnmLookupEntry[] {
   return Array.isArray(value) ? (value as unknown as EnmLookupEntry[]) : [];
 }
@@ -294,6 +304,10 @@ export const SldEditorPage: React.FC<SldEditorPageProps> = ({
   const [activeTool, setActiveTool] = useState<CreatorTool>('select');
   const [interactionMessage, setInteractionMessage] = useState<string | null>(null);
   const [hoveredElementName, setHoveredElementName] = useState<string | null>(null);
+  const [pendingRingTerminal, setPendingRingTerminal] = useState<{
+    id: string;
+    label: string;
+  } | null>(null);
   const [selectedSegment, setSelectedSegment] = useState<{
     segment_ref: string;
     edge_id: string;
@@ -315,9 +329,20 @@ export const SldEditorPage: React.FC<SldEditorPageProps> = ({
   const enmReadiness = useSnapshotStore((state) => state.readiness);
   const enmFixActions = useSnapshotStore((state) => state.fixActions);
   const enmMaterializedParams = useSnapshotStore((state) => state.materializedParams);
+  const openOperationForm = useNetworkBuildStore((state) => state.openOperationForm);
   const [segmentLengthKmDraft, setSegmentLengthKmDraft] = useState<string>('');
   const [segmentStatusDraft, setSegmentStatusDraft] = useState<string>('closed');
   const [catalogAssignmentState, catalogAssignmentActions] = useCatalogAssignment();
+  const [toolCatalogPickerState, setToolCatalogPickerState] = useState<{
+    isOpen: boolean;
+    category: TypeCategory | null;
+    namespace: CatalogNamespace | null;
+    pendingOp: {
+      canonicalOp: CanonicalOpName;
+      payload: Record<string, unknown>;
+      targetName: string;
+    } | null;
+  }>({ isOpen: false, category: null, namespace: null, pendingOp: null });
   const [segmentCatalogDraft, setSegmentCatalogDraft] = useState<string>('');
 
   // UX 10/10: Results mode flag — true when RESULT_VIEW mode and results available
@@ -343,6 +368,22 @@ export const SldEditorPage: React.FC<SldEditorPageProps> = ({
 
     return null;
   }, [selectedElement, enmSnapshot]);
+
+  const findEnmElementByRef = useCallback((refId: string): EnmLookupEntry | null => {
+    if (!enmSnapshot) {
+      return null;
+    }
+
+    for (const collection of ENM_LOOKUP_COLLECTIONS) {
+      const entries = asEnmLookupEntries(enmSnapshot[collection]);
+      const found = entries.find((entry) => entry.ref_id === refId);
+      if (found) {
+        return found;
+      }
+    }
+
+    return null;
+  }, [enmSnapshot]);
 
   const elementData = useMemo<Record<string, unknown>>(() => {
     if (!selectedSymbol && !selectedEnmElement) return {};
@@ -370,7 +411,7 @@ export const SldEditorPage: React.FC<SldEditorPageProps> = ({
       return null;
     }
 
-    const namespace = inferCatalogNamespaceFromElement(selectedEnmElement);
+    const namespace = readExplicitCatalogNamespace(selectedEnmElement);
     if (!namespace) {
       return null;
     }
@@ -381,13 +422,16 @@ export const SldEditorPage: React.FC<SldEditorPageProps> = ({
         ? enmMaterializedParams.lines_sn?.[refId] ?? enmMaterializedParams.transformers_sn_nn?.[refId] ?? null
         : null
     );
+    const hasSnapshotMaterialization = Boolean(
+      selectedEnmElement.materialized_params && typeof selectedEnmElement.materialized_params === 'object',
+    );
 
     return {
       namespace,
       typeId: catalogRef,
       typeName: catalogRef,
-      version: inferCatalogVersionFromElement(selectedEnmElement),
-      isMaterialized: materializedEntry !== null,
+      version: readExplicitCatalogVersion(selectedEnmElement) ?? 'BRAK',
+      isMaterialized: materializedEntry !== null || hasSnapshotMaterialization,
       hasDrift: false,
     };
   }, [selectedEnmElement, enmMaterializedParams]);
@@ -429,12 +473,37 @@ export const SldEditorPage: React.FC<SldEditorPageProps> = ({
     );
 
     return {
-      namespace: inferCatalogNamespaceFromElement(selectedSegmentBranch),
+      namespace: readExplicitCatalogNamespace(selectedSegmentBranch),
       catalogRef,
-      version: inferCatalogVersionFromElement(selectedSegmentBranch),
+      version: readExplicitCatalogVersion(selectedSegmentBranch) ?? 'BRAK',
       isMaterialized: materializedEntry !== null,
     };
   }, [selectedSegmentBranch, enmMaterializedParams]);
+
+  const selectedSegmentParameterSourceInfo = useMemo(() => {
+    if (!selectedSegmentBranch) {
+      return null;
+    }
+
+    const snapshotMaterialized =
+      selectedSegmentBranch.materialized_params && typeof selectedSegmentBranch.materialized_params === 'object';
+    const manualOverrides =
+      selectedSegmentBranch.manual_overrides && typeof selectedSegmentBranch.manual_overrides === 'object'
+        ? Object.keys(selectedSegmentBranch.manual_overrides as Record<string, unknown>).length
+        : 0;
+    const sourceMode =
+      typeof selectedSegmentBranch.source_mode === 'string'
+        ? selectedSegmentBranch.source_mode
+        : selectedSegmentCatalogInfo
+        ? 'KATALOG'
+        : 'BRAK';
+
+    return {
+      sourceMode,
+      manualOverrideCount: manualOverrides,
+      hasMaterializedParams: Boolean(selectedSegmentCatalogInfo?.isMaterialized || snapshotMaterialized),
+    };
+  }, [selectedSegmentBranch, selectedSegmentCatalogInfo]);
 
   useEffect(() => {
     const length = selectedSegmentBranch?.length_km;
@@ -479,17 +548,15 @@ export const SldEditorPage: React.FC<SldEditorPageProps> = ({
       return;
     }
 
-    const binding = getDefaultBindingForElement(selectedEnmElement);
+    const binding = readExplicitCatalogBinding(selectedEnmElement);
     if (!binding) {
-      notify('Nie można odtworzyć bindingu katalogowego dla elementu.', 'warning');
+      notify('Element nie ma kompletnego jawnego wiązania katalogowego w Snapshot.', 'warning');
       return;
     }
 
     const result = await executeEnmOperation(activeCaseId, 'assign_catalog_to_element', {
       element_ref: selectedElement.id,
-      catalog_item_id: binding.catalog_item_id,
-      catalog_namespace: binding.catalog_namespace,
-      catalog_item_version: binding.catalog_item_version,
+      catalog_binding: binding,
       source_mode: 'KATALOG',
     });
     notify(
@@ -498,22 +565,63 @@ export const SldEditorPage: React.FC<SldEditorPageProps> = ({
     );
   }, [activeCaseId, executeEnmOperation, selectedElement, selectedEnmElement]);
 
-  const clearCatalogForSelectedSegment = useCallback(async () => {
-    if (!activeCaseId || !selectedSegment || !selectedSegmentBranch) {
-      notify('Brak aktywnego przypadku lub segmentu do wyczyszczenia katalogu.', 'warning');
+  const openToolCatalogPicker = useCallback((
+    canonicalOp: CanonicalOpName,
+    payload: Record<string, unknown>,
+    targetName: string,
+  ): boolean => {
+    const gate = checkCatalogGate(canonicalOp);
+    if (!gate.required || !gate.namespace) {
+      return false;
+    }
+
+    if (!isCatalogNamespace(gate.namespace)) {
+      notify(`Operacja ${canonicalOp} nie wskazuje jawnie poprawnej kategorii katalogu.`, 'error');
+      return true;
+    }
+
+    const category = NAMESPACE_TO_PICKER_CATEGORY[gate.namespace] ?? null;
+    if (!category) {
+      notify(`Brak kategorii pickera dla katalogu ${gate.label ?? gate.namespace}.`, 'error');
+      return true;
+    }
+
+    setToolCatalogPickerState({
+      isOpen: true,
+      category,
+      namespace: gate.namespace,
+      pendingOp: {
+        canonicalOp,
+        payload,
+        targetName,
+      },
+    });
+    return true;
+  }, []);
+
+  const closeToolCatalogPicker = useCallback(() => {
+    setToolCatalogPickerState({ isOpen: false, category: null, namespace: null, pendingOp: null });
+  }, []);
+
+  const handleToolCatalogTypeSelected = useCallback((typeId: string, typeName: string) => {
+    const pending = toolCatalogPickerState.pendingOp;
+    const namespace = toolCatalogPickerState.namespace;
+    if (!pending || !namespace) {
       return;
     }
 
-    const result = await executeEnmOperation(activeCaseId, 'assign_catalog_to_element', {
-      element_ref: selectedSegment.segment_ref,
-      catalog_item_id: null,
-      catalog_namespace: inferCatalogNamespaceFromElement(selectedSegmentBranch),
+    openOperationForm(pending.canonicalOp, {
+      ...pending.payload,
+      catalog_binding: buildCatalogBinding(namespace, typeId),
+      catalog_name: typeName,
+      source_mode: 'KATALOG',
     });
-    notify(
-      result ? 'Usunięto przypisanie katalogu segmentu.' : 'Nie udało się usunąć katalogu segmentu.',
-      result ? 'success' : 'error',
-    );
-  }, [activeCaseId, executeEnmOperation, selectedSegment, selectedSegmentBranch]);
+    setToolCatalogPickerState({ isOpen: false, category: null, namespace: null, pendingOp: null });
+    const msg = `Wybrano typ ${typeName} i otwarto formularz ${pending.canonicalOp} dla ${pending.targetName}.`;
+    setInteractionMessage(msg);
+    notify(msg, 'success');
+    setActiveTool('select');
+  }, [openOperationForm, toolCatalogPickerState]);
 
   // Resolve results summary for SldResultsAccess
   const resultsSummary = useMemo<ElementResultsSummary | null>(() => {
@@ -721,6 +829,12 @@ export const SldEditorPage: React.FC<SldEditorPageProps> = ({
     }
   }, [selectedElement]);
 
+  useEffect(() => {
+    if (activeTool !== 'connect_ring' && pendingRingTerminal) {
+      setPendingRingTerminal(null);
+    }
+  }, [activeTool, pendingRingTerminal]);
+
   const runResolvedAction = useCallback(async (
     tool: CreatorTool,
     target: { id: string; type: any; name: string },
@@ -732,10 +846,116 @@ export const SldEditorPage: React.FC<SldEditorPageProps> = ({
       activeCaseId,
     }, interaction);
 
+    const formDrivenOps = new Set([
+      'add_grid_source_sn',
+      'continue_trunk_segment_sn',
+      'insert_station_on_segment_sn',
+      'start_branch_segment_sn',
+      'add_transformer_sn_nn',
+      'add_pv_inverter_nn',
+      'add_bess_inverter_nn',
+      'assign_catalog_to_element',
+      'update_element_parameters',
+    ]);
+
     if (resolved.mode !== 'DOMAIN_OP' || !resolved.canonicalOp) {
       const reason = resolved.reasonPl ?? 'Narzędzie chwilowo niedostępne.';
       setInteractionMessage(reason);
       notify(reason, 'warning');
+      return;
+    }
+
+    if (resolved.canonicalOp === 'connect_secondary_ring_sn') {
+      if (!pendingRingTerminal) {
+        setPendingRingTerminal({
+          id: target.id,
+          label: target.name ?? target.id,
+        });
+        const msg = 'Wybierz drugi port ringu, aby otworzyć formularz domknięcia pierścienia.';
+        setInteractionMessage(msg);
+        notify(msg, 'info');
+        return;
+      }
+
+      if (pendingRingTerminal.id === target.id) {
+        const msg = 'Wskaż drugi, różny port ringu.';
+        setInteractionMessage(msg);
+        notify(msg, 'warning');
+        return;
+      }
+
+      const ringPayload = {
+        terminalA_id: pendingRingTerminal.id,
+        terminal_a_id: pendingRingTerminal.id,
+        terminalA_label: pendingRingTerminal.label,
+        terminalB_id: target.id,
+        terminal_b_id: target.id,
+        terminalB_label: target.name ?? target.id,
+        source: 'sld_tool',
+      };
+      if (
+        openToolCatalogPicker(
+          'connect_secondary_ring_sn',
+          ringPayload,
+          `${pendingRingTerminal.label} → ${target.name ?? target.id}`,
+        )
+      ) {
+        setPendingRingTerminal(null);
+        const msg = 'Wybierz typ kabla lub linii dla domknięcia ringu.';
+        setInteractionMessage(msg);
+        notify(msg, 'info');
+        return;
+      }
+
+      openOperationForm('connect_secondary_ring_sn', ringPayload);
+      setPendingRingTerminal(null);
+      const msg = `Otworzono formularz ${resolved.canonicalOp} dla portów ${pendingRingTerminal.label} i ${target.name}.`;
+      setInteractionMessage(msg);
+      notify(msg, 'success');
+      setActiveTool('select');
+      return;
+    }
+
+    if (formDrivenOps.has(resolved.canonicalOp)) {
+      if (resolved.canonicalOp === 'assign_catalog_to_element') {
+        const enmElement = findEnmElementByRef(target.id);
+        catalogAssignmentActions.openPicker({
+          elementRef: target.id,
+          enmElementType: String(enmElement?.type ?? target.type),
+          currentCatalogRef:
+            typeof enmElement?.catalog_ref === 'string' ? enmElement.catalog_ref : null,
+        });
+        const msg = `Wybierz typ katalogowy dla ${target.name}.`;
+        setInteractionMessage(msg);
+        notify(msg, 'info');
+        setActiveTool('select');
+        return;
+      }
+
+      if (
+        resolved.catalogRequired
+        && openToolCatalogPicker(
+          resolved.canonicalOp,
+          {
+            ...resolved.payload,
+            source_mode: 'KATALOG',
+          },
+          target.name,
+        )
+      ) {
+        const msg = resolved.catalogLabelPl
+          ? `Wybierz typ z katalogu: ${resolved.catalogLabelPl}.`
+          : 'Wybierz typ z katalogu przed otwarciem formularza.';
+        setInteractionMessage(msg);
+        notify(msg, 'info');
+        return;
+      }
+
+      openOperationForm(resolved.canonicalOp, resolved.payload);
+      const msg = `Otworzono formularz ${resolved.canonicalOp} dla ${target.name}.`;
+      setInteractionMessage(msg);
+      notify(msg, 'success');
+      setActiveTool('select');
       return;
     }
 
@@ -752,7 +972,17 @@ export const SldEditorPage: React.FC<SldEditorPageProps> = ({
       setInteractionMessage(err);
       notify(err, 'error');
     }
-  }, [hasSource, hasRing, activeCaseId, executeEnmOperation]);
+  }, [
+    hasSource,
+    hasRing,
+    activeCaseId,
+    executeEnmOperation,
+    openOperationForm,
+    pendingRingTerminal,
+    catalogAssignmentActions,
+    findEnmElementByRef,
+    openToolCatalogPicker,
+  ]);
 
   const buildPreview = useCallback((
     tool: CreatorTool,
@@ -772,7 +1002,11 @@ export const SldEditorPage: React.FC<SldEditorPageProps> = ({
       target_kind: interaction.kind === 'port' ? 'port' : interaction.kind,
       target_id: target.id,
       valid: resolved.mode === 'DOMAIN_OP',
-      message_pl: resolved.reasonPl ?? `Gotowe: ${resolved.canonicalOp}`,
+      message_pl:
+        resolved.reasonPl
+        ?? (resolved.catalogRequired && resolved.catalogLabelPl
+          ? `Wymagany typ z katalogu: ${resolved.catalogLabelPl}`
+          : `Gotowe: ${resolved.canonicalOp}`),
       port_role: interaction.portRole,
     });
   }, [hasSource, hasRing, activeCaseId]);
@@ -1050,6 +1284,15 @@ export const SldEditorPage: React.FC<SldEditorPageProps> = ({
             <div data-testid="sld-segment-inspector-version">
               <span className="font-medium">wersja:</span> {String(selectedSegmentCatalogInfo?.version ?? 'BRAK')}
             </div>
+            <div data-testid="sld-segment-inspector-parameter-source">
+              <span className="font-medium">pochodzenie parametrów:</span> {String(selectedSegmentParameterSourceInfo?.sourceMode ?? 'BRAK')}
+            </div>
+            <div data-testid="sld-segment-inspector-materialized">
+              <span className="font-medium">Wczytanie parametrów z katalogu:</span> {selectedSegmentParameterSourceInfo?.hasMaterializedParams ? 'TAK' : 'NIE'}
+            </div>
+            <div data-testid="sld-segment-inspector-overrides">
+              <span className="font-medium">nadpisania ręczne:</span> {selectedSegmentParameterSourceInfo?.manualOverrideCount ?? 0}
+            </div>
           </div>
 
           <div className="mt-3 rounded border border-gray-200 p-2">
@@ -1138,43 +1381,21 @@ export const SldEditorPage: React.FC<SldEditorPageProps> = ({
             >
               Zmień typ z katalogu
             </button>
-            <button
-              data-testid="sld-segment-clear-catalog-button"
-              type="button"
-              className="mt-2 w-full rounded border border-amber-300 px-2 py-1 text-xs text-amber-700 hover:bg-amber-50 disabled:cursor-not-allowed disabled:opacity-50"
-              disabled={!selectedSegmentCatalogInfo}
-              onClick={() => {
-                void clearCatalogForSelectedSegment();
-              }}
-            >
-              Usuń przypisanie katalogu
-            </button>
             <input
               data-testid="sld-segment-input-catalog"
               type="text"
               value={segmentCatalogDraft}
-              onChange={(event) => setSegmentCatalogDraft(event.target.value)}
-              placeholder="np. YAKXS_3x120"
-              className="mt-1 w-full rounded border border-gray-300 px-2 py-1 text-xs"
+              readOnly
+              disabled
+              placeholder="Brak przypisania katalogowego"
+              className="mt-1 w-full rounded border border-gray-300 bg-gray-50 px-2 py-1 text-xs"
             />
             <button
               data-testid="sld-segment-assign-catalog-button"
               type="button"
               className="mt-2 w-full rounded border border-emerald-300 px-2 py-1 text-xs text-emerald-700 hover:bg-emerald-50"
               onClick={() => {
-                if (!activeCaseId) {
-                  notify('Brak aktywnego przypadku do przypisania katalogu.', 'warning');
-                  return;
-                }
-                if (!segmentCatalogDraft.trim()) {
-                  notify('Podaj identyfikator katalogu segmentu.', 'warning');
-                  return;
-                }
-                void executeEnmOperation(activeCaseId, 'assign_catalog_to_element', {
-                  element_ref: selectedSegment.segment_ref,
-                  catalog_item_id: segmentCatalogDraft.trim(),
-                });
-                notify('Przypisano katalog segmentu.', 'success');
+                openCatalogPickerForSelectedSegment();
               }}
             >
               Przypisz katalog
@@ -1211,6 +1432,17 @@ export const SldEditorPage: React.FC<SldEditorPageProps> = ({
           />
         </div>
       )}
+
+      {toolCatalogPickerState.isOpen
+        && toolCatalogPickerState.category
+        && (
+          <TypePicker
+            isOpen={toolCatalogPickerState.isOpen}
+            category={toolCatalogPickerState.category}
+            onClose={closeToolCatalogPicker}
+            onSelectType={handleToolCatalogTypeSelected}
+          />
+        )}
 
       {catalogAssignmentState.isPickerOpen
         && catalogAssignmentState.pickerCategory

@@ -37,6 +37,8 @@ export const ELEMENT_TYPE_TO_NAMESPACE: Readonly<Record<string, CatalogNamespace
   // Linie i kable SN (BranchBase derivatives)
   line_overhead: 'LINIA_SN',
   cable: 'KABEL_SN',
+  source: 'ZRODLO_SN',
+  Source: 'ZRODLO_SN',
 
   // Transformatory SN/nN
   transformer: 'TRAFO_SN_NN',
@@ -83,6 +85,7 @@ export const ELEMENT_TYPE_TO_NAMESPACE: Readonly<Record<string, CatalogNamespace
 export const NAMESPACE_TO_PICKER_CATEGORY: Readonly<Record<CatalogNamespace, TypeCategory>> = {
   LINIA_SN: 'LINE',
   KABEL_SN: 'CABLE',
+  ZRODLO_SN: 'SYSTEM_SOURCE',
   TRAFO_SN_NN: 'TRANSFORMER',
   APARAT_SN: 'MV_APPARATUS',
   APARAT_NN: 'LV_APPARATUS',
@@ -112,6 +115,7 @@ export const NAMESPACE_TO_PICKER_CATEGORY: Readonly<Record<CatalogNamespace, Typ
 export const NAMESPACE_TO_TREE_NODE: Readonly<Partial<Record<CatalogNamespace, TreeNodeType>>> = {
   LINIA_SN: 'LINE_TYPES',
   KABEL_SN: 'CABLE_TYPES',
+  ZRODLO_SN: 'ELEMENT',
   TRAFO_SN_NN: 'TRANSFORMER_TYPES',
   APARAT_SN: 'SWITCH_EQUIPMENT_TYPES',
 } as const;
@@ -128,6 +132,7 @@ export const NAMESPACE_TO_TREE_NODE: Readonly<Partial<Record<CatalogNamespace, T
 export const NAMESPACE_LABEL_PL: Readonly<Record<CatalogNamespace, string>> = {
   LINIA_SN: 'Typy linii napowietrznych',
   KABEL_SN: 'Typy kabli SN',
+  ZRODLO_SN: 'Typy zasilania systemowego SN',
   TRAFO_SN_NN: 'Typy transformatorów SN/nN',
   APARAT_SN: 'Typy aparatury SN',
   APARAT_NN: 'Typy aparatury nN',
@@ -233,6 +238,7 @@ export function getNamespaceForTreeNode(treeNodeType: TreeNodeType): CatalogName
 export const CATALOG_TREE_NAMESPACES: readonly CatalogNamespace[] = [
   'LINIA_SN',
   'KABEL_SN',
+  'ZRODLO_SN',
   'TRAFO_SN_NN',
   'APARAT_SN',
 ] as const;

@@ -411,12 +411,14 @@ class TestExtendedTraceDTO:
             snapshot_id="snap-001",
             input_hash="abc123",
             white_box_trace=trace,
+            catalog_context=[{"element_id": "line-1"}],
         )
 
         assert dto.run_id == run_id
         assert dto.snapshot_id == "snap-001"
         assert dto.input_hash == "abc123"
         assert len(dto.white_box_trace) == 2
+        assert dto.catalog_context == [{"element_id": "line-1"}]
 
     def test_to_dict_serialization(self):
         """ExtendedTraceDTO must serialize to dict."""
@@ -426,6 +428,7 @@ class TestExtendedTraceDTO:
             snapshot_id="snap-001",
             input_hash="abc123",
             white_box_trace=[{"key": "step1"}],
+            catalog_context=[{"element_id": "line-1", "catalog_binding": {"catalog_item_id": "KABEL-1"}}],
         )
 
         d = dto.to_dict()
@@ -433,6 +436,7 @@ class TestExtendedTraceDTO:
         assert d["snapshot_id"] == "snap-001"
         assert d["input_hash"] == "abc123"
         assert d["white_box_trace"] == [{"key": "step1"}]
+        assert d["catalog_context"] == [{"element_id": "line-1", "catalog_binding": {"catalog_item_id": "KABEL-1"}}]
 
 
 class TestSldOverlayNodeDTO:
@@ -667,6 +671,7 @@ class TestEdgeCases:
 
         d = dto.to_dict()
         assert d["white_box_trace"] == []
+        assert d["catalog_context"] == []
 
     def test_special_characters_in_names(self):
         """Names with special characters should be handled."""

@@ -1,0 +1,73 @@
+# MACIERZ_TESTOW_GLOBALNYCH
+
+Status: wiazacy dla aktualnego zestawu testow w repo.
+
+Backend katalog-first i ENM:
+- `backend/tests/api/test_domain_ops_policy.py`
+- `backend/tests/enm/test_catalog_gate.py`
+- `backend/tests/enm/test_catalog_first_validation.py`
+- `backend/tests/enm/test_catalog_materialization_persistence.py`
+- `backend/tests/enm/test_update_element_parameters_catalog_guards.py`
+- `backend/tests/enm/test_nn_source_catalog_provenance.py`
+- `backend/tests/enm/test_branch_point_sn.py`
+- `backend/tests/enm/test_enm_validator.py`
+
+Backend analiza i topologia:
+- `backend/tests/enm/test_enm_mapping.py`
+- `backend/tests/enm/test_golden_network_enm.py`
+- `backend/tests/enm/test_golden_network_v1_e2e.py`
+- `backend/tests/enm/test_mv_general_workflow_e2e.py`
+- `backend/tests/enm/test_enm_topology.py`
+- `backend/tests/enm/test_enm_topology_api.py`
+- `backend/tests/test_canonical_analysis_api.py`
+- `backend/tests/enm/test_canonical_analysis_trace_catalog_context.py`
+- `backend/tests/application/analysis_run/test_catalog_context.py`
+- `backend/tests/test_p11a_results_inspector.py`
+
+Frontend katalog-first i workflow:
+- `frontend/src/ui/network-build/__tests__/catalogBrowser.test.tsx`
+- `frontend/src/ui/network-build/__tests__/catalogFirstRules.test.ts`
+- `frontend/src/ui/network-build/__tests__/contextMenuIntegration.test.ts`
+- `frontend/src/ui/network-build/__tests__/operationFormRouter.test.tsx`
+- `frontend/src/ui/network-build/__tests__/workflowIntegration.test.ts`
+
+Frontend SLD:
+- `frontend/src/ui/sld/core/__tests__/catalogContract.test.ts`
+- `frontend/src/ui/sld/core/__tests__/determinism.test.ts`
+- `frontend/src/ui/sld/core/__tests__/goldenNetworkE2E.test.ts`
+- `frontend/src/ui/sld/core/__tests__/readinessGates.test.ts`
+- `frontend/src/ui/sld/core/__tests__/semanticGraphContract.test.ts`
+- `frontend/src/ui/sld/core/__tests__/sldSemanticModel.test.ts`
+- `frontend/src/ui/sld/core/__tests__/stationBlockBuilder.test.ts`
+- `frontend/src/ui/sld/__tests__/powerFlowOverlayGeometryInvariant.test.tsx`
+- `frontend/src/ui/sld/__tests__/sldCanonicalHygiene.test.ts`
+
+Frontend White Box i eksport sladu:
+- `frontend/src/ui/proof/__tests__/TraceViewer.test.tsx`
+- `frontend/src/ui/proof/__tests__/traceCatalogContextExport.spec.tsx`
+
+CI i guardy katalog-first:
+- `.github/workflows/docs-guard.yml`
+- `.github/workflows/arch-guard.yml`
+- `.github/workflows/python-tests.yml`
+- `backend/tests/ci/test_catalog_first_repo_guards.py`
+- `backend/tests/ci/test_catalog_first_repo_hygiene.py`
+- `scripts/docs_guard.py`
+- `scripts/repo_hygiene_guard.py`
+- `scripts/pcc_zero_guard.py`
+- `scripts/domain_no_guessing_guard.py`
+- `scripts/catalog_binding_guard.py`
+- `scripts/catalog_enforcement_guard.py`
+- `scripts/catalog_gate_guard.py`
+- `scripts/transformer_catalog_voltage_guard.py`
+- `scripts/fix_action_completeness_guard.py`
+- `scripts/audit_contract_guard.py`
+
+Luki testowe potwierdzone w kodzie:
+- brak dowodu testowego, ze legacy mutujace endpointy katalogowe poza `domain-ops` zostaly produkcyjnie wygaszone; w aktualnym kodzie nadal sa montowane w `backend/src/api/catalog.py`,
+- brak pelnego testu `insert_section_switch_sn` z utrwaleniem `materialized_params`,
+- brak backendowego testu eksportow `power-flow-runs/{run_id}/export/json|docx|pdf` z jawna proweniencja `catalog -> materialized_params -> solver input`; obecne dowody obejmuja rozszerzony White Box i frontendowe eksporty sladu.
+
+Luki higieny repo potwierdzone guardem:
+- `scripts/repo_hygiene_guard.py` wykrywa nadal legacy payload aliases w `frontend/src/types/domainOps.ts` oraz aktywnych specach `frontend/e2e/*.spec.ts`,
+- obecny stan FE nie jest jeszcze grep-zero dla `catalog_ref`, `transformer_catalog_ref` i `from_bus_ref` w warstwie typow i scenariuszy E2E.

@@ -21,6 +21,7 @@ from network_model.catalog.types import (
     MVApparatusType,
     MaterializationContract,
     PVInverterType,
+    SourceSystemType,
     VTType,
 )
 from network_model.catalog.repository import CatalogRepository
@@ -31,6 +32,7 @@ class TestCatalogNamespace:
         expected = {
             "KABEL_SN", "LINIA_SN", "TRAFO_SN_NN", "APARAT_SN", "APARAT_NN",
             "KABEL_NN", "CT", "VT", "OBCIAZENIE", "ZRODLO_NN_PV", "ZRODLO_NN_BESS",
+            "ZRODLO_SN",
             "ZABEZPIECZENIE", "NASTAWY_ZABEZPIECZEN", "CONVERTER", "INVERTER",
         }
         actual = {ns.value for ns in CatalogNamespace}
@@ -108,6 +110,19 @@ class TestLoadType:
         )
         assert t.p_kw == 15.0
         assert t.cos_phi == 0.95
+
+
+class TestSourceSystemType:
+    def test_creation(self):
+        t = SourceSystemType(
+            id="src_gpz_15_250",
+            name="Zasilanie GPZ 15 kV / 250 MVA",
+            voltage_rating_kv=15.0,
+            sk3_mva=250.0,
+            rx_ratio=0.1,
+        )
+        assert t.voltage_rating_kv == 15.0
+        assert t.sk3_mva == 250.0
 
 
 class TestMVApparatusType:
@@ -193,7 +208,7 @@ class TestMaterializationContracts:
         """Every non-legacy namespace must have a materialization contract."""
         required = {
             "KABEL_SN", "LINIA_SN", "TRAFO_SN_NN", "APARAT_SN", "APARAT_NN",
-            "KABEL_NN", "CT", "VT", "OBCIAZENIE", "ZRODLO_NN_PV", "ZRODLO_NN_BESS",
+            "KABEL_NN", "CT", "VT", "OBCIAZENIE", "ZRODLO_SN", "ZRODLO_NN_PV", "ZRODLO_NN_BESS",
             "ZABEZPIECZENIE", "NASTAWY_ZABEZPIECZEN",
         }
         actual = set(MATERIALIZATION_CONTRACTS.keys())
@@ -229,6 +244,7 @@ class TestExtendedCatalogRepository:
         assert repo.list_lv_apparatus_types() == []
         assert repo.list_ct_types() == []
         assert repo.list_vt_types() == []
+        assert repo.list_source_system_types() == []
         assert repo.list_pv_inverter_types() == []
         assert repo.list_bess_inverter_types() == []
 
@@ -255,11 +271,17 @@ class TestExtendedCatalogRepository:
                     "ratio_primary_a": 400.0, "ratio_secondary_a": 5.0,
                 }},
             ],
+            source_system_types=[
+                {"id": "src1", "name": "GPZ 15 kV / 250 MVA", "params": {
+                    "voltage_rating_kv": 15.0, "sk3_mva": 250.0, "rx_ratio": 0.1,
+                }},
+            ],
         )
         assert len(repo.list_lv_cable_types()) == 1
         assert len(repo.list_load_types()) == 1
         assert len(repo.list_mv_apparatus_types()) == 1
         assert len(repo.list_ct_types()) == 1
+        assert len(repo.list_source_system_types()) == 1
 
     def test_get_by_id(self):
         repo = CatalogRepository.from_records(

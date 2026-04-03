@@ -17,6 +17,7 @@ backend_src = Path(__file__).parent.parent / "src"
 sys.path.insert(0, str(backend_src))
 
 from enm.domain_operations import execute_domain_operation
+from tests.catalog_test_helpers import gpz_payload
 
 
 def _empty_enm() -> dict:
@@ -44,14 +45,24 @@ def _hash_snapshot(snapshot: dict) -> str:
 
 def _build_base_network_with_line_catalog() -> dict:
     enm = _empty_enm()
-    r = execute_domain_operation(enm, "add_grid_source_sn", {"voltage_kv": 15.0, "sk3_mva": 500.0})
+    r = execute_domain_operation(
+        enm,
+        "add_grid_source_sn",
+        gpz_payload(voltage_kv=15.0, sk3_mva=500.0, rx_ratio=0.10),
+    )
     assert r.get("error") is None
     enm = r["snapshot"]
 
     r = execute_domain_operation(
         enm,
         "continue_trunk_segment_sn",
-        {"segment": {"rodzaj": "KABEL", "dlugosc_m": 120, "catalog_ref": "YAKXS_3x120"}},
+            {
+                "segment": {
+                    "rodzaj": "KABEL",
+                    "dlugosc_m": 120,
+                    "catalog_ref": "cable-tfk-yakxs-3x120",
+                }
+            },
     )
     assert r.get("error") is None
     return r["snapshot"]
@@ -99,7 +110,7 @@ def test_catalog_bind_unblocks_analysis() -> None:
         "assign_catalog_to_element",
         {
             "element_ref": branch_ref,
-            "catalog_item_id": "YAKXS_3x120",
+            "catalog_item_id": "cable-tfk-yakxs-3x120",
             "catalog_item_version": "v1",
         },
     )["snapshot"]
@@ -109,7 +120,10 @@ def test_catalog_bind_unblocks_analysis() -> None:
 
     assert "E009" not in after_codes, "Po przypięciu katalogu blokada katalogowa musi zniknąć"
     assert branch_ref in after["materialized_params"]["lines_sn"]
-    assert after["materialized_params"]["lines_sn"][branch_ref]["catalog_item_id"] == "YAKXS_3x120"
+    assert (
+        after["materialized_params"]["lines_sn"][branch_ref]["catalog_item_id"]
+        == "cable-tfk-yakxs-3x120"
+    )
 
 
 def test_catalog_version_change_creates_new_snapshot() -> None:
@@ -122,7 +136,7 @@ def test_catalog_version_change_creates_new_snapshot() -> None:
         "assign_catalog_to_element",
         {
             "element_ref": branch_ref,
-            "catalog_item_id": "YAKXS_3x120",
+            "catalog_item_id": "cable-tfk-yakxs-3x120",
             "catalog_item_version": "v1",
         },
     )["snapshot"]
@@ -133,7 +147,7 @@ def test_catalog_version_change_creates_new_snapshot() -> None:
         "assign_catalog_to_element",
         {
             "element_ref": branch_ref,
-            "catalog_item_id": "YAKXS_3x120",
+            "catalog_item_id": "cable-tfk-yakxs-3x120",
             "catalog_item_version": "v2",
         },
     )["snapshot"]

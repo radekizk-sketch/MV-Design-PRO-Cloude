@@ -13,7 +13,11 @@ from __future__ import annotations
 import copy
 import hashlib
 import json
+import math
 from typing import Any
+
+from network_model.catalog.materialization import materialize_catalog_binding
+from network_model.catalog.types import CatalogBinding
 
 from .topology_ops import (
     TopologyOpResult,
@@ -743,6 +747,152 @@ def _get_catalog_safe():
         return None
 
 
+def _build_catalog_binding_payload(
+    catalog_ref: str,
+    catalog_binding: Any,
+    *,
+    default_namespace: str,
+    default_version: str | None = None,
+) -> dict[str, Any]:
+    """Znormalizuj binding do jednego kanonicznego kontraktu."""
+    binding = catalog_binding if isinstance(catalog_binding, dict) else {}
+    return {
+        "catalog_namespace": (
+            _extract_catalog_binding_namespace(binding) or default_namespace
+        ),
+        "catalog_item_id": catalog_ref,
+        "catalog_item_version": (
+            _extract_catalog_binding_version(binding)
+            or default_version
+            or "legacy"
+        ),
+        "materialize": bool(binding.get("materialize", True)),
+        "snapshot_mapping_version": str(binding.get("snapshot_mapping_version", "1.0")),
+    }
+
+
+def _materialize_catalog_payload(
+    *,
+    catalog_ref: str,
+    catalog_binding: Any,
+    default_namespace: str,
+    default_version: str | None = None,
+) -> tuple[dict[str, Any], dict[str, Any]] | dict[str, Any]:
+    """Zmaterializuj pozycję katalogową do trwałych pól snapshotu."""
+    catalog = _get_catalog_safe()
+    if catalog is None:
+        return _error_response(
+            "Nie udało się załadować repozytorium katalogowego.",
+            "catalog.materialization_incomplete",
+        )
+
+    binding_payload = _build_catalog_binding_payload(
+        catalog_ref,
+        catalog_binding,
+        default_namespace=default_namespace,
+        default_version=default_version,
+    )
+    binding = CatalogBinding.from_dict(binding_payload)
+    result = materialize_catalog_binding(binding, catalog)
+    if not result.success:
+        return _error_response(
+            result.error_message_pl or "Materializacja katalogu nie powiodła się.",
+            result.error_code or "catalog.materialization_incomplete",
+        )
+
+    materialized_params = {
+        "catalog_item_id": binding.catalog_item_id,
+        "catalog_item_version": binding.catalog_item_version or None,
+        **result.solver_fields,
+    }
+    return binding_payload, materialized_params
+
+
+def _apply_materialized_branch_fields(
+    target: dict[str, Any],
+    materialized_params: dict[str, Any],
+) -> None:
+    """Wpisz do gałęzi zarówno fizykę solvera, jak i trwałą materializację."""
+    target["materialized_params"] = materialized_params
+
+    r_ohm_per_km = materialized_params.get("r_ohm_per_km")
+    x_ohm_per_km = materialized_params.get("x_ohm_per_km")
+    if r_ohm_per_km is not None:
+        target["r_ohm_per_km"] = float(r_ohm_per_km)
+    if x_ohm_per_km is not None:
+        target["x_ohm_per_km"] = float(x_ohm_per_km)
+
+    b_us_per_km = materialized_params.get("b_us_per_km")
+    c_nf_per_km = materialized_params.get("c_nf_per_km")
+    if b_us_per_km is not None:
+        target["b_siemens_per_km"] = float(b_us_per_km) / 1_000_000.0
+    elif c_nf_per_km is not None:
+        target["b_siemens_per_km"] = 2 * math.pi * 50.0 * float(c_nf_per_km) * 1e-9
+
+    rated_current_a = (
+        materialized_params.get("rated_current_a")
+        if materialized_params.get("rated_current_a") is not None
+        else materialized_params.get("i_max_a")
+    )
+    if rated_current_a is not None:
+        target["rating"] = {
+            **(target.get("rating") or {}),
+            "in_a": float(rated_current_a),
+        }
+
+
+def _apply_materialized_transformer_fields(
+    target: dict[str, Any],
+    materialized_params: dict[str, Any],
+) -> None:
+    """Wpisz do transformatora trwałą materializację i pola solverowe."""
+    target["materialized_params"] = materialized_params
+
+    field_mapping = {
+        "rated_power_mva": "sn_mva",
+        "voltage_hv_kv": "uhv_kv",
+        "voltage_lv_kv": "ulv_kv",
+        "uk_percent": "uk_percent",
+        "pk_kw": "pk_kw",
+        "p0_kw": "p0_kw",
+        "i0_percent": "i0_percent",
+        "vector_group": "vector_group",
+        "tap_min": "tap_min",
+        "tap_max": "tap_max",
+        "tap_step_percent": "tap_step_percent",
+    }
+    for source_key, target_key in field_mapping.items():
+        if materialized_params.get(source_key) is not None:
+            target[target_key] = materialized_params[source_key]
+
+
+def _element_requires_catalog(collection: str, element: dict[str, Any]) -> bool:
+    """Określ, czy dany element techniczny może istnieć wyłącznie z katalogiem."""
+    if collection in {
+        "branches",
+        "transformers",
+        "sources",
+        "branch_points",
+        "loads",
+        "measurements",
+        "protection_assignments",
+    }:
+        return True
+
+    if collection == "generators":
+        gen_type = str(element.get("gen_type") or "").upper()
+        return gen_type in {
+            "PV_INVERTER",
+            "WIND_INVERTER",
+            "BESS",
+            "BESS_INVERTER",
+            "GENSET",
+            "UPS",
+        }
+
+    return False
+
+
 def _compute_materialized_params(enm: dict[str, Any]) -> dict[str, Any]:
     """Oblicz zmaterializowane parametry katalogowe.
 
@@ -752,6 +902,7 @@ def _compute_materialized_params(enm: dict[str, Any]) -> dict[str, Any]:
     """
     lines_sn: dict[str, Any] = {}
     transformers_sn_nn: dict[str, Any] = {}
+    sources_sn: dict[str, Any] = {}
 
     # Try loading catalog for actual parameter resolution
     catalog = _get_catalog_safe()
@@ -764,25 +915,34 @@ def _compute_materialized_params(enm: dict[str, Any]) -> dict[str, Any]:
         if not catalog_ref:
             continue
 
-        r_ohm_per_km = b.get("r_ohm_per_km")
-        x_ohm_per_km = b.get("x_ohm_per_km")
-        i_max_a = (
-            (b.get("rating") or {}).get("in_a")
-            if isinstance(b.get("rating"), dict)
-            else None
-        )
-
-        # Resolve from catalog if available
-        if catalog:
-            is_cable = btype == "cable"
-            type_data = (
-                catalog.get_cable_type(catalog_ref) if is_cable
-                else catalog.get_line_type(catalog_ref)
+        materialized = b.get("materialized_params")
+        if isinstance(materialized, dict) and materialized:
+            r_ohm_per_km = materialized.get("r_ohm_per_km")
+            x_ohm_per_km = materialized.get("x_ohm_per_km")
+            i_max_a = (
+                materialized.get("rated_current_a")
+                if materialized.get("rated_current_a") is not None
+                else materialized.get("i_max_a")
             )
-            if type_data:
-                r_ohm_per_km = type_data.r_ohm_per_km
-                x_ohm_per_km = type_data.x_ohm_per_km
-                i_max_a = type_data.rated_current_a
+        else:
+            r_ohm_per_km = b.get("r_ohm_per_km")
+            x_ohm_per_km = b.get("x_ohm_per_km")
+            i_max_a = (
+                (b.get("rating") or {}).get("in_a")
+                if isinstance(b.get("rating"), dict)
+                else None
+            )
+
+            if catalog:
+                is_cable = btype == "cable"
+                type_data = (
+                    catalog.get_cable_type(catalog_ref) if is_cable
+                    else catalog.get_line_type(catalog_ref)
+                )
+                if type_data:
+                    r_ohm_per_km = type_data.r_ohm_per_km
+                    x_ohm_per_km = type_data.x_ohm_per_km
+                    i_max_a = type_data.rated_current_a
 
         lines_sn[b["ref_id"]] = {
             "catalog_item_id": catalog_ref,
@@ -799,19 +959,30 @@ def _compute_materialized_params(enm: dict[str, Any]) -> dict[str, Any]:
         if not catalog_ref:
             continue
 
-        uk_percent = t.get("uk_percent")
-        p0_kw = t.get("p0_kw")
-        pk_kw = t.get("pk_kw")
-        s_n_kva = (t.get("sn_mva") or 0) * 1000 if t.get("sn_mva") else None
+        materialized = t.get("materialized_params")
+        if isinstance(materialized, dict) and materialized:
+            uk_percent = materialized.get("uk_percent")
+            p0_kw = materialized.get("p0_kw")
+            pk_kw = materialized.get("pk_kw")
+            rated_power_mva = materialized.get("rated_power_mva")
+            s_n_kva = (
+                float(rated_power_mva) * 1000
+                if rated_power_mva is not None
+                else (t.get("sn_mva") or 0) * 1000 if t.get("sn_mva") else None
+            )
+        else:
+            uk_percent = t.get("uk_percent")
+            p0_kw = t.get("p0_kw")
+            pk_kw = t.get("pk_kw")
+            s_n_kva = (t.get("sn_mva") or 0) * 1000 if t.get("sn_mva") else None
 
-        # Resolve from catalog if available
-        if catalog:
-            type_data = catalog.get_transformer_type(catalog_ref)
-            if type_data:
-                uk_percent = type_data.uk_percent
-                p0_kw = type_data.p0_kw
-                pk_kw = type_data.pk_kw
-                s_n_kva = type_data.rated_power_mva * 1000
+            if catalog:
+                type_data = catalog.get_transformer_type(catalog_ref)
+                if type_data:
+                    uk_percent = type_data.uk_percent
+                    p0_kw = type_data.p0_kw
+                    pk_kw = type_data.pk_kw
+                    s_n_kva = type_data.rated_power_mva * 1000
 
         transformers_sn_nn[t["ref_id"]] = {
             "catalog_item_id": catalog_ref,
@@ -824,9 +995,43 @@ def _compute_materialized_params(enm: dict[str, Any]) -> dict[str, Any]:
             "s_n_kva": s_n_kva,
         }
 
+    for s in enm.get("sources", []):
+        catalog_ref = s.get("catalog_ref")
+        if not catalog_ref:
+            continue
+
+        materialized = s.get("materialized_params")
+        if isinstance(materialized, dict) and materialized:
+            voltage_rating_kv = materialized.get("voltage_rating_kv")
+            sk3_mva = materialized.get("sk3_mva")
+            ik3_ka = materialized.get("ik3_ka")
+            rx_ratio = materialized.get("rx_ratio")
+        else:
+            voltage_rating_kv = None
+            sk3_mva = s.get("sk3_mva")
+            ik3_ka = s.get("ik3_ka")
+            rx_ratio = s.get("rx_ratio")
+            if catalog:
+                type_data = getattr(catalog, "get_source_system_type", lambda _id: None)(catalog_ref)
+                if type_data:
+                    voltage_rating_kv = type_data.voltage_rating_kv
+                    sk3_mva = type_data.sk3_mva
+                    ik3_ka = type_data.ik3_ka
+                    rx_ratio = type_data.rx_ratio
+
+        sources_sn[s["ref_id"]] = {
+            "catalog_item_id": catalog_ref,
+            "catalog_item_version": s.get("meta", {}).get("catalog_item_version"),
+            "voltage_rating_kv": voltage_rating_kv,
+            "sk3_mva": sk3_mva,
+            "ik3_ka": ik3_ka,
+            "rx_ratio": rx_ratio,
+        }
+
     return {
         "lines_sn": lines_sn,
         "transformers_sn_nn": transformers_sn_nn,
+        "sources_sn": sources_sn,
     }
 
 
@@ -914,14 +1119,14 @@ def _error_response(message: str, code: str = "UNKNOWN") -> dict[str, Any]:
         "selection_hint": None,
         "audit_trail": [],
         "domain_events": [],
-        "materialized_params": {"lines_sn": {}, "transformers_sn_nn": {}},
+        "materialized_params": {"lines_sn": {}, "transformers_sn_nn": {}, "sources_sn": {}},
         "layout": {"layout_hash": "", "layout_version": "1.0"},
     }
 
 
 def _require_catalog_ref(
-    payload_ref: Any,
-    payload_binding: Any,
+    payload_ref: object,
+    payload_binding: object,
     context_code: str,
 ) -> str | dict[str, Any]:
     """Zwróć kanoniczny catalog_ref albo odpowiedź błędu catalog.ref_required."""
@@ -970,7 +1175,40 @@ def add_grid_source_sn(enm: dict[str, Any], payload: dict[str, Any]) -> dict[str
             "source.already_exists",
         )
 
-    seed = _compute_seed({"op": "add_grid_source_sn", "voltage_kv": voltage_kv})
+    catalog_binding = payload.get("catalog_binding")
+    catalog_ref_required = _require_catalog_ref(
+        payload.get("catalog_ref"),
+        catalog_binding,
+        "Źródło systemowe GPZ",
+    )
+    if isinstance(catalog_ref_required, dict):
+        return catalog_ref_required
+    catalog_ref = catalog_ref_required
+    materialization = _materialize_catalog_payload(
+        catalog_ref=catalog_ref,
+        catalog_binding=catalog_binding,
+        default_namespace="ZRODLO_SN",
+    )
+    if isinstance(materialization, dict):
+        return materialization
+    binding_payload, materialized_params = materialization
+    if (voltage_kv is None or voltage_kv <= 0) and materialized_params.get("voltage_rating_kv") is not None:
+        voltage_kv = materialized_params["voltage_rating_kv"]
+    if voltage_kv is None or voltage_kv <= 0:
+        voltage_kv = enm.get("header", {}).get("defaults", {}).get("sn_nominal_kv")
+    if voltage_kv is None or voltage_kv <= 0:
+        return _error_response(
+            "Brak napięcia znamionowego SN: podaj voltage_kv w payloadzie lub ustaw defaults.sn_nominal_kv w nagłówku ENM.",
+            "source.missing_voltage",
+        )
+
+    seed = _compute_seed(
+        {
+            "op": "add_grid_source_sn",
+            "catalog_ref": catalog_ref,
+            "voltage_kv": voltage_kv,
+        }
+    )
     bus_ref = _make_id("gpz", seed, "bus_sn")
     source_ref = _make_id("gpz", seed, "source")
     substation_ref = _make_id("gpz", seed, "substation")
@@ -1008,13 +1246,22 @@ def add_grid_source_sn(enm: dict[str, Any], payload: dict[str, Any]) -> dict[str
         "name": payload.get("source_name") or f"Źródło GPZ {voltage_kv} kV",
         "bus_ref": bus_ref,
         "model": "short_circuit_power",
+        "catalog_ref": catalog_ref,
+        "materialized_params": materialized_params,
     }
-    if payload.get("sk3_mva"):
-        source_data["sk3_mva"] = payload["sk3_mva"]
-    if payload.get("ik3_ka"):
-        source_data["ik3_ka"] = payload["ik3_ka"]
-    if payload.get("rx_ratio"):
-        source_data["rx_ratio"] = payload["rx_ratio"]
+    _apply_catalog_metadata(source_data, binding_payload, default_namespace="ZRODLO_SN")
+    if payload.get("source_mode"):
+        source_data["source_mode"] = payload["source_mode"]
+    if payload.get("parameter_source"):
+        source_data["parameter_source"] = payload["parameter_source"]
+    if isinstance(payload.get("overrides"), list):
+        source_data["overrides"] = payload["overrides"]
+    if materialized_params.get("sk3_mva") is not None:
+        source_data["sk3_mva"] = materialized_params["sk3_mva"]
+    if materialized_params.get("ik3_ka") is not None:
+        source_data["ik3_ka"] = materialized_params["ik3_ka"]
+    if materialized_params.get("rx_ratio") is not None:
+        source_data["rx_ratio"] = materialized_params["rx_ratio"]
 
     result = create_device(new_enm, source_data)
     if not result.success:
@@ -1166,13 +1413,21 @@ def continue_trunk_segment_sn(enm: dict[str, Any], payload: dict[str, Any]) -> d
         "x_ohm_per_km": 0.0,
         "status": "closed",
     }
-    if catalog_ref:
-        branch_data["catalog_ref"] = catalog_ref
-    _apply_catalog_metadata(
-        branch_data,
-        segment_catalog_binding,
+    materialization = _materialize_catalog_payload(
+        catalog_ref=catalog_ref,
+        catalog_binding=segment_catalog_binding,
         default_namespace="KABEL_SN" if branch_type == "cable" else "LINIA_SN",
     )
+    if isinstance(materialization, dict):
+        return materialization
+    binding_payload, materialized_params = materialization
+    branch_data["catalog_ref"] = catalog_ref
+    _apply_catalog_metadata(
+        branch_data,
+        binding_payload,
+        default_namespace="KABEL_SN" if branch_type == "cable" else "LINIA_SN",
+    )
+    _apply_materialized_branch_fields(branch_data, materialized_params)
 
     result = create_branch(new_enm, branch_data)
     if not result.success:
@@ -1344,6 +1599,11 @@ def insert_station_on_segment_sn(enm: dict[str, Any], payload: dict[str, Any]) -
     length_km = segment.get("length_km", 1.0)
     segment_catalog_binding = segment.get("catalog_binding")
     catalog_ref = _resolve_catalog_ref(segment.get("catalog_ref"), segment_catalog_binding)
+    segment_catalog_version = (
+        segment.get("meta", {}).get("catalog_item_version")
+        if isinstance(segment.get("meta"), dict)
+        else None
+    )
 
     # --- Compute deterministic seed ---
     station_seed = _compute_seed({
@@ -1422,12 +1682,22 @@ def insert_station_on_segment_sn(enm: dict[str, Any], payload: dict[str, Any]) -
         "status": "closed",
     }
     if catalog_ref:
+        materialization = _materialize_catalog_payload(
+            catalog_ref=catalog_ref,
+            catalog_binding=segment_catalog_binding,
+            default_namespace="KABEL_SN" if seg_type == "cable" else "LINIA_SN",
+            default_version=segment_catalog_version,
+        )
+        if isinstance(materialization, dict):
+            return materialization
+        binding_payload, materialized_params = materialization
         left_data["catalog_ref"] = catalog_ref
-    _apply_catalog_metadata(
-        left_data,
-        segment_catalog_binding,
-        default_namespace="KABEL_SN" if seg_type == "cable" else "LINIA_SN",
-    )
+        _apply_catalog_metadata(
+            left_data,
+            binding_payload,
+            default_namespace="KABEL_SN" if seg_type == "cable" else "LINIA_SN",
+        )
+        _apply_materialized_branch_fields(left_data, materialized_params)
     result = create_branch(new_enm, left_data)
     if not result.success:
         return _error_response(
@@ -1448,12 +1718,22 @@ def insert_station_on_segment_sn(enm: dict[str, Any], payload: dict[str, Any]) -
         "status": "closed",
     }
     if catalog_ref:
+        materialization = _materialize_catalog_payload(
+            catalog_ref=catalog_ref,
+            catalog_binding=segment_catalog_binding,
+            default_namespace="KABEL_SN" if seg_type == "cable" else "LINIA_SN",
+            default_version=segment_catalog_version,
+        )
+        if isinstance(materialization, dict):
+            return materialization
+        binding_payload, materialized_params = materialization
         right_data["catalog_ref"] = catalog_ref
-    _apply_catalog_metadata(
-        right_data,
-        segment_catalog_binding,
-        default_namespace="KABEL_SN" if seg_type == "cable" else "LINIA_SN",
-    )
+        _apply_catalog_metadata(
+            right_data,
+            binding_payload,
+            default_namespace="KABEL_SN" if seg_type == "cable" else "LINIA_SN",
+        )
+        _apply_materialized_branch_fields(right_data, materialized_params)
     result = create_branch(new_enm, right_data)
     if not result.success:
         return _error_response(
@@ -1556,13 +1836,21 @@ def insert_station_on_segment_sn(enm: dict[str, Any], payload: dict[str, Any]) -
             "uk_percent": 0.01,  # Wartosc inicjalna — materializacja z katalogu
             "pk_kw": 0.0,
         }
-        if tr_catalog:
-            tr_data["catalog_ref"] = tr_catalog
-        _apply_catalog_metadata(
-            tr_data,
-            transformer_catalog_binding,
+        materialization = _materialize_catalog_payload(
+            catalog_ref=tr_catalog,
+            catalog_binding=transformer_catalog_binding,
             default_namespace="TRAFO_SN_NN",
         )
+        if isinstance(materialization, dict):
+            return materialization
+        binding_payload, materialized_params = materialization
+        tr_data["catalog_ref"] = tr_catalog
+        _apply_catalog_metadata(
+            tr_data,
+            binding_payload,
+            default_namespace="TRAFO_SN_NN",
+        )
+        _apply_materialized_transformer_fields(tr_data, materialized_params)
 
         result = create_device(new_enm, tr_data)
         if not result.success:
@@ -1952,13 +2240,21 @@ def start_branch_segment_sn(enm: dict[str, Any], payload: dict[str, Any]) -> dic
         "x_ohm_per_km": 0.0,
         "status": "closed",
     }
-    if branch_catalog_ref:
-        branch_data["catalog_ref"] = branch_catalog_ref
-    _apply_catalog_metadata(
-        branch_data,
-        branch_catalog_binding,
+    materialization = _materialize_catalog_payload(
+        catalog_ref=branch_catalog_ref,
+        catalog_binding=branch_catalog_binding,
         default_namespace="KABEL_SN" if branch_type == "cable" else "LINIA_SN",
     )
+    if isinstance(materialization, dict):
+        return materialization
+    binding_payload, materialized_params = materialization
+    branch_data["catalog_ref"] = branch_catalog_ref
+    _apply_catalog_metadata(
+        branch_data,
+        binding_payload,
+        default_namespace="KABEL_SN" if branch_type == "cable" else "LINIA_SN",
+    )
+    _apply_materialized_branch_fields(branch_data, materialized_params)
     result = create_branch(new_enm, branch_data)
     if not result.success:
         return _error_response("Nie udało się utworzyć odgałęzienia.", "branch.creation_failed")
@@ -2223,8 +2519,21 @@ def connect_secondary_ring_sn(enm: dict[str, Any], payload: dict[str, Any]) -> d
         "x_ohm_per_km": 0.0,
         "status": "closed",
     }
-    if ring_catalog_ref:
-        ring_data["catalog_ref"] = ring_catalog_ref
+    materialization = _materialize_catalog_payload(
+        catalog_ref=ring_catalog_ref,
+        catalog_binding=ring_catalog_binding,
+        default_namespace="KABEL_SN" if branch_type == "cable" else "LINIA_SN",
+    )
+    if isinstance(materialization, dict):
+        return materialization
+    binding_payload, materialized_params = materialization
+    ring_data["catalog_ref"] = ring_catalog_ref
+    _apply_catalog_metadata(
+        ring_data,
+        binding_payload,
+        default_namespace="KABEL_SN" if branch_type == "cable" else "LINIA_SN",
+    )
+    _apply_materialized_branch_fields(ring_data, materialized_params)
     result = create_branch(new_enm, ring_data)
     if not result.success:
         return _error_response("Nie udało się zamknąć pierścienia.", "ring.creation_failed")
@@ -2344,13 +2653,21 @@ def add_transformer_sn_nn(enm: dict[str, Any], payload: dict[str, Any]) -> dict[
         "source_mode": "KATALOG",
         "catalog_namespace": "TRAFO_SN_NN",
     }
-    if standalone_catalog:
-        tr_data["catalog_ref"] = standalone_catalog
-    _apply_catalog_metadata(
-        tr_data,
-        payload.get("catalog_binding"),
+    materialization = _materialize_catalog_payload(
+        catalog_ref=standalone_catalog,
+        catalog_binding=payload.get("catalog_binding"),
         default_namespace="TRAFO_SN_NN",
     )
+    if isinstance(materialization, dict):
+        return materialization
+    binding_payload, materialized_params = materialization
+    tr_data["catalog_ref"] = standalone_catalog
+    _apply_catalog_metadata(
+        tr_data,
+        binding_payload,
+        default_namespace="TRAFO_SN_NN",
+    )
+    _apply_materialized_transformer_fields(tr_data, materialized_params)
     if payload.get("station_ref"):
         for sub in new_enm.get("substations", []):
             if sub.get("ref_id") == payload["station_ref"]:
@@ -2381,8 +2698,13 @@ def assign_catalog_to_element(enm: dict[str, Any], payload: dict[str, Any]) -> d
     """Przypisz katalog do elementu."""
     element_ref = payload.get("element_ref")
     clear_catalog = "catalog_item_id" in payload and payload.get("catalog_item_id") is None
+    catalog_binding = payload.get("catalog_binding")
     catalog_item_id_raw = payload.get("catalog_item_id")
-    catalog_item_id = catalog_item_id_raw or payload.get("catalog_ref")
+    catalog_item_id = (
+        catalog_item_id_raw
+        or _extract_catalog_binding_item_id(catalog_binding)
+        or payload.get("catalog_ref")
+    )
 
     if not element_ref:
         return _error_response("Brak identyfikatora elementu.", "catalog.element_missing")
@@ -2398,6 +2720,11 @@ def assign_catalog_to_element(enm: dict[str, Any], payload: dict[str, Any]) -> d
     target_element = new_enm[coll][idx]
 
     if clear_catalog:
+        if _element_requires_catalog(coll, target_element):
+            return _error_response(
+                "Element techniczny nie może istnieć bez przypięcia katalogowego.",
+                "catalog.clear_forbidden",
+            )
         target_element["catalog_ref"] = None
         if "parameter_source" in target_element:
             target_element["parameter_source"] = None
@@ -2417,13 +2744,57 @@ def assign_catalog_to_element(enm: dict[str, Any], payload: dict[str, Any]) -> d
         target_element["parameter_source"] = "CATALOG"
         target_element["source_mode"] = payload.get("source_mode") or "KATALOG"
 
-        catalog_namespace = payload.get("catalog_namespace") or _infer_catalog_namespace_for_element(target_element)
+        catalog_namespace = (
+            payload.get("catalog_namespace")
+            or _extract_catalog_binding_namespace(catalog_binding)
+            or _infer_catalog_namespace_for_element(target_element)
+        )
         if catalog_namespace:
             target_element["catalog_namespace"] = catalog_namespace
 
-        catalog_item_version = payload.get("catalog_item_version")
-        if isinstance(catalog_item_version, str) and catalog_item_version.strip():
-            target_element.setdefault("meta", {})["catalog_item_version"] = catalog_item_version.strip()
+        catalog_item_version = (
+            _extract_catalog_binding_version(catalog_binding)
+            or payload.get("catalog_item_version")
+        )
+        effective_catalog_version = (
+            catalog_item_version.strip()
+            if isinstance(catalog_item_version, str) and catalog_item_version.strip()
+            else target_element.get("meta", {}).get("catalog_item_version")
+        )
+        if effective_catalog_version:
+            target_element.setdefault("meta", {})["catalog_item_version"] = effective_catalog_version
+
+        if coll == "branches" and target_element.get("type") in {"cable", "line_overhead"} and catalog_namespace:
+            materialization = _materialize_catalog_payload(
+                catalog_ref=catalog_item_id,
+                catalog_binding={
+                    "catalog_namespace": catalog_namespace,
+                    "catalog_item_version": effective_catalog_version or "legacy",
+                },
+                default_namespace=catalog_namespace,
+                default_version=effective_catalog_version,
+            )
+            if isinstance(materialization, dict):
+                return materialization
+            binding_payload, materialized_params = materialization
+            _apply_catalog_metadata(target_element, binding_payload, default_namespace=catalog_namespace)
+            _apply_materialized_branch_fields(target_element, materialized_params)
+
+        if coll == "transformers" and catalog_namespace:
+            materialization = _materialize_catalog_payload(
+                catalog_ref=catalog_item_id,
+                catalog_binding={
+                    "catalog_namespace": catalog_namespace,
+                    "catalog_item_version": effective_catalog_version or "legacy",
+                },
+                default_namespace=catalog_namespace,
+                default_version=effective_catalog_version,
+            )
+            if isinstance(materialization, dict):
+                return materialization
+            binding_payload, materialized_params = materialization
+            _apply_catalog_metadata(target_element, binding_payload, default_namespace=catalog_namespace)
+            _apply_materialized_transformer_fields(target_element, materialized_params)
 
     return _response(
         new_enm,
@@ -2508,13 +2879,13 @@ def update_element_parameters(enm: dict[str, Any], payload: dict[str, Any]) -> d
                 "name", "status", "length_km", "r_ohm_per_km", "x_ohm_per_km",
                 "b_siemens_per_km", "r0_ohm_per_km", "x0_ohm_per_km", "b0_siemens_per_km",
                 "rating", "insulation", "catalog_ref", "parameter_source", "overrides",
-                "meta", "source_mode", "catalog_namespace",
+                "meta", "source_mode", "catalog_namespace", "materialized_params",
             },
             "transformers": {
                 "name", "sn_mva", "uhv_kv", "ulv_kv", "uk_percent", "pk_kw", "p0_kw",
                 "i0_percent", "vector_group", "hv_neutral", "lv_neutral", "tap_position",
                 "tap_min", "tap_max", "tap_step_percent", "catalog_ref", "parameter_source",
-                "overrides", "meta", "source_mode", "catalog_namespace",
+                "overrides", "meta", "source_mode", "catalog_namespace", "materialized_params",
             },
             "branch_points": {
                 "name", "switch_state", "catalog_ref", "catalog_namespace", "catalog_version",

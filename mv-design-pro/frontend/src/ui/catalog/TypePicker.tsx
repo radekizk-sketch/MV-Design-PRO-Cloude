@@ -1,46 +1,74 @@
-/**
- * Type Picker Component (PowerFactory-style)
- *
- * CANONICAL ALIGNMENT:
- * - P8.2: UI Assign/Clear Type
- * - Deterministic type list ordering (manufacturer → name → id)
- * - Search by name and id
- * - Category filtering
- *
- * All labels in Polish per wizard_screens.md.
- */
-
-import { useState, useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { clsx } from 'clsx';
-import {
-  fetchTypesByCategory,
-  type LineType,
-  type CableType,
-  type TransformerType,
-  type SwitchEquipmentType,
-  type TypeCategory,
-} from './';
-
-type CatalogTypeUnion = LineType | CableType | TransformerType | SwitchEquipmentType;
+import type { CatalogListItem } from './api';
+import { fetchTypesByCategory } from './api';
+import type { TypeCategory } from './types';
 
 interface TypePickerProps {
-  /** Category to display */
   category: TypeCategory;
-  /** Current selected type ID (for highlighting) */
   currentTypeId?: string | null;
-  /** Callback when type is selected */
   onSelectType: (typeId: string, typeName: string) => void;
-  /** Callback when picker is closed */
   onClose: () => void;
-  /** Is picker open? */
   isOpen: boolean;
 }
 
-/**
- * Type Picker Modal.
- *
- * Displays catalog types in deterministic order with search and selection.
- */
+const CATEGORY_LABELS: Partial<Record<TypeCategory, string>> = {
+  LINE: 'Linie napowietrzne SN',
+  CABLE: 'Kable SN',
+  TRANSFORMER: 'Transformatory SN/nN',
+  SWITCH_EQUIPMENT: 'Aparatura laczeniowa SN',
+  MV_APPARATUS: 'Aparatura laczeniowa SN',
+  LV_APPARATUS: 'Aparatura laczeniowa nN',
+  LV_CABLE: 'Kable nN',
+  LOAD: 'Obciazenia',
+  CT: 'Przekladniki pradowe',
+  VT: 'Przekladniki napieciowe',
+  MEASUREMENT_TRANSFORMER: 'Przekladniki pomiarowe',
+  PV_INVERTER: 'Falowniki PV',
+  BESS_INVERTER: 'Falowniki BESS',
+  PROTECTION_DEVICE: 'Zabezpieczenia',
+  SYSTEM_SOURCE: 'Zasilanie systemowe SN',
+  CONVERTER: 'Konwertery',
+};
+
+function getTypeParams(type: CatalogListItem, category: TypeCategory): string {
+  const record = type as unknown as Record<string, unknown>;
+
+  switch (category) {
+    case 'LINE':
+    case 'CABLE':
+      return `R=${record.r_ohm_per_km ?? '-'} Ohm/km, X=${record.x_ohm_per_km ?? '-'} Ohm/km, I=${record.rated_current_a ?? '-'} A`;
+    case 'TRANSFORMER':
+      return `${record.rated_power_mva ?? '-'} MVA, ${record.voltage_hv_kv ?? '-'} / ${record.voltage_lv_kv ?? '-'} kV, uk=${record.uk_percent ?? '-'}%`;
+    case 'SWITCH_EQUIPMENT':
+      return `${record.un_kv ?? '-'} kV, ${record.in_a ?? '-'} A, ${record.ik_ka ?? '-'} kA`;
+    case 'MV_APPARATUS':
+      return `${record.u_n_kv ?? '-'} kV, ${record.i_n_a ?? '-'} A, ${record.breaking_capacity_ka ?? '-'} kA`;
+    case 'LV_APPARATUS':
+      return `${record.u_n_kv ?? '-'} kV, ${record.i_n_a ?? '-'} A, ${record.breaking_capacity_ka ?? '-'} kA`;
+    case 'LV_CABLE':
+      return `${record.u_n_kv ?? '-'} kV, ${record.cross_section_mm2 ?? '-'} mm2, ${record.i_max_a ?? '-'} A`;
+    case 'LOAD':
+      return `P=${record.p_kw ?? '-'} kW, cos fi=${record.cos_phi ?? '-'}, model=${record.model ?? '-'}`;
+    case 'CT':
+      return `${record.ratio_primary_a ?? '-'} / ${record.ratio_secondary_a ?? '-'} A, klasa=${record.accuracy_class ?? '-'}`;
+    case 'VT':
+      return `${record.ratio_primary_v ?? '-'} / ${record.ratio_secondary_v ?? '-'} V, klasa=${record.accuracy_class ?? '-'}`;
+    case 'PV_INVERTER':
+      return `${record.s_n_kva ?? '-'} kVA, Pmax=${record.p_max_kw ?? '-'} kW`;
+    case 'BESS_INVERTER':
+      return `P=${record.p_discharge_kw ?? '-'} kW, E=${record.e_kwh ?? '-'} kWh`;
+    case 'PROTECTION_DEVICE':
+      return `${record.vendor ?? record.manufacturer ?? '-'}, ${record.series ?? '-'}, In=${record.rated_current_a ?? '-'} A`;
+    case 'SYSTEM_SOURCE':
+      return `${record.voltage_rating_kv ?? '-'} kV, Sk3=${record.sk3_mva ?? '-'} MVA, R/X=${record.rx_ratio ?? '-'}`;
+    case 'MEASUREMENT_TRANSFORMER':
+    case 'CONVERTER':
+    default:
+      return '-';
+  }
+}
+
 export function TypePicker({
   category,
   currentTypeId,
@@ -48,173 +76,160 @@ export function TypePicker({
   onClose,
   isOpen,
 }: TypePickerProps) {
-  const [types, setTypes] = useState<CatalogTypeUnion[]>([]);
+  const [types, setTypes] = useState<CatalogListItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
 
-  // Fetch types when picker opens
   useEffect(() => {
-    if (!isOpen) return;
+    if (!isOpen) {
+      return;
+    }
 
     setLoading(true);
     setError(null);
 
     fetchTypesByCategory(category)
-      .then((fetchedTypes) => {
-        setTypes(fetchedTypes);
+      .then((items) => {
+        setTypes(items);
         setLoading(false);
       })
-      .catch((err) => {
-        setError(err.message ?? 'Błąd pobierania typów');
+      .catch((err: unknown) => {
+        setError(err instanceof Error ? err.message : 'Blad pobierania typow.');
         setLoading(false);
       });
-  }, [isOpen, category]);
+  }, [category, isOpen]);
 
-  // Filter types by search query (name or id)
   const filteredTypes = useMemo(() => {
-    if (!searchQuery.trim()) return types;
-
+    if (!searchQuery.trim()) {
+      return types;
+    }
     const query = searchQuery.toLowerCase();
-    return types.filter(
-      (type) =>
-        type.name.toLowerCase().includes(query) || type.id.toLowerCase().includes(query)
-    );
-  }, [types, searchQuery]);
+    return types.filter((type) => {
+      const manufacturer =
+        (type as unknown as Record<string, unknown>).manufacturer
+        ?? (type as unknown as Record<string, unknown>).vendor;
+      return (
+        type.name.toLowerCase().includes(query)
+        || type.id.toLowerCase().includes(query)
+        || (typeof manufacturer === 'string' && manufacturer.toLowerCase().includes(query))
+      );
+    });
+  }, [searchQuery, types]);
 
-  // Get category label in Polish
-  const getCategoryLabel = () => {
-    switch (category) {
-      case 'LINE':
-        return 'Linie napowietrzne';
-      case 'CABLE':
-        return 'Kable';
-      case 'TRANSFORMER':
-        return 'Transformatory';
-      case 'SWITCH_EQUIPMENT':
-        return 'Aparatura łączeniowa';
-      default:
-        return category;
-    }
-  };
-
-  // Handle type selection
-  const handleSelect = (type: CatalogTypeUnion) => {
-    onSelectType(type.id, type.name);
-    onClose();
-  };
-
-  // Handle backdrop click
-  const handleBackdropClick = (e: React.MouseEvent) => {
-    if (e.target === e.currentTarget) {
-      onClose();
-    }
-  };
-
-  if (!isOpen) return null;
+  if (!isOpen) {
+    return null;
+  }
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50"
-      onClick={handleBackdropClick}
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
+      onClick={(event) => {
+        if (event.target === event.currentTarget) {
+          onClose();
+        }
+      }}
     >
-      <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[80vh] flex flex-col">
-        {/* Header */}
-        <div className="px-6 py-4 border-b border-gray-200">
+      <div className="flex max-h-[80vh] w-full max-w-5xl flex-col rounded-lg bg-white shadow-xl">
+        <div className="border-b border-gray-200 px-6 py-4">
           <div className="flex items-center justify-between">
             <h2 className="text-xl font-semibold text-gray-800">
-              Wybierz typ: {getCategoryLabel()}
+              Wybierz typ: {CATEGORY_LABELS[category] ?? category}
             </h2>
             <button
               onClick={onClose}
-              className="text-gray-400 hover:text-gray-600 text-2xl leading-none"
+              className="text-2xl leading-none text-gray-400 hover:text-gray-600"
               aria-label="Zamknij"
             >
               ×
             </button>
           </div>
-
-          {/* Search bar */}
           <div className="mt-4">
             <input
               type="text"
               placeholder="Szukaj po nazwie lub ID..."
               value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              onChange={(event) => setSearchQuery(event.target.value)}
+              className="w-full rounded-md border border-gray-300 px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
         </div>
 
-        {/* Content */}
         <div className="flex-1 overflow-y-auto px-6 py-4">
-          {loading && (
-            <div className="text-center py-8 text-gray-500">Ładowanie typów...</div>
-          )}
+          {loading ? (
+            <div className="py-8 text-center text-gray-500">Ladowanie typow...</div>
+          ) : null}
 
-          {error && (
-            <div className="text-center py-8 text-red-600">
-              <p className="font-semibold">Błąd</p>
+          {error ? (
+            <div className="py-8 text-center text-red-600">
+              <p className="font-semibold">Blad</p>
               <p className="text-sm">{error}</p>
             </div>
-          )}
+          ) : null}
 
-          {!loading && !error && filteredTypes.length === 0 && (
-            <div className="text-center py-8 text-gray-500">
-              {searchQuery ? 'Brak wyników dla zapytania.' : 'Brak typów w katalogu.'}
+          {!loading && !error && filteredTypes.length === 0 ? (
+            <div className="py-8 text-center text-gray-500">
+              {searchQuery ? 'Brak wynikow dla zapytania.' : 'Brak typow w katalogu.'}
             </div>
-          )}
+          ) : null}
 
-          {!loading && !error && filteredTypes.length > 0 && (
+          {!loading && !error && filteredTypes.length > 0 ? (
             <table className="w-full">
-              <thead className="bg-gray-50 sticky top-0">
+              <thead className="sticky top-0 bg-gray-50">
                 <tr>
-                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-4 py-2 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
                     Nazwa
                   </th>
-                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-4 py-2 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
                     Producent
                   </th>
-                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-4 py-2 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
                     Parametry
                   </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200">
                 {filteredTypes.map((type) => {
-                  const isSelected = type.id === currentTypeId;
+                  const record = type as unknown as Record<string, unknown>;
+                  const manufacturer =
+                    typeof record.manufacturer === 'string'
+                      ? record.manufacturer
+                      : typeof record.vendor === 'string'
+                        ? record.vendor
+                        : '-';
+
                   return (
                     <tr
                       key={type.id}
-                      onClick={() => handleSelect(type)}
+                      onClick={() => {
+                        onSelectType(type.id, type.name);
+                        onClose();
+                      }}
                       className={clsx(
-                        'cursor-pointer hover:bg-blue-50 transition-colors',
-                        isSelected && 'bg-blue-100'
+                        'cursor-pointer transition-colors hover:bg-blue-50',
+                        type.id === currentTypeId ? 'bg-blue-100' : '',
                       )}
                     >
                       <td className="px-4 py-3">
                         <div className="text-sm font-medium text-gray-900">{type.name}</div>
                         <div className="text-xs text-gray-500">{type.id}</div>
                       </td>
-                      <td className="px-4 py-3 text-sm text-gray-700">
-                        {type.manufacturer ?? '—'}
-                      </td>
+                      <td className="px-4 py-3 text-sm text-gray-700">{manufacturer}</td>
                       <td className="px-4 py-3 text-sm text-gray-600">
-                        {renderTypeParams(type, category)}
+                        {getTypeParams(type, category)}
                       </td>
                     </tr>
                   );
                 })}
               </tbody>
             </table>
-          )}
+          ) : null}
         </div>
 
-        {/* Footer */}
-        <div className="px-6 py-4 border-t border-gray-200 flex justify-end gap-3">
+        <div className="flex justify-end gap-3 border-t border-gray-200 px-6 py-4">
           <button
             onClick={onClose}
-            className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
+            className="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
           >
             Anuluj
           </button>
@@ -222,27 +237,4 @@ export function TypePicker({
       </div>
     </div>
   );
-}
-
-/**
- * Render type-specific parameters for display.
- */
-function renderTypeParams(type: CatalogTypeUnion, category: TypeCategory): string {
-  switch (category) {
-    case 'LINE':
-    case 'CABLE': {
-      const t = type as LineType | CableType;
-      return `R=${t.r_ohm_per_km.toFixed(3)} Ω/km, X=${t.x_ohm_per_km.toFixed(3)} Ω/km, I=${t.rated_current_a} A`;
-    }
-    case 'TRANSFORMER': {
-      const t = type as TransformerType;
-      return `${t.rated_power_mva} MVA, ${t.voltage_hv_kv}/${t.voltage_lv_kv} kV, uk=${t.uk_percent}%`;
-    }
-    case 'SWITCH_EQUIPMENT': {
-      const t = type as SwitchEquipmentType;
-      return `${t.un_kv} kV, ${t.in_a} A, ${t.ik_ka} kA`;
-    }
-    default:
-      return '—';
-  }
 }

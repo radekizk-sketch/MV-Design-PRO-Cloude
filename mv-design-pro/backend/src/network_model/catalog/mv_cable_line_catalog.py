@@ -22,7 +22,14 @@ IZOLACJE:
 - EPR — kauczuk etylenowo-propylenowy (θmax = 90°C, θkz = 250°C)
 """
 
+from collections import Counter
 from typing import Any
+
+from .types import (
+    CATALOG_CONTRACT_VERSION,
+    CatalogStatus,
+    CatalogVerificationStatus,
+)
 
 # =============================================================================
 # STAŁE MATERIAŁOWE — gęstość prądu zwarciowego jth dla 1s [A/mm²]
@@ -34,6 +41,151 @@ JTH_CU_EPR = 143.0   # Miedź + EPR (θb=90°C → θk=250°C)
 JTH_AL_EPR = 94.0    # Aluminium + EPR (θb=90°C → θk=250°C)
 JTH_AL_OHL = 94.0    # Aluminium linie napowietrzne (AAC)
 JTH_AL_ST_OHL = 88.0 # Aluminium-stal linie napowietrzne (ACSR/AFL)
+
+LINE_SOURCE_REFERENCE = (
+    "PN-EN 50182 / IEC 61089 / katalogi rodzin AAL, AFL 6 i AFL 2 dla sieci SN"
+)
+CABLE_BASE_SOURCE_REFERENCE = (
+    "IEC 60502-2 / IEC 60949 / matryca bazowych kabli SN 12/20 kV MV-DESIGN-PRO"
+)
+CABLE_MANUFACTURER_SOURCE_REFERENCE = (
+    "IEC 60502-2 / karty katalogowe NKT i Tele-Fonika Kable dla rodzin SN"
+)
+CATALOG_TEST_SOURCE_REFERENCE = (
+    "Rekord testowy MV-DESIGN-PRO - nie stosowac w katalogu produkcyjnym"
+)
+
+
+def _with_catalog_quality(
+    record: dict[str, Any],
+    *,
+    source_reference: str,
+    verification_status: str,
+    catalog_status: str,
+    verification_note: str | None = None,
+) -> dict[str, Any]:
+    """Dopisuje jawne metadane jakości do surowego rekordu katalogowego."""
+
+    params = dict(record.get("params") or {})
+    params.setdefault("source_reference", source_reference)
+    params.setdefault("verification_status", verification_status)
+    params.setdefault("catalog_status", catalog_status)
+    params.setdefault("contract_version", CATALOG_CONTRACT_VERSION)
+    if verification_note and not params.get("verification_note"):
+        params["verification_note"] = verification_note
+    return {
+        "id": record["id"],
+        "name": record["name"],
+        "params": params,
+    }
+
+
+def _line_family(record_id: str) -> str:
+    if record_id.startswith("line-base-al-st-"):
+        return "AFL_6"
+    if record_id.startswith("line-base-afl2-"):
+        return "AFL_2"
+    if record_id.startswith("line-base-al-"):
+        return "AAL"
+    return "TEST"
+
+
+def _cable_family(record_id: str) -> str:
+    if record_id.startswith("cable-nkt-"):
+        return "NKT"
+    if record_id.startswith("cable-tfk-"):
+        return "TELE_FONIKA"
+    if record_id.startswith("cable-base-xlpe-cu-1c-"):
+        return "XLPE_CU_1C"
+    if record_id.startswith("cable-base-xlpe-al-1c-"):
+        return "XLPE_AL_1C"
+    if record_id.startswith("cable-base-xlpe-cu-3c-"):
+        return "XLPE_CU_3C"
+    if record_id.startswith("cable-base-xlpe-al-3c-"):
+        return "XLPE_AL_3C"
+    if record_id.startswith("cable-base-epr-cu-1c-"):
+        return "EPR_CU_1C"
+    if record_id.startswith("cable-base-epr-al-1c-"):
+        return "EPR_AL_1C"
+    if record_id.startswith("cable-base-epr-cu-3c-"):
+        return "EPR_CU_3C"
+    if record_id.startswith("cable-base-epr-al-3c-"):
+        return "EPR_AL_3C"
+    return "TEST"
+
+
+def _line_records_with_quality() -> list[dict[str, Any]]:
+    production = [
+        _with_catalog_quality(
+            record,
+            source_reference=LINE_SOURCE_REFERENCE,
+            verification_status=CatalogVerificationStatus.CZESCIOWO_ZWERYFIKOWANY.value,
+            catalog_status=CatalogStatus.PRODUKCYJNY_V1.value,
+        )
+        for record in LINE_AL_BASE + LINE_AL_ST_BASE + LINE_AFL2_BASE
+    ]
+    tests = [
+        _with_catalog_quality(
+            record,
+            source_reference=CATALOG_TEST_SOURCE_REFERENCE,
+            verification_status=CatalogVerificationStatus.REFERENCYJNY.value,
+            catalog_status=CatalogStatus.TESTOWY.value,
+            verification_note="Rekord zachowany wyłącznie do testów kompletności danych cieplnych.",
+        )
+        for record in LINE_INCOMPLETE_TYPES
+    ]
+    return production + tests
+
+
+def _cable_records_with_quality() -> list[dict[str, Any]]:
+    base_records = [
+        _with_catalog_quality(
+            record,
+            source_reference=CABLE_BASE_SOURCE_REFERENCE,
+            verification_status=CatalogVerificationStatus.CZESCIOWO_ZWERYFIKOWANY.value,
+            catalog_status=CatalogStatus.PRODUKCYJNY_V1.value,
+        )
+        for record in (
+            CABLE_XLPE_CU_1C_BASE
+            + CABLE_XLPE_AL_1C_BASE
+            + CABLE_XLPE_CU_3C_BASE
+            + CABLE_XLPE_AL_3C_BASE
+            + CABLE_EPR_CU_1C_BASE
+            + CABLE_EPR_AL_1C_BASE
+            + CABLE_EPR_CU_3C_BASE
+            + CABLE_EPR_AL_3C_BASE
+        )
+    ]
+    manufacturer_records = [
+        _with_catalog_quality(
+            record,
+            source_reference=CABLE_MANUFACTURER_SOURCE_REFERENCE,
+            verification_status=CatalogVerificationStatus.ZWERYFIKOWANY.value,
+            catalog_status=CatalogStatus.PRODUKCYJNY_V1.value,
+        )
+        for record in CABLE_NKT_TYPES + CABLE_TELEFONIKA_TYPES
+    ]
+    tests = [
+        _with_catalog_quality(
+            record,
+            source_reference=CATALOG_TEST_SOURCE_REFERENCE,
+            verification_status=CatalogVerificationStatus.REFERENCYJNY.value,
+            catalog_status=CatalogStatus.TESTOWY.value,
+            verification_note="Rekord zachowany wyłącznie do testów kompletności danych cieplnych.",
+        )
+        for record in CABLE_INCOMPLETE_TYPES
+    ]
+    return base_records + manufacturer_records + tests
+
+
+def _status_list(records: list[dict[str, Any]], field_name: str) -> list[str]:
+    return sorted(
+        {
+            str((record.get("params") or {}).get(field_name))
+            for record in records
+            if (record.get("params") or {}).get(field_name)
+        }
+    )
 
 
 # =============================================================================
@@ -874,8 +1026,25 @@ CABLE_EPR_AL_3C_BASE: list[dict[str, Any]] = [
 
 LINE_AL_BASE: list[dict[str, Any]] = [
     {
+        "id": "line-base-al-16",
+        "name": "Linia AAL 16 mm²",
+        "params": {
+            "conductor_material": "AL",
+            "cross_section_mm2": 16,
+            "r_ohm_per_km": 1.800,
+            "x_ohm_per_km": 0.405,
+            "b_us_per_km": 2.55,
+            "rated_current_a": 85,
+            "voltage_rating_kv": 20.0,
+            "max_temperature_c": 70,
+            "jth_1s_a_per_mm2": JTH_AL_OHL,
+            "standard": "PN-EN 50182",
+            "source_reference": "PN-EN 50182 / norma IEC 61089 / dane katalogowe AAC",
+        },
+    },
+    {
         "id": "line-base-al-25",
-        "name": "Linia Al 25 mm²",
+        "name": "Linia AAL 25 mm²",
         "params": {
             "conductor_material": "AL",
             "cross_section_mm2": 25,
@@ -971,7 +1140,7 @@ LINE_AL_BASE: list[dict[str, Any]] = [
     },
     {
         "id": "line-base-al-150",
-        "name": "Linia Al 150 mm²",
+        "name": "Linia AAL 150 mm²",
         "params": {
             "conductor_material": "AL",
             "cross_section_mm2": 150,
@@ -985,6 +1154,40 @@ LINE_AL_BASE: list[dict[str, Any]] = [
             "standard": "PN-EN 50182",
         },
     },
+    {
+        "id": "line-base-al-185",
+        "name": "Linia AAL 185 mm²",
+        "params": {
+            "conductor_material": "AL",
+            "cross_section_mm2": 185,
+            "r_ohm_per_km": 0.154,
+            "x_ohm_per_km": 0.318,
+            "b_us_per_km": 3.35,
+            "rated_current_a": 420,
+            "voltage_rating_kv": 20.0,
+            "max_temperature_c": 70,
+            "jth_1s_a_per_mm2": JTH_AL_OHL,
+            "standard": "PN-EN 50182",
+            "source_reference": "PN-EN 50182 / norma IEC 61089 / dane katalogowe AAC",
+        },
+    },
+    {
+        "id": "line-base-al-240",
+        "name": "Linia AAL 240 mm²",
+        "params": {
+            "conductor_material": "AL",
+            "cross_section_mm2": 240,
+            "r_ohm_per_km": 0.119,
+            "x_ohm_per_km": 0.309,
+            "b_us_per_km": 3.45,
+            "rated_current_a": 490,
+            "voltage_rating_kv": 20.0,
+            "max_temperature_c": 70,
+            "jth_1s_a_per_mm2": JTH_AL_OHL,
+            "standard": "PN-EN 50182",
+            "source_reference": "PN-EN 50182 / norma IEC 61089 / dane katalogowe AAC",
+        },
+    },
 ]
 
 # =============================================================================
@@ -992,6 +1195,23 @@ LINE_AL_BASE: list[dict[str, Any]] = [
 # =============================================================================
 
 LINE_AL_ST_BASE: list[dict[str, Any]] = [
+    {
+        "id": "line-base-al-st-16",
+        "name": "Linia AFL 6 16/2,7 mm²",
+        "params": {
+            "conductor_material": "AL_ST",
+            "cross_section_mm2": 16,
+            "r_ohm_per_km": 1.800,
+            "x_ohm_per_km": 0.408,
+            "b_us_per_km": 2.55,
+            "rated_current_a": 90,
+            "voltage_rating_kv": 20.0,
+            "max_temperature_c": 70,
+            "jth_1s_a_per_mm2": JTH_AL_ST_OHL,
+            "standard": "PN-EN 50182",
+            "source_reference": "PN-EN 50182 / katalog linii AFL 6 / typowe dane OSD",
+        },
+    },
     {
         "id": "line-base-al-st-25",
         "name": "Linia AFL 6 25/4,2 mm²",
@@ -1102,6 +1322,133 @@ LINE_AL_ST_BASE: list[dict[str, Any]] = [
             "max_temperature_c": 70,
             "jth_1s_a_per_mm2": JTH_AL_ST_OHL,
             "standard": "PN-EN 50182",
+        },
+    },
+    {
+        "id": "line-base-al-st-185",
+        "name": "Linia AFL 8 185/30,0 mm²",
+        "params": {
+            "conductor_material": "AL_ST",
+            "cross_section_mm2": 185,
+            "r_ohm_per_km": 0.152,
+            "x_ohm_per_km": 0.319,
+            "b_us_per_km": 3.30,
+            "rated_current_a": 440,
+            "voltage_rating_kv": 20.0,
+            "max_temperature_c": 70,
+            "jth_1s_a_per_mm2": JTH_AL_ST_OHL,
+            "standard": "PN-EN 50182",
+            "source_reference": "PN-EN 50182 / katalog linii AFL 8 / typowe dane OSD",
+        },
+    },
+    {
+        "id": "line-base-al-st-240",
+        "name": "Linia AFL 8 240/40,0 mm²",
+        "params": {
+            "conductor_material": "AL_ST",
+            "cross_section_mm2": 240,
+            "r_ohm_per_km": 0.117,
+            "x_ohm_per_km": 0.310,
+            "b_us_per_km": 3.40,
+            "rated_current_a": 520,
+            "voltage_rating_kv": 20.0,
+            "max_temperature_c": 70,
+            "jth_1s_a_per_mm2": JTH_AL_ST_OHL,
+            "standard": "PN-EN 50182",
+            "source_reference": "PN-EN 50182 / katalog linii AFL 8 / typowe dane OSD",
+        },
+    },
+]
+
+# =============================================================================
+# TYPY BAZOWE — LINIE NAPOWIETRZNE AFL 2 (ACSR lekki rdzeń stalowy)
+# Stosowane w sieciach SN o mniejszych obciążeniach mechanicznych
+# =============================================================================
+
+LINE_AFL2_BASE: list[dict[str, Any]] = [
+    {
+        "id": "line-base-afl2-35",
+        "name": "Linia AFL 2 35/6,2 mm²",
+        "params": {
+            "conductor_material": "AL_ST",
+            "cross_section_mm2": 35,
+            "r_ohm_per_km": 0.822,
+            "x_ohm_per_km": 0.381,
+            "b_us_per_km": 2.72,
+            "rated_current_a": 148,
+            "voltage_rating_kv": 20.0,
+            "max_temperature_c": 70,
+            "jth_1s_a_per_mm2": JTH_AL_ST_OHL,
+            "standard": "PN-EN 50182",
+            "source_reference": "PN-EN 50182 / katalog linii AFL 2 / dane typowe",
+        },
+    },
+    {
+        "id": "line-base-afl2-50",
+        "name": "Linia AFL 2 50/8,0 mm²",
+        "params": {
+            "conductor_material": "AL_ST",
+            "cross_section_mm2": 50,
+            "r_ohm_per_km": 0.574,
+            "x_ohm_per_km": 0.369,
+            "b_us_per_km": 2.82,
+            "rated_current_a": 185,
+            "voltage_rating_kv": 20.0,
+            "max_temperature_c": 70,
+            "jth_1s_a_per_mm2": JTH_AL_ST_OHL,
+            "standard": "PN-EN 50182",
+            "source_reference": "PN-EN 50182 / katalog linii AFL 2 / dane typowe",
+        },
+    },
+    {
+        "id": "line-base-afl2-70",
+        "name": "Linia AFL 2 70/11,0 mm²",
+        "params": {
+            "conductor_material": "AL_ST",
+            "cross_section_mm2": 70,
+            "r_ohm_per_km": 0.410,
+            "x_ohm_per_km": 0.357,
+            "b_us_per_km": 2.92,
+            "rated_current_a": 232,
+            "voltage_rating_kv": 20.0,
+            "max_temperature_c": 70,
+            "jth_1s_a_per_mm2": JTH_AL_ST_OHL,
+            "standard": "PN-EN 50182",
+            "source_reference": "PN-EN 50182 / katalog linii AFL 2 / dane typowe",
+        },
+    },
+    {
+        "id": "line-base-afl2-95",
+        "name": "Linia AFL 2 95/16,0 mm²",
+        "params": {
+            "conductor_material": "AL_ST",
+            "cross_section_mm2": 95,
+            "r_ohm_per_km": 0.301,
+            "x_ohm_per_km": 0.346,
+            "b_us_per_km": 3.02,
+            "rated_current_a": 280,
+            "voltage_rating_kv": 20.0,
+            "max_temperature_c": 70,
+            "jth_1s_a_per_mm2": JTH_AL_ST_OHL,
+            "standard": "PN-EN 50182",
+            "source_reference": "PN-EN 50182 / katalog linii AFL 2 / dane typowe",
+        },
+    },
+    {
+        "id": "line-base-afl2-120",
+        "name": "Linia AFL 2 120/20,0 mm²",
+        "params": {
+            "conductor_material": "AL_ST",
+            "cross_section_mm2": 120,
+            "r_ohm_per_km": 0.238,
+            "x_ohm_per_km": 0.337,
+            "b_us_per_km": 3.12,
+            "rated_current_a": 332,
+            "voltage_rating_kv": 20.0,
+            "max_temperature_c": 70,
+            "jth_1s_a_per_mm2": JTH_AL_ST_OHL,
+            "standard": "PN-EN 50182",
+            "source_reference": "PN-EN 50182 / katalog linii AFL 2 / dane typowe",
         },
     },
 ]
@@ -1303,28 +1650,20 @@ def get_all_cable_types() -> list[dict[str, Any]]:
     bazowe XLPE Al 3C, bazowe EPR Cu 1C, bazowe EPR Al 1C,
     bazowe EPR Cu 3C, bazowe EPR Al 3C, producenci, niekompletne.
     """
-    return (
-        CABLE_XLPE_CU_1C_BASE
-        + CABLE_XLPE_AL_1C_BASE
-        + CABLE_XLPE_CU_3C_BASE
-        + CABLE_XLPE_AL_3C_BASE
-        + CABLE_EPR_CU_1C_BASE
-        + CABLE_EPR_AL_1C_BASE
-        + CABLE_EPR_CU_3C_BASE
-        + CABLE_EPR_AL_3C_BASE
-        + CABLE_NKT_TYPES
-        + CABLE_TELEFONIKA_TYPES
-        + CABLE_INCOMPLETE_TYPES
-    )
+    return _cable_records_with_quality()
 
 
 def get_all_line_types() -> list[dict[str, Any]]:
     """
     Zwraca wszystkie typy linii napowietrznych SN w deterministycznej kolejności.
 
-    Kolejność: bazowe Al, bazowe Al/St, niekompletne.
+    Kolejność: bazowe AAL (Al), bazowe AFL 6 (Al/St), bazowe AFL 2 (Al/St lekki), niekompletne.
+    Rodziny:
+    - AAL: czyste aluminium, przekroje 16-240 mm² (10 rekordów)
+    - AFL 6: aluminium-stal 6% rdzenia, przekroje 16-240 mm² (10 rekordów)
+    - AFL 2: aluminium-stal 2% rdzenia (lekkie), przekroje 35-120 mm² (5 rekordów)
     """
-    return LINE_AL_BASE + LINE_AL_ST_BASE + LINE_INCOMPLETE_TYPES
+    return _line_records_with_quality()
 
 
 def get_base_cable_type_ids() -> list[str]:
@@ -1344,7 +1683,7 @@ def get_base_cable_type_ids() -> list[str]:
 
 def get_base_line_type_ids() -> list[str]:
     """Zwraca ID wszystkich bazowych typów linii."""
-    return [t["id"] for t in LINE_AL_BASE + LINE_AL_ST_BASE]
+    return [t["id"] for t in LINE_AL_BASE + LINE_AL_ST_BASE + LINE_AFL2_BASE]
 
 
 def get_manufacturer_cable_type_ids() -> list[str]:
@@ -1369,15 +1708,153 @@ def get_catalog_statistics() -> dict[str, Any]:
 
     return {
         "liczba_kabli_ogolem": len(all_cables),
+        "liczba_kabli_produkcyjnych": len(
+            [
+                record
+                for record in all_cables
+                if (record.get("params") or {}).get("catalog_status")
+                == CatalogStatus.PRODUKCYJNY_V1.value
+            ]
+        ),
         "liczba_kabli_bazowych": len(base_cable_ids),
         "liczba_kabli_producentow": len(manufacturer_cable_ids),
         "liczba_kabli_niekompletnych": len(incomplete_cable_ids),
         "liczba_linii_ogolem": len(all_lines),
+        "liczba_linii_produkcyjnych": len(
+            [
+                record
+                for record in all_lines
+                if (record.get("params") or {}).get("catalog_status")
+                == CatalogStatus.PRODUKCYJNY_V1.value
+            ]
+        ),
         "liczba_linii_bazowych": len(get_base_line_type_ids()),
         "liczba_linii_niekompletnych": len(incomplete_line_ids),
         "producenci_kabli": ["NKT", "Tele-Fonika Kable"],
+        "rodziny_kabli": sorted(
+            {
+                family
+                for family in (_cable_family(record["id"]) for record in all_cables)
+                if family != "TEST"
+            }
+        ),
+        "rodziny_linii": sorted(
+            {
+                family
+                for family in (_line_family(record["id"]) for record in all_lines)
+                if family != "TEST"
+            }
+        ),
         "materialy_przewodu": ["CU", "AL", "AL_ST"],
         "izolacje_kabli": ["XLPE", "EPR"],
-        "przekroje_kabli_mm2": [70, 120, 150, 185, 240, 300, 400],
-        "przekroje_linii_mm2": [25, 35, 50, 70, 95, 120, 150],
+        "przekroje_kabli_mm2": sorted(
+            {
+                int((record.get("params") or {}).get("cross_section_mm2", 0))
+                for record in all_cables
+                if (record.get("params") or {}).get("cross_section_mm2")
+            }
+        ),
+        "przekroje_linii_mm2": sorted(
+            {
+                int((record.get("params") or {}).get("cross_section_mm2", 0))
+                for record in all_lines
+                if (record.get("params") or {}).get("cross_section_mm2")
+            }
+        ),
+        "statusy_weryfikacji": _status_list(all_cables + all_lines, "verification_status"),
+        "statusy_katalogowe": _status_list(all_cables + all_lines, "catalog_status"),
+    }
+
+
+def get_line_catalog_quality_summary() -> dict[str, Any]:
+    """Zwraca podsumowanie jakości i szerokości katalogu linii napowietrznych."""
+
+    lines = get_all_line_types()
+    verification_counter = Counter(
+        (record.get("params") or {}).get("verification_status") for record in lines
+    )
+    catalog_counter = Counter(
+        (record.get("params") or {}).get("catalog_status") for record in lines
+    )
+    return {
+        "liczba_linii_ogolem": len(lines),
+        "liczba_linii_produkcyjnych": catalog_counter.get(
+            CatalogStatus.PRODUKCYJNY_V1.value, 0
+        ),
+        "liczba_linii_testowych": catalog_counter.get(CatalogStatus.TESTOWY.value, 0),
+        "liczba_czesciowo_zweryfikowanych": verification_counter.get(
+            CatalogVerificationStatus.CZESCIOWO_ZWERYFIKOWANY.value, 0
+        ),
+        "liczba_referencyjnych": verification_counter.get(
+            CatalogVerificationStatus.REFERENCYJNY.value, 0
+        ),
+        "rodziny_linii": sorted(
+            {
+                family
+                for family in (_line_family(record["id"]) for record in lines)
+                if family != "TEST"
+            }
+        ),
+        "przekroje_linii_mm2": sorted(
+            {
+                int((record.get("params") or {}).get("cross_section_mm2", 0))
+                for record in lines
+                if (record.get("params") or {}).get("cross_section_mm2")
+            }
+        ),
+        "statusy_weryfikacji": _status_list(lines, "verification_status"),
+        "statusy_katalogowe": _status_list(lines, "catalog_status"),
+        "contract_version": CATALOG_CONTRACT_VERSION,
+    }
+
+
+def get_cable_catalog_quality_summary() -> dict[str, Any]:
+    """Zwraca podsumowanie jakości i szerokości katalogu kabli SN."""
+
+    cables = get_all_cable_types()
+    verification_counter = Counter(
+        (record.get("params") or {}).get("verification_status") for record in cables
+    )
+    catalog_counter = Counter(
+        (record.get("params") or {}).get("catalog_status") for record in cables
+    )
+    return {
+        "liczba_kabli_ogolem": len(cables),
+        "liczba_kabli_produkcyjnych": catalog_counter.get(
+            CatalogStatus.PRODUKCYJNY_V1.value, 0
+        ),
+        "liczba_kabli_testowych": catalog_counter.get(CatalogStatus.TESTOWY.value, 0),
+        "liczba_zweryfikowanych": verification_counter.get(
+            CatalogVerificationStatus.ZWERYFIKOWANY.value, 0
+        ),
+        "liczba_czesciowo_zweryfikowanych": verification_counter.get(
+            CatalogVerificationStatus.CZESCIOWO_ZWERYFIKOWANY.value, 0
+        ),
+        "rodziny_kabli": sorted(
+            {
+                family
+                for family in (_cable_family(record["id"]) for record in cables)
+                if family != "TEST"
+            }
+        ),
+        "przekroje_kabli_mm2": sorted(
+            {
+                int((record.get("params") or {}).get("cross_section_mm2", 0))
+                for record in cables
+                if (record.get("params") or {}).get("cross_section_mm2")
+            }
+        ),
+        "liczba_typow_1z": sum(
+            1
+            for record in cables
+            if (record.get("params") or {}).get("number_of_cores") == 1
+        ),
+        "liczba_typow_3z": sum(
+            1
+            for record in cables
+            if (record.get("params") or {}).get("number_of_cores") == 3
+        ),
+        "statusy_weryfikacji": _status_list(cables, "verification_status"),
+        "statusy_katalogowe": _status_list(cables, "catalog_status"),
+        "contract_version": CATALOG_CONTRACT_VERSION,
     }

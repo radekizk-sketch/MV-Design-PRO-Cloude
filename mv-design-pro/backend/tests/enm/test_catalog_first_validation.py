@@ -42,6 +42,10 @@ def _make_minimal_enm(**kwargs) -> EnergyNetworkModel:
                 ref_id="src_1", name="Zasilanie",
                 bus_ref="bus_hv", model="short_circuit_power",
                 sk3_mva=500.0, r_ohm=0.01, x_ohm=0.1,
+                catalog_ref="SRC_TEST",
+                catalog_namespace="ZRODLO_SN",
+                parameter_source="CATALOG",
+                source_mode="KATALOG",
             ),
         ],
         branches=[
@@ -87,7 +91,7 @@ class TestCatalogFirstValidation:
                     hv_bus_ref="bus_hv", lv_bus_ref="bus_lv",
                     sn_mva=0.63, uhv_kv=15.0, ulv_kv=0.4,
                     uk_percent=6.0, pk_kw=7.0,
-                    catalog_ref="cat_trafo_630",
+                    catalog_ref="tr-sn-nn-15-04-630kva-dyn11",
                 ),
             ],
         )
@@ -104,7 +108,7 @@ class TestCatalogFirstValidation:
                     hv_bus_ref="bus_hv", lv_bus_ref="bus_lv",
                     sn_mva=0.63, uhv_kv=15.0, ulv_kv=0.4,
                     uk_percent=6.0, pk_kw=7.0,
-                    catalog_ref="cat_trafo_630",
+                    catalog_ref="tr-sn-nn-15-04-630kva-dyn11",
                     parameter_source="CATALOG",
                     overrides=[
                         ParameterOverride(key="uk_percent", value=5.5, reason="test"),
@@ -126,7 +130,7 @@ class TestCatalogFirstValidation:
                     hv_bus_ref="bus_hv", lv_bus_ref="bus_lv",
                     sn_mva=0.63, uhv_kv=15.0, ulv_kv=0.4,
                     uk_percent=6.0, pk_kw=7.0,
-                    catalog_ref="cat_trafo_630",
+                    catalog_ref="tr-sn-nn-15-04-630kva-dyn11",
                     parameter_source="OVERRIDE",
                     overrides=[
                         ParameterOverride(key="uk_percent", value=5.5, reason="pomiar fabryczny"),
@@ -147,7 +151,7 @@ class TestCatalogFirstValidation:
                     hv_bus_ref="bus_hv", lv_bus_ref="bus_lv",
                     sn_mva=0.63, uhv_kv=15.0, ulv_kv=0.4,
                     uk_percent=6.0, pk_kw=7.0,
-                    catalog_ref="cat_trafo_630",
+                    catalog_ref="tr-sn-nn-15-04-630kva-dyn11",
                     parameter_source="CATALOG",
                     overrides=[],
                 ),

@@ -8,6 +8,8 @@
  */
 
 import type { ContextMenuAction, OperatingMode, ElementType } from '../types';
+import { checkCatalogGate } from '../context-menu/catalogGate';
+import type { CatalogNamespace } from '../context-menu/catalogGate';
 import {
   buildSourceSNContextMenu,
   buildBusSNContextMenu,
@@ -44,6 +46,15 @@ export interface ContextMenuRequest {
   mode: OperatingMode;
 }
 
+export interface ContextMenuCatalogGateRequest {
+  operationId: string;
+  elementId: string;
+  elementType: ElementType;
+  namespace: CatalogNamespace;
+  label: string;
+  initialFormData?: Record<string, unknown>;
+}
+
 /** Callbacki operacji domenowych. */
 export interface ContextMenuHandlers {
   onOpenOperationForm: (op: string, context?: Record<string, unknown>) => void;
@@ -51,6 +62,7 @@ export interface ContextMenuHandlers {
   onSelectElement: (id: string, type: ElementType, name: string) => void;
   onCenterOnElement: (elementId: string) => void;
   onDeleteElement?: (elementId: string, elementType: ElementType) => void;
+  onCatalogRequired?: (request: ContextMenuCatalogGateRequest) => void;
 }
 
 // =============================================================================
@@ -65,6 +77,29 @@ function buildStandardHandlers(
   req: ContextMenuRequest,
   handlers: ContextMenuHandlers,
 ): Record<string, (() => void) | undefined> {
+  const openWithCatalogGate = (
+    canonicalOp: string,
+    actionId: string,
+    context?: Record<string, unknown>,
+  ) => {
+    const gate = checkCatalogGate(canonicalOp);
+    if (gate.required && gate.namespace && gate.label) {
+      if (handlers.onCatalogRequired) {
+        handlers.onCatalogRequired({
+          operationId: gate.canonicalOperation,
+          elementId: req.elementId,
+          elementType: req.elementType,
+          namespace: gate.namespace,
+          label: gate.label,
+          initialFormData: context,
+        });
+      }
+      return;
+    }
+
+    handlers.onOpenOperationForm(gate.canonicalOperation || canonicalOp || actionId, context);
+  };
+
   return {
     onProperties: () =>
       handlers.onOpenObjectCard(elementTypeToCardKind(req.elementType), req.elementId),
@@ -107,49 +142,77 @@ function buildStandardHandlers(
       : undefined,
     // Dodatkowe akcje przekazywane do konkretnych builderów
     onAddLine: () =>
-      handlers.onOpenOperationForm('start_branch_segment_sn', {
-        from_bus_ref: req.elementId,
+      openWithCatalogGate('start_branch_segment_sn', 'add_line', {
+        from_ref: req.elementId,
       }),
     onAddTransformer: () =>
-      handlers.onOpenOperationForm('add_transformer_sn_nn', {
+      openWithCatalogGate('add_transformer_sn_nn', 'add_transformer', {
         station_ref: req.elementId,
       }),
-    onAddBreaker: () =>
-      handlers.onOpenOperationForm('insert_section_switch_sn', {
+    onInsertSwitch: () =>
+      openWithCatalogGate('insert_section_switch_sn', 'insert_section_switch', {
         bus_ref: req.elementId,
         switch_kind: 'BREAKER',
       }),
-    onAddDisconnector: () =>
-      handlers.onOpenOperationForm('insert_section_switch_sn', {
+    onInsertDisconnector: () =>
+      openWithCatalogGate('insert_section_switch_sn', 'insert_disconnector', {
         bus_ref: req.elementId,
         switch_kind: 'DISCONNECTOR',
       }),
     onAddSource: () =>
-      handlers.onOpenOperationForm('add_grid_source_sn', {
+      openWithCatalogGate('add_grid_source_sn', 'add_source', {
         bus_ref: req.elementId,
+      }),
+    onAddCT: () =>
+      openWithCatalogGate('add_ct', 'add_ct', {
+        element_ref: req.elementId,
+      }),
+    onAddVT: () =>
+      openWithCatalogGate('add_vt', 'add_vt', {
+        element_ref: req.elementId,
+      }),
+    onAddPV: () =>
+      openWithCatalogGate('add_pv_inverter_nn', 'add_pv', {
+        station_ref: req.elementId,
+      }),
+    onAddBESS: () =>
+      openWithCatalogGate('add_bess_inverter_nn', 'add_bess', {
+        station_ref: req.elementId,
+      }),
+    onAddNNFeeder: () =>
+      openWithCatalogGate('add_nn_outgoing_field', 'add_nn_feeder', {
+        station_ref: req.elementId,
+      }),
+    onAddFeeder: () =>
+      openWithCatalogGate('add_nn_outgoing_field', 'add_feeder', {
+        station_ref: req.elementId,
+      }),
+    onAddSourceField: () =>
+      openWithCatalogGate('add_nn_outgoing_field', 'add_source_field', {
+        station_ref: req.elementId,
+      }),
+    onAddRelay: () =>
+      openWithCatalogGate('add_relay', 'add_relay', {
+        element_ref: req.elementId,
+      }),
+    onAddProtection: () =>
+      openWithCatalogGate('add_relay', 'add_protection', {
+        element_ref: req.elementId,
+      }),
+    onAddBreaker: () =>
+      handlers.onOpenOperationForm('add_sn_bay', {
+        bus_ref: req.elementId,
+        bay_kind: 'BREAKER',
+      }),
+    onAddDisconnector: () =>
+      handlers.onOpenOperationForm('add_sn_bay', {
+        bus_ref: req.elementId,
+        bay_kind: 'DISCONNECTOR',
       }),
     onAddLoad: () =>
       handlers.onOpenOperationForm('update_element_parameters', {
         bus_ref: req.elementId,
         element_type: 'Load',
-      }),
-    onAddCT: () =>
-      handlers.onOpenOperationForm('assign_catalog_to_element', {
-        bus_ref: req.elementId,
-        catalog_namespace: 'CT',
-      }),
-    onAddVT: () =>
-      handlers.onOpenOperationForm('assign_catalog_to_element', {
-        bus_ref: req.elementId,
-        catalog_namespace: 'VT',
-      }),
-    onAddPV: () =>
-      handlers.onOpenOperationForm('add_pv_inverter_nn', {
-        station_ref: req.elementId,
-      }),
-    onAddBESS: () =>
-      handlers.onOpenOperationForm('add_bess_inverter_nn', {
-        station_ref: req.elementId,
       }),
     onToggleSwitchState: () =>
       handlers.onOpenOperationForm('update_element_parameters', {

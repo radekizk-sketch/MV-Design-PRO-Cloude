@@ -1,36 +1,43 @@
 # INDEX KANONICZNY
 
-Status: **KANONICZNY**  
-Data aktualizacji: **2026-03-30**
+Status: **KANONICZNY**
+Data aktualizacji: **2026-04-02**
 
-## 1. Fundament (binding)
+## 1. Fundament wiążący
 
-1. `docs/spec/` — szczegółowa specyfikacja systemu (source of truth).  
-2. `SYSTEM_SPEC.md` — executive map i reguły nadrzędne.  
-3. `ARCHITECTURE.md` — architektura warstw i kontrakty techniczne.  
-4. `AGENTS.md` — governance i protokoły wykonawcze.  
-5. `PLANS.md` — jedyny aktywny plan wykonawczy.
+1. `docs/system/SPEC_KATALOGI_I_MATERIALIZACJA_PARAMETROW.md`
+2. `docs/system/SPEC_MODEL_SYSTEMOWY_SN.md`
+3. `docs/system/SPEC_OPERACJE_DOMENOWE_I_SNAPSHOT.md`
+4. `docs/system/SPEC_GOTOWOSC_I_DZIALANIA_NAPRAWCZE.md`
+5. `docs/system/SPEC_ANALIZY_WYNIKI_WHITE_BOX_RAPORTY.md`
+6. `docs/system/SPEC_TYPOSZEREGI_I_KLASY_ELEMENTOW_TECHNICZNYCH.md`
 
-## 2. Kanon SLD/CAD
+## 2. Fundament użytkowy
 
-- `docs/sld/SLD_CONTRACT_FLOW_V1.md`
-- `docs/sld/SLD_SEMANTIC_MODEL_CANONICAL_V1.md`
-- `docs/sld/SLD_PIPELINE_CANONICAL_STATUS.md`
-- `docs/sld/SLD_CAD_EDITOR_ARCHITEKTURA_DOCELOWA.md`
+- `docs/ui/UX_KATALOG_FIRST_DLA_INZYNIERA_SIECI_SN.md`
+- `docs/ui/UX_KREATOR_SIECI_SN_OD_GPZ.md`
+- `docs/ui/UX_INSPEKTOR_ANALIZA_WHITE_BOX_RAPORT.md`
+- `docs/ui/UX_ZESTAWIENIA_MATERIALOWE_I_KOMPLETNOSC_TECHNICZNA.md`
+
+## 3. Fundament SLD
+
+- `docs/sld/SLD_SYSTEM_SPEC_CANONICAL.md`
+- `docs/sld/SLD_MODEL_SEMANTYCZNY.md`
 - `docs/sld/SLD_GEOMETRIA_KANONICZNA.md`
 - `docs/sld/SLD_TYPY_STACJI_KANONICZNE.md`
 
-## 3. Kanon domenowy ENM_OP
+## 4. Fundament jakości i audytu
 
-- `docs/domain/OPERACJE_DOMENOWE_V1.md`
-- `docs/domain/READINESS_FIXACTIONS_CANONICAL_PL.md`
-- `docs/domain/ENM_OP_CONTRACTS_CANONICAL_FULL.md`
+- `docs/qa/MACIERZ_TESTOW_GLOBALNYCH.md`
+- `docs/audit/AUDYT_KATALOG_FIRST_END_TO_END.md`
+- `docs/audit/REPO_HYGIENE_PO_ETAPIE_KATALOG_FIRST.md`
 
-## 4. Audyt i migracja dokumentów
+## 5. Status dokumentów historycznych
 
-- `docs/AUDYT_DOKUMENTACJI_I_PLANOW_REPO.md`
-- `docs/MAPA_MIGRACJI_DOKUMENTOW_I_PLANOW.md`
+- `docs/spec/` ma status: **archiwalny / kontekstowy**.
+- Dokumenty w `docs/spec/`, `docs/catalog/`, `docs/analysis/` i stare audyty nie są źródłem prawdy, jeśli rozjeżdżają się z plikami wymienionymi powyżej.
+- `SYSTEM_SPEC.md`, `ARCHITECTURE.md`, `AGENTS.md` i `PLANS.md` pozostają dokumentami orientacyjnymi i zarządczymi, ale nie nadpisują wiążących specyfikacji etapu katalog-first.
 
-## 5. Zasada skrócona
+## 6. Zasada skrócona
 
-Jeśli dokument nie prowadzi do powyższych pozycji i nie jest wymagany przez testy/procedury — traktować jako roboczy lub archiwalny.
+Jeżeli dokument nie prowadzi do powyższych pozycji albo opisuje wygaszone ścieżki, traktować go jako materiał historyczny lub roboczy.

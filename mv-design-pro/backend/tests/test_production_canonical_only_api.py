@@ -10,6 +10,7 @@ from api.main import app
 from domain.analysis_run import AnalysisRun, new_analysis_run
 from domain.models import OperatingCase, Project
 from domain.project_design_mode import ProjectDesignMode
+from tests.catalog_test_helpers import gpz_payload
 
 
 def _reset_runtime_state() -> None:
@@ -153,13 +154,17 @@ def test_main_app_no_longer_exposes_noncanonical_routers(client: TestClient) -> 
 
 def test_production_enm_has_single_public_write_path(client: TestClient) -> None:
     case_id = str(uuid4())
+    project_id = str(uuid4())
+    branch_id = str(uuid4())
+    transformer_id = str(uuid4())
+    switch_id = str(uuid4())
 
     domain_op = client.post(
         f"/api/cases/{case_id}/enm/domain-ops",
         json={
             "operation": {
                 "name": "add_grid_source_sn",
-                "payload": {"voltage_kv": 15.0, "sk3_mva": 250.0, "rx_ratio": 0.1},
+                "payload": gpz_payload(voltage_kv=15.0, sk3_mva=250.0, rx_ratio=0.10),
             }
         },
     )
@@ -177,4 +182,25 @@ def test_production_enm_has_single_public_write_path(client: TestClient) -> None
     assert client.post(
         f"/api/cases/{case_id}/wizard/apply-step",
         json={"step_id": "K1", "data": {}},
+    ).status_code == 404
+    assert client.post(
+        f"/api/catalog/projects/{project_id}/branches/{branch_id}/type-ref",
+        json={"type_id": str(uuid4())},
+    ).status_code == 404
+    assert client.post(
+        f"/api/catalog/projects/{project_id}/transformers/{transformer_id}/type-ref",
+        json={"type_id": str(uuid4())},
+    ).status_code == 404
+    assert client.post(
+        f"/api/catalog/projects/{project_id}/switches/{switch_id}/equipment-type",
+        json={"type_id": str(uuid4())},
+    ).status_code == 404
+    assert client.delete(
+        f"/api/catalog/projects/{project_id}/branches/{branch_id}/type-ref",
+    ).status_code == 404
+    assert client.delete(
+        f"/api/catalog/projects/{project_id}/transformers/{transformer_id}/type-ref",
+    ).status_code == 404
+    assert client.delete(
+        f"/api/catalog/projects/{project_id}/switches/{switch_id}/equipment-type",
     ).status_code == 404

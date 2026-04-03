@@ -65,6 +65,7 @@ import { useLabelModeStore } from './labelModeStore';
 import { notify } from '../notifications/store';
 import { useModalController, ModalOverlay } from './ModalController';
 import { TypePicker } from '../catalog/TypePicker';
+import { buildCatalogBinding } from '../catalog/catalogBinding';
 import { NAMESPACE_TO_PICKER_CATEGORY } from '../catalog/elementCatalogRegistry';
 import type { CatalogNamespace, TypeCategory } from '../catalog/types';
 
@@ -146,13 +147,10 @@ const CONTEXT_MENU_OP_MAP: Record<string, string> = {
   assign_catalog: 'assign_catalog_to_element',
   assign_tr_catalog: 'assign_catalog_to_element',
   assign_bus_catalog: 'assign_catalog_to_element',
-  assign_default_catalog: 'assign_catalog_to_element',
   assign_inverter_catalog: 'assign_catalog_to_element',
   assign_storage_catalog: 'assign_catalog_to_element',
   assign_switch_catalog: 'assign_catalog_to_element',
   assign_cable_catalog: 'assign_catalog_to_element',
-  assign_next_catalog: 'assign_catalog_to_element',
-  clear_catalog: 'assign_catalog_to_element',
   // Topology operations — SN
   add_line: 'start_branch_segment_sn',
   add_cable: 'start_branch_segment_sn',
@@ -321,6 +319,10 @@ function mapSelectionHintElementType(rawType: string): ElementType {
     switch: 'Switch',
   };
   return map[normalized] ?? 'Bus';
+}
+
+function isCatalogNamespace(value: unknown): value is CatalogNamespace {
+  return typeof value === 'string' && value in NAMESPACE_TO_PICKER_CATEGORY;
 }
 
 /**
@@ -497,7 +499,8 @@ export const SLDView: React.FC<SLDViewProps> = ({
   const handleCatalogTypeSelected = useCallback(
     (typeId: string, typeName: string) => {
       const pending = catalogPickerState.pendingOp;
-      if (!pending) return;
+      const namespace = catalogPickerState.namespace;
+      if (!pending || !namespace) return;
 
       // Zamknij TypePicker
       setCatalogPickerState({ isOpen: false, category: null, namespace: null, pendingOp: null });
@@ -509,18 +512,15 @@ export const SLDView: React.FC<SLDViewProps> = ({
         name: pending.elementId,
       });
 
-      // Dispatch do ModalController z catalog_binding w initialFormData
+      // Dispatch do ModalController z kanonicznym catalog_ref w initialFormData
       modalController.dispatch(
         pending.operationId,
         pending.elementId,
         pending.elementType,
         {
-          catalog_binding: {
-            item_id: typeId,
-            name: typeName,
-            namespace: catalogPickerState.namespace,
-          },
-          catalog_ref: typeId,
+          catalog_binding: buildCatalogBinding(namespace, typeId),
+          catalog_name: typeName,
+          source_mode: 'KATALOG',
         },
       );
     },
@@ -563,11 +563,30 @@ export const SLDView: React.FC<SLDViewProps> = ({
       };
 
       if (detail.actionType === 'SELECT_CATALOG') {
-        // Odczytaj namespace z payload_hint (backend zwraca namespace jako hint)
-        const ns = (detail.payloadHint?.catalog_namespace ?? detail.payloadHint?.namespace ?? 'KABEL_SN') as CatalogNamespace;
+        const namespaceCandidate = detail.payloadHint?.catalog_namespace;
+        if (!isCatalogNamespace(namespaceCandidate)) {
+          notify('Działanie naprawcze nie zawiera jawnego namespace katalogu.', 'error');
+          return;
+        }
+
+        const hintedElementType =
+          typeof detail.payloadHint?.element_type === 'string'
+            ? mapSelectionHintElementType(detail.payloadHint.element_type)
+            : null;
+        const elementType =
+          selectedElement && selectedElement.id === detail.elementRef
+            ? selectedElement.type
+            : hintedElementType;
+
+        if (!detail.elementRef || !elementType) {
+          notify('Działanie naprawcze nie wskazuje jawnie elementu do przypisania katalogu.', 'error');
+          return;
+        }
+
+        const ns = namespaceCandidate;
         const category = NAMESPACE_TO_PICKER_CATEGORY[ns] ?? null;
 
-        if (category && detail.elementRef) {
+        if (category) {
           setCatalogPickerState({
             isOpen: true,
             category,
@@ -575,18 +594,21 @@ export const SLDView: React.FC<SLDViewProps> = ({
             pendingOp: {
               operationId: 'assign_catalog_to_element',
               elementId: detail.elementRef,
-              elementType: 'LineBranch',
+              elementType,
               namespace: ns as GateCatalogNamespace,
               label: '',
             },
           });
+          return;
         }
+
+        notify('Nie udało się otworzyć katalogu dla działania naprawczego.', 'error');
       }
     };
 
     window.addEventListener('open-fix-modal', handleFixModal);
     return () => window.removeEventListener('open-fix-modal', handleFixModal);
-  }, []);
+  }, [selectedElement]);
 
   /**
    * Fit to content on mount if enabled.

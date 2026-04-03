@@ -8,7 +8,7 @@
     "catalog_namespace": {
       "type": "string",
       "enum": [
-        "KABEL_SN", "LINIA_SN", "TRAFO_SN_NN", "APARAT_SN", "APARAT_NN",
+        "KABEL_SN", "LINIA_SN", "ZRODLO_SN", "TRAFO_SN_NN", "APARAT_SN", "APARAT_NN",
         "KABEL_NN", "CT", "VT", "OBCIAZENIE", "ZRODLO_NN_PV", "ZRODLO_NN_BESS",
         "ZABEZPIECZENIE", "NASTAWY_ZABEZPIECZEN", "CONVERTER", "INVERTER"
       ]

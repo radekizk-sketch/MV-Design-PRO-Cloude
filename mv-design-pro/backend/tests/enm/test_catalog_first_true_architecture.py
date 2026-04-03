@@ -3,6 +3,11 @@ from __future__ import annotations
 from enm.models import ENMDefaults, ENMHeader, EnergyNetworkModel
 from enm.domain_operations import execute_domain_operation
 
+CATALOG_KABEL_SN = 'cable-tfk-yakxs-3x120'
+CATALOG_LINIA_SN = 'line-base-al-st-50'
+CATALOG_LINIA_ODG = 'line-base-al-st-70'
+CATALOG_ZRODLO_SN = "src-gpz-15kv-250mva-rx010"
+
 
 def _empty_enm() -> dict:
     enm = EnergyNetworkModel(
@@ -12,8 +17,13 @@ def _empty_enm() -> dict:
 
 
 def _seed_with_segment(rodzaj: str = 'LINIA_NAPOWIETRZNA') -> tuple[dict, str]:
+    catalog_ref = CATALOG_KABEL_SN if rodzaj == 'KABEL' else CATALOG_LINIA_SN
     s0 = _empty_enm()
-    s1 = execute_domain_operation(s0, 'add_grid_source_sn', {'voltage_kv': 15.0, 'sk3_mva': 250.0})['snapshot']
+    s1 = execute_domain_operation(
+        s0,
+        'add_grid_source_sn',
+        {'voltage_kv': 15.0, 'sk3_mva': 250.0, 'catalog_ref': CATALOG_ZRODLO_SN},
+    )['snapshot']
     s2 = execute_domain_operation(
         s1,
         'continue_trunk_segment_sn',
@@ -21,7 +31,7 @@ def _seed_with_segment(rodzaj: str = 'LINIA_NAPOWIETRZNA') -> tuple[dict, str]:
             'segment': {
                 'rodzaj': rodzaj,
                 'dlugosc_m': 600,
-                'catalog_ref': 'SEG-001',
+                'catalog_ref': catalog_ref,
             },
         },
     )['snapshot']
@@ -89,7 +99,7 @@ def test_branch_from_branch_pole_branch_port() -> None:
         'start_branch_segment_sn',
         {
             'from_ref': f"{bp['ref_id']}.BRANCH",
-            'segment': {'rodzaj': 'LINIA_NAPOWIETRZNA', 'dlugosc_m': 100, 'catalog_ref': 'LINIA-ODG-70'},
+            'segment': {'rodzaj': 'LINIA_NAPOWIETRZNA', 'dlugosc_m': 100, 'catalog_ref': CATALOG_LINIA_ODG},
         },
     )
     assert resp.get('error') in (None, '')
@@ -110,7 +120,7 @@ def test_branch_from_zksn_branch_1_port() -> None:
         'start_branch_segment_sn',
         {
             'from_ref': f"{zksn['ref_id']}.BRANCH_1",
-            'segment': {'rodzaj': 'KABEL', 'dlugosc_m': 80, 'catalog_ref': 'YAKXS_3x120'},
+            'segment': {'rodzaj': 'KABEL', 'dlugosc_m': 80, 'catalog_ref': CATALOG_KABEL_SN},
         },
     )
     assert resp.get('error') in (None, '')

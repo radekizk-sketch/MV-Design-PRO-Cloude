@@ -26,6 +26,8 @@ from enm.domain_operations import (
     execute_domain_operation,
 )
 
+CATALOG_ZRODLO_SN = "src-gpz-15kv-250mva-rx010"
+
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -46,7 +48,7 @@ def _enm_with_source() -> dict:
     result = execute_domain_operation(
         enm_dict=enm,
         op_name="add_grid_source_sn",
-        payload={"voltage_kv": 15.0, "sk3_mva": 250.0},
+        payload={"voltage_kv": 15.0, "sk3_mva": 250.0, "catalog_ref": CATALOG_ZRODLO_SN},
     )
     assert result.get("snapshot") is not None, "add_grid_source_sn musi zwrócić snapshot"
     return result["snapshot"]
@@ -61,7 +63,13 @@ def _minimal_network() -> dict:
     result = execute_domain_operation(
         enm_dict=enm,
         op_name="continue_trunk_segment_sn",
-        payload={"segment": {"rodzaj": "KABEL", "dlugosc_m": 500, "catalog_ref": "YAKXS_3x120"}},
+        payload={
+            "segment": {
+                "rodzaj": "KABEL",
+                "dlugosc_m": 500,
+                "catalog_ref": "cable-tfk-yakxs-3x120",
+            }
+        },
     )
     assert result.get("snapshot") is not None
     return result["snapshot"]
@@ -83,7 +91,11 @@ class TestAllOperationsReturnSnapshot:
 
     def test_add_grid_source_returns_snapshot(self) -> None:
         enm = _empty_enm()
-        result = execute_domain_operation(enm, "add_grid_source_sn", {"voltage_kv": 15.0, "sk3_mva": 250.0})
+        result = execute_domain_operation(
+            enm,
+            "add_grid_source_sn",
+            {"voltage_kv": 15.0, "sk3_mva": 250.0, "catalog_ref": CATALOG_ZRODLO_SN},
+        )
         assert result.get("snapshot") is not None, "snapshot nie może być None"
         assert "readiness" in result, "readiness musi być w odpowiedzi"
         assert "fix_actions" in result, "fix_actions musi być w odpowiedzi"
@@ -92,7 +104,17 @@ class TestAllOperationsReturnSnapshot:
 
     def test_continue_trunk_returns_snapshot(self) -> None:
         enm = _enm_with_source()
-        result = execute_domain_operation(enm, "continue_trunk_segment_sn", {"segment": {"rodzaj": "KABEL", "dlugosc_m": 500, "catalog_ref": "YAKXS_3x120"}})
+        result = execute_domain_operation(
+            enm,
+            "continue_trunk_segment_sn",
+            {
+                "segment": {
+                    "rodzaj": "KABEL",
+                    "dlugosc_m": 500,
+                    "catalog_ref": "cable-tfk-yakxs-3x120",
+                }
+            },
+        )
         assert result.get("snapshot") is not None
         assert "readiness" in result
 
@@ -132,14 +154,28 @@ class TestSnapshotChangesAfterOperation:
     def test_add_source_changes_snapshot(self) -> None:
         enm = _empty_enm()
         fp_before = _snapshot_fingerprint(enm)
-        result = execute_domain_operation(enm, "add_grid_source_sn", {"voltage_kv": 15.0, "sk3_mva": 250.0})
+        result = execute_domain_operation(
+            enm,
+            "add_grid_source_sn",
+            {"voltage_kv": 15.0, "sk3_mva": 250.0, "catalog_ref": CATALOG_ZRODLO_SN},
+        )
         fp_after = _snapshot_fingerprint(result["snapshot"])
         assert fp_before != fp_after, "Fingerprint musi się zmienić po dodaniu źródła"
 
     def test_continue_trunk_changes_snapshot(self) -> None:
         enm = _enm_with_source()
         fp_before = _snapshot_fingerprint(enm)
-        result = execute_domain_operation(enm, "continue_trunk_segment_sn", {"segment": {"rodzaj": "KABEL", "dlugosc_m": 500, "catalog_ref": "YAKXS_3x120"}})
+        result = execute_domain_operation(
+        enm,
+        "continue_trunk_segment_sn",
+        {
+            "segment": {
+                "rodzaj": "KABEL",
+                "dlugosc_m": 500,
+                "catalog_ref": "cable-tfk-yakxs-3x120",
+            }
+        },
+        )
         fp_after = _snapshot_fingerprint(result["snapshot"])
         assert fp_before != fp_after, "Fingerprint musi się zmienić po dodaniu odcinka"
 
@@ -153,7 +189,11 @@ class TestSnapshotChangesAfterOperation:
 
     def test_changes_field_contains_created_ids(self) -> None:
         enm = _empty_enm()
-        result = execute_domain_operation(enm, "add_grid_source_sn", {"voltage_kv": 15.0, "sk3_mva": 250.0})
+        result = execute_domain_operation(
+            enm,
+            "add_grid_source_sn",
+            {"voltage_kv": 15.0, "sk3_mva": 250.0, "catalog_ref": CATALOG_ZRODLO_SN},
+        )
         changes = result.get("changes", {})
         assert len(changes.get("created_element_ids", [])) > 0, "Muszą być nowe elementy po dodaniu GPZ"
 
@@ -279,7 +319,11 @@ class TestNoUnhandledException:
     def test_duplicate_source_returns_error(self) -> None:
         """Drugie dodanie GPZ musi zwrócić error."""
         enm = _enm_with_source()
-        result = execute_domain_operation(enm, "add_grid_source_sn", {"voltage_kv": 15.0, "sk3_mva": 250.0})
+        result = execute_domain_operation(
+            enm,
+            "add_grid_source_sn",
+            {"voltage_kv": 15.0, "sk3_mva": 250.0, "catalog_ref": CATALOG_ZRODLO_SN},
+        )
         assert "error" in result, "Drugie dodanie GPZ powinno zwrócić error"
 
     def test_invalid_element_ref_returns_error(self) -> None:
@@ -340,7 +384,11 @@ class TestFullDesignPath:
     def test_step1_add_gpz(self) -> None:
         """Krok 1: Dodaj GPZ."""
         enm = _empty_enm()
-        result = execute_domain_operation(enm, "add_grid_source_sn", {"voltage_kv": 15.0, "sk3_mva": 250.0})
+        result = execute_domain_operation(
+            enm,
+            "add_grid_source_sn",
+            {"voltage_kv": 15.0, "sk3_mva": 250.0, "catalog_ref": CATALOG_ZRODLO_SN},
+        )
         assert result.get("snapshot") is not None
         assert len(result["snapshot"].get("buses", [])) >= 1
         assert len(result["snapshot"].get("sources", [])) >= 1
@@ -349,7 +397,11 @@ class TestFullDesignPath:
         """Krok 2: Dodaj odcinek SN."""
         enm = _enm_with_source()
         result = execute_domain_operation(enm, "continue_trunk_segment_sn", {
-            "segment": {"rodzaj": "KABEL", "dlugosc_m": 500, "catalog_ref": "YAKXS_3x120"},
+            "segment": {
+                "rodzaj": "KABEL",
+                "dlugosc_m": 500,
+                "catalog_ref": "cable-tfk-yakxs-3x120",
+            },
         })
         assert result.get("snapshot") is not None
         snapshot = result["snapshot"]
@@ -360,7 +412,11 @@ class TestFullDesignPath:
         enm = _enm_with_source()
         # Dodaj odcinek, potem wstaw stację
         r1 = execute_domain_operation(enm, "continue_trunk_segment_sn", {
-            "segment": {"rodzaj": "KABEL", "dlugosc_m": 500, "catalog_ref": "YAKXS_3x120"},
+            "segment": {
+                "rodzaj": "KABEL",
+                "dlugosc_m": 500,
+                "catalog_ref": "cable-tfk-yakxs-3x120",
+            },
         })
         if r1.get("snapshot") is None:
             pytest.skip("Brak snapshot po dodaniu odcinka")
@@ -381,7 +437,11 @@ class TestFullDesignPath:
         r_empty = execute_domain_operation(enm, "refresh_snapshot", {})
         blockers_0 = len(r_empty.get("readiness", {}).get("blockers", []))
 
-        r_gpz = execute_domain_operation(enm, "add_grid_source_sn", {"voltage_kv": 15.0, "sk3_mva": 250.0})
+        r_gpz = execute_domain_operation(
+            enm,
+            "add_grid_source_sn",
+            {"voltage_kv": 15.0, "sk3_mva": 250.0, "catalog_ref": CATALOG_ZRODLO_SN},
+        )
         r_after_gpz = execute_domain_operation(r_gpz["snapshot"], "refresh_snapshot", {})
         blockers_1 = len(r_after_gpz.get("readiness", {}).get("blockers", []))
 
@@ -416,7 +476,11 @@ class TestResponseEnvelopeCompleteness:
 
     def test_success_response_has_all_fields(self) -> None:
         enm = _empty_enm()
-        result = execute_domain_operation(enm, "add_grid_source_sn", {"voltage_kv": 15.0, "sk3_mva": 250.0})
+        result = execute_domain_operation(
+            enm,
+            "add_grid_source_sn",
+            {"voltage_kv": 15.0, "sk3_mva": 250.0, "catalog_ref": CATALOG_ZRODLO_SN},
+        )
         for field in self.REQUIRED_FIELDS:
             assert field in result, f"Brak pola '{field}' w odpowiedzi sukcesu"
 

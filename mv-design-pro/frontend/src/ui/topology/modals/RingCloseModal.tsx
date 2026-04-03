@@ -25,7 +25,7 @@ export interface RingCloseFormData {
   length_m: number;
   nop_required: boolean;
   nop_element: string | null;
-  catalog_binding: string | null;
+  catalog_ref: string | null;
 }
 
 interface TerminalRef {
@@ -102,7 +102,7 @@ export function RingCloseModal({
     length_m: 0,
     nop_required: true,
     nop_element: null,
-    catalog_binding: null,
+    catalog_ref: null,
   });
   const [errors, setErrors] = useState<FieldError[]>([]);
   const [touched, setTouched] = useState<Set<string>>(new Set());
@@ -116,7 +116,7 @@ export function RingCloseModal({
         length_m: 0,
         nop_required: true,
         nop_element: null,
-        catalog_binding: null,
+        catalog_ref: null,
       });
       setErrors([]);
       setTouched(new Set());
@@ -307,12 +307,12 @@ export function RingCloseModal({
               </label>
               <input
                 type="text"
-                value={formData.catalog_binding ?? ''}
+                value={formData.catalog_ref ?? ''}
                 onChange={(e) =>
-                  handleChange('catalog_binding', e.target.value.trim() || null)
+                  handleChange('catalog_ref', e.target.value.trim() || null)
                 }
                 className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
-                placeholder="opcjonalnie"
+                placeholder="Wskaż pozycję katalogową"
               />
             </div>
           </div>

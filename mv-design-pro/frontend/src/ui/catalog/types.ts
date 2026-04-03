@@ -117,8 +117,15 @@ export interface MeasurementTransformerType extends CatalogType {
  */
 export interface ProtectionDeviceType extends CatalogType {
   vendor?: string;
+  model?: string;
   series?: string;
   rated_current_a?: number;
+  notes_pl?: string;
+  source_catalog?: string;
+  unverified?: boolean;
+  unverified_ranges?: boolean;
+  functions_supported?: string[];
+  curves_supported?: string[];
 }
 
 // =============================================================================
@@ -222,6 +229,32 @@ export interface BESSInverterCatalogType extends CatalogType {
 }
 
 /**
+ * MV System Source Type (ZRODLO_SN).
+ * Source: backend SourceSystemType dataclass.
+ */
+export interface SourceSystemCatalogType extends CatalogType {
+  voltage_rating_kv: number;
+  sk3_mva: number;
+  ik3_ka?: number;
+  rx_ratio?: number;
+  earthing_system?: string;
+  short_circuit_model?: string;
+  operator_name?: string;
+  supply_role?: string;
+  series?: string;
+  catalog_number?: string;
+  data_source?: string;
+}
+
+export interface MVApparatusCatalogType extends CatalogType {
+  device_kind: string;
+  u_n_kv: number;
+  i_n_a: number;
+  breaking_capacity_ka?: number;
+  making_capacity_ka?: number;
+}
+
+/**
  * Catalog Binding — links element to catalog item with version.
  * Source: backend CatalogBinding / CatalogBindingPayload.
  */
@@ -239,6 +272,7 @@ export interface CatalogBinding {
 export type CatalogNamespace =
   | 'KABEL_SN'
   | 'LINIA_SN'
+  | 'ZRODLO_SN'
   | 'TRAFO_SN_NN'
   | 'APARAT_SN'
   | 'APARAT_NN'
@@ -259,7 +293,7 @@ export type CatalogNamespace =
 export type TypeCategory = 'LINE' | 'CABLE' | 'TRANSFORMER' | 'SWITCH_EQUIPMENT'
   | 'CONVERTER' | 'MEASUREMENT_TRANSFORMER' | 'PROTECTION_DEVICE'
   | 'LV_CABLE' | 'LOAD' | 'MV_APPARATUS' | 'LV_APPARATUS'
-  | 'CT' | 'VT' | 'PV_INVERTER' | 'BESS_INVERTER';
+  | 'CT' | 'VT' | 'PV_INVERTER' | 'BESS_INVERTER' | 'SYSTEM_SOURCE';
 
 /**
  * Type reference in element (points to catalog).

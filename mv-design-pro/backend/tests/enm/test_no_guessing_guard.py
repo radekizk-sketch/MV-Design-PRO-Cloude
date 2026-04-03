@@ -17,6 +17,7 @@ import pytest
 
 from enm.domain_operations import execute_domain_operation
 from enm.models import EnergyNetworkModel, ENMHeader, ENMDefaults
+from tests.catalog_test_helpers import gpz_payload
 
 
 # ---------------------------------------------------------------------------
@@ -33,7 +34,7 @@ def _add_grid_source(enm_dict):
     return execute_domain_operation(
         enm_dict=enm_dict,
         op_name="add_grid_source_sn",
-        payload={"voltage_kv": 15.0, "sk3_mva": 250.0},
+        payload=gpz_payload(voltage_kv=15.0, sk3_mva=250.0, rx_ratio=0.10),
     )
 
 
@@ -45,7 +46,7 @@ def _build_gpz_plus_segments(n_segments=2):
         result = execute_domain_operation(
             enm_dict=snapshot,
             op_name="continue_trunk_segment_sn",
-            payload={"segment": {"rodzaj": "KABEL", "dlugosc_m": 500, "catalog_ref": "YAKXS_3x120"}},
+            payload={"segment": {"rodzaj": "KABEL", "dlugosc_m": 500, "catalog_ref": "cable-tfk-yakxs-3x120"}},
         )
         snapshot = result["snapshot"]
     return result, snapshot
@@ -111,7 +112,7 @@ class TestNoDefaultLengthBranch:
                 "segment_id": first_segment,
                 "name": "Stacja testowa",
                 "station_type": "branch",
-                "transformer": {"transformer_catalog_ref": "TRAFO-0.63MVA"},
+                "transformer": {"transformer_catalog_ref": "tr-sn-nn-15-04-630kva-dyn11"},
                 "station": {"nn_voltage_kv": 0.4},
                 "nn_voltage_kv": 0.4,
             },
@@ -160,7 +161,7 @@ class TestNoAutoDetectBranchSource:
             op_name="start_branch_segment_sn",
             payload={
                 # NO from_ref
-                "segment": {"rodzaj": "KABEL", "dlugosc_m": 300, "catalog_ref": "YAKXS_3x120"},
+                "segment": {"rodzaj": "KABEL", "dlugosc_m": 300, "catalog_ref": "cable-tfk-yakxs-3x120"},
             },
         )
 
@@ -243,7 +244,7 @@ class TestNoAutoDetectRingEndpoints:
             payload={
                 # NO from_bus_ref
                 "to_bus_ref": buses[-1]["ref_id"],
-                "segment": {"rodzaj": "KABEL", "dlugosc_m": 200, "catalog_ref": "YAKXS_3x120"},
+                "segment": {"rodzaj": "KABEL", "dlugosc_m": 200, "catalog_ref": "cable-tfk-yakxs-3x120"},
             },
         )
 
@@ -495,7 +496,7 @@ class TestSecondaryConnectorDetection:
             payload={
                 "from_bus_ref": buses[-1]["ref_id"],
                 "to_bus_ref": buses[0]["ref_id"],
-                "segment": {"rodzaj": "KABEL", "dlugosc_m": 200, "catalog_ref": "YAKXS_3x120"},
+                "segment": {"rodzaj": "KABEL", "dlugosc_m": 200, "catalog_ref": "cable-tfk-yakxs-3x120"},
             },
         )
 
@@ -529,7 +530,7 @@ class TestSecondaryConnectorDetection:
             payload={
                 "from_bus_ref": buses[-1]["ref_id"],
                 "to_bus_ref": buses[0]["ref_id"],
-                "segment": {"rodzaj": "KABEL", "dlugosc_m": 200, "catalog_ref": "YAKXS_3x120"},
+                "segment": {"rodzaj": "KABEL", "dlugosc_m": 200, "catalog_ref": "cable-tfk-yakxs-3x120"},
             },
         )
 
