@@ -69,6 +69,7 @@ def test_root_python_workflow_runs_catalog_first_backend_guards():
         "python scripts/domain_no_guessing_guard.py",
         "python scripts/pcc_zero_guard.py",
         "python scripts/repo_hygiene_guard.py",
+        "python scripts/catalog_metadata_guard.py",
     ):
         assert command in workflow
 

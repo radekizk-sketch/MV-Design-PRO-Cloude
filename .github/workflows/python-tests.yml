@@ -68,3 +68,6 @@ jobs:
       - name: Repo Hygiene Guard
         working-directory: mv-design-pro
         run: python scripts/repo_hygiene_guard.py
+      - name: Catalog Metadata Guard
+        working-directory: mv-design-pro
+        run: python scripts/catalog_metadata_guard.py
