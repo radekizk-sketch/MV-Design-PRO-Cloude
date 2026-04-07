@@ -1,20 +1,20 @@
-﻿/**
- * Active Case Bar â€” Pasek aktywnego przypadku obliczeniowego
+/**
+ * Active Case Bar — Pasek aktywnego przypadku obliczeniowego
  *
  * CANONICAL ALIGNMENT:
- * - wizard_screens.md Â§ 1.3: Active case awareness bar
- * - powerfactory_ui_parity.md Â§ A.2: Status bar
+ * - wizard_screens.md § 1.3: Active case awareness bar
+ * - powerfactory_ui_parity.md § A.2: Status bar
  *
  * ALWAYS VISIBLE bar showing:
  * - Aktywny przypadek (nazwa i typ)
- * - Stan wynikĂłw (BRAK / AKTUALNE / NIEAKTUALNE)
- * - Przyciski akcji: ZmieĹ„, Konfiguruj, Oblicz, Wyniki
+ * - Stan wyników (BRAK / AKTUALNE / NIEAKTUALNE)
+ * - Przyciski akcji: Zmień, Konfiguruj, Oblicz, Wyniki
  *
  * POLISH UI (100% Polish labels).
  *
  * INVARIANTS:
- * - Brak aktywnego przypadku â†’ [Oblicz] DISABLED z komunikatem PL
- * - Kolory stanu wynikĂłw: BRAK=szary, AKTUALNE=zielony, NIEAKTUALNE=bursztynowy
+ * - Brak aktywnego przypadku → [Oblicz] DISABLED z komunikatem PL
+ * - Kolory stanu wyników: BRAK=szary, AKTUALNE=zielony, NIEAKTUALNE=bursztynowy
  */
 
 import { useCallback } from 'react';
@@ -31,7 +31,7 @@ import type { ResultStatus } from '../types';
 import { UndoRedoButtons } from '../history/UndoRedoButtons';
 
 // =============================================================================
-// Status Styling â€” Industrial Grade
+// Status Styling — Industrial Grade
 // =============================================================================
 
 const RESULT_STATUS_STYLES: Record<ResultStatus, { badge: string; dot: string }> = {
@@ -155,7 +155,7 @@ export function ActiveCaseBar({
           </>
         )}
 
-        {/* Stan wynikĂłw */}
+        {/* Stan wyników */}
         {hasActiveCase && (
           <>
             <div className="ind-divider-v" />
@@ -191,13 +191,13 @@ export function ActiveCaseBar({
 
       {/* Prawa strona: Przyciski akcji */}
       <div className="flex items-center gap-1.5">
-        {/* ZmieĹ„ przypadek */}
+        {/* Zmień przypadek */}
         <button
           data-testid="btn-change-case"
           onClick={handleChangeCaseClick}
           className="ind-btn text-chrome-600 bg-chrome-50 hover:bg-chrome-100 border border-chrome-200"
         >
-          ZmieĹ„ przypadek
+          Zmień przypadek
         </button>
 
         {/* Konfiguruj */}
@@ -213,7 +213,7 @@ export function ActiveCaseBar({
           )}
           title={
             !hasActiveCase
-              ? 'Wybierz przypadek, aby skonfigurowaÄ‡'
+              ? 'Wybierz przypadek, aby skonfigurować'
               : 'Konfiguruj parametry przypadku'
           }
         >
@@ -222,7 +222,7 @@ export function ActiveCaseBar({
 
         <div className="ind-divider-v" />
 
-        {/* Oblicz â€” gĹ‚Ăłwna akcja */}
+        {/* Oblicz — główna akcja */}
         <button
           data-testid="btn-calculate"
           onClick={handleCalculateClick}
@@ -249,20 +249,20 @@ export function ActiveCaseBar({
           )}
           title={
             !hasActiveCase
-              ? 'Wybierz przypadek, aby zobaczyÄ‡ wyniki'
+              ? 'Wybierz przypadek, aby zobaczyć wyniki'
               : resultStatus === 'NONE'
-                ? 'Brak wynikĂłw â€” uruchom obliczenia'
-                : 'Otworz kanoniczna przestrzen wynikow i analizy'
+                ? 'Brak wyników — uruchom obliczenia'
+                : 'Otwórz kanoniczną przestrzeń wyników i analizy'
           }
         >
           Wyniki i analiza
         </button>
 
-        {/* Separator + Cofnij/PonĂłw */}
+        {/* Separator + Cofnij/Ponów */}
         <div className="ind-divider-v" />
         <UndoRedoButtons />
 
-        {/* WskaĹşnik trybu */}
+        {/* Wskaźnik trybu */}
         <div className="ind-divider-v" />
         <ModeIndicator mode={activeMode} />
       </div>

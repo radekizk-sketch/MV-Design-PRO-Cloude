@@ -27,7 +27,7 @@
  * - "#case-config" â†’ Konfiguracja przypadku obliczeniowego
  */
 
-import { Suspense, lazy, useEffect, useState, useCallback, useMemo } from 'react';
+import { type ReactNode, Suspense, lazy, useEffect, useState, useCallback, useMemo } from 'react';
 
 import { resolveResultsRunId } from './ui/results-inspector/viewState';
 <<<<<<< HEAD
@@ -289,7 +289,7 @@ function App() {
   const networkStats = useNetworkStats();
 
   // E2E_STABILIZATION: Wrapper with app-ready indicator
-  const wrapWithReadyIndicator = (content: React.ReactNode) => (
+  const wrapWithReadyIndicator = (content: ReactNode) => (
     <div data-testid="app-root" data-ready={appReady}>
       {appReady && <div data-testid="app-ready" style={{ display: 'none' }} />}
       <NotificationToast />
@@ -297,7 +297,7 @@ function App() {
     </div>
   );
 
-  const renderRouteModule = (content: React.ReactNode) => (
+  const renderRouteModule = (content: ReactNode) => (
     <Suspense fallback={<RouteLoadingState />}>{content}</Suspense>
   );
 
