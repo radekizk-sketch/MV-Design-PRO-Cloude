@@ -1,14 +1,14 @@
-/**
- * WizardPage — Kreator budowy sieci SN/nN z ENM
+﻿/**
+ * WizardPage â€” Kreator budowy sieci SN/nN z ENM
  *
- * Kreator krok po kroku (K1-K10) prowadzący użytkownika
- * przez proces budowy kompletnej sieci średniego napięcia.
- * Proces zaczyna się od GPZ — punkt zasilania (K2) jest kluczowy.
+ * Kreator krok po kroku (K1-K10) prowadzÄ…cy uĹĽytkownika
+ * przez proces budowy kompletnej sieci Ĺ›redniego napiÄ™cia.
+ * Proces zaczyna siÄ™ od GPZ â€” punkt zasilania (K2) jest kluczowy.
  *
- * Każdy krok edytuje EnergyNetworkModel (ENM) — autosave via PUT.
+ * KaĹĽdy krok edytuje EnergyNetworkModel (ENM) â€” autosave via PUT.
  * Integracja: wizardStateMachine (gate logic) + WizardSldPreview (live SLD).
  *
- * BINDING: Etykiety po polsku, brak kodów projektowych.
+ * BINDING: Etykiety po polsku, brak kodĂłw projektowych.
  */
 
 import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
@@ -49,16 +49,16 @@ interface WizardStep {
 }
 
 const WIZARD_STEPS: WizardStep[] = [
-  { id: 'K1', number: 1, title: 'Parametry modelu', description: 'Nazwa projektu, częstotliwość, opis' },
-  { id: 'K2', number: 2, title: 'Punkt zasilania (GPZ)', description: 'Szyna główna SN + sieć zasilająca — początek budowy' },
-  { id: 'K3', number: 3, title: 'Struktura szyn i sekcji', description: 'Sekcjonowanie szyn, sprzęgła' },
-  { id: 'K4', number: 4, title: 'Gałęzie (linie / kable)', description: 'Parametry linii: R, X, długość' },
+  { id: 'K1', number: 1, title: 'Parametry modelu', description: 'Nazwa projektu, czÄ™stotliwoĹ›Ä‡, opis' },
+  { id: 'K2', number: 2, title: 'Punkt zasilania (GPZ)', description: 'Szyna gĹ‚Ăłwna SN + sieÄ‡ zasilajÄ…ca â€” poczÄ…tek budowy' },
+  { id: 'K3', number: 3, title: 'Struktura szyn i sekcji', description: 'Sekcjonowanie szyn, sprzÄ™gĹ‚a' },
+  { id: 'K4', number: 4, title: 'GaĹ‚Ä™zie (linie / kable)', description: 'Parametry linii: R, X, dĹ‚ugoĹ›Ä‡' },
   { id: 'K5', number: 5, title: 'Transformatory', description: 'Dane znamionowe: Sn, uk%, Pk' },
-  { id: 'K6', number: 6, title: 'Odbiory i generacja', description: 'Odbiorniki (P, Q) i źródła OZE' },
-  { id: 'K7', number: 7, title: 'Uziemienia i składowe zerowe', description: 'Przegląd kompletności Z0' },
-  { id: 'K8', number: 8, title: 'Walidacja', description: 'Sprawdzenie gotowości obliczeń' },
-  { id: 'K9', number: 9, title: 'Schemat jednokreskowy', description: 'Podgląd SLD z referencjami ENM' },
-  { id: 'K10', number: 10, title: 'Uruchom analizy', description: 'Zwarcia 3F, rozpływ mocy' },
+  { id: 'K6', number: 6, title: 'Odbiory i generacja', description: 'Odbiorniki (P, Q) i ĹşrĂłdĹ‚a OZE' },
+  { id: 'K7', number: 7, title: 'Uziemienia i skĹ‚adowe zerowe', description: 'PrzeglÄ…d kompletnoĹ›ci Z0' },
+  { id: 'K8', number: 8, title: 'Walidacja', description: 'Sprawdzenie gotowoĹ›ci obliczeĹ„' },
+  { id: 'K9', number: 9, title: 'Schemat jednokreskowy', description: 'PodglÄ…d SLD z referencjami ENM' },
+  { id: 'K10', number: 10, title: 'Uruchom analizy', description: 'Zwarcia 3F, rozpĹ‚yw mocy' },
 ];
 
 function createDefaultENM(): EnergyNetworkModel {
@@ -114,7 +114,7 @@ async function runPowerFlow(caseId: string): Promise<Record<string, unknown>> {
 }
 
 // ---------------------------------------------------------------------------
-// Reusable UI components — Industrial Grade
+// Reusable UI components â€” Industrial Grade
 // ---------------------------------------------------------------------------
 
 function FieldRow({ label, children, unit }: { label: string; children: React.ReactNode; unit?: string }) {
@@ -156,7 +156,7 @@ function HelpText({ children }: { children: React.ReactNode }) {
 
 function RemoveButton({ onClick }: { onClick: () => void }) {
   return (
-    <button onClick={onClick} className="flex h-6 w-6 items-center justify-center rounded-ind text-red-400 hover:text-red-600 hover:bg-red-50 transition-colors" title="Usuń">
+    <button onClick={onClick} className="flex h-6 w-6 items-center justify-center rounded-ind text-red-400 hover:text-red-600 hover:bg-red-50 transition-colors" title="UsuĹ„">
       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
         <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
       </svg>
@@ -185,7 +185,7 @@ function StepK1({ enm, onChange }: StepProps) {
   const VOLTAGE_OPTIONS = [6, 10, 15, 20, 30];
   const NETWORK_TYPES = [
     { value: 'promieniowy', label: 'Promieniowy' },
-    { value: 'pierścieniowy', label: 'Pierścieniowy' },
+    { value: 'pierĹ›cieniowy', label: 'PierĹ›cieniowy' },
     { value: 'mieszany', label: 'Mieszany' },
   ];
 
@@ -222,16 +222,16 @@ function StepK1({ enm, onChange }: StepProps) {
       </FieldRow>
 
       <SectionTitle>Parametry systemu</SectionTitle>
-      <FieldRow label="Napięcie znamionowe SN" unit="kV">
+      <FieldRow label="NapiÄ™cie znamionowe SN" unit="kV">
         <Select value={String(voltageSn)} onChange={(v) => updateHeaderMeta('voltage_sn_kv', Number(v))}>
           {VOLTAGE_OPTIONS.map((kv) => (
             <option key={kv} value={String(kv)}>{kv} kV</option>
           ))}
         </Select>
       </FieldRow>
-      <HelpText>Napięcie zostanie automatycznie ustawione na szynie źródłowej GPZ.</HelpText>
+      <HelpText>NapiÄ™cie zostanie automatycznie ustawione na szynie ĹşrĂłdĹ‚owej GPZ.</HelpText>
 
-      <FieldRow label="Układ sieci">
+      <FieldRow label="UkĹ‚ad sieci">
         <Select value={networkType} onChange={(v) => updateHeaderMeta('network_type', v)}>
           {NETWORK_TYPES.map((nt) => (
             <option key={nt.value} value={nt.value}>{nt.label}</option>
@@ -239,7 +239,7 @@ function StepK1({ enm, onChange }: StepProps) {
         </Select>
       </FieldRow>
 
-      <FieldRow label="Częstotliwość" unit="Hz">
+      <FieldRow label="CzÄ™stotliwoĹ›Ä‡" unit="Hz">
         <Input type="number" value={enm.header.defaults.frequency_hz} onChange={(v) => onChange({ ...enm, header: { ...enm.header, defaults: { ...enm.header.defaults, frequency_hz: Number(v) || 50 } } })} />
       </FieldRow>
     </div>
@@ -255,7 +255,7 @@ function StepK2({ enm, onChange }: StepProps) {
     const buses = [...enm.buses];
     const bi = buses.findIndex((b) => b.ref_id === busRef);
     if (bi < 0) {
-      buses.push({ id: crypto.randomUUID(), ref_id: busRef, name: patch.name ?? 'Szyna główna SN', tags: ['source'], meta: {}, voltage_kv: patch.voltage_kv ?? 15, phase_system: '3ph' });
+      buses.push({ id: crypto.randomUUID(), ref_id: busRef, name: patch.name ?? 'Szyna gĹ‚Ăłwna SN', tags: ['source'], meta: {}, voltage_kv: patch.voltage_kv ?? 15, phase_system: '3ph' });
     } else {
       buses[bi] = { ...buses[bi], ...patch };
     }
@@ -268,7 +268,7 @@ function StepK2({ enm, onChange }: StepProps) {
     const sources = [...enm.sources];
     const si = sources.findIndex((s) => s.ref_id === srcRef);
     if (si < 0) {
-      sources.push({ id: crypto.randomUUID(), ref_id: srcRef, name: 'Sieć zasilająca', tags: [], meta: {}, bus_ref: busRef, model: 'short_circuit_power', sk3_mva: 250, rx_ratio: 0.1, c_max: 1.1, c_min: 1.0, ...patch });
+      sources.push({ id: crypto.randomUUID(), ref_id: srcRef, name: 'SieÄ‡ zasilajÄ…ca', tags: [], meta: {}, bus_ref: busRef, model: 'short_circuit_power', sk3_mva: 250, rx_ratio: 0.1, c_max: 1.1, c_min: 1.0, ...patch });
     } else {
       sources[si] = { ...sources[si], ...patch };
     }
@@ -286,19 +286,19 @@ function StepK2({ enm, onChange }: StepProps) {
           </svg>
           <span className="text-sm font-semibold text-ind-800">Punkt zasilania GPZ</span>
         </div>
-        <p className="text-xs text-ind-600">Szyna główna SN, parametry sieci zasilającej i współczynniki napięciowe IEC 60909.</p>
+        <p className="text-xs text-ind-600">Szyna gĹ‚Ăłwna SN, parametry sieci zasilajÄ…cej i wspĂłĹ‚czynniki napiÄ™ciowe IEC 60909.</p>
       </div>
 
-      <SectionTitle>Szyna źródłowa</SectionTitle>
-      <FieldRow label="Nazwa szyny"><Input value={bus?.name ?? 'Szyna główna SN'} onChange={(v) => updateBus({ name: v })} /></FieldRow>
-      <FieldRow label="Napięcie znamionowe" unit="kV"><Input type="number" value={bus?.voltage_kv ?? 15} onChange={(v) => updateBus({ voltage_kv: Number(v) || 15 })} /></FieldRow>
+      <SectionTitle>Szyna ĹşrĂłdĹ‚owa</SectionTitle>
+      <FieldRow label="Nazwa szyny"><Input value={bus?.name ?? 'Szyna gĹ‚Ăłwna SN'} onChange={(v) => updateBus({ name: v })} /></FieldRow>
+      <FieldRow label="NapiÄ™cie znamionowe" unit="kV"><Input type="number" value={bus?.voltage_kv ?? 15} onChange={(v) => updateBus({ voltage_kv: Number(v) || 15 })} /></FieldRow>
 
-      <SectionTitle>Źródło zasilania</SectionTitle>
+      <SectionTitle>ĹąrĂłdĹ‚o zasilania</SectionTitle>
       <FieldRow label="Model">
         <Select value={model} onChange={(v) => updateSrc({ model: v as Source['model'] })}>
           <option value="short_circuit_power">Moc zwarciowa Sk&#34;</option>
           <option value="thevenin">Impedancja Thevenin (R, X)</option>
-          <option value="external_grid">Sieć zewnętrzna</option>
+          <option value="external_grid">SieÄ‡ zewnÄ™trzna</option>
         </Select>
       </FieldRow>
 
@@ -316,13 +316,13 @@ function StepK2({ enm, onChange }: StepProps) {
         </>
       )}
 
-      <SectionTitle>Współczynniki napięciowe IEC 60909</SectionTitle>
-      <HelpText>Współczynniki c_max i c_min korygują napięcie przed obliczeniem prądów zwarciowych.</HelpText>
+      <SectionTitle>WspĂłĹ‚czynniki napiÄ™ciowe IEC 60909</SectionTitle>
+      <HelpText>WspĂłĹ‚czynniki c_max i c_min korygujÄ… napiÄ™cie przed obliczeniem prÄ…dĂłw zwarciowych.</HelpText>
       <FieldRow label="c_max"><Input type="number" value={src?.c_max ?? 1.1} onChange={(v) => updateSrc({ c_max: Number(v) || 1.1 })} /></FieldRow>
       <FieldRow label="c_min"><Input type="number" value={src?.c_min ?? 1.0} onChange={(v) => updateSrc({ c_min: Number(v) || 1.0 })} /></FieldRow>
 
-      <SectionTitle>Składowa zerowa źródła (Z0)</SectionTitle>
-      <HelpText>Wymagana do obliczeń zwarć doziemnych (1F). Podaj stosunek Z0/Z1 lub bezpośrednio R0, X0.</HelpText>
+      <SectionTitle>SkĹ‚adowa zerowa ĹşrĂłdĹ‚a (Z0)</SectionTitle>
+      <HelpText>Wymagana do obliczeĹ„ zwarÄ‡ doziemnych (1F). Podaj stosunek Z0/Z1 lub bezpoĹ›rednio R0, X0.</HelpText>
       <FieldRow label="Z0/Z1"><Input type="number" value={src?.z0_z1_ratio ?? ''} onChange={(v) => updateSrc({ z0_z1_ratio: v ? Number(v) : null })} placeholder="np. 1.0" /></FieldRow>
       <FieldRow label="R0" unit="&Omega;"><Input type="number" value={src?.r0_ohm ?? ''} onChange={(v) => updateSrc({ r0_ohm: v ? Number(v) : null })} placeholder="opcjonalne" /></FieldRow>
       <FieldRow label="X0" unit="&Omega;"><Input type="number" value={src?.x0_ohm ?? ''} onChange={(v) => updateSrc({ x0_ohm: v ? Number(v) : null })} placeholder="opcjonalne" /></FieldRow>
@@ -355,7 +355,7 @@ function StepK3({ enm, onChange }: StepProps) {
   const addCoupler = () => {
     if (allRefs.length < 2) return;
     const c: SwitchBranch = {
-      id: crypto.randomUUID(), ref_id: `coupler_${Date.now()}`, name: `Sprzęgło ${couplers.length + 1}`,
+      id: crypto.randomUUID(), ref_id: `coupler_${Date.now()}`, name: `SprzÄ™gĹ‚o ${couplers.length + 1}`,
       tags: [], meta: {}, type: 'bus_coupler',
       from_bus_ref: allRefs[0], to_bus_ref: allRefs[1] ?? allRefs[0], status: 'open',
     };
@@ -368,9 +368,9 @@ function StepK3({ enm, onChange }: StepProps) {
 
   return (
     <div>
-      <HelpText>Szyny zborcze SN i nN. Każda szyna to jedna sekcja rozdzielnicy. Sprzęgło łączy dwie sekcje (NO = normalnie otwarte).</HelpText>
+      <HelpText>Szyny zborcze SN i nN. KaĹĽda szyna to jedna sekcja rozdzielnicy. SprzÄ™gĹ‚o Ĺ‚Ä…czy dwie sekcje (NO = normalnie otwarte).</HelpText>
 
-      {/* Source bus — read-only */}
+      {/* Source bus â€” read-only */}
       {sourceBus && (
         <div className="wizard-card flex items-center mb-2 bg-ind-50 border-ind-200">
           <span className="flex-1 text-sm font-medium text-ind-800">{sourceBus.name}</span>
@@ -391,18 +391,18 @@ function StepK3({ enm, onChange }: StepProps) {
               </div>
             </div>
             <FieldRow label="Nazwa"><Input value={b.name} onChange={(v) => updBus(b.ref_id, { name: v })} /></FieldRow>
-            <FieldRow label="Napięcie" unit="kV"><Input type="number" value={b.voltage_kv} onChange={(v) => updBus(b.ref_id, { voltage_kv: Number(v) || 0.4 })} /></FieldRow>
+            <FieldRow label="NapiÄ™cie" unit="kV"><Input type="number" value={b.voltage_kv} onChange={(v) => updBus(b.ref_id, { voltage_kv: Number(v) || 0.4 })} /></FieldRow>
             <FieldRow label="Strefa (opcjonalnie)"><Input value={b.zone ?? ''} onChange={(v) => updBus(b.ref_id, { zone: v || null })} placeholder="np. Sekcja A" /></FieldRow>
           </div>
         ))}
       </div>
       <div className="flex gap-2 mt-3">
-        <AddButton onClick={addBusSN} label="Dodaj szynę SN" />
-        <AddButton onClick={addBusNN} label="Dodaj szynę nN (0,4 kV)" />
+        <AddButton onClick={addBusSN} label="Dodaj szynÄ™ SN" />
+        <AddButton onClick={addBusNN} label="Dodaj szynÄ™ nN (0,4 kV)" />
       </div>
 
       {/* Bus couplers */}
-      <SectionTitle>Sprzęgła (łączniki międzysystemowe)</SectionTitle>
+      <SectionTitle>SprzÄ™gĹ‚a (Ĺ‚Ä…czniki miÄ™dzysystemowe)</SectionTitle>
       <div className="space-y-2">
         {couplers.map((c) => (
           <div key={c.ref_id} className="wizard-card">
@@ -410,7 +410,7 @@ function StepK3({ enm, onChange }: StepProps) {
               <span className="text-sm font-semibold text-ind-800">{c.name}</span>
               <div className="flex items-center gap-1">
                 <span className={clsx('ind-badge text-[10px]', c.status === 'closed' ? 'ind-badge-ok' : 'ind-badge-warn')}>
-                  {c.status === 'closed' ? 'Zamknięty' : 'Otwarty'}
+                  {c.status === 'closed' ? 'ZamkniÄ™ty' : 'Otwarty'}
                 </span>
                 <RemoveButton onClick={() => rmCoupler(c.ref_id)} />
               </div>
@@ -420,14 +420,14 @@ function StepK3({ enm, onChange }: StepProps) {
             <FieldRow label="Stan">
               <Select value={c.status} onChange={(v) => updCoupler(c.ref_id, { status: v as 'closed' | 'open' })}>
                 <option value="open">Otwarty (NO)</option>
-                <option value="closed">Zamknięty (NC)</option>
+                <option value="closed">ZamkniÄ™ty (NC)</option>
               </Select>
             </FieldRow>
           </div>
         ))}
       </div>
-      {allRefs.length >= 2 && <AddButton onClick={addCoupler} label="Dodaj sprzęgło" />}
-      {allRefs.length < 2 && <HelpText>Dodaj co najmniej 2 szyny, aby móc utworzyć sprzęgło.</HelpText>}
+      {allRefs.length >= 2 && <AddButton onClick={addCoupler} label="Dodaj sprzÄ™gĹ‚o" />}
+      {allRefs.length < 2 && <HelpText>Dodaj co najmniej 2 szyny, aby mĂłc utworzyÄ‡ sprzÄ™gĹ‚o.</HelpText>}
     </div>
   );
 }
@@ -456,7 +456,7 @@ function StepK4({ enm, onChange }: StepProps) {
 
   return (
     <div>
-      <HelpText>Linie napowietrzne i kable SN. Wybierz typ z katalogu lub wpisz parametry ręcznie.</HelpText>
+      <HelpText>Linie napowietrzne i kable SN. Wybierz typ z katalogu lub wpisz parametry rÄ™cznie.</HelpText>
       <div className="space-y-3">
         {lines.map((l) => (
           <div key={l.ref_id} className="wizard-card">
@@ -470,8 +470,8 @@ function StepK4({ enm, onChange }: StepProps) {
             <FieldRow label="Typ z katalogu">
               <div className="flex items-center gap-2">
                 <span className="text-sm text-chrome-600 flex-1 truncate">{l.catalog_ref ? l.name : 'Nie wybrano'}</span>
-                <button onClick={() => openPicker(l.ref_id, l.type)} className="ind-btn text-ind-600 bg-ind-50 hover:bg-ind-100 border border-ind-200 text-[11px] whitespace-nowrap">{l.catalog_ref ? 'Zmień typ' : 'Wybierz z katalogu'}</button>
-                {l.catalog_ref && <button onClick={() => upd(l.ref_id, { catalog_ref: null, parameter_source: null })} className="ind-btn text-red-500 bg-red-50 hover:bg-red-100 border border-red-200 text-[11px]">Wyczyść</button>}
+                <button onClick={() => openPicker(l.ref_id, l.type)} className="ind-btn text-ind-600 bg-ind-50 hover:bg-ind-100 border border-ind-200 text-[11px] whitespace-nowrap">{l.catalog_ref ? 'ZmieĹ„ typ' : 'Wybierz z katalogu'}</button>
+                {l.catalog_ref && <button onClick={() => upd(l.ref_id, { catalog_ref: null, parameter_source: null })} className="ind-btn text-red-500 bg-red-50 hover:bg-red-100 border border-red-200 text-[11px]">WyczyĹ›Ä‡</button>}
               </div>
             </FieldRow>
             <FieldRow label="Rodzaj"><Select value={l.type} onChange={(v) => upd(l.ref_id, { type: v })}><option value="line_overhead">Linia napowietrzna</option><option value="cable">Kabel</option></Select></FieldRow>
@@ -479,20 +479,20 @@ function StepK4({ enm, onChange }: StepProps) {
             <FieldRow label="Nazwa"><Input value={l.name} onChange={(v) => upd(l.ref_id, { name: v })} /></FieldRow>
             <FieldRow label="Z szyny"><Select value={l.from_bus_ref} onChange={(v) => upd(l.ref_id, { from_bus_ref: v })}>{refs.map((r) => <option key={r} value={r}>{r}</option>)}</Select></FieldRow>
             <FieldRow label="Do szyny"><Select value={l.to_bus_ref} onChange={(v) => upd(l.ref_id, { to_bus_ref: v })}>{refs.map((r) => <option key={r} value={r}>{r}</option>)}</Select></FieldRow>
-            <FieldRow label="Długość" unit="km"><Input type="number" value={l.length_km} onChange={(v) => upd(l.ref_id, { length_km: Number(v) || 0 })} /></FieldRow>
+            <FieldRow label="DĹ‚ugoĹ›Ä‡" unit="km"><Input type="number" value={l.length_km} onChange={(v) => upd(l.ref_id, { length_km: Number(v) || 0 })} /></FieldRow>
             <div className={catLock(l)}>
               {l.catalog_ref && <div className="text-[10px] text-ind-500 mb-1 mt-2 font-medium">Parametry z katalogu (tylko odczyt)</div>}
               <FieldRow label="R1" unit="&Omega;/km"><Input type="number" value={l.r_ohm_per_km} onChange={(v) => upd(l.ref_id, { r_ohm_per_km: Number(v) || 0 })} /></FieldRow>
               <FieldRow label="X1" unit="&Omega;/km"><Input type="number" value={l.x_ohm_per_km} onChange={(v) => upd(l.ref_id, { x_ohm_per_km: Number(v) || 0 })} /></FieldRow>
               <FieldRow label="B1" unit="S/km"><Input type="number" value={l.b_siemens_per_km ?? ''} onChange={(v) => upd(l.ref_id, { b_siemens_per_km: v ? Number(v) : null })} placeholder="susceptancja" /></FieldRow>
             </div>
-            <button onClick={() => setExpandedRating((s) => ({ ...s, [l.ref_id]: !s[l.ref_id] }))} className="text-[11px] text-ind-600 hover:underline mt-2">{expandedRating[l.ref_id] ? '\u25BE' : '\u25B8'} Obciążalność i wytrzymałość</button>
+            <button onClick={() => setExpandedRating((s) => ({ ...s, [l.ref_id]: !s[l.ref_id] }))} className="text-[11px] text-ind-600 hover:underline mt-2">{expandedRating[l.ref_id] ? '\u25BE' : '\u25B8'} ObciÄ…ĹĽalnoĹ›Ä‡ i wytrzymaĹ‚oĹ›Ä‡</button>
             {expandedRating[l.ref_id] && <div className={catLock(l)}>
-              <FieldRow label="In" unit="A"><Input type="number" value={l.rating?.in_a ?? ''} onChange={(v) => upd(l.ref_id, { rating: { ...l.rating, in_a: v ? Number(v) : null } })} placeholder="obciążalność" /></FieldRow>
+              <FieldRow label="In" unit="A"><Input type="number" value={l.rating?.in_a ?? ''} onChange={(v) => upd(l.ref_id, { rating: { ...l.rating, in_a: v ? Number(v) : null } })} placeholder="obciÄ…ĹĽalnoĹ›Ä‡" /></FieldRow>
               <FieldRow label="Ith" unit="kA"><Input type="number" value={l.rating?.ith_ka ?? ''} onChange={(v) => upd(l.ref_id, { rating: { ...l.rating, ith_ka: v ? Number(v) : null } })} /></FieldRow>
               <FieldRow label="Idyn" unit="kA"><Input type="number" value={l.rating?.idyn_ka ?? ''} onChange={(v) => upd(l.ref_id, { rating: { ...l.rating, idyn_ka: v ? Number(v) : null } })} /></FieldRow>
             </div>}
-            <button onClick={() => setExpandedZ0((s) => ({ ...s, [l.ref_id]: !s[l.ref_id] }))} className="text-[11px] text-ind-600 hover:underline mt-1">{expandedZ0[l.ref_id] ? '\u25BE' : '\u25B8'} Składowa zerowa (Z0)</button>
+            <button onClick={() => setExpandedZ0((s) => ({ ...s, [l.ref_id]: !s[l.ref_id] }))} className="text-[11px] text-ind-600 hover:underline mt-1">{expandedZ0[l.ref_id] ? '\u25BE' : '\u25B8'} SkĹ‚adowa zerowa (Z0)</button>
             {expandedZ0[l.ref_id] && <div className={catLock(l)}>
               <FieldRow label="R0" unit="&Omega;/km"><Input type="number" value={l.r0_ohm_per_km ?? ''} onChange={(v) => upd(l.ref_id, { r0_ohm_per_km: v ? Number(v) : null })} /></FieldRow>
               <FieldRow label="X0" unit="&Omega;/km"><Input type="number" value={l.x0_ohm_per_km ?? ''} onChange={(v) => upd(l.ref_id, { x0_ohm_per_km: v ? Number(v) : null })} /></FieldRow>
@@ -501,7 +501,7 @@ function StepK4({ enm, onChange }: StepProps) {
           </div>
         ))}
       </div>
-      <div className="flex gap-2 mt-3"><AddButton onClick={() => add('line_overhead')} label="Dodaj linię" /><AddButton onClick={() => add('cable')} label="Dodaj kabel" /></div>
+      <div className="flex gap-2 mt-3"><AddButton onClick={() => add('line_overhead')} label="Dodaj liniÄ™" /><AddButton onClick={() => add('cable')} label="Dodaj kabel" /></div>
       <TypePicker category={pickerCategory} currentTypeId={lines.find((l) => l.ref_id === pickerTargetRef)?.catalog_ref ?? null} onSelectType={handleTypeSelected} onClose={() => { setPickerOpen(false); setPickerTargetRef(null); }} isOpen={pickerOpen} />
     </div>
   );
@@ -538,7 +538,7 @@ function StepK5({ enm, onChange }: StepProps) {
 
   return (
     <div>
-      <HelpText>Dodaj transformatory SN/nN. Wybierz typ z katalogu — dane znamionowe zostaną wypełnione automatycznie.</HelpText>
+      <HelpText>Dodaj transformatory SN/nN. Wybierz typ z katalogu â€” dane znamionowe zostanÄ… wypeĹ‚nione automatycznie.</HelpText>
       <div className="space-y-3">
         {enm.transformers.map((t) => (
           <div key={t.ref_id} className="wizard-card">
@@ -564,14 +564,14 @@ function StepK5({ enm, onChange }: StepProps) {
                   onClick={() => { setPickerTargetRef(t.ref_id); setPickerOpen(true); }}
                   className="ind-btn text-ind-600 bg-ind-50 hover:bg-ind-100 border border-ind-200 text-[11px] whitespace-nowrap"
                 >
-                  {t.catalog_ref ? 'Zmień typ' : 'Wybierz z katalogu'}
+                  {t.catalog_ref ? 'ZmieĹ„ typ' : 'Wybierz z katalogu'}
                 </button>
                 {t.catalog_ref && (
                   <button
                     onClick={() => upd(t.ref_id, { catalog_ref: null, parameter_source: null })}
                     className="ind-btn text-red-500 bg-red-50 hover:bg-red-100 border border-red-200 text-[11px]"
                   >
-                    Wyczyść
+                    WyczyĹ›Ä‡
                   </button>
                 )}
               </div>
@@ -581,14 +581,14 @@ function StepK5({ enm, onChange }: StepProps) {
             <FieldRow label="Szyna DN"><Select value={t.lv_bus_ref} onChange={(v) => upd(t.ref_id, { lv_bus_ref: v })}>{refs.map((r) => <option key={r} value={r}>{r}</option>)}</Select></FieldRow>
 
             {/* Grupa polaczen */}
-            <FieldRow label="Grupa połączeń">
+            <FieldRow label="Grupa poĹ‚Ä…czeĹ„">
               <Select value={t.vector_group ?? ''} onChange={(v) => upd(t.ref_id, { vector_group: v || null })}>
-                <option value="">Nie określono</option>
+                <option value="">Nie okreĹ›lono</option>
                 {VECTOR_GROUPS.map((vg) => <option key={vg} value={vg}>{vg}</option>)}
               </Select>
             </FieldRow>
 
-            {/* Dane znamionowe — read-only gdy z katalogu */}
+            {/* Dane znamionowe â€” read-only gdy z katalogu */}
             <div className={t.catalog_ref ? 'opacity-60 pointer-events-none' : ''}>
               {t.catalog_ref && (
                 <div className="text-[10px] text-ind-500 mb-1 mt-2 font-medium">Dane znamionowe z katalogu (tylko odczyt)</div>
@@ -598,13 +598,13 @@ function StepK5({ enm, onChange }: StepProps) {
               <FieldRow label="UDN" unit="kV"><Input type="number" value={t.ulv_kv} onChange={(v) => upd(t.ref_id, { ulv_kv: Number(v) || 0 })} /></FieldRow>
               <FieldRow label="uk" unit="%"><Input type="number" value={t.uk_percent} onChange={(v) => upd(t.ref_id, { uk_percent: Number(v) || 0 })} /></FieldRow>
               <FieldRow label="Pk" unit="kW"><Input type="number" value={t.pk_kw} onChange={(v) => upd(t.ref_id, { pk_kw: Number(v) || 0 })} /></FieldRow>
-              <FieldRow label="P0 (straty jałowe)" unit="kW"><Input type="number" value={t.p0_kw ?? ''} onChange={(v) => upd(t.ref_id, { p0_kw: v ? Number(v) : null })} placeholder="opcjonalne" /></FieldRow>
-              <FieldRow label="I0 (prąd jałowy)" unit="%"><Input type="number" value={t.i0_percent ?? ''} onChange={(v) => upd(t.ref_id, { i0_percent: v ? Number(v) : null })} placeholder="opcjonalne" /></FieldRow>
+              <FieldRow label="P0 (straty jaĹ‚owe)" unit="kW"><Input type="number" value={t.p0_kw ?? ''} onChange={(v) => upd(t.ref_id, { p0_kw: v ? Number(v) : null })} placeholder="opcjonalne" /></FieldRow>
+              <FieldRow label="I0 (prÄ…d jaĹ‚owy)" unit="%"><Input type="number" value={t.i0_percent ?? ''} onChange={(v) => upd(t.ref_id, { i0_percent: v ? Number(v) : null })} placeholder="opcjonalne" /></FieldRow>
             </div>
 
-            {/* Przełącznik zaczepów */}
+            {/* PrzeĹ‚Ä…cznik zaczepĂłw */}
             <button onClick={() => setExpandedTap((s) => ({ ...s, [t.ref_id]: !s[t.ref_id] }))} className="text-[11px] text-ind-600 hover:underline mt-2">
-              {expandedTap[t.ref_id] ? '\u25BE' : '\u25B8'} Przełącznik zaczepów
+              {expandedTap[t.ref_id] ? '\u25BE' : '\u25B8'} PrzeĹ‚Ä…cznik zaczepĂłw
               {hasTapChanger(t) && <span className="ind-badge ind-badge-ok text-[10px] ml-2">Skonfigurowany</span>}
             </button>
             {expandedTap[t.ref_id] && (
@@ -622,14 +622,14 @@ function StepK5({ enm, onChange }: StepProps) {
                     }}
                     className="rounded border-chrome-300"
                   />
-                  <span className="text-xs text-chrome-600">Posiada podobciążeniowy przełącznik zaczepów</span>
+                  <span className="text-xs text-chrome-600">Posiada podobciÄ…ĹĽeniowy przeĹ‚Ä…cznik zaczepĂłw</span>
                 </div>
                 {hasTapChanger(t) && (
                   <>
                     <FieldRow label="Aktualna pozycja"><Input type="number" value={t.tap_position ?? 0} onChange={(v) => upd(t.ref_id, { tap_position: v !== '' ? Number(v) : null })} /></FieldRow>
                     <FieldRow label="Zakres min"><Input type="number" value={t.tap_min ?? -5} onChange={(v) => upd(t.ref_id, { tap_min: v !== '' ? Number(v) : null })} /></FieldRow>
                     <FieldRow label="Zakres max"><Input type="number" value={t.tap_max ?? 5} onChange={(v) => upd(t.ref_id, { tap_max: v !== '' ? Number(v) : null })} /></FieldRow>
-                    <FieldRow label="Krok zaczepów" unit="%"><Input type="number" value={t.tap_step_percent ?? 2.5} onChange={(v) => upd(t.ref_id, { tap_step_percent: v !== '' ? Number(v) : null })} /></FieldRow>
+                    <FieldRow label="Krok zaczepĂłw" unit="%"><Input type="number" value={t.tap_step_percent ?? 2.5} onChange={(v) => upd(t.ref_id, { tap_step_percent: v !== '' ? Number(v) : null })} /></FieldRow>
                   </>
                 )}
               </div>
@@ -671,7 +671,7 @@ function StepK6({ enm, onChange }: StepProps) {
   // --- Loads ---
   const addLoad = () => {
     const n = enm.loads.length + 1;
-    onChange({ ...enm, loads: [...enm.loads, { id: crypto.randomUUID(), ref_id: `load_${n}`, name: `Odbiór ${n}`, tags: [], meta: {}, bus_ref: refs[refs.length - 1] ?? '', p_mw: 1, q_mvar: 0.3, model: 'pq' as const }] });
+    onChange({ ...enm, loads: [...enm.loads, { id: crypto.randomUUID(), ref_id: `load_${n}`, name: `OdbiĂłr ${n}`, tags: [], meta: {}, bus_ref: refs[refs.length - 1] ?? '', p_mw: 1, q_mvar: 0.3, model: 'pq' as const }] });
   };
   const updLoad = (ref: string, p: Partial<Load>) => onChange({ ...enm, loads: enm.loads.map((l) => l.ref_id === ref ? { ...l, ...p } : l) });
   const rmLoad = (ref: string) => onChange({ ...enm, loads: enm.loads.filter((l) => l.ref_id !== ref) });
@@ -730,7 +730,7 @@ function StepK6({ enm, onChange }: StepProps) {
   return (
     <div>
       <SectionTitle>Odbiory</SectionTitle>
-      <HelpText>Dodaj odbiorniki mocy. Opcjonalnie wybierz typ z katalogu — parametry mocy zostaną wypełnione automatycznie.</HelpText>
+      <HelpText>Dodaj odbiorniki mocy. Opcjonalnie wybierz typ z katalogu â€” parametry mocy zostanÄ… wypeĹ‚nione automatycznie.</HelpText>
       <div className="space-y-3">
         {enm.loads.map((ld) => (
           <div key={ld.ref_id} className="wizard-card">
@@ -741,7 +741,7 @@ function StepK6({ enm, onChange }: StepProps) {
             <FieldRow label="Typ z katalogu">
               <div className="flex items-center gap-2">
                 <span className="text-sm text-chrome-600 flex-1 truncate">{ld.catalog_ref ? ld.name : 'Nie wybrano'}</span>
-                <button onClick={() => { setPickerTargetRef(ld.ref_id); setPickerTarget('load'); setPickerOpen(true); }} className="ind-btn text-ind-600 bg-ind-50 hover:bg-ind-100 border border-ind-200 text-[11px] whitespace-nowrap">{ld.catalog_ref ? 'Zmień typ' : 'Wybierz z katalogu'}</button>
+                <button onClick={() => { setPickerTargetRef(ld.ref_id); setPickerTarget('load'); setPickerOpen(true); }} className="ind-btn text-ind-600 bg-ind-50 hover:bg-ind-100 border border-ind-200 text-[11px] whitespace-nowrap">{ld.catalog_ref ? 'ZmieĹ„ typ' : 'Wybierz z katalogu'}</button>
               </div>
             </FieldRow>
             <FieldRow label="Nazwa"><Input value={ld.name} onChange={(v) => updLoad(ld.ref_id, { name: v })} /></FieldRow>
@@ -764,17 +764,17 @@ function StepK6({ enm, onChange }: StepProps) {
             </FieldRow>
             <FieldRow label="Model">
               <Select value={ld.model} onChange={(v) => updLoad(ld.ref_id, { model: v as 'pq' | 'zip' })}>
-                <option value="pq">Stała moc (PQ)</option>
+                <option value="pq">StaĹ‚a moc (PQ)</option>
                 <option value="zip">Model ZIP</option>
               </Select>
             </FieldRow>
           </div>
         ))}
       </div>
-      <AddButton onClick={addLoad} label="Dodaj odbiór" />
+      <AddButton onClick={addLoad} label="Dodaj odbiĂłr" />
 
-      <SectionTitle>Źródła rozproszone (OZE / BESS)</SectionTitle>
-      <HelpText>Generatory, instalacje PV, turbiny wiatrowe i magazyny energii. Dla każdego źródła określ wariant przyłączenia do sieci SN.</HelpText>
+      <SectionTitle>ĹąrĂłdĹ‚a rozproszone (OZE / BESS)</SectionTitle>
+      <HelpText>Generatory, instalacje PV, turbiny wiatrowe i magazyny energii. Dla kaĹĽdego ĹşrĂłdĹ‚a okreĹ›l wariant przyĹ‚Ä…czenia do sieci SN.</HelpText>
       <div className="space-y-3">
         {enm.generators.map((g) => (
           <div key={g.ref_id} className="wizard-card">
@@ -800,14 +800,14 @@ function StepK6({ enm, onChange }: StepProps) {
                   disabled={!getGeneratorCatalogCategory(g)}
                   className="ind-btn text-ind-600 bg-ind-50 hover:bg-ind-100 border border-ind-200 text-[11px] whitespace-nowrap disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                  {g.catalog_ref ? 'Zmień typ' : 'Wybierz z katalogu'}
+                  {g.catalog_ref ? 'ZmieĹ„ typ' : 'Wybierz z katalogu'}
                 </button>
                 {g.catalog_ref && (
                   <button
                     onClick={() => updGen(g.ref_id, { catalog_ref: null, parameter_source: null })}
                     className="ind-btn text-red-500 bg-red-50 hover:bg-red-100 border border-red-200 text-[11px]"
                   >
-                    Wyczyść
+                    WyczyĹ›Ä‡
                   </button>
                 )}
               </div>
@@ -822,19 +822,19 @@ function StepK6({ enm, onChange }: StepProps) {
             <FieldRow label="P" unit="MW"><Input type="number" value={g.p_mw} onChange={(v) => updGen(g.ref_id, { p_mw: Number(v) || 0 })} /></FieldRow>
             <FieldRow label="Q" unit="Mvar"><Input type="number" value={g.q_mvar ?? 0} onChange={(v) => updGen(g.ref_id, { q_mvar: Number(v) || 0 })} /></FieldRow>
             {g.gen_type !== 'synchronous' && (
-              <FieldRow label="Wariant przyłączenia">
+              <FieldRow label="Wariant przyĹ‚Ä…czenia">
                 <Select value={g.connection_variant ?? ''} onChange={(v) => updGen(g.ref_id, { connection_variant: (v || null) as Generator['connection_variant'] })}>
-                  <option value="">Nie określono</option>
+                  <option value="">Nie okreĹ›lono</option>
                   <option value="nn_side">Po stronie nN (przez trafo stacji)</option>
                   <option value="block_transformer">Transformator blokowy do SN</option>
                 </Select>
               </FieldRow>
             )}
             {g.gen_type !== 'synchronous' && (
-              <FieldRow label="Liczba równoległych"><Input type="number" value={g.n_parallel ?? 1} onChange={(v) => updGen(g.ref_id, { n_parallel: Number(v) || 1 })} /></FieldRow>
+              <FieldRow label="Liczba rĂłwnolegĹ‚ych"><Input type="number" value={g.n_parallel ?? 1} onChange={(v) => updGen(g.ref_id, { n_parallel: Number(v) || 1 })} /></FieldRow>
             )}
 
-            {/* Limity mocy — collapsible */}
+            {/* Limity mocy â€” collapsible */}
             <button onClick={() => setExpandedLimits((s) => ({ ...s, [g.ref_id]: !s[g.ref_id] }))} className="text-[11px] text-ind-600 hover:underline mt-2">
               {expandedLimits[g.ref_id] ? '\u25BE' : '\u25B8'} Limity mocy (P, Q)
               {g.limits && (g.limits.p_min_mw != null || g.limits.p_max_mw != null || g.limits.q_min_mvar != null || g.limits.q_max_mvar != null) && (
@@ -884,7 +884,7 @@ function StepK7({ enm, onChange }: StepProps) {
   const GROUNDING_TYPES: { value: NonNullable<GroundingConfig['type']>; label: string }[] = [
     { value: 'isolated', label: 'Izolowany' },
     { value: 'petersen_coil', label: 'Cewka Petersena' },
-    { value: 'directly_grounded', label: 'Bezpośrednio uziemiony' },
+    { value: 'directly_grounded', label: 'BezpoĹ›rednio uziemiony' },
     { value: 'resistor_grounded', label: 'Uziemiony przez rezystor' },
   ];
 
@@ -906,17 +906,17 @@ function StepK7({ enm, onChange }: StepProps) {
 
   return (
     <div>
-      <HelpText>Przegląd kompletności składowej zerowej (Z0) i konfiguracji uziemienia. Elementy bez Z0 ograniczają analizy zwarć doziemnych.</HelpText>
+      <HelpText>PrzeglÄ…d kompletnoĹ›ci skĹ‚adowej zerowej (Z0) i konfiguracji uziemienia. Elementy bez Z0 ograniczajÄ… analizy zwarÄ‡ doziemnych.</HelpText>
 
       {/* Grounding configuration for source bus */}
       <SectionTitle>Konfiguracja uziemienia punktu neutralnego</SectionTitle>
-      <HelpText>Typ uziemienia punktu gwiazdowego sieci SN wpływa na prądy zwarć doziemnych.</HelpText>
+      <HelpText>Typ uziemienia punktu gwiazdowego sieci SN wpĹ‚ywa na prÄ…dy zwarÄ‡ doziemnych.</HelpText>
 
       {sourceBus && (
         <div className="wizard-card mb-3">
           <div className="wizard-card-header">
             <span className="text-sm font-semibold text-ind-800">{sourceBus.name}</span>
-            <span className="ind-badge ind-badge-ok text-[10px]">Szyna źródłowa</span>
+            <span className="ind-badge ind-badge-ok text-[10px]">Szyna ĹşrĂłdĹ‚owa</span>
           </div>
           <FieldRow label="Typ uziemienia">
             <Select value={sourceBus.grounding?.type ?? 'isolated'} onChange={(v) => {
@@ -940,11 +940,11 @@ function StepK7({ enm, onChange }: StepProps) {
         </div>
       )}
 
-      {/* Other buses grounding — collapsible */}
+      {/* Other buses grounding â€” collapsible */}
       {enm.buses.filter((b) => !b.tags.includes('source')).length > 0 && (
         <>
           <button onClick={() => setExpandedGrounding((s) => ({ ...s, __other_buses: !s.__other_buses }))} className="text-[11px] text-ind-600 hover:underline mt-2 mb-2">
-            {expandedGrounding.__other_buses ? '\u25BE' : '\u25B8'} Uziemienie pozostałych szyn ({enm.buses.filter((b) => !b.tags.includes('source')).length})
+            {expandedGrounding.__other_buses ? '\u25BE' : '\u25B8'} Uziemienie pozostaĹ‚ych szyn ({enm.buses.filter((b) => !b.tags.includes('source')).length})
           </button>
           {expandedGrounding.__other_buses && (
             <div className="space-y-2 mb-3">
@@ -977,27 +977,27 @@ function StepK7({ enm, onChange }: StepProps) {
       )}
 
       {/* Z0 status warnings */}
-      <SectionTitle>Status składowej zerowej (Z0)</SectionTitle>
+      <SectionTitle>Status skĹ‚adowej zerowej (Z0)</SectionTitle>
       {noZ0.length > 0 && (
         <div className="mb-3 p-3 bg-status-warn-light border border-amber-200 rounded-md text-sm">
-          <span className="font-semibold text-amber-800">Gałęzie bez Z0:</span>{' '}
+          <span className="font-semibold text-amber-800">GaĹ‚Ä™zie bez Z0:</span>{' '}
           <span className="text-amber-700">{noZ0.map((l) => l.ref_id).join(', ')}</span>
         </div>
       )}
       {srcNoZ0.length > 0 && (
         <div className="mb-3 p-3 bg-status-warn-light border border-amber-200 rounded-md text-sm">
-          <span className="font-semibold text-amber-800">Źródła bez Z0:</span>{' '}
+          <span className="font-semibold text-amber-800">ĹąrĂłdĹ‚a bez Z0:</span>{' '}
           <span className="text-amber-700">{srcNoZ0.map((s) => s.ref_id).join(', ')}</span>
         </div>
       )}
       {noZ0.length === 0 && srcNoZ0.length === 0 && (
         <div className="mb-3 p-3 bg-status-ok-light border border-emerald-200 rounded-md text-sm text-emerald-800 font-medium">
-          Wszystkie elementy mają kompletne składowe zerowe.
+          Wszystkie elementy majÄ… kompletne skĹ‚adowe zerowe.
         </div>
       )}
 
       {/* Summary table */}
-      <SectionTitle>Podsumowanie — uziemienie i Z0</SectionTitle>
+      <SectionTitle>Podsumowanie â€” uziemienie i Z0</SectionTitle>
       <div className="overflow-hidden rounded-md border border-chrome-200">
         <table className="w-full text-sm">
           <thead>
@@ -1012,7 +1012,7 @@ function StepK7({ enm, onChange }: StepProps) {
             {enm.buses.map((bus) => (
               <tr key={bus.ref_id} className="hover:bg-chrome-50">
                 <td className="px-3 py-2 font-mono text-xs text-chrome-600">{bus.name}</td>
-                <td className="px-3 py-2 text-xs text-chrome-400">—</td>
+                <td className="px-3 py-2 text-xs text-chrome-400">â€”</td>
                 <td className="px-3 py-2">
                   <span className={clsx('ind-badge text-[10px]', bus.grounding ? 'ind-badge-ok' : 'ind-badge-warn')}>
                     {bus.grounding ? GROUNDING_TYPES.find((gt) => gt.value === bus.grounding!.type)?.label ?? bus.grounding.type : 'Izolowany'}
@@ -1029,7 +1029,7 @@ function StepK7({ enm, onChange }: StepProps) {
                     {getZ0Status('branch', br)}
                   </span>
                 </td>
-                <td className="px-3 py-2 text-xs text-chrome-400">—</td>
+                <td className="px-3 py-2 text-xs text-chrome-400">â€”</td>
               </tr>
             ))}
             {/* Sources */}
@@ -1041,7 +1041,7 @@ function StepK7({ enm, onChange }: StepProps) {
                     {getZ0Status('source', src as unknown as Source)}
                   </span>
                 </td>
-                <td className="px-3 py-2 text-xs text-chrome-400">—</td>
+                <td className="px-3 py-2 text-xs text-chrome-400">â€”</td>
               </tr>
             ))}
           </tbody>
@@ -1052,18 +1052,18 @@ function StepK7({ enm, onChange }: StepProps) {
 }
 
 function StepK8({ validation, onGoToStep }: { validation: ValidationResult | null; onGoToStep: (s: number) => void }) {
-  if (!validation) return <div className="text-sm text-chrome-400">Ładowanie walidacji...</div>;
+  if (!validation) return <div className="text-sm text-chrome-400">Ĺadowanie walidacji...</div>;
   const sm: Record<string, number> = { K1: 0, K2: 1, K3: 2, K4: 3, K5: 4, K6: 5, K7: 6 };
   return (
     <div>
-      {/* Dostępność analiz */}
+      {/* DostÄ™pnoĹ›Ä‡ analiz */}
       <div className="mb-4 flex gap-3 flex-wrap">
         {(['short_circuit_3f', 'short_circuit_1f', 'load_flow'] as const).map((k) => {
-          const labels: Record<string, string> = { short_circuit_3f: 'Zwarcie 3F', short_circuit_1f: 'Zwarcie 1F', load_flow: 'Rozpływ mocy' };
+          const labels: Record<string, string> = { short_circuit_3f: 'Zwarcie 3F', short_circuit_1f: 'Zwarcie 1F', load_flow: 'RozpĹ‚yw mocy' };
           const ok = validation.analysis_available[k];
           return (
             <div key={k} className={clsx('px-3 py-2 rounded-md text-sm font-medium', ok ? 'bg-status-ok-light text-emerald-800' : 'bg-status-error-light text-red-800')}>
-              {labels[k]}: {ok ? 'dostępne' : 'niedostępne'}
+              {labels[k]}: {ok ? 'dostÄ™pne' : 'niedostÄ™pne'}
             </div>
           );
         })}
@@ -1071,7 +1071,7 @@ function StepK8({ validation, onGoToStep }: { validation: ValidationResult | nul
 
       {validation.issues.length === 0 && (
         <div className="p-4 bg-status-ok-light border border-emerald-200 rounded-md text-sm font-semibold text-emerald-800">
-          Model sieci jest kompletny i gotowy do obliczeń.
+          Model sieci jest kompletny i gotowy do obliczeĹ„.
         </div>
       )}
 
@@ -1116,19 +1116,19 @@ function StepK8({ validation, onGoToStep }: { validation: ValidationResult | nul
 function StepK9({ enm }: { enm: EnergyNetworkModel }) {
   return (
     <div>
-      <HelpText>Podgląd schematu jednokreskowego (SLD). Układ generowany automatycznie przez silnik topologiczny.</HelpText>
+      <HelpText>PodglÄ…d schematu jednokreskowego (SLD). UkĹ‚ad generowany automatycznie przez silnik topologiczny.</HelpText>
       <WizardSldPreview enm={enm} />
       <div className="mt-3 flex gap-3 text-xs text-chrome-400">
         <span>{enm.buses.length} szyn</span>
         <span className="text-chrome-200">|</span>
-        <span>{enm.branches.length + enm.transformers.length} gałęzi</span>
+        <span>{enm.branches.length + enm.transformers.length} gaĹ‚Ä™zi</span>
         <span className="text-chrome-200">|</span>
-        <span>{enm.sources.length} źródeł</span>
+        <span>{enm.sources.length} ĹşrĂłdeĹ‚</span>
         <span className="text-chrome-200">|</span>
-        <span>{enm.loads.length} odbiorów</span>
+        <span>{enm.loads.length} odbiorĂłw</span>
       </div>
       <div className="mt-2 text-xs text-chrome-300">
-        Pełny edytor SLD dostępny w widoku <a href="#sld" className="text-ind-500 hover:text-ind-700 underline">Schemat</a>
+        Pelny edytor sieci dostepny w widoku <a href="#editor" className="text-ind-500 hover:text-ind-700 underline">Edytor sieci</a>
       </div>
     </div>
   );
@@ -1148,19 +1148,19 @@ function StepK10({ validation, wizardState, runResult, isRunning, onRun, onRunPF
   const analysisItems = [
     { key: 'sc3f', label: 'Zwarcie 3F', ready: rm?.shortCircuit3F },
     { key: 'sc1f', label: 'Zwarcie 1F', ready: rm?.shortCircuit1F },
-    { key: 'lf', label: 'Rozpływ mocy', ready: rm?.loadFlow },
+    { key: 'lf', label: 'RozpĹ‚yw mocy', ready: rm?.loadFlow },
   ];
 
   return (
     <div>
-      {/* Macierz gotowości */}
-      <SectionTitle>Macierz gotowości analiz</SectionTitle>
+      {/* Macierz gotowoĹ›ci */}
+      <SectionTitle>Macierz gotowoĹ›ci analiz</SectionTitle>
       <div className="mb-4 flex gap-3 flex-wrap">
         {analysisItems.map(({ key, label, ready }) => {
           const ok = ready?.available ?? false;
           return (
             <div key={key} data-testid={`readiness-${key}`} className={clsx('p-3 rounded-md min-w-[180px]', ok ? 'bg-status-ok-light border border-emerald-200' : 'bg-status-error-light border border-red-200')}>
-              <div className="text-sm font-medium mb-1">{label}: {ok ? <span className="text-emerald-700">dostępne</span> : <span className="text-red-700">niedostępne</span>}</div>
+              <div className="text-sm font-medium mb-1">{label}: {ok ? <span className="text-emerald-700">dostÄ™pne</span> : <span className="text-red-700">niedostÄ™pne</span>}</div>
               {!ok && ready && ready.missingRequirements.length > 0 && (
                 <ul className="ml-4 text-[11px] text-chrome-500 list-disc">
                   {ready.missingRequirements.map((req, i) => <li key={i}>{req}</li>)}
@@ -1171,13 +1171,13 @@ function StepK10({ validation, wizardState, runResult, isRunning, onRun, onRunPF
         })}
       </div>
 
-      {/* Statystyki elementów */}
+      {/* Statystyki elementĂłw */}
       {wizardState && (
         <div className="mb-4 p-3 bg-chrome-50 rounded-md flex gap-4 flex-wrap text-xs text-chrome-500">
           <span>Szyny: <span className="font-semibold text-chrome-700">{wizardState.elementCounts.buses}</span></span>
-          <span>Źródła: <span className="font-semibold text-chrome-700">{wizardState.elementCounts.sources}</span></span>
+          <span>ĹąrĂłdĹ‚a: <span className="font-semibold text-chrome-700">{wizardState.elementCounts.sources}</span></span>
           <span>Transformatory: <span className="font-semibold text-chrome-700">{wizardState.elementCounts.transformers}</span></span>
-          <span>Gałęzie: <span className="font-semibold text-chrome-700">{wizardState.elementCounts.branches}</span></span>
+          <span>GaĹ‚Ä™zie: <span className="font-semibold text-chrome-700">{wizardState.elementCounts.branches}</span></span>
           <span>Odbiory: <span className="font-semibold text-chrome-700">{wizardState.elementCounts.loads}</span></span>
           <span>Generatory: <span className="font-semibold text-chrome-700">{wizardState.elementCounts.generators}</span></span>
         </div>
@@ -1185,7 +1185,7 @@ function StepK10({ validation, wizardState, runResult, isRunning, onRun, onRunPF
 
       {!canRun && (
         <div className="mb-4 p-3 bg-status-error-light border border-red-200 rounded-md text-sm text-red-800">
-          Model sieci zawiera blokery — obliczenia zablokowane. Wróć do K8.
+          Model sieci zawiera blokery â€” obliczenia zablokowane. WrĂłÄ‡ do K8.
         </div>
       )}
 
@@ -1198,7 +1198,7 @@ function StepK10({ validation, wizardState, runResult, isRunning, onRun, onRunPF
                 <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                 <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
               </svg>
-              Obliczanie zwarć...
+              Obliczanie zwarÄ‡...
             </>
           ) : (
             <>
@@ -1217,14 +1217,14 @@ function StepK10({ validation, wizardState, runResult, isRunning, onRun, onRunPF
                 <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                 <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
               </svg>
-              Obliczanie rozpływu...
+              Obliczanie rozpĹ‚ywu...
             </>
           ) : (
             <>
               <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
                 <path d="M6.3 2.841A1.5 1.5 0 004 4.11V15.89a1.5 1.5 0 002.3 1.269l9.344-5.89a1.5 1.5 0 000-2.538L6.3 2.84z" />
               </svg>
-              Uruchom rozpływ mocy
+              Uruchom rozpĹ‚yw mocy
             </>
           )}
         </button>
@@ -1233,12 +1233,12 @@ function StepK10({ validation, wizardState, runResult, isRunning, onRun, onRunPF
       {/* SC Results */}
       {scResults.length > 0 && (
         <div className="mt-4" data-testid="sc-results">
-          <SectionTitle>Wyniki zwarć 3F</SectionTitle>
+          <SectionTitle>Wyniki zwarÄ‡ 3F</SectionTitle>
           <div className="overflow-hidden rounded-md border border-chrome-200">
             <table className="w-full text-sm">
               <thead>
                 <tr className="bg-chrome-50 border-b border-chrome-200">
-                  <th className="text-left px-3 py-2 text-xs font-semibold text-chrome-500 uppercase tracking-wider">Węzeł</th>
+                  <th className="text-left px-3 py-2 text-xs font-semibold text-chrome-500 uppercase tracking-wider">WÄ™zeĹ‚</th>
                   <th className="text-right px-3 py-2 text-xs font-semibold text-chrome-500 uppercase tracking-wider">Ik&quot; [A]</th>
                   <th className="text-right px-3 py-2 text-xs font-semibold text-chrome-500 uppercase tracking-wider">Ip [A]</th>
                   <th className="text-right px-3 py-2 text-xs font-semibold text-chrome-500 uppercase tracking-wider">Ith [A]</th>
@@ -1264,7 +1264,7 @@ function StepK10({ validation, wizardState, runResult, isRunning, onRun, onRunPF
       {/* PF Bus Results */}
       {pfBuses.length > 0 && (
         <div className="mt-4" data-testid="pf-bus-results">
-          <SectionTitle>Rozpływ mocy — napięcia węzłowe</SectionTitle>
+          <SectionTitle>RozpĹ‚yw mocy â€” napiÄ™cia wÄ™zĹ‚owe</SectionTitle>
           <div className="overflow-hidden rounded-md border border-chrome-200">
             <table className="w-full text-sm">
               <thead>
@@ -1295,12 +1295,12 @@ function StepK10({ validation, wizardState, runResult, isRunning, onRun, onRunPF
       {/* PF Branch Results */}
       {pfBranches.length > 0 && (
         <div className="mt-4" data-testid="pf-branch-results">
-          <SectionTitle>Rozpływ mocy — przepływy gałęziowe</SectionTitle>
+          <SectionTitle>RozpĹ‚yw mocy â€” przepĹ‚ywy gaĹ‚Ä™ziowe</SectionTitle>
           <div className="overflow-hidden rounded-md border border-chrome-200">
             <table className="w-full text-sm">
               <thead>
                 <tr className="bg-chrome-50 border-b border-chrome-200">
-                  <th className="text-left px-3 py-2 text-xs font-semibold text-chrome-500 uppercase tracking-wider">Gałąź</th>
+                  <th className="text-left px-3 py-2 text-xs font-semibold text-chrome-500 uppercase tracking-wider">GaĹ‚Ä…Ĺş</th>
                   <th className="text-right px-3 py-2 text-xs font-semibold text-chrome-500 uppercase tracking-wider">P_from [MW]</th>
                   <th className="text-right px-3 py-2 text-xs font-semibold text-chrome-500 uppercase tracking-wider">Q_from [Mvar]</th>
                   <th className="text-right px-3 py-2 text-xs font-semibold text-chrome-500 uppercase tracking-wider">I [A]</th>
@@ -1404,7 +1404,7 @@ function BlockerBanner({ issues }: { issues: WizardIssueApi[] }) {
         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
           <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
         </svg>
-        Przejście do następnego kroku jest zablokowane:
+        PrzejĹ›cie do nastÄ™pnego kroku jest zablokowane:
       </div>
       <ul className="ml-6 text-xs text-red-700 list-disc space-y-0.5">
         {blockers.map((b, i) => (
@@ -1438,7 +1438,7 @@ export function WizardPage() {
   const wizardStore = useWizardStore();
   const refreshSnapshot = useSnapshotStore((s) => s.refreshFromBackend);
 
-  // Wizard state machine — deterministic
+  // Wizard state machine â€” deterministic
   const wizardState = useMemo<WizardState>(() => computeWizardState(enm), [enm]);
 
   useEffect(() => { wizardStore.recomputeFromEnm(enm); }, [enm]);
@@ -1505,7 +1505,7 @@ export function WizardPage() {
 
   return (
     <div data-testid="wizard-page" className="flex h-full font-sans">
-      {/* Sidebar — kroków kreatora */}
+      {/* Sidebar â€” krokĂłw kreatora */}
       <div className="w-wizard-sidebar border-r border-chrome-200 bg-white flex flex-col overflow-hidden">
         {/* Header */}
         <div className="ind-panel-header justify-between">
@@ -1530,7 +1530,7 @@ export function WizardPage() {
         {/* Save status */}
         {saveStatus && (
           <div className={clsx('px-3 py-2 text-[11px] border-t border-chrome-200', saveStatus === 'saved' ? 'text-status-ok' : saveStatus === 'error' ? 'text-status-error' : 'text-chrome-400')}>
-            {saveStatus === 'saved' ? 'Zapisano automatycznie' : saveStatus === 'saving' ? 'Zapisywanie...' : 'Błąd zapisu'}
+            {saveStatus === 'saved' ? 'Zapisano automatycznie' : saveStatus === 'saving' ? 'Zapisywanie...' : 'BĹ‚Ä…d zapisu'}
           </div>
         )}
       </div>
@@ -1587,7 +1587,7 @@ export function WizardPage() {
               disabled={!canGoForward}
               className="ind-btn-action"
             >
-              {currentStep === 9 ? 'Zakończ' : 'Dalej'}
+              {currentStep === 9 ? 'ZakoĹ„cz' : 'Dalej'}
               <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
               </svg>
