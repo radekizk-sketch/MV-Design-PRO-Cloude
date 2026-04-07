@@ -148,9 +148,11 @@ export interface CatalogBrowserProps {
   className?: string;
   onSelectType?: (typeId: string, namespace: CatalogNamespace) => void;
   onClose?: () => void;
+  /** 'browse' — read-only view without assignment actions; 'assign' — show assign button (default) */
+  mode?: 'browse' | 'assign';
 }
 
-export function CatalogBrowser({ className, onSelectType, onClose }: CatalogBrowserProps) {
+export function CatalogBrowser({ className, onSelectType, onClose, mode = 'assign' }: CatalogBrowserProps) {
   const [activeNamespace, setActiveNamespace] = useState<CatalogNamespace>('KABEL_SN');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedTypeId, setSelectedTypeId] = useState<string | null>(null);
@@ -334,13 +336,17 @@ export function CatalogBrowser({ className, onSelectType, onClose }: CatalogBrow
                     {selectedType.manufacturer ? ` • ${selectedType.manufacturer}` : ''}
                   </p>
                 </div>
-                <button
-                  type="button"
-                  onClick={handleAssign}
-                  className="rounded bg-blue-600 px-3 py-1 text-[10px] font-medium text-white hover:bg-blue-700"
-                >
-                  Przypisz do elementu
-                </button>
+                {mode === 'browse' ? (
+                  <span className="text-[10px] text-chrome-400 italic">tryb przeglądowy</span>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={handleAssign}
+                    className="rounded bg-blue-600 px-3 py-1 text-[10px] font-medium text-white hover:bg-blue-700"
+                  >
+                    Przypisz do elementu
+                  </button>
+                )}
               </div>
             </div>
           ) : null}

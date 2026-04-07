@@ -1,13 +1,13 @@
-﻿/**
- * App Root â€” POWERFACTORY_LAYOUT + UI_INTEGRATION_E2E + PROJECT_TREE_PARITY_V1
+/**
+ * App Root — POWERFACTORY_LAYOUT + UI_INTEGRATION_E2E + PROJECT_TREE_PARITY_V1
  *
  * CANONICAL ALIGNMENT:
- * - powerfactory_ui_parity.md: Layout narzÄ™dziowy ZAWSZE renderowany
- * - wizard_screens.md Â§ 1.3: Active case bar (always visible)
- * - UI_CORE_ARCHITECTURE.md Â§ 4.1: Navigation structure
+ * - powerfactory_ui_parity.md: Layout narzędziowy ZAWSZE renderowany
+ * - wizard_screens.md § 1.3: Active case bar (always visible)
+ * - UI_CORE_ARCHITECTURE.md § 4.1: Navigation structure
  *
  * POWERFACTORY/ETAP RULE:
- * > Layout narzÄ™dziowy ZAWSZE jest renderowany.
+ * > Layout narzędziowy ZAWSZE jest renderowany.
  * > Brak danych = komunikat w obszarze roboczym, a NIE brak UI.
  *
  * Main application entry with:
@@ -17,98 +17,44 @@
  * - Empty state overlays (NOT empty screens)
  *
  * Routes (Polish):
- * - "" / "#sld" / "#network-build" â†’ Edytor sieci (aliasy zgodnosci)
- * - "#results" / "#results-workspace" â†’ Wyniki i analiza
- * - "#proof" â†’ Pomocniczy Ĺ›lad obliczeĹ„
- * - "#protection-results" â†’ Wyniki zabezpieczeĹ„
- * - "#power-flow-results" â†’ Wyniki rozpĹ‚ywu
- * - "#protection-settings" â†’ Nastawy zabezpieczeĹ„
- * - "#catalog" â†’ Biblioteka typĂłw
- * - "#case-config" â†’ Konfiguracja przypadku obliczeniowego
+ * - "" / "#sld" → Schemat jednokreskowy (SLD Editor)
+ * - "#sld-view" → Podglad schematu (SLD Read-Only Viewer)
+ * - "#results" → Przegląd wyników (Results Browser)
+ * - "#proof" → Ślad obliczeń
+ * - "#protection-results" → Wyniki zabezpieczeń
+ * - "#power-flow-results" → Wyniki rozpływu
+ * - "#network-build" → Budowa sieci (ten sam ekran modelowania co SLD)
+ * - "#protection-settings" → Nastawy zabezpieczeń
+ * - "#catalog" → Biblioteka typów (Type Library Browser)
+ * - "#case-config" → Konfiguracja przypadku obliczeniowego
  */
 
-import { type ReactNode, Suspense, lazy, useEffect, useState, useCallback, useMemo } from 'react';
+import { type ReactNode, useEffect, useState, useCallback, useMemo } from 'react';
 
+import { ProtectionResultsInspectorPage } from './ui/protection-results';
+import { PowerFlowResultsInspectorPage } from './ui/power-flow-results';
+import { ReferencePatternsPage } from './ui/reference-patterns';
+import { ResultsInspectorPage } from './ui/results-inspector';
 import { resolveResultsRunId } from './ui/results-inspector/viewState';
-<<<<<<< HEAD
 import { SLDViewPage, SldEditorPage } from './ui/sld';
 import { EnmInspectorPage } from './ui/enm-inspector';
 import { FaultScenariosPanel, FaultScenarioModal } from './ui/fault-scenarios';
-=======
->>>>>>> ae0d9db (Domknij osadzony SLD wynikowy end-to-end)
 import { PowerFactoryLayout } from './ui/layout';
 import { useAppStateStore } from './ui/app-state';
 import { useSnapshotStore } from './ui/topology/snapshotStore';
 import { useExecutionRunsStore } from './ui/study-cases/runStore';
 import type { ExecutionAnalysisType } from './ui/study-cases/types';
-import { ROUTES, useUrlSelectionSync, getCurrentHashRoute, getCurrentSearchParams, normalizeHashRoute } from './ui/navigation';
+import { ROUTES, useUrlSelectionSync, getCurrentHashRoute, getCurrentSearchParams } from './ui/navigation';
 import { useSelectionStore } from './ui/selection';
 import { NotificationToast } from './ui/notifications/NotificationToast';
 import { notify } from './ui/notifications/store';
 import type { TreeNode, TreeNodeType, ElementType } from './ui/types';
+import { TypeLibraryBrowser } from './ui/catalog';
+import { PowerDistributionPage } from './ui/power-distribution';
+import { CaseConfigPage } from './ui/study-cases/CaseConfigPage';
+import { ProtectionSettingsPage } from './ui/protection-engine-v1/ProtectionSettingsPage';
 import { InspectorResolver } from './ui/inspector-panel';
 import { useNetworkTreeElements, useNetworkStats } from './ui/topology/useNetworkTreeElements';
-
-const NetworkEditorPage = lazy(() =>
-  import('./ui/network-editor').then((module) => ({ default: module.NetworkEditorPage })),
-);
-const ResultsWorkspacePage = lazy(() =>
-  import('./ui/results-workspace').then((module) => ({ default: module.ResultsWorkspacePage })),
-);
-const LegacyTraceWorkspacePage = lazy(() =>
-  import('./ui/results-inspector/LegacyTraceWorkspacePage').then((module) => ({
-    default: module.LegacyTraceWorkspacePage,
-  })),
-);
-const ProtectionResultsInspectorPage = lazy(() =>
-  import('./ui/protection-results').then((module) => ({
-    default: module.ProtectionResultsInspectorPage,
-  })),
-);
-const PowerFlowResultsInspectorPage = lazy(() =>
-  import('./ui/power-flow-results').then((module) => ({
-    default: module.PowerFlowResultsInspectorPage,
-  })),
-);
-const ReferencePatternsPage = lazy(() =>
-  import('./ui/reference-patterns').then((module) => ({ default: module.ReferencePatternsPage })),
-);
-const SLDViewPage = lazy(() =>
-  import('./ui/sld').then((module) => ({ default: module.SLDViewPage })),
-);
-const EnmInspectorPage = lazy(() =>
-  import('./ui/enm-inspector').then((module) => ({ default: module.EnmInspectorPage })),
-);
-const FaultScenariosRoutePage = lazy(() =>
-  import('./ui/fault-scenarios').then((module) => ({
-    default: function FaultScenariosRoutePage() {
-      return (
-        <div className="flex flex-col h-full">
-          <module.FaultScenariosPanel studyCaseId={null} />
-          <module.FaultScenarioModal />
-        </div>
-      );
-    },
-  })),
-);
-const TypeLibraryBrowser = lazy(() =>
-  import('./ui/catalog').then((module) => ({ default: module.TypeLibraryBrowser })),
-);
-const PowerDistributionPage = lazy(() =>
-  import('./ui/power-distribution').then((module) => ({
-    default: module.PowerDistributionPage,
-  })),
-);
-const CaseConfigPage = lazy(() =>
-  import('./ui/study-cases/CaseConfigPage').then((module) => ({
-    default: module.CaseConfigPage,
-  })),
-);
-const ProtectionSettingsPage = lazy(() =>
-  import('./ui/protection-engine-v1/ProtectionSettingsPage').then((module) => ({
-    default: module.ProtectionSettingsPage,
-  })),
-);
 
 // PROJECT_TREE_PARITY_V1: Get active project name from store
 function useActiveProjectName(): string | null {
@@ -132,17 +78,6 @@ function useAppReady(): boolean {
   }, []);
 
   return ready;
-}
-
-function RouteLoadingState() {
-  return (
-    <div className="flex h-full min-h-[240px] items-center justify-center bg-slate-50 text-sm text-slate-500">
-      <div className="flex items-center gap-3 rounded-full border border-slate-200 bg-white px-4 py-2 shadow-sm">
-        <div className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-slate-300 border-t-slate-700" />
-        Ładowanie modułu inżynierskiego...
-      </div>
-    </div>
-  );
 }
 
 /**
@@ -175,7 +110,7 @@ function isResultsRoute(route: string): boolean {
 
 function App() {
   // NAVIGATION_SELECTOR_UI: Use getCurrentHashRoute to strip query params from hash
-  const [route, setRoute] = useState(() => normalizeHashRoute(getCurrentHashRoute()));
+  const [route, setRoute] = useState(() => getCurrentHashRoute());
   const [hashVersion, setHashVersion] = useState(0);
   const setActiveMode = useAppStateStore((state) => state.setActiveMode);
   const activeCaseId = useAppStateStore((state) => state.activeCaseId);
@@ -195,17 +130,9 @@ function App() {
   useEffect(() => {
     // NAVIGATION_SELECTOR_UI: Strip query params when handling hash changes
     const handler = () => {
-      const rawRoute = getCurrentHashRoute();
-      const normalizedRoute = normalizeHashRoute(rawRoute);
-      setRoute(normalizedRoute);
+      setRoute(getCurrentHashRoute());
       setHashVersion((current) => current + 1);
-
-      if (normalizedRoute !== rawRoute) {
-        const query = window.location.hash.includes('?') ? window.location.hash.slice(window.location.hash.indexOf('?')) : '';
-        window.history.replaceState(null, '', `${window.location.pathname}${normalizedRoute}${query}`);
-      }
     };
-    handler();
     window.addEventListener('hashchange', handler);
     return () => window.removeEventListener('hashchange', handler);
   }, []);
@@ -237,26 +164,24 @@ function App() {
       const analysisType = mapAnalysisTypeToExecutionType(activeAnalysisType);
       const run = await createAndExecuteRun(activeCaseId, { analysis_type: analysisType });
       setActiveRun(run.id);
-      notify('Uruchomiono obliczenia. Otwieram kanoniczna przestrzen wynikow dla biezacego uruchomienia.', 'success');
-      window.location.hash = `${ROUTES.RESULTS.hash}?run=${run.id}&mode=run`;
+      notify('Uruchomiono obliczenia. Przejdź do widoku wyników po zakończeniu.', 'success');
+      window.location.hash = ROUTES.RESULTS.hash;
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'BĹ‚Ä…d uruchomienia obliczeĹ„';
+      const message = error instanceof Error ? error.message : 'Błąd uruchomienia obliczeń';
       notify(message, 'error');
     }
   }, [activeAnalysisType, activeCaseId, createAndExecuteRun, readiness, setActiveRun]);
 
   /**
-   * Navigate to Results (PrzeglÄ…d wynikĂłw).
+   * Navigate to Results (Przegląd wyników).
    * UI_INTEGRATION_E2E: Uses #results route.
    */
   const handleViewResults = useCallback(() => {
-    window.location.hash = activeRunId
-      ? `${ROUTES.RESULTS.hash}?run=${activeRunId}&mode=run`
-      : `${ROUTES.RESULTS.hash}?mode=run`;
-  }, [activeRunId]);
+    window.location.hash = ROUTES.RESULTS.hash;
+  }, []);
 
   // PROJECT_TREE_PARITY_V1: Tree node click handler
-  // Updates selection â†’ syncs URL â†’ triggers Results Table / Inspector update
+  // Updates selection → syncs URL → triggers Results Table / Inspector update
   const handleTreeNodeClick = useCallback((node: TreeNode) => {
     // Only handle element nodes (not categories)
     if (node.nodeType === 'ELEMENT' && node.elementId && node.elementType) {
@@ -281,7 +206,7 @@ function App() {
   // PROJECT_TREE_PARITY_V1: Tree run click handler
   const handleTreeRunClick = useCallback((runId: string) => {
     // Navigate to results with run context
-    window.location.hash = `${ROUTES.RESULTS.hash}?run=${runId}&mode=run`;
+    window.location.hash = `#results?run=${runId}`;
   }, []);
 
   // Network tree elements derived from ENM snapshot (replaces mock data)
@@ -297,10 +222,6 @@ function App() {
     </div>
   );
 
-  const renderRouteModule = (content: ReactNode) => (
-    <Suspense fallback={<RouteLoadingState />}>{content}</Suspense>
-  );
-
   // Derive validation status from readiness
   const validationStatus = useMemo(() => {
     if (!readiness) return undefined;
@@ -314,28 +235,24 @@ function App() {
   const routeSearchParams = useMemo(() => getCurrentSearchParams(), [hashVersion]);
   const effectiveRunId = resolveResultsRunId(routeSearchParams.get('run'), activeRunId) ?? undefined;
 
-  // Menu action handler â€” routes navigation from MainMenuBar
+  // Menu action handler — routes navigation from MainMenuBar
   const handleMenuAction = useCallback((actionId: string) => {
     switch (actionId) {
       case 'sld':
-      case 'editor':
-      case 'network-editor':
+        window.location.hash = '';
+        break;
       case 'network-build':
-        window.location.hash = ROUTES.SLD.hash;
+        window.location.hash = '#network-build';
         break;
       case 'catalog':
         window.location.hash = '#catalog';
         break;
       case 'results':
-        window.location.hash = activeRunId
-          ? `${ROUTES.RESULTS.hash}?run=${activeRunId}&mode=run`
-          : `${ROUTES.RESULTS.hash}?mode=run`;
+        window.location.hash = '#results';
         break;
       case 'proof':
       case 'whitebox':
-        window.location.hash = activeRunId
-          ? `${ROUTES.PROOF.hash}?run=${activeRunId}`
-          : ROUTES.PROOF.hash;
+        window.location.hash = '#proof';
         break;
       case 'protection':
         window.location.hash = '#protection-settings';
@@ -350,14 +267,14 @@ function App() {
         break;
       case 'navigator':
       case 'inspector':
-        // Toggle panels â€” handled by layout
+        // Toggle panels — handled by layout
         break;
       default:
         if (import.meta.env.DEV) {
           console.debug(`[handleMenuAction] Unhandled action: ${actionId}`);
         }
     }
-  }, [activeRunId, handleCalculate]);
+  }, [handleCalculate]);
 
   // Common layout props for PowerFactoryLayout
   const layoutProps = {
@@ -376,24 +293,20 @@ function App() {
     networkStats: networkStats,
   };
 
-<<<<<<< HEAD
   // UI_INTEGRATION_E2E + PROJECT_TREE_PARITY_V1: Przegląd wyników (Results Browser)
-=======
-  // Kanoniczna przestrzen wynikow: run / batch / compare / overlay
->>>>>>> ae0d9db (Domknij osadzony SLD wynikowy end-to-end)
   if (route === '#results') {
     return wrapWithReadyIndicator(
-      <PowerFactoryLayout {...layoutProps} hideInspector={true}>
-        {renderRouteModule(<ResultsWorkspacePage />)}
+      <PowerFactoryLayout {...layoutProps}>
+        <ResultsInspectorPage runId={effectiveRunId} />
       </PowerFactoryLayout>
     );
   }
 
-  // Pomocniczy Ĺ›lad obliczeĹ„ dla diagnostyki inĹĽynierskiej
+  // Ślad obliczeń (pełny widok przebiegu analizy)
   if (route === '#proof') {
     return wrapWithReadyIndicator(
       <PowerFactoryLayout {...layoutProps} hideInspector={true}>
-        {renderRouteModule(<LegacyTraceWorkspacePage runId={effectiveRunId} />)}
+        <ResultsInspectorPage runId={effectiveRunId} forcedTab="TRACE" />
       </PowerFactoryLayout>
     );
   }
@@ -402,7 +315,7 @@ function App() {
   if (route === '#protection-results') {
     return wrapWithReadyIndicator(
       <PowerFactoryLayout {...layoutProps}>
-        {renderRouteModule(<ProtectionResultsInspectorPage />)}
+        <ProtectionResultsInspectorPage />
       </PowerFactoryLayout>
     );
   }
@@ -411,7 +324,7 @@ function App() {
   if (route === '#power-flow-results') {
     return wrapWithReadyIndicator(
       <PowerFactoryLayout {...layoutProps}>
-        {renderRouteModule(<PowerFlowResultsInspectorPage />)}
+        <PowerFlowResultsInspectorPage />
       </PowerFactoryLayout>
     );
   }
@@ -420,25 +333,25 @@ function App() {
   if (route === '#reference-patterns') {
     return wrapWithReadyIndicator(
       <PowerFactoryLayout {...layoutProps} hideInspector={true}>
-        {renderRouteModule(<ReferencePatternsPage />)}
+        <ReferencePatternsPage />
       </PowerFactoryLayout>
     );
   }
 
   // Budowa sieci (ten sam kanoniczny ekran modelowania co #sld)
-  if (route === ROUTES.SLD.hash) {
+  if (route === '#network-build') {
     return wrapWithReadyIndicator(
       <PowerFactoryLayout {...layoutProps}>
-        {renderRouteModule(<NetworkEditorPage />)}
+        <SldEditorPage useDemo={false} />
       </PowerFactoryLayout>
     );
   }
 
-  // Inspektor modelu ENM (v4.2 â€” diagnostyka inĹĽynierska)
+  // Inspektor modelu ENM (v4.2 — diagnostyka inżynierska)
   if (route === '#enm-inspector') {
     return wrapWithReadyIndicator(
       <PowerFactoryLayout {...layoutProps}>
-        {renderRouteModule(<EnmInspectorPage />)}
+        <EnmInspectorPage />
       </PowerFactoryLayout>
     );
   }
@@ -447,7 +360,10 @@ function App() {
   if (route === '#fault-scenarios') {
     return wrapWithReadyIndicator(
       <PowerFactoryLayout {...layoutProps}>
-        {renderRouteModule(<FaultScenariosRoutePage />)}
+        <div className="flex flex-col h-full">
+          <FaultScenariosPanel studyCaseId={null} />
+          <FaultScenarioModal />
+        </div>
       </PowerFactoryLayout>
     );
   }
@@ -456,7 +372,7 @@ function App() {
   if (route === '#catalog') {
     return wrapWithReadyIndicator(
       <PowerFactoryLayout {...layoutProps} hideInspector={true}>
-        {renderRouteModule(<TypeLibraryBrowser />)}
+        <TypeLibraryBrowser />
       </PowerFactoryLayout>
     );
   }
@@ -465,7 +381,7 @@ function App() {
   if (route === '#case-config') {
     return wrapWithReadyIndicator(
       <PowerFactoryLayout {...layoutProps}>
-        {renderRouteModule(<CaseConfigPage />)}
+        <CaseConfigPage />
       </PowerFactoryLayout>
     );
   }
@@ -474,7 +390,7 @@ function App() {
   if (route === '#protection-settings') {
     return wrapWithReadyIndicator(
       <PowerFactoryLayout {...layoutProps}>
-        {renderRouteModule(<ProtectionSettingsPage />)}
+        <ProtectionSettingsPage />
       </PowerFactoryLayout>
     );
   }
@@ -483,7 +399,7 @@ function App() {
   if (route === '#power-distribution') {
     return wrapWithReadyIndicator(
       <PowerFactoryLayout {...layoutProps}>
-        {renderRouteModule(<PowerDistributionPage />)}
+        <PowerDistributionPage />
       </PowerFactoryLayout>
     );
   }
@@ -492,15 +408,15 @@ function App() {
   if (route === '#sld-view') {
     return wrapWithReadyIndicator(
       <PowerFactoryLayout {...layoutProps}>
-        {renderRouteModule(<SLDViewPage useDemo={false} />)}
+        <SLDViewPage useDemo={false} />
       </PowerFactoryLayout>
     );
   }
-  // POWERFACTORY_LAYOUT: Default â€” SLD Editor Page (ALWAYS shows tools)
+  // POWERFACTORY_LAYOUT: Default — SLD Editor Page (ALWAYS shows tools)
   // This replaces the old DesignerPage with proper PowerFactory-style layout
   return wrapWithReadyIndicator(
     <PowerFactoryLayout {...layoutProps}>
-      {renderRouteModule(<NetworkEditorPage />)}
+      <SldEditorPage useDemo={false} />
     </PowerFactoryLayout>
   );
 }
