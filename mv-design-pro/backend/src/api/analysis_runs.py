@@ -26,7 +26,7 @@ from enm.canonical_analysis import (
 )
 
 
-router = APIRouter(prefix="/api", tags=["analysis-runs"])
+router = APIRouter(tags=["analysis-runs"])
 
 
 def _require_canonical_run(run_id: UUID) -> CanonicalRun:
