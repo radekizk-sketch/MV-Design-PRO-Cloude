@@ -13,6 +13,7 @@
  * - Polish labels for UI display
  */
 
+import type { EnergyNetworkModel } from '../../types/enm';
 import type { ResultStatus as _ResultStatus } from '../types';
 
 // =============================================================================
@@ -201,6 +202,10 @@ export interface TraceStep {
   manual_override_count?: number;
   has_manual_overrides?: boolean;
   catalog_context_entry?: CatalogContextEntry | null;
+  primary_element_ref?: string | null;
+  primary_element_type?: string | null;
+  related_elements?: TraceRelatedElement[];
+  selection_refs?: string[];
   /** Legacy fields for backward compatibility */
   step_id?: string;
   phase?: string;
@@ -218,6 +223,12 @@ export interface TraceValue {
   value: number | string | boolean | null;
   unit?: string;
   label?: string;
+}
+
+export interface TraceRelatedElement {
+  element_ref: string;
+  element_type?: string;
+  role: string;
 }
 
 export interface CatalogContextEntry {
@@ -302,6 +313,7 @@ export interface ExtendedTrace {
   snapshot_id: string | null;
   input_hash: string;
   white_box_trace: TraceStep[];
+  selection_index?: Record<string, number>;
   catalog_context: CatalogContextEntry[];
   catalog_context_by_element?: Record<string, CatalogContextEntry>;
   catalog_context_summary?: {
@@ -367,6 +379,12 @@ export interface SldResultOverlay {
   branches: SldOverlayBranch[];
   /** Overall energy validation status: PASS | WARNING | FAIL */
   overall_ev_status?: string;
+}
+
+export interface ResultsRunSnapshot {
+  run_id: string;
+  snapshot_id: string | null;
+  snapshot: EnergyNetworkModel;
 }
 
 // =============================================================================

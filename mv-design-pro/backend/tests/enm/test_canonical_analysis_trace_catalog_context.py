@@ -61,7 +61,15 @@ def test_build_extended_trace_uses_snapshot_catalog_context_without_fabrication(
 
     payload = build_extended_trace(run)
 
-    assert payload["white_box_trace"] == [{"key": "step-001", "title": "Krok 1"}]
+    assert payload["white_box_trace"] == [
+        {
+            "key": "step-001",
+            "title": "Krok 1",
+            "related_elements": [],
+            "selection_refs": [],
+        }
+    ]
+    assert payload["selection_index"] == {}
     assert payload["catalog_context"] == [
         {
             "element_id": "line-002",

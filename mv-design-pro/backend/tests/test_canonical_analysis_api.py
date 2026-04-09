@@ -179,6 +179,10 @@ def test_domain_operation_snapshot_feeds_analysis_result_and_trace(client: TestC
     assert index_payload["run_header"]["snapshot_id"] == snapshot_hash
     assert index_payload["run_header"]["input_hash"] == input_hash
 
+    api_results_index = client.get(f"/api/analysis-runs/{run_id}/results/index")
+    assert api_results_index.status_code == 200
+    assert api_results_index.json() == index_payload
+
     short_circuit = client.get(f"/analysis-runs/{run_id}/results/short-circuit")
     assert short_circuit.status_code == 200
     short_circuit_payload = short_circuit.json()
@@ -193,13 +197,28 @@ def test_domain_operation_snapshot_feeds_analysis_result_and_trace(client: TestC
     assert trace_payload["snapshot_id"] == snapshot_hash
     assert trace_payload["input_hash"] == input_hash
     assert trace_payload["white_box_trace"]
+    assert "selection_index" in trace_payload
+    assert trace_payload["selection_index"]
     assert "catalog_context" in trace_payload
     assert isinstance(trace_payload["catalog_context"], list)
     assert any("element_id" in step for step in trace_payload["white_box_trace"])
+    assert any("primary_element_ref" in step for step in trace_payload["white_box_trace"])
+    assert any("related_elements" in step for step in trace_payload["white_box_trace"])
 
     trace_view = client.get(f"/analysis-runs/{run_id}/trace")
     assert trace_view.status_code == 200
     assert trace_view.json()["trace"] == trace_payload["white_box_trace"]
+
+    snapshot_view = client.get(f"/analysis-runs/{run_id}/snapshot")
+    assert snapshot_view.status_code == 200
+    snapshot_payload = snapshot_view.json()
+    assert snapshot_payload["run_id"] == run_id
+    assert snapshot_payload["snapshot_id"] == snapshot_hash
+    assert snapshot_payload["snapshot"]["header"]["hash_sha256"] == snapshot_hash
+
+    api_snapshot_view = client.get(f"/api/analysis-runs/{run_id}/snapshot")
+    assert api_snapshot_view.status_code == 200
+    assert api_snapshot_view.json() == snapshot_payload
 
 
 def test_analysis_creation_requires_canonical_enm_snapshot(client: TestClient) -> None:

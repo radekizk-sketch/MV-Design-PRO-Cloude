@@ -71,6 +71,18 @@ def get_analysis_run(run_id: str) -> dict[str, Any]:
     return canonicalize_json(build_analysis_run_detail(_require_canonical_run(parsed_run_id)))
 
 
+@router.get("/analysis-runs/{run_id}/snapshot")
+def get_analysis_run_snapshot(run_id: UUID) -> dict[str, Any]:
+    canonical_run = _require_canonical_run(run_id)
+    return canonicalize_json(
+        {
+            "run_id": str(canonical_run.id),
+            "snapshot_id": canonical_run.snapshot_hash,
+            "snapshot": canonical_run.snapshot,
+        }
+    )
+
+
 @router.get("/analysis-runs/{run_id}/results")
 def get_analysis_run_results(run_id: UUID) -> dict[str, Any]:
     canonical_run = _require_canonical_run(run_id)
@@ -78,7 +90,7 @@ def get_analysis_run_results(run_id: UUID) -> dict[str, Any]:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail=f"Wyniki przebiegu {run_id} są niedostępne (status={canonical_run.status})",
-        )
+    )
     return canonicalize_json(build_result_items(canonical_run))
 
 

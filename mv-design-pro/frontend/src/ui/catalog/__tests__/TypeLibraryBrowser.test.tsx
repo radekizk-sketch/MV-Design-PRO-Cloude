@@ -280,7 +280,7 @@ describe('TypeLibraryBrowser', () => {
       expect(catalogApi.fetchTypesByCategory).toHaveBeenCalledWith('LINE');
     });
 
-    expect(screen.getByText('ACSR 240')).toBeInTheDocument();
+    expect(await screen.findByText('ACSR 240')).toBeInTheDocument();
     expect(screen.getAllByText('ABC Cables')).toHaveLength(2);
     expect(screen.getByRole('cell', { name: /R=0\.12 Ohm\/km .* In=645 A/ })).toBeInTheDocument();
   });
@@ -309,10 +309,8 @@ describe('TypeLibraryBrowser', () => {
     const user = userEvent.setup();
     render(<TypeLibraryBrowser />);
 
-    await waitFor(() => {
-      expect(screen.getByText('ACSR 240')).toBeInTheDocument();
-      expect(screen.getByText('ACSR 120')).toBeInTheDocument();
-    });
+    expect(await screen.findByText('ACSR 240')).toBeInTheDocument();
+    expect(await screen.findByText('ACSR 120')).toBeInTheDocument();
 
     await user.type(
       screen.getByPlaceholderText('Szukaj po nazwie, producencie lub ID...'),
@@ -327,9 +325,7 @@ describe('TypeLibraryBrowser', () => {
     const user = userEvent.setup();
     render(<TypeLibraryBrowser />);
 
-    await waitFor(() => {
-      expect(screen.getByText('ACSR 240')).toBeInTheDocument();
-    });
+    expect(await screen.findByText('ACSR 240')).toBeInTheDocument();
 
     await user.type(screen.getByPlaceholderText('Szukaj po nazwie, producencie lub ID...'), '240');
     await user.click(screen.getByText('ACSR 240'));
@@ -348,9 +344,7 @@ describe('TypeLibraryBrowser', () => {
     const onSelectType = vi.fn();
     render(<TypeLibraryBrowser initialTab="PROTECTION_DEVICE" onSelectType={onSelectType} />);
 
-    await waitFor(() => {
-      expect(screen.getByText('Przekaznik pola liniowego')).toBeInTheDocument();
-    });
+    expect(await screen.findByText('Przekaznik pola liniowego')).toBeInTheDocument();
 
     await user.click(screen.getByText('Przekaznik pola liniowego'));
 
