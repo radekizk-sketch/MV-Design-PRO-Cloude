@@ -248,6 +248,7 @@ def _execute_short_circuit(run: CanonicalRun) -> None:
                     "step": len(trace_steps) + 1,
                     "target_id": node_id,
                     "element_id": node_context.get("element_id"),
+                    "element_type": node_context.get("element_type"),
                     "graph_role": node_context.get("graph_role"),
                     "title": step.get("title") or f"Zwarcie 3F: {node_id} / krok {step_index}",
                 }
@@ -838,6 +839,7 @@ def _enrich_trace_steps_with_catalog_context(
         if catalog_entry is not None:
             enriched["catalog_context_entry"] = dict(catalog_entry)
             enriched.setdefault("element_id", catalog_entry.get("element_id"))
+            enriched.setdefault("element_type", catalog_entry.get("element_type"))
             enriched.setdefault("catalog_binding", catalog_entry.get("catalog_binding"))
             enriched.setdefault("source_catalog", catalog_entry.get("source_catalog"))
             enriched.setdefault("source_catalog_label", catalog_entry.get("source_catalog_label"))
@@ -849,18 +851,81 @@ def _enrich_trace_steps_with_catalog_context(
             enriched.setdefault("overrides", catalog_entry.get("overrides"))
             enriched.setdefault("manual_override_count", catalog_entry.get("manual_override_count"))
             enriched.setdefault("has_manual_overrides", catalog_entry.get("has_manual_overrides"))
+
+        primary_element_ref = (
+            enriched.get("element_id")
+            or (catalog_entry.get("element_id") if catalog_entry is not None else None)
+        )
+        primary_element_type = (
+            enriched.get("element_type")
+            or (catalog_entry.get("element_type") if catalog_entry is not None else None)
+        )
+        related_elements: list[dict[str, Any]] = []
+        seen_related: set[tuple[str, str]] = set()
+
+        def register_related(
+            element_ref: object | None,
+            element_type: object | None,
+            role: str,
+        ) -> None:
+            if element_ref is None:
+                return
+            ref_value = str(element_ref)
+            key = (ref_value, role)
+            if key in seen_related:
+                return
+            seen_related.add(key)
+            payload = {
+                "element_ref": ref_value,
+                "role": role,
+            }
+            if element_type is not None:
+                payload["element_type"] = str(element_type)
+            related_elements.append(payload)
+
+        register_related(primary_element_ref, primary_element_type, "PRIMARY_MODEL")
+        register_related(enriched.get("target_id"), primary_element_type, "SOLVER_TARGET")
+        register_related(enriched.get("solver_ref"), None, "SOLVER_REF")
+
+        selection_refs: list[str] = []
+        for candidate in [primary_element_ref]:
+            if candidate is None:
+                continue
+            candidate_ref = str(candidate)
+            if candidate_ref not in selection_refs:
+                selection_refs.append(candidate_ref)
+
+        if primary_element_ref is not None:
+            enriched["primary_element_ref"] = str(primary_element_ref)
+        if primary_element_type is not None:
+            enriched["primary_element_type"] = str(primary_element_type)
+        enriched["related_elements"] = related_elements
+        enriched["selection_refs"] = selection_refs
         enriched_steps.append(enriched)
 
     return enriched_steps
 
 
+def _build_trace_selection_index(steps: list[dict[str, Any]]) -> dict[str, int]:
+    selection_index: dict[str, int] = {}
+    for index, step in enumerate(steps):
+        for selection_ref in step.get("selection_refs") or []:
+            if selection_ref is None:
+                continue
+            selection_key = str(selection_ref)
+            selection_index.setdefault(selection_key, index)
+    return selection_index
+
+
 def build_extended_trace(run: CanonicalRun) -> dict[str, Any]:
     catalog_context = _build_snapshot_catalog_context(run.snapshot or {})
+    enriched_steps = _enrich_trace_steps_with_catalog_context(list(run.white_box_trace), catalog_context)
     return {
         "run_id": str(run.id),
         "snapshot_id": run.snapshot_hash,
         "input_hash": run.input_hash,
-        "white_box_trace": _enrich_trace_steps_with_catalog_context(list(run.white_box_trace), catalog_context),
+        "white_box_trace": enriched_steps,
+        "selection_index": _build_trace_selection_index(enriched_steps),
         "catalog_context": catalog_context,
         "catalog_context_by_element": _build_catalog_context_index(catalog_context),
         "catalog_context_summary": _build_catalog_context_summary(catalog_context),
