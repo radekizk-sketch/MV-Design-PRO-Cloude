@@ -181,7 +181,15 @@ export function updateUrlWithSelection(selection: SelectedElement | null): void 
   }
 
   const currentHash = getCurrentHashRoute();
-  const params = encodeSelectionToParams(selection);
+  const params = getCurrentSearchParams();
+  params.delete(URL_PARAMS.SELECTION_ID);
+  params.delete(URL_PARAMS.SELECTION_TYPE);
+  params.delete(URL_PARAMS.SELECTION_NAME);
+
+  const selectionParams = encodeSelectionToParams(selection);
+  for (const [key, value] of selectionParams.entries()) {
+    params.set(key, value);
+  }
   const queryString = params.toString();
 
   // Build new URL: hash + optional query string

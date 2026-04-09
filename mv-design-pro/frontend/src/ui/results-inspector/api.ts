@@ -12,17 +12,19 @@
  * - GET /analysis-runs/{run_id}/results/branches
  * - GET /analysis-runs/{run_id}/results/short-circuit
  * - GET /analysis-runs/{run_id}/results/trace
- * - GET /projects/{project_id}/sld/{diagram_id}/overlay?run_id={run_id}
+ * - GET /analysis-runs/{run_id}/overlay?diagram_id={diagram_id}
  */
 
 import type {
   BranchResults,
   BusResults,
   ExtendedTrace,
+  ResultsRunSnapshot,
   ResultsIndex,
   ShortCircuitResults,
   SldResultOverlay,
 } from './types';
+import type { EnergyNetworkModel } from '../../types/enm';
 
 const API_BASE = '/api';
 
@@ -93,21 +95,58 @@ export async function fetchExtendedTrace(runId: string): Promise<ExtendedTrace> 
 }
 
 /**
+ * Fetch canonical snapshot used for the run.
+ */
+export async function fetchRunSnapshot(runId: string): Promise<ResultsRunSnapshot> {
+  const response = await fetch(`${API_BASE}/analysis-runs/${runId}/snapshot`);
+  if (!response.ok) {
+    throw new Error(`Błąd pobierania migawki uruchomienia: ${response.statusText}`);
+  }
+  return response.json();
+}
+
+/**
+ * Fetch current ENM snapshot for the active case.
+ */
+export async function fetchCurrentCaseSnapshot(caseId: string): Promise<EnergyNetworkModel> {
+  const response = await fetch(`${API_BASE}/cases/${caseId}/enm`);
+  if (!response.ok) {
+    throw new Error(`Błąd pobierania bieżącego modelu: ${response.statusText}`);
+  }
+  return response.json();
+}
+
+/**
  * Fetch SLD result overlay for a diagram.
  *
  * Maps analysis results to SLD symbols for visualization.
  * READ-ONLY: Does not mutate model or diagram.
  */
 export async function fetchSldOverlay(
-  projectId: string,
+  _projectId: string,
   diagramId: string,
   runId: string
 ): Promise<SldResultOverlay> {
   const response = await fetch(
-    `${API_BASE}/projects/${projectId}/sld/${diagramId}/overlay?run_id=${runId}`
+    `${API_BASE}/analysis-runs/${runId}/overlay?diagram_id=${diagramId}`
   );
   if (!response.ok) {
     throw new Error(`Błąd pobierania nakładki SLD: ${response.statusText}`);
   }
-  return response.json();
+  const payload = await response.json();
+
+  if ('nodes' in payload && 'branches' in payload) {
+    return payload as SldResultOverlay;
+  }
+
+  const nodes = Array.isArray(payload.bus_overlays) ? payload.bus_overlays : [];
+  const branches = Array.isArray(payload.branch_overlays) ? payload.branch_overlays : [];
+  return {
+    diagram_id: diagramId,
+    run_id: runId,
+    result_status: 'VALID',
+    nodes,
+    buses: nodes,
+    branches,
+  };
 }

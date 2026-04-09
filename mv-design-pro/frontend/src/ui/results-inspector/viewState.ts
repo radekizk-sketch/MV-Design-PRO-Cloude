@@ -1,10 +1,57 @@
 import type { ResultsInspectorTab } from './types';
+import { getCurrentHashRoute, getCurrentSearchParams } from '../navigation/urlState';
+
+export type ResultsSnapshotMode = 'RUN_SNAPSHOT' | 'CURRENT_MODEL';
+
+const RESULTS_SNAPSHOT_PARAM = 'snapshot';
+
+export function encodeResultsSnapshotMode(mode: ResultsSnapshotMode): string {
+  return mode === 'CURRENT_MODEL' ? 'current' : 'run';
+}
 
 export function resolveResultsRunId(
   routeRunId: string | null | undefined,
   activeRunId: string | null | undefined,
 ): string | null {
   return routeRunId ?? activeRunId ?? null;
+}
+
+export function resolveResultsSnapshotMode(
+  routeValue: string | null | undefined,
+  hasCurrentModelSnapshot: boolean,
+): ResultsSnapshotMode {
+  if (routeValue === 'current' && hasCurrentModelSnapshot) {
+    return 'CURRENT_MODEL';
+  }
+  return 'RUN_SNAPSHOT';
+}
+
+export function hasSnapshotDrift(
+  runSnapshotId: string | null | undefined,
+  currentSnapshotId: string | null | undefined,
+): boolean {
+  return Boolean(
+    runSnapshotId &&
+      currentSnapshotId &&
+      runSnapshotId.trim() !== '' &&
+      currentSnapshotId.trim() !== '' &&
+      runSnapshotId !== currentSnapshotId,
+  );
+}
+
+export function updateResultsSnapshotMode(mode: ResultsSnapshotMode): void {
+  if (typeof window === 'undefined') {
+    return;
+  }
+
+  const currentHash = getCurrentHashRoute();
+  const params = getCurrentSearchParams();
+  params.set(RESULTS_SNAPSHOT_PARAM, encodeResultsSnapshotMode(mode));
+
+  const queryString = params.toString();
+  const nextHash = queryString ? `${currentHash}?${queryString}` : currentHash;
+  const nextUrl = `${window.location.pathname}${nextHash}`;
+  window.history.replaceState(null, '', nextUrl);
 }
 
 export function resolveAvailableResultsTabs(

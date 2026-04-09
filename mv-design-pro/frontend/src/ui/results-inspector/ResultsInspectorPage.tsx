@@ -39,6 +39,7 @@ import { useSelectionStore } from '../selection';
 import type { ElementType } from '../types';
 import { InspectorPanel } from '../inspector';
 import { ResultsExport } from './ResultsExport';
+import { EmbeddedSldWorkspace } from './EmbeddedSldWorkspace';
 import { resolveAvailableResultsTabs } from './viewState';
 import { TraceViewerContainer } from '../proof';
 
@@ -515,6 +516,7 @@ export function ResultsInspectorPage({ runId, forcedTab, onClose }: ResultsInspe
   } = useResultsInspectorStore();
 
   const selectElement = useSelectionStore((state) => state.selectElement);
+  const centerSldOnElement = useSelectionStore((state) => state.centerSldOnElement);
   const globalSelectedElement = useSelectionStore((state) => state.selectedElement);
   const hasShortCircuit = useHasShortCircuitResults();
 
@@ -545,7 +547,49 @@ export function ResultsInspectorPage({ runId, forcedTab, onClose }: ResultsInspe
 
   // PROJECT_TREE_PARITY_V1: Sync selection from Tree/URL to Results Table
   // When globalSelectedElement changes (e.g., from Tree click), find matching row
-  const { busResults, branchResults, shortCircuitResults, extendedTrace, isLoadingTrace, loadExtendedTrace } = useResultsInspectorStore();
+  const {
+    busResults,
+    branchResults,
+    shortCircuitResults,
+    extendedTrace,
+    runSnapshot,
+    isLoadingTrace,
+    loadBusResults,
+    loadBranchResults,
+    loadShortCircuitResults,
+    loadExtendedTrace,
+    loadRunSnapshot,
+  } = useResultsInspectorStore();
+
+  useEffect(() => {
+    if (!resultsIndex) {
+      return;
+    }
+
+    if (!busResults) {
+      void loadBusResults();
+    }
+    if (!branchResults) {
+      void loadBranchResults();
+    }
+    if (hasShortCircuit && !shortCircuitResults) {
+      void loadShortCircuitResults();
+    }
+    if (!runSnapshot) {
+      void loadRunSnapshot();
+    }
+  }, [
+    resultsIndex,
+    busResults,
+    branchResults,
+    shortCircuitResults,
+    runSnapshot,
+    hasShortCircuit,
+    loadBranchResults,
+    loadBusResults,
+    loadRunSnapshot,
+    loadShortCircuitResults,
+  ]);
 
   // Load trace when TRACE tab is active
   useEffect(() => {
@@ -599,7 +643,8 @@ export function ResultsInspectorPage({ runId, forcedTab, onClose }: ResultsInspe
       type: 'Bus' as ElementType,
       name: row.name,
     });
-  }, [selectElement]);
+    centerSldOnElement(row.bus_id);
+  }, [centerSldOnElement, selectElement]);
 
   // Handle branch row selection
   const handleBranchRowSelect = useCallback((row: BranchResultRow) => {
@@ -610,7 +655,8 @@ export function ResultsInspectorPage({ runId, forcedTab, onClose }: ResultsInspe
       type: 'LineBranch' as ElementType,
       name: row.name,
     });
-  }, [selectElement]);
+    centerSldOnElement(row.branch_id);
+  }, [centerSldOnElement, selectElement]);
 
   // Handle short-circuit row selection
   const handleShortCircuitRowSelect = useCallback((row: ShortCircuitRow) => {
@@ -621,13 +667,15 @@ export function ResultsInspectorPage({ runId, forcedTab, onClose }: ResultsInspe
       type: 'Bus' as ElementType,
       name: row.target_name ?? row.target_id,
     });
-  }, [selectElement]);
+    centerSldOnElement(row.target_id);
+  }, [centerSldOnElement, selectElement]);
 
   // Close inspector panel
   const handleCloseInspector = useCallback(() => {
     setSelectedResultRow(null);
     selectElement(null);
-  }, [selectElement]);
+    centerSldOnElement(null);
+  }, [centerSldOnElement, selectElement]);
 
   // Get selected row ID for highlighting
   const getSelectedRowId = (): string | null => {
@@ -656,23 +704,13 @@ export function ResultsInspectorPage({ runId, forcedTab, onClose }: ResultsInspe
 
   const traceSelectionToStepMap = useMemo(() => {
     const mapping = new Map<string, number>();
-    if (!extendedTrace) {
+    if (!extendedTrace?.selection_index) {
       return mapping;
     }
-    extendedTrace.white_box_trace.forEach((step, index) => {
-      const candidateIds = [
-        typeof step.element_id === 'string' ? step.element_id : null,
-        typeof step.target_id === 'string' ? step.target_id : null,
-        typeof step.solver_ref === 'string' ? step.solver_ref : null,
-        typeof step.catalog_context_entry?.element_id === 'string'
-          ? step.catalog_context_entry.element_id
-          : null,
-      ].filter((value): value is string => Boolean(value));
-      candidateIds.forEach((candidateId) => {
-        if (!mapping.has(candidateId)) {
-          mapping.set(candidateId, index);
-        }
-      });
+    Object.entries(extendedTrace.selection_index).forEach(([selectionId, stepIndex]) => {
+      if (typeof stepIndex === 'number' && stepIndex >= 0) {
+        mapping.set(selectionId, stepIndex);
+      }
     });
     return mapping;
   }, [extendedTrace]);
@@ -812,7 +850,11 @@ export function ResultsInspectorPage({ runId, forcedTab, onClose }: ResultsInspe
           ))}
         </div>
 
-        {/* Content grid with table and inspector */}
+        <div className="mt-6">
+          <EmbeddedSldWorkspace runHeader={run_header} />
+        </div>
+
+        {/* Content grid with table/proof and inspector */}
         <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-3">
           {/* Tab content */}
           <div className="lg:col-span-2 rounded border border-slate-200 bg-white p-4" data-testid="results-table-container">

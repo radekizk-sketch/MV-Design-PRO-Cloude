@@ -64,6 +64,7 @@ export {
   fitToContent,
   calculateSymbolsBounds,
 } from './types';
+export { enmSnapshotToSldSymbols } from './enmSnapshotToSldSymbols';
 
 // Overlay utilities
 export {

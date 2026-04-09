@@ -50,6 +50,30 @@ async function executeDomainOp(
   return body;
 }
 
+async function waitForAnalysisRunIndex(
+  request: APIRequestContext,
+  runId: string,
+  timeoutMs = 15000,
+): Promise<void> {
+  const deadline = Date.now() + timeoutMs;
+  let lastStatus = 0;
+  let lastBody = '';
+
+  while (Date.now() < deadline) {
+    const response = await request.get(`${BACKEND_BASE}/api/analysis-runs/${runId}/results/index`);
+    lastStatus = response.status();
+    if (response.ok()) {
+      return;
+    }
+    lastBody = await response.text();
+    await new Promise((resolve) => setTimeout(resolve, 500));
+  }
+
+  throw new Error(
+    `Publiczny results/index nie jest gotowy dla runu ${runId}. status=${lastStatus} body=${lastBody}`,
+  );
+}
+
 async function createCaseFromUi(page: Page): Promise<string> {
   await page.goto('/', { waitUntil: 'commit' });
   await page.evaluate(() => {
@@ -76,7 +100,7 @@ async function createCaseFromUi(page: Page): Promise<string> {
   return casePayload.id;
 }
 
-test('krytyczny flow V1 na realnym backendzie: case -> GPZ -> trunk -> station -> branch -> katalogi -> readiness -> run -> wyniki -> geometria bez zmian', async ({ page, request }) => {
+test('krytyczny flow V1 na realnym backendzie: case -> GPZ -> trunk -> station -> branch -> katalogi -> readiness -> run -> wyniki -> SLD -> White Box -> geometria bez zmian', async ({ page, request }) => {
   const caseId = await createCaseFromUi(page);
 
   // Krok 1: GPZ
@@ -217,6 +241,7 @@ test('krytyczny flow V1 na realnym backendzie: case -> GPZ -> trunk -> station -
       `${BACKEND_BASE}/api/execution/runs/${createRunPayload.id}/execute`,
     );
     expect(executeRunResponse.ok()).toBeTruthy();
+    await waitForAnalysisRunIndex(request, runId);
   } else {
     const legacyRunResponse = await request.post(`${BACKEND_BASE}/api/cases/${caseId}/runs/short-circuit`);
     if (legacyRunResponse.ok()) {
@@ -226,8 +251,15 @@ test('krytyczny flow V1 na realnym backendzie: case -> GPZ -> trunk -> station -
     runId = `legacy-sc-${caseId}`;
   }
 
-  await page.goto('/#results', { waitUntil: 'commit' });
-  await expect(page).toHaveURL(/#results/);
+  await page.goto(`/#results?run=${runId}`, { waitUntil: 'commit' });
+  await expect(page).toHaveURL(new RegExp(`#results\\?run=${runId}`));
+  await expect(page.getByTestId('embedded-sld-workspace')).toBeVisible();
+  await expect(page.getByTestId('embedded-sld-mode-run')).toBeVisible();
+  await expect(page.getByText('Osadzony widok techniczny')).toBeVisible();
+
+  await page.getByRole('button', { name: 'White Box' }).click();
+  await expect(page).toHaveURL(new RegExp(`#proof\\?run=${runId}`));
+  await expect(page.getByRole('heading', { name: 'Przebieg obliczeń analizy' })).toBeVisible();
 
   // Krok 8: Realne wyniki backend
   if (!runId.startsWith('legacy-sc-')) {
